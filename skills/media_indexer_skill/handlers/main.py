@@ -53,6 +53,7 @@ _state: Dict[str, Any] = {
     "selected_query": DEFAULT_QUERY,
     "index_loaded": False,
     "last_operation": None,
+    "last_diagnostics": None,
     "scan_in_progress": False,
 }
 
@@ -274,8 +275,14 @@ def _snapshot_payload(
     status: Dict[str, Any],
     form: Dict[str, Any] | None = None,
     results: List[Dict[str, Any]] | None = None,
+    diagnostics: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    return {"status": status, "form": form or _current_form(), "results": list(results or [])[:MAX_RESULTS]}
+    return {
+        "status": status,
+        "form": form or _current_form(),
+        "results": list(results or [])[:MAX_RESULTS],
+        "diagnostics": diagnostics or _state.get("last_diagnostics") or _empty_diagnostics(),
+    }
 
 
 def _project_snapshot(snapshot: Dict[str, Any], *, webspace_id: str | None = None) -> None:
@@ -378,6 +385,135 @@ def _build_display_title(stem: str, title: str, artist: str) -> str:
     return stem
 
 
+def _empty_diagnostics() -> Dict[str, Any]:
+    return {
+        "value": "ready",
+        "label": "Model diagnostics",
+        "subtitle": "waiting for scan",
+        "description": "Scan a media directory to show NER, metadata and enrichment coverage.",
+        "files_found": 0,
+        "indexed_count": 0,
+        "by_type": {},
+        "ner_parsed": 0,
+        "shazam_matched": 0,
+        "ocr_checked": 0,
+        "ocr_text_found": 0,
+        "technical_errors": 0,
+    }
+
+
+def _type_counts(inventory: Dict[str, List[Any]]) -> Dict[str, int]:
+    return {str(m_type): len(m_list or []) for m_type, m_list in inventory.items()}
+
+
+def _has_ner_entities(ner_result: Dict[str, Any]) -> bool:
+    return any(str(ner_result.get(key) or "").strip() for key in ("title", "year", "quality", "artist"))
+
+
+def _scan_diagnostics(
+    *,
+    type_counts: Dict[str, int],
+    files_found: int,
+    indexed_count: int,
+    ner_parsed: int,
+    shazam_matched: int,
+    ocr_checked: int,
+    ocr_text_found: int,
+    technical_errors: int,
+    error_count: int,
+) -> Dict[str, Any]:
+    type_text = ", ".join(f"{name}: {count}" for name, count in sorted(type_counts.items())) or "no media"
+    audio_count = int(type_counts.get("audio") or 0)
+    description_parts = [
+        f"{type_text}",
+        f"NER parsed {ner_parsed}/{files_found}",
+    ]
+    if audio_count:
+        description_parts.append(f"Shazam matched {shazam_matched}/{audio_count}")
+    if ocr_checked:
+        description_parts.append(f"OCR checked {ocr_checked}, text found {ocr_text_found}")
+    if technical_errors:
+        description_parts.append(f"metadata errors {technical_errors}")
+    if error_count:
+        description_parts.append(f"indexing errors {error_count}")
+    return {
+        "value": str(indexed_count),
+        "label": "Model diagnostics",
+        "subtitle": f"{indexed_count}/{files_found} files indexed",
+        "description": "; ".join(description_parts),
+        "files_found": files_found,
+        "indexed_count": indexed_count,
+        "by_type": type_counts,
+        "ner_parsed": ner_parsed,
+        "shazam_matched": shazam_matched,
+        "ocr_checked": ocr_checked,
+        "ocr_text_found": ocr_text_found,
+        "technical_errors": technical_errors,
+        "error_count": error_count,
+    }
+
+
+def _best_results_by_path(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    best: Dict[str, Dict[str, Any]] = {}
+    for result in results:
+        payload = result.get("payload") if isinstance(result.get("payload"), dict) else {}
+        key = str(payload.get("full_path") or payload.get("real_file_name") or result.get("text") or id(result))
+        current = best.get(key)
+        if current is None or float(result.get("score") or 0.0) > float(current.get("score") or 0.0):
+            best[key] = result
+    deduped = list(best.values())
+    deduped.sort(key=lambda item: float(item.get("score") or 0.0), reverse=True)
+    return deduped
+
+
+def _result_payload(result: Dict[str, Any]) -> Dict[str, Any]:
+    payload = result.get("payload")
+    return payload if isinstance(payload, dict) else {}
+
+
+def _result_title(payload: Dict[str, Any]) -> str:
+    return str(
+        payload.get("display_title")
+        or payload.get("title")
+        or payload.get("real_file_name")
+        or pathlib.Path(str(payload.get("full_path") or "")).name
+        or "Untitled media"
+    )
+
+
+def _result_subtitle(result: Dict[str, Any], payload: Dict[str, Any]) -> str:
+    parts = [
+        str(payload.get("ftype") or payload.get("type") or result.get("type") or "media"),
+        f"score {float(result.get('score') or 0.0):.1f}",
+    ]
+    for key in ("year", "quality", "artist"):
+        value = str(payload.get(key) or "").strip()
+        if value and value != "---":
+            parts.append(value)
+    match_type = str(result.get("type") or "").strip()
+    if match_type:
+        parts.append(f"match {match_type}")
+    return " | ".join(parts)
+
+
+def _result_details(result: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "file": payload.get("real_file_name") or pathlib.Path(str(payload.get("full_path") or "")).name,
+        "path": payload.get("full_path") or "",
+        "type": payload.get("ftype") or payload.get("type") or "",
+        "score": float(result.get("score") or 0.0),
+        "match_type": result.get("type") or "",
+        "ner": {
+            "title": payload.get("ner_title") or payload.get("display_title") or "",
+            "year": payload.get("year") or "",
+            "quality": payload.get("quality") or "",
+            "artist": payload.get("artist") or "",
+        },
+        "technical_metadata": payload.get("technical_metadata") or {},
+        "enriched": payload.get("enriched") or {},
+    }
+
+
 def _trim_for_log(value: Any, *, limit: int = 1000) -> Any:
     if isinstance(value, dict):
         return {str(k): _trim_for_log(v, limit=limit) for k, v in value.items()}
@@ -436,11 +572,24 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
         return {"status": "error", "indexed_count": 0, "errors": [str(exc)]}
 
     all_files = _flatten_inventory(inventory)
+    type_counts = _type_counts(inventory)
     if not all_files:
         _state["indexed_directory"] = str(path)
         _save_settings(selected_directory=str(path), default_directory=str(path))
         index_meta = _clear_persisted_index(str(path))
-        return {"status": "ok", "indexed_count": 0, "errors": [], "index": index_meta}
+        diagnostics = _scan_diagnostics(
+            type_counts=type_counts,
+            files_found=0,
+            indexed_count=0,
+            ner_parsed=0,
+            shazam_matched=0,
+            ocr_checked=0,
+            ocr_text_found=0,
+            technical_errors=0,
+            error_count=0,
+        )
+        _state["last_diagnostics"] = diagnostics
+        return {"status": "ok", "indexed_count": 0, "errors": [], "index": index_meta, "diagnostics": diagnostics}
 
     logger.info("Preparing media index ML initialization for %s files", len(all_files))
     if progress:
@@ -464,6 +613,11 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
 
     errors: List[str] = []
     indexed = 0
+    ner_parsed = 0
+    shazam_matched = 0
+    ocr_checked = 0
+    ocr_text_found = 0
+    technical_errors = 0
 
     total = len(all_files)
     for ordinal, (media, ftype) in enumerate(all_files, start=1):
@@ -488,6 +642,8 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
             started = time.perf_counter()
             ner_result = ner.extract_entities(media.name)
             timings["ner"] = time.perf_counter() - started
+            if _has_ner_entities(ner_result):
+                ner_parsed += 1
             title = ner_result.get("title") or ""
             year = ner_result.get("year") or "---"
             quality = ner_result.get("quality") or "---"
@@ -498,6 +654,14 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
             if ftype == "video" and title:
                 enriched.update(enricher.enrich_video(title))
             timings["enrichment"] = time.perf_counter() - started
+            if technical_metadata.get("status") == "error":
+                technical_errors += 1
+            if ftype == "audio" and (enriched.get("shazam_title") or enriched.get("shazam_subtitle")):
+                shazam_matched += 1
+            if ftype == "image":
+                ocr_checked += 1
+                if enriched.get("ocr_text"):
+                    ocr_text_found += 1
 
             stem = pathlib.Path(media.name).stem
             display_title = _build_display_title(stem, title, artist)
@@ -596,7 +760,19 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
     _state["indexed_directory"] = str(path)
     _save_settings(selected_directory=str(path), default_directory=str(path))
     index_meta = _persist_index(str(path), indexed)
-    return {"status": "ok", "indexed_count": indexed, "errors": errors, "index": index_meta}
+    diagnostics = _scan_diagnostics(
+        type_counts=type_counts,
+        files_found=total,
+        indexed_count=indexed,
+        ner_parsed=ner_parsed,
+        shazam_matched=shazam_matched,
+        ocr_checked=ocr_checked,
+        ocr_text_found=ocr_text_found,
+        technical_errors=technical_errors,
+        error_count=len(errors),
+    )
+    _state["last_diagnostics"] = diagnostics
+    return {"status": "ok", "indexed_count": indexed, "errors": errors, "index": index_meta, "diagnostics": diagnostics}
 
 
 @tool("search_media")
@@ -623,15 +799,22 @@ def search_media(query: str, k: int = 5) -> Dict[str, Any]:
 
     _save_settings(selected_query=query.strip(), k=limit)
     raw_results = _state["vector_db"].search(query.strip(), k=limit)
-    valid_results = [result for result in raw_results if result.get("score", 0) >= SCORE_THRESHOLD]
-    formatted = [
-        {
-            "score": float(result.get("score", 0.0)),
-            "path": result.get("payload", {}).get("full_path", ""),
-            "payload": result.get("payload", {}),
-        }
-        for result in valid_results[:MAX_RESULTS]
-    ]
+    valid_results = _best_results_by_path([result for result in raw_results if result.get("score", 0) >= SCORE_THRESHOLD])
+    formatted = []
+    for result in valid_results[:MAX_RESULTS]:
+        payload = _result_payload(result)
+        formatted.append(
+            {
+                "score": float(result.get("score", 0.0)),
+                "path": payload.get("full_path", ""),
+                "payload": payload,
+                "title": _result_title(payload),
+                "subtitle": _result_subtitle(result, payload),
+                "description": str(payload.get("real_file_name") or ""),
+                "details": _result_details(result, payload),
+                "match_type": result.get("type") or "",
+            }
+        )
     return {"status": "ok", "results": formatted}
 
 
@@ -663,6 +846,8 @@ def dispose() -> Dict[str, Any]:
             "enricher": None,
             "vector_db": None,
             "index_loaded": False,
+            "last_diagnostics": None,
+            "scan_in_progress": False,
         }
     )
     return {"status": "ok"}
@@ -709,6 +894,16 @@ async def on_media_indexer_action(evt: Any) -> None:
         return
 
     if action_id == "scan":
+        if _state.get("scan_in_progress"):
+            status = _status_payload(
+                value="scanning",
+                subtitle="indexing already running",
+                description="A scan is already in progress. Wait for the final indexed status.",
+            )
+            _project_snapshot(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
+            _publish_operation({"value": status["value"], "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
+            return
+
         status = _status_payload(value="scanning", subtitle="indexing media files", description=f"Scanning {directory or '(empty)'}")
         _project_snapshot(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
         _publish_operation({"value": "scanning", "subtitle": "indexing media files", "description": status["description"]}, webspace_id=webspace_id)
@@ -746,20 +941,23 @@ async def on_media_indexer_action(evt: Any) -> None:
         errors = list(result.get("errors") or [])
         ok = str(result.get("status") or "").lower() == "ok"
         indexed_count = int(result.get("indexed_count") or 0)
+        diagnostics = result.get("diagnostics") if isinstance(result.get("diagnostics"), dict) else _empty_diagnostics()
+        _state["last_diagnostics"] = diagnostics
         final_status = _status_payload(
             value="indexed" if ok else "error",
             subtitle=f"{indexed_count} files indexed" if ok else "scan failed",
-            description="Index is ready for semantic search." if ok else "; ".join(errors[:3]),
+            description=str(diagnostics.get("description") or "Index is ready for semantic search.") if ok else "; ".join(errors[:3]),
             error="" if ok else "; ".join(errors[:3]),
             indexed_count=indexed_count,
         )
-        _project_snapshot(_snapshot_payload(status=final_status, form=_current_form(k=k)), webspace_id=webspace_id)
+        _project_snapshot(_snapshot_payload(status=final_status, form=_current_form(k=k), diagnostics=diagnostics), webspace_id=webspace_id)
         _publish_operation(
             {
                 "value": final_status["value"],
                 "subtitle": final_status["subtitle"],
                 "description": final_status["description"],
                 "indexed_count": indexed_count,
+                "diagnostics": diagnostics,
             },
             webspace_id=webspace_id,
         )
