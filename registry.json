@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-31T21:08:36+00:00",
+  "updated_at": "2026-05-31T21:09:02+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -374,6 +374,28 @@
         "id": "rasa_nlu_service_skill"
       },
       "description": "Local Rasa NLU-only service for AdaOS intent detection"
+    },
+    {
+      "kind": "skill",
+      "id": "redevice_list",
+      "name": "redevice_list",
+      "version": "0.1.1",
+      "updated_at": "2026-05-31T21:09:02+00:00",
+      "path": "skills/redevice_list",
+      "manifest": "skills/redevice_list/skill.yaml",
+      "source": {
+        "path": "skills/redevice_list",
+        "manifest": "skills/redevice_list/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "redevice_list",
+        "id": "redevice_list"
+      },
+      "description": "Workspace dashboard for ReDevice endpoint inventory, diagnostics, manifest, policy, revoke, and retire operations.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 3
     },
     {
       "kind": "skill",
