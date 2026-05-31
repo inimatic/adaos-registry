@@ -1,5 +1,5 @@
 name: ai_event_analysis_skill
-version: 0.2.18
+version: 0.2.19
 description: Research skill for measurable AI/ML analysis of AdaOS operational event
   windows.
 runtime:
@@ -248,6 +248,8 @@ tools:
         type: integer
       include_windows:
         type: boolean
+      cross_skill:
+        type: boolean
   output_schema:
     type: object
     required:
@@ -408,5 +410,5 @@ tools:
         type: boolean
       export:
         type: object
-updated_at: '2026-05-31T07:17:42+00:00'
+updated_at: '2026-05-31T08:55:24+00:00'
 

@@ -189,12 +189,19 @@ def test_real_trial_emits_events_and_analyzes_read_back_logs(monkeypatch) -> Non
     monkeypatch.setattr(mod, "publish_event", fake_publish)
     monkeypatch.setattr(mod, "stream_publish", lambda _receiver, payload, _meta=None: published.append(payload))
     monkeypatch.setattr(mod, "import_local_logs", fake_import)
+    monkeypatch.setattr(
+        mod,
+        "_run_cross_skill_probes",
+        lambda webspace_id, trial_id: [{"skill": "demo_metrics_skill", "tool": "emit_demo_event", "ok": True, "duration_ms": 1.0}],
+    )
 
     result = mod.run_real_trial({"webspace_id": "test", "trial_id": "real-test", "event_count": 12})["result"]
 
     assert result["mode"] == "real_trial"
     assert result["emitted_event_count"] >= 12
     assert result["trial_record_count"] == result["record_count"]
+    assert result["cross_skill_probe_count"] == 1
+    assert result["cross_skill_ok_count"] == 1
     assert result["window_count"] >= 1
     assert result["baseline_result"]["window_count"] == result["window_count"]
     assert result["rows"]

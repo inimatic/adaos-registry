@@ -146,8 +146,9 @@ See [Dataset Schema](docs/dataset-schema.md).
 - [x] Add a deterministic synthetic dataset for the first iteration.
 - [x] Add a deterministic synthetic trial suite that exercises normal, incident, and
   subscription-routing cases.
-- [x] Add a real trial that emits AdaOS SDK events, reads local node logs back,
-  and builds event windows from the resulting log records.
+- [x] Add a real trial that emits AdaOS SDK events, calls lightweight tools from
+  existing skills, reads local node logs back, and builds event windows from the
+  resulting log records.
 - [x] Implement a rule-based baseline classifier.
 - [x] Compute accuracy, macro-F1, per-class precision/recall/F1, false positive
   rate, critical recall, detection delay, and top-reason hit rate.
@@ -208,8 +209,8 @@ See [Dataset Schema](docs/dataset-schema.md).
   consumer cases.
 - [x] Project the trial result into the same dataset, window, metric,
   subscription, and chart surfaces as real logs.
-- [x] Add `run_real_trial` to publish real AdaOS events and analyze the log
-  records written by the local node.
+- [x] Add `run_real_trial` to publish real AdaOS events, call cross-skill
+  probes, and analyze the log records written by the local node.
 - [ ] Add scenario runners that execute real AdaOS UI/API workflows and collect
   resulting logs.
 - [ ] Persist scenario run metadata so trial datasets can be compared across
@@ -285,7 +286,7 @@ flowchart LR
 ```mermaid
 flowchart LR
   A[Run real trial] --> B[AdaOS SDK publish_event]
-  A --> C[WebIO stream publish]
+  A --> C[Cross-skill tool probes]
   B --> D[Local node logs]
   C --> D
   D --> E[Log importer]
@@ -329,7 +330,8 @@ The skill currently ships:
 
 - a synthetic benchmark dataset generator;
 - a deterministic synthetic trial suite for useful first-run data;
-- a real-trial runner that emits AdaOS events and analyzes local node logs;
+- a real-trial runner that emits AdaOS events, calls selected tools from other
+  installed skills, and analyzes local node logs;
 - local log import into redacted evidence records;
 - fixed-window feature extraction;
 - JSONL event-window export;
@@ -352,10 +354,12 @@ Use cases now supported:
 2. `Run synthetic trial` populates every important table and chart with a
    diverse, deterministic in-memory workload. This is the best first action when
    local logs do not contain enough incidents.
-3. `Run real trial` emits real AdaOS SDK events, waits briefly, imports local
-   node logs, and builds event windows from the log records that were actually
-   written. This validates the event/log/projection path, but it is still a
-   controlled local trial rather than a physical ReDevice admission run.
+3. `Run real trial` emits real AdaOS SDK events, calls lightweight tools from
+   `demo_metrics_skill`, `browsers_skill`, `infrascope_skill`, `subnet_env`, and
+   `pair_new_device_skill`, waits briefly, imports local node logs, and builds
+   event windows from the log records that were actually written. This validates
+   the event/log/tool/projection path, but it is still a controlled local trial
+   rather than a physical ReDevice admission run.
 4. `Analyze real logs` builds event windows from available AdaOS logs and
    compares the rule baseline with reviewed heuristic labels.
 5. `Analyze subscriptions` checks whether observed event emissions match

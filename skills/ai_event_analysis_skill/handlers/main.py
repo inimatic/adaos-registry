@@ -851,7 +851,8 @@ def _emit_real_trial_events(*, webspace_id: str, trial_id: str, event_count: int
         emit("ai_event_analysis.real_trial.eventbus.backpressure.drop", {"index": index, "symptom": "drop queue backpressure"})
     for index in range(max(1, event_count // 2)):
         emit("ai_event_analysis.real_trial.projection.refresh.requested", {"index": index, "symptom": "projection refresh materialization"})
-    emit("ai_event_analysis.real_trial.service.failed", {"phase": "check", "symptom": "controlled failure marker"})
+    for index in range(max(8, event_count // 2)):
+        emit("ai_event_analysis.real_trial.service.failed", {"index": index, "phase": "check", "symptom": "controlled failure marker"})
     emit("ai_event_analysis.real_trial.completed", {"phase": "finish"})
     try:
         stream_publish(
@@ -869,6 +870,82 @@ def _emit_real_trial_events(*, webspace_id: str, trial_id: str, event_count: int
     except Exception:
         pass
     return {"trial_id": trial_id, "emitted_event_count": len(emitted), "sample": emitted[:8]}
+
+
+def _call_workspace_skill_tool(
+    skill_name: str,
+    tool_name: str,
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    started = time.time()
+    try:
+        from adaos.services.agent_context import get_ctx
+        from adaos.skills.runtime_runner import execute_tool
+
+        ctx = get_ctx()
+        skill_dir = Path(ctx.paths.skills_workspace_dir()) / skill_name
+        previous = ctx.skill_ctx.get()
+        try:
+            ctx.skill_ctx.set(skill_name, skill_dir)
+            result = execute_tool(skill_dir, module="handlers.main", attr=tool_name, payload=payload)
+        finally:
+            if previous is None:
+                try:
+                    ctx.skill_ctx.clear()
+                except Exception:
+                    pass
+            else:
+                try:
+                    ctx.skill_ctx.set(previous.name, previous.path)
+                except Exception:
+                    pass
+        return {
+            "skill": skill_name,
+            "tool": tool_name,
+            "ok": bool(isinstance(result, Mapping) and result.get("ok") is not False),
+            "duration_ms": round((time.time() - started) * 1000, 1),
+            "result_keys": sorted(result.keys())[:8] if isinstance(result, Mapping) else [],
+        }
+    except Exception as exc:
+        return {
+            "skill": skill_name,
+            "tool": tool_name,
+            "ok": False,
+            "duration_ms": round((time.time() - started) * 1000, 1),
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+
+def _run_cross_skill_probes(*, webspace_id: str, trial_id: str) -> list[dict[str, Any]]:
+    probes = [
+        ("demo_metrics_skill", "emit_demo_event", {"webspace_id": webspace_id, "action_id": f"ai_event_analysis:{trial_id}", "metric_id": "current"}),
+        ("browsers_skill", "refresh_snapshot", {"webspace_id": webspace_id}),
+        ("infrascope_skill", "refresh_snapshot", {"webspace_id": webspace_id, "task_goal": "ai_event_analysis_real_trial"}),
+        ("subnet_env", "refresh_snapshot", {"webspace_id": webspace_id}),
+        ("pair_new_device_skill", "create_pairing", {"webspace_id": webspace_id}),
+    ]
+    results: list[dict[str, Any]] = []
+    for skill_name, tool_name, payload in probes:
+        publish_event(
+            "ai_event_analysis.real_trial.cross_skill.started",
+            {"trial_id": trial_id, "webspace_id": webspace_id, "skill": skill_name, "tool": tool_name},
+            source="ai_event_analysis_skill.real_trial",
+        )
+        outcome = _call_workspace_skill_tool(skill_name, tool_name, payload)
+        results.append(outcome)
+        publish_event(
+            "ai_event_analysis.real_trial.cross_skill.completed",
+            {
+                "trial_id": trial_id,
+                "webspace_id": webspace_id,
+                "skill": skill_name,
+                "tool": tool_name,
+                "ok": outcome.get("ok"),
+                "duration_ms": outcome.get("duration_ms"),
+            },
+            source="ai_event_analysis_skill.real_trial",
+        )
+    return results
 
 
 def _value(features: Mapping[str, Any], key: str) -> float:
@@ -1249,6 +1326,7 @@ def _project_real_trial_result(result: Mapping[str, Any], *, webspace_id: str) -
             "items": [
                 {"id": "trial_id", "name": "Trial id", "current": result.get("trial_id"), "target": "unique per run", "notes": "Used to identify generated AdaOS events in local logs."},
                 {"id": "emitted", "name": "Emitted AdaOS events", "current": result.get("emitted_event_count"), "target": "real event bus/log path", "notes": "Events are published through AdaOS SDK, not injected as windows."},
+                {"id": "cross_skill_probes", "name": "Cross-skill probes", "current": result.get("cross_skill_probe_count"), "target": "several existing skills", "notes": f"ok={result.get('cross_skill_ok_count')} exercises real tool/projection paths."},
                 {"id": "records", "name": "Imported log records", "current": result.get("record_count"), "target": "contains trial event lines", "notes": "Read back from local node logs after emission."},
                 {"id": "trial_records", "name": "Trial-tagged records", "current": result.get("trial_record_count"), "target": ">= emitted events where logging is configured", "notes": "Depends on runtime log sink and retention window."},
                 {"id": "windows", "name": "Event windows", "current": result.get("window_count"), "target": ">= 1", "notes": "Built from actual imported log records."},
@@ -1393,6 +1471,8 @@ def run_real_trial(payload: Mapping[str, Any] | None = None, **_: Any) -> dict[s
     event_count = max(12, min(24, int(_value(body, "event_count") or 14)))
     max_lines = max(_MAX_DEFAULT_LOG_LINES, min(_MAX_EXPLICIT_LOG_LINES, int(_value(body, "max_lines") or 600)))
     emitted = _emit_real_trial_events(webspace_id=webspace_id, trial_id=trial_id, event_count=event_count)
+    cross_skill_enabled = body.get("cross_skill") is not False
+    probe_results = _run_cross_skill_probes(webspace_id=webspace_id, trial_id=trial_id) if cross_skill_enabled else []
     time.sleep(float(body.get("settle_seconds") or 0.25))
     imported = import_local_logs({"max_lines": max_lines})
     records = [item for item in imported.get("records", []) if isinstance(item, Mapping)]
@@ -1415,6 +1495,10 @@ def run_real_trial(payload: Mapping[str, Any] | None = None, **_: Any) -> dict[s
         "trial_id": trial_id,
         "emitted_event_count": emitted["emitted_event_count"],
         "emitted_sample": emitted["sample"],
+        "cross_skill_enabled": cross_skill_enabled,
+        "cross_skill_probe_count": len(probe_results),
+        "cross_skill_ok_count": sum(1 for item in probe_results if item.get("ok") is True),
+        "cross_skill_results": probe_results,
         "record_count": len(records),
         "trial_record_count": len(trial_records),
         "used_record_count": len(analysis_records),
@@ -1453,6 +1537,7 @@ def run_real_trial(payload: Mapping[str, Any] | None = None, **_: Any) -> dict[s
                     "content": {
                         "trial_id": trial_id,
                         "baseline": _compact_evaluation_result(baseline_result),
+                        "cross_skill_results": probe_results,
                         "record_count": result["record_count"],
                         "trial_record_count": result["trial_record_count"],
                         "sources": result["sources"],
