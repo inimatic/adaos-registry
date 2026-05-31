@@ -89,6 +89,24 @@
               }
             },
             {
+              "id": "media-indexer-diagnostics",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Model diagnostics",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/media_indexer/diagnostics",
+                "observeRoot": true
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "emptyText": "Waiting"
+              }
+            },
+            {
               "id": "media-indexer-directory",
               "type": "input.text",
               "area": "main",
@@ -221,11 +239,11 @@
                 "observeRoot": true
               },
               "inputs": {
-                "titleKey": "path",
-                "subtitleKey": "score",
-                "detailsPath": "payload",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "detailsPath": "details",
                 "showDetails": false,
-                "itemAccordion": false,
+                "itemAccordion": true,
                 "emptyText": "No search results yet"
               }
             }
@@ -243,6 +261,20 @@
         "subtitle": "semantic local media search",
         "description": "Set a directory, build an index, then search by natural language.",
         "error": ""
+      },
+      "diagnostics": {
+        "value": "ready",
+        "label": "Model diagnostics",
+        "subtitle": "waiting for scan",
+        "description": "Scan a media directory to show NER, metadata and enrichment coverage.",
+        "files_found": 0,
+        "indexed_count": 0,
+        "by_type": {},
+        "ner_parsed": 0,
+        "shazam_matched": 0,
+        "ocr_checked": 0,
+        "ocr_text_found": 0,
+        "technical_errors": 0
       },
       "form": {
         "directory": "",
