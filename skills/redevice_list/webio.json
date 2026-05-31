@@ -1,0 +1,18 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "note": "Compatibility alias. The canonical AdaOS declarative surface is webui.json; this file keeps the requested webio.json entry point discoverable.",
+  "webio": {
+    "receivers": {
+      "redevice_list.devices": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "items": [],
+          "count": 0,
+          "updated_at": null
+        }
+      }
+    }
+  }
+}

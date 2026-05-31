@@ -1,0 +1,67 @@
+name: redevice_list
+version: 0.1.0
+entry: handlers/main.py
+runtime:
+  python: '3.11'
+description: Workspace dashboard for ReDevice endpoint inventory, diagnostics, manifest, policy, revoke, and retire operations.
+dependencies: []
+webui_owner: shared
+events:
+  subscribe:
+    - webio.stream.snapshot.requested
+    - webio.stream.subscription.changed
+  publish:
+    - io.out.stream.publish
+tools:
+  - name: refresh_redevices
+    description: Refresh the ReDevice inventory stream from the AdaOS root API.
+    entry: handlers.main:refresh_redevices
+    input_schema:
+      type: object
+      properties:
+        webspace_id:
+          type: string
+    output_schema:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        count:
+          type: number
+      required:
+        - ok
+  - name: revoke_redevice
+    description: Revoke a ReDevice admission or endpoint session.
+    entry: handlers.main:revoke_redevice
+    input_schema:
+      type: object
+      properties:
+        code:
+          type: string
+      required:
+        - code
+    output_schema:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+        - ok
+  - name: retire_redevice
+    description: Retire a ReDevice endpoint from active use.
+    entry: handlers.main:retire_redevice
+    input_schema:
+      type: object
+      properties:
+        code:
+          type: string
+      required:
+        - code
+    output_schema:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+        - ok
+updated_at: '2026-05-31T20:55:00+00:00'

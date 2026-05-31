@@ -1,0 +1,220 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "webio": {
+    "receivers": {
+      "redevice_list.devices": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "items": [],
+          "count": 0,
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 1,
+          "maxSnapshotHz": 1,
+          "maxItems": 128
+        },
+        "guardVisibility": {
+          "degradedState": "Keep last ReDevice inventory rows.",
+          "log": "service.redevice_list.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.redevice_list.devices"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:redevice_list_modal",
+          "owner": "skill:redevice_list",
+          "firstPaint": "empty ReDevice list",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested"
+          ]
+        }
+      }
+    }
+  },
+  "apps": [
+    {
+      "id": "redevice_list_app",
+      "title": "ReDevice",
+      "icon": "phone-portrait-outline",
+      "launchModal": "redevice_list_modal"
+    }
+  ],
+  "registry": {
+    "modals": {
+      "redevice_list_modal": {
+        "title": "ReDevice endpoints",
+        "schema": {
+          "id": "redevice_list_modal",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "redevice-actions",
+              "type": "ui.actions",
+              "area": "main",
+              "title": "",
+              "inputs": {
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "refresh",
+                    "label": "Refresh"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:refresh",
+                  "type": "callSkill",
+                  "target": "redevice_list.refresh_redevices",
+                  "params": {}
+                }
+              ]
+            },
+            {
+              "id": "redevice-table",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Registered devices",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "redevice_list.devices"
+              },
+              "inputs": {
+                "emptyText": "No ReDevice endpoints yet",
+                "columns": [
+                  {
+                    "key": "title",
+                    "label": "Device"
+                  },
+                  {
+                    "key": "state",
+                    "label": "State",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "zone_id",
+                    "label": "Zone",
+                    "width": "80px"
+                  },
+                  {
+                    "key": "trust_level",
+                    "label": "Trust",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "endpoint_id",
+                    "label": "Endpoint",
+                    "mono": true,
+                    "width": "220px"
+                  },
+                  {
+                    "key": "_actions",
+                    "label": "Actions",
+                    "kind": "buttons",
+                    "width": "210px",
+                    "buttons": [
+                      {
+                        "id": "details",
+                        "label": "Details"
+                      },
+                      {
+                        "id": "revoke",
+                        "label": "Revoke"
+                      },
+                      {
+                        "id": "retire",
+                        "label": "Retire"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:details",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "redevice_details_modal"
+                  }
+                },
+                {
+                  "on": "click:revoke",
+                  "type": "callSkill",
+                  "target": "redevice_list.revoke_redevice",
+                  "params": {
+                    "code": "$event.code"
+                  }
+                },
+                {
+                  "on": "click:retire",
+                  "type": "callSkill",
+                  "target": "redevice_list.retire_redevice",
+                  "params": {
+                    "code": "$event.code"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "redevice_details_modal": {
+        "title": "ReDevice details",
+        "schema": {
+          "id": "redevice_details_modal",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "redevice-details",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Diagnostics, manifest, and policy",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "redevice_list.devices"
+              },
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "detailsPath": "content",
+                "showDetails": true,
+                "emptyText": "No ReDevice details"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "redevice_list_app",
+      "autoInstall": true
+    }
+  ]
+}
