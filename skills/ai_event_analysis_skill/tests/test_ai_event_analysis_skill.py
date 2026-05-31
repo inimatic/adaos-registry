@@ -35,6 +35,7 @@ def test_manifest_declares_measurable_tools_and_stream_wakeup() -> None:
         "rehydrate",
         "run_demo_evaluation",
         "run_trial_suite",
+        "run_real_trial",
         "evaluate_windows",
         "import_local_logs",
         "build_event_windows",
@@ -79,6 +80,7 @@ def test_webui_declares_app_widget_and_results_receiver() -> None:
     actions = next(widget for widget in widgets if widget["id"] == "ai-event-analysis-actions")
     assert any(button["id"] == "refresh_snapshot" for button in actions["inputs"]["buttons"])
     assert any(button["id"] == "run_trials" for button in actions["inputs"]["buttons"])
+    assert any(button["id"] == "run_real_trial" for button in actions["inputs"]["buttons"])
     assert any(button["id"] == "analyze_logs" for button in actions["inputs"]["buttons"])
     assert any(button["id"] == "analyze_subscriptions" for button in actions["inputs"]["buttons"])
     readiness = next(widget for widget in widgets if widget["id"] == "ai-event-analysis-chart")
@@ -161,6 +163,42 @@ def test_trial_suite_populates_operational_and_subscription_data() -> None:
     assert result["subscription_result"]["summary"]["missing_consumers"] >= 1
     assert result["chart"]["title"] == "Trial operational readiness"
     assert any(point["ts"] == "routing health" for point in result["chart"]["points"])
+
+
+def test_real_trial_emits_events_and_analyzes_read_back_logs(monkeypatch) -> None:
+    mod = _load_module()
+    emitted: list[tuple[str, object, str]] = []
+    published: list[object] = []
+
+    def fake_publish(event_type: str, payload: object, source: str | None = None) -> None:
+        emitted.append((event_type, payload, source or ""))
+
+    def fake_import(_payload: object) -> dict[str, object]:
+        records = [
+            {
+                "id": f"real:{index}",
+                "ts": 1000 + index,
+                "topic": "eventbus.pressure" if "backpressure" in event_type else "projection.lifecycle",
+                "severity": "error" if "failed" in event_type or "drop" in event_type else "info",
+                "message": json.dumps({"type": event_type, "source": source, "trial_id": payload["trial_id"]}),
+            }
+            for index, (event_type, payload, source) in enumerate(emitted)
+        ]
+        return {"ok": True, "records": records, "summary": {"sources": [{"path": "fake.log", "records": len(records)}]}}
+
+    monkeypatch.setattr(mod, "publish_event", fake_publish)
+    monkeypatch.setattr(mod, "stream_publish", lambda _receiver, payload, _meta=None: published.append(payload))
+    monkeypatch.setattr(mod, "import_local_logs", fake_import)
+
+    result = mod.run_real_trial({"webspace_id": "test", "trial_id": "real-test", "event_count": 12})["result"]
+
+    assert result["mode"] == "real_trial"
+    assert result["emitted_event_count"] >= 12
+    assert result["trial_record_count"] == result["record_count"]
+    assert result["window_count"] >= 1
+    assert result["baseline_result"]["window_count"] == result["window_count"]
+    assert result["rows"]
+    assert published
 
 
 def test_custom_window_evaluation_reports_false_positive_rate() -> None:

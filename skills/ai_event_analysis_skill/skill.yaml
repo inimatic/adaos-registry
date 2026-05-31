@@ -1,5 +1,5 @@
 name: ai_event_analysis_skill
-version: 0.2.17
+version: 0.2.18
 description: Research skill for measurable AI/ML analysis of AdaOS operational event
   windows.
 runtime:
@@ -210,14 +210,44 @@ tools:
       result:
         type: object
 - name: run_trial_suite
-  description: Run a deterministic multi-scenario workload that populates event-window,
-    metric, chart, and subscription-flow projections with useful smoke-test data.
+  description: Run a deterministic synthetic multi-scenario workload that populates
+    event-window, metric, chart, and subscription-flow projections with useful smoke-test
+    data.
   entry: handlers.main:run_trial_suite
   input_schema:
     type: object
     properties:
       webspace_id:
         type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - result
+    properties:
+      ok:
+        type: boolean
+      result:
+        type: object
+- name: run_real_trial
+  description: Emit real AdaOS SDK events, read back local node logs, build event
+    windows from those logs, and project the measured result.
+  entry: handlers.main:run_real_trial
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+      trial_id:
+        type: string
+      event_count:
+        type: integer
+      max_lines:
+        type: integer
+      window_seconds:
+        type: integer
+      include_windows:
+        type: boolean
   output_schema:
     type: object
     required:
@@ -378,5 +408,5 @@ tools:
         type: boolean
       export:
         type: object
-updated_at: '2026-05-31T06:10:15+00:00'
+updated_at: '2026-05-31T07:17:42+00:00'
 

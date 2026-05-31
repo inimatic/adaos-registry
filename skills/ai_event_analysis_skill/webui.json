@@ -533,7 +533,11 @@
                   },
                   {
                     "id": "run_trials",
-                    "label": "Run trial suite"
+                    "label": "Run synthetic trial"
+                  },
+                  {
+                    "id": "run_real_trial",
+                    "label": "Run real trial"
                   },
                   {
                     "id": "refresh_snapshot",
@@ -572,6 +576,17 @@
                   "target": "ai_event_analysis_skill.run_trial_suite",
                   "params": {
                     "webspace_id": "$runtime.webspace_id"
+                  }
+                },
+                {
+                  "on": "click:run_real_trial",
+                  "type": "callSkill",
+                  "target": "ai_event_analysis_skill.run_real_trial",
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id",
+                    "event_count": 14,
+                    "window_seconds": 60,
+                    "max_lines": 600
                   }
                 },
                 {

@@ -144,8 +144,10 @@ See [Dataset Schema](docs/dataset-schema.md).
 ### Phase 5. Baselines And Metrics
 
 - [x] Add a deterministic synthetic dataset for the first iteration.
-- [x] Add a deterministic trial suite that exercises normal, incident, and
+- [x] Add a deterministic synthetic trial suite that exercises normal, incident, and
   subscription-routing cases.
+- [x] Add a real trial that emits AdaOS SDK events, reads local node logs back,
+  and builds event windows from the resulting log records.
 - [x] Implement a rule-based baseline classifier.
 - [x] Compute accuracy, macro-F1, per-class precision/recall/F1, false positive
   rate, critical recall, detection delay, and top-reason hit rate.
@@ -196,7 +198,7 @@ See [Dataset Schema](docs/dataset-schema.md).
 - [ ] Add before/after simulation for throttling, coalescing, and debounce
   policies.
 
-### Phase 9. Trial Suite For Useful First-Run Data
+### Phase 9. Trial Suites For Useful First-Run Data
 
 - [x] Add `run_trial_suite` as a deterministic workload.
 - [x] Cover normal idle/busy windows, eventbus backpressure, projection refresh
@@ -206,6 +208,8 @@ See [Dataset Schema](docs/dataset-schema.md).
   consumer cases.
 - [x] Project the trial result into the same dataset, window, metric,
   subscription, and chart surfaces as real logs.
+- [x] Add `run_real_trial` to publish real AdaOS events and analyze the log
+  records written by the local node.
 - [ ] Add scenario runners that execute real AdaOS UI/API workflows and collect
   resulting logs.
 - [ ] Persist scenario run metadata so trial datasets can be compared across
@@ -267,13 +271,26 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  A[Deterministic trial scenarios] --> B[Event windows]
+  A[Deterministic synthetic scenarios] --> B[Event windows]
   A --> C[Subscription event records]
   B --> D[Rule baseline metrics]
   C --> E[Subscription flow analysis]
   D --> F[Operational readiness chart]
   E --> F
   F --> G[Concrete UI smoke test]
+```
+
+## Real Trial Diagram
+
+```mermaid
+flowchart LR
+  A[Run real trial] --> B[AdaOS SDK publish_event]
+  A --> C[WebIO stream publish]
+  B --> D[Local node logs]
+  C --> D
+  D --> E[Log importer]
+  E --> F[Event windows]
+  F --> G[Operational readiness metrics]
 ```
 
 ## Evaluation Loop
@@ -311,7 +328,8 @@ Stretch target:
 The skill currently ships:
 
 - a synthetic benchmark dataset generator;
-- a deterministic trial suite for useful first-run data;
+- a deterministic synthetic trial suite for useful first-run data;
+- a real-trial runner that emits AdaOS events and analyzes local node logs;
 - local log import into redacted evidence records;
 - fixed-window feature extraction;
 - JSONL event-window export;
@@ -331,12 +349,16 @@ Use cases now supported:
 
 1. `Run demo baseline` keeps the small synthetic benchmark available for quick
    regression checks.
-2. `Run trial suite` populates every important table and chart with a diverse,
-   deterministic workload. This is the best first action when local logs do not
-   contain enough incidents.
-3. `Analyze real logs` builds event windows from available AdaOS logs and
+2. `Run synthetic trial` populates every important table and chart with a
+   diverse, deterministic in-memory workload. This is the best first action when
+   local logs do not contain enough incidents.
+3. `Run real trial` emits real AdaOS SDK events, waits briefly, imports local
+   node logs, and builds event windows from the log records that were actually
+   written. This validates the event/log/projection path, but it is still a
+   controlled local trial rather than a physical ReDevice admission run.
+4. `Analyze real logs` builds event windows from available AdaOS logs and
    compares the rule baseline with reviewed heuristic labels.
-4. `Analyze subscriptions` checks whether observed event emissions match
+5. `Analyze subscriptions` checks whether observed event emissions match
    declared subscribers in the sampled logs.
 
 The right-side quality graph was changed from `Weak-label baseline quality` to

@@ -836,6 +836,41 @@ def _trial_suite_result() -> dict[str, Any]:
     }
 
 
+def _emit_real_trial_events(*, webspace_id: str, trial_id: str, event_count: int) -> dict[str, Any]:
+    emitted: list[dict[str, Any]] = []
+
+    def emit(event_type: str, payload: Mapping[str, Any] | None = None) -> None:
+        body = {"trial_id": trial_id, "webspace_id": webspace_id}
+        if payload:
+            body.update(dict(payload))
+        publish_event(event_type, body, source="ai_event_analysis_skill.real_trial")
+        emitted.append({"type": event_type, "payload": body})
+
+    emit("ai_event_analysis.real_trial.started", {"phase": "start"})
+    for index in range(max(1, event_count)):
+        emit("ai_event_analysis.real_trial.eventbus.backpressure.drop", {"index": index, "symptom": "drop queue backpressure"})
+    for index in range(max(1, event_count // 2)):
+        emit("ai_event_analysis.real_trial.projection.refresh.requested", {"index": index, "symptom": "projection refresh materialization"})
+    emit("ai_event_analysis.real_trial.service.failed", {"phase": "check", "symptom": "controlled failure marker"})
+    emit("ai_event_analysis.real_trial.completed", {"phase": "finish"})
+    try:
+        stream_publish(
+            _RESULTS_RECEIVER,
+            [
+                {
+                    "id": "real-trial-events",
+                    "title": f"Real trial emitted {len(emitted)} AdaOS events",
+                    "description": f"trial_id={trial_id} webspace_id={webspace_id}",
+                    "content": {"trial_id": trial_id, "events": emitted[:8], "event_count": len(emitted)},
+                }
+            ],
+            _meta={"webspace_id": webspace_id},
+        )
+    except Exception:
+        pass
+    return {"trial_id": trial_id, "emitted_event_count": len(emitted), "sample": emitted[:8]}
+
+
 def _value(features: Mapping[str, Any], key: str) -> float:
     raw = features.get(key, 0)
     try:
@@ -1156,13 +1191,13 @@ def _project_trial_suite(result: Mapping[str, Any], *, webspace_id: str) -> dict
             ),
             "buttons": [
                 {"id": "open", "label": "Open"},
-                {"id": "run_trials", "label": "Run trial suite"},
+                {"id": "run_trials", "label": "Run synthetic trial"},
                 {"id": "analyze_logs", "label": "Analyze real logs"},
             ],
         },
         "dataset": {
             "items": [
-                {"id": "trial_scenarios", "name": "Trial scenarios", "current": result.get("scenario_count"), "target": "normal + incident + routing", "notes": "Deterministic local workload for useful first-run data."},
+                {"id": "trial_scenarios", "name": "Synthetic trial scenarios", "current": result.get("scenario_count"), "target": "normal + incident + routing", "notes": "Deterministic local workload for useful first-run data."},
                 {"id": "scenario_classes", "name": "Covered classes", "current": len(result.get("scenario_classes") or []), "target": "all baseline classes", "notes": ", ".join(result.get("scenario_classes") or [])},
                 {"id": "trial_windows", "name": "Event windows", "current": result.get("window_count"), "target": "diverse synthetic evidence", "notes": "Windows are deterministic and labeled by construction."},
                 {"id": "subscription_records", "name": "Subscription events", "current": result.get("record_count"), "target": "active, idle, noisy, missing consumer", "notes": "Exercises subscription-flow analysis without core changes."},
@@ -1184,11 +1219,48 @@ def _project_trial_suite(result: Mapping[str, Any], *, webspace_id: str) -> dict
         "subscription_chart": subscription.get("chart") if isinstance(subscription, Mapping) else {"title": "Observed event volume by type", "unit": "events", "points": []},
         "experiments": {
             "items": [
-                {"id": "trial_suite", "model": "Trial suite", "status": "implemented", "macro_f1": baseline.get("macro_f1") if isinstance(baseline, Mapping) else "", "next_step": "Use before real-log/manual-label evaluation to prove UI and metrics are populated."},
+                {"id": "synthetic_trial", "model": "Synthetic trial", "status": "implemented", "macro_f1": baseline.get("macro_f1") if isinstance(baseline, Mapping) else "", "next_step": "Use before real-log/manual-label evaluation to prove UI and metrics are populated."},
                 {"id": "real_log_review", "model": "Real-log reviewed heuristic", "status": "implemented", "macro_f1": "", "next_step": "Add manual label review to turn weak labels into ground truth."},
                 {"id": "subscription_routing", "model": "Subscription flow analysis", "status": "implemented", "macro_f1": "", "next_step": "Add delivery ack/latency logs for routing accuracy."},
             ]
         },
+    }
+    return _project_sections(sections, webspace_id=webspace_id, force=True)
+
+
+def _project_real_trial_result(result: Mapping[str, Any], *, webspace_id: str) -> dict[str, Any]:
+    baseline = result.get("baseline_result") if isinstance(result.get("baseline_result"), Mapping) else {}
+    sections = {
+        "summary": {
+            "label": "AI Event Analysis",
+            "value": f"{_value(baseline, 'macro_f1'):.3f}",
+            "subtitle": "real-trial log analysis",
+            "description": (
+                f"trial_id={result.get('trial_id')} emitted={result.get('emitted_event_count')} "
+                f"records={result.get('record_count')} windows={result.get('window_count')}"
+            ),
+            "buttons": [
+                {"id": "open", "label": "Open"},
+                {"id": "run_real_trial", "label": "Run real trial"},
+                {"id": "analyze_logs", "label": "Analyze real logs"},
+            ],
+        },
+        "dataset": {
+            "items": [
+                {"id": "trial_id", "name": "Trial id", "current": result.get("trial_id"), "target": "unique per run", "notes": "Used to identify generated AdaOS events in local logs."},
+                {"id": "emitted", "name": "Emitted AdaOS events", "current": result.get("emitted_event_count"), "target": "real event bus/log path", "notes": "Events are published through AdaOS SDK, not injected as windows."},
+                {"id": "records", "name": "Imported log records", "current": result.get("record_count"), "target": "contains trial event lines", "notes": "Read back from local node logs after emission."},
+                {"id": "trial_records", "name": "Trial-tagged records", "current": result.get("trial_record_count"), "target": ">= emitted events where logging is configured", "notes": "Depends on runtime log sink and retention window."},
+                {"id": "windows", "name": "Event windows", "current": result.get("window_count"), "target": ">= 1", "notes": "Built from actual imported log records."},
+                {"id": "label_source", "name": "Label source", "current": result.get("label_source"), "target": "manual labels for final evaluation", "notes": "Real-trial labels are still reviewed heuristics."},
+            ]
+        },
+        "windows": {"items": list(result.get("rows") or [])},
+        "metrics": {"items": _metric_rows(baseline)},
+        "per_class": {"items": list(baseline.get("per_class") or []) if isinstance(baseline, Mapping) else []},
+        "chart": _readiness_chart(baseline, title="Real-trial operational readiness"),
+        "event_volume_chart": result.get("event_volume_chart") or {"title": "Real-trial event volume by window", "unit": "events", "points": []},
+        "class_distribution_chart": result.get("class_distribution_chart") or {"title": "Real-trial class distribution", "unit": "windows", "points": []},
     }
     return _project_sections(sections, webspace_id=webspace_id, force=True)
 
@@ -1303,6 +1375,87 @@ def run_trial_suite(payload: Mapping[str, Any] | None = None, **_: Any) -> dict[
                         "scenario_classes": result.get("scenario_classes"),
                         "baseline": _compact_evaluation_result(baseline),
                         "subscription_summary": summary,
+                    },
+                }
+            ],
+            _meta={"webspace_id": webspace_id},
+        )
+    except Exception:
+        pass
+    return {"ok": True, "result": result}
+
+
+@tool("run_real_trial")
+def run_real_trial(payload: Mapping[str, Any] | None = None, **_: Any) -> dict[str, Any]:
+    body = payload if isinstance(payload, Mapping) else {}
+    webspace_id = _webspace_id_from_payload(body)
+    trial_id = str(body.get("trial_id") or f"real-{int(time.time())}")
+    event_count = max(12, min(24, int(_value(body, "event_count") or 14)))
+    max_lines = max(_MAX_DEFAULT_LOG_LINES, min(_MAX_EXPLICIT_LOG_LINES, int(_value(body, "max_lines") or 600)))
+    emitted = _emit_real_trial_events(webspace_id=webspace_id, trial_id=trial_id, event_count=event_count)
+    time.sleep(float(body.get("settle_seconds") or 0.25))
+    imported = import_local_logs({"max_lines": max_lines})
+    records = [item for item in imported.get("records", []) if isinstance(item, Mapping)]
+    trial_records = [
+        item
+        for item in records
+        if trial_id in str(item.get("message") or "") or "ai_event_analysis.real_trial" in str(item.get("message") or "")
+    ]
+    analysis_records = trial_records or records
+    windows = _records_to_windows(
+        analysis_records,
+        window_seconds=int(_value(body, "window_seconds") or 60),
+        node_id=str(body.get("node_id") or "local-real-trial"),
+        subnet_id=str(body.get("subnet_id") or "local"),
+        webspace_id=webspace_id,
+    )
+    baseline_result = _evaluate(windows)
+    result = {
+        "mode": "real_trial",
+        "trial_id": trial_id,
+        "emitted_event_count": emitted["emitted_event_count"],
+        "emitted_sample": emitted["sample"],
+        "record_count": len(records),
+        "trial_record_count": len(trial_records),
+        "used_record_count": len(analysis_records),
+        "window_count": len(windows),
+        "window_seconds": int(_value(body, "window_seconds") or 60),
+        "label_source": "codex_reviewed_log_heuristic",
+        "baseline_result": baseline_result,
+        "windows": windows[:_MAX_TOOL_WINDOWS] if bool(body.get("include_windows")) else [],
+        "rows": _window_rows(windows),
+        "event_volume_chart": {
+            "title": "Real-trial event volume by window",
+            "unit": "events",
+            "points": _event_volume_points(windows),
+        },
+        "class_distribution_chart": {
+            "title": "Real-trial class distribution",
+            "unit": "windows",
+            "points": _class_distribution_points(windows),
+        },
+        "sources": (imported.get("summary") or {}).get("sources") if isinstance(imported.get("summary"), Mapping) else [],
+        "built_at": _now_iso(),
+    }
+    _project_real_trial_result(result, webspace_id=webspace_id)
+    _publish_dataset_result(result, webspace_id=webspace_id)
+    try:
+        stream_publish(
+            _RESULTS_RECEIVER,
+            [
+                {
+                    "id": "real-trial-analysis",
+                    "title": f"Real trial analyzed {result['window_count']} windows",
+                    "description": (
+                        f"trial_id={trial_id} emitted={result['emitted_event_count']} "
+                        f"trial_records={result['trial_record_count']} macro_f1={baseline_result.get('macro_f1')}"
+                    ),
+                    "content": {
+                        "trial_id": trial_id,
+                        "baseline": _compact_evaluation_result(baseline_result),
+                        "record_count": result["record_count"],
+                        "trial_record_count": result["trial_record_count"],
+                        "sources": result["sources"],
                     },
                 }
             ],
