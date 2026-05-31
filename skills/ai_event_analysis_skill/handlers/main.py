@@ -243,6 +243,41 @@ def _redact_line(text: str, *, max_len: int = 240) -> str:
     return value[:max_len]
 
 
+def _json_object_from_line(text: str) -> dict[str, Any]:
+    try:
+        payload = json.loads(text or "")
+        return dict(payload) if isinstance(payload, Mapping) else {}
+    except Exception:
+        return {}
+
+
+def _extract_structured_event_fields(line: str) -> dict[str, Any]:
+    payload = _json_object_from_line(line)
+    event_type = str(payload.get("type") or "").strip()
+    source = str(payload.get("source") or "").strip()
+    logger = str(payload.get("logger") or "").strip()
+    trace = str(payload.get("trace") or payload.get("correlation_id") or payload.get("request_id") or "").strip()
+    nested = payload.get("payload")
+    if isinstance(nested, Mapping):
+        trace = trace or str(nested.get("trace") or nested.get("correlation_id") or nested.get("request_id") or nested.get("trial_id") or "").strip()
+    if not event_type:
+        match = re.search(r"\btype=([A-Za-z0-9_.:\-]+)", line or "")
+        if match:
+            event_type = match.group(1).strip()
+    if not source:
+        match = re.search(r"\bsource=([A-Za-z0-9_.:\-]+)", line or "")
+        if match:
+            source = match.group(1).strip()
+    return {
+        "structured": bool(payload),
+        "event_type": event_type,
+        "event_source": source,
+        "logger": logger,
+        "trace": trace,
+        "raw_msg": str(payload.get("msg") or "") if payload else "",
+    }
+
+
 def _log_candidates() -> list[Path]:
     roots = [
         Path.cwd() / ".adaos" / "state",
@@ -281,6 +316,7 @@ def _read_log_records(path: Path, *, max_lines: int) -> list[dict[str, Any]]:
             ts = base_ts + index
         severity = _severity_from_text(line)
         topic = _topic_from_text(line)
+        fields = _extract_structured_event_fields(line)
         records.append(
             {
                 "id": f"{path.name}:{index}",
@@ -290,6 +326,7 @@ def _read_log_records(path: Path, *, max_lines: int) -> list[dict[str, Any]]:
                 "source_path": str(path),
                 "topic": topic,
                 "severity": severity,
+                **fields,
                 "message": _redact_line(line),
             }
         )
@@ -529,6 +566,184 @@ def _project_subscription_flow(result: Mapping[str, Any], *, webspace_id: str) -
         "subscription_edges": {"items": list(result.get("rows") or [])},
         "subscription_metrics": result.get("metrics") or {"items": []},
         "subscription_chart": result.get("chart") or {"title": "Observed event volume by type", "unit": "events", "points": []},
+    }
+    return _project_sections(sections, webspace_id=webspace_id, force=True)
+
+
+def _ratio(numerator: int | float, denominator: int | float) -> float:
+    return round(float(numerator) / float(denominator), 3) if denominator else 0.0
+
+
+def _score_from_counts(*counts: int, weight: float = 1.0) -> float:
+    return round(1.0 / (1.0 + sum(max(0, count) for count in counts) * weight), 3)
+
+
+def _observability_health_from_records(records: list[Mapping[str, Any]]) -> dict[str, Any]:
+    total = len(records)
+    structured = sum(1 for item in records if bool(item.get("structured")))
+    typed = sum(1 for item in records if str(item.get("event_type") or "").strip())
+    sourced = sum(1 for item in records if str(item.get("event_source") or item.get("logger") or "").strip())
+    timestamped = sum(1 for item in records if _value(item, "ts") > 0)
+    correlated = sum(
+        1
+        for item in records
+        if str(item.get("trace") or "").strip()
+        or any(token in str(item.get("message") or "").lower() for token in ("trace", "correlation", "request_id", "trial_id"))
+    )
+
+    def count_text(*tokens: str) -> int:
+        lowered = [str(item.get("message") or "").lower() for item in records]
+        return sum(1 for text in lowered if any(token in text for token in tokens))
+
+    eventbus_records = sum(1 for item in records if str(item.get("logger") or "") == "adaos.eventbus" or str(item.get("topic") or "") == "eventbus.pressure")
+    projection_records = count_text("projection", "materializ")
+    yjs_warnings = count_text("yjs owner flow", "blocked yjs", "throttled yjs", "yroom effective branches repaired")
+    blocked_writes = count_text("write_amplification_blocked", "blocked yjs")
+    throttled_writes = count_text("write_amplification", "throttled yjs")
+    slow_tool_calls = count_text("tools.call slow")
+    slow_handlers = count_text("slow async event handler")
+    event_loop_lag = count_text("event loop lag")
+    browser_sessions = count_text("browser.session", "websocket", "/ws", "/yws", "connection closed", "connection open")
+    runtime_errors = sum(1 for item in records if str(item.get("severity") or "") in {"error", "critical"})
+    repairs = count_text("repaired", "repair_effective", "initial_client_update_reconcile")
+
+    schema_score = round((_ratio(typed, total) + _ratio(sourced, total) + _ratio(timestamped, total)) / 3.0, 3) if total else 0.0
+    correlation_score = _ratio(correlated, total)
+    projection_health = _score_from_counts(blocked_writes, repairs, weight=0.25)
+    runtime_health = _score_from_counts(slow_tool_calls, slow_handlers, event_loop_lag, runtime_errors, weight=0.15)
+    browser_health = _score_from_counts(browser_sessions, weight=0.02)
+    overall = round((schema_score + correlation_score + projection_health + runtime_health + browser_health) / 5.0, 3)
+
+    invariants = [
+        {
+            "id": "event_type_coverage",
+            "metric": "Event type coverage",
+            "value": _ratio(typed, total),
+            "target": ">= 0.90",
+            "status": "ok" if _ratio(typed, total) >= 0.90 else "warning",
+        },
+        {
+            "id": "source_coverage",
+            "metric": "Source coverage",
+            "value": _ratio(sourced, total),
+            "target": ">= 0.95",
+            "status": "ok" if _ratio(sourced, total) >= 0.95 else "warning",
+        },
+        {
+            "id": "correlation_coverage",
+            "metric": "Correlation coverage",
+            "value": correlation_score,
+            "target": ">= 0.50",
+            "status": "ok" if correlation_score >= 0.50 else "warning",
+        },
+        {
+            "id": "blocked_yjs_writes",
+            "metric": "Blocked YJS/projection writes",
+            "value": blocked_writes,
+            "target": "0",
+            "status": "ok" if blocked_writes == 0 else "critical",
+        },
+        {
+            "id": "slow_handlers",
+            "metric": "Slow event handlers",
+            "value": slow_handlers,
+            "target": "0",
+            "status": "ok" if slow_handlers == 0 else "warning",
+        },
+        {
+            "id": "event_loop_lag",
+            "metric": "Event loop lag warnings",
+            "value": event_loop_lag,
+            "target": "0",
+            "status": "ok" if event_loop_lag == 0 else "warning",
+        },
+    ]
+    metrics = {
+        "items": [
+            {"id": "observability_score", "metric": "Observability score", "value": overall, "target": ">= 0.80", "status": "ok" if overall >= 0.80 else "warning"},
+            {"id": "schema_score", "metric": "Schema coverage score", "value": schema_score, "target": ">= 0.90", "status": "ok" if schema_score >= 0.90 else "warning"},
+            {"id": "correlation_score", "metric": "Correlation score", "value": correlation_score, "target": ">= 0.50", "status": "ok" if correlation_score >= 0.50 else "warning"},
+            {"id": "projection_health", "metric": "Projection/YJS health", "value": projection_health, "target": ">= 0.80", "status": "ok" if projection_health >= 0.80 else "warning"},
+            {"id": "runtime_health", "metric": "Tool/runtime health", "value": runtime_health, "target": ">= 0.80", "status": "ok" if runtime_health >= 0.80 else "warning"},
+            {"id": "browser_health", "metric": "Browser/session health", "value": browser_health, "target": ">= 0.80", "status": "ok" if browser_health >= 0.80 else "warning"},
+        ] + invariants
+    }
+    dataset = {
+        "items": [
+            {"id": "records", "name": "Normalized records", "current": total, "target": "core + browser + skill logs", "notes": "Input rows after redaction and parsing."},
+            {"id": "structured", "name": "Structured JSON records", "current": structured, "target": "maximize", "notes": "Rows parsed as JSON log events."},
+            {"id": "eventbus", "name": "Eventbus records", "current": eventbus_records, "target": "visible command/event flow", "notes": "Rows emitted by eventbus logging."},
+            {"id": "projection", "name": "Projection/YJS records", "current": projection_records, "target": "visible UI materialization flow", "notes": "Projection, materialization, and YJS activity."},
+            {"id": "browser", "name": "Browser/session records", "current": browser_sessions, "target": "browser log coverage", "notes": "Browser, websocket, YWS, and session records."},
+            {"id": "labels", "name": "Suggested label policy", "current": "invariant + operator review", "target": "manual acceptance", "notes": "Use invariant violations as weak labels, then accept/reject in review."},
+        ]
+    }
+    chart = {
+        "title": "Observability health",
+        "unit": "0..1",
+        "points": [
+            {"ts": "schema", "value": schema_score},
+            {"ts": "correlation", "value": correlation_score},
+            {"ts": "projection", "value": projection_health},
+            {"ts": "runtime", "value": runtime_health},
+            {"ts": "browser", "value": browser_health},
+        ],
+    }
+    labels = [
+        {"id": "blocked_projection", "class": "projection_write_blocked", "support": blocked_writes, "precision": "", "recall": "", "f1": "", "review": "accept when paired with UI stale/repair symptoms"},
+        {"id": "slow_handler", "class": "slow_event_handler", "support": slow_handlers, "precision": "", "recall": "", "f1": "", "review": "accept when handler duration exceeds SLO"},
+        {"id": "event_loop_lag", "class": "runtime_event_loop_lag", "support": event_loop_lag, "precision": "", "recall": "", "f1": "", "review": "accept when user-visible latency or tool slowdown co-occurs"},
+        {"id": "browser_instability", "class": "browser_session_instability", "support": browser_sessions, "precision": "", "recall": "", "f1": "", "review": "accept when reconnect/repair bursts exceed baseline"},
+    ]
+    return {
+        "mode": "observability_health",
+        "record_count": total,
+        "summary": {
+            "observability_score": overall,
+            "schema_score": schema_score,
+            "correlation_score": correlation_score,
+            "projection_health": projection_health,
+            "runtime_health": runtime_health,
+            "browser_health": browser_health,
+            "yjs_warnings": yjs_warnings,
+            "blocked_writes": blocked_writes,
+            "throttled_writes": throttled_writes,
+            "slow_tool_calls": slow_tool_calls,
+            "slow_handlers": slow_handlers,
+            "event_loop_lag": event_loop_lag,
+        },
+        "metrics": metrics,
+        "dataset": dataset,
+        "chart": chart,
+        "labels": {"items": labels},
+        "analyzed_at": _now_iso(),
+    }
+
+
+def _project_observability_health(result: Mapping[str, Any], *, webspace_id: str, windows: list[Mapping[str, Any]]) -> dict[str, Any]:
+    summary = result.get("summary") if isinstance(result.get("summary"), Mapping) else {}
+    sections = {
+        "summary": {
+            "label": "AI Event Analysis",
+            "value": f"{_value(summary, 'observability_score'):.3f}",
+            "subtitle": "observability health score",
+            "description": (
+                f"records={result.get('record_count')} schema={summary.get('schema_score')} "
+                f"correlation={summary.get('correlation_score')} blocked_writes={summary.get('blocked_writes')}"
+            ),
+            "buttons": [
+                {"id": "open", "label": "Open"},
+                {"id": "analyze_health", "label": "Analyze health"},
+                {"id": "run_real_trial", "label": "Run real trial"},
+            ],
+        },
+        "dataset": result.get("dataset") or {"items": []},
+        "metrics": result.get("metrics") or {"items": []},
+        "per_class": result.get("labels") or {"items": []},
+        "chart": result.get("chart") or {"title": "Observability health", "unit": "0..1", "points": []},
+        "windows": {"items": _window_rows(windows)},
+        "event_volume_chart": {"title": "Observed log volume by window", "unit": "records", "points": _event_volume_points(windows)},
+        "class_distribution_chart": {"title": "Weak issue class distribution", "unit": "windows", "points": _class_distribution_points(windows)},
     }
     return _project_sections(sections, webspace_id=webspace_id, force=True)
 
@@ -1664,6 +1879,46 @@ def analyze_subscription_flow(payload: Mapping[str, Any] | None = None, **_: Any
                         f"declared={result['summary']['declared_subscriptions']} "
                         f"observed_types={result['summary']['observed_event_types']} "
                         f"missing={result['summary']['missing_consumers']}"
+                    ),
+                    "content": result,
+                }
+            ],
+            _meta={"webspace_id": _webspace_id_from_payload(body)},
+        )
+    except Exception:
+        pass
+    return {"ok": True, "result": result}
+
+
+@tool("analyze_observability_health")
+def analyze_observability_health(payload: Mapping[str, Any] | None = None, **_: Any) -> dict[str, Any]:
+    body = payload if isinstance(payload, Mapping) else {}
+    imported = import_local_logs({"path": body.get("path"), "max_lines": int(_value(body, "max_lines") or 800)} if body.get("path") else {"max_lines": int(_value(body, "max_lines") or 800)})
+    records = [item for item in imported.get("records", []) if isinstance(item, Mapping)]
+    window_seconds = int(_value(body, "window_seconds") or 60)
+    windows = _records_to_windows(
+        records,
+        window_seconds=window_seconds,
+        node_id=str(body.get("node_id") or "local-observability"),
+        subnet_id=str(body.get("subnet_id") or "local"),
+        webspace_id=_webspace_id_from_payload(body),
+    )
+    result = _observability_health_from_records(records)
+    result["window_count"] = len(windows)
+    result["window_seconds"] = window_seconds
+    result["sources"] = (imported.get("summary") or {}).get("sources") if isinstance(imported.get("summary"), Mapping) else []
+    _project_observability_health(result, webspace_id=_webspace_id_from_payload(body), windows=windows)
+    try:
+        summary = result.get("summary") if isinstance(result.get("summary"), Mapping) else {}
+        stream_publish(
+            _RESULTS_RECEIVER,
+            [
+                {
+                    "id": "observability-health",
+                    "title": f"Observability health {summary.get('observability_score')}",
+                    "description": (
+                        f"records={result.get('record_count')} windows={result.get('window_count')} "
+                        f"schema={summary.get('schema_score')} correlation={summary.get('correlation_score')}"
                     ),
                     "content": result,
                 }

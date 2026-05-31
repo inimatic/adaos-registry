@@ -40,6 +40,7 @@ def test_manifest_declares_measurable_tools_and_stream_wakeup() -> None:
         "import_local_logs",
         "build_event_windows",
         "analyze_local_logs",
+        "analyze_observability_health",
         "analyze_subscription_flow",
         "export_event_windows_jsonl",
     }
@@ -82,6 +83,7 @@ def test_webui_declares_app_widget_and_results_receiver() -> None:
     assert any(button["id"] == "run_trials" for button in actions["inputs"]["buttons"])
     assert any(button["id"] == "run_real_trial" for button in actions["inputs"]["buttons"])
     assert any(button["id"] == "analyze_logs" for button in actions["inputs"]["buttons"])
+    assert any(button["id"] == "analyze_health" for button in actions["inputs"]["buttons"])
     assert any(button["id"] == "analyze_subscriptions" for button in actions["inputs"]["buttons"])
     readiness = next(widget for widget in widgets if widget["id"] == "ai-event-analysis-chart")
     assert readiness["title"] == "Operational readiness"
@@ -259,6 +261,32 @@ def test_local_log_import_builds_redacted_event_windows(tmp_path: Path) -> None:
     assert windows[0]["features"]["projection_refresh_total"] == 1
     assert windows[0]["features"]["yjs_write_total"] == 1
     assert windows[0]["label"]["source"] == "codex_reviewed_log_heuristic"
+
+
+def test_observability_health_reports_schema_and_invariant_metrics(tmp_path: Path) -> None:
+    mod = _load_module()
+    log_path = tmp_path / "events.log"
+    log_path.write_text(
+        "\n".join(
+            [
+                '{"level":"INFO","logger":"adaos.events","msg":"event","time":"2026-05-31T08:00:00Z","ts":1780214400,"type":"tool.started","source":"tool_bridge","trace":"t1"}',
+                '{"level":"WARNING","logger":"adaos.yjs.governance","msg":"blocked YJS primary-doc write reason=write_amplification_blocked","time":"2026-05-31T08:00:01Z","ts":1780214401}',
+                '{"level":"WARNING","logger":"adaos.eventbus","msg":"slow async event handler duration=1.2s","time":"2026-05-31T08:00:02Z","ts":1780214402}',
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = mod.analyze_observability_health({"path": str(log_path), "max_lines": 20})["result"]
+
+    assert result["mode"] == "observability_health"
+    assert result["record_count"] == 3
+    assert result["summary"]["blocked_writes"] == 1
+    assert result["summary"]["slow_handlers"] == 1
+    assert result["summary"]["schema_score"] > 0
+    metric_ids = {item["id"] for item in result["metrics"]["items"]}
+    assert "observability_score" in metric_ids
+    assert "correlation_coverage" in metric_ids
 
 
 def test_event_window_export_writes_jsonl(tmp_path: Path) -> None:

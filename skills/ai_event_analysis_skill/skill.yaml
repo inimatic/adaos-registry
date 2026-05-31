@@ -1,5 +1,5 @@
 name: ai_event_analysis_skill
-version: 0.2.19
+version: 0.2.20
 description: Research skill for measurable AI/ML analysis of AdaOS operational event
   windows.
 runtime:
@@ -361,6 +361,35 @@ tools:
         type: boolean
       result:
         type: object
+- name: analyze_observability_health
+  description: Normalize local core, browser, YJS, and skill logs into observability
+    records, compute health metrics and invariant violations, and project the result.
+  entry: handlers.main:analyze_observability_health
+  input_schema:
+    type: object
+    properties:
+      path:
+        type: string
+      max_lines:
+        type: integer
+      window_seconds:
+        type: integer
+      node_id:
+        type: string
+      subnet_id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - result
+    properties:
+      ok:
+        type: boolean
+      result:
+        type: object
 - name: analyze_subscription_flow
   description: Analyze event publisher/subscriber flow from local logs and project
     subscription routing health.
@@ -410,5 +439,5 @@ tools:
         type: boolean
       export:
         type: object
-updated_at: '2026-05-31T08:55:24+00:00'
+updated_at: '2026-05-31T19:56:09+00:00'
 

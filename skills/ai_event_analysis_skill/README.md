@@ -237,6 +237,31 @@ The skill should not ingest raw secrets, full local paths, bearer tokens, or
 large log bodies into training data. The default importer stores redacted
 evidence excerpts plus aggregate features.
 
+## Observability Health Strategy
+
+The useful first milestone is not a neural classifier. It is a trustworthy
+data-engineering and observability layer:
+
+- normalize core, API, browser/YWS, YJS, projection, eventbus, and skill logs
+  into compact event records;
+- measure schema coverage: timestamp, event type, source/logger, and
+  correlation id coverage;
+- measure runtime health: slow tool calls, slow event handlers, event loop lag,
+  runtime errors, and service failures;
+- measure projection and browser health: YJS owner-flow warnings,
+  blocked/throttled writes, materialization repairs, and browser reconnect
+  bursts;
+- evaluate invariants before model metrics: event type coverage, source
+  coverage, correlation coverage, zero blocked writes, zero slow handlers, and
+  zero event-loop lag warnings.
+
+Labeling should start from invariant violations rather than model guesses.
+Each detected issue becomes a weak label candidate, for example
+`projection_write_blocked`, `slow_event_handler`,
+`runtime_event_loop_lag`, or `browser_session_instability`. Operators or
+students then accept/reject these candidates and attach a cause. Only after
+that review loop exists should ML/NN models be trained against held-out data.
+
 ## Pipeline Diagram
 
 ```mermaid
@@ -332,6 +357,9 @@ The skill currently ships:
 - a deterministic synthetic trial suite for useful first-run data;
 - a real-trial runner that emits AdaOS events, calls selected tools from other
   installed skills, and analyzes local node logs;
+- observability health analysis for normalized logs, schema coverage, runtime
+  health, projection/YJS health, browser/session health, and invariant-based
+  weak labels;
 - local log import into redacted evidence records;
 - fixed-window feature extraction;
 - JSONL event-window export;

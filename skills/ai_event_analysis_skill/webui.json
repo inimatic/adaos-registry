@@ -548,6 +548,10 @@
                     "label": "Analyze real logs"
                   },
                   {
+                    "id": "analyze_health",
+                    "label": "Analyze health"
+                  },
+                  {
                     "id": "analyze_subscriptions",
                     "label": "Analyze subscriptions"
                   },
@@ -604,6 +608,16 @@
                   "params": {
                     "webspace_id": "$runtime.webspace_id",
                     "window_seconds": 60
+                  }
+                },
+                {
+                  "on": "click:analyze_health",
+                  "type": "callSkill",
+                  "target": "ai_event_analysis_skill.analyze_observability_health",
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id",
+                    "window_seconds": 60,
+                    "max_lines": 800
                   }
                 },
                 {
