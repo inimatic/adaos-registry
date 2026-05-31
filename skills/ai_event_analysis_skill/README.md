@@ -144,6 +144,8 @@ See [Dataset Schema](docs/dataset-schema.md).
 ### Phase 5. Baselines And Metrics
 
 - [x] Add a deterministic synthetic dataset for the first iteration.
+- [x] Add a deterministic trial suite that exercises normal, incident, and
+  subscription-routing cases.
 - [x] Implement a rule-based baseline classifier.
 - [x] Compute accuracy, macro-F1, per-class precision/recall/F1, false positive
   rate, critical recall, detection delay, and top-reason hit rate.
@@ -166,7 +168,8 @@ See [Dataset Schema](docs/dataset-schema.md).
 
 ### Phase 7. Operator Insight Prototype
 
-- [x] Add baseline quality chart.
+- [x] Add operational readiness chart based on classification, critical recall,
+  normal precision, reason quality, routing health, and consumer coverage.
 - [x] Add event-volume chart by event window.
 - [x] Add class-distribution chart for baseline predictions.
 - [x] Add a `Subscriptions` Web UI view for event publisher/subscriber flow.
@@ -192,6 +195,21 @@ See [Dataset Schema](docs/dataset-schema.md).
 - [ ] Add suggested filter changes for overbroad subscriptions.
 - [ ] Add before/after simulation for throttling, coalescing, and debounce
   policies.
+
+### Phase 9. Trial Suite For Useful First-Run Data
+
+- [x] Add `run_trial_suite` as a deterministic workload.
+- [x] Cover normal idle/busy windows, eventbus backpressure, projection refresh
+  loops, Yjs pressure, browser reconnects, member disconnects, runtime rebuild
+  churn, and combined pressure.
+- [x] Generate subscription-flow records with active, idle, noisy, and missing
+  consumer cases.
+- [x] Project the trial result into the same dataset, window, metric,
+  subscription, and chart surfaces as real logs.
+- [ ] Add scenario runners that execute real AdaOS UI/API workflows and collect
+  resulting logs.
+- [ ] Persist scenario run metadata so trial datasets can be compared across
+  commits.
 
 ## Data Collection Strategy
 
@@ -245,6 +263,19 @@ flowchart LR
   G --> H[Web UI tables and charts]
 ```
 
+## Trial Suite Diagram
+
+```mermaid
+flowchart LR
+  A[Deterministic trial scenarios] --> B[Event windows]
+  A --> C[Subscription event records]
+  B --> D[Rule baseline metrics]
+  C --> E[Subscription flow analysis]
+  D --> F[Operational readiness chart]
+  E --> F
+  F --> G[Concrete UI smoke test]
+```
+
 ## Evaluation Loop
 
 ```mermaid
@@ -280,6 +311,7 @@ Stretch target:
 The skill currently ships:
 
 - a synthetic benchmark dataset generator;
+- a deterministic trial suite for useful first-run data;
 - local log import into redacted evidence records;
 - fixed-window feature extraction;
 - JSONL event-window export;
@@ -290,10 +322,29 @@ The skill currently ships:
 - a Web UI app named `AI Event Analysis`;
 - a `Windows` inspection view;
 - a `Subscriptions` inspection view;
-- baseline quality, event-volume, and class-distribution charts;
+- operational readiness, event-volume, and class-distribution charts;
 - subscription summary, publisher/subscriber edge table, and event-type volume
   chart;
 - a live stream receiver for demo evaluation and dataset-building results.
+
+Use cases now supported:
+
+1. `Run demo baseline` keeps the small synthetic benchmark available for quick
+   regression checks.
+2. `Run trial suite` populates every important table and chart with a diverse,
+   deterministic workload. This is the best first action when local logs do not
+   contain enough incidents.
+3. `Analyze real logs` builds event windows from available AdaOS logs and
+   compares the rule baseline with reviewed heuristic labels.
+4. `Analyze subscriptions` checks whether observed event emissions match
+   declared subscribers in the sampled logs.
+
+The right-side quality graph was changed from `Weak-label baseline quality` to
+`Operational readiness`. The new chart is intended to answer an operator-facing
+question: how ready the current event model is for incident classification and
+subscription routing review. On the `Subscriptions` tab the baseline chart is
+hidden, so the visible graph describes event-type volume for the subscription
+flow being inspected.
 
 Latest local reviewed-heuristic run:
 

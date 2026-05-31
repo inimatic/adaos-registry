@@ -34,6 +34,7 @@ def test_manifest_declares_measurable_tools_and_stream_wakeup() -> None:
         "refresh_snapshot",
         "rehydrate",
         "run_demo_evaluation",
+        "run_trial_suite",
         "evaluate_windows",
         "import_local_logs",
         "build_event_windows",
@@ -77,8 +78,12 @@ def test_webui_declares_app_widget_and_results_receiver() -> None:
     assert any(button["id"] == "subscriptions" for button in tabs["inputs"]["buttons"])
     actions = next(widget for widget in widgets if widget["id"] == "ai-event-analysis-actions")
     assert any(button["id"] == "refresh_snapshot" for button in actions["inputs"]["buttons"])
+    assert any(button["id"] == "run_trials" for button in actions["inputs"]["buttons"])
     assert any(button["id"] == "analyze_logs" for button in actions["inputs"]["buttons"])
     assert any(button["id"] == "analyze_subscriptions" for button in actions["inputs"]["buttons"])
+    readiness = next(widget for widget in widgets if widget["id"] == "ai-event-analysis-chart")
+    assert readiness["title"] == "Operational readiness"
+    assert "subscriptions" not in readiness["visibleIf"]
 
 
 def test_refresh_snapshot_projects_all_first_paint_sections(monkeypatch) -> None:
@@ -140,6 +145,22 @@ def test_rule_baseline_returns_required_measurement_fields() -> None:
     assert result["false_positive_rate"] <= 0.15
     assert result["top_reason_hit_rate"] > 0
     assert result["per_class"]
+
+
+def test_trial_suite_populates_operational_and_subscription_data() -> None:
+    mod = _load_module()
+
+    result = mod.run_trial_suite({"webspace_id": "test"})["result"]
+
+    assert result["mode"] == "trial_suite"
+    assert result["scenario_count"] >= 8
+    assert result["readiness_score"] >= 0.5
+    assert result["baseline_result"]["macro_f1"] >= 0.75
+    assert len(result["scenario_classes"]) >= 6
+    assert result["subscription_result"]["summary"]["declared_subscriptions"] >= 4
+    assert result["subscription_result"]["summary"]["missing_consumers"] >= 1
+    assert result["chart"]["title"] == "Trial operational readiness"
+    assert any(point["ts"] == "routing health" for point in result["chart"]["points"])
 
 
 def test_custom_window_evaluation_reports_false_positive_rate() -> None:

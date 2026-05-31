@@ -458,7 +458,8 @@
               "id": "ai-event-analysis-chart",
               "type": "visual.metricChart",
               "area": "right",
-              "title": "Baseline quality",
+              "title": "Operational readiness",
+              "visibleIf": "$state.aiEventAnalysisTab === 'overview' || $state.aiEventAnalysisTab === 'metrics'",
               "dataSource": {
                 "kind": "y",
                 "path": "data/ai_event_analysis/chart"
@@ -531,6 +532,10 @@
                     "label": "Run demo baseline"
                   },
                   {
+                    "id": "run_trials",
+                    "label": "Run trial suite"
+                  },
+                  {
                     "id": "refresh_snapshot",
                     "label": "Refresh demo"
                   },
@@ -557,6 +562,14 @@
                   "on": "click:run_demo",
                   "type": "callSkill",
                   "target": "ai_event_analysis_skill.run_demo_evaluation",
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  }
+                },
+                {
+                  "on": "click:run_trials",
+                  "type": "callSkill",
+                  "target": "ai_event_analysis_skill.run_trial_suite",
                   "params": {
                     "webspace_id": "$runtime.webspace_id"
                   }
@@ -742,8 +755,8 @@
         "items": []
       },
       "chart": {
-        "title": "Baseline quality",
-        "unit": "score",
+        "title": "Operational readiness",
+        "unit": "0..1",
         "points": []
       },
       "event_volume_chart": {

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-29T15:39:28+00:00",
+  "updated_at": "2026-05-31T06:10:15+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -28,8 +28,8 @@
       "kind": "skill",
       "id": "ai_event_analysis_skill",
       "name": "ai_event_analysis_skill",
-      "version": "0.2.16",
-      "updated_at": "2026-05-29T15:39:28+00:00",
+      "version": "0.2.17",
+      "updated_at": "2026-05-31T06:10:15+00:00",
       "path": "skills/ai_event_analysis_skill",
       "manifest": "skills/ai_event_analysis_skill/skill.yaml",
       "source": {
@@ -43,7 +43,7 @@
       },
       "description": "Research skill for measurable AI/ML analysis of AdaOS operational event windows.",
       "runtime_python": "3.11",
-      "tools_count": 10
+      "tools_count": 11
     },
     {
       "kind": "skill",

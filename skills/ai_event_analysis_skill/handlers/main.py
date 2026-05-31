@@ -533,6 +533,32 @@ def _project_subscription_flow(result: Mapping[str, Any], *, webspace_id: str) -
     return _project_sections(sections, webspace_id=webspace_id, force=True)
 
 
+def _readiness_chart(
+    result: Mapping[str, Any],
+    *,
+    title: str = "Operational readiness",
+    subscription_result: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    points = [
+        {"ts": "classification", "value": _value(result, "macro_f1")},
+        {"ts": "critical", "value": _value(result, "critical_recall")},
+        {"ts": "normal precision", "value": round(1.0 - _value(result, "false_positive_rate"), 3)},
+        {"ts": "reason quality", "value": _value(result, "top_reason_hit_rate")},
+    ]
+    if isinstance(subscription_result, Mapping):
+        summary = subscription_result.get("summary") if isinstance(subscription_result.get("summary"), Mapping) else {}
+        risk_score = _value(summary, "risk_score")
+        observed = max(1.0, _value(summary, "observed_event_types"))
+        missing = _value(summary, "missing_consumers")
+        points.extend(
+            [
+                {"ts": "routing health", "value": round(max(0.0, 1.0 - risk_score), 3)},
+                {"ts": "consumer coverage", "value": round(max(0.0, 1.0 - missing / observed), 3)},
+            ]
+        )
+    return {"title": title, "unit": "0..1", "points": points}
+
+
 def _weak_label(
     features: Mapping[str, Any],
     *,
@@ -706,6 +732,108 @@ def _synthetic_windows() -> list[dict[str, Any]]:
         _window("demo-011", "normal", "info", {"event_total": 46, "error_total": 0, "drop_total": 0, "supersede_total": 1, "projection_refresh_total": 9, "same_projection_refresh_max": 3, "yjs_write_total": 7, "browser_reconnect_total": 1, "member_disconnect_total": 0, "runtime_rebuild_total": 1}),
         _window("demo-012", "browser_session_instability", "critical", {"event_total": 94, "error_total": 8, "drop_total": 2, "supersede_total": 4, "projection_refresh_total": 18, "same_projection_refresh_max": 7, "yjs_write_total": 12, "browser_reconnect_total": 23, "member_disconnect_total": 0, "runtime_rebuild_total": 0}, first_symptom_s=7),
     ]
+
+
+def _trial_windows() -> list[dict[str, Any]]:
+    return [
+        _window("trial-001-normal-idle", "normal", "info", {"event_total": 24, "error_total": 0, "drop_total": 0, "supersede_total": 0, "projection_refresh_total": 5, "same_projection_refresh_max": 2, "yjs_write_total": 4, "browser_reconnect_total": 0, "member_disconnect_total": 0, "runtime_rebuild_total": 0}),
+        _window("trial-002-normal-busy", "normal", "info", {"event_total": 74, "error_total": 1, "drop_total": 0, "supersede_total": 1, "projection_refresh_total": 9, "same_projection_refresh_max": 4, "yjs_write_total": 17, "browser_reconnect_total": 1, "member_disconnect_total": 0, "runtime_rebuild_total": 1}),
+        _window("trial-003-eventbus-drop", "eventbus_backpressure", "critical", {"event_total": 390, "error_total": 13, "drop_total": 48, "supersede_total": 74, "projection_refresh_total": 32, "same_projection_refresh_max": 8, "yjs_write_total": 24, "browser_reconnect_total": 1, "member_disconnect_total": 0, "runtime_rebuild_total": 0}, first_symptom_s=6),
+        _window("trial-004-eventbus-supersede", "eventbus_backpressure", "warning", {"event_total": 260, "error_total": 5, "drop_total": 7, "supersede_total": 56, "projection_refresh_total": 17, "same_projection_refresh_max": 6, "yjs_write_total": 13, "browser_reconnect_total": 0, "member_disconnect_total": 0, "runtime_rebuild_total": 0}, first_symptom_s=11),
+        _window("trial-005-projection-loop", "projection_refresh_storm", "warning", {"event_total": 155, "error_total": 2, "drop_total": 1, "supersede_total": 5, "projection_refresh_total": 118, "same_projection_refresh_max": 70, "yjs_write_total": 18, "browser_reconnect_total": 0, "member_disconnect_total": 0, "runtime_rebuild_total": 0}, first_symptom_s=17),
+        _window("trial-006-yjs-pressure", "yjs_write_pressure", "critical", {"event_total": 112, "error_total": 10, "drop_total": 2, "supersede_total": 8, "projection_refresh_total": 28, "same_projection_refresh_max": 10, "yjs_write_total": 156, "browser_reconnect_total": 1, "member_disconnect_total": 0, "runtime_rebuild_total": 0}, first_symptom_s=4),
+        _window("trial-007-browser-reconnect", "browser_session_instability", "warning", {"event_total": 96, "error_total": 3, "drop_total": 0, "supersede_total": 3, "projection_refresh_total": 14, "same_projection_refresh_max": 4, "yjs_write_total": 15, "browser_reconnect_total": 15, "member_disconnect_total": 0, "runtime_rebuild_total": 0}, first_symptom_s=9),
+        _window("trial-008-member-drop", "member_node_disconnect", "critical", {"event_total": 81, "error_total": 8, "drop_total": 1, "supersede_total": 0, "projection_refresh_total": 11, "same_projection_refresh_max": 5, "yjs_write_total": 9, "browser_reconnect_total": 1, "member_disconnect_total": 4, "runtime_rebuild_total": 0}, first_symptom_s=3),
+        _window("trial-009-runtime-rebuild", "runtime_rebuild_churn", "warning", {"event_total": 132, "error_total": 4, "drop_total": 1, "supersede_total": 12, "projection_refresh_total": 31, "same_projection_refresh_max": 9, "yjs_write_total": 22, "browser_reconnect_total": 2, "member_disconnect_total": 0, "runtime_rebuild_total": 6}, first_symptom_s=19),
+        _window("trial-010-combined-pressure", "eventbus_backpressure", "critical", {"event_total": 520, "error_total": 18, "drop_total": 62, "supersede_total": 104, "projection_refresh_total": 88, "same_projection_refresh_max": 24, "yjs_write_total": 91, "browser_reconnect_total": 7, "member_disconnect_total": 1, "runtime_rebuild_total": 2}, first_symptom_s=2),
+    ]
+
+
+def _trial_subscription_records() -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = [
+        {
+            "message": '{"level":"INFO","logger":"adaos.sdk.subscriptions","msg":"skill=web_desktop_skill subscriptions=[desktop.webspace.reload: on_reload, webio.stream.snapshot.requested: on_snapshot]"}',
+            "severity": "info",
+            "topic": "trial.subscription",
+            "ts": 1,
+        },
+        {
+            "message": '{"level":"INFO","logger":"adaos.sdk.subscriptions","msg":"skill=ai_event_analysis_skill subscriptions=[ai_event_analysis.evaluate_requested: on_eval, data.changed: on_data_changed]"}',
+            "severity": "info",
+            "topic": "trial.subscription",
+            "ts": 2,
+        },
+        {
+            "message": '{"level":"INFO","logger":"adaos.sdk.subscriptions","msg":"skill=diagnostics_skill subscriptions=[diagnostic.run.requested: on_run, sys.ready: on_ready]"}',
+            "severity": "info",
+            "topic": "trial.subscription",
+            "ts": 3,
+        },
+    ]
+    emitted = [
+        ("desktop.webspace.reload", "desktop", 4),
+        ("webio.stream.snapshot.requested", "webio", 8),
+        ("sys.ready", "runtime", 2),
+        ("data.changed", "projection.runtime", 58),
+        ("diagnostic.unhandled.alert", "diagnostics", 7),
+    ]
+    ts = 10
+    for event_type, source, count in emitted:
+        for _index in range(count):
+            records.append(
+                {
+                    "message": json.dumps({"level": "INFO", "logger": "adaos.events", "type": event_type, "source": source}, sort_keys=True),
+                    "severity": "info",
+                    "topic": "trial.event",
+                    "ts": ts,
+                }
+            )
+            ts += 1
+    return records
+
+
+def _trial_suite_result() -> dict[str, Any]:
+    windows = _trial_windows()
+    baseline_result = _evaluate(windows)
+    subscription_result = _subscription_flow_from_records(_trial_subscription_records())
+    readiness = _readiness_chart(baseline_result, title="Trial operational readiness", subscription_result=subscription_result)
+    scenario_classes = sorted({str((window.get("label") or {}).get("incident_type") or "normal") for window in windows})
+    summary = subscription_result.get("summary") if isinstance(subscription_result.get("summary"), Mapping) else {}
+    readiness_score = round(
+        (
+            _value(baseline_result, "macro_f1")
+            + _value(baseline_result, "critical_recall")
+            + max(0.0, 1.0 - _value(baseline_result, "false_positive_rate"))
+            + max(0.0, 1.0 - _value(summary, "risk_score"))
+        )
+        / 4.0,
+        3,
+    )
+    return {
+        "mode": "trial_suite",
+        "scenario_count": len(windows),
+        "scenario_classes": scenario_classes,
+        "window_count": len(windows),
+        "record_count": len(_trial_subscription_records()),
+        "label_source": "deterministic_trial_suite",
+        "baseline_result": baseline_result,
+        "subscription_result": subscription_result,
+        "readiness_score": readiness_score,
+        "chart": readiness,
+        "windows": windows,
+        "rows": _window_rows(windows, limit=48),
+        "event_volume_chart": {
+            "title": "Trial event volume by window",
+            "unit": "events",
+            "points": _event_volume_points(windows),
+        },
+        "class_distribution_chart": {
+            "title": "Trial class distribution",
+            "unit": "windows",
+            "points": _class_distribution_points(windows),
+        },
+        "built_at": _now_iso(),
+    }
 
 
 def _value(features: Mapping[str, Any], key: str) -> float:
@@ -922,16 +1050,7 @@ def _snapshot() -> dict[str, Any]:
         "windows": {"items": _window_rows(demo_windows)},
         "metrics": {"items": _metric_rows(demo_result)},
         "per_class": {"items": demo_result["per_class"]},
-        "chart": {
-            "title": "Baseline quality",
-            "unit": "score",
-            "points": [
-                {"ts": "accuracy", "value": demo_result["accuracy"]},
-                {"ts": "macro-F1", "value": demo_result["macro_f1"]},
-                {"ts": "critical recall", "value": demo_result["critical_recall"]},
-                {"ts": "reason hit", "value": demo_result["top_reason_hit_rate"]},
-            ],
-        },
+        "chart": _readiness_chart(demo_result),
         "event_volume_chart": {
             "title": "Event volume by window",
             "unit": "events",
@@ -983,17 +1102,8 @@ def _project_evaluation_result(result: Mapping[str, Any], *, webspace_id: str) -
         },
         "metrics": {"items": _metric_rows(result)},
         "per_class": {"items": list(result.get("per_class") or [])},
-        "chart": {
-            "title": "Baseline quality",
-            "unit": "score",
-            "points": [
-                {"ts": "accuracy", "value": result.get("accuracy")},
-                {"ts": "macro-F1", "value": result.get("macro_f1")},
-                {"ts": "critical recall", "value": result.get("critical_recall")},
-                {"ts": "reason hit", "value": result.get("top_reason_hit_rate")},
-            ],
-        },
-    }
+                "chart": _readiness_chart(result),
+            }
     return _project_sections(sections, webspace_id=webspace_id)
 
 
@@ -1026,19 +1136,61 @@ def _project_windows_result(result: Mapping[str, Any], *, webspace_id: str, incl
                 },
                 "metrics": {"items": _metric_rows(baseline)},
                 "per_class": {"items": list(baseline.get("per_class") or [])},
-                "chart": {
-                    "title": "Weak-label baseline quality",
-                    "unit": "score",
-                    "points": [
-                        {"ts": "accuracy", "value": baseline.get("accuracy")},
-                        {"ts": "macro-F1", "value": baseline.get("macro_f1")},
-                        {"ts": "critical recall", "value": baseline.get("critical_recall")},
-                        {"ts": "reason hit", "value": baseline.get("top_reason_hit_rate")},
-                    ],
-                },
+                "chart": _readiness_chart(baseline, title="Real-log operational readiness"),
             }
         )
     return _project_sections(sections, webspace_id=webspace_id)
+
+
+def _project_trial_suite(result: Mapping[str, Any], *, webspace_id: str) -> dict[str, Any]:
+    baseline = result.get("baseline_result") if isinstance(result.get("baseline_result"), Mapping) else {}
+    subscription = result.get("subscription_result") if isinstance(result.get("subscription_result"), Mapping) else {}
+    sections = {
+        "summary": {
+            "label": "AI Event Analysis",
+            "value": f"{_value(result, 'readiness_score'):.3f}",
+            "subtitle": "trial-suite readiness score",
+            "description": (
+                f"scenarios={result.get('scenario_count')} classes={len(result.get('scenario_classes') or [])} "
+                f"routing_risk={((subscription.get('summary') or {}).get('risk_score') if isinstance(subscription.get('summary'), Mapping) else 'n/a')}"
+            ),
+            "buttons": [
+                {"id": "open", "label": "Open"},
+                {"id": "run_trials", "label": "Run trial suite"},
+                {"id": "analyze_logs", "label": "Analyze real logs"},
+            ],
+        },
+        "dataset": {
+            "items": [
+                {"id": "trial_scenarios", "name": "Trial scenarios", "current": result.get("scenario_count"), "target": "normal + incident + routing", "notes": "Deterministic local workload for useful first-run data."},
+                {"id": "scenario_classes", "name": "Covered classes", "current": len(result.get("scenario_classes") or []), "target": "all baseline classes", "notes": ", ".join(result.get("scenario_classes") or [])},
+                {"id": "trial_windows", "name": "Event windows", "current": result.get("window_count"), "target": "diverse synthetic evidence", "notes": "Windows are deterministic and labeled by construction."},
+                {"id": "subscription_records", "name": "Subscription events", "current": result.get("record_count"), "target": "active, idle, noisy, missing consumer", "notes": "Exercises subscription-flow analysis without core changes."},
+                {"id": "label_source", "name": "Label source", "current": result.get("label_source"), "target": "manual labels for real datasets", "notes": "Use trial data for smoke tests and UI validation."},
+            ]
+        },
+        "windows": {"items": list(result.get("rows") or [])},
+        "metrics": {"items": _metric_rows(baseline)},
+        "per_class": {"items": list(baseline.get("per_class") or []) if isinstance(baseline, Mapping) else []},
+        "chart": result.get("chart") or _readiness_chart(baseline, title="Trial operational readiness", subscription_result=subscription),
+        "event_volume_chart": result.get("event_volume_chart") or {"title": "Trial event volume by window", "unit": "events", "points": []},
+        "class_distribution_chart": result.get("class_distribution_chart") or {"title": "Trial class distribution", "unit": "windows", "points": []},
+        "subscription_summary": {"items": [
+            {"id": key, "name": key.replace("_", " ").title(), "value": value}
+            for key, value in ((subscription.get("summary") or {}) if isinstance(subscription, Mapping) else {}).items()
+        ]},
+        "subscription_edges": {"items": list(subscription.get("rows") or []) if isinstance(subscription, Mapping) else []},
+        "subscription_metrics": subscription.get("metrics") if isinstance(subscription, Mapping) else {"items": []},
+        "subscription_chart": subscription.get("chart") if isinstance(subscription, Mapping) else {"title": "Observed event volume by type", "unit": "events", "points": []},
+        "experiments": {
+            "items": [
+                {"id": "trial_suite", "model": "Trial suite", "status": "implemented", "macro_f1": baseline.get("macro_f1") if isinstance(baseline, Mapping) else "", "next_step": "Use before real-log/manual-label evaluation to prove UI and metrics are populated."},
+                {"id": "real_log_review", "model": "Real-log reviewed heuristic", "status": "implemented", "macro_f1": "", "next_step": "Add manual label review to turn weak labels into ground truth."},
+                {"id": "subscription_routing", "model": "Subscription flow analysis", "status": "implemented", "macro_f1": "", "next_step": "Add delivery ack/latency logs for routing accuracy."},
+            ]
+        },
+    }
+    return _project_sections(sections, webspace_id=webspace_id, force=True)
 
 
 def _publish_result(result: Mapping[str, Any], *, webspace_id: str) -> None:
@@ -1121,6 +1273,40 @@ def run_demo_evaluation(payload: Mapping[str, Any] | None = None, **_: Any) -> d
             "ai_event_analysis.evaluation.completed",
             {"model": result["model"], "macro_f1": result["macro_f1"], "webspace_id": webspace_id},
             source="ai_event_analysis_skill",
+        )
+    except Exception:
+        pass
+    return {"ok": True, "result": result}
+
+
+@tool("run_trial_suite")
+def run_trial_suite(payload: Mapping[str, Any] | None = None, **_: Any) -> dict[str, Any]:
+    webspace_id = _webspace_id_from_payload(payload)
+    result = _trial_suite_result()
+    _project_trial_suite(result, webspace_id=webspace_id)
+    baseline = result.get("baseline_result") if isinstance(result.get("baseline_result"), Mapping) else {}
+    subscription = result.get("subscription_result") if isinstance(result.get("subscription_result"), Mapping) else {}
+    summary = subscription.get("summary") if isinstance(subscription.get("summary"), Mapping) else {}
+    try:
+        stream_publish(
+            _RESULTS_RECEIVER,
+            [
+                {
+                    "id": "trial-suite",
+                    "title": f"Trial suite readiness {result.get('readiness_score')}",
+                    "description": (
+                        f"scenarios={result.get('scenario_count')} macro_f1={baseline.get('macro_f1')} "
+                        f"critical_recall={baseline.get('critical_recall')} routing_risk={summary.get('risk_score')}"
+                    ),
+                    "content": {
+                        "readiness_score": result.get("readiness_score"),
+                        "scenario_classes": result.get("scenario_classes"),
+                        "baseline": _compact_evaluation_result(baseline),
+                        "subscription_summary": summary,
+                    },
+                }
+            ],
+            _meta={"webspace_id": webspace_id},
         )
     except Exception:
         pass
