@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-31T19:56:09+00:00",
+  "updated_at": "2026-05-31T21:08:36+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -360,8 +360,8 @@
       "kind": "skill",
       "id": "rasa_nlu_service_skill",
       "name": "rasa_nlu_service_skill",
-      "version": "0.1.6",
-      "updated_at": "2026-05-29T14:23:30+00:00",
+      "version": "0.1.7",
+      "updated_at": "2026-05-31T21:08:36+00:00",
       "path": "skills/rasa_nlu_service_skill",
       "manifest": "skills/rasa_nlu_service_skill/skill.yaml",
       "source": {

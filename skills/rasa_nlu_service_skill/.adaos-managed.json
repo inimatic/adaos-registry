@@ -4,12 +4,12 @@
     "adaos-rasa-nlu @ git+https://github.com/inimatic/rasa-port.git@main"
   ],
   "files": {
-    "skill.yaml": "e93d4effc5aab0951364a388b7d7955d039adfde020259c7044216d70fdd0643",
+    "skill.yaml": "62649730a70175d758c9e6501f8a889f89db5f42bbd106ca4dcd4c901cad28fa",
     "requirements.in": "e12ba9d343d3661ea9ea0cb3a52e72b4fbd3e20c2d2ec99bd99c637287cf0cdb",
     "README.md": "666b3b038e885c32d82e1ee728416e403ddff142e6332d99b9e16e185be67cbc",
     "handlers/__init__.py": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
     "handlers/main.py": "8ea4758b860a1d433f41c12f4c861330eeb5809428a4c38c8a5171de9558f343",
     "handlers/service.py": "4a624fbc6ba4b98f8bf34a688942272e33b67c285c972972c171c76ae95f7ba1"
   },
-  "fingerprint": "231dc06d321e8615954e2b061320910701e1965387afeef037b8ca297f2e323a"
+  "fingerprint": "88d75898e785d0b73bfbd1b49c690a4004e8907889355f389d49ae450914efdc"
 }
