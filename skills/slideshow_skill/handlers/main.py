@@ -261,13 +261,22 @@ def start_redevice_slideshow(
         },
     }
     res = _request_json("POST", f"/v1/redevice/devices/{urllib.parse.quote(pair_code, safe='')}/commands", {"command": command})
+    queued = res.get("command") if isinstance(res.get("command"), Mapping) else {}
     payload = {
         "ok": bool(res.get("ok")),
         "device": {"code": pair_code, "endpoint_id": device.get("endpoint_id"), "state": device.get("state")},
         "command_id": command_id,
         "source_dir": str(root),
         "items": [{"source_name": item["source_name"], "thumbnail_path": item["thumbnail_path"], "cached": item["cached"]} for item in items],
-        "result": res,
+        "result": {
+            "ok": bool(res.get("ok")),
+            "error": res.get("error"),
+            "command": {
+                "command_id": queued.get("command_id") or command_id,
+                "type": queued.get("type") or command.get("type"),
+                "state": queued.get("state"),
+            },
+        },
         "updated_at": datetime.now(tz=timezone.utc).isoformat(),
     }
     _publish(payload, webspace_id)

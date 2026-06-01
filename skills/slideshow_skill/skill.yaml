@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.4
+version: 0.1.5
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -119,5 +119,5 @@ data_routes:
     log: service.slideshow_skill.runtime.log
     quarantine: false
 redui: redui.json
-updated_at: '2026-06-01T20:25:00+00:00'
+updated_at: '2026-06-01T20:37:00+00:00'
 

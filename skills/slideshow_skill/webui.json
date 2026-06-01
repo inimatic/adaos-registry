@@ -121,8 +121,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.refresh_redevice_slideshow_state",
                   "params": {
-                    "source_dir": "$state.slideshowSourceDir",
-                    "webspace_id": "$webspace.id"
+                    "source_dir": "$state.slideshowSourceDir"
                   }
                 },
                 {
@@ -131,8 +130,7 @@
                   "target": "slideshow_skill.list_slideshow_photos",
                   "params": {
                     "limit": 10,
-                    "source_dir": "$state.slideshowSourceDir",
-                    "webspace_id": "$webspace.id"
+                    "source_dir": "$state.slideshowSourceDir"
                   }
                 },
                 {
@@ -142,8 +140,7 @@
                   "params": {
                     "code": "$state.slideshowDeviceCode",
                     "limit": 5,
-                    "source_dir": "$state.slideshowSourceDir",
-                    "webspace_id": "$webspace.id"
+                    "source_dir": "$state.slideshowSourceDir"
                   }
                 }
               ]
