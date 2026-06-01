@@ -140,7 +140,8 @@
                 "title": "User requests",
                 "dataSource": {
                   "kind": "y",
-                  "path": "data/nlu_teacher/threads_by_request"
+                  "path": "data/nlu_teacher/threads_by_request",
+                  "scope": "shared"
                 },
                 "inputs": {
                   "inset": true,
@@ -179,7 +180,8 @@
                 "title": "Candidates",
                 "dataSource": {
                   "kind": "y",
-                  "path": "data/nlu_teacher/threads_by_candidate"
+                  "path": "data/nlu_teacher/threads_by_candidate",
+                  "scope": "shared"
                 },
                 "inputs": {
                   "inset": true,
@@ -242,7 +244,8 @@
                 "title": "Signals",
                 "dataSource": {
                   "kind": "y",
-                  "path": "data/nlu_teacher/workbench_signals"
+                  "path": "data/nlu_teacher/workbench_signals",
+                  "scope": "shared"
                 },
                 "inputs": {
                   "inset": true,

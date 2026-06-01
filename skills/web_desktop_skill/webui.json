@@ -156,7 +156,8 @@
               "title": "User requests",
               "dataSource": {
                 "kind": "y",
-                "path": "data/nlu_teacher/events"
+                "path": "data/nlu_teacher/events",
+                "scope": "shared"
               },
               "inputs": {
                 "inset": true,
@@ -201,7 +202,8 @@
               "title": "Candidates",
               "dataSource": {
                 "kind": "y",
-                "path": "data/nlu_teacher/events_by_candidate"
+                "path": "data/nlu_teacher/events_by_candidate",
+                "scope": "shared"
               },
               "inputs": {
                 "inset": true,
@@ -265,7 +267,8 @@
               "title": "Signals",
               "dataSource": {
                 "kind": "y",
-                "path": "data/nlu_teacher/workbench_signals"
+                "path": "data/nlu_teacher/workbench_signals",
+                "scope": "shared"
               },
               "inputs": {
                 "inset": true,
