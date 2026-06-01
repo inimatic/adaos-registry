@@ -102,6 +102,10 @@
                     {
                       "id": "candidates",
                       "label": "Candidates"
+                    },
+                    {
+                      "id": "signals",
+                      "label": "Signals"
                     }
                   ]
                 },
@@ -118,6 +122,13 @@
                     "type": "updateState",
                     "params": {
                       "nluTeacherTab": "candidates"
+                    }
+                  },
+                  {
+                    "on": "click:signals",
+                    "type": "updateState",
+                    "params": {
+                      "nluTeacherTab": "signals"
                     }
                   }
                 ]
@@ -223,6 +234,28 @@
                     }
                   }
                 ]
+              },
+              {
+                "id": "nlu-signals",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Signals",
+                "dataSource": {
+                  "kind": "y",
+                  "path": "data/nlu_teacher/workbench_signals"
+                },
+                "inputs": {
+                  "inset": true,
+                  "emptyText": "No teacher signals yet",
+                  "titleKey": "title",
+                  "subtitleKey": "subtitle",
+                  "itemAccordion": true,
+                  "detailsPath": "details",
+                  "detailsModal": true,
+                  "detailsModalTitleKey": "title"
+                },
+                "visibleIf": "$state.nluTeacherTab === 'signals'",
+                "actions": []
               }
             ]
           }
