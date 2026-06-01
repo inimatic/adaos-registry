@@ -1,9 +1,10 @@
 name: slideshow_skill
-version: 0.1.1
+version: 0.1.2
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
-runtime: python
-entrypoint: handlers.main
+runtime:
+  type: python
+  module: handlers.main
 tools:
 - name: list_slideshow_photos
   description: List source photos that can be sent to a ReDevice slideshow endpoint.
@@ -21,5 +22,5 @@ data_routes:
   description: Current slideshow source, target endpoint, queued command, cache status,
     and last endpoint event.
 redui: redui.json
-updated_at: '2026-06-01T18:38:12+00:00'
+updated_at: '2026-06-01T19:18:19+00:00'
 
