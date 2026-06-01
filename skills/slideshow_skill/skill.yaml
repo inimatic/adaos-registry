@@ -1,10 +1,12 @@
 name: slideshow_skill
-version: 0.1.6
+version: 0.1.7
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
   type: python
   module: handlers.main
+dependencies:
+- pillow>=10.0.0
 tools:
 - name: list_slideshow_photos
   description: List source photos that can be sent to a ReDevice slideshow endpoint.
@@ -46,7 +48,8 @@ tools:
     properties:
       code:
         type: string
-        description: Optional ReDevice pair code. The first admitted endpoint is used when omitted.
+        description: Optional ReDevice pair code. The first admitted endpoint is used
+          when omitted.
       limit:
         type: integer
         minimum: 1
@@ -182,5 +185,5 @@ data_routes:
     log: service.slideshow_skill.runtime.log
     quarantine: false
 redui: redui.json
-updated_at: '2026-06-02T00:35:00+00:00'
+updated_at: '2026-06-01T22:47:57+00:00'
 
