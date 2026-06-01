@@ -1,0 +1,186 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "webio": {
+    "receivers": {
+      "slideshow_skill.state": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": false,
+          "device": null,
+          "items": [],
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 1,
+          "maxSnapshotHz": 1,
+          "maxItems": 32
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last slideshow command state.",
+          "log": "service.slideshow_skill.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.slideshow_skill.state"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:slideshow_modal",
+          "owner": "skill:slideshow_skill",
+          "firstPaint": "empty slideshow state",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "slideshow_skill.action"
+          ]
+        }
+      }
+    }
+  },
+  "apps": [
+    {
+      "id": "slideshow_skill_app",
+      "title": "Slideshow",
+      "subtitle": "Send photos to a ReDevice endpoint",
+      "icon": "images-outline",
+      "launchModal": "slideshow_modal",
+      "action": {
+        "openModal": "slideshow_modal"
+      }
+    }
+  ],
+  "registry": {
+    "modals": {
+      "slideshow_modal": {
+        "title": "ReDevice slideshow",
+        "schema": {
+          "id": "slideshow_modal",
+          "initialState": {
+            "slideshowSourceDir": "C:\\Users\\Zver\\Pictures"
+          },
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "slideshow-source-dir",
+              "type": "input.text",
+              "area": "main",
+              "title": "Photo source folder",
+              "inputs": {
+                "initialValue": "C:\\Users\\Zver\\Pictures",
+                "placeholder": "C:\\Users\\Zver\\Pictures",
+                "commitMode": "manual",
+                "saveLabel": "Apply source",
+                "helper": "Root folder scanned for slideshow images on this node."
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "slideshowSourceDir": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "slideshow-actions",
+              "type": "input.commandBar",
+              "area": "main",
+              "title": "Actions",
+              "inputs": {
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "refresh",
+                    "label": "Refresh endpoint"
+                  },
+                  {
+                    "id": "preview",
+                    "label": "Preview"
+                  },
+                  {
+                    "id": "start",
+                    "label": "Start"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:refresh",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.refresh_redevice_slideshow_state",
+                  "params": {
+                    "source_dir": "$state.slideshowSourceDir",
+                    "webspace_id": "$webspace.id"
+                  }
+                },
+                {
+                  "on": "click:preview",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.list_slideshow_photos",
+                  "params": {
+                    "limit": 10,
+                    "source_dir": "$state.slideshowSourceDir",
+                    "webspace_id": "$webspace.id"
+                  }
+                },
+                {
+                  "on": "click:start",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.start_redevice_slideshow",
+                  "params": {
+                    "limit": 5,
+                    "source_dir": "$state.slideshowSourceDir",
+                    "webspace_id": "$webspace.id"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "slideshow-state",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Last command",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.state"
+              },
+              "inputs": {
+                "titleKey": "source_dir",
+                "subtitleKey": "updated_at",
+                "detailsPath": "items",
+                "showDetails": true,
+                "emptyText": "No slideshow command yet"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "slideshow_skill_app",
+      "title": "Slideshow",
+      "subtitle": "Send photos to a ReDevice endpoint",
+      "icon": "images-outline",
+      "launchModal": "slideshow_modal",
+      "action": {
+        "openModal": "slideshow_modal"
+      },
+      "autoInstall": true
+    }
+  ]
+}

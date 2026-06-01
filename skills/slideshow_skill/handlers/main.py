@@ -38,8 +38,9 @@ def _root_base() -> str:
     return str(raw).strip().rstrip("/")
 
 
-def _source_dir() -> Path:
-    return Path(os.environ.get("SLIDESHOW_SOURCE_DIR") or r"C:\Users\Zver\Pictures")
+def _source_dir(source_dir: str | None = None) -> Path:
+    token = str(source_dir or "").strip()
+    return Path(token or os.environ.get("SLIDESHOW_SOURCE_DIR") or r"C:\Users\Zver\Pictures")
 
 
 def _cache_dir() -> Path:
@@ -73,8 +74,8 @@ def _request_json(method: str, path: str, payload: Mapping[str, Any] | None = No
         return {"ok": False, "error": f"http_{exc.code}", "detail": detail}
 
 
-def _photo_files(limit: int = 20) -> list[Path]:
-    root = _source_dir()
+def _photo_files(limit: int = 20, source_dir: str | None = None) -> list[Path]:
+    root = _source_dir(source_dir)
     if not root.exists():
         return []
     files = [p for p in root.iterdir() if p.is_file() and p.suffix.lower() in _SUPPORTED]
@@ -144,27 +145,41 @@ def _publish(payload: Mapping[str, Any], webspace_id: str | None = None) -> None
 
 
 @tool
-def list_slideshow_photos(limit: int = 10) -> dict[str, Any]:
-    files = _photo_files(limit)
-    return {
+def list_slideshow_photos(
+    limit: int = 10,
+    source_dir: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    root = _source_dir(source_dir)
+    files = _photo_files(limit, source_dir)
+    payload = {
         "ok": True,
-        "source_dir": str(_source_dir()),
+        "source_dir": str(root),
         "count": len(files),
         "items": [{"path": str(p), "name": p.name, "size": p.stat().st_size} for p in files],
+        "updated_at": datetime.now(tz=timezone.utc).isoformat(),
     }
+    _publish(payload, webspace_id)
+    return payload
 
 
 @tool
-def start_redevice_slideshow(code: str | None = None, limit: int = 5, webspace_id: str | None = None) -> dict[str, Any]:
+def start_redevice_slideshow(
+    code: str | None = None,
+    limit: int = 5,
+    webspace_id: str | None = None,
+    source_dir: str | None = None,
+) -> dict[str, Any]:
     device = _select_device(code)
     if not device:
         return {"ok": False, "error": "no_redevice_endpoint"}
     pair_code = str(device.get("code") or "")
     if not pair_code:
         return {"ok": False, "error": "device_code_missing"}
-    files = _photo_files(limit)
+    root = _source_dir(source_dir)
+    files = _photo_files(limit, source_dir)
     if not files:
-        return {"ok": False, "error": "no_supported_photos", "source_dir": str(_source_dir())}
+        return {"ok": False, "error": "no_supported_photos", "source_dir": str(root)}
     items = [_content_item(path) for path in files]
     command_id = "cmd:slideshow:" + hashlib.sha256(f"{pair_code}:{datetime.now(tz=timezone.utc).isoformat()}".encode("utf-8")).hexdigest()[:16]
     owner = _owner()
@@ -197,7 +212,7 @@ def start_redevice_slideshow(code: str | None = None, limit: int = 5, webspace_i
         "ok": bool(res.get("ok")),
         "device": {"code": pair_code, "endpoint_id": device.get("endpoint_id"), "state": device.get("state")},
         "command_id": command_id,
-        "source_dir": str(_source_dir()),
+        "source_dir": str(root),
         "items": [{"source_name": item["source_name"], "thumbnail_path": item["thumbnail_path"], "cached": item["cached"]} for item in items],
         "result": res,
         "updated_at": datetime.now(tz=timezone.utc).isoformat(),
@@ -207,8 +222,18 @@ def start_redevice_slideshow(code: str | None = None, limit: int = 5, webspace_i
 
 
 @tool
-def refresh_redevice_slideshow_state(code: str | None = None, webspace_id: str | None = None) -> dict[str, Any]:
+def refresh_redevice_slideshow_state(
+    code: str | None = None,
+    webspace_id: str | None = None,
+    source_dir: str | None = None,
+) -> dict[str, Any]:
     device = _select_device(code)
-    payload = {"ok": device is not None, "device": device, "owner": _owner(), "updated_at": datetime.now(tz=timezone.utc).isoformat()}
+    payload = {
+        "ok": device is not None,
+        "device": device,
+        "owner": _owner(),
+        "source_dir": str(_source_dir(source_dir)),
+        "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
     _publish(payload, webspace_id)
     return payload

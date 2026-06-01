@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.2
+version: 0.1.3
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -9,18 +9,115 @@ tools:
 - name: list_slideshow_photos
   description: List source photos that can be sent to a ReDevice slideshow endpoint.
   entry: handlers.main:list_slideshow_photos
+  input_schema:
+    type: object
+    properties:
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+      source_dir:
+        type: string
+        description: Root folder with source photos.
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      source_dir:
+        type: string
+      count:
+        type: integer
+      items:
+        type: array
+        items:
+          type: object
 - name: start_redevice_slideshow
   description: Convert source photos to cached thumbnails and queue a display.render_surface
     command for a ReDevice endpoint.
   entry: handlers.main:start_redevice_slideshow
+  input_schema:
+    type: object
+    properties:
+      code:
+        type: string
+        description: Optional ReDevice pair code. The first admitted endpoint is used when omitted.
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 20
+        default: 5
+      webspace_id:
+        type: string
+      source_dir:
+        type: string
+        description: Root folder with source photos.
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      error:
+        type: string
+      command_id:
+        type: string
+      source_dir:
+        type: string
+      device:
+        type: object
+      items:
+        type: array
+        items:
+          type: object
 - name: refresh_redevice_slideshow_state
   description: Read the latest ReDevice registry state and last surface event.
   entry: handlers.main:refresh_redevice_slideshow_state
+  input_schema:
+    type: object
+    properties:
+      code:
+        type: string
+      webspace_id:
+        type: string
+      source_dir:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      device:
+        type: object
+      owner:
+        type: object
+      updated_at:
+        type: string
 data_routes:
-- id: slideshow_skill.state
+- surface: modal:slideshow_modal
   route: stream
-  description: Current slideshow source, target endpoint, queued command, cache status,
-    and last endpoint event.
+  receiver: slideshow_skill.state
+  first_paint: empty slideshow state
+  recovery: latest slideshow command state is restored from stream snapshot
+  update_source:
+  - slideshow_skill.action
+  budget:
+    max_payload_bytes: 65536
+    max_publish_hz: 1
+    max_items: 32
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the last slideshow command state
+    log: service.slideshow_skill.runtime.log
+    quarantine: false
 redui: redui.json
-updated_at: '2026-06-01T19:18:19+00:00'
+updated_at: '2026-06-01T20:05:00+00:00'
 
