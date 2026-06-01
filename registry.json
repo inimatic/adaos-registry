@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-05-12T03:49:11+00:00",
+  "updated_at": "2026-06-01T18:38:12+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -438,6 +438,26 @@
       },
       "description": "Consumes skill.service.doctor.request and emits a stub doctor report (no LLM yet).",
       "runtime_python": "3.11"
+    },
+    {
+      "kind": "skill",
+      "id": "slideshow_skill",
+      "name": "slideshow_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-06-01T18:38:12+00:00",
+      "path": "skills/slideshow_skill",
+      "manifest": "skills/slideshow_skill/skill.yaml",
+      "source": {
+        "path": "skills/slideshow_skill",
+        "manifest": "skills/slideshow_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "slideshow_skill",
+        "id": "slideshow_skill"
+      },
+      "description": "ReDevice slideshow pilot skill that renders cached thumbnails on an assigned endpoint and records endpoint surface events.",
+      "tools_count": 3
     },
     {
       "kind": "skill",

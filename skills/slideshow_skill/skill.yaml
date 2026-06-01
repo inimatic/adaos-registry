@@ -1,0 +1,25 @@
+name: slideshow_skill
+version: 0.1.1
+description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
+  endpoint and records endpoint surface events.
+runtime: python
+entrypoint: handlers.main
+tools:
+- name: list_slideshow_photos
+  description: List source photos that can be sent to a ReDevice slideshow endpoint.
+  entry: handlers.main:list_slideshow_photos
+- name: start_redevice_slideshow
+  description: Convert source photos to cached thumbnails and queue a display.render_surface
+    command for a ReDevice endpoint.
+  entry: handlers.main:start_redevice_slideshow
+- name: refresh_redevice_slideshow_state
+  description: Read the latest ReDevice registry state and last surface event.
+  entry: handlers.main:refresh_redevice_slideshow_state
+data_routes:
+- id: slideshow_skill.state
+  route: stream
+  description: Current slideshow source, target endpoint, queued command, cache status,
+    and last endpoint event.
+redui: redui.json
+updated_at: '2026-06-01T18:38:12+00:00'
+
