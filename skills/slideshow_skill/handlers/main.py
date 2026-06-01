@@ -128,12 +128,65 @@ def _load_devices() -> list[dict[str, Any]]:
     return [dict(item) for item in devices if isinstance(item, Mapping)] if isinstance(devices, list) else []
 
 
+def _age_seconds(value: Any) -> int | None:
+    try:
+        ts = float(value or 0)
+    except Exception:
+        return None
+    if ts <= 0:
+        return None
+    return max(0, int(datetime.now(tz=timezone.utc).timestamp() - ts))
+
+
+def _online_state(item: Mapping[str, Any]) -> str:
+    sec = _age_seconds(item.get("last_seen_at"))
+    if sec is None:
+        return "unknown"
+    if sec < 60:
+        return "online"
+    if sec < 5 * 60:
+        return "stale"
+    return "offline"
+
+
+def _compact_device(item: Mapping[str, Any]) -> dict[str, Any]:
+    policy = item.get("endpoint_policy") if isinstance(item.get("endpoint_policy"), Mapping) else {}
+    state = str(item.get("state") or "-")
+    code = str(item.get("code") or "")
+    endpoint_id = str(item.get("endpoint_id") or "")
+    label = str(item.get("device_label") or endpoint_id or code)
+    seen = _age_seconds(item.get("last_seen_at"))
+    return {
+        "id": code or endpoint_id,
+        "code": code,
+        "title": label,
+        "state": state,
+        "online_state": _online_state(item),
+        "last_seen": "-" if seen is None else f"{seen}s" if seen < 60 else f"{seen // 60}m {seen % 60}s",
+        "zone_id": str(item.get("zone_id") or "-"),
+        "trust_level": str(policy.get("trust_level") or "limited"),
+        "endpoint_id": endpoint_id,
+        "selectable": bool(code and state in {"approved", "consumed"}),
+    }
+
+
 def _select_device(code: str | None = None) -> dict[str, Any] | None:
     devices = _load_devices()
     if code:
         for item in devices:
             if str(item.get("code") or "") == str(code):
                 return item
+        return None
+    ranked = sorted(
+        devices,
+        key=lambda item: (
+            0 if _online_state(item) == "online" else 1 if _online_state(item) == "stale" else 2 if _online_state(item) == "unknown" else 3,
+            0 if str(item.get("state") or "") in {"approved", "consumed"} else 1,
+        ),
+    )
+    for item in ranked:
+        if str(item.get("state") or "") in {"approved", "consumed"}:
+            return item
     for item in devices:
         if str(item.get("state") or "") in {"approved", "consumed"}:
             return item
@@ -227,10 +280,13 @@ def refresh_redevice_slideshow_state(
     webspace_id: str | None = None,
     source_dir: str | None = None,
 ) -> dict[str, Any]:
+    devices = _load_devices()
     device = _select_device(code)
     payload = {
         "ok": device is not None,
         "device": device,
+        "selected_device_code": str(device.get("code") or "") if device else "",
+        "items": [_compact_device(item) for item in devices],
         "owner": _owner(),
         "source_dir": str(_source_dir(source_dir)),
         "updated_at": datetime.now(tz=timezone.utc).isoformat(),

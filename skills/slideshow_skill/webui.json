@@ -57,7 +57,8 @@
         "schema": {
           "id": "slideshow_modal",
           "initialState": {
-            "slideshowSourceDir": "C:\\Users\\Zver\\Pictures"
+            "slideshowSourceDir": "C:\\Users\\Zver\\Pictures",
+            "slideshowDeviceCode": ""
           },
           "layout": {
             "type": "single",
@@ -139,9 +140,68 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.start_redevice_slideshow",
                   "params": {
+                    "code": "$state.slideshowDeviceCode",
                     "limit": 5,
                     "source_dir": "$state.slideshowSourceDir",
                     "webspace_id": "$webspace.id"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "slideshow-endpoint-table",
+              "type": "ui.table",
+              "area": "main",
+              "title": "ReDevice endpoints",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.state"
+              },
+              "inputs": {
+                "emptyText": "Refresh endpoint to load ReDevice endpoints",
+                "columns": [
+                  {
+                    "key": "title",
+                    "label": "Device"
+                  },
+                  {
+                    "key": "online_state",
+                    "label": "Online",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "last_seen",
+                    "label": "Last seen",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "code",
+                    "label": "Code",
+                    "mono": true,
+                    "width": "110px"
+                  },
+                  {
+                    "key": "_actions",
+                    "label": "Actions",
+                    "kind": "buttons",
+                    "width": "90px",
+                    "buttons": [
+                      {
+                        "id": "use",
+                        "label": "Use",
+                        "disabledKey": "selectable",
+                        "disabledWhenEquals": false
+                      }
+                    ]
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:use",
+                  "type": "updateState",
+                  "params": {
+                    "slideshowDeviceCode": "$event.code"
                   }
                 }
               ]

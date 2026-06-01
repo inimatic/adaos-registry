@@ -106,6 +106,16 @@
                     "width": "110px"
                   },
                   {
+                    "key": "online_state",
+                    "label": "Online",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "last_seen",
+                    "label": "Last seen",
+                    "width": "110px"
+                  },
+                  {
                     "key": "zone_id",
                     "label": "Zone",
                     "width": "80px"

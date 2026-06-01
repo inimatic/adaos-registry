@@ -62,6 +62,23 @@ def _age(value: Any) -> str:
     return f"{sec // 60}m {sec % 60}s"
 
 
+def _last_seen_status(value: Any) -> tuple[str, str]:
+    try:
+        ts = float(value or 0)
+    except Exception:
+        return "unknown", "-"
+    if ts <= 0:
+        return "unknown", "-"
+    sec = max(0, int(datetime.now(tz=timezone.utc).timestamp() - ts))
+    if sec < 60:
+        status = "online"
+    elif sec < 5 * 60:
+        status = "stale"
+    else:
+        status = "offline"
+    return status, _age(ts)
+
+
 def _compact_device(item: Mapping[str, Any]) -> dict[str, Any]:
     policy = item.get("endpoint_policy") if isinstance(item.get("endpoint_policy"), Mapping) else {}
     manifest = item.get("endpoint_manifest") if isinstance(item.get("endpoint_manifest"), Mapping) else {}
@@ -72,13 +89,17 @@ def _compact_device(item: Mapping[str, Any]) -> dict[str, Any]:
     state = str(item.get("state") or "-")
     trust = str(policy.get("trust_level") or manifest.get("trust_level") or "limited")
     zone = str(item.get("zone_id") or "-")
-    seen = _age(item.get("approved_at") or item.get("issued_at"))
+    online_state, last_seen = _last_seen_status(item.get("last_seen_at"))
+    admitted = _age(item.get("approved_at") or item.get("issued_at"))
     return {
         "id": code or endpoint_id,
         "code": code,
         "title": label,
-        "subtitle": f"state={state} zone={zone} trust={trust} seen={seen}",
+        "subtitle": f"state={state} online={online_state} last_seen={last_seen} zone={zone} trust={trust}",
         "state": state,
+        "online_state": online_state,
+        "last_seen": last_seen,
+        "admitted_age": admitted,
         "zone_id": zone,
         "trust_level": trust,
         "endpoint_id": endpoint_id,
