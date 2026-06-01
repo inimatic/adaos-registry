@@ -1,5 +1,5 @@
 name: greet_on_boot_skill
-version: 0.2.0
+version: 0.2.1
 description: System greeting and infrastructure health-check skill used by the greet_on_boot
   scenario.
 runtime:
@@ -49,5 +49,5 @@ tools:
       message:
         type: string
         description: Human-readable summary used for notifications.
-updated_at: '2026-04-07T19:49:12+00:00'
+updated_at: '2026-06-01T16:45:00+00:00'
 

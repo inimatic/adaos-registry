@@ -22,6 +22,49 @@ REQUIRES_DATA_PROJECTIONS = [
 _NOTIFY_SENT = False
 
 
+def _payload_webspace_id(payload: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(payload, Mapping):
+        return None
+    ws = payload.get("webspace_id") or payload.get("workspace_id")
+    if isinstance(ws, str) and ws.strip():
+        return ws.strip()
+    return None
+
+
+def _infra_status_value(ctx) -> dict[str, Any]:
+    # Use config snapshot; AgentContext may not expose node/subnet objects yet.
+    conf = getattr(ctx, "config", None)
+    node_id = getattr(conf, "node_id", None) if conf is not None else None
+    subnet_id = getattr(conf, "subnet_id", None) if conf is not None else None
+    role = getattr(conf, "role", None) if conf is not None else None
+    hostname = platform.node() or None
+
+    base_status = {
+        "node": {
+            "id": node_id,
+            "hostname": hostname,
+            "roles": [role] if role else [],
+        },
+        "subnet": {
+            "id": subnet_id,
+        },
+    }
+    # Shape tailored for visual.metricTile: main value + label
+    return {
+        "value": "OK",
+        "label": f"{hostname or 'unknown-host'} ({node_id or 'unknown-node'})",
+        **base_status,
+    }
+
+
+async def _collect_infra_status_async(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    ctx = get_ctx()
+    webspace_id = _payload_webspace_id(payload)
+    status_value = _infra_status_value(ctx)
+    await ctx_subnet.set_async("infra.status", status_value, webspace_id=webspace_id)
+    return {"ok": True, "status": status_value}
+
+
 def _load_skill_data_projections(ctx) -> None:
     """
     Load skill-level data_projections from skill.yaml into ProjectionRegistry.
@@ -68,42 +111,16 @@ def collect_infra_status(payload: Mapping[str, Any] | None = None) -> dict[str, 
     """
     ctx = get_ctx()
     _log.debug("greet_on_boot.collect_infra_status start payload=%r", payload)
-    webspace_id = None
-    if isinstance(payload, Mapping):
-        ws = payload.get("webspace_id") or payload.get("workspace_id")
-        if isinstance(ws, str) and ws.strip():
-            webspace_id = ws.strip()
+    webspace_id = _payload_webspace_id(payload)
     _log.debug("greet_on_boot.collect_infra_status webspace_id=%r", webspace_id)
 
-    # Use config snapshot; AgentContext may not expose node/subnet objects yet.
-    conf = getattr(ctx, "config", None)
-    node_id = getattr(conf, "node_id", None) if conf is not None else None
-    subnet_id = getattr(conf, "subnet_id", None) if conf is not None else None
-    role = getattr(conf, "role", None) if conf is not None else None
-    hostname = platform.node() or None
-
-    base_status = {
-        "node": {
-            "id": node_id,
-            "hostname": hostname,
-            "roles": [role] if role else [],
-        },
-        "subnet": {
-            "id": subnet_id,
-        },
-    }
-    # Shape tailored for visual.metricTile: main value + label
-    status_value: dict[str, Any] = {
-        "value": "OK",
-        "label": f"{hostname or 'unknown-host'} ({node_id or 'unknown-node'})",
-        **base_status,
-    }
+    status_value = _infra_status_value(ctx)
 
     _log.debug(
         "greet_on_boot.collect_infra_status status webspace=%s node_id=%s subnet_id=%s",
         webspace_id,
-        node_id,
-        subnet_id,
+        status_value["node"]["id"],
+        status_value["subnet"]["id"],
     )
 
     # Project into configured backends (Yjs, KV, ...) via data_projections.
@@ -185,7 +202,7 @@ def analyze_and_notify(payload: Mapping[str, Any] | None = None) -> dict[str, An
 
 
 @subscribe("subnet.stopped")
-def on_subnet_stopped(evt: Any) -> None:
+async def on_subnet_stopped(evt: Any) -> None:
     """
     Mark infrastructure as OFF in all workspace webspaces when subnet stops.
     """
@@ -198,7 +215,7 @@ def on_subnet_stopped(evt: Any) -> None:
     for ws in webspaces:
         webspace_id = ws.id
         try:
-            ctx_subnet.set(
+            await ctx_subnet.set_async(
                 "infra.status",
                 {
                     "value": "OFF",
@@ -301,7 +318,7 @@ async def on_webspace_reload(evt: Any) -> None:
         webspace_id = "default"
 
     try:
-        collect_infra_status({"webspace_id": webspace_id})
+        await _collect_infra_status_async({"webspace_id": webspace_id})
     except Exception:
         # best-effort: infra widget can be refreshed manually later
         return
