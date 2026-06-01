@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.5
+version: 0.1.6
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -76,6 +76,37 @@ tools:
         type: array
         items:
           type: object
+- name: select_redevice_endpoint
+  description: Select a ReDevice endpoint for the slideshow modal and publish visible
+    selection state.
+  entry: handlers.main:select_redevice_endpoint
+  input_schema:
+    type: object
+    properties:
+      code:
+        type: string
+      webspace_id:
+        type: string
+      source_dir:
+        type: string
+        description: Root folder with source photos.
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      selected_device_code:
+        type: string
+      selected_items:
+        type: array
+        items:
+          type: object
+      items:
+        type: array
+        items:
+          type: object
 - name: refresh_redevice_slideshow_state
   description: Read the latest ReDevice registry state and last surface event.
   entry: handlers.main:refresh_redevice_slideshow_state
@@ -104,8 +135,40 @@ tools:
 data_routes:
 - surface: modal:slideshow_modal
   route: stream
-  receiver: slideshow_skill.state
-  first_paint: empty slideshow state
+  receiver: slideshow_skill.endpoints
+  first_paint: empty ReDevice endpoint inventory
+  recovery: latest endpoint inventory is restored from stream snapshot
+  update_source:
+  - slideshow_skill.action
+  budget:
+    max_payload_bytes: 65536
+    max_publish_hz: 1
+    max_items: 32
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the last ReDevice endpoint inventory
+    log: service.slideshow_skill.runtime.log
+    quarantine: false
+- surface: modal:slideshow_modal
+  route: stream
+  receiver: slideshow_skill.preview
+  first_paint: empty photo preview
+  recovery: photo preview is refreshed manually from the selected source folder
+  update_source:
+  - slideshow_skill.action
+  budget:
+    max_payload_bytes: 65536
+    max_publish_hz: 1
+    max_items: 64
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the last photo preview list
+    log: service.slideshow_skill.runtime.log
+    quarantine: false
+- surface: modal:slideshow_modal
+  route: stream
+  receiver: slideshow_skill.command
+  first_paint: empty slideshow command state
   recovery: latest slideshow command state is restored from stream snapshot
   update_source:
   - slideshow_skill.action
@@ -119,5 +182,5 @@ data_routes:
     log: service.slideshow_skill.runtime.log
     quarantine: false
 redui: redui.json
-updated_at: '2026-06-01T20:37:00+00:00'
+updated_at: '2026-06-02T00:35:00+00:00'
 

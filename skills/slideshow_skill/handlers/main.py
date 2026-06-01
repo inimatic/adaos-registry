@@ -23,7 +23,9 @@ except Exception:  # pragma: no cover
         return "default"
 
 
-_RECEIVER = "slideshow_skill.state"
+_ENDPOINTS_RECEIVER = "slideshow_skill.endpoints"
+_PREVIEW_RECEIVER = "slideshow_skill.preview"
+_COMMAND_RECEIVER = "slideshow_skill.command"
 _SUPPORTED = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
 _MAX_SIZE = (1280, 800)
 
@@ -149,19 +151,24 @@ def _online_state(item: Mapping[str, Any]) -> str:
     return "offline"
 
 
-def _compact_device(item: Mapping[str, Any]) -> dict[str, Any]:
+def _compact_device(item: Mapping[str, Any], selected_code: str = "") -> dict[str, Any]:
     policy = item.get("endpoint_policy") if isinstance(item.get("endpoint_policy"), Mapping) else {}
     state = str(item.get("state") or "-")
     code = str(item.get("code") or "")
     endpoint_id = str(item.get("endpoint_id") or "")
     label = str(item.get("device_label") or endpoint_id or code)
     seen = _age_seconds(item.get("last_seen_at"))
+    online_state = _online_state(item)
+    selected = bool(code and selected_code and code == selected_code)
     return {
         "id": code or endpoint_id,
         "code": code,
         "title": label,
         "state": state,
-        "online_state": _online_state(item),
+        "selected": selected,
+        "selected_label": "selected" if selected else "",
+        "online_state": online_state,
+        "online": online_state == "online",
         "last_seen": "-" if seen is None else f"{seen}s" if seen < 60 else f"{seen // 60}m {seen % 60}s",
         "zone_id": str(item.get("zone_id") or "-"),
         "trust_level": str(policy.get("trust_level") or "limited"),
@@ -193,8 +200,109 @@ def _select_device(code: str | None = None) -> dict[str, Any] | None:
     return devices[0] if devices else None
 
 
-def _publish(payload: Mapping[str, Any], webspace_id: str | None = None) -> None:
-    stream_publish(_RECEIVER, dict(payload), _meta={"webspace_id": str(webspace_id or default_webspace_id())})
+def _selected_items(device: Mapping[str, Any] | None, source_dir: str | None = None) -> list[dict[str, Any]]:
+    if not device:
+        return [
+            {
+                "id": "selected:none",
+                "title": "No endpoint selected",
+                "subtitle": "Refresh endpoints, then press Use on an online ReDevice.",
+                "content": {"source_dir": str(_source_dir(source_dir))},
+            }
+        ]
+    compact = _compact_device(device, str(device.get("code") or ""))
+    subtitle_parts = [
+        compact.get("online_state") or "unknown",
+        f"seen {compact.get('last_seen')}" if compact.get("last_seen") else "",
+        f"code {compact.get('code')}" if compact.get("code") else "",
+    ]
+    return [
+        {
+            "id": "selected:" + str(compact.get("code") or compact.get("endpoint_id") or "endpoint"),
+            "title": "Selected endpoint: " + str(compact.get("title") or "ReDevice"),
+            "subtitle": " · ".join(part for part in subtitle_parts if part),
+            "content": {
+                "code": compact.get("code"),
+                "endpoint_id": compact.get("endpoint_id"),
+                "state": compact.get("state"),
+                "zone_id": compact.get("zone_id"),
+                "trust_level": compact.get("trust_level"),
+                "source_dir": str(_source_dir(source_dir)),
+            },
+        }
+    ]
+
+
+def _endpoint_payload(
+    devices: list[dict[str, Any]],
+    selected: Mapping[str, Any] | None,
+    source_dir: str | None = None,
+) -> dict[str, Any]:
+    selected_code = str(selected.get("code") or "") if selected else ""
+    return {
+        "ok": selected is not None,
+        "device": dict(selected) if isinstance(selected, Mapping) else None,
+        "selected_device_code": selected_code,
+        "selected_items": _selected_items(selected, source_dir),
+        "items": [_compact_device(item, selected_code) for item in devices],
+        "owner": _owner(),
+        "source_dir": str(_source_dir(source_dir)),
+        "updated_at": datetime.now(tz=timezone.utc).isoformat(),
+    }
+
+
+def _preview_item(path: Path) -> dict[str, Any]:
+    stat = path.stat()
+    modified = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+    size = int(stat.st_size)
+    return {
+        "id": str(path),
+        "title": path.name,
+        "source_name": path.name,
+        "source_path": str(path),
+        "size": size,
+        "size_label": f"{size // 1024} KB" if size >= 1024 else f"{size} B",
+        "modified_at": modified,
+        "modified": modified[:19].replace("T", " "),
+    }
+
+
+def _command_items(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
+    result = payload.get("result") if isinstance(payload.get("result"), Mapping) else {}
+    command = result.get("command") if isinstance(result.get("command"), Mapping) else {}
+    device = payload.get("device") if isinstance(payload.get("device"), Mapping) else {}
+    count = len(payload.get("items")) if isinstance(payload.get("items"), list) else 0
+    command_id = str(payload.get("command_id") or command.get("command_id") or "")
+    state = str(command.get("state") or "queued")
+    title = "Slideshow command " + state
+    subtitle = " · ".join(
+        part
+        for part in [
+            str(device.get("code") or ""),
+            f"{count} photos",
+            command_id,
+        ]
+        if part
+    )
+    return [
+        {
+            "id": command_id or "last-command",
+            "title": title,
+            "subtitle": subtitle,
+            "content": {
+                "device": device,
+                "command_id": command_id,
+                "state": state,
+                "source_dir": payload.get("source_dir"),
+                "items": payload.get("items"),
+                "updated_at": payload.get("updated_at"),
+            },
+        }
+    ]
+
+
+def _publish(receiver: str, payload: Mapping[str, Any], webspace_id: str | None = None) -> None:
+    stream_publish(receiver, dict(payload), _meta={"webspace_id": str(webspace_id or default_webspace_id())})
 
 
 @tool
@@ -209,10 +317,23 @@ def list_slideshow_photos(
         "ok": True,
         "source_dir": str(root),
         "count": len(files),
-        "items": [{"path": str(p), "name": p.name, "size": p.stat().st_size} for p in files],
+        "items": [_preview_item(p) for p in files],
         "updated_at": datetime.now(tz=timezone.utc).isoformat(),
     }
-    _publish(payload, webspace_id)
+    _publish(_PREVIEW_RECEIVER, payload, webspace_id)
+    return payload
+
+
+@tool
+def select_redevice_endpoint(
+    code: str | None = None,
+    webspace_id: str | None = None,
+    source_dir: str | None = None,
+) -> dict[str, Any]:
+    devices = _load_devices()
+    device = _select_device(code)
+    payload = _endpoint_payload(devices, device, source_dir)
+    _publish(_ENDPOINTS_RECEIVER, payload, webspace_id)
     return payload
 
 
@@ -279,7 +400,8 @@ def start_redevice_slideshow(
         },
         "updated_at": datetime.now(tz=timezone.utc).isoformat(),
     }
-    _publish(payload, webspace_id)
+    payload["command_items"] = _command_items(payload)
+    _publish(_COMMAND_RECEIVER, payload, webspace_id)
     return payload
 
 
@@ -291,14 +413,6 @@ def refresh_redevice_slideshow_state(
 ) -> dict[str, Any]:
     devices = _load_devices()
     device = _select_device(code)
-    payload = {
-        "ok": device is not None,
-        "device": device,
-        "selected_device_code": str(device.get("code") or "") if device else "",
-        "items": [_compact_device(item) for item in devices],
-        "owner": _owner(),
-        "source_dir": str(_source_dir(source_dir)),
-        "updated_at": datetime.now(tz=timezone.utc).isoformat(),
-    }
-    _publish(payload, webspace_id)
+    payload = _endpoint_payload(devices, device, source_dir)
+    _publish(_ENDPOINTS_RECEIVER, payload, webspace_id)
     return payload

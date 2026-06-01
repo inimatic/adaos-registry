@@ -2,13 +2,91 @@
   "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
   "webio": {
     "receivers": {
-      "slideshow_skill.state": {
+      "slideshow_skill.endpoints": {
         "mode": "replace",
         "transport": "hub",
         "snapshotPolicy": "on_subscribe",
         "initialState": {
           "ok": false,
           "device": null,
+          "selected_device_code": "",
+          "selected_items": [
+            {
+              "id": "selected:none",
+              "title": "No endpoint selected",
+              "subtitle": "Refresh endpoints, then press Use on an online ReDevice."
+            }
+          ],
+          "items": [],
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 1,
+          "maxSnapshotHz": 1,
+          "maxItems": 32
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last ReDevice endpoint inventory.",
+          "log": "service.slideshow_skill.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.slideshow_skill.endpoints"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:slideshow_modal",
+          "owner": "skill:slideshow_skill",
+          "firstPaint": "empty endpoint inventory",
+          "recovery": "endpoint inventory requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "slideshow_skill.action"
+          ]
+        }
+      },
+      "slideshow_skill.preview": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": false,
+          "source_dir": "",
+          "count": 0,
+          "items": [],
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 1,
+          "maxSnapshotHz": 1,
+          "maxItems": 64
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last photo preview list.",
+          "log": "service.slideshow_skill.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.slideshow_skill.preview"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:slideshow_modal",
+          "owner": "skill:slideshow_skill",
+          "firstPaint": "empty photo preview",
+          "recovery": "photo preview can be refreshed manually",
+          "updateSource": [
+            "slideshow_skill.action"
+          ]
+        }
+      },
+      "slideshow_skill.command": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": false,
+          "device": null,
+          "command_id": "",
+          "command_items": [],
           "items": [],
           "updated_at": null
         },
@@ -22,14 +100,14 @@
           "degradedState": "Keep the last slideshow command state.",
           "log": "service.slideshow_skill.runtime.log",
           "quarantine": false,
-          "metric": "webio_stream_guard.slideshow_skill.state"
+          "metric": "webio_stream_guard.slideshow_skill.command"
         },
         "route": {
           "kind": "stream",
           "surface": "modal:slideshow_modal",
           "owner": "skill:slideshow_skill",
-          "firstPaint": "empty slideshow state",
-          "recovery": "snapshot requested on stream subscribe",
+          "firstPaint": "empty command state",
+          "recovery": "latest slideshow command state is restored from stream snapshot",
           "updateSource": [
             "webio.stream.snapshot.requested",
             "slideshow_skill.action"
@@ -103,15 +181,15 @@
                 "buttons": [
                   {
                     "id": "refresh",
-                    "label": "Refresh endpoint"
+                    "label": "Refresh endpoints"
                   },
                   {
                     "id": "preview",
-                    "label": "Preview"
+                    "label": "Preview photos"
                   },
                   {
                     "id": "start",
-                    "label": "Start"
+                    "label": "Start slideshow"
                   }
                 ]
               },
@@ -121,6 +199,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.refresh_redevice_slideshow_state",
                   "params": {
+                    "code": "$state.slideshowDeviceCode",
                     "source_dir": "$state.slideshowSourceDir"
                   }
                 },
@@ -129,7 +208,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.list_slideshow_photos",
                   "params": {
-                    "limit": 10,
+                    "limit": 12,
                     "source_dir": "$state.slideshowSourceDir"
                   }
                 },
@@ -146,17 +225,38 @@
               ]
             },
             {
+              "id": "slideshow-selected-endpoint",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Selected endpoint",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.endpoints"
+              },
+              "inputs": {
+                "collectionKey": "selected_items",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "emptyText": "No endpoint selected"
+              }
+            },
+            {
               "id": "slideshow-endpoint-table",
               "type": "ui.table",
               "area": "main",
               "title": "ReDevice endpoints",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "slideshow_skill.state"
+                "receiver": "slideshow_skill.endpoints"
               },
               "inputs": {
-                "emptyText": "Refresh endpoint to load ReDevice endpoints",
+                "emptyText": "Refresh endpoints to load ReDevice endpoints",
                 "columns": [
+                  {
+                    "key": "selected_label",
+                    "label": "",
+                    "width": "90px"
+                  },
                   {
                     "key": "title",
                     "label": "Device"
@@ -200,22 +300,61 @@
                   "params": {
                     "slideshowDeviceCode": "$event.code"
                   }
+                },
+                {
+                  "on": "click:use",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.select_redevice_endpoint",
+                  "params": {
+                    "code": "$event.code",
+                    "source_dir": "$state.slideshowSourceDir"
+                  }
                 }
               ]
             },
             {
-              "id": "slideshow-state",
+              "id": "slideshow-preview-table",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Preview photos",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.preview"
+              },
+              "inputs": {
+                "emptyText": "Press Preview photos to scan the source folder",
+                "columns": [
+                  {
+                    "key": "title",
+                    "label": "File"
+                  },
+                  {
+                    "key": "size_label",
+                    "label": "Size",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "modified",
+                    "label": "Modified",
+                    "width": "170px"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "slideshow-command-state",
               "type": "ui.list",
               "area": "main",
               "title": "Last command",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "slideshow_skill.state"
+                "receiver": "slideshow_skill.command"
               },
               "inputs": {
-                "titleKey": "source_dir",
-                "subtitleKey": "updated_at",
-                "detailsPath": "items",
+                "collectionKey": "command_items",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "detailsPath": "content",
                 "showDetails": true,
                 "emptyText": "No slideshow command yet"
               }
