@@ -298,6 +298,34 @@
             "id": "fav",
             "label": "Favorite",
             "icon": "star-outline"
+          },
+          {
+            "id": "send_telegram",
+            "label": "Send to Telegram",
+            "icon": "send-outline"
+          }
+        ],
+        "fullscreenActions": [
+          {
+            "id": "close",
+            "label": "Close",
+            "icon": "close-outline",
+            "local": "closeFullscreen"
+          },
+          {
+            "id": "favorite_on",
+            "label": "Add favorite",
+            "icon": "star-outline"
+          },
+          {
+            "id": "favorite_off",
+            "label": "Remove favorite",
+            "icon": "star-outline"
+          },
+          {
+            "id": "send_telegram",
+            "label": "Telegram",
+            "icon": "send-outline"
           }
         ],
         "keyboardActions": {
@@ -373,11 +401,35 @@
           }
         },
         {
+          "on": "click:favorite_on",
+          "type": "callSkill",
+          "target": "slideshow_skill.control_redevice_slideshow",
+          "params": {
+            "action": "favorite_on"
+          }
+        },
+        {
+          "on": "click:favorite_off",
+          "type": "callSkill",
+          "target": "slideshow_skill.control_redevice_slideshow",
+          "params": {
+            "action": "favorite_off"
+          }
+        },
+        {
           "on": "click:hide",
           "type": "callSkill",
           "target": "slideshow_skill.control_redevice_slideshow",
           "params": {
             "action": "hide"
+          }
+        },
+        {
+          "on": "click:send_telegram",
+          "type": "callSkill",
+          "target": "slideshow_skill.control_redevice_slideshow",
+          "params": {
+            "action": "send_telegram"
           }
         }
       ]

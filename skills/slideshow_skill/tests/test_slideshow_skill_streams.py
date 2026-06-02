@@ -201,6 +201,11 @@ def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeyp
 
     monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "ABC123", "state": "approved", "display_name": "Tablet"}])
     monkeypatch.setattr(mod, "_favorite_refs", lambda _root: [])
+    monkeypatch.setattr(
+        mod,
+        "_publish_media_file",
+        lambda thumb, ref, **_kwargs: {"ok": True, "url": f"/api/node/media/files/content/{thumb.name}", "content_ref": ref},
+    )
 
     payload = mod._session_payload(
         {
@@ -218,6 +223,8 @@ def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeyp
     )
 
     assert len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) < 98_304
+    assert not str(payload["image"]["src"]).startswith("data:")
+    assert payload["image"]["src"].startswith("/api/node/media/files/content/")
     assert payload["label"] == "Tablet"
 
 

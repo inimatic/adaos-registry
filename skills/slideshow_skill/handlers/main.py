@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import random
+import shutil
 import socket
 import sqlite3
 import threading
@@ -13,12 +14,15 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import quote
 
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import skill_memory
 from adaos.sdk.data.skill_env import skill_env_path
-from adaos.sdk.io import stream_publish
+from adaos.sdk.io import stream_publish, telegram_photo
 from adaos.sdk.redevice import ReDeviceBridge, compact_endpoint, list_endpoints as sdk_list_endpoints, select_transport
+from adaos.services.agent_context import get_ctx
+from adaos.services.media_library import media_file_path
 from PIL import Image, ImageOps
 
 try:
@@ -50,6 +54,7 @@ _STATE_KEY = "slideshow_skill.state"
 _INDEX_META_KEY = "slideshow_skill.photo_index"
 _INDEX_STATUS_KEY = "slideshow_skill.index_status"
 _COMMAND_STATE_KEY = "slideshow_skill.command_state"
+_LAST_MEDIA_KEY = "slideshow_skill.last_media"
 _POLL_INTERVAL_S = 2.5
 _SNAPSHOT_DEBOUNCE_S = 1.0
 _log = logging.getLogger("skills.slideshow_skill")
@@ -926,9 +931,50 @@ def _data_uri(path: Path) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
 
+def _api_token() -> str:
+    token = _text(os.environ.get("ADAOS_TOKEN"))
+    if token:
+        return token
+    try:
+        return _text(get_ctx().config.token) or "dev-local-token"
+    except Exception:
+        return "dev-local-token"
+
+
+def _media_content_url(filename: str) -> str:
+    token = _api_token()
+    query = f"?token={quote(token)}" if token else ""
+    return f"/api/node/media/files/content/{quote(filename)}{query}"
+
+
+def _publish_media_file(path: Path, content_ref: str, *, variant: str = "widget") -> dict[str, Any]:
+    suffix = "".join(ch for ch in _text(variant).lower() if ch.isalnum() or ch in {"-", "_"}) or "media"
+    filename = f"slideshow-{hashlib.sha256(_text(content_ref).encode('utf-8')).hexdigest()[:24]}-{suffix}.jpg"
+    try:
+        target = media_file_path(filename)
+        if not target.exists() or target.stat().st_size != path.stat().st_size:
+            shutil.copyfile(path, target)
+        payload = {
+            "ok": True,
+            "filename": target.name,
+            "path": str(target),
+            "url": _media_content_url(target.name),
+            "mime": "image/jpeg",
+            "size_bytes": int(target.stat().st_size),
+            "content_ref": content_ref,
+            "route": "node_media_file",
+        }
+        _memory_set(_LAST_MEDIA_KEY, payload)
+        return payload
+    except Exception as exc:
+        _log.debug("failed to publish slideshow media file", exc_info=True)
+        return {"ok": False, "error": str(exc), "content_ref": content_ref}
+
+
 def _content_item(path: Path) -> dict[str, Any]:
     thumb, cached = _thumbnail(path, _ENDPOINT_SIZE, "endpoint-cache-v6")
     ref = _content_ref(path)
+    media = _publish_media_file(thumb, ref, variant="endpoint")
     return {
         "content_ref": ref,
         "source_path": str(path),
@@ -938,6 +984,8 @@ def _content_item(path: Path) -> dict[str, Any]:
         "cached": cached,
         "thumbnail_path": str(thumb),
         "thumbnail_bytes": thumb.stat().st_size,
+        "content_url": _text(media.get("url")),
+        "media": media,
         "data_uri": _data_uri(thumb),
     }
 
@@ -1064,6 +1112,16 @@ def _toggle_favorite_ref(state: dict[str, Any], ref: str) -> dict[str, Any]:
     return state
 
 
+def _set_current_favorite(state: dict[str, Any], files: list[Path], favorite: bool) -> dict[str, Any]:
+    current = _current_photo(files, state)
+    if current is None:
+        return state
+    root = _source_dir(_text(state.get("source_dir")))
+    _set_favorite(root, _content_ref(current), favorite)
+    state["favorites"] = _favorite_refs(root)
+    return state
+
+
 def _hide_ref(state: dict[str, Any], ref: str) -> dict[str, Any]:
     token = _text(ref)
     if not token:
@@ -1099,11 +1157,18 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
     image: dict[str, Any] = {"src": "", "mime": "image/jpeg"}
     title = "No photo"
     content_ref = ""
+    media: dict[str, Any] = {}
     if current is not None:
         thumb, _cached = _widget_thumbnail(current)
-        image = {"src": _data_uri(thumb), "mime": "image/jpeg"}
         title = current.name
         content_ref = _content_ref(current)
+        media = _publish_media_file(thumb, content_ref, variant="widget")
+        image = {
+            "src": _text(media.get("url")) if media.get("ok") else "",
+            "mime": "image/jpeg",
+            "route": media.get("route") or "node_media_file",
+            "content_ref": content_ref,
+        }
     selected_codes = _unique_texts(state.get("selected_codes"))
     header = _selected_endpoint_label(selected_codes)
     root = _source_dir(_text(state.get("source_dir")))
@@ -1117,6 +1182,7 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
         "label": header,
         "description": f"{filtered_count} photos, {len(favorites)} favorites",
         "image": image,
+        "media": media,
         "frame": {"label": f"{(int(state.get('current_index') or 0) + 1) if files else 0}/{filtered_count}"},
         "status": {"label": "sync" if state.get("sync") else "independent", "color": "success" if state.get("sync") else "warning"},
         "content_ref": content_ref,
@@ -1855,9 +1921,23 @@ def control_redevice_slideshow(
         _advance(state, files, -1)
     elif token in {"fav", "favorite", "favorite_toggle"}:
         _toggle_current_favorite(state, files)
+    elif token in {"favorite_on", "fav_on"}:
+        _set_current_favorite(state, files, True)
+    elif token in {"favorite_off", "fav_off", "unfavorite"}:
+        _set_current_favorite(state, files, False)
     elif token in {"hide", "hide_item", "down"}:
         _hide_current_photo(state, files)
         files = _files_for_state(state, _MAX_CONTROL_SCAN)
+    elif token in {"send_telegram", "telegram", "tg"}:
+        current = _current_photo(files, state)
+        if current is None:
+            return {"ok": False, "error": "no_current_photo"}
+        result = telegram_photo(
+            str(current),
+            caption=f"Slideshow: {current.name}",
+            _meta={"webspace_id": webspace_id or default_webspace_id(), "route_id": "telegram"},
+        )
+        return {"ok": bool(result.get("ok")), "telegram": dict(result), "source_name": current.name}
     elif token == "sync_on":
         state["sync"] = True
     elif token == "sync_off":
