@@ -39,9 +39,10 @@ _ENDPOINT_SIZE = (480, 300)
 _WIDGET_SIZE = (220, 140)
 _MAX_SCAN = 2000
 _MAX_CONTROL_SCAN = 240
-_MAX_ENDPOINT_CURRENT = 1
+_MAX_ENDPOINT_CURRENT = 4
 _MAX_ENDPOINT_FAVORITES = 20
 _MAX_FOLDER_STREAM_ITEMS = 250
+_INLINE_CONTENT_BUDGET_BYTES = 45_000
 _INDEX_BATCH_SIZE = 500
 _INDEX_PUBLISH_INTERVAL_S = 1.5
 _STATE_KEY = "slideshow_skill.state"
@@ -786,7 +787,7 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
     root = _source_dir(_text(state.get("source_dir")))
     _ensure_index(root)
     selected = _text(state.get("selected_folder"))
-    items = [{"id": "", "title": "All photos", "subtitle": str(root), "selected": selected == ""}]
+    items = [{"id": "", "title": "All photos", "subtitle": str(root), "selected": selected == "", "selectable": True}]
     total_folders = 0
     try:
         with _connect_index() as conn:
@@ -827,6 +828,7 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "count": count,
                 "favorites": favorites,
                 "selected": folder == selected,
+                "selectable": True,
             }
         )
     if total_folders > len(rows):
@@ -858,7 +860,10 @@ def _thumbnail(path: Path, size: tuple[int, int], label: str) -> tuple[Path, boo
             canvas.paste(image, mask=image.getchannel("A"))
         else:
             canvas.paste(image.convert("RGB"))
-        quality = 62 if label.startswith("endpoint") else 58
+        if label.startswith("endpoint-cache"):
+            quality = 62
+        else:
+            quality = 62 if label.startswith("endpoint") else 58
         canvas.save(cache_path, "JPEG", quality=quality, optimize=True)
     return cache_path, False
 
@@ -868,7 +873,7 @@ def _data_uri(path: Path) -> str:
 
 
 def _content_item(path: Path) -> dict[str, Any]:
-    thumb, cached = _thumbnail(path, _ENDPOINT_SIZE, "endpoint-v3")
+    thumb, cached = _thumbnail(path, _ENDPOINT_SIZE, "endpoint-cache-v6")
     ref = _content_ref(path)
     return {
         "content_ref": ref,
@@ -920,7 +925,28 @@ def _endpoint_window(files: list[Path], state: Mapping[str, Any]) -> list[Path]:
     if not selected:
         return []
     index = int(state.get("current_index") or 0) % len(selected)
-    return [selected[index]]
+    if len(selected) <= _MAX_ENDPOINT_CURRENT:
+        return selected[index:] + selected[:index]
+    if _text(state.get("mode")) == "random":
+        pool = [item for i, item in enumerate(selected) if i != index]
+        random.shuffle(pool)
+        return [selected[index], *pool[: _MAX_ENDPOINT_CURRENT - 1]]
+    return [selected[(index + offset) % len(selected)] for offset in range(_MAX_ENDPOINT_CURRENT)]
+
+
+def _content_items_for_window(window: list[Path]) -> tuple[list[dict[str, Any]], int, bool]:
+    items: list[dict[str, Any]] = []
+    content_bytes = 0
+    budget_limited = False
+    for path in window:
+        item = _content_item(path)
+        item_bytes = int(item.get("thumbnail_bytes") or 0)
+        if items and content_bytes + item_bytes > _INLINE_CONTENT_BUDGET_BYTES:
+            budget_limited = True
+            break
+        items.append(item)
+        content_bytes += item_bytes
+    return items, content_bytes, budget_limited
 
 
 def _advance(state: dict[str, Any], files: list[Path], step: int) -> dict[str, Any]:
@@ -1172,6 +1198,8 @@ def _build_command(
                 "max_current_items": _MAX_ENDPOINT_CURRENT,
                 "max_favorite_items": 0,
                 "receiver_cache_items": _MAX_ENDPOINT_CURRENT,
+                "target_current_items": _MAX_ENDPOINT_CURRENT,
+                "inline_content_budget_bytes": _INLINE_CONTENT_BUDGET_BYTES,
             },
             "items": items,
             "controls": {
@@ -1205,8 +1233,7 @@ def _send_to_selected(
     window = _endpoint_window(files, state)
     if not window:
         return {"ok": False, "error": "no_supported_photos", "source_dir": state.get("source_dir")}
-    items = [_content_item(path) for path in window]
-    content_bytes = sum(int(item.get("thumbnail_bytes") or 0) for item in items)
+    items, content_bytes, budget_limited = _content_items_for_window(window)
     bridge = ReDeviceBridge()
     devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
     results: list[dict[str, Any]] = []
@@ -1241,6 +1268,9 @@ def _send_to_selected(
         "source_dir": state.get("source_dir"),
         "selected_codes": selected_codes,
         "item_count": len(items),
+        "cache_target": _MAX_ENDPOINT_CURRENT,
+        "cache_budget_limited": budget_limited,
+        "content_bytes": content_bytes,
         "items": [{"source_name": item["source_name"], "thumbnail_path": item["thumbnail_path"], "cached": item["cached"]} for item in items],
         "transport": next(iter(transports.values()), {}),
         "transports": transports,
@@ -1435,6 +1465,21 @@ def get_slideshow_index_status(
     status = _index_status(_source_dir(state.get("source_dir")))
     _publish(_INDEX_RECEIVER, status, webspace_id)
     return status
+
+
+@tool
+def get_slideshow_folders(
+    source_dir: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    state = _load_state()
+    if source_dir:
+        state["source_dir"] = str(_source_dir(source_dir))
+        state = _save_state(state)
+    payload = _folders_payload(state)
+    _publish(_FOLDERS_RECEIVER, payload, webspace_id, force=True)
+    _publish(_INDEX_RECEIVER, payload.get("status") if isinstance(payload.get("status"), Mapping) else _index_status(_source_dir(state.get("source_dir"))), webspace_id)
+    return payload
 
 
 @tool

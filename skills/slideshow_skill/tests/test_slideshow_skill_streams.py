@@ -124,10 +124,10 @@ def test_duplicate_snapshot_requests_are_coalesced(monkeypatch):
     assert published == ["slideshow_skill.index"]
 
 
-def test_endpoint_window_uses_current_frame_only(monkeypatch, tmp_path):
+def test_endpoint_window_prefetches_from_current_frame(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 
-    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(3)]
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(12)]
     for photo in photos:
         photo.write_bytes(b"jpeg")
 
@@ -135,7 +135,30 @@ def test_endpoint_window_uses_current_frame_only(monkeypatch, tmp_path):
 
     state = {"current_index": 1}
 
-    assert mod._endpoint_window(photos, state) == [photos[1]]
+    assert mod._endpoint_window(photos, state) == photos[1:5]
+
+
+def test_endpoint_content_items_stop_at_inline_budget(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+    monkeypatch.setattr(mod, "_INLINE_CONTENT_BUDGET_BYTES", 10)
+    monkeypatch.setattr(
+        mod,
+        "_content_item",
+        lambda path: {
+            "source_name": path.name,
+            "thumbnail_path": str(path),
+            "cached": True,
+            "thumbnail_bytes": 6,
+            "data_uri": "",
+        },
+    )
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(3)]
+    items, content_bytes, limited = mod._content_items_for_window(photos)
+
+    assert len(items) == 1
+    assert content_bytes == 6
+    assert limited is True
 
 
 def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):

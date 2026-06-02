@@ -470,6 +470,11 @@
                 },
                 {
                   "on": "click:folders",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.get_slideshow_folders"
+                },
+                {
+                  "on": "click:folders",
                   "type": "openModal",
                   "params": {
                     "modalId": "slideshow_folders_modal"

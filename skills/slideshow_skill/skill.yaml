@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.13
+version: 0.1.15
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -90,6 +90,31 @@ tools:
         type: integer
       visited_files:
         type: integer
+- name: get_slideshow_folders
+  description: Publish and return the current top-level slideshow folder snapshot.
+  entry: handlers.main:get_slideshow_folders
+  input_schema:
+    type: object
+    properties:
+      source_dir:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      source_dir:
+        type: string
+      selected_folder:
+        type: string
+      items:
+        type: array
+        items:
+          type: object
 - name: start_redevice_slideshow
   description: Convert source photos to cached thumbnails and queue a display.render_surface
     command for a ReDevice endpoint.

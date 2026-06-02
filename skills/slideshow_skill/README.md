@@ -39,7 +39,9 @@ Runtime state:
 - display mode is `fit` or `crop`;
 - sync mode broadcasts skill-selected state to all selected endpoints;
 - when running in sync mode, the first selected endpoint drives autoplay;
-- endpoint payload is bounded to 10 current items plus up to 20 favorites.
+- endpoint payload targets 4 current items, but root inline fallback is budget guarded;
+- when inline transport is selected, the endpoint receives as many compact cached frames as fit the command budget;
+- a future `content_url` pull route should provide the guaranteed 10-frame cache without inflating root commands.
 
 Default photo source:
 
