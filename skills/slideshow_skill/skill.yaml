@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.7
+version: 0.1.8
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -53,8 +53,8 @@ tools:
       limit:
         type: integer
         minimum: 1
-        maximum: 20
-        default: 5
+        maximum: 30
+        default: 10
       webspace_id:
         type: string
       source_dir:
@@ -110,6 +110,90 @@ tools:
         type: array
         items:
           type: object
+- name: toggle_redevice_endpoint
+  description: Add or remove a ReDevice endpoint from the slideshow sync group.
+  entry: handlers.main:toggle_redevice_endpoint
+  input_schema:
+    type: object
+    properties:
+      code:
+        type: string
+      webspace_id:
+        type: string
+      source_dir:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      selected_codes:
+        type: array
+        items:
+          type: string
+- name: control_redevice_slideshow
+  description: Control the shared slideshow state and broadcast it to selected ReDevice endpoints.
+  entry: handlers.main:control_redevice_slideshow
+  input_schema:
+    type: object
+    required:
+    - action
+    properties:
+      action:
+        type: string
+        enum:
+        - start
+        - prev
+        - next
+        - fav
+        - sync_on
+        - sync_off
+        - random
+        - sequential
+        - all
+        - favorites
+        - fullscreen_on
+        - fullscreen_off
+      code:
+        type: string
+      webspace_id:
+        type: string
+      source_dir:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      error:
+        type: string
+- name: rename_redevice_endpoint
+  description: Rename a ReDevice endpoint and set comma-separated aliases.
+  entry: handlers.main:rename_redevice_endpoint
+  input_schema:
+    type: object
+    required:
+    - code
+    properties:
+      code:
+        type: string
+      display_name:
+        type: string
+      aliases:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 - name: refresh_redevice_slideshow_state
   description: Read the latest ReDevice registry state and last surface event.
   entry: handlers.main:refresh_redevice_slideshow_state
@@ -170,6 +254,22 @@ data_routes:
     quarantine: false
 - surface: modal:slideshow_modal
   route: stream
+  receiver: slideshow_skill.session
+  first_paint: empty slideshow session state
+  recovery: latest slideshow session state is restored from stream snapshot
+  update_source:
+  - slideshow_skill.action
+  budget:
+    max_payload_bytes: 98304
+    max_publish_hz: 1
+    max_items: 16
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the last slideshow session state
+    log: service.slideshow_skill.runtime.log
+    quarantine: false
+- surface: modal:slideshow_modal
+  route: stream
   receiver: slideshow_skill.command
   first_paint: empty slideshow command state
   recovery: latest slideshow command state is restored from stream snapshot
@@ -185,5 +285,5 @@ data_routes:
     log: service.slideshow_skill.runtime.log
     quarantine: false
 redui: redui.json
-updated_at: '2026-06-01T22:47:57+00:00'
+updated_at: '2026-06-02T00:00:00+00:00'
 

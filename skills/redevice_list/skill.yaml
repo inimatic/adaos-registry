@@ -1,5 +1,5 @@
 name: redevice_list
-version: 0.1.2
+version: 0.1.3
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -65,5 +65,26 @@ tools:
         type: boolean
     required:
     - ok
-updated_at: '2026-06-01T20:25:00+00:00'
+- name: rename_redevice
+  description: Rename a ReDevice endpoint and update comma-separated aliases.
+  entry: handlers.main:rename_redevice
+  input_schema:
+    type: object
+    properties:
+      code:
+        type: string
+      display_name:
+        type: string
+      aliases:
+        type: string
+    required:
+    - code
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+    required:
+    - ok
+updated_at: '2026-06-02T00:00:00+00:00'
 

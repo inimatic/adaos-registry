@@ -85,6 +85,50 @@
               ]
             },
             {
+              "id": "redevice-rename-name",
+              "type": "input.text",
+              "area": "main",
+              "title": "Display name",
+              "inputs": {
+                "initialValue": "",
+                "placeholder": "Tablet",
+                "commitMode": "manual",
+                "saveLabel": "Use name",
+                "helper": "Fill this value, then press Rename in a row."
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "redeviceDisplayName": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "redevice-rename-aliases",
+              "type": "input.text",
+              "area": "main",
+              "title": "Aliases",
+              "inputs": {
+                "initialValue": "",
+                "placeholder": "Kitchen tablet, TF201",
+                "commitMode": "manual",
+                "saveLabel": "Use aliases",
+                "helper": "Comma-separated names for entity matching and voice routing."
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "redeviceAliases": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
               "id": "redevice-table",
               "type": "ui.table",
               "area": "main",
@@ -126,6 +170,16 @@
                     "width": "110px"
                   },
                   {
+                    "key": "active_app_label",
+                    "label": "Active app",
+                    "width": "130px"
+                  },
+                  {
+                    "key": "aliases",
+                    "label": "Aliases",
+                    "width": "160px"
+                  },
+                  {
                     "key": "endpoint_id",
                     "label": "Endpoint",
                     "mono": true,
@@ -135,11 +189,15 @@
                     "key": "_actions",
                     "label": "Actions",
                     "kind": "buttons",
-                    "width": "210px",
+                    "width": "280px",
                     "buttons": [
                       {
                         "id": "details",
                         "label": "Details"
+                      },
+                      {
+                        "id": "rename",
+                        "label": "Rename"
                       },
                       {
                         "id": "revoke",
@@ -159,6 +217,16 @@
                   "type": "openModal",
                   "params": {
                     "modalId": "redevice_details_modal"
+                  }
+                },
+                {
+                  "on": "click:rename",
+                  "type": "callSkill",
+                  "target": "redevice_list.rename_redevice",
+                  "params": {
+                    "code": "$event.code",
+                    "display_name": "$state.redeviceDisplayName",
+                    "aliases": "$state.redeviceAliases"
                   }
                 },
                 {
