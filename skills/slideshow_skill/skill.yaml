@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.12
+version: 0.1.13
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -162,8 +162,8 @@ tools:
         items:
           type: object
 - name: refresh_slideshow_photo_index
-  description: Start or resume a background photo index refresh for the selected
-    root folder while preserving favorites until a full scan succeeds.
+  description: Start or resume a background photo index refresh for the selected root
+    folder while preserving favorites until a full scan succeeds.
   entry: handlers.main:refresh_slideshow_photo_index
   input_schema:
     type: object
@@ -247,7 +247,8 @@ tools:
         items:
           type: string
 - name: control_redevice_slideshow
-  description: Control the shared slideshow state and broadcast it to selected ReDevice endpoints.
+  description: Control the shared slideshow state and broadcast it to selected ReDevice
+    endpoints.
   entry: handlers.main:control_redevice_slideshow
   input_schema:
     type: object
@@ -467,5 +468,5 @@ memory_budget:
     max_threads: 1
     cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-06-02T09:35:00+00:00'
+updated_at: '2026-06-02T10:04:01+00:00'
 
