@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from uuid import uuid4
+
+from PIL import Image
 
 
 def _load_slideshow_module():
@@ -115,3 +118,43 @@ def test_duplicate_snapshot_requests_are_coalesced(monkeypatch):
     mod.on_webio_stream_snapshot_requested(event)
 
     assert published == ["slideshow_skill.index"]
+
+
+def test_endpoint_window_uses_current_frame_only(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(3)]
+    for photo in photos:
+        photo.write_bytes(b"jpeg")
+
+    monkeypatch.setattr(mod, "_favorite_files_for_state", lambda *_args, **_kwargs: photos)
+
+    state = {"current_index": 1}
+
+    assert mod._endpoint_window(photos, state) == [photos[1]]
+
+
+def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):
+    mod = _load_slideshow_module()
+
+    photo = tmp_path / "source.jpg"
+    Image.effect_noise((1600, 1000), 100).convert("RGB").save(photo, "JPEG", quality=92)
+    item = mod._content_item(photo)
+    command = mod._build_command(
+        "ABC123",
+        [item],
+        {
+            "fullscreen": True,
+            "display_mode": "fit",
+            "interval_ms": 7000,
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+        },
+        autoplay=True,
+    )
+    raw = json.dumps({"command": command}, separators=(",", ":")).encode("utf-8")
+
+    assert len(command["payload"]["items"]) == 1
+    assert item["thumbnail_bytes"] < 48_000
+    assert len(raw) < 80_000

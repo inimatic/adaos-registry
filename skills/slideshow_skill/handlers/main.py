@@ -35,11 +35,11 @@ _SESSION_RECEIVER = "slideshow_skill.session"
 _COMMAND_RECEIVER = "slideshow_skill.command"
 _INDEX_RECEIVER = "slideshow_skill.index"
 _SUPPORTED = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
-_ENDPOINT_SIZE = (1280, 800)
-_WIDGET_SIZE = (420, 260)
+_ENDPOINT_SIZE = (480, 300)
+_WIDGET_SIZE = (220, 140)
 _MAX_SCAN = 2000
 _MAX_CONTROL_SCAN = 240
-_MAX_ENDPOINT_CURRENT = 10
+_MAX_ENDPOINT_CURRENT = 1
 _MAX_ENDPOINT_FAVORITES = 20
 _MAX_FOLDER_STREAM_ITEMS = 250
 _INDEX_BATCH_SIZE = 500
@@ -858,7 +858,7 @@ def _thumbnail(path: Path, size: tuple[int, int], label: str) -> tuple[Path, boo
             canvas.paste(image, mask=image.getchannel("A"))
         else:
             canvas.paste(image.convert("RGB"))
-        quality = 78 if label == "endpoint" else 70
+        quality = 62 if label.startswith("endpoint") else 58
         canvas.save(cache_path, "JPEG", quality=quality, optimize=True)
     return cache_path, False
 
@@ -868,7 +868,7 @@ def _data_uri(path: Path) -> str:
 
 
 def _content_item(path: Path) -> dict[str, Any]:
-    thumb, cached = _thumbnail(path, _ENDPOINT_SIZE, "endpoint")
+    thumb, cached = _thumbnail(path, _ENDPOINT_SIZE, "endpoint-v3")
     ref = _content_ref(path)
     return {
         "content_ref": ref,
@@ -878,6 +878,7 @@ def _content_item(path: Path) -> dict[str, Any]:
         "mime": "image/jpeg",
         "cached": cached,
         "thumbnail_path": str(thumb),
+        "thumbnail_bytes": thumb.stat().st_size,
         "data_uri": _data_uri(thumb),
     }
 
@@ -919,14 +920,7 @@ def _endpoint_window(files: list[Path], state: Mapping[str, Any]) -> list[Path]:
     if not selected:
         return []
     index = int(state.get("current_index") or 0) % len(selected)
-    current: list[Path] = []
-    for offset in range(min(_MAX_ENDPOINT_CURRENT, len(selected))):
-        current.append(selected[(index + offset) % len(selected)])
-    fav_paths = _favorite_files_for_state(state, _MAX_ENDPOINT_FAVORITES)
-    by_ref: dict[str, Path] = {}
-    for path in [*current, *fav_paths]:
-        by_ref[_content_ref(path)] = path
-    return list(by_ref.values())
+    return [selected[index]]
 
 
 def _advance(state: dict[str, Any], files: list[Path], step: int) -> dict[str, Any]:
@@ -968,7 +962,7 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
     title = "No photo"
     content_ref = ""
     if current is not None:
-        thumb, _cached = _thumbnail(current, _WIDGET_SIZE, "widget")
+        thumb, _cached = _thumbnail(current, _WIDGET_SIZE, "widget-v2")
         image = {"src": _data_uri(thumb), "mime": "image/jpeg"}
         title = current.name
         content_ref = _content_ref(current)
@@ -1166,8 +1160,8 @@ def _build_command(pair_code: str, items: list[dict[str, Any]], state: Mapping[s
             "scope": state.get("scope"),
             "cache_policy": {
                 "max_current_items": _MAX_ENDPOINT_CURRENT,
-                "max_favorite_items": _MAX_ENDPOINT_FAVORITES,
-                "receiver_cache_items": _MAX_ENDPOINT_CURRENT + _MAX_ENDPOINT_FAVORITES,
+                "max_favorite_items": 0,
+                "receiver_cache_items": _MAX_ENDPOINT_CURRENT,
             },
             "items": items,
             "controls": {

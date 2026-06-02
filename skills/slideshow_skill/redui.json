@@ -14,11 +14,11 @@
       },
       "content": {
         "accepted_mime": ["image/jpeg"],
-        "max_width": 1280,
-        "max_height": 800,
-        "receiver_cache_items": 30,
-        "max_current_items": 10,
-        "max_favorite_items": 20
+        "max_width": 480,
+        "max_height": 300,
+        "receiver_cache_items": 1,
+        "max_current_items": 1,
+        "max_favorite_items": 0
       },
       "state": {
         "sync_group_id": "node_id:skill_id scoped",
