@@ -368,10 +368,6 @@
               {
                 "id": "right",
                 "role": "aux"
-              },
-              {
-                "id": "bottom",
-                "role": "footer"
               }
             ]
           },
@@ -636,7 +632,6 @@
                 "descriptionPath": "description",
                 "noticePath": "message",
                 "colorPath": "color",
-                "refreshMs": 1500,
                 "emptyText": "0"
               },
               "actions": [
@@ -950,7 +945,7 @@
             {
               "id": "slideshow-preview-table",
               "type": "ui.table",
-              "area": "bottom",
+              "area": "main",
               "title": "Preview photos",
               "dataSource": {
                 "kind": "stream",
@@ -984,7 +979,7 @@
             {
               "id": "slideshow-command-state",
               "type": "ui.list",
-              "area": "bottom",
+              "area": "main",
               "title": "Last command",
               "dataSource": {
                 "kind": "stream",
@@ -1035,7 +1030,6 @@
                 "descriptionPath": "description",
                 "noticePath": "message",
                 "colorPath": "color",
-                "refreshMs": 1500,
                 "emptyText": "0"
               },
               "actions": [
