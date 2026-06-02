@@ -12,16 +12,22 @@ Dashboard flow:
 
 1. `Refresh endpoints` loads admitted ReDevice endpoints into the endpoint table.
 2. `Add/remove` builds a multi-endpoint sync group; `Only` replaces the group.
-3. `Preview photos` scans the source folder and shows the files that will be converted.
-4. `Start` queues a fullscreen `display.render_surface` command for all selected endpoints.
-5. Desktop widgets expose the current frame plus Prev, Next, and Fav controls.
+3. `Refresh index` rebuilds a persistent SQLite index for the source tree.
+4. `Folders` selects a top-level folder from the indexed source tree.
+5. `Preview photos` shows indexed files in the current folder/scope.
+6. `Run` switches between `Running` and `Stopped`.
+7. Desktop widgets expose the current frame plus Prev, Next, and Fav controls.
 
 Runtime state:
 
-- favorites are global for this skill instance;
+- skill state is stored through AdaOS skill memory, not in ad-hoc user-home files;
+- generated thumbnails are stored beside source photos in `.adaos-thumbs`;
+- favorites are global for this skill instance and persisted in the photo index;
 - mode is `sequential` or `random`;
 - scope is `all` or `favorites`;
+- display mode is `fit` or `crop`;
 - sync mode broadcasts skill-selected state to all selected endpoints;
+- when running in sync mode, the first selected endpoint drives autoplay;
 - endpoint payload is bounded to 10 current items plus up to 20 favorites.
 
 Default photo source:

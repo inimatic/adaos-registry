@@ -24,6 +24,9 @@
         "sync_group_id": "node_id:skill_id scoped",
         "mode": ["sequential", "random"],
         "scope": ["all", "favorites"],
+        "display_mode": ["fit", "crop"],
+        "autoplay": false,
+        "interval_ms": 7000,
         "fullscreen": true
       },
       "degraded_fallback": "slideshow.viewer.buttons"
