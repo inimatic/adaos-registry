@@ -188,6 +188,39 @@ def test_endpoint_content_items_stop_at_inline_budget(monkeypatch, tmp_path):
     assert limited is True
 
 
+def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photo = tmp_path / "large-photo.jpg"
+    image = Image.new("RGB", (2400, 1600))
+    pixels = image.load()
+    for y in range(image.height):
+        for x in range(image.width):
+            pixels[x, y] = ((x * 17 + y * 3) % 256, (x * 5 + y * 19) % 256, (x * 11 + y * 7) % 256)
+    image.save(photo, "JPEG", quality=94)
+
+    monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "ABC123", "state": "approved", "display_name": "Tablet"}])
+    monkeypatch.setattr(mod, "_favorite_refs", lambda _root: [])
+
+    payload = mod._session_payload(
+        {
+            "source_dir": str(tmp_path),
+            "selected_codes": ["ABC123"],
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+            "display_mode": "fit",
+            "fullscreen": True,
+            "running": True,
+            "current_index": 0,
+        },
+        [photo],
+    )
+
+    assert len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) < 98_304
+    assert payload["label"] == "Tablet"
+
+
 def test_endpoint_next_refreshes_independent_endpoint_window(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 

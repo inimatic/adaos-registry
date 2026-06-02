@@ -36,7 +36,8 @@ _COMMAND_RECEIVER = "slideshow_skill.command"
 _INDEX_RECEIVER = "slideshow_skill.index"
 _SUPPORTED = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
 _ENDPOINT_SIZE = (480, 300)
-_WIDGET_SIZE = (960, 540)
+_WIDGET_SIZE = (720, 405)
+_WIDGET_IMAGE_BUDGET_BYTES = 60_000
 _MAX_SCAN = 2000
 _MAX_CONTROL_SCAN = 240
 _MAX_ENDPOINT_CURRENT = 4
@@ -882,9 +883,43 @@ def _thumbnail(path: Path, size: tuple[int, int], label: str) -> tuple[Path, boo
         if label.startswith("endpoint-cache"):
             quality = 62
         else:
-            quality = 62 if label.startswith("endpoint") else 86
+            quality = 62 if label.startswith("endpoint") else _thumbnail_quality(label, default=78)
         canvas.save(cache_path, "JPEG", quality=quality, optimize=True)
     return cache_path, False
+
+
+def _thumbnail_quality(label: str, *, default: int) -> int:
+    token = str(label or "")
+    marker = "-q"
+    if marker not in token:
+        return default
+    try:
+        value = int(token.rsplit(marker, 1)[-1].split("-", 1)[0])
+        return max(40, min(90, value))
+    except Exception:
+        return default
+
+
+def _widget_thumbnail(path: Path) -> tuple[Path, bool]:
+    # Keep browser stream payloads under the declared 98 KB receiver budget.
+    # The best cached candidate wins, but detailed photos degrade gracefully.
+    options = [
+        ((720, 405), 78),
+        ((640, 360), 74),
+        ((560, 315), 72),
+        ((480, 270), 70),
+        ((384, 216), 68),
+    ]
+    last: tuple[Path, bool] | None = None
+    for size, quality in options:
+        thumb, cached = _thumbnail(path, size, f"widget-v4-{size[0]}x{size[1]}-q{quality}")
+        last = (thumb, cached)
+        try:
+            if thumb.stat().st_size <= _WIDGET_IMAGE_BUDGET_BYTES:
+                return thumb, cached
+        except Exception:
+            return thumb, cached
+    return last if last is not None else _thumbnail(path, _WIDGET_SIZE, "widget-v4")
 
 
 def _data_uri(path: Path) -> str:
@@ -1065,7 +1100,7 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
     title = "No photo"
     content_ref = ""
     if current is not None:
-        thumb, _cached = _thumbnail(current, _WIDGET_SIZE, "widget-v3")
+        thumb, _cached = _widget_thumbnail(current)
         image = {"src": _data_uri(thumb), "mime": "image/jpeg"}
         title = current.name
         content_ref = _content_ref(current)
