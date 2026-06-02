@@ -161,6 +161,49 @@ def test_endpoint_content_items_stop_at_inline_budget(monkeypatch, tmp_path):
     assert limited is True
 
 
+def test_endpoint_next_refreshes_independent_endpoint_window(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(8)]
+    for photo in photos:
+        photo.write_bytes(b"jpeg")
+
+    sent_codes: list[str | None] = []
+    monkeypatch.setattr(mod, "_save_state", lambda state: state)
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: photos)
+    monkeypatch.setattr(
+        mod,
+        "_send_to_selected",
+        lambda state, files, **kwargs: sent_codes.append(kwargs.get("code")) or {"ok": True},
+    )
+
+    state = {
+        "selected_codes": ["A", "B"],
+        "sync": False,
+        "running": True,
+        "current_index": 0,
+        "endpoint_index_by_code": {},
+        "last_event_by_code": {},
+    }
+    devices = [
+        {
+            "code": "B",
+            "last_event": {
+                "type": "endpoint.surface.event",
+                "observed_at": 10,
+                "action": "next",
+                "item_ref": "content:1",
+            },
+        }
+    ]
+
+    updated = mod._apply_root_events(state, devices, photos, webspace_id="ws-1", broadcast=True)
+
+    assert updated["selected_codes"] == ["A", "B"]
+    assert updated["endpoint_index_by_code"] == {"B": 1}
+    assert sent_codes == ["B"]
+
+
 def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):
     mod = _load_slideshow_module()
 

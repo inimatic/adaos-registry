@@ -303,6 +303,15 @@
         "size": "small",
         "buttons": [
           {
+            "id": "play",
+            "label": "Play"
+          },
+          {
+            "id": "stop",
+            "label": "Stop",
+            "kind": "danger"
+          },
+          {
             "id": "prev",
             "label": "Prev"
           },
@@ -317,6 +326,22 @@
         ]
       },
       "actions": [
+        {
+          "on": "click:play",
+          "type": "callSkill",
+          "target": "slideshow_skill.control_redevice_slideshow",
+          "params": {
+            "action": "start"
+          }
+        },
+        {
+          "on": "click:stop",
+          "type": "callSkill",
+          "target": "slideshow_skill.control_redevice_slideshow",
+          "params": {
+            "action": "stop"
+          }
+        },
         {
           "on": "click:prev",
           "type": "callSkill",
@@ -436,6 +461,15 @@
                     "label": "Preview photos"
                   },
                   {
+                    "id": "play",
+                    "label": "Play"
+                  },
+                  {
+                    "id": "stop",
+                    "label": "Stop",
+                    "kind": "danger"
+                  },
+                  {
                     "id": "prev",
                     "label": "Prev"
                   },
@@ -486,6 +520,22 @@
                   "target": "slideshow_skill.list_slideshow_photos",
                   "params": {
                     "limit": 48
+                  }
+                },
+                {
+                  "on": "click:play",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.control_redevice_slideshow",
+                  "params": {
+                    "action": "start"
+                  }
+                },
+                {
+                  "on": "click:stop",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.control_redevice_slideshow",
+                  "params": {
+                    "action": "stop"
                   }
                 },
                 {

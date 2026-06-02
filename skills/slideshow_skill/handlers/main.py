@@ -148,6 +148,7 @@ def _default_state() -> dict[str, Any]:
         "source_dir": str(_source_dir()),
         "selected_folder": "",
         "last_event_by_code": {},
+        "endpoint_index_by_code": {},
     }
 
 
@@ -179,6 +180,8 @@ def _load_state() -> dict[str, Any]:
         state["current_index"] = 0
     if not isinstance(state.get("last_event_by_code"), Mapping):
         state["last_event_by_code"] = {}
+    if not isinstance(state.get("endpoint_index_by_code"), Mapping):
+        state["endpoint_index_by_code"] = {}
     return state
 
 
@@ -920,11 +923,35 @@ def _current_photo(files: list[Path], state: Mapping[str, Any]) -> Path | None:
     return selected[index]
 
 
-def _endpoint_window(files: list[Path], state: Mapping[str, Any]) -> list[Path]:
+def _current_index(state: Mapping[str, Any], *, code: str | None = None) -> int:
+    token = _text(code)
+    if token and not state.get("sync"):
+        by_code = _mapping(state.get("endpoint_index_by_code"))
+        try:
+            return max(0, int(by_code.get(token) or state.get("current_index") or 0))
+        except Exception:
+            return 0
+    try:
+        return max(0, int(state.get("current_index") or 0))
+    except Exception:
+        return 0
+
+
+def _set_current_index(state: dict[str, Any], index: int, *, code: str | None = None) -> None:
+    token = _text(code)
+    if token and not state.get("sync"):
+        by_code = dict(state.get("endpoint_index_by_code") or {})
+        by_code[token] = max(0, int(index))
+        state["endpoint_index_by_code"] = by_code
+        return
+    state["current_index"] = max(0, int(index))
+
+
+def _endpoint_window(files: list[Path], state: Mapping[str, Any], *, code: str | None = None) -> list[Path]:
     selected = _selected_photos(files, state)
     if not selected:
         return []
-    index = int(state.get("current_index") or 0) % len(selected)
+    index = _current_index(state, code=code) % len(selected)
     if len(selected) <= _MAX_ENDPOINT_CURRENT:
         return selected[index:] + selected[:index]
     if _text(state.get("mode")) == "random":
@@ -950,14 +977,18 @@ def _content_items_for_window(window: list[Path]) -> tuple[list[dict[str, Any]],
 
 
 def _advance(state: dict[str, Any], files: list[Path], step: int) -> dict[str, Any]:
+    return _advance_for_code(state, files, step)
+
+
+def _advance_for_code(state: dict[str, Any], files: list[Path], step: int, *, code: str | None = None) -> dict[str, Any]:
     selected = _selected_photos(files, state)
     if not selected:
-        state["current_index"] = 0
+        _set_current_index(state, 0, code=code)
         return state
     if _text(state.get("mode")) == "random" and step != 0:
-        state["current_index"] = random.randrange(0, len(selected))
+        _set_current_index(state, random.randrange(0, len(selected)), code=code)
     else:
-        state["current_index"] = (int(state.get("current_index") or 0) + step) % len(selected)
+        _set_current_index(state, (_current_index(state, code=code) + step) % len(selected), code=code)
     return state
 
 
@@ -1218,29 +1249,49 @@ def _send_to_selected(
     webspace_id: str | None = None,
 ) -> dict[str, Any]:
     devices = _load_devices()
-    selected_codes = _unique_texts([code] if code else state.get("selected_codes"))
-    if code and selected_codes and isinstance(state, dict):
-        state["selected_codes"] = selected_codes
-        _save_state(state)
-    if not selected_codes:
+    configured_codes = _unique_texts(state.get("selected_codes"))
+    target_codes = _unique_texts([code]) if code else configured_codes
+    if not target_codes:
         device = _select_device(devices)
-        selected_codes = [_text(device.get("code"))] if device else []
-        if selected_codes and isinstance(state, dict):
-            state["selected_codes"] = selected_codes
+        target_codes = [_text(device.get("code"))] if device else []
+        if target_codes and isinstance(state, dict):
+            state["selected_codes"] = target_codes
             _save_state(state)
-    if not selected_codes:
+    if not target_codes:
         return {"ok": False, "error": "no_redevice_endpoint"}
-    window = _endpoint_window(files, state)
-    if not window:
+    if not _endpoint_window(files, state, code=target_codes[0] if target_codes else None):
         return {"ok": False, "error": "no_supported_photos", "source_dir": state.get("source_dir")}
-    items, content_bytes, budget_limited = _content_items_for_window(window)
     bridge = ReDeviceBridge()
     devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
     results: list[dict[str, Any]] = []
     transports: dict[str, Any] = {}
+    items_by_code: dict[str, list[dict[str, Any]]] = {}
+    first_items: list[dict[str, Any]] = []
+    first_content_bytes = 0
+    any_budget_limited = False
     first_command_id = ""
-    for pair_code in selected_codes:
-        autoplay = bool(state.get("running")) and (not state.get("sync") or pair_code == selected_codes[0])
+    for pair_code in target_codes:
+        window = _endpoint_window(files, state, code=pair_code)
+        items, content_bytes, budget_limited = _content_items_for_window(window)
+        if not items:
+            results.append(
+                {
+                    "code": pair_code,
+                    "ok": False,
+                    "error": "no_supported_photos",
+                    "command_id": "",
+                    "state": "failed",
+                    "item_count": 0,
+                    "content_bytes": 0,
+                    "transport": {},
+                }
+            )
+            continue
+        items_by_code[pair_code] = items
+        first_items = first_items or items
+        first_content_bytes = first_content_bytes or content_bytes
+        any_budget_limited = any_budget_limited or budget_limited
+        autoplay = bool(state.get("running")) and (not state.get("sync") or pair_code == target_codes[0])
         transport = select_transport(
             devices_by_code.get(pair_code, {}),
             intent="display.slideshow",
@@ -1259,6 +1310,9 @@ def _send_to_selected(
                 "error": res.get("error"),
                 "command_id": queued.get("command_id") or command.get("command_id"),
                 "state": queued.get("state"),
+                "item_count": len(items),
+                "content_bytes": content_bytes,
+                "cache_budget_limited": budget_limited,
                 "transport": transport,
             }
         )
@@ -1266,12 +1320,20 @@ def _send_to_selected(
         "ok": any(bool(item.get("ok")) for item in results),
         "command_id": first_command_id,
         "source_dir": state.get("source_dir"),
-        "selected_codes": selected_codes,
-        "item_count": len(items),
+        "selected_codes": configured_codes or target_codes,
+        "target_codes": target_codes,
+        "item_count": len(first_items),
         "cache_target": _MAX_ENDPOINT_CURRENT,
-        "cache_budget_limited": budget_limited,
-        "content_bytes": content_bytes,
-        "items": [{"source_name": item["source_name"], "thumbnail_path": item["thumbnail_path"], "cached": item["cached"]} for item in items],
+        "cache_budget_limited": any_budget_limited,
+        "content_bytes": first_content_bytes,
+        "items": [{"source_name": item["source_name"], "thumbnail_path": item["thumbnail_path"], "cached": item["cached"]} for item in first_items],
+        "items_by_code": {
+            pair_code: [
+                {"source_name": item["source_name"], "thumbnail_path": item["thumbnail_path"], "cached": item["cached"]}
+                for item in pair_items
+            ]
+            for pair_code, pair_items in items_by_code.items()
+        },
         "transport": next(iter(transports.values()), {}),
         "transports": transports,
         "results": results,
@@ -1353,6 +1415,7 @@ def _apply_root_events(
     selected = set(_unique_texts(state.get("selected_codes")))
     last_by_code = dict(state.get("last_event_by_code") or {})
     changed = False
+    refresh_codes: set[str] = set()
     for item in devices:
         code = _text(item.get("code"))
         if not code or code not in selected:
@@ -1365,9 +1428,14 @@ def _apply_root_events(
             continue
         last_by_code[code] = event_id
         action = _text(event.get("action"))
-        if action == "next" and state.get("sync"):
-            _advance(state, files, 1)
+        if action == "next":
+            _advance_for_code(state, files, 1, code=None if state.get("sync") else code)
             changed = True
+            if state.get("running"):
+                if state.get("sync"):
+                    refresh_codes.update(selected)
+                else:
+                    refresh_codes.add(code)
         elif action == "favorite_toggle":
             _toggle_favorite_ref(state, _text(event.get("item_ref")))
             changed = True
@@ -1376,13 +1444,17 @@ def _apply_root_events(
         _save_state(state)
         if broadcast and state.get("sync"):
             _send_to_selected(state, _files_for_state(state, _MAX_CONTROL_SCAN), webspace_id=webspace_id)
+        elif broadcast and refresh_codes:
+            fresh_files = _files_for_state(state, _MAX_CONTROL_SCAN)
+            for target_code in sorted(refresh_codes):
+                _send_to_selected(state, fresh_files, code=target_code, webspace_id=webspace_id)
     return state
 
 
 def _poll_once(webspace_id: str | None = None) -> None:
     try:
         state = _load_state()
-        if not state.get("sync") or not _unique_texts(state.get("selected_codes")):
+        if not _unique_texts(state.get("selected_codes")):
             return
         devices = _load_devices()
         files = _files_for_state(state, _MAX_CONTROL_SCAN)
@@ -1391,6 +1463,13 @@ def _poll_once(webspace_id: str | None = None) -> None:
         _publish(_ENDPOINTS_RECEIVER, _endpoint_payload(devices, state), webspace_id)
     except Exception:
         _log.debug("slideshow root event poll failed", exc_info=True)
+
+
+@subscribe("sys.ready")
+def on_sys_ready(evt: Any) -> None:
+    state = _load_state()
+    if state.get("running") or _unique_texts(state.get("selected_codes")):
+        _ensure_polling(default_webspace_id())
 
 
 def _poll_loop() -> None:

@@ -16,8 +16,9 @@ Dashboard flow:
 4. `Refresh index` starts a background SQLite index refresh for the source tree.
 5. `Folders` opens a separate folder picker backed by the indexed source tree.
 6. `Preview photos` shows indexed files in the current folder/scope.
-7. `Run` switches between `Running` and `Stopped`.
-8. Desktop widgets expose the current frame plus Prev, Next, and Fav controls.
+7. `Play` starts endpoint autoplay and sends the current cache window.
+8. `Stop` clears the active ReDevice slideshow surface.
+9. Desktop widgets expose the current frame plus Play, Stop, Prev, Next, and Fav controls.
 
 Large libraries:
 
@@ -42,6 +43,13 @@ Runtime state:
 - endpoint payload targets 4 current items, but root inline fallback is budget guarded;
 - when inline transport is selected, the endpoint receives as many compact cached frames as fit the command budget;
 - a future `content_url` pull route should provide the guaranteed 10-frame cache without inflating root commands.
+
+Service behavior:
+
+- the skill resumes its ReDevice event poller on `sys.ready` when it has selected endpoints or a running session;
+- endpoint-side `next` events advance the skill's cache window;
+- in synchronous mode, endpoint-side `next` refreshes the shared window on all selected endpoints;
+- in independent mode, endpoint-side `next` refreshes only the endpoint that produced the event.
 
 Default photo source:
 
