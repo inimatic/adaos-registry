@@ -5,7 +5,15 @@
       "id": "mediaserver_app",
       "title": "Media Server",
       "icon": "videocam-outline",
-      "launchModal": "mediaserver_modal"
+      "launchModal": "mediaserver_modal",
+      "nlu_aliases": [
+        "media server",
+        "mediaserver",
+        "медиа сервер",
+        "медиасервер",
+        "медиа библиотека",
+        "медиатека"
+      ]
     }
   ],
   "widgets": [
@@ -28,6 +36,14 @@
     "modals": {
       "mediaserver_modal": {
         "title": "Media Server",
+        "nlu_aliases": [
+          "media server",
+          "mediaserver",
+          "медиа сервер",
+          "медиасервер",
+          "медиа библиотека",
+          "медиатека"
+        ],
         "schema": {
           "id": "mediaserver_modal",
           "layout": {
