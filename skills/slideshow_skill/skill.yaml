@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.9
+version: 0.1.10
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -39,6 +39,57 @@ tools:
         type: array
         items:
           type: object
+- name: set_slideshow_source
+  description: Persist the slideshow source folder in skill memory and refresh visible
+    session/index state without starting a scan.
+  entry: handlers.main:set_slideshow_source
+  input_schema:
+    type: object
+    required:
+    - source_dir
+    properties:
+      source_dir:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      source_dir:
+        type: string
+      index:
+        type: object
+      status:
+        type: object
+- name: get_slideshow_index_status
+  description: Publish and return the current background photo index status.
+  entry: handlers.main:get_slideshow_index_status
+  input_schema:
+    type: object
+    properties:
+      source_dir:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - status
+    properties:
+      ok:
+        type: boolean
+      status:
+        type: string
+      source_dir:
+        type: string
+      indexed_count:
+        type: integer
+      visited_files:
+        type: integer
 - name: start_redevice_slideshow
   description: Convert source photos to cached thumbnails and queue a display.render_surface
     command for a ReDevice endpoint.
@@ -111,7 +162,8 @@ tools:
         items:
           type: object
 - name: refresh_slideshow_photo_index
-  description: Rebuild the persistent photo index for the selected slideshow root folder.
+  description: Start or resume a background photo index refresh for the selected
+    root folder while preserving favorites until a full scan succeeds.
   entry: handlers.main:refresh_slideshow_photo_index
   input_schema:
     type: object
@@ -133,6 +185,23 @@ tools:
         type: integer
       index:
         type: object
+- name: cancel_slideshow_photo_index
+  description: Ask the background photo indexer to stop after the current batch.
+  entry: handlers.main:cancel_slideshow_photo_index
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - status
+    properties:
+      ok:
+        type: boolean
+      status:
+        type: string
 - name: select_slideshow_folder
   description: Select a top-level indexed folder as the current slideshow scope.
   entry: handlers.main:select_slideshow_folder
@@ -315,17 +384,18 @@ data_routes:
     degraded_state: keep the last slideshow session state
     log: service.slideshow_skill.runtime.log
     quarantine: false
-- surface: modal:slideshow_modal
+- surface: modal:slideshow_folders_modal
   route: stream
   receiver: slideshow_skill.folders
   first_paint: empty folder index
   recovery: folder list is restored from the persistent photo index
   update_source:
+  - webio.stream.snapshot.requested
   - slideshow_skill.action
   budget:
     max_payload_bytes: 65536
     max_publish_hz: 1
-    max_items: 128
+    max_items: 256
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: keep the last indexed folder list
@@ -347,6 +417,24 @@ data_routes:
     degraded_state: keep the last slideshow command state
     log: service.slideshow_skill.runtime.log
     quarantine: false
+- surface: modal:slideshow_modal
+  route: stream
+  receiver: slideshow_skill.index
+  first_paint: idle photo index status
+  recovery: latest background index status is restored from skill memory
+  update_source:
+  - webio.stream.snapshot.requested
+  - slideshow_skill.action
+  - slideshow_skill.indexer
+  budget:
+    max_payload_bytes: 32768
+    max_publish_hz: 2
+    max_items: 1
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the last photo index status
+    log: service.slideshow_skill.runtime.log
+    quarantine: false
 redui: redui.json
-updated_at: '2026-06-02T07:00:00+00:00'
+updated_at: '2026-06-02T08:00:00+00:00'
 

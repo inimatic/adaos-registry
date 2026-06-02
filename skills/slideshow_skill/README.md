@@ -12,16 +12,27 @@ Dashboard flow:
 
 1. `Refresh endpoints` loads admitted ReDevice endpoints into the endpoint table.
 2. `Add/remove` builds a multi-endpoint sync group; `Only` replaces the group.
-3. `Refresh index` rebuilds a persistent SQLite index for the source tree.
-4. `Folders` selects a top-level folder from the indexed source tree.
-5. `Preview photos` shows indexed files in the current folder/scope.
-6. `Run` switches between `Running` and `Stopped`.
-7. Desktop widgets expose the current frame plus Prev, Next, and Fav controls.
+3. `Apply source` stores the source folder in AdaOS skill memory.
+4. `Refresh index` starts a background SQLite index refresh for the source tree.
+5. `Folders` opens a separate folder picker backed by the indexed source tree.
+6. `Preview photos` shows indexed files in the current folder/scope.
+7. `Run` switches between `Running` and `Stopped`.
+8. Desktop widgets expose the current frame plus Prev, Next, and Fav controls.
+
+Large libraries:
+
+- indexing runs in the runtime process background and continues after the modal is closed;
+- the `Photo index` tile shows running/completed/failed state plus indexed and visited counts;
+- a refresh keeps old rows and favorite flags until a full scan completes;
+- if a scan is canceled or interrupted, existing and partial rows remain usable;
+- folder output is capped for WebIO, with the full source still kept in SQLite;
+- endpoint refresh and playback controls read the existing index and do not rescan the file tree.
 
 Runtime state:
 
 - skill state is stored through AdaOS skill memory, not in ad-hoc user-home files;
 - generated thumbnails are stored beside source photos in `.adaos-thumbs`;
+- the persistent photo index is stored under the skill runtime data area;
 - favorites are global for this skill instance and persisted in the photo index;
 - mode is `sequential` or `random`;
 - scope is `all` or `favorites`;

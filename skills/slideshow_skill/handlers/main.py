@@ -33,6 +33,7 @@ _PREVIEW_RECEIVER = "slideshow_skill.preview"
 _FOLDERS_RECEIVER = "slideshow_skill.folders"
 _SESSION_RECEIVER = "slideshow_skill.session"
 _COMMAND_RECEIVER = "slideshow_skill.command"
+_INDEX_RECEIVER = "slideshow_skill.index"
 _SUPPORTED = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
 _ENDPOINT_SIZE = (1280, 800)
 _WIDGET_SIZE = (420, 260)
@@ -40,14 +41,21 @@ _MAX_SCAN = 2000
 _MAX_CONTROL_SCAN = 240
 _MAX_ENDPOINT_CURRENT = 10
 _MAX_ENDPOINT_FAVORITES = 20
+_MAX_FOLDER_STREAM_ITEMS = 250
+_INDEX_BATCH_SIZE = 500
+_INDEX_PUBLISH_INTERVAL_S = 1.5
 _STATE_KEY = "slideshow_skill.state"
 _INDEX_META_KEY = "slideshow_skill.photo_index"
+_INDEX_STATUS_KEY = "slideshow_skill.index_status"
 _POLL_INTERVAL_S = 2.5
 _log = logging.getLogger("skills.slideshow_skill")
 _poll_lock = threading.Lock()
 _poll_thread: threading.Thread | None = None
 _poll_stop = threading.Event()
 _poll_webspace_id = ""
+_index_lock = threading.Lock()
+_index_thread: threading.Thread | None = None
+_index_stop = threading.Event()
 
 
 def _now() -> str:
@@ -60,6 +68,13 @@ def _text(value: Any) -> str:
 
 def _mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _count_label(value: Any) -> str:
+    try:
+        return f"{int(value):,}".replace(",", " ")
+    except Exception:
+        return "0"
 
 
 def _memory_get(key: str, default: Any = None) -> Any:
@@ -266,80 +281,329 @@ def _index_meta(root: Path) -> dict[str, Any]:
     return {"root_dir": str(root), "indexed_at": float(row["indexed_at"]), "photo_count": int(row["photo_count"])}
 
 
+def _index_status(root: Path | None = None) -> dict[str, Any]:
+    data = _memory_get(_INDEX_STATUS_KEY, {})
+    status = dict(data) if isinstance(data, Mapping) else {}
+    requested_source_dir = str(root) if root is not None else ""
+    saved_source_dir = _text(status.get("source_dir"))
+    if requested_source_dir and saved_source_dir and saved_source_dir.casefold() != requested_source_dir.casefold():
+        status = {}
+    source_dir = _text(status.get("source_dir")) or requested_source_dir
+    meta = _index_meta(_source_dir(source_dir)) if source_dir else {}
+    if not status:
+        status = {
+            "ok": bool(meta),
+            "status": "ready" if meta else "idle",
+            "source_dir": source_dir,
+            "visited_files": 0,
+            "indexed_count": int(meta.get("photo_count") or 0),
+            "photo_count": int(meta.get("photo_count") or 0),
+            "folder_count": 0,
+            "started_at": None,
+            "updated_at": _now(),
+            "completed_at": None,
+        }
+    if _text(status.get("status")) == "running":
+        with _index_lock:
+            alive = _index_thread is not None and _index_thread.is_alive()
+        if not alive:
+            status["status"] = "interrupted"
+            status["message"] = "Indexing was interrupted. Press Refresh index to resume."
+            _memory_set(_INDEX_STATUS_KEY, status)
+    if meta and _text(status.get("status")) not in {"running", "canceling"}:
+        status["photo_count"] = int(meta.get("photo_count") or status.get("photo_count") or 0)
+        status["indexed_count"] = int(meta.get("photo_count") or status.get("indexed_count") or 0)
+    status["value"] = _count_label(status.get("indexed_count") or status.get("photo_count"))
+    status["label"] = _text(status.get("status")) or "idle"
+    status["description"] = _text(status.get("message")) or _index_message(status)
+    status["color"] = {
+        "running": "primary",
+        "ready": "success",
+        "completed": "success",
+        "failed": "danger",
+        "interrupted": "warning",
+        "canceling": "warning",
+        "canceled": "warning",
+    }.get(_text(status.get("status")), "warning")
+    return status
+
+
+def _index_message(status: Mapping[str, Any]) -> str:
+    state = _text(status.get("status")) or "idle"
+    source = _text(status.get("source_dir"))
+    indexed = _count_label(status.get("indexed_count") or status.get("photo_count"))
+    visited = _count_label(status.get("visited_files"))
+    folders = _count_label(status.get("folder_count"))
+    if state == "running":
+        return f"Indexing {source}: {indexed} photos, {folders} folders, {visited} files visited."
+    if state in {"completed", "ready"}:
+        return f"Index ready for {source}: {indexed} photos, {folders} folders."
+    if state == "failed":
+        return f"Index failed for {source}: {_text(status.get('error'))}"
+    if state == "canceled":
+        return f"Index canceled for {source}: {indexed} photos kept."
+    if state == "interrupted":
+        return f"Index interrupted for {source}: press Refresh index to resume."
+    if source:
+        return f"Index idle for {source}: press Refresh index."
+    return "Index idle."
+
+
+def _set_index_status(payload: Mapping[str, Any], webspace_id: str | None = None) -> dict[str, Any]:
+    status = dict(payload)
+    status["updated_at"] = _now()
+    status["message"] = _index_message(status)
+    _memory_set(_INDEX_STATUS_KEY, status)
+    normalized = _index_status(_source_dir(status.get("source_dir")))
+    _publish(_INDEX_RECEIVER, normalized, webspace_id)
+    return normalized
+
+
 def _ensure_index(root: Path, *, force: bool = False) -> dict[str, Any]:
     root = root.expanduser()
     if not root.exists():
         return {"ok": False, "error": "source_dir_missing", "root_dir": str(root), "photo_count": 0}
     existing = _index_meta(root)
-    if existing and not force:
+    if existing:
         return {"ok": True, **existing, "source": "cache"}
+    return {"ok": False, "error": "index_missing", "root_dir": str(root), "photo_count": 0, "source": "none"}
+
+
+def _upsert_index_row(conn: sqlite3.Connection, root: Path, path: Path, scan_started: float) -> str | None:
+    if path.suffix.lower() not in _SUPPORTED:
+        return None
+    try:
+        stat = path.stat()
+        ref = _content_ref(path)
+        existing = conn.execute(
+            """
+            SELECT favorite, hidden FROM photos
+            WHERE root_dir = ? AND (source_path = ? OR content_ref = ?)
+            ORDER BY CASE WHEN source_path = ? THEN 0 ELSE 1 END
+            LIMIT 1
+            """,
+            (str(root), str(path), ref, str(path)),
+        ).fetchone()
+        favorite = int(existing["favorite"]) if existing is not None else 0
+        hidden = int(existing["hidden"]) if existing is not None else 0
+        conn.execute(
+            "DELETE FROM photos WHERE root_dir = ? AND (source_path = ? OR content_ref = ?)",
+            (str(root), str(path), ref),
+        )
+        conn.execute(
+            """
+            INSERT INTO photos (
+                content_ref, source_path, root_dir, rel_path, top_folder,
+                source_name, ext, size, mtime, favorite, hidden, indexed_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                ref,
+                str(path),
+                str(root),
+                _rel_path(root, path),
+                _top_folder(root, path),
+                path.name,
+                path.suffix.lower(),
+                int(stat.st_size),
+                int(stat.st_mtime),
+                favorite,
+                hidden,
+                scan_started,
+            ),
+        )
+        return ref
+    except Exception:
+        _log.debug("failed to index slideshow photo path=%s", path, exc_info=True)
+        return None
+
+
+def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> dict[str, Any]:
+    root = root.expanduser()
+    if not root.exists():
+        return _set_index_status(
+            {
+                "ok": False,
+                "job_id": job_id,
+                "status": "failed",
+                "source_dir": str(root),
+                "error": "source_dir_missing",
+                "visited_files": 0,
+                "indexed_count": 0,
+                "photo_count": 0,
+                "folder_count": 0,
+                "started_at": _now(),
+                "completed_at": _now(),
+            },
+            webspace_id,
+        )
 
     started = time.time()
-    now = time.time()
-    seen: set[str] = set()
-    count = 0
-    with _connect_index() as conn:
-        for current, dirs, names in os.walk(str(root)):
-            dirs[:] = [name for name in dirs if name != ".adaos-thumbs"]
-            for name in names:
-                path = Path(current) / name
-                if path.suffix.lower() not in _SUPPORTED:
-                    continue
-                try:
-                    stat = path.stat()
-                    ref = _content_ref(path)
-                    seen.add(ref)
-                    conn.execute(
-                        """
-                        INSERT INTO photos (
-                            content_ref, source_path, root_dir, rel_path, top_folder,
-                            source_name, ext, size, mtime, favorite, hidden, indexed_at
-                        )
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, COALESCE(
-                            (SELECT favorite FROM photos WHERE content_ref = ?), 0
-                        ), COALESCE(
-                            (SELECT hidden FROM photos WHERE content_ref = ?), 0
-                        ), ?)
-                        ON CONFLICT(content_ref) DO UPDATE SET
-                            source_path = excluded.source_path,
-                            root_dir = excluded.root_dir,
-                            rel_path = excluded.rel_path,
-                            top_folder = excluded.top_folder,
-                            source_name = excluded.source_name,
-                            ext = excluded.ext,
-                            size = excluded.size,
-                            mtime = excluded.mtime,
-                            indexed_at = excluded.indexed_at
-                        """,
-                        (
-                            ref,
-                            str(path),
-                            str(root),
-                            _rel_path(root, path),
-                            _top_folder(root, path),
-                            path.name,
-                            path.suffix.lower(),
-                            int(stat.st_size),
-                            int(stat.st_mtime),
-                            ref,
-                            ref,
-                            now,
-                        ),
+    started_at = _now()
+    scan_started = time.time()
+    visited_files = 0
+    indexed_count = 0
+    folders: set[str] = set()
+    last_publish = 0.0
+    _set_index_status(
+        {
+            "ok": True,
+            "job_id": job_id,
+            "status": "running",
+            "source_dir": str(root),
+            "visited_files": 0,
+            "indexed_count": 0,
+            "photo_count": int(_index_meta(root).get("photo_count") or 0),
+            "folder_count": 0,
+            "started_at": started_at,
+            "completed_at": None,
+        },
+        webspace_id,
+    )
+
+    try:
+        with _connect_index() as conn:
+            for current, dirs, names in os.walk(str(root)):
+                dirs[:] = [name for name in dirs if name != ".adaos-thumbs"]
+                if _index_stop.is_set():
+                    conn.commit()
+                    return _set_index_status(
+                        {
+                            "ok": True,
+                            "job_id": job_id,
+                            "status": "canceled",
+                            "source_dir": str(root),
+                            "visited_files": visited_files,
+                            "indexed_count": indexed_count,
+                            "photo_count": indexed_count,
+                            "folder_count": len(folders),
+                            "started_at": started_at,
+                            "completed_at": _now(),
+                        },
+                        webspace_id,
                     )
-                    count += 1
-                except Exception:
-                    _log.debug("failed to index slideshow photo path=%s", path, exc_info=True)
-        stale_rows = conn.execute("SELECT content_ref FROM photos WHERE root_dir = ?", (str(root),)).fetchall()
-        for row in stale_rows:
-            if row["content_ref"] not in seen:
-                conn.execute("DELETE FROM photos WHERE content_ref = ?", (row["content_ref"],))
-        conn.execute(
-            "INSERT OR REPLACE INTO roots(root_dir, indexed_at, photo_count) VALUES (?, ?, ?)",
-            (str(root), now, count),
+                for name in names:
+                    visited_files += 1
+                    path = Path(current) / name
+                    ref = _upsert_index_row(conn, root, path, scan_started)
+                    if ref:
+                        indexed_count += 1
+                        folder = _top_folder(root, path)
+                        if folder:
+                            folders.add(folder)
+                    if indexed_count and indexed_count % _INDEX_BATCH_SIZE == 0:
+                        conn.commit()
+                    now = time.time()
+                    if now - last_publish >= _INDEX_PUBLISH_INTERVAL_S:
+                        last_publish = now
+                        _set_index_status(
+                            {
+                                "ok": True,
+                                "job_id": job_id,
+                                "status": "running",
+                                "source_dir": str(root),
+                                "visited_files": visited_files,
+                                "indexed_count": indexed_count,
+                                "photo_count": indexed_count,
+                                "folder_count": len(folders),
+                                "started_at": started_at,
+                                "completed_at": None,
+                            },
+                            webspace_id,
+                        )
+            conn.commit()
+            conn.execute("DELETE FROM photos WHERE root_dir = ? AND indexed_at != ?", (str(root), scan_started))
+            row = conn.execute("SELECT COUNT(*) AS count FROM photos WHERE root_dir = ? AND hidden = 0", (str(root),)).fetchone()
+            indexed_count = int(row["count"] or 0) if row is not None else indexed_count
+            conn.execute(
+                "INSERT OR REPLACE INTO roots(root_dir, indexed_at, photo_count) VALUES (?, ?, ?)",
+                (str(root), scan_started, indexed_count),
+            )
+            conn.commit()
+    except Exception as exc:
+        _log.exception("slideshow photo index failed root=%s", root)
+        return _set_index_status(
+            {
+                "ok": False,
+                "job_id": job_id,
+                "status": "failed",
+                "source_dir": str(root),
+                "error": str(exc),
+                "visited_files": visited_files,
+                "indexed_count": indexed_count,
+                "photo_count": indexed_count,
+                "folder_count": len(folders),
+                "started_at": started_at,
+                "completed_at": _now(),
+                "duration_s": round(time.time() - started, 3),
+            },
+            webspace_id,
         )
-    meta = {"ok": True, "root_dir": str(root), "indexed_at": now, "photo_count": count, "duration_s": round(time.time() - started, 3), "source": "scan"}
+
+    meta = {
+        "ok": True,
+        "root_dir": str(root),
+        "indexed_at": scan_started,
+        "photo_count": indexed_count,
+        "duration_s": round(time.time() - started, 3),
+        "source": "scan",
+    }
     _memory_set(_INDEX_META_KEY, meta)
-    return meta
+    status = _set_index_status(
+        {
+            "ok": True,
+            "job_id": job_id,
+            "status": "completed",
+            "source_dir": str(root),
+            "visited_files": visited_files,
+            "indexed_count": indexed_count,
+            "photo_count": indexed_count,
+            "folder_count": len(folders),
+            "started_at": started_at,
+            "completed_at": _now(),
+            "duration_s": round(time.time() - started, 3),
+        },
+        webspace_id,
+    )
+    state = _load_state()
+    if _text(state.get("source_dir")) == str(root):
+        _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
+        _publish(_PREVIEW_RECEIVER, _preview_payload(state, 48), webspace_id)
+        _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+    return status
+
+
+def _start_index_job(root: Path, *, webspace_id: str | None = None) -> dict[str, Any]:
+    global _index_thread
+    root = root.expanduser()
+    job_id = "idx:" + hashlib.sha256(f"{root}:{time.time()}".encode("utf-8")).hexdigest()[:16]
+    with _index_lock:
+        if _index_thread is not None and _index_thread.is_alive():
+            current = _index_status()
+            if _text(current.get("source_dir")).casefold() == str(root).casefold():
+                return current
+            return {**current, "ok": False, "error": "indexer_busy", "requested_source_dir": str(root)}
+        _index_stop.clear()
+        _index_thread = threading.Thread(
+            target=_scan_index,
+            kwargs={"root": root, "job_id": job_id, "webspace_id": webspace_id},
+            name="slideshow-photo-index",
+            daemon=True,
+        )
+        _index_thread.start()
+    return _index_status(root)
+
+
+def _cancel_index_job(webspace_id: str | None = None) -> dict[str, Any]:
+    with _index_lock:
+        running = _index_thread is not None and _index_thread.is_alive()
+    if running:
+        _index_stop.set()
+        status = _index_status()
+        status["status"] = "canceling"
+        return _set_index_status(status, webspace_id)
+    return _index_status()
 
 
 def _query_photo_records(
@@ -426,8 +690,20 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
     _ensure_index(root)
     selected = _text(state.get("selected_folder"))
     items = [{"id": "", "title": "All photos", "subtitle": str(root), "selected": selected == ""}]
+    total_folders = 0
     try:
         with _connect_index() as conn:
+            count_row = conn.execute(
+                """
+                SELECT COUNT(*) AS count FROM (
+                    SELECT top_folder FROM photos
+                    WHERE root_dir = ? AND hidden = 0 AND top_folder != ''
+                    GROUP BY top_folder
+                )
+                """,
+                (str(root),),
+            ).fetchone()
+            total_folders = int(count_row["count"] or 0) if count_row is not None else 0
             rows = conn.execute(
                 """
                 SELECT top_folder, COUNT(*) AS count,
@@ -436,8 +712,9 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
                 WHERE root_dir = ? AND hidden = 0 AND top_folder != ''
                 GROUP BY top_folder
                 ORDER BY top_folder ASC
+                LIMIT ?
                 """,
-                (str(root),),
+                (str(root), max(1, _MAX_FOLDER_STREAM_ITEMS - 1)),
             ).fetchall()
     except Exception:
         rows = []
@@ -453,6 +730,18 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "count": count,
                 "favorites": favorites,
                 "selected": folder == selected,
+            }
+        )
+    if total_folders > len(rows):
+        items.append(
+            {
+                "id": "__more__",
+                "title": "More folders not shown",
+                "subtitle": f"{total_folders - len(rows)} more top-level folders. Narrow the source root if needed.",
+                "count": total_folders - len(rows),
+                "favorites": 0,
+                "selected": False,
+                "selectable": False,
             }
         )
     return items
@@ -949,29 +1238,82 @@ def list_slideshow_photos(
         state["source_dir"] = str(_source_dir(source_dir))
         _save_state(state)
     _ensure_index(_source_dir(state.get("source_dir")))
-    files = _files_for_state(state, limit)
-    payload = {
-        "ok": True,
-        "source_dir": str(_source_dir(state.get("source_dir"))),
-        "selected_folder": _text(state.get("selected_folder")),
-        "count": len(files),
-        "items": [_preview_item(p) for p in files],
-        "updated_at": _now(),
-    }
+    payload = _preview_payload(state, limit)
     _publish(_PREVIEW_RECEIVER, payload, webspace_id)
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+    _publish(_INDEX_RECEIVER, _index_status(_source_dir(state.get("source_dir"))), webspace_id)
     return payload
+
+
+@tool
+def set_slideshow_source(
+    source_dir: str,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    state = _load_state()
+    next_root = _source_dir(source_dir)
+    previous_root = _text(state.get("source_dir"))
+    state["source_dir"] = str(next_root)
+    if previous_root.casefold() != str(next_root).casefold():
+        state["selected_folder"] = ""
+        state["current_index"] = 0
+    state = _save_state(state)
+    files = _files_for_state(state, _MAX_CONTROL_SCAN)
+    devices = _load_devices()
+    _publish(_ENDPOINTS_RECEIVER, _endpoint_payload(devices, state), webspace_id)
+    _publish(_SESSION_RECEIVER, _session_payload(state, files), webspace_id)
+    _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
+    _publish(_PREVIEW_RECEIVER, _preview_payload(state, 48), webspace_id)
+    status = _index_status(next_root)
+    _publish(_INDEX_RECEIVER, status, webspace_id)
+    return {"ok": True, "source_dir": str(next_root), "index": _ensure_index(next_root), "status": status, "updated_at": _now()}
+
+
+@tool
+def get_slideshow_index_status(
+    source_dir: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    state = _load_state()
+    if source_dir:
+        state["source_dir"] = str(_source_dir(source_dir))
+        state = _save_state(state)
+    status = _index_status(_source_dir(state.get("source_dir")))
+    _publish(_INDEX_RECEIVER, status, webspace_id)
+    return status
+
+
+@tool
+def cancel_slideshow_photo_index(webspace_id: str | None = None) -> dict[str, Any]:
+    status = _cancel_index_job(webspace_id)
+    return status
 
 
 def _folders_payload(state: Mapping[str, Any]) -> dict[str, Any]:
     meta = _ensure_index(_source_dir(state.get("source_dir")))
+    status = _index_status(_source_dir(state.get("source_dir")))
     return {
         "ok": bool(meta.get("ok", True)),
         "source_dir": str(_source_dir(state.get("source_dir"))),
         "selected_folder": _text(state.get("selected_folder")),
         "index": meta,
+        "status": status,
         "items": _folder_items(state),
+        "updated_at": _now(),
+    }
+
+
+def _preview_payload(state: Mapping[str, Any], limit: int = 48) -> dict[str, Any]:
+    files = _files_for_state(state, limit)
+    return {
+        "ok": True,
+        "source_dir": str(_source_dir(state.get("source_dir"))),
+        "selected_folder": _text(state.get("selected_folder")),
+        "count": len(files),
+        "items": [_preview_item(p) for p in files],
+        "index": _ensure_index(_source_dir(state.get("source_dir"))),
+        "status": _index_status(_source_dir(state.get("source_dir"))),
         "updated_at": _now(),
     }
 
@@ -985,21 +1327,14 @@ def refresh_slideshow_photo_index(
     if source_dir:
         state["source_dir"] = str(_source_dir(source_dir))
         state = _save_state(state)
-    meta = _ensure_index(_source_dir(state.get("source_dir")), force=True)
-    files = _files_for_state(state, 48)
-    preview = {
-        "ok": bool(meta.get("ok")),
-        "source_dir": str(_source_dir(state.get("source_dir"))),
-        "selected_folder": _text(state.get("selected_folder")),
-        "count": len(files),
-        "items": [_preview_item(p) for p in files],
-        "folders": _folder_items(state),
-        "index": meta,
-        "updated_at": _now(),
-    }
+    status = _start_index_job(_source_dir(state.get("source_dir")), webspace_id=webspace_id)
+    preview = _preview_payload(state, 48)
+    preview["folders"] = _folder_items(state)
+    preview["status"] = status
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_PREVIEW_RECEIVER, preview, webspace_id)
     _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+    _publish(_INDEX_RECEIVER, status, webspace_id)
     return preview
 
 
@@ -1012,21 +1347,15 @@ def select_slideshow_folder(
     state = _load_state()
     if source_dir:
         state["source_dir"] = str(_source_dir(source_dir))
-    state["selected_folder"] = _text(folder)
+    folder_token = _text(folder)
+    state["selected_folder"] = "" if folder_token == "__more__" else folder_token
     state["current_index"] = 0
     state = _save_state(state)
-    files = _files_for_state(state, 48)
-    preview = {
-        "ok": True,
-        "source_dir": str(_source_dir(state.get("source_dir"))),
-        "selected_folder": _text(state.get("selected_folder")),
-        "count": len(files),
-        "items": [_preview_item(p) for p in files],
-        "updated_at": _now(),
-    }
+    preview = _preview_payload(state, 48)
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_PREVIEW_RECEIVER, preview, webspace_id)
     _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+    _publish(_INDEX_RECEIVER, _index_status(_source_dir(state.get("source_dir"))), webspace_id)
     return preview
 
 
@@ -1183,6 +1512,7 @@ def refresh_redevice_slideshow_state(
     _publish(_ENDPOINTS_RECEIVER, endpoint_payload, webspace_id)
     _publish(_SESSION_RECEIVER, session_payload, webspace_id)
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
+    _publish(_INDEX_RECEIVER, _index_status(_source_dir(state.get("source_dir"))), webspace_id)
     _ensure_polling(webspace_id)
     return {**endpoint_payload, "session": session_payload}
 
@@ -1194,7 +1524,7 @@ def _event_payload(evt: Any) -> Mapping[str, Any]:
 
 def _matches_receiver(payload: Mapping[str, Any]) -> bool:
     receiver = _text(payload.get("receiver"))
-    return receiver in {_ENDPOINTS_RECEIVER, _PREVIEW_RECEIVER, _FOLDERS_RECEIVER, _SESSION_RECEIVER, _COMMAND_RECEIVER, "slideshow_skill.*"}
+    return receiver in {_ENDPOINTS_RECEIVER, _PREVIEW_RECEIVER, _FOLDERS_RECEIVER, _SESSION_RECEIVER, _COMMAND_RECEIVER, _INDEX_RECEIVER, "slideshow_skill.*"}
 
 
 @subscribe("webio.stream.snapshot.requested")
@@ -1210,6 +1540,7 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
     _publish(_ENDPOINTS_RECEIVER, _endpoint_payload(devices, state), webspace_id)
     _publish(_SESSION_RECEIVER, _session_payload(state, files), webspace_id)
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
+    _publish(_INDEX_RECEIVER, _index_status(_source_dir(state.get("source_dir"))), webspace_id)
     _ensure_polling(webspace_id)
 
 

@@ -37,7 +37,10 @@
           "owner": "skill:slideshow_skill",
           "firstPaint": "empty endpoint inventory",
           "recovery": "endpoint inventory requested on stream subscribe",
-          "updateSource": ["webio.stream.snapshot.requested", "slideshow_skill.action"]
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "slideshow_skill.action"
+          ]
         }
       },
       "slideshow_skill.preview": {
@@ -69,7 +72,9 @@
           "owner": "skill:slideshow_skill",
           "firstPaint": "empty photo preview",
           "recovery": "photo preview can be refreshed manually",
-          "updateSource": ["slideshow_skill.action"]
+          "updateSource": [
+            "slideshow_skill.action"
+          ]
         }
       },
       "slideshow_skill.folders": {
@@ -87,7 +92,7 @@
           "maxPayloadBytes": 65536,
           "maxPublishHz": 1,
           "maxSnapshotHz": 1,
-          "maxItems": 128
+          "maxItems": 256
         },
         "guardVisibility": {
           "degradedState": "Keep the last indexed folder list.",
@@ -97,11 +102,14 @@
         },
         "route": {
           "kind": "stream",
-          "surface": "modal:slideshow_modal",
+          "surface": "modal:slideshow_folders_modal",
           "owner": "skill:slideshow_skill",
           "firstPaint": "empty folder index",
           "recovery": "folder list is restored from the photo index",
-          "updateSource": ["webio.stream.snapshot.requested", "slideshow_skill.action"]
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "slideshow_skill.action"
+          ]
         }
       },
       "slideshow_skill.session": {
@@ -127,7 +135,8 @@
           "running": false,
           "run_value": "stop",
           "selected_folder": "",
-          "updated_at": null
+          "updated_at": null,
+          "source_dir": ""
         },
         "budget": {
           "maxPayloadBytes": 98304,
@@ -147,7 +156,10 @@
           "owner": "skill:slideshow_skill",
           "firstPaint": "empty session state",
           "recovery": "latest session state is restored from stream snapshot",
-          "updateSource": ["webio.stream.snapshot.requested", "slideshow_skill.action"]
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "slideshow_skill.action"
+          ]
         }
       },
       "slideshow_skill.command": {
@@ -179,7 +191,53 @@
           "owner": "skill:slideshow_skill",
           "firstPaint": "empty command state",
           "recovery": "latest slideshow command state is restored from stream snapshot",
-          "updateSource": ["webio.stream.snapshot.requested", "slideshow_skill.action"]
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "slideshow_skill.action"
+          ]
+        }
+      },
+      "slideshow_skill.index": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": false,
+          "status": "idle",
+          "source_dir": "",
+          "value": "0",
+          "label": "idle",
+          "description": "Index idle.",
+          "message": "Index idle.",
+          "visited_files": 0,
+          "indexed_count": 0,
+          "photo_count": 0,
+          "folder_count": 0,
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 32768,
+          "maxPublishHz": 2,
+          "maxSnapshotHz": 1,
+          "maxItems": 1
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last photo index status.",
+          "log": "service.slideshow_skill.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.slideshow_skill.index"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:slideshow_modal",
+          "owner": "skill:slideshow_skill",
+          "firstPaint": "idle photo index status",
+          "recovery": "photo index status is restored from skill memory",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "slideshow_skill.action",
+            "slideshow_skill.indexer"
+          ]
         }
       }
     }
@@ -212,9 +270,18 @@
         "retainLastImageOnEmpty": true,
         "emptyText": "Start slideshow to show the current photo.",
         "metrics": [
-          { "label": "Endpoint", "path": "label" },
-          { "label": "Mode", "path": "mode" },
-          { "label": "Scope", "path": "scope" }
+          {
+            "label": "Endpoint",
+            "path": "label"
+          },
+          {
+            "label": "Mode",
+            "path": "mode"
+          },
+          {
+            "label": "Scope",
+            "path": "scope"
+          }
         ]
       },
       "actions": [
@@ -235,9 +302,18 @@
       "inputs": {
         "size": "small",
         "buttons": [
-          { "id": "prev", "label": "Prev" },
-          { "id": "next", "label": "Next" },
-          { "id": "fav", "label": "Fav" }
+          {
+            "id": "prev",
+            "label": "Prev"
+          },
+          {
+            "id": "next",
+            "label": "Next"
+          },
+          {
+            "id": "fav",
+            "label": "Fav"
+          }
         ]
       },
       "actions": [
@@ -245,19 +321,25 @@
           "on": "click:prev",
           "type": "callSkill",
           "target": "slideshow_skill.control_redevice_slideshow",
-          "params": { "action": "prev" }
+          "params": {
+            "action": "prev"
+          }
         },
         {
           "on": "click:next",
           "type": "callSkill",
           "target": "slideshow_skill.control_redevice_slideshow",
-          "params": { "action": "next" }
+          "params": {
+            "action": "next"
+          }
         },
         {
           "on": "click:fav",
           "type": "callSkill",
           "target": "slideshow_skill.control_redevice_slideshow",
-          "params": { "action": "fav" }
+          "params": {
+            "action": "fav"
+          }
         }
       ]
     }
@@ -269,17 +351,28 @@
         "schema": {
           "id": "slideshow_modal",
           "initialState": {
-            "slideshowSourceDir": "C:\\Users\\Zver\\Pictures",
+            "slideshowSourceDir": "",
             "slideshowFolder": "",
             "slideshowDeviceCode": "",
             "slideshowDisplayName": "",
             "slideshowAliases": ""
           },
           "layout": {
-            "type": "single",
-            "pattern": "stack",
+            "type": "split",
+            "pattern": "split",
             "areas": [
-              { "id": "main", "role": "main" }
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
             ]
           },
           "widgets": [
@@ -289,19 +382,33 @@
               "area": "main",
               "title": "Photo source folder",
               "inputs": {
-                "initialValue": "C:\\Users\\Zver\\Pictures",
+                "bindField": "source_dir",
                 "placeholder": "C:\\Users\\Zver\\Pictures",
                 "commitMode": "manual",
                 "saveLabel": "Apply source",
-                "helper": "Root folder scanned for slideshow images on this node."
+                "helper": "Stored in skill memory. Refresh index runs in background and preserves favorites."
               },
               "actions": [
                 {
                   "on": "change",
                   "type": "updateState",
-                  "params": { "slideshowSourceDir": "$event.value" }
+                  "params": {
+                    "slideshowSourceDir": "$event.value"
+                  }
+                },
+                {
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.set_slideshow_source",
+                  "params": {
+                    "source_dir": "$event.value"
+                  }
                 }
-              ]
+              ],
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.session"
+              }
             },
             {
               "id": "slideshow-main-actions",
@@ -311,12 +418,39 @@
               "inputs": {
                 "size": "small",
                 "buttons": [
-                  { "id": "refresh", "label": "Refresh endpoints" },
-                  { "id": "index", "label": "Refresh index" },
-                  { "id": "preview", "label": "Preview photos" },
-                  { "id": "prev", "label": "Prev" },
-                  { "id": "next", "label": "Next" },
-                  { "id": "fav", "label": "Fav" }
+                  {
+                    "id": "refresh",
+                    "label": "Refresh endpoints"
+                  },
+                  {
+                    "id": "index",
+                    "label": "Refresh index"
+                  },
+                  {
+                    "id": "cancelIndex",
+                    "label": "Cancel index",
+                    "kind": "danger"
+                  },
+                  {
+                    "id": "folders",
+                    "label": "Folders"
+                  },
+                  {
+                    "id": "preview",
+                    "label": "Preview photos"
+                  },
+                  {
+                    "id": "prev",
+                    "label": "Prev"
+                  },
+                  {
+                    "id": "next",
+                    "label": "Next"
+                  },
+                  {
+                    "id": "fav",
+                    "label": "Fav"
+                  }
                 ]
               },
               "actions": [
@@ -325,16 +459,24 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.refresh_redevice_slideshow_state",
                   "params": {
-                    "code": "$state.slideshowDeviceCode",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "code": "$state.slideshowDeviceCode"
                   }
                 },
                 {
                   "on": "click:index",
                   "type": "callSkill",
-                  "target": "slideshow_skill.refresh_slideshow_photo_index",
+                  "target": "slideshow_skill.refresh_slideshow_photo_index"
+                },
+                {
+                  "on": "click:cancelIndex",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.cancel_slideshow_photo_index"
+                },
+                {
+                  "on": "click:folders",
+                  "type": "openModal",
                   "params": {
-                    "source_dir": "$state.slideshowSourceDir"
+                    "modalId": "slideshow_folders_modal"
                   }
                 },
                 {
@@ -342,8 +484,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.list_slideshow_photos",
                   "params": {
-                    "limit": 48,
-                    "source_dir": "$state.slideshowSourceDir"
+                    "limit": 48
                   }
                 },
                 {
@@ -351,8 +492,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
-                    "action": "prev",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "action": "prev"
                   }
                 },
                 {
@@ -360,8 +500,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
-                    "action": "next",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "action": "next"
                   }
                 },
                 {
@@ -369,16 +508,149 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
-                    "action": "fav",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "action": "fav"
                   }
+                }
+              ]
+            },
+            {
+              "id": "slideshow-endpoint-table",
+              "type": "ui.table",
+              "area": "main",
+              "title": "ReDevice endpoints",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.endpoints"
+              },
+              "inputs": {
+                "emptyText": "Refresh endpoints to load ReDevice endpoints",
+                "columns": [
+                  {
+                    "key": "selected_label",
+                    "label": "",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "title",
+                    "label": "Device"
+                  },
+                  {
+                    "key": "online_state",
+                    "label": "Online",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "last_seen",
+                    "label": "Last seen",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "code",
+                    "label": "Code",
+                    "mono": true,
+                    "width": "110px"
+                  },
+                  {
+                    "key": "_actions",
+                    "label": "Actions",
+                    "kind": "buttons",
+                    "width": "210px",
+                    "buttons": [
+                      {
+                        "id": "toggle",
+                        "label": "Add/remove",
+                        "disabledKey": "selectable",
+                        "disabledWhenEquals": false
+                      },
+                      {
+                        "id": "only",
+                        "label": "Only",
+                        "disabledKey": "selectable",
+                        "disabledWhenEquals": false
+                      },
+                      {
+                        "id": "rename",
+                        "label": "Rename",
+                        "disabledKey": "selectable",
+                        "disabledWhenEquals": false
+                      }
+                    ]
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:toggle",
+                  "type": "updateState",
+                  "params": {
+                    "slideshowDeviceCode": "$event.code"
+                  }
+                },
+                {
+                  "on": "click:toggle",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.toggle_redevice_endpoint",
+                  "params": {
+                    "code": "$event.code"
+                  }
+                },
+                {
+                  "on": "click:only",
+                  "type": "updateState",
+                  "params": {
+                    "slideshowDeviceCode": "$event.code"
+                  }
+                },
+                {
+                  "on": "click:only",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.select_redevice_endpoint",
+                  "params": {
+                    "code": "$event.code"
+                  }
+                },
+                {
+                  "on": "click:rename",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.rename_redevice_endpoint",
+                  "params": {
+                    "code": "$event.code",
+                    "display_name": "$state.slideshowDisplayName",
+                    "aliases": "$state.slideshowAliases"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "slideshow-index-status",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "Photo index",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.index"
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "descriptionPath": "description",
+                "noticePath": "message",
+                "colorPath": "color",
+                "refreshMs": 1500,
+                "emptyText": "0"
+              },
+              "actions": [
+                {
+                  "on": "click",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.get_slideshow_index_status"
                 }
               ]
             },
             {
               "id": "slideshow-run-selector",
               "type": "input.selector",
-              "area": "main",
+              "area": "right",
               "title": "Run",
               "dataSource": {
                 "kind": "stream",
@@ -389,8 +661,14 @@
                 "optionValuePath": "id",
                 "optionLabelPath": "label",
                 "options": [
-                  { "id": "start", "label": "Running" },
-                  { "id": "stop", "label": "Stopped" }
+                  {
+                    "id": "start",
+                    "label": "Running"
+                  },
+                  {
+                    "id": "stop",
+                    "label": "Stopped"
+                  }
                 ]
               },
               "actions": [
@@ -399,8 +677,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
-                    "action": "$event.value",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "action": "$event.value"
                   }
                 }
               ]
@@ -408,7 +685,7 @@
             {
               "id": "slideshow-order-selector",
               "type": "input.selector",
-              "area": "main",
+              "area": "right",
               "title": "Order",
               "dataSource": {
                 "kind": "stream",
@@ -419,8 +696,14 @@
                 "optionValuePath": "id",
                 "optionLabelPath": "label",
                 "options": [
-                  { "id": "sequential", "label": "Sequential" },
-                  { "id": "random", "label": "Random" }
+                  {
+                    "id": "sequential",
+                    "label": "Sequential"
+                  },
+                  {
+                    "id": "random",
+                    "label": "Random"
+                  }
                 ]
               },
               "actions": [
@@ -429,8 +712,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
-                    "action": "$event.value",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "action": "$event.value"
                   }
                 }
               ]
@@ -438,7 +720,7 @@
             {
               "id": "slideshow-scope-selector",
               "type": "input.selector",
-              "area": "main",
+              "area": "right",
               "title": "Scope",
               "dataSource": {
                 "kind": "stream",
@@ -449,8 +731,14 @@
                 "optionValuePath": "id",
                 "optionLabelPath": "label",
                 "options": [
-                  { "id": "all", "label": "All photos" },
-                  { "id": "favorites", "label": "Favorites" }
+                  {
+                    "id": "all",
+                    "label": "All photos"
+                  },
+                  {
+                    "id": "favorites",
+                    "label": "Favorites"
+                  }
                 ]
               },
               "actions": [
@@ -459,8 +747,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
-                    "action": "$event.value",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "action": "$event.value"
                   }
                 }
               ]
@@ -468,7 +755,7 @@
             {
               "id": "slideshow-sync-selector",
               "type": "input.selector",
-              "area": "main",
+              "area": "right",
               "title": "Endpoint sync",
               "dataSource": {
                 "kind": "stream",
@@ -479,8 +766,14 @@
                 "optionValuePath": "id",
                 "optionLabelPath": "label",
                 "options": [
-                  { "id": "sync_on", "label": "Synchronous" },
-                  { "id": "sync_off", "label": "Independent" }
+                  {
+                    "id": "sync_on",
+                    "label": "Synchronous"
+                  },
+                  {
+                    "id": "sync_off",
+                    "label": "Independent"
+                  }
                 ]
               },
               "actions": [
@@ -489,8 +782,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
-                    "action": "$event.value",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "action": "$event.value"
                   }
                 }
               ]
@@ -498,7 +790,7 @@
             {
               "id": "slideshow-display-selector",
               "type": "input.selector",
-              "area": "main",
+              "area": "right",
               "title": "Display",
               "dataSource": {
                 "kind": "stream",
@@ -509,8 +801,14 @@
                 "optionValuePath": "id",
                 "optionLabelPath": "label",
                 "options": [
-                  { "id": "fit", "label": "Fit" },
-                  { "id": "crop", "label": "Crop" }
+                  {
+                    "id": "fit",
+                    "label": "Fit"
+                  },
+                  {
+                    "id": "crop",
+                    "label": "Crop"
+                  }
                 ]
               },
               "actions": [
@@ -519,8 +817,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
-                    "action": "$event.value",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "action": "$event.value"
                   }
                 }
               ]
@@ -528,7 +825,7 @@
             {
               "id": "slideshow-fullscreen-selector",
               "type": "input.selector",
-              "area": "main",
+              "area": "right",
               "title": "Surface",
               "dataSource": {
                 "kind": "stream",
@@ -539,8 +836,14 @@
                 "optionValuePath": "id",
                 "optionLabelPath": "label",
                 "options": [
-                  { "id": "fullscreen_on", "label": "Fullscreen" },
-                  { "id": "fullscreen_off", "label": "Panel" }
+                  {
+                    "id": "fullscreen_on",
+                    "label": "Fullscreen"
+                  },
+                  {
+                    "id": "fullscreen_off",
+                    "label": "Panel"
+                  }
                 ]
               },
               "actions": [
@@ -549,8 +852,7 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
-                    "action": "$event.value",
-                    "source_dir": "$state.slideshowSourceDir"
+                    "action": "$event.value"
                   }
                 }
               ]
@@ -558,7 +860,7 @@
             {
               "id": "slideshow-current-frame",
               "type": "visual.frameViewer",
-              "area": "main",
+              "area": "right",
               "title": "Current photo",
               "dataSource": {
                 "kind": "stream",
@@ -570,59 +872,25 @@
                 "retainLastImageOnEmpty": true,
                 "emptyText": "Start slideshow to show the current photo.",
                 "metrics": [
-                  { "label": "Endpoint", "path": "label" },
-                  { "label": "Mode", "path": "mode" },
-                  { "label": "Scope", "path": "scope" }
+                  {
+                    "label": "Endpoint",
+                    "path": "label"
+                  },
+                  {
+                    "label": "Mode",
+                    "path": "mode"
+                  },
+                  {
+                    "label": "Scope",
+                    "path": "scope"
+                  }
                 ]
               }
             },
             {
-              "id": "slideshow-folder-table",
-              "type": "ui.table",
-              "area": "main",
-              "title": "Folders",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "slideshow_skill.folders"
-              },
-              "inputs": {
-                "emptyText": "Refresh index to load top-level folders",
-                "columns": [
-                  { "key": "selected", "label": "", "width": "80px" },
-                  { "key": "title", "label": "Folder" },
-                  { "key": "subtitle", "label": "Photos" },
-                  {
-                    "key": "_actions",
-                    "label": "Actions",
-                    "kind": "buttons",
-                    "width": "90px",
-                    "buttons": [
-                      { "id": "use", "label": "Use" }
-                    ]
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:use",
-                  "type": "updateState",
-                  "params": { "slideshowFolder": "$event.id" }
-                },
-                {
-                  "on": "click:use",
-                  "type": "callSkill",
-                  "target": "slideshow_skill.select_slideshow_folder",
-                  "params": {
-                    "folder": "$event.id",
-                    "source_dir": "$state.slideshowSourceDir"
-                  }
-                }
-              ]
-            },
-            {
               "id": "slideshow-selected-endpoints",
               "type": "ui.list",
-              "area": "main",
+              "area": "right",
               "title": "Selected endpoints",
               "dataSource": {
                 "kind": "stream",
@@ -638,7 +906,7 @@
             {
               "id": "slideshow-display-name",
               "type": "input.text",
-              "area": "main",
+              "area": "right",
               "title": "Display name for Rename",
               "inputs": {
                 "initialValue": "",
@@ -660,7 +928,7 @@
             {
               "id": "slideshow-aliases",
               "type": "input.text",
-              "area": "main",
+              "area": "right",
               "title": "Aliases for Rename",
               "inputs": {
                 "initialValue": "",
@@ -680,99 +948,43 @@
               ]
             },
             {
-              "id": "slideshow-endpoint-table",
-              "type": "ui.table",
-              "area": "main",
-              "title": "ReDevice endpoints",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "slideshow_skill.endpoints"
-              },
-              "inputs": {
-                "emptyText": "Refresh endpoints to load ReDevice endpoints",
-                "columns": [
-                  { "key": "selected_label", "label": "", "width": "90px" },
-                  { "key": "title", "label": "Device" },
-                  { "key": "online_state", "label": "Online", "width": "90px" },
-                  { "key": "last_seen", "label": "Last seen", "width": "100px" },
-                  { "key": "code", "label": "Code", "mono": true, "width": "110px" },
-                  {
-                    "key": "_actions",
-                    "label": "Actions",
-                    "kind": "buttons",
-                    "width": "210px",
-                    "buttons": [
-                      { "id": "toggle", "label": "Add/remove", "disabledKey": "selectable", "disabledWhenEquals": false },
-                      { "id": "only", "label": "Only", "disabledKey": "selectable", "disabledWhenEquals": false },
-                      { "id": "rename", "label": "Rename", "disabledKey": "selectable", "disabledWhenEquals": false }
-                    ]
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:toggle",
-                  "type": "updateState",
-                  "params": { "slideshowDeviceCode": "$event.code" }
-                },
-                {
-                  "on": "click:toggle",
-                  "type": "callSkill",
-                  "target": "slideshow_skill.toggle_redevice_endpoint",
-                  "params": {
-                    "code": "$event.code",
-                    "source_dir": "$state.slideshowSourceDir"
-                  }
-                },
-                {
-                  "on": "click:only",
-                  "type": "updateState",
-                  "params": { "slideshowDeviceCode": "$event.code" }
-                },
-                {
-                  "on": "click:only",
-                  "type": "callSkill",
-                  "target": "slideshow_skill.select_redevice_endpoint",
-                  "params": {
-                    "code": "$event.code",
-                    "source_dir": "$state.slideshowSourceDir"
-                  }
-                },
-                {
-                  "on": "click:rename",
-                  "type": "callSkill",
-                  "target": "slideshow_skill.rename_redevice_endpoint",
-                  "params": {
-                    "code": "$event.code",
-                    "display_name": "$state.slideshowDisplayName",
-                    "aliases": "$state.slideshowAliases"
-                  }
-                }
-              ]
-            },
-            {
               "id": "slideshow-preview-table",
               "type": "ui.table",
-              "area": "main",
+              "area": "bottom",
               "title": "Preview photos",
               "dataSource": {
                 "kind": "stream",
                 "receiver": "slideshow_skill.preview"
               },
               "inputs": {
-                "emptyText": "Press Preview photos to scan the source folder",
+                "emptyText": "Press Preview photos to show indexed files. Refresh index runs in background.",
                 "columns": [
-                  { "key": "title", "label": "File" },
-                  { "key": "favorite", "label": "Fav", "width": "70px" },
-                  { "key": "size_label", "label": "Size", "width": "90px" },
-                  { "key": "modified", "label": "Modified", "width": "170px" }
+                  {
+                    "key": "title",
+                    "label": "File"
+                  },
+                  {
+                    "key": "favorite",
+                    "label": "Fav",
+                    "width": "70px"
+                  },
+                  {
+                    "key": "size_label",
+                    "label": "Size",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "modified",
+                    "label": "Modified",
+                    "width": "170px"
+                  }
                 ]
               }
             },
             {
               "id": "slideshow-command-state",
               "type": "ui.list",
-              "area": "main",
+              "area": "bottom",
               "title": "Last command",
               "dataSource": {
                 "kind": "stream",
@@ -786,6 +998,112 @@
                 "showDetails": true,
                 "emptyText": "No slideshow command yet"
               }
+            }
+          ]
+        }
+      },
+      "slideshow_folders_modal": {
+        "title": "Slideshow folders",
+        "schema": {
+          "id": "slideshow_folders_modal",
+          "initialState": {
+            "slideshowFolder": ""
+          },
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "slideshow-folders-index-status",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Photo index",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.index"
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "descriptionPath": "description",
+                "noticePath": "message",
+                "colorPath": "color",
+                "refreshMs": 1500,
+                "emptyText": "0"
+              },
+              "actions": [
+                {
+                  "on": "click",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.get_slideshow_index_status"
+                }
+              ]
+            },
+            {
+              "id": "slideshow-folder-table",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Folders",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.folders"
+              },
+              "inputs": {
+                "emptyText": "Refresh index to load top-level folders. Large folder sets are capped in this view.",
+                "columns": [
+                  {
+                    "key": "selected",
+                    "label": "",
+                    "width": "80px"
+                  },
+                  {
+                    "key": "title",
+                    "label": "Folder"
+                  },
+                  {
+                    "key": "subtitle",
+                    "label": "Photos"
+                  },
+                  {
+                    "key": "_actions",
+                    "label": "Actions",
+                    "kind": "buttons",
+                    "width": "90px",
+                    "buttons": [
+                      {
+                        "id": "use",
+                        "label": "Use",
+                        "disabledKey": "selectable",
+                        "disabledWhenEquals": false
+                      }
+                    ]
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:use",
+                  "type": "updateState",
+                  "params": {
+                    "slideshowFolder": "$event.id"
+                  }
+                },
+                {
+                  "on": "click:use",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.select_slideshow_folder",
+                  "params": {
+                    "folder": "$event.id"
+                  }
+                }
+              ]
             }
           ]
         }
