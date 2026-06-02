@@ -47,7 +47,9 @@ _INDEX_PUBLISH_INTERVAL_S = 1.5
 _STATE_KEY = "slideshow_skill.state"
 _INDEX_META_KEY = "slideshow_skill.photo_index"
 _INDEX_STATUS_KEY = "slideshow_skill.index_status"
+_COMMAND_STATE_KEY = "slideshow_skill.command_state"
 _POLL_INTERVAL_S = 2.5
+_SNAPSHOT_DEBOUNCE_S = 1.0
 _log = logging.getLogger("skills.slideshow_skill")
 _poll_lock = threading.Lock()
 _poll_thread: threading.Thread | None = None
@@ -56,6 +58,10 @@ _poll_webspace_id = ""
 _index_lock = threading.Lock()
 _index_thread: threading.Thread | None = None
 _index_stop = threading.Event()
+_stream_lock = threading.Lock()
+_last_stream_fingerprints: dict[tuple[str, str], str] = {}
+_snapshot_seen_at: dict[tuple[str, str], float] = {}
+_active_receivers_by_webspace: dict[str, set[str]] = {}
 
 
 def _now() -> str:
@@ -204,6 +210,52 @@ def _node_id() -> str:
 def _owner() -> dict[str, str]:
     node_id = _node_id()
     return {"node_id": node_id, "skill_id": "slideshow_skill", "target": f"{node_id}:slideshow_skill"}
+
+
+def _json_fingerprint(value: Any) -> str:
+    try:
+        raw = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    except Exception:
+        raw = repr(value).encode("utf-8", errors="replace")
+    return hashlib.sha256(raw).hexdigest()
+
+
+def _stream_key(webspace_id: str | None, receiver: str) -> tuple[str, str]:
+    return (_text(webspace_id) or default_webspace_id(), _text(receiver))
+
+
+def _remember_receiver(webspace_id: str | None, receiver: str) -> None:
+    token = _text(receiver)
+    if not token:
+        return
+    ws = _text(webspace_id) or default_webspace_id()
+    with _stream_lock:
+        _active_receivers_by_webspace.setdefault(ws, set()).add(token)
+
+
+def _forget_receiver(webspace_id: str | None, receiver: str) -> None:
+    token = _text(receiver)
+    if not token:
+        return
+    ws = _text(webspace_id) or default_webspace_id()
+    key = (ws, token)
+    with _stream_lock:
+        receivers = _active_receivers_by_webspace.get(ws)
+        if receivers is not None:
+            receivers.discard(token)
+            if not receivers:
+                _active_receivers_by_webspace.pop(ws, None)
+        _last_stream_fingerprints.pop(key, None)
+        _snapshot_seen_at.pop(key, None)
+
+
+def _consume_snapshot_request(webspace_id: str | None, receiver: str) -> bool:
+    key = _stream_key(webspace_id, receiver)
+    now = time.monotonic()
+    with _stream_lock:
+        last = float(_snapshot_seen_at.get(key) or 0.0)
+        _snapshot_seen_at[key] = now
+    return last <= 0 or now - last >= _SNAPSHOT_DEBOUNCE_S
 
 
 def _fingerprint(path: Path) -> str:
@@ -606,6 +658,51 @@ def _cancel_index_job(webspace_id: str | None = None) -> dict[str, Any]:
     return _index_status()
 
 
+def dispose(reason: str | None = None, **_: Any) -> dict[str, Any]:
+    _poll_stop.set()
+    _index_stop.set()
+    with _stream_lock:
+        active_receiver_total = sum(len(items) for items in _active_receivers_by_webspace.values())
+        _active_receivers_by_webspace.clear()
+        _last_stream_fingerprints.clear()
+        _snapshot_seen_at.clear()
+    return {
+        "ok": True,
+        "reason": _text(reason) or "dispose",
+        "active_receiver_total": active_receiver_total,
+        "updated_at": _now(),
+    }
+
+
+def on_quarantine(
+    ttl_s: float | None = None,
+    reason: str | None = None,
+    metrics: Mapping[str, Any] | None = None,
+    webspace_id: str | None = None,
+    owner: Mapping[str, Any] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    result = dispose(reason="quarantine")
+    incident = {
+        "schema": "adaos.slideshow_skill.quarantine.v1",
+        "event": "skill.quarantine",
+        "reason": _text(reason) or "unknown",
+        "ttl_s": ttl_s,
+        "webspace_id": _text(webspace_id) or None,
+        "owner": dict(owner or {}),
+        "metrics": dict(metrics or {}),
+        "updated_at": _now(),
+    }
+    try:
+        log_dir = _internal_data_dir() / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with (log_dir / "quarantine.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(incident, ensure_ascii=False, default=str) + "\n")
+    except Exception:
+        _log.debug("failed to write slideshow quarantine incident", exc_info=True)
+    return {**result, "incident": incident}
+
+
 def _query_photo_records(
     state: Mapping[str, Any],
     *,
@@ -913,11 +1010,21 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
     }
 
 
-def _publish(receiver: str, payload: Mapping[str, Any], webspace_id: str | None = None) -> None:
+def _publish(receiver: str, payload: Mapping[str, Any], webspace_id: str | None = None, *, force: bool = False) -> None:
+    token = _text(receiver)
+    if not token:
+        return
+    ws = _text(webspace_id) or default_webspace_id()
+    fingerprint = _json_fingerprint(payload)
+    key = (ws, token)
+    with _stream_lock:
+        if not force and _last_stream_fingerprints.get(key) == fingerprint:
+            return
+        _last_stream_fingerprints[key] = fingerprint
     try:
-        stream_publish(receiver, dict(payload), _meta={"webspace_id": _text(webspace_id) or default_webspace_id()})
+        stream_publish(token, dict(payload), _meta={"webspace_id": ws})
     except Exception:
-        _log.debug("failed to publish slideshow stream receiver=%s", receiver, exc_info=True)
+        _log.debug("failed to publish slideshow stream receiver=%s", token, exc_info=True)
 
 
 def _load_devices() -> list[dict[str, Any]]:
@@ -987,6 +1094,33 @@ def _command_items(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
             "content": dict(payload),
         }
     ]
+
+
+def _empty_command_payload() -> dict[str, Any]:
+    return {
+        "ok": False,
+        "command_id": "",
+        "command_items": [],
+        "items": [],
+        "updated_at": _now(),
+    }
+
+
+def _remember_command_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    compact = dict(payload)
+    if "command_items" not in compact:
+        compact["command_items"] = _command_items(compact)
+    _memory_set(_COMMAND_STATE_KEY, compact)
+    return compact
+
+
+def _last_command_payload() -> dict[str, Any]:
+    data = _memory_get(_COMMAND_STATE_KEY, {})
+    if isinstance(data, Mapping):
+        payload = dict(data)
+        payload.setdefault("command_items", _command_items(payload))
+        return payload
+    return _empty_command_payload()
 
 
 def _build_command(pair_code: str, items: list[dict[str, Any]], state: Mapping[str, Any], *, autoplay: bool) -> dict[str, Any]:
@@ -1097,6 +1231,7 @@ def _send_to_selected(
         "updated_at": _now(),
     }
     payload["command_items"] = _command_items(payload)
+    payload = _remember_command_payload(payload)
     _publish(_COMMAND_RECEIVER, payload, webspace_id)
     _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=payload), webspace_id)
     return payload
@@ -1154,6 +1289,7 @@ def _stop_selected(
         "updated_at": _now(),
     }
     payload["command_items"] = _command_items(payload)
+    payload = _remember_command_payload(payload)
     _publish(_COMMAND_RECEIVER, payload, webspace_id)
     _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=payload), webspace_id)
     return payload
@@ -1522,30 +1658,89 @@ def _event_payload(evt: Any) -> Mapping[str, Any]:
     return payload if isinstance(payload, Mapping) else {}
 
 
+_STREAM_RECEIVERS = (
+    _ENDPOINTS_RECEIVER,
+    _PREVIEW_RECEIVER,
+    _FOLDERS_RECEIVER,
+    _SESSION_RECEIVER,
+    _COMMAND_RECEIVER,
+    _INDEX_RECEIVER,
+)
+
+
+def _event_webspace_id(payload: Mapping[str, Any]) -> str:
+    return _text(payload.get("webspace_id") or payload.get("workspace_id")) or default_webspace_id()
+
+
+def _event_receiver(payload: Mapping[str, Any]) -> str:
+    return _text(payload.get("receiver"))
+
+
 def _matches_receiver(payload: Mapping[str, Any]) -> bool:
-    receiver = _text(payload.get("receiver"))
-    return receiver in {_ENDPOINTS_RECEIVER, _PREVIEW_RECEIVER, _FOLDERS_RECEIVER, _SESSION_RECEIVER, _COMMAND_RECEIVER, _INDEX_RECEIVER, "slideshow_skill.*"}
+    receiver = _event_receiver(payload)
+    return receiver in {*_STREAM_RECEIVERS, "slideshow_skill.*"}
+
+
+def _requested_receivers(payload: Mapping[str, Any]) -> list[str]:
+    receiver = _event_receiver(payload)
+    if receiver == "slideshow_skill.*":
+        return list(_STREAM_RECEIVERS)
+    return [receiver] if receiver in _STREAM_RECEIVERS else []
+
+
+def _publish_receiver_snapshot(receiver: str, state: Mapping[str, Any], webspace_id: str) -> None:
+    if receiver == _ENDPOINTS_RECEIVER:
+        devices = _load_devices()
+        _publish(receiver, _endpoint_payload(devices, state), webspace_id, force=True)
+        return
+    if receiver == _SESSION_RECEIVER:
+        files = _files_for_state(state, _MAX_CONTROL_SCAN)
+        _publish(receiver, _session_payload(state, files, last_command=_last_command_payload()), webspace_id, force=True)
+        return
+    if receiver == _FOLDERS_RECEIVER:
+        _publish(receiver, _folders_payload(state), webspace_id, force=True)
+        return
+    if receiver == _PREVIEW_RECEIVER:
+        _publish(receiver, _preview_payload(state, 48), webspace_id, force=True)
+        return
+    if receiver == _COMMAND_RECEIVER:
+        _publish(receiver, _last_command_payload(), webspace_id, force=True)
+        return
+    if receiver == _INDEX_RECEIVER:
+        _publish(receiver, _index_status(_source_dir(state.get("source_dir"))), webspace_id, force=True)
 
 
 @subscribe("webio.stream.snapshot.requested")
 def on_webio_stream_snapshot_requested(evt: Any) -> None:
     payload = _event_payload(evt)
-    if not _matches_receiver(payload):
+    receivers = _requested_receivers(payload)
+    if not receivers:
         return
-    webspace_id = _text(payload.get("webspace_id") or payload.get("workspace_id")) or default_webspace_id()
+    webspace_id = _event_webspace_id(payload)
     state = _load_state()
-    files = _files_for_state(state, _MAX_CONTROL_SCAN)
-    devices = _load_devices()
-    state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=True)
-    _publish(_ENDPOINTS_RECEIVER, _endpoint_payload(devices, state), webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, files), webspace_id)
-    _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
-    _publish(_INDEX_RECEIVER, _index_status(_source_dir(state.get("source_dir"))), webspace_id)
-    _ensure_polling(webspace_id)
+    for receiver in receivers:
+        _remember_receiver(webspace_id, receiver)
+        if not _consume_snapshot_request(webspace_id, receiver):
+            continue
+        _publish_receiver_snapshot(receiver, state, webspace_id)
+    if state.get("running") or _unique_texts(state.get("selected_codes")):
+        _ensure_polling(webspace_id)
 
 
 @subscribe("webio.stream.subscription.changed")
 def on_webio_stream_subscription_changed(evt: Any) -> None:
     payload = _event_payload(evt)
-    if _matches_receiver(payload):
-        on_webio_stream_snapshot_requested(evt)
+    receiver = _event_receiver(payload)
+    if not _matches_receiver(payload):
+        return
+    webspace_id = _event_webspace_id(payload)
+    action = _text(payload.get("action")).lower() or "subscribed"
+    if receiver == "slideshow_skill.*":
+        receivers = list(_STREAM_RECEIVERS)
+    else:
+        receivers = [receiver]
+    for item in receivers:
+        if action in {"unsubscribed", "removed", "release"}:
+            _forget_receiver(webspace_id, item)
+        else:
+            _remember_receiver(webspace_id, item)

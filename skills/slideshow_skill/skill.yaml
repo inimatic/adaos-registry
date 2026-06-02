@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.11
+version: 0.1.12
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -348,6 +348,7 @@ data_routes:
     max_publish_hz: 1
     max_items: 32
     snapshot_policy: on_subscribe
+    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last ReDevice endpoint inventory
     log: service.slideshow_skill.runtime.log
@@ -364,6 +365,7 @@ data_routes:
     max_publish_hz: 1
     max_items: 64
     snapshot_policy: on_subscribe
+    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last photo preview list
     log: service.slideshow_skill.runtime.log
@@ -380,6 +382,7 @@ data_routes:
     max_publish_hz: 1
     max_items: 16
     snapshot_policy: on_subscribe
+    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last slideshow session state
     log: service.slideshow_skill.runtime.log
@@ -397,6 +400,7 @@ data_routes:
     max_publish_hz: 1
     max_items: 256
     snapshot_policy: on_subscribe
+    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last indexed folder list
     log: service.slideshow_skill.runtime.log
@@ -413,6 +417,7 @@ data_routes:
     max_publish_hz: 1
     max_items: 32
     snapshot_policy: on_subscribe
+    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last slideshow command state
     log: service.slideshow_skill.runtime.log
@@ -431,10 +436,36 @@ data_routes:
     max_publish_hz: 2
     max_items: 1
     snapshot_policy: on_subscribe
+    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last photo index status
     log: service.slideshow_skill.runtime.log
     quarantine: false
+memory_budget:
+  expected_rss_mb: 128
+  caches:
+  - name: slideshow.photos.sqlite
+    owner: slideshow_skill
+    max_items: persistent_index_rows
+    storage: skill_internal_sqlite
+    cleanup_hook: refresh_slideshow_photo_index
+  - name: slideshow.thumbnail_cache
+    owner: source_photo_folder
+    storage: source_local_dot_adaos_thumbs
+    cleanup_hook: source_folder_retention_policy
+  - name: slideshow.stream_fingerprints
+    max_items: 64
+    cleanup_hook: webio.stream.subscription.changed
+  - name: slideshow.command_state
+    max_items: 1
+    storage: skill_memory
+  background_workers:
+  - name: slideshow-photo-index
+    max_threads: 1
+    cleanup_hook: cancel_slideshow_photo_index
+  - name: slideshow-root-poll
+    max_threads: 1
+    cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-06-02T09:15:00+00:00'
+updated_at: '2026-06-02T09:35:00+00:00'
 
