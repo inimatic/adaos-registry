@@ -270,8 +270,48 @@
       "inputs": {
         "imageField": "image.src",
         "aspectRatio": "16 / 9",
+        "fullscreenOnClick": true,
         "retainLastImageOnEmpty": true,
         "emptyText": "Start slideshow to show the current photo.",
+        "headerActions": [
+          {
+            "id": "play",
+            "label": "Play",
+            "icon": "play-outline"
+          },
+          {
+            "id": "stop",
+            "label": "Stop",
+            "icon": "stop-outline"
+          },
+          {
+            "id": "prev",
+            "label": "Previous",
+            "icon": "chevron-back-outline"
+          },
+          {
+            "id": "next",
+            "label": "Next",
+            "icon": "chevron-forward-outline"
+          },
+          {
+            "id": "fav",
+            "label": "Favorite",
+            "icon": "star-outline"
+          }
+        ],
+        "keyboardActions": {
+          "ArrowLeft": "next",
+          "ArrowRight": "prev",
+          "ArrowDown": "hide",
+          "ArrowUp": "fav"
+        },
+        "swipeActions": {
+          "left": "next",
+          "right": "prev",
+          "down": "hide",
+          "up": "fav"
+        },
         "metrics": [
           {
             "label": "Endpoint",
@@ -293,66 +333,11 @@
       },
       "actions": [
         {
-          "on": "click",
-          "type": "openModal",
-          "params": {
-            "modalId": "slideshow_modal"
-          }
-        }
-      ]
-    },
-    {
-      "id": "slideshow_skill_widget_controls",
-      "title": "Slideshow controls",
-      "type": "input.commandBar",
-      "icon": "image",
-      "inputs": {
-        "size": "small",
-        "buttons": [
-          {
-            "id": "play",
-            "label": "Play"
-          },
-          {
-            "id": "stop",
-            "label": "Stop",
-            "kind": "danger"
-          },
-          {
-            "id": "prev",
-            "label": "Prev"
-          },
-          {
-            "id": "next",
-            "label": "Next"
-          },
-          {
-            "id": "fav",
-            "label": "Fav"
-          }
-        ]
-      },
-      "actions": [
-        {
-          "on": "click:play",
-          "type": "updateState",
-          "params": {
-            "slideshowRunMode": "start"
-          }
-        },
-        {
           "on": "click:play",
           "type": "callSkill",
           "target": "slideshow_skill.control_redevice_slideshow",
           "params": {
             "action": "start"
-          }
-        },
-        {
-          "on": "click:stop",
-          "type": "updateState",
-          "params": {
-            "slideshowRunMode": "stop"
           }
         },
         {
@@ -385,6 +370,14 @@
           "target": "slideshow_skill.control_redevice_slideshow",
           "params": {
             "action": "fav"
+          }
+        },
+        {
+          "on": "click:hide",
+          "type": "callSkill",
+          "target": "slideshow_skill.control_redevice_slideshow",
+          "params": {
+            "action": "hide"
           }
         }
       ]
@@ -1239,12 +1232,6 @@
       "extensionPoint": "desktop.widgets",
       "type": "widget",
       "id": "slideshow_skill_widget_frame",
-      "autoInstall": true
-    },
-    {
-      "extensionPoint": "desktop.widgets",
-      "type": "widget",
-      "id": "slideshow_skill_widget_controls",
       "autoInstall": true
     }
   ]

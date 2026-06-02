@@ -231,6 +231,42 @@ def test_endpoint_next_refreshes_independent_endpoint_window(monkeypatch, tmp_pa
     assert sent_codes == ["B"]
 
 
+def test_endpoint_hide_item_marks_photo_hidden(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    hidden_refs: list[str] = []
+    monkeypatch.setattr(mod, "_save_state", lambda state: state)
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(mod, "_set_hidden", lambda _root, ref, hidden: hidden_refs.append(ref) if hidden else None)
+    monkeypatch.setattr(mod, "_send_to_selected", lambda *_args, **_kwargs: {"ok": True})
+
+    state = {
+        "source_dir": str(tmp_path),
+        "selected_codes": ["A"],
+        "sync": True,
+        "running": True,
+        "current_index": 0,
+        "favorites": ["content:hide-me"],
+        "last_event_by_code": {},
+    }
+    devices = [
+        {
+            "code": "A",
+            "last_event": {
+                "type": "endpoint.surface.event",
+                "observed_at": 11,
+                "action": "hide_item",
+                "item_ref": "content:hide-me",
+            },
+        }
+    ]
+
+    updated = mod._apply_root_events(state, devices, [], webspace_id="ws-1", broadcast=True)
+
+    assert hidden_refs == ["content:hide-me"]
+    assert updated["favorites"] == []
+
+
 def test_service_tick_advances_running_slideshow_without_modal(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 

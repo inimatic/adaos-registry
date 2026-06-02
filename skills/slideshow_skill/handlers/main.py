@@ -36,7 +36,7 @@ _COMMAND_RECEIVER = "slideshow_skill.command"
 _INDEX_RECEIVER = "slideshow_skill.index"
 _SUPPORTED = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
 _ENDPOINT_SIZE = (480, 300)
-_WIDGET_SIZE = (220, 140)
+_WIDGET_SIZE = (960, 540)
 _MAX_SCAN = 2000
 _MAX_CONTROL_SCAN = 240
 _MAX_ENDPOINT_CURRENT = 4
@@ -779,6 +779,17 @@ def _set_favorite(root: Path, content_ref: str, favorite: bool) -> None:
         _log.debug("failed to update slideshow favorite ref=%s", content_ref, exc_info=True)
 
 
+def _set_hidden(root: Path, content_ref: str, hidden: bool) -> None:
+    try:
+        with _connect_index() as conn:
+            conn.execute(
+                "UPDATE photos SET hidden = ? WHERE root_dir = ? AND content_ref = ?",
+                (1 if hidden else 0, str(root), content_ref),
+            )
+    except Exception:
+        _log.debug("failed to update slideshow hidden ref=%s", content_ref, exc_info=True)
+
+
 def _is_favorite(root: Path, content_ref: str) -> bool:
     try:
         with _connect_index() as conn:
@@ -871,7 +882,7 @@ def _thumbnail(path: Path, size: tuple[int, int], label: str) -> tuple[Path, boo
         if label.startswith("endpoint-cache"):
             quality = 62
         else:
-            quality = 62 if label.startswith("endpoint") else 58
+            quality = 62 if label.startswith("endpoint") else 86
         canvas.save(cache_path, "JPEG", quality=quality, optimize=True)
     return cache_path, False
 
@@ -1018,18 +1029,48 @@ def _toggle_favorite_ref(state: dict[str, Any], ref: str) -> dict[str, Any]:
     return state
 
 
+def _hide_ref(state: dict[str, Any], ref: str) -> dict[str, Any]:
+    token = _text(ref)
+    if not token:
+        return state
+    root = _source_dir(_text(state.get("source_dir")))
+    _set_hidden(root, token, True)
+    state["favorites"] = [item for item in _unique_texts(state.get("favorites")) if item != token]
+    return state
+
+
+def _hide_current_photo(state: dict[str, Any], files: list[Path]) -> dict[str, Any]:
+    current = _current_photo(files, state)
+    if current is None:
+        return state
+    return _hide_ref(state, _content_ref(current))
+
+
+def _selected_endpoint_label(selected_codes: list[str]) -> str:
+    if not selected_codes:
+        return "No endpoint"
+    try:
+        devices = _load_devices()
+        items = [compact_endpoint(item, selected_codes=set(selected_codes)) for item in devices]
+        by_code = {_text(item.get("code")): _text(item.get("title")) for item in items}
+        labels = [by_code.get(code) or code for code in selected_codes]
+        return ", ".join(label for label in labels if label) or ", ".join(selected_codes)
+    except Exception:
+        return ", ".join(selected_codes)
+
+
 def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_command: Mapping[str, Any] | None = None) -> dict[str, Any]:
     current = _current_photo(files, state)
     image: dict[str, Any] = {"src": "", "mime": "image/jpeg"}
     title = "No photo"
     content_ref = ""
     if current is not None:
-        thumb, _cached = _thumbnail(current, _WIDGET_SIZE, "widget-v2")
+        thumb, _cached = _thumbnail(current, _WIDGET_SIZE, "widget-v3")
         image = {"src": _data_uri(thumb), "mime": "image/jpeg"}
         title = current.name
         content_ref = _content_ref(current)
     selected_codes = _unique_texts(state.get("selected_codes"))
-    header = ", ".join(selected_codes) if selected_codes else "No endpoint"
+    header = _selected_endpoint_label(selected_codes)
     root = _source_dir(_text(state.get("source_dir")))
     favorites = _favorite_refs(root)
     filtered_count = len(_selected_photos(files, state))
@@ -1446,6 +1487,14 @@ def _apply_root_events(
         elif action == "favorite_toggle":
             _toggle_favorite_ref(state, _text(event.get("item_ref")))
             changed = True
+        elif action == "hide_item":
+            _hide_ref(state, _text(event.get("item_ref")))
+            changed = True
+            if state.get("running"):
+                if state.get("sync"):
+                    refresh_codes.update(selected)
+                else:
+                    refresh_codes.add(code)
     state["last_event_by_code"] = last_by_code
     if changed:
         _save_state(state)
@@ -1771,6 +1820,9 @@ def control_redevice_slideshow(
         _advance(state, files, -1)
     elif token in {"fav", "favorite", "favorite_toggle"}:
         _toggle_current_favorite(state, files)
+    elif token in {"hide", "hide_item", "down"}:
+        _hide_current_photo(state, files)
+        files = _files_for_state(state, _MAX_CONTROL_SCAN)
     elif token == "sync_on":
         state["sync"] = True
     elif token == "sync_off":
