@@ -527,8 +527,6 @@ def handle_text(text: str, _meta: Mapping[str, Any] | None = None, **_: Any) -> 
 
     city_raw = _extract_city(text)
     if not city_raw:
-        reply = "Пока я понимаю только запросы про погоду. Скажи: «Какая погода в Москве?»"
-        _append_reply(reply, webspace_id=webspace_id, target_node_id=target_node_id)
         return {"ok": False, "error": "intent_not_supported"}
 
     city_for_weather, city_display = _canon_city_for_weather(city_raw)
