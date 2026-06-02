@@ -453,6 +453,15 @@
         "enabled": true,
         "source": "teacher",
         "candidate_id": "cand.1768301216687"
+      },
+      {
+        "id": "rx.88191729-f555-46f8-8972-bd6ce657b3c4",
+        "created_at": 1780377811.4295616,
+        "intent": "desktop.switch_scenario",
+        "pattern": "\\b\\u043f\\u043e\\u043a\\u0430\\u0436\\u0438\\s+(?P<scenario_id>infrascope)\\b",
+        "enabled": true,
+        "source": "teacher",
+        "candidate_id": "cand.1780377779719"
       }
     ]
   },
