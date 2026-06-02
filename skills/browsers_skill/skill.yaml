@@ -1,5 +1,5 @@
 name: browsers_skill
-version: 0.15.10
+version: 0.15.11
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -339,5 +339,5 @@ tools:
   output_schema:
     type: object
 exports: {}
-updated_at: '2026-05-23T11:42:22+00:00'
+updated_at: '2026-06-02T13:23:16+00:00'
 

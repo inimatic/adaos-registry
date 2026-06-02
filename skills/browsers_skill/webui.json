@@ -54,6 +54,7 @@
     {
       "id": "browsers",
       "title": "Browsers",
+      "aliases": ["браузеры", "браузер", "browser sessions"],
       "subtitle": "Browser sessions and access links",
       "icon": "browsers-outline",
       "launchModal": "browsers_modal",
@@ -69,6 +70,7 @@
       "type": "app",
       "id": "browsers",
       "title": "Browsers",
+      "aliases": ["браузеры", "браузер", "browser sessions"],
       "subtitle": "Browser sessions and access links",
       "icon": "browsers-outline",
       "launchModal": "browsers_modal",
@@ -81,6 +83,7 @@
     "modals": {
       "browsers_modal": {
         "title": "Browsers",
+        "aliases": ["браузеры", "браузер", "browser sessions"],
         "schema": {
           "id": "browsers_modal",
           "initialState": {
@@ -364,6 +367,34 @@
           ]
         }
       }
+    }
+  },
+  "nlu": {
+    "llm_hints": {
+      "aliases": {
+        "app_id": {
+          "browsers": ["браузеры", "браузер", "browser sessions"]
+        },
+        "modal_id": {
+          "browsers_modal": ["браузеры", "браузер", "browser sessions"]
+        }
+      },
+      "entities": [
+        {
+          "lookup": "modal_id",
+          "value": "browsers_modal",
+          "aliases": ["браузеры", "браузер", "browser sessions"]
+        }
+      ],
+      "primary_actions": [
+        {
+          "utterances": ["покажи браузеры", "открой браузеры", "show browsers", "open browsers"],
+          "intent": "desktop.open_modal",
+          "slot": "modal_id",
+          "value": "browsers_modal",
+          "confirmation": "Открыть Browsers?"
+        }
+      ]
     }
   }
 }
