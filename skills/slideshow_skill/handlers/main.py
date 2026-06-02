@@ -18,7 +18,7 @@ from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import skill_memory
 from adaos.sdk.data.skill_env import skill_env_path
 from adaos.sdk.io import stream_publish
-from adaos.sdk.redevice import ReDeviceBridge, compact_endpoint, list_endpoints as sdk_list_endpoints
+from adaos.sdk.redevice import ReDeviceBridge, compact_endpoint, list_endpoints as sdk_list_endpoints, select_transport
 from PIL import Image, ImageOps
 
 try:
@@ -1117,13 +1117,22 @@ def _last_command_payload() -> dict[str, Any]:
     return _empty_command_payload()
 
 
-def _build_command(pair_code: str, items: list[dict[str, Any]], state: Mapping[str, Any], *, autoplay: bool) -> dict[str, Any]:
+def _build_command(
+    pair_code: str,
+    items: list[dict[str, Any]],
+    state: Mapping[str, Any],
+    *,
+    autoplay: bool,
+    transport: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     command_id = "cmd:slideshow:" + hashlib.sha256(f"{pair_code}:{_now()}".encode("utf-8")).hexdigest()[:16]
     owner = _owner()
+    transport_payload = dict(transport or {})
     return {
         "command_id": command_id,
         "type": "display.render_surface",
         "owner": owner,
+        "transport": transport_payload,
         "active_app": {
             "app_id": "slideshow_skill",
             "skill_id": "slideshow_skill",
@@ -1158,6 +1167,7 @@ def _build_command(pair_code: str, items: list[dict[str, Any]], state: Mapping[s
             "sync": bool(state.get("sync")),
             "mode": state.get("mode"),
             "scope": state.get("scope"),
+            "transport": transport_payload,
             "cache_policy": {
                 "max_current_items": _MAX_ENDPOINT_CURRENT,
                 "max_favorite_items": 0,
@@ -1196,12 +1206,22 @@ def _send_to_selected(
     if not window:
         return {"ok": False, "error": "no_supported_photos", "source_dir": state.get("source_dir")}
     items = [_content_item(path) for path in window]
+    content_bytes = sum(int(item.get("thumbnail_bytes") or 0) for item in items)
     bridge = ReDeviceBridge()
+    devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
     results: list[dict[str, Any]] = []
+    transports: dict[str, Any] = {}
     first_command_id = ""
     for pair_code in selected_codes:
         autoplay = bool(state.get("running")) and (not state.get("sync") or pair_code == selected_codes[0])
-        command = _build_command(pair_code, items, state, autoplay=autoplay)
+        transport = select_transport(
+            devices_by_code.get(pair_code, {}),
+            intent="display.slideshow",
+            content_bytes=content_bytes,
+            allow_root_relay=True,
+        )
+        transports[pair_code] = transport
+        command = _build_command(pair_code, items, state, autoplay=autoplay, transport=transport)
         first_command_id = first_command_id or _text(command.get("command_id"))
         res = bridge.send_command(pair_code, command)
         queued = _mapping(res.get("command"))
@@ -1212,6 +1232,7 @@ def _send_to_selected(
                 "error": res.get("error"),
                 "command_id": queued.get("command_id") or command.get("command_id"),
                 "state": queued.get("state"),
+                "transport": transport,
             }
         )
     payload = {
@@ -1221,6 +1242,8 @@ def _send_to_selected(
         "selected_codes": selected_codes,
         "item_count": len(items),
         "items": [{"source_name": item["source_name"], "thumbnail_path": item["thumbnail_path"], "cached": item["cached"]} for item in items],
+        "transport": next(iter(transports.values()), {}),
+        "transports": transports,
         "results": results,
         "updated_at": _now(),
     }

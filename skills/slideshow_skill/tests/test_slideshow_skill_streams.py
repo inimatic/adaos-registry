@@ -6,6 +6,10 @@ import sys
 from pathlib import Path
 from uuid import uuid4
 
+_REPO_SRC = Path(__file__).resolve().parents[5] / "src"
+if _REPO_SRC.exists():
+    sys.path.insert(0, str(_REPO_SRC))
+
 from PIL import Image
 
 
