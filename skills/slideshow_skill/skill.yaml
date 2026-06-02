@@ -1,10 +1,20 @@
 name: slideshow_skill
-version: 0.1.18
+version: 0.1.20
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
   type: python
+  kind: service
   module: handlers.main
+service:
+  host: 127.0.0.1
+  port: 18104
+  command:
+  - -m
+  - handlers.service
+  healthcheck:
+    path: /health
+    timeout_ms: 1000
 dependencies:
 - pillow>=10.0.0
 lifecycle:

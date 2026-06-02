@@ -231,6 +231,41 @@ def test_endpoint_next_refreshes_independent_endpoint_window(monkeypatch, tmp_pa
     assert sent_codes == ["B"]
 
 
+def test_service_tick_advances_running_slideshow_without_modal(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(8)]
+    for photo in photos:
+        photo.write_bytes(b"jpeg")
+
+    saved: list[dict[str, object]] = []
+    sent: list[list[str]] = []
+    monkeypatch.setattr(mod.time, "time", lambda: 100.0)
+    monkeypatch.setattr(mod, "_save_state", lambda state: saved.append(dict(state)) or state)
+    monkeypatch.setattr(
+        mod,
+        "_send_to_selected",
+        lambda state, files, **_kwargs: sent.append([item.name for item in mod._endpoint_window(files, state)]) or {"ok": True},
+    )
+
+    state = {
+        "selected_codes": ["A"],
+        "sync": True,
+        "running": True,
+        "interval_ms": 7000,
+        "last_service_tick_at": 90.0,
+        "current_index": 0,
+        "mode": "sequential",
+        "scope": "all",
+    }
+
+    assert mod._apply_service_tick(state, photos, webspace_id="ws-1") is True
+    assert state["current_index"] == 1
+    assert state["last_service_tick_at"] == 100.0
+    assert sent == [["photo-1.jpg", "photo-2.jpg", "photo-3.jpg", "photo-4.jpg"]]
+    assert saved[-1]["current_index"] == 1
+
+
 def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):
     mod = _load_slideshow_module()
 

@@ -143,6 +143,7 @@ def _default_state() -> dict[str, Any]:
         "fullscreen": True,
         "running": False,
         "interval_ms": 7000,
+        "last_service_tick_at": 0,
         "current_index": 0,
         "favorites": [],
         "source_dir": str(_source_dir()),
@@ -178,6 +179,10 @@ def _load_state() -> dict[str, Any]:
         state["current_index"] = max(0, int(state.get("current_index") or 0))
     except Exception:
         state["current_index"] = 0
+    try:
+        state["last_service_tick_at"] = max(0.0, float(state.get("last_service_tick_at") or 0))
+    except Exception:
+        state["last_service_tick_at"] = 0
     if not isinstance(state.get("last_event_by_code"), Mapping):
         state["last_event_by_code"] = {}
     if not isinstance(state.get("endpoint_index_by_code"), Mapping):
@@ -1291,7 +1296,6 @@ def _send_to_selected(
         first_items = first_items or items
         first_content_bytes = first_content_bytes or content_bytes
         any_budget_limited = any_budget_limited or budget_limited
-        autoplay = bool(state.get("running")) and (not state.get("sync") or pair_code == target_codes[0])
         transport = select_transport(
             devices_by_code.get(pair_code, {}),
             intent="display.slideshow",
@@ -1299,7 +1303,9 @@ def _send_to_selected(
             allow_root_relay=True,
         )
         transports[pair_code] = transport
-        command = _build_command(pair_code, items, state, autoplay=autoplay, transport=transport)
+        # The skill owns slideshow sequencing. Endpoint-side autoplay is kept off
+        # so legacy devices do not loop over a small local cache window.
+        command = _build_command(pair_code, items, state, autoplay=False, transport=transport)
         first_command_id = first_command_id or _text(command.get("command_id"))
         res = bridge.send_command(pair_code, command)
         queued = _mapping(res.get("command"))
@@ -1430,6 +1436,7 @@ def _apply_root_events(
         action = _text(event.get("action"))
         if action == "next":
             _advance_for_code(state, files, 1, code=None if state.get("sync") else code)
+            state["last_service_tick_at"] = time.time()
             changed = True
             if state.get("running"):
                 if state.get("sync"):
@@ -1451,6 +1458,34 @@ def _apply_root_events(
     return state
 
 
+def _apply_service_tick(
+    state: dict[str, Any],
+    files: list[Path],
+    *,
+    webspace_id: str | None = None,
+) -> bool:
+    if not state.get("running"):
+        return False
+    if not _unique_texts(state.get("selected_codes")):
+        return False
+    if not _selected_photos(files, state):
+        return False
+    now = time.time()
+    interval_s = max(1.5, min(60.0, float(state.get("interval_ms") or 7000) / 1000.0))
+    last_tick = float(state.get("last_service_tick_at") or 0)
+    if last_tick <= 0:
+        state["last_service_tick_at"] = now
+        _save_state(state)
+        return False
+    if now - last_tick < interval_s:
+        return False
+    _advance(state, files, 1)
+    state["last_service_tick_at"] = now
+    _save_state(state)
+    _send_to_selected(state, files, webspace_id=webspace_id)
+    return True
+
+
 def _poll_once(webspace_id: str | None = None) -> None:
     try:
         state = _load_state()
@@ -1459,6 +1494,7 @@ def _poll_once(webspace_id: str | None = None) -> None:
         devices = _load_devices()
         files = _files_for_state(state, _MAX_CONTROL_SCAN)
         state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=True)
+        _apply_service_tick(state, files, webspace_id=webspace_id)
         _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
         _publish(_ENDPOINTS_RECEIVER, _endpoint_payload(devices, state), webspace_id)
     except Exception:
@@ -1710,6 +1746,7 @@ def start_redevice_slideshow(
     if code and code not in _unique_texts(state.get("selected_codes")):
         state["selected_codes"] = _unique_texts([*state.get("selected_codes", []), code])
     state["running"] = True
+    state["last_service_tick_at"] = time.time()
     state = _save_state(state)
     files = _files_for_state(state, min(_MAX_CONTROL_SCAN, max(limit, _MAX_ENDPOINT_CURRENT + _MAX_ENDPOINT_FAVORITES)))
     _ensure_polling(webspace_id)
@@ -1758,8 +1795,10 @@ def control_redevice_slideshow(
         state["display_mode"] = "crop"
     elif token == "start":
         state["running"] = True
+        state["last_service_tick_at"] = time.time()
     elif token == "stop":
         state["running"] = False
+        state["last_service_tick_at"] = 0
     else:
         return {"ok": False, "error": "unknown_action", "action": action}
     state = _save_state(state)

@@ -134,6 +134,9 @@
           "fullscreen_value": "fullscreen_on",
           "running": false,
           "run_value": "stop",
+          "frame": {
+            "label": "0/0"
+          },
           "selected_folder": "",
           "updated_at": null,
           "source_dir": ""
@@ -281,6 +284,10 @@
           {
             "label": "Scope",
             "path": "scope"
+          },
+          {
+            "label": "Frame",
+            "path": "frame.label"
           }
         ]
       },
@@ -984,6 +991,10 @@
                   {
                     "label": "Scope",
                     "path": "scope"
+                  },
+                  {
+                    "label": "Frame",
+                    "path": "frame.label"
                   }
                 ]
               }

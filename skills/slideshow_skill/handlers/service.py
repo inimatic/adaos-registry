@@ -1,0 +1,74 @@
+from __future__ import annotations
+
+import json
+import logging
+import os
+import signal
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from typing import Any
+
+from handlers import main
+
+_log = logging.getLogger("skills.slideshow_skill.service")
+_stop = threading.Event()
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path != "/health":
+            self.send_response(404)
+            self.end_headers()
+            return
+        state = main._load_state()
+        body = {
+            "ok": True,
+            "skill": "slideshow_skill",
+            "running": bool(state.get("running")),
+            "selected_codes": state.get("selected_codes") or [],
+            "current_index": state.get("current_index") or 0,
+            "updated_at": main._now(),
+        }
+        raw = json.dumps(body, ensure_ascii=False).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        self.wfile.write(raw)
+
+    def log_message(self, _format: str, *_args: Any) -> None:
+        return
+
+
+def _serve_health() -> None:
+    host = os.environ.get("ADAOS_SERVICE_HOST") or "127.0.0.1"
+    port = int(os.environ.get("ADAOS_SERVICE_PORT") or "18104")
+    server = ThreadingHTTPServer((host, port), _HealthHandler)
+    server.timeout = 0.5
+    try:
+        while not _stop.is_set():
+            server.handle_request()
+    finally:
+        server.server_close()
+
+
+def _handle_stop(_signum: int, _frame: Any) -> None:
+    _stop.set()
+
+
+def run() -> None:
+    logging.basicConfig(level=logging.INFO)
+    signal.signal(signal.SIGTERM, _handle_stop)
+    signal.signal(signal.SIGINT, _handle_stop)
+    health_thread = threading.Thread(target=_serve_health, name="slideshow-health", daemon=True)
+    health_thread.start()
+    _log.info("slideshow service started")
+    main.activate_slideshow_runtime()
+    while not _stop.wait(main._POLL_INTERVAL_S):
+        main._poll_once()
+    _log.info("slideshow service stopped")
+
+
+if __name__ == "__main__":
+    run()
