@@ -134,7 +134,8 @@
 		{
 			"id": "infrastate_app",
 			"title": "Infra State",
-  "icon": "server-outline",
+      "aliases": ["infrastate", "infra state", "инфрастейт", "инфра стейт", "инфраструктура"],
+      "icon": "server-outline",
 			"launchModal": "infrastate_modal"
 		}
 	],
@@ -163,6 +164,7 @@
 		"modals": {
 			"infrastate_modal": {
 				"title": "Infrastructure State",
+        "aliases": ["Infra State", "infrastate", "infra state", "инфрастейт", "инфра стейт", "инфраструктура"],
 				"schema": {
 					"id": "infrastate_modal",
           "initialState": {
@@ -1009,5 +1011,33 @@
 			"id": "infrastate_widget",
 			"autoInstall": true
 		}
-	]
+	],
+  "nlu": {
+    "llm_hints": {
+      "aliases": {
+        "app_id": {
+          "infrastate_app": ["infrastate", "infra state", "инфрастейт", "инфра стейт", "инфраструктура"]
+        },
+        "modal_id": {
+          "infrastate_modal": ["Infra State", "infrastate", "infra state", "инфрастейт", "инфра стейт", "инфраструктура"]
+        }
+      },
+      "entities": [
+        {
+          "lookup": "modal_id",
+          "value": "infrastate_modal",
+          "aliases": ["Infra State", "infrastate", "infra state", "инфрастейт", "инфра стейт", "инфраструктура"]
+        }
+      ],
+      "primary_actions": [
+        {
+          "utterances": ["покажи infrastate", "покажи infra state", "покажи инфрастейт", "открой infra state"],
+          "intent": "desktop.open_modal",
+          "slot": "modal_id",
+          "value": "infrastate_modal",
+          "confirmation": "Открыть Infra State?"
+        }
+      ]
+    }
+  }
 }
