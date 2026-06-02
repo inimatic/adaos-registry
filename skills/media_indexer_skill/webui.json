@@ -5,7 +5,15 @@
       "id": "media_indexer_app",
       "title": "Media Indexer",
       "icon": "videocam-outline",
-      "launchModal": "media_indexer_modal"
+      "launchModal": "media_indexer_modal",
+      "nlu_aliases": [
+        "media indexer",
+        "media index",
+        "медиа индексер",
+        "медиа индекс",
+        "индексер",
+        "индекса"
+      ]
     }
   ],
   "widgets": [],
@@ -37,6 +45,14 @@
     "modals": {
       "media_indexer_modal": {
         "title": "Media Indexer",
+        "nlu_aliases": [
+          "media indexer",
+          "media index",
+          "медиа индексер",
+          "медиа индекс",
+          "индексер",
+          "индекса"
+        ],
         "schema": {
           "id": "media_indexer_modal",
           "title": "Media Indexer",
