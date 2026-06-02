@@ -328,10 +328,24 @@
       "actions": [
         {
           "on": "click:play",
+          "type": "updateState",
+          "params": {
+            "slideshowRunMode": "start"
+          }
+        },
+        {
+          "on": "click:play",
           "type": "callSkill",
           "target": "slideshow_skill.control_redevice_slideshow",
           "params": {
             "action": "start"
+          }
+        },
+        {
+          "on": "click:stop",
+          "type": "updateState",
+          "params": {
+            "slideshowRunMode": "stop"
           }
         },
         {
@@ -380,8 +394,24 @@
             "slideshowFolder": "",
             "slideshowDeviceCode": "",
             "slideshowDisplayName": "",
-            "slideshowAliases": ""
+            "slideshowAliases": "",
+            "slideshowRunMode": "start"
           },
+          "autoActions": [
+            {
+              "id": "slideshow_redevice_tick",
+              "intervalMs": 4000,
+              "enabledIf": "$state.slideshowRunMode !== 'stop'",
+              "action": {
+                "on": "interval",
+                "type": "callSkill",
+                "target": "slideshow_skill.refresh_redevice_slideshow_state",
+                "params": {
+                  "code": "$state.slideshowDeviceCode"
+                }
+              }
+            }
+          ],
           "layout": {
             "type": "split",
             "pattern": "split",
@@ -524,10 +554,24 @@
                 },
                 {
                   "on": "click:play",
+                  "type": "updateState",
+                  "params": {
+                    "slideshowRunMode": "start"
+                  }
+                },
+                {
+                  "on": "click:play",
                   "type": "callSkill",
                   "target": "slideshow_skill.control_redevice_slideshow",
                   "params": {
                     "action": "start"
+                  }
+                },
+                {
+                  "on": "click:stop",
+                  "type": "updateState",
+                  "params": {
+                    "slideshowRunMode": "stop"
                   }
                 },
                 {
@@ -722,6 +766,13 @@
                 ]
               },
               "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "slideshowRunMode": "$event.value"
+                  }
+                },
                 {
                   "on": "change",
                   "type": "callSkill",

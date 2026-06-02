@@ -1490,6 +1490,22 @@ def _ensure_polling(webspace_id: str | None = None) -> None:
 
 
 @tool
+def activate_slideshow_runtime(webspace_id: str | None = None, **_payload: Any) -> dict[str, Any]:
+    state = _load_state()
+    selected = _unique_texts(state.get("selected_codes"))
+    should_poll = bool(state.get("running") or selected)
+    if should_poll:
+        _ensure_polling(webspace_id or default_webspace_id())
+        _poll_once(webspace_id or default_webspace_id())
+    return {
+        "ok": True,
+        "polling": should_poll,
+        "selected_codes": selected,
+        "running": bool(state.get("running")),
+    }
+
+
+@tool
 def list_slideshow_photos(
     limit: int = 24,
     source_dir: str | None = None,
@@ -1885,3 +1901,8 @@ def on_webio_stream_subscription_changed(evt: Any) -> None:
             _forget_receiver(webspace_id, item)
         else:
             _remember_receiver(webspace_id, item)
+    state = _load_state()
+    if action not in {"unsubscribed", "removed", "release"} and (
+        state.get("running") or _unique_texts(state.get("selected_codes"))
+    ):
+        _ensure_polling(webspace_id)

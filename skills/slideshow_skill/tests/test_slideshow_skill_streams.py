@@ -92,6 +92,33 @@ def test_subscription_changed_does_not_build_snapshot(monkeypatch):
     assert published == []
 
 
+def test_subscription_changed_starts_poller_for_running_slideshow(monkeypatch):
+    mod = _load_slideshow_module()
+
+    started: list[str | None] = []
+    monkeypatch.setattr(
+        mod,
+        "_load_state",
+        lambda: {
+            "source_dir": r"C:\photos",
+            "selected_codes": ["ABC123"],
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+            "display_mode": "fit",
+            "fullscreen": False,
+            "running": True,
+        },
+    )
+    monkeypatch.setattr(mod, "_ensure_polling", lambda webspace_id=None: started.append(webspace_id))
+
+    mod.on_webio_stream_subscription_changed(
+        {"webspace_id": "ws-1", "receiver": "slideshow_skill.session", "action": "subscribed"},
+    )
+
+    assert started == ["ws-1"]
+
+
 def test_duplicate_snapshot_requests_are_coalesced(monkeypatch):
     mod = _load_slideshow_module()
 

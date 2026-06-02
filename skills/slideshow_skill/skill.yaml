@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.16
+version: 0.1.18
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -7,7 +7,36 @@ runtime:
   module: handlers.main
 dependencies:
 - pillow>=10.0.0
+lifecycle:
+  after_activate: activate_slideshow_runtime
+  rehydrate: activate_slideshow_runtime
+events:
+  subscribe:
+  - sys.ready
+  - webio.stream.snapshot.requested
+  - webio.stream.subscription.changed
 tools:
+- name: activate_slideshow_runtime
+  description: Rehydrate slideshow background polling after skill activation.
+  entry: handlers.main:activate_slideshow_runtime
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      polling:
+        type: boolean
+      selected_codes:
+        type: array
+        items:
+          type: string
 - name: list_slideshow_photos
   description: List source photos that can be sent to a ReDevice slideshow endpoint.
   entry: handlers.main:list_slideshow_photos
