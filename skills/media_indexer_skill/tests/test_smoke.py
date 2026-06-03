@@ -37,18 +37,30 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
 
     assert webui["ydoc_defaults"]["data/media_indexer"]["form"]["directory"] == ""
     assert "D:\\diploma_final\\demo_media" not in json.dumps(webui)
+    assert webui["ydoc_defaults"]["data/media_indexer"]["form"]["query"] == ""
     defaults = webui["ydoc_defaults"]["data/media_indexer"]
+    assert defaults["overview"]["label"] == "Library overview"
     assert defaults["diagnostics"]["label"] == "Model diagnostics"
+    assert defaults["diagnostics"]["summary"]["label"] == "Indexed media"
+    assert defaults["library"] == []
     receiver = webui["webio"]["receivers"]["media_indexer.operations"]
     assert receiver["mode"] == "replace"
     assert receiver["snapshotPolicy"] == "on_subscribe"
+    schema = webui["registry"]["modals"]["media_indexer_modal"]["schema"]
+    assert schema["layout"]["pattern"] == "split"
+    library_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-library")
+    assert library_widget["type"] == "ui.table"
+    actions_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-controls")
+    assert [button["id"] for button in actions_widget["inputs"]["buttons"]] == ["scan_selected"]
     results_widget = next(
         widget
-        for widget in webui["registry"]["modals"]["media_indexer_modal"]["schema"]["widgets"]
+        for widget in schema["widgets"]
         if widget["id"] == "media-indexer-results"
     )
+    assert results_widget["area"] == "bottom"
     assert results_widget["inputs"]["titleKey"] == "title"
     assert results_widget["inputs"]["subtitleKey"] == "subtitle"
+    assert results_widget["inputs"]["detailsPath"] == "details_text"
 
 
 def test_scanner_finds_supported_media_without_hashing(tmp_path: pathlib.Path) -> None:
@@ -129,6 +141,9 @@ def test_search_formats_results_and_dedupes_same_media_path(monkeypatch, tmp_pat
     assert item["title"] == "cat"
     assert "score 72.0" in item["subtitle"]
     assert item["details"]["ner"]["title"] == "cat"
+    assert "File: cat.jpg" in item["details_text"]
+    assert "technical_metadata" not in item["details"]
+    assert "enriched" not in item["details"]
 
 
 def test_ner_weights_prefers_skill_runtime_models_dir(monkeypatch, tmp_path: pathlib.Path) -> None:
