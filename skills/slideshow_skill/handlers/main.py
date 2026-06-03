@@ -71,6 +71,8 @@ _stream_lock = threading.Lock()
 _last_stream_fingerprints: dict[tuple[str, str], str] = {}
 _snapshot_seen_at: dict[tuple[str, str], float] = {}
 _active_receivers_by_webspace: dict[str, set[str]] = {}
+_prewarm_lock = threading.Lock()
+_prewarm_jobs: set[str] = set()
 
 
 def _now() -> str:
@@ -628,7 +630,16 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
     if _text(state.get("source_dir")) == str(root):
         _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
         _publish(_PREVIEW_RECEIVER, _preview_payload(state, 48), webspace_id)
-        _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+        _publish(
+            _SESSION_RECEIVER,
+            _session_payload(
+                state,
+                _files_for_state(state, _MAX_CONTROL_SCAN),
+                webspace_id=webspace_id,
+                schedule_prewarm=True,
+            ),
+            webspace_id,
+        )
     return status
 
 
@@ -911,7 +922,7 @@ def _widget_thumbnail(path: Path) -> tuple[Path, bool]:
     return last if last is not None else _thumbnail(path, _WIDGET_SIZE, "widget-v4")
 
 
-def _fullscreen_image(path: Path) -> tuple[Path, bool]:
+def _fullscreen_image(path: Path, *, create: bool = True) -> tuple[Path, bool]:
     return cached_image_variant(
         path,
         max_size=_FULLSCREEN_SIZE,
@@ -919,7 +930,95 @@ def _fullscreen_image(path: Path) -> tuple[Path, bool]:
         quality=88,
         background="black",
         fallback_dir=_internal_data_dir() / "thumbs",
+        create=create,
     )
+
+
+def _current_and_next_photos(files: list[Path], state: Mapping[str, Any]) -> tuple[Path | None, Path | None]:
+    selected = _selected_photos(files, state)
+    current = _current_photo(files, state)
+    if current is None or len(selected) <= 1:
+        return current, None
+    try:
+        current_idx = _current_index(state) % len(selected)
+        next_photo = selected[(current_idx + 1) % len(selected)]
+        return current, None if next_photo == current else next_photo
+    except Exception:
+        return current, None
+
+
+def _fullscreen_media_descriptor(path: Path, *, create: bool = False) -> dict[str, Any]:
+    content_ref = _content_ref(path)
+    try:
+        full_image, cached = _fullscreen_image(path, create=create)
+        if not cached and not create:
+            return {}
+        media = _publish_media_file(full_image, content_ref, variant="fullscreen")
+        if not media.get("ok"):
+            return {}
+        return browser_media_descriptor(media, content_ref=content_ref)
+    except Exception:
+        _log.debug("failed to prepare fullscreen slideshow image", exc_info=True)
+        return {}
+
+
+def _schedule_fullscreen_prewarm(
+    state: Mapping[str, Any],
+    files: list[Path],
+    *,
+    webspace_id: str | None = None,
+) -> None:
+    current, next_photo = _current_and_next_photos(files, state)
+    paths = [item for item in (current, next_photo) if item is not None]
+    if not paths:
+        return
+    ws = _text(webspace_id) or default_webspace_id()
+    job_key = f"{ws}:{','.join(_content_ref(item) for item in paths)}"
+    with _prewarm_lock:
+        if job_key in _prewarm_jobs:
+            return
+        _prewarm_jobs.add(job_key)
+    state_snapshot = dict(state)
+    files_snapshot = list(files)
+    thread = threading.Thread(
+        target=_prewarm_fullscreen_worker,
+        args=(job_key, state_snapshot, files_snapshot, ws),
+        name="slideshow-fullscreen-prewarm",
+        daemon=True,
+    )
+    thread.start()
+
+
+def _prewarm_fullscreen_worker(
+    job_key: str,
+    state: Mapping[str, Any],
+    files: list[Path],
+    webspace_id: str,
+) -> None:
+    try:
+        current, next_photo = _current_and_next_photos(files, state)
+        expected_ref = _content_ref(current) if current is not None else ""
+        for path in (current, next_photo):
+            if path is not None:
+                _fullscreen_media_descriptor(path, create=True)
+        latest_state = _load_state()
+        latest_files = _files_for_state(latest_state, _MAX_CONTROL_SCAN)
+        latest_current, _latest_next = _current_and_next_photos(latest_files, latest_state)
+        if expected_ref and (latest_current is None or _content_ref(latest_current) != expected_ref):
+            return
+        payload = _session_payload(
+            latest_state,
+            latest_files,
+            last_command=_last_command_payload(),
+            webspace_id=webspace_id,
+            schedule_prewarm=False,
+        )
+        _publish(_SESSION_RECEIVER, payload, webspace_id, force=True)
+    except Exception:
+        _log.debug("failed to prewarm slideshow fullscreen media", exc_info=True)
+    finally:
+        with _prewarm_lock:
+            _prewarm_jobs.discard(job_key)
 
 
 def _data_uri(path: Path) -> str:
@@ -1132,41 +1231,35 @@ def _selected_endpoint_label(selected_codes: list[str]) -> str:
         return ", ".join(selected_codes)
 
 
-def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_command: Mapping[str, Any] | None = None) -> dict[str, Any]:
+def _session_payload(
+    state: Mapping[str, Any],
+    files: list[Path],
+    *,
+    last_command: Mapping[str, Any] | None = None,
+    webspace_id: str | None = None,
+    schedule_prewarm: bool = False,
+) -> dict[str, Any]:
     selected = _selected_photos(files, state)
-    current = _current_photo(files, state)
+    current, next_photo = _current_and_next_photos(files, state)
     image: dict[str, Any] = {"src": "", "mime": "image/jpeg"}
     title = "No photo"
     content_ref = ""
     media: dict[str, Any] = {}
+    needs_prewarm = False
     if current is not None:
         thumb, _cached = _widget_thumbnail(current)
         title = current.name
         content_ref = _content_ref(current)
         media = _publish_media_file(thumb, content_ref, variant="widget")
-        fullscreen_media: dict[str, Any] = {}
-        next_media: dict[str, Any] = {}
-        try:
-            full_image, _full_cached = _fullscreen_image(current)
-            fullscreen_media = _publish_media_file(full_image, content_ref, variant="fullscreen")
-        except Exception:
-            _log.debug("failed to prepare fullscreen slideshow image", exc_info=True)
-        if selected:
-            try:
-                current_idx = _current_index(state) % len(selected)
-                next_photo = selected[(current_idx + 1) % len(selected)]
-                if next_photo != current:
-                    next_ref = _content_ref(next_photo)
-                    next_full, _next_cached = _fullscreen_image(next_photo)
-                    next_media = _publish_media_file(next_full, next_ref, variant="fullscreen")
-            except Exception:
-                _log.debug("failed to prepare next fullscreen slideshow image", exc_info=True)
+        fullscreen_media = _fullscreen_media_descriptor(current, create=False)
+        next_media = _fullscreen_media_descriptor(next_photo, create=False) if next_photo is not None else {}
+        needs_prewarm = not bool(fullscreen_media) or bool(next_photo is not None and not next_media)
         image = {
             "mime": "image/jpeg",
             "route": media.get("browser_route") or media.get("route") or "hub_browser_media",
             "media": browser_media_descriptor(media, content_ref=content_ref),
-            "fullscreen_media": browser_media_descriptor(fullscreen_media, content_ref=content_ref) if fullscreen_media.get("ok") else {},
-            "next_media": browser_media_descriptor(next_media) if next_media.get("ok") else {},
+            "fullscreen_media": fullscreen_media,
+            "next_media": next_media,
             "node_src": _text(media.get("node_url") or media.get("url")) if media.get("ok") else "",
             "content_ref": content_ref,
         }
@@ -1176,7 +1269,7 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
     favorites = _favorite_refs(root)
     favorite = bool(content_ref and _is_favorite(root, content_ref))
     filtered_count = len(_selected_photos(files, state))
-    return {
+    payload = {
         "ok": bool(current),
         "title": title,
         "subtitle": f"{header} | {state.get('mode')} | {state.get('scope')}",
@@ -1211,6 +1304,9 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
         "last_command": _compact_command_payload(last_command),
         "updated_at": _now(),
     }
+    if schedule_prewarm and needs_prewarm:
+        _schedule_fullscreen_prewarm(state, files, webspace_id=webspace_id)
+    return payload
 
 
 def _publish(receiver: str, payload: Mapping[str, Any], webspace_id: str | None = None, *, force: bool = False) -> None:
@@ -1590,7 +1686,11 @@ def _send_to_selected(
     payload["command_items"] = _command_items(payload)
     payload = _remember_command_payload(payload)
     _publish(_COMMAND_RECEIVER, payload, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=payload), webspace_id)
+    _publish(
+        _SESSION_RECEIVER,
+        _session_payload(state, files, last_command=payload, webspace_id=webspace_id, schedule_prewarm=True),
+        webspace_id,
+    )
     return payload
 
 
@@ -1671,7 +1771,11 @@ def _stop_selected(
     payload["command_items"] = _command_items(payload)
     payload = _remember_command_payload(payload)
     _publish(_COMMAND_RECEIVER, payload, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=payload), webspace_id)
+    _publish(
+        _SESSION_RECEIVER,
+        _session_payload(state, files, last_command=payload, webspace_id=webspace_id, schedule_prewarm=True),
+        webspace_id,
+    )
     return payload
 
 
@@ -1773,7 +1877,16 @@ def _poll_once(webspace_id: str | None = None) -> None:
         files = _files_for_state(state, _MAX_CONTROL_SCAN)
         state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=True)
         _apply_service_tick(state, files, webspace_id=webspace_id)
-        _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+        _publish(
+            _SESSION_RECEIVER,
+            _session_payload(
+                state,
+                _files_for_state(state, _MAX_CONTROL_SCAN),
+                webspace_id=webspace_id,
+                schedule_prewarm=True,
+            ),
+            webspace_id,
+        )
         _publish(_ENDPOINTS_RECEIVER, _endpoint_payload(devices, state), webspace_id)
     except Exception:
         _log.debug("slideshow root event poll failed", exc_info=True)
@@ -1833,7 +1946,16 @@ def list_slideshow_photos(
     payload = _preview_payload(state, limit)
     _publish(_PREVIEW_RECEIVER, payload, webspace_id)
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+    _publish(
+        _SESSION_RECEIVER,
+        _session_payload(
+            state,
+            _files_for_state(state, _MAX_CONTROL_SCAN),
+            webspace_id=webspace_id,
+            schedule_prewarm=True,
+        ),
+        webspace_id,
+    )
     _publish(_INDEX_RECEIVER, _index_status(_source_dir(state.get("source_dir"))), webspace_id)
     return payload
 
@@ -1855,7 +1977,11 @@ def set_slideshow_source(
     command = _sync_running_surface(state, files, webspace_id=webspace_id, reason="source_changed")
     devices = _load_devices()
     _publish(_ENDPOINTS_RECEIVER, _endpoint_payload(devices, state), webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
+    _publish(
+        _SESSION_RECEIVER,
+        _session_payload(state, files, last_command=command or None, webspace_id=webspace_id, schedule_prewarm=True),
+        webspace_id,
+    )
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_PREVIEW_RECEIVER, _preview_payload(state, 48), webspace_id)
     status = _index_status(next_root)
@@ -1943,7 +2069,11 @@ def refresh_slideshow_photo_index(
     preview["status"] = status
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_PREVIEW_RECEIVER, preview, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
+    _publish(
+        _SESSION_RECEIVER,
+        _session_payload(state, files, last_command=command or None, webspace_id=webspace_id, schedule_prewarm=True),
+        webspace_id,
+    )
     _publish(_INDEX_RECEIVER, status, webspace_id)
     return preview
 
@@ -1966,7 +2096,11 @@ def select_slideshow_folder(
     preview = _preview_payload(state, 48)
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_PREVIEW_RECEIVER, preview, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
+    _publish(
+        _SESSION_RECEIVER,
+        _session_payload(state, files, last_command=command or None, webspace_id=webspace_id, schedule_prewarm=True),
+        webspace_id,
+    )
     _publish(_INDEX_RECEIVER, _index_status(_source_dir(state.get("source_dir"))), webspace_id)
     return preview
 
@@ -1998,7 +2132,11 @@ def toggle_redevice_endpoint(
     devices = _load_devices()
     payload = _endpoint_payload(devices, state)
     _publish(_ENDPOINTS_RECEIVER, payload, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
+    _publish(
+        _SESSION_RECEIVER,
+        _session_payload(state, files, last_command=command or None, webspace_id=webspace_id, schedule_prewarm=True),
+        webspace_id,
+    )
     _ensure_polling(webspace_id)
     return payload
 
@@ -2020,7 +2158,11 @@ def select_redevice_endpoint(
     command = _sync_running_surface(state, files, webspace_id=webspace_id, reason="endpoint_selected")
     payload = _endpoint_payload(devices, state)
     _publish(_ENDPOINTS_RECEIVER, payload, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
+    _publish(
+        _SESSION_RECEIVER,
+        _session_payload(state, files, last_command=command or None, webspace_id=webspace_id, schedule_prewarm=True),
+        webspace_id,
+    )
     _ensure_polling(webspace_id)
     return payload
 
@@ -2158,7 +2300,7 @@ def refresh_redevice_slideshow_state(
     state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=True)
     state = _save_state(state)
     endpoint_payload = _endpoint_payload(devices, state)
-    session_payload = _session_payload(state, files)
+    session_payload = _session_payload(state, files, webspace_id=webspace_id, schedule_prewarm=True)
     _publish(_ENDPOINTS_RECEIVER, endpoint_payload, webspace_id)
     _publish(_SESSION_RECEIVER, session_payload, webspace_id)
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
@@ -2209,7 +2351,18 @@ def _publish_receiver_snapshot(receiver: str, state: Mapping[str, Any], webspace
         return
     if receiver == _SESSION_RECEIVER:
         files = _files_for_state(state, _MAX_CONTROL_SCAN)
-        _publish(receiver, _session_payload(state, files, last_command=_last_command_payload()), webspace_id, force=True)
+        _publish(
+            receiver,
+            _session_payload(
+                state,
+                files,
+                last_command=_last_command_payload(),
+                webspace_id=webspace_id,
+                schedule_prewarm=True,
+            ),
+            webspace_id,
+            force=True,
+        )
         return
     if receiver == _FOLDERS_RECEIVER:
         _publish(receiver, _folders_payload(state), webspace_id, force=True)

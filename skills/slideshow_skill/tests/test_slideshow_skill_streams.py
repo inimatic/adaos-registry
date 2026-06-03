@@ -239,7 +239,7 @@ def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeyp
     assert payload["label"] == "Tablet"
 
 
-def test_session_payload_exposes_fullscreen_and_next_media(monkeypatch, tmp_path):
+def test_session_payload_exposes_ready_fullscreen_and_next_media(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 
     photos = []
@@ -251,7 +251,6 @@ def test_session_payload_exposes_fullscreen_and_next_media(monkeypatch, tmp_path
     monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "ABC123", "state": "approved", "display_name": "Tablet"}])
     monkeypatch.setattr(mod, "_favorite_refs", lambda _root: [])
     monkeypatch.setattr(mod, "_widget_thumbnail", lambda path: (path, True))
-    monkeypatch.setattr(mod, "_fullscreen_image", lambda path: (path, True))
 
     published: list[tuple[str, str]] = []
 
@@ -270,6 +269,18 @@ def test_session_payload_exposes_fullscreen_and_next_media(monkeypatch, tmp_path
         }
 
     monkeypatch.setattr(mod, "_publish_media_file", _publish)
+    monkeypatch.setattr(
+        mod,
+        "_fullscreen_media_descriptor",
+        lambda path, **_kwargs: {
+            "route": "hub_browser_media",
+            "path": f"/media/files/content/{Path(path).stem}-fullscreen.jpg",
+            "filename": f"{Path(path).stem}-fullscreen.jpg",
+            "mime": "image/jpeg",
+            "content_ref": mod._content_ref(path),
+            "size_bytes": 1234,
+        },
+    )
 
     payload = mod._session_payload(
         {
@@ -289,7 +300,63 @@ def test_session_payload_exposes_fullscreen_and_next_media(monkeypatch, tmp_path
     assert payload["image"]["media"]["path"].endswith("photo-0-widget.jpg")
     assert payload["image"]["fullscreen_media"]["path"].endswith("photo-0-fullscreen.jpg")
     assert payload["image"]["next_media"]["path"].endswith("photo-1-fullscreen.jpg")
-    assert [item[1] for item in published] == ["widget", "fullscreen", "fullscreen"]
+    assert [item[1] for item in published] == ["widget"]
+
+
+def test_session_payload_schedules_fullscreen_prewarm_without_blocking(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = []
+    for idx in range(2):
+        photo = tmp_path / f"photo-{idx}.jpg"
+        Image.new("RGB", (1200, 800), color=(idx * 40, 64, 128)).save(photo, "JPEG")
+        photos.append(photo)
+
+    monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "ABC123", "state": "approved", "display_name": "Tablet"}])
+    monkeypatch.setattr(mod, "_favorite_refs", lambda _root: [])
+    monkeypatch.setattr(mod, "_widget_thumbnail", lambda path: (path, True))
+    monkeypatch.setattr(
+        mod,
+        "_publish_media_file",
+        lambda path, ref, **kwargs: {
+            "ok": True,
+            "browser_path": f"/media/files/content/{Path(path).stem}-{kwargs.get('variant') or 'widget'}.jpg",
+            "browser_route": "hub_browser_media",
+            "node_url": f"/api/node/media/files/content/{Path(path).stem}.jpg",
+            "filename": f"{Path(path).stem}.jpg",
+            "content_ref": ref,
+        },
+    )
+    monkeypatch.setattr(mod, "_fullscreen_media_descriptor", lambda path, **_kwargs: {})
+
+    scheduled: list[tuple[str, int]] = []
+    monkeypatch.setattr(
+        mod,
+        "_schedule_fullscreen_prewarm",
+        lambda state, files, **kwargs: scheduled.append((str(kwargs.get("webspace_id") or ""), len(files))),
+    )
+
+    payload = mod._session_payload(
+        {
+            "source_dir": str(tmp_path),
+            "selected_codes": ["ABC123"],
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+            "display_mode": "fit",
+            "fullscreen": True,
+            "running": True,
+            "current_index": 0,
+        },
+        photos,
+        webspace_id="ws-1",
+        schedule_prewarm=True,
+    )
+
+    assert payload["image"]["media"]["path"].endswith("photo-0-widget.jpg")
+    assert payload["image"]["fullscreen_media"] == {}
+    assert payload["image"]["next_media"] == {}
+    assert scheduled == [("ws-1", 2)]
 
 
 def test_endpoint_payload_omits_raw_endpoint_details(monkeypatch):
