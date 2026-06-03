@@ -57,6 +57,7 @@ _COMMAND_STATE_KEY = "slideshow_skill.command_state"
 _LAST_MEDIA_KEY = "slideshow_skill.last_media"
 _POLL_INTERVAL_S = 2.5
 _SNAPSHOT_DEBOUNCE_S = 1.0
+_SURFACE_REASSERT_INTERVAL_S = 20.0
 _log = logging.getLogger("skills.slideshow_skill")
 _poll_lock = threading.Lock()
 _poll_thread: threading.Thread | None = None
@@ -1476,6 +1477,11 @@ def _build_command(
             "sync": bool(state.get("sync")),
             "mode": state.get("mode"),
             "scope": state.get("scope"),
+            "source_fingerprint": hashlib.sha256(
+                f"{_text(state.get('source_dir'))}\n{_text(state.get('selected_folder'))}".encode("utf-8", errors="replace")
+            ).hexdigest()[:16],
+            "selected_folder": _text(state.get("selected_folder")),
+            "current_index": _current_index(state, code=pair_code),
             "transport": transport_payload,
             "cache_policy": {
                 "max_current_items": _MAX_ENDPOINT_CURRENT,
@@ -1513,6 +1519,11 @@ def _send_to_selected(
         return {"ok": False, "error": "no_redevice_endpoint"}
     if not _endpoint_window(files, state, code=target_codes[0] if target_codes else None):
         return {"ok": False, "error": "no_supported_photos", "source_dir": state.get("source_dir")}
+    if isinstance(state, dict):
+        now = time.time()
+        state["last_surface_sync_at"] = now
+        state["last_surface_target_codes"] = target_codes
+        _save_state(state)
     bridge = ReDeviceBridge()
     devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
     results: list[dict[str, Any]] = []
@@ -1597,6 +1608,29 @@ def _send_to_selected(
     _publish(_COMMAND_RECEIVER, payload, webspace_id)
     _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=payload), webspace_id)
     return payload
+
+
+def _sync_running_surface(
+    state: dict[str, Any],
+    files: list[Path] | None = None,
+    *,
+    code: str | None = None,
+    webspace_id: str | None = None,
+    reason: str = "state_changed",
+) -> dict[str, Any]:
+    if not state.get("running"):
+        return {}
+    target_codes = _unique_texts([code] if code else state.get("selected_codes"))
+    if not target_codes:
+        return {}
+    selected_files = files if files is not None else _files_for_state(state, _MAX_CONTROL_SCAN)
+    if not _selected_photos(selected_files, state):
+        state["last_surface_sync_reason"] = _text(reason) or "state_changed"
+        state["last_surface_sync_at"] = time.time()
+        _save_state(state)
+        return _stop_selected(state, code=code, webspace_id=webspace_id)
+    state["last_surface_sync_reason"] = _text(reason) or "state_changed"
+    return _send_to_selected(state, selected_files, code=code, webspace_id=webspace_id)
 
 
 def _stop_selected(
@@ -1731,13 +1765,18 @@ def _apply_service_tick(
     if last_tick <= 0:
         state["last_service_tick_at"] = now
         _save_state(state)
-        return False
+        _sync_running_surface(state, files, webspace_id=webspace_id, reason="runtime_started")
+        return True
     if now - last_tick < interval_s:
+        last_sync = float(state.get("last_surface_sync_at") or 0)
+        if now - last_sync >= _SURFACE_REASSERT_INTERVAL_S:
+            _sync_running_surface(state, files, webspace_id=webspace_id, reason="periodic_reassert")
+            return True
         return False
     _advance(state, files, 1)
     state["last_service_tick_at"] = now
     _save_state(state)
-    _send_to_selected(state, files, webspace_id=webspace_id)
+    _sync_running_surface(state, files, webspace_id=webspace_id, reason="service_tick")
     return True
 
 
@@ -1829,9 +1868,10 @@ def set_slideshow_source(
         state["current_index"] = 0
     state = _save_state(state)
     files = _files_for_state(state, _MAX_CONTROL_SCAN)
+    command = _sync_running_surface(state, files, webspace_id=webspace_id, reason="source_changed")
     devices = _load_devices()
     _publish(_ENDPOINTS_RECEIVER, _endpoint_payload(devices, state), webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, files), webspace_id)
+    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_PREVIEW_RECEIVER, _preview_payload(state, 48), webspace_id)
     status = _index_status(next_root)
@@ -1912,12 +1952,14 @@ def refresh_slideshow_photo_index(
         state["source_dir"] = str(_source_dir(source_dir))
         state = _save_state(state)
     status = _start_index_job(_source_dir(state.get("source_dir")), webspace_id=webspace_id)
+    files = _files_for_state(state, _MAX_CONTROL_SCAN)
+    command = _sync_running_surface(state, files, webspace_id=webspace_id, reason="index_refresh_requested")
     preview = _preview_payload(state, 48)
     preview["folders"] = _folder_items(state)
     preview["status"] = status
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_PREVIEW_RECEIVER, preview, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
     _publish(_INDEX_RECEIVER, status, webspace_id)
     return preview
 
@@ -1935,10 +1977,12 @@ def select_slideshow_folder(
     state["selected_folder"] = "" if folder_token == "__more__" else folder_token
     state["current_index"] = 0
     state = _save_state(state)
+    files = _files_for_state(state, _MAX_CONTROL_SCAN)
+    command = _sync_running_surface(state, files, webspace_id=webspace_id, reason="folder_changed")
     preview = _preview_payload(state, 48)
     _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_PREVIEW_RECEIVER, preview, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
     _publish(_INDEX_RECEIVER, _index_status(_source_dir(state.get("source_dir"))), webspace_id)
     return preview
 
@@ -1954,16 +1998,23 @@ def toggle_redevice_endpoint(
         state["source_dir"] = str(_source_dir(source_dir))
     token = _text(code)
     selected = _unique_texts(state.get("selected_codes"))
+    removed_token = ""
     if token in selected:
         selected = [item for item in selected if item != token]
+        removed_token = token
     elif token:
         selected.append(token)
     state["selected_codes"] = selected
     state = _save_state(state)
+    files = _files_for_state(state, _MAX_CONTROL_SCAN)
+    command: dict[str, Any] = {}
+    if removed_token:
+        _stop_selected(state, code=removed_token, webspace_id=webspace_id)
+    command = _sync_running_surface(state, files, webspace_id=webspace_id, reason="endpoint_selection_changed")
     devices = _load_devices()
     payload = _endpoint_payload(devices, state)
     _publish(_ENDPOINTS_RECEIVER, payload, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
     _ensure_polling(webspace_id)
     return payload
 
@@ -1981,9 +2032,11 @@ def select_redevice_endpoint(
     device = _select_device(devices, code)
     state["selected_codes"] = [_text(device.get("code"))] if device else []
     state = _save_state(state)
+    files = _files_for_state(state, _MAX_CONTROL_SCAN)
+    command = _sync_running_surface(state, files, webspace_id=webspace_id, reason="endpoint_selected")
     payload = _endpoint_payload(devices, state)
     _publish(_ENDPOINTS_RECEIVER, payload, webspace_id)
-    _publish(_SESSION_RECEIVER, _session_payload(state, _files_for_state(state, _MAX_CONTROL_SCAN)), webspace_id)
+    _publish(_SESSION_RECEIVER, _session_payload(state, files, last_command=command or None), webspace_id)
     _ensure_polling(webspace_id)
     return payload
 
@@ -2061,9 +2114,11 @@ def control_redevice_slideshow(
     elif token == "favorites":
         state["scope"] = "favorites"
         state["current_index"] = 0
+        files = _files_for_state(state, _MAX_CONTROL_SCAN)
     elif token == "all":
         state["scope"] = "all"
         state["current_index"] = 0
+        files = _files_for_state(state, _MAX_CONTROL_SCAN)
     elif token == "fullscreen_on":
         state["fullscreen"] = True
     elif token == "fullscreen_off":

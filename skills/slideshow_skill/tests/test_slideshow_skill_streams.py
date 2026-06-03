@@ -394,6 +394,118 @@ def test_service_tick_advances_running_slideshow_without_modal(monkeypatch, tmp_
     assert saved[-1]["current_index"] == 1
 
 
+def test_service_tick_reasserts_surface_without_advancing(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(8)]
+    for photo in photos:
+        photo.write_bytes(b"jpeg")
+
+    sent: list[list[str]] = []
+    monkeypatch.setattr(mod.time, "time", lambda: 100.0)
+    monkeypatch.setattr(mod, "_save_state", lambda state: state)
+    monkeypatch.setattr(
+        mod,
+        "_send_to_selected",
+        lambda state, files, **_kwargs: sent.append([item.name for item in mod._endpoint_window(files, state)]) or {"ok": True},
+    )
+
+    state = {
+        "selected_codes": ["A"],
+        "sync": True,
+        "running": True,
+        "interval_ms": 7000,
+        "last_service_tick_at": 95.0,
+        "last_surface_sync_at": 70.0,
+        "current_index": 2,
+        "mode": "sequential",
+        "scope": "all",
+    }
+
+    assert mod._apply_service_tick(state, photos, webspace_id="ws-1") is True
+    assert state["current_index"] == 2
+    assert state["last_surface_sync_reason"] == "periodic_reassert"
+    assert sent == [["photo-2.jpg", "photo-3.jpg", "photo-4.jpg", "photo-5.jpg"]]
+
+
+def test_select_folder_resends_running_surface(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(4)]
+    for photo in photos:
+        Image.new("RGB", (32, 24), color=(32, 64, 96)).save(photo, "JPEG")
+
+    sent: list[tuple[str, list[str]]] = []
+    monkeypatch.setattr(
+        mod,
+        "_load_state",
+        lambda: {
+            "source_dir": str(tmp_path),
+            "selected_codes": ["A"],
+            "sync": True,
+            "running": True,
+            "current_index": 5,
+            "mode": "sequential",
+            "scope": "all",
+        },
+    )
+    monkeypatch.setattr(mod, "_save_state", lambda state: state)
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: photos)
+    monkeypatch.setattr(
+        mod,
+        "_send_to_selected",
+        lambda state, files, **_kwargs: sent.append((state.get("selected_folder"), [item.name for item in files])) or {"ok": True},
+    )
+    monkeypatch.setattr(mod, "_preview_payload", lambda state, _limit: {"ok": True, "folder": state.get("selected_folder")})
+    monkeypatch.setattr(mod, "_folders_payload", lambda state: {"items": [], "selected_folder": state.get("selected_folder")})
+    monkeypatch.setattr(mod, "_index_status", lambda _root: {"state": "ready"})
+    monkeypatch.setattr(mod, "_publish", lambda *_args, **_kwargs: {"ok": True})
+
+    result = mod.select_slideshow_folder("Trips", webspace_id="ws-1")
+
+    assert result["folder"] == "Trips"
+    assert sent == [("Trips", ["photo-0.jpg", "photo-1.jpg", "photo-2.jpg", "photo-3.jpg"])]
+
+
+def test_select_endpoint_resends_running_surface(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(4)]
+    for photo in photos:
+        Image.new("RGB", (32, 24), color=(32, 64, 96)).save(photo, "JPEG")
+
+    sent: list[list[str]] = []
+    monkeypatch.setattr(
+        mod,
+        "_load_state",
+        lambda: {
+            "source_dir": str(tmp_path),
+            "selected_codes": ["A"],
+            "sync": True,
+            "running": True,
+            "current_index": 0,
+            "mode": "sequential",
+            "scope": "all",
+        },
+    )
+    monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "B", "state": "approved"}])
+    monkeypatch.setattr(mod, "_save_state", lambda state: state)
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: photos)
+    monkeypatch.setattr(
+        mod,
+        "_send_to_selected",
+        lambda state, files, **_kwargs: sent.append(list(state.get("selected_codes") or [])) or {"ok": True},
+    )
+    monkeypatch.setattr(mod, "_endpoint_payload", lambda _devices, state: {"selected_codes": state.get("selected_codes")})
+    monkeypatch.setattr(mod, "_publish", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(mod, "_ensure_polling", lambda *_args, **_kwargs: None)
+
+    result = mod.select_redevice_endpoint("B", webspace_id="ws-1")
+
+    assert result["selected_codes"] == ["B"]
+    assert sent == [["B"]]
+
+
 def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):
     mod = _load_slideshow_module()
 

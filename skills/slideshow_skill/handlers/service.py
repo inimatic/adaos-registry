@@ -7,7 +7,32 @@ import signal
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
+
+
+def _bootstrap_runtime_env() -> None:
+    current_env = os.environ.get("ADAOS_SKILL_ENV_PATH") or ""
+    current_memory = os.environ.get("ADAOS_SKILL_MEMORY_PATH") or ""
+    if "slideshow_skill" in current_env and "slideshow_skill" in current_memory:
+        return
+    path = Path(__file__).resolve()
+    parts = path.parts
+    try:
+        idx = parts.index(".runtime")
+    except ValueError:
+        return
+    if len(parts) <= idx + 2:
+        return
+    runtime_root = Path(*parts[: idx + 3])
+    skill_env = runtime_root / "data" / "db" / "skill_env.json"
+    os.environ["ADAOS_SKILL_ENV_PATH"] = str(skill_env)
+    os.environ["ADAOS_SKILL_MEMORY_PATH"] = str(skill_env)
+    os.environ["ADAOS_SKILL_NAME"] = "slideshow_skill"
+    os.environ["ADAOS_SKILL_INTERNAL_DATA_ROOT"] = str(runtime_root / "data" / "internal" / "slideshow_skill")
+
+
+_bootstrap_runtime_env()
 
 from handlers import main
 
@@ -28,6 +53,8 @@ class _HealthHandler(BaseHTTPRequestHandler):
             "running": bool(state.get("running")),
             "selected_codes": state.get("selected_codes") or [],
             "current_index": state.get("current_index") or 0,
+            "last_surface_sync_reason": state.get("last_surface_sync_reason") or "",
+            "memory_path": os.environ.get("ADAOS_SKILL_ENV_PATH") or "",
             "updated_at": main._now(),
         }
         raw = json.dumps(body, ensure_ascii=False).encode("utf-8")
