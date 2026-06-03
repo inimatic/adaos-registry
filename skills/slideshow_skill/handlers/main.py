@@ -948,6 +948,10 @@ def _media_content_url(filename: str, *, browser: bool = False) -> str:
     return f"{prefix}/files/content/{quote(filename)}{query}"
 
 
+def _media_content_path(filename: str) -> str:
+    return f"/media/files/content/{quote(filename)}"
+
+
 def _publish_media_file(path: Path, content_ref: str, *, variant: str = "widget") -> dict[str, Any]:
     suffix = "".join(ch for ch in _text(variant).lower() if ch.isalnum() or ch in {"-", "_"}) or "media"
     filename = f"slideshow-{hashlib.sha256(_text(content_ref).encode('utf-8')).hexdigest()[:24]}-{suffix}.jpg"
@@ -961,7 +965,7 @@ def _publish_media_file(path: Path, content_ref: str, *, variant: str = "widget"
             "path": str(target),
             "url": _media_content_url(target.name),
             "node_url": _media_content_url(target.name),
-            "browser_url": _media_content_url(target.name, browser=True),
+            "browser_path": _media_content_path(target.name),
             "mime": "image/jpeg",
             "size_bytes": int(target.stat().st_size),
             "content_ref": content_ref,
@@ -989,7 +993,7 @@ def _content_item(path: Path) -> dict[str, Any]:
         "thumbnail_path": str(thumb),
         "thumbnail_bytes": thumb.stat().st_size,
         "content_url": _text(media.get("node_url") or media.get("url")),
-        "browser_content_url": _text(media.get("browser_url")),
+        "browser_content_path": _text(media.get("browser_path")),
         "media": media,
         "data_uri": _data_uri(thumb),
     }
@@ -1169,9 +1173,15 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
         content_ref = _content_ref(current)
         media = _publish_media_file(thumb, content_ref, variant="widget")
         image = {
-            "src": _text(media.get("browser_url") or media.get("url")) if media.get("ok") else "",
             "mime": "image/jpeg",
             "route": media.get("browser_route") or media.get("route") or "hub_browser_media",
+            "media": {
+                "route": media.get("browser_route") or "hub_browser_media",
+                "path": _text(media.get("browser_path")),
+                "filename": _text(media.get("filename")),
+                "mime": "image/jpeg",
+                "content_ref": content_ref,
+            },
             "node_src": _text(media.get("node_url") or media.get("url")) if media.get("ok") else "",
             "content_ref": content_ref,
         }

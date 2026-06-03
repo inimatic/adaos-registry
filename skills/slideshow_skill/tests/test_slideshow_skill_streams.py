@@ -208,8 +208,9 @@ def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeyp
             "ok": True,
             "url": f"/api/node/media/files/content/{thumb.name}",
             "node_url": f"/api/node/media/files/content/{thumb.name}",
-            "browser_url": f"/media/files/content/{thumb.name}",
+            "browser_path": f"/media/files/content/{thumb.name}",
             "browser_route": "hub_browser_media",
+            "filename": thumb.name,
             "content_ref": ref,
         },
     )
@@ -230,8 +231,9 @@ def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeyp
     )
 
     assert len(json.dumps(payload, separators=(",", ":")).encode("utf-8")) < 98_304
-    assert not str(payload["image"]["src"]).startswith("data:")
-    assert payload["image"]["src"].startswith("/media/files/content/")
+    assert "src" not in payload["image"]
+    assert payload["image"]["media"]["route"] == "hub_browser_media"
+    assert payload["image"]["media"]["path"].startswith("/media/files/content/")
     assert payload["image"]["node_src"].startswith("/api/node/media/files/content/")
     assert payload["image"]["route"] == "hub_browser_media"
     assert payload["label"] == "Tablet"
