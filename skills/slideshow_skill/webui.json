@@ -271,6 +271,7 @@
         "imageField": "image.src",
         "aspectRatio": "16 / 9",
         "fullscreenOnClick": true,
+        "nativeFullscreen": true,
         "retainLastImageOnEmpty": true,
         "emptyText": "Start slideshow to show the current photo.",
         "headerActions": [
