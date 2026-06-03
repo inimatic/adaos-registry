@@ -941,10 +941,11 @@ def _api_token() -> str:
         return "dev-local-token"
 
 
-def _media_content_url(filename: str) -> str:
+def _media_content_url(filename: str, *, browser: bool = False) -> str:
     token = _api_token()
     query = f"?token={quote(token)}" if token else ""
-    return f"/api/node/media/files/content/{quote(filename)}{query}"
+    prefix = "/media" if browser else "/api/node/media"
+    return f"{prefix}/files/content/{quote(filename)}{query}"
 
 
 def _publish_media_file(path: Path, content_ref: str, *, variant: str = "widget") -> dict[str, Any]:
@@ -959,10 +960,13 @@ def _publish_media_file(path: Path, content_ref: str, *, variant: str = "widget"
             "filename": target.name,
             "path": str(target),
             "url": _media_content_url(target.name),
+            "node_url": _media_content_url(target.name),
+            "browser_url": _media_content_url(target.name, browser=True),
             "mime": "image/jpeg",
             "size_bytes": int(target.stat().st_size),
             "content_ref": content_ref,
             "route": "node_media_file",
+            "browser_route": "hub_browser_media",
         }
         _memory_set(_LAST_MEDIA_KEY, payload)
         return payload
@@ -984,7 +988,8 @@ def _content_item(path: Path) -> dict[str, Any]:
         "cached": cached,
         "thumbnail_path": str(thumb),
         "thumbnail_bytes": thumb.stat().st_size,
-        "content_url": _text(media.get("url")),
+        "content_url": _text(media.get("node_url") or media.get("url")),
+        "browser_content_url": _text(media.get("browser_url")),
         "media": media,
         "data_uri": _data_uri(thumb),
     }
@@ -1164,9 +1169,10 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
         content_ref = _content_ref(current)
         media = _publish_media_file(thumb, content_ref, variant="widget")
         image = {
-            "src": _text(media.get("url")) if media.get("ok") else "",
+            "src": _text(media.get("browser_url") or media.get("url")) if media.get("ok") else "",
             "mime": "image/jpeg",
-            "route": media.get("route") or "node_media_file",
+            "route": media.get("browser_route") or media.get("route") or "hub_browser_media",
+            "node_src": _text(media.get("node_url") or media.get("url")) if media.get("ok") else "",
             "content_ref": content_ref,
         }
     selected_codes = _unique_texts(state.get("selected_codes"))
