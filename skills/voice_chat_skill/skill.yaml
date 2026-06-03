@@ -1,5 +1,5 @@
 name: voice_chat_skill
-version: 0.6.8
+version: 0.6.9
 description: Voice chat bridge for web_desktop (text in -> publish chat + TTS via
   io.out.*; shared chat history goes through YJS, with stream receiver kept as a recovery/compatibility
   path).
@@ -88,5 +88,5 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-updated_at: '2026-06-02T14:32:39+00:00'
+updated_at: '2026-06-03T15:49:16+00:00'
 

@@ -66,7 +66,7 @@ _DATA_PROJECTION_ENTRIES = [
     },
 ]
 _MAX_MESSAGES = 80
-_STREAM_TAIL_MAX_MESSAGES = 80
+_STREAM_TAIL_MAX_MESSAGES = 8
 _MAX_STATE_KEYS = 32
 _STATE_TTL_S = 3600.0
 _VOICE_TAIL_RECEIVER = "voice_chat.messages"
@@ -617,14 +617,10 @@ def on_desktop_modal_open(evt: Any) -> None:
 
 @subscribe("webio.stream.snapshot.requested")
 def on_webio_stream_snapshot_requested(evt: Any) -> None:
-    payload = getattr(evt, "payload", evt)
-    if not isinstance(payload, Mapping):
-        return
-    if str(payload.get("receiver") or "").strip() != _VOICE_TAIL_RECEIVER:
-        return
-    webspace_id = str(payload.get("webspace_id") or payload.get("workspace_id") or default_webspace_id()).strip() or default_webspace_id()
-    target_node_id = str(payload.get("target_node_id") or payload.get("node_id") or "").strip() or None
-    _publish_tail_stream(webspace_id, target_node_id, force=True)
+    # Router/YJS is the authoritative voice_chat.messages stream owner.
+    # Publishing the skill-local memory snapshot here can overwrite fresh
+    # assistant replies with a stale user-only tail during modal open/reconnect.
+    return
 
 
 @subscribe("webio.stream.subscription.changed")
@@ -633,5 +629,5 @@ def on_webio_stream_subscription_changed(evt: Any) -> None:
     if isinstance(payload, Mapping) and str(payload.get("action") or "").strip().lower() == "unsubscribed":
         _STREAM_RUNTIME.handle_subscription_changed(evt, receiver_prefix="voice_chat.")
         return
-    on_webio_stream_snapshot_requested(evt)
+    return
 
