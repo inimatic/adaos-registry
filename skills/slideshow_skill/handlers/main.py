@@ -1189,6 +1189,7 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
     header = _selected_endpoint_label(selected_codes)
     root = _source_dir(_text(state.get("source_dir")))
     favorites = _favorite_refs(root)
+    favorite = bool(content_ref and _is_favorite(root, content_ref))
     filtered_count = len(_selected_photos(files, state))
     return {
         "ok": bool(current),
@@ -1202,6 +1203,9 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
         "frame": {"label": f"{(int(state.get('current_index') or 0) + 1) if files else 0}/{filtered_count}"},
         "status": {"label": "sync" if state.get("sync") else "independent", "color": "success" if state.get("sync") else "warning"},
         "content_ref": content_ref,
+        "favorite": favorite,
+        "favorite_icon": "star-sharp" if favorite else "star-outline",
+        "favorite_label": "Remove favorite" if favorite else "Add favorite",
         "selected_codes": selected_codes,
         "sync": bool(state.get("sync")),
         "sync_value": "sync_on" if state.get("sync") else "sync_off",
@@ -1953,7 +1957,14 @@ def control_redevice_slideshow(
             caption=f"Slideshow: {current.name}",
             _meta={"webspace_id": webspace_id or default_webspace_id(), "route_id": "telegram"},
         )
-        return {"ok": bool(result.get("ok")), "telegram": dict(result), "source_name": current.name}
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "error": _text(result.get("error")) or "telegram_photo_failed",
+                "telegram": dict(result),
+                "source_name": current.name,
+            }
+        return {"ok": True, "telegram": dict(result), "source_name": current.name}
     elif token == "sync_on":
         state["sync"] = True
     elif token == "sync_off":

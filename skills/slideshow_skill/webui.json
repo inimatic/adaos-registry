@@ -297,7 +297,9 @@
           {
             "id": "fav",
             "label": "Favorite",
-            "icon": "star-outline"
+            "icon": "star-outline",
+            "labelField": "favorite_label",
+            "iconField": "favorite_icon"
           },
           {
             "id": "send_telegram",
@@ -313,14 +315,11 @@
             "local": "closeFullscreen"
           },
           {
-            "id": "favorite_on",
-            "label": "Add favorite",
-            "icon": "star-outline"
-          },
-          {
-            "id": "favorite_off",
-            "label": "Remove favorite",
-            "icon": "star-outline"
+            "id": "fav",
+            "label": "Favorite",
+            "icon": "star-outline",
+            "labelField": "favorite_label",
+            "iconField": "favorite_icon"
           },
           {
             "id": "send_telegram",
