@@ -37,9 +37,30 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
 
     assert webui["ydoc_defaults"]["data/media_indexer"]["form"]["directory"] == ""
     assert "D:\\diploma_final\\demo_media" not in json.dumps(webui)
+    assert webui["ydoc_defaults"]["data/media_indexer"]["form"]["query"] == ""
+    defaults = webui["ydoc_defaults"]["data/media_indexer"]
+    assert defaults["overview"]["label"] == "Library overview"
+    assert defaults["diagnostics"]["label"] == "Model diagnostics"
+    assert defaults["diagnostics"]["summary"]["label"] == "Indexed media"
+    assert defaults["library"] == []
     receiver = webui["webio"]["receivers"]["media_indexer.operations"]
     assert receiver["mode"] == "replace"
     assert receiver["snapshotPolicy"] == "on_subscribe"
+    schema = webui["registry"]["modals"]["media_indexer_modal"]["schema"]
+    assert schema["layout"]["pattern"] == "split"
+    library_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-library")
+    assert library_widget["type"] == "ui.table"
+    actions_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-controls")
+    assert [button["id"] for button in actions_widget["inputs"]["buttons"]] == ["scan_selected"]
+    results_widget = next(
+        widget
+        for widget in schema["widgets"]
+        if widget["id"] == "media-indexer-results"
+    )
+    assert results_widget["area"] == "bottom"
+    assert results_widget["inputs"]["titleKey"] == "title"
+    assert results_widget["inputs"]["subtitleKey"] == "subtitle"
+    assert results_widget["inputs"]["detailsPath"] == "details_text"
 
 
 def test_scanner_finds_supported_media_without_hashing(tmp_path: pathlib.Path) -> None:
@@ -76,6 +97,53 @@ def test_handler_import_is_passive_and_search_without_index_does_not_load_models
     assert result["status"] == "error"
     assert result["results"] == []
     assert main._state["vector_db"] is None
+
+
+def test_search_formats_results_and_dedupes_same_media_path(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_path = str(tmp_path / "media" / "cat.jpg")
+    payload = {
+        "full_path": media_path,
+        "real_file_name": "cat.jpg",
+        "display_title": "cat",
+        "ftype": "image",
+        "year": "---",
+        "quality": "---",
+        "artist": "",
+        "ner_title": "",
+        "technical_metadata": {"image_format": "JPEG"},
+        "enriched": {},
+    }
+
+    class FakeVectorDb:
+        text_docs = [{"text": "cat", "payload": payload}]
+        image_docs = [{"text": "[VISUAL] cat.jpg", "payload": payload}]
+
+        def search(self, query: str, k: int = 5) -> list[dict]:
+            return [
+                {"score": 55.0, "type": "media/text", "payload": payload},
+                {"score": 72.0, "type": "image", "payload": payload},
+            ]
+
+    main._state["vector_db"] = FakeVectorDb()
+    main._state["index_loaded"] = True
+
+    result = main.search_media("cat", k=5)
+
+    assert result["status"] == "ok"
+    assert len(result["results"]) == 1
+    item = result["results"][0]
+    assert item["score"] == 72.0
+    assert item["title"] == "cat"
+    assert "score 72.0" in item["subtitle"]
+    assert item["details"]["ner"]["title"] == "cat"
+    assert "File: cat.jpg" in item["details_text"]
+    assert "technical_metadata" not in item["details"]
+    assert "enriched" not in item["details"]
 
 
 def test_ner_weights_prefers_skill_runtime_models_dir(monkeypatch, tmp_path: pathlib.Path) -> None:
@@ -206,3 +274,6 @@ def test_scan_resets_loaded_vector_index_before_reindexing(monkeypatch, tmp_path
 
     assert fake_vector.reset_called is True
     assert result["index"]["text_count"] == 1
+    assert result["diagnostics"]["by_type"] == {"video": 1}
+    assert result["diagnostics"]["ner_parsed"] == 0
+    assert result["diagnostics"]["indexed_count"] == 1

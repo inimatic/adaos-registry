@@ -4,7 +4,7 @@
     {
       "id": "media_indexer_app",
       "title": "Media Indexer",
-      "icon": "videocam-outline",
+      "icon": "search-outline",
       "launchModal": "media_indexer_modal",
       "nlu_aliases": [
         "media indexer",
@@ -23,9 +23,11 @@
         "mode": "replace",
         "initialState": {
           "value": "ready",
+          "display_value": "Ready",
           "label": "Media Indexer",
-          "subtitle": "waiting for action",
-          "description": "Set a directory, build an index, then search.",
+          "subtitle": "Waiting for directory",
+          "description": "Choose a folder, build the index, then search the media library.",
+          "color": "#6EE7B7",
           "updated_at": 0
         },
         "snapshotPolicy": "on_subscribe",
@@ -34,7 +36,7 @@
           "maxPublishHz": 1
         },
         "guardVisibility": {
-          "degradedState": "live operation tile falls back to Yjs status",
+          "degradedState": "Live operation tile falls back to Yjs status.",
           "log": "skill:media_indexer_skill.runtime",
           "quarantine": false
         }
@@ -53,28 +55,40 @@
           "индексер",
           "индекса"
         ],
+        "presentation": {
+          "kind": "fullscreen"
+        },
         "schema": {
           "id": "media_indexer_modal",
           "title": "Media Indexer",
+          "surfaceClass": "operations",
           "layout": {
-            "type": "single",
-            "pattern": "stack",
+            "type": "split",
+            "pattern": "split",
             "areas": [
               {
                 "id": "main",
                 "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
               }
             ]
           },
           "widgets": [
             {
-              "id": "media-indexer-summary",
+              "id": "media-indexer-overview",
               "type": "visual.metricTile",
               "area": "main",
-              "title": "Index status",
+              "title": "Library overview",
               "dataSource": {
                 "kind": "y",
-                "path": "data/media_indexer/status",
+                "path": "data/media_indexer/overview",
                 "observeRoot": true
               },
               "inputs": {
@@ -82,33 +96,49 @@
                 "labelPath": "label",
                 "subtitlePath": "subtitle",
                 "descriptionPath": "description",
-                "noticePath": "error",
-                "emptyText": "Ready"
+                "colorPath": "color",
+                "emptyText": "No index"
               }
             },
             {
-              "id": "media-indexer-operation",
-              "type": "visual.metricTile",
+              "id": "media-indexer-library",
+              "type": "ui.table",
               "area": "main",
-              "title": "Live operation",
+              "title": "Indexed media",
               "dataSource": {
-                "kind": "stream",
-                "receiver": "media_indexer.operations",
-                "transport": "auto"
+                "kind": "y",
+                "path": "data/media_indexer/library",
+                "observeRoot": true
               },
               "inputs": {
-                "valuePath": "value",
-                "labelPath": "label",
-                "subtitlePath": "subtitle",
-                "descriptionPath": "description",
-                "emptyText": "Waiting"
+                "emptyText": "Scan a folder to see indexed media here.",
+                "columns": [
+                  {
+                    "key": "title",
+                    "label": "Title"
+                  },
+                  {
+                    "key": "type",
+                    "label": "Type",
+                    "width": "96px"
+                  },
+                  {
+                    "key": "signals",
+                    "label": "Signals",
+                    "width": "180px"
+                  },
+                  {
+                    "key": "source",
+                    "label": "Source"
+                  }
+                ]
               }
             },
             {
               "id": "media-indexer-directory",
               "type": "input.text",
               "area": "main",
-              "title": "Directory",
+              "title": "Media directory",
               "dataSource": {
                 "kind": "y",
                 "path": "data/media_indexer/form",
@@ -116,7 +146,7 @@
               },
               "inputs": {
                 "bindField": "directory",
-                "placeholder": "Enter a local media directory",
+                "placeholder": "D:\\path\\to\\demo_media",
                 "commitMode": "manual",
                 "saveLabel": "Set directory"
               },
@@ -139,22 +169,17 @@
               ]
             },
             {
-              "id": "media-indexer-actions",
+              "id": "media-indexer-controls",
               "type": "input.commandBar",
               "area": "main",
+              "title": "Controls",
               "inputs": {
-                "variant": "stack",
                 "size": "small",
                 "buttons": [
                   {
                     "id": "scan_selected",
-                    "label": "Scan selected",
-                    "icon": "sync-outline"
-                  },
-                  {
-                    "id": "search_test",
-                    "label": "Search test",
-                    "icon": "search-outline"
+                    "label": "Scan directory",
+                    "icon": "scan-outline"
                   }
                 ]
               },
@@ -172,22 +197,6 @@
                       "timeout_ms": 600000
                     }
                   }
-                },
-                {
-                  "on": "click:search_test",
-                  "type": "callHost",
-                  "target": "media_indexer.action",
-                  "params": {
-                    "id": "search",
-                    "query": "test",
-                    "k": 5,
-                    "_observe": {
-                      "kind": "y",
-                      "path": "data/media_indexer/results",
-                      "scope": "node",
-                      "timeout_ms": 60000
-                    }
-                  }
                 }
               ]
             },
@@ -195,7 +204,7 @@
               "id": "media-indexer-query",
               "type": "input.text",
               "area": "main",
-              "title": "Search query",
+              "title": "Semantic search",
               "dataSource": {
                 "kind": "y",
                 "path": "data/media_indexer/form",
@@ -203,7 +212,7 @@
               },
               "inputs": {
                 "bindField": "query",
-                "placeholder": "Find scenes, people, audio, images...",
+                "placeholder": "movie, music, Queen, Inception, sunset...",
                 "commitMode": "manual",
                 "saveLabel": "Search"
               },
@@ -227,22 +236,136 @@
               ]
             },
             {
+              "id": "media-indexer-operation",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "Status",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "media_indexer.operations",
+                "transport": "auto"
+              },
+              "inputs": {
+                "valuePath": "display_value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "Ready"
+              }
+            },
+            {
+              "id": "media-indexer-files",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "Files",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/media_indexer/diagnostics/summary",
+                "observeRoot": true
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "0"
+              }
+            },
+            {
+              "id": "media-indexer-ner",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "NER",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/media_indexer/diagnostics/ner",
+                "observeRoot": true
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "0/0"
+              }
+            },
+            {
+              "id": "media-indexer-audio",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "Audio ID",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/media_indexer/diagnostics/audio",
+                "observeRoot": true
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "0/0"
+              }
+            },
+            {
+              "id": "media-indexer-image",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "OCR",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/media_indexer/diagnostics/image",
+                "observeRoot": true
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "0"
+              }
+            },
+            {
+              "id": "media-indexer-metadata",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "Metadata",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/media_indexer/diagnostics/metadata",
+                "observeRoot": true
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "0/0"
+              }
+            },
+            {
               "id": "media-indexer-results",
               "type": "ui.list",
-              "area": "main",
-              "title": "Results",
+              "area": "bottom",
+              "title": "Semantic results",
               "dataSource": {
                 "kind": "y",
                 "path": "data/media_indexer/results",
                 "observeRoot": true
               },
               "inputs": {
-                "titleKey": "path",
-                "subtitleKey": "score",
-                "detailsPath": "payload",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "detailsPath": "details_text",
                 "showDetails": false,
-                "itemAccordion": false,
-                "emptyText": "No search results yet"
+                "itemAccordion": true,
+                "emptyText": "Search the indexed library by title, artist, scene, filename clues or media type."
               }
             }
           ]
@@ -255,16 +378,76 @@
     "data/media_indexer": {
       "status": {
         "value": "ready",
+        "display_value": "Ready",
         "label": "Media Indexer",
-        "subtitle": "semantic local media search",
-        "description": "Set a directory, build an index, then search by natural language.",
+        "subtitle": "Local semantic media search",
+        "description": "Choose a folder, build an index, then search media with natural language.",
+        "color": "#6EE7B7",
         "error": ""
+      },
+      "overview": {
+        "value": "No index",
+        "label": "Library overview",
+        "subtitle": "Video, audio and image semantic search",
+        "description": "Choose a local media folder, build the index, then search by title, artist, filename clues or media type.",
+        "color": "#93C5FD"
+      },
+      "diagnostics": {
+        "value": "ready",
+        "label": "Model diagnostics",
+        "subtitle": "Waiting for scan",
+        "description": "Scan a folder to show NER coverage, audio recognition, OCR and metadata quality.",
+        "color": "#93C5FD",
+        "files_found": 0,
+        "indexed_count": 0,
+        "by_type": {},
+        "summary": {
+          "value": "0",
+          "label": "Indexed media",
+          "subtitle": "Waiting for scan",
+          "description": "The indexed collection will appear after scanning.",
+          "color": "#93C5FD"
+        },
+        "ner": {
+          "value": "0/0",
+          "label": "Filename NER",
+          "subtitle": "Custom model ready",
+          "description": "Extracts title, artist, year and quality from filenames.",
+          "color": "#93C5FD"
+        },
+        "audio": {
+          "value": "0/0",
+          "label": "Audio ID",
+          "subtitle": "Waiting for recognition",
+          "description": "Recognized tracks are added to the semantic index.",
+          "color": "#93C5FD"
+        },
+        "image": {
+          "value": "0",
+          "label": "Image OCR",
+          "subtitle": "Waiting for OCR",
+          "description": "Images are checked for text and visual search payloads.",
+          "color": "#93C5FD"
+        },
+        "metadata": {
+          "value": "0/0",
+          "label": "Metadata quality",
+          "subtitle": "No warnings",
+          "description": "Shows how much of the media library has complete technical metadata.",
+          "color": "#6EE7B7"
+        },
+        "ner_parsed": 0,
+        "shazam_matched": 0,
+        "ocr_checked": 0,
+        "ocr_text_found": 0,
+        "technical_errors": 0
       },
       "form": {
         "directory": "",
-        "query": "test",
+        "query": "",
         "k": 5
       },
+      "library": [],
       "results": []
     }
   },

@@ -36,11 +36,60 @@ logger = logging.getLogger(__name__)
 
 REQUIRES_DATA_PROJECTIONS = True
 SCORE_THRESHOLD = 25.0
-DEFAULT_QUERY = "test"
+DEFAULT_QUERY = ""
 SETTINGS_KEY = "media_indexer.settings"
 INDEX_META_KEY = "media_indexer.index"
 OPERATION_RECEIVER = "media_indexer.operations"
 MAX_RESULTS = 20
+STATUS_COLORS = {
+    "ready": "#6EE7B7",
+    "scanning": "#60A5FA",
+    "loading": "#FBBF24",
+    "indexing": "#60A5FA",
+    "indexed": "#34D399",
+    "searching": "#A78BFA",
+    "done": "#6EE7B7",
+    "busy": "#FBBF24",
+    "error": "#FB7185",
+}
+STATUS_LABELS = {
+    "ready": "Готово",
+    "scanning": "Сканирование",
+    "loading": "Загрузка",
+    "indexing": "Индексация",
+    "indexed": "Готово",
+    "searching": "Поиск",
+    "done": "Готово",
+    "busy": "Занято",
+    "error": "Ошибка",
+}
+TYPE_LABELS = {
+    "audio": "аудио",
+    "image": "изображения",
+    "video": "видео",
+    "media": "медиа",
+    "media/text": "текстовые признаки",
+}
+
+# Keep the public UI English, matching the skill name and the rest of AdaOS.
+STATUS_LABELS = {
+    "ready": "Ready",
+    "scanning": "Scanning",
+    "loading": "Loading",
+    "indexing": "Indexing",
+    "indexed": "Indexed",
+    "searching": "Searching",
+    "done": "Done",
+    "busy": "Busy",
+    "error": "Error",
+}
+TYPE_LABELS = {
+    "audio": "Audio",
+    "image": "Image",
+    "video": "Video",
+    "media": "Media",
+    "media/text": "Text match",
+}
 
 _state: Dict[str, Any] = {
     "scanner": None,
@@ -53,6 +102,8 @@ _state: Dict[str, Any] = {
     "selected_query": DEFAULT_QUERY,
     "index_loaded": False,
     "last_operation": None,
+    "last_diagnostics": None,
+    "library_items": [],
     "scan_in_progress": False,
 }
 
@@ -245,7 +296,7 @@ def _resolve_query(payload: Dict[str, Any]) -> str:
     raw = str(payload.get("query") or "").strip()
     if raw.startswith("$"):
         raw = ""
-    return raw or str(_current_form().get("query") or DEFAULT_QUERY).strip() or DEFAULT_QUERY
+    return raw or str(_current_form().get("query") or DEFAULT_QUERY).strip()
 
 
 def _status_payload(
@@ -258,10 +309,12 @@ def _status_payload(
 ) -> Dict[str, Any]:
     payload: Dict[str, Any] = {
         "value": value,
+        "display_value": STATUS_LABELS.get(str(value).lower(), value),
         "label": "Media Indexer",
         "subtitle": subtitle,
         "description": description,
         "error": error,
+        "color": STATUS_COLORS.get(str(value).lower(), "#93C5FD"),
         "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     if indexed_count is not None:
@@ -269,13 +322,61 @@ def _status_payload(
     return payload
 
 
+def _empty_overview() -> Dict[str, Any]:
+    return {
+        "value": "No index",
+        "label": "Media Indexer",
+        "subtitle": "Video, audio and image semantic search",
+        "description": "Choose a local media folder, build the index, then search by title, artist, filename clues or media type.",
+        "color": "#93C5FD",
+    }
+
+
+def _overview_payload(status: Dict[str, Any], diagnostics: Dict[str, Any]) -> Dict[str, Any]:
+    indexed = int(diagnostics.get("indexed_count") or 0)
+    found = int(diagnostics.get("files_found") or indexed or 0)
+    by_type = diagnostics.get("by_type") if isinstance(diagnostics.get("by_type"), dict) else {}
+    video_count = int(by_type.get("video") or 0)
+    audio_count = int(by_type.get("audio") or 0)
+    image_count = int(by_type.get("image") or 0)
+    status_value = str(status.get("value") or "ready").lower()
+    if status_value in {"scanning", "loading", "indexing"}:
+        value = STATUS_LABELS.get(status_value, "Indexing")
+        subtitle = str(status.get("subtitle") or "Building semantic index")
+    elif indexed:
+        value = f"{indexed} files"
+        subtitle = "Media library is ready"
+    else:
+        value = "No index"
+        subtitle = "Waiting for scan"
+    description = str(status.get("description") or "").strip()
+    if indexed and status_value not in {"scanning", "loading", "indexing"}:
+        description = f"{video_count} video, {audio_count} audio, {image_count} images. Search is powered by NER, enrichment metadata and embeddings."
+    return {
+        "value": value,
+        "label": "Library overview",
+        "subtitle": subtitle,
+        "description": description or _empty_overview()["description"],
+        "color": STATUS_COLORS.get(status_value, diagnostics.get("color") or "#93C5FD"),
+    }
+
+
 def _snapshot_payload(
     *,
     status: Dict[str, Any],
     form: Dict[str, Any] | None = None,
     results: List[Dict[str, Any]] | None = None,
+    diagnostics: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
-    return {"status": status, "form": form or _current_form(), "results": list(results or [])[:MAX_RESULTS]}
+    diagnostics_payload = diagnostics or _state.get("last_diagnostics") or _empty_diagnostics()
+    return {
+        "status": status,
+        "overview": _overview_payload(status, diagnostics_payload),
+        "form": form or _current_form(),
+        "results": list(results or [])[:MAX_RESULTS],
+        "diagnostics": diagnostics_payload,
+        "library": list(_state.get("library_items") or [])[:50],
+    }
 
 
 def _project_snapshot(snapshot: Dict[str, Any], *, webspace_id: str | None = None) -> None:
@@ -292,7 +393,14 @@ def _project_snapshot(snapshot: Dict[str, Any], *, webspace_id: str | None = Non
 
 
 def _publish_operation(value: Dict[str, Any], *, webspace_id: str | None = None) -> None:
-    payload = {"label": "Media Indexer", **value, "updated_at": time.time()}
+    status_value = str(value.get("value") or "ready").lower()
+    payload = {
+        "label": "Media Indexer",
+        "display_value": STATUS_LABELS.get(status_value, value.get("value") or "ready"),
+        "color": STATUS_COLORS.get(status_value, "#93C5FD"),
+        **value,
+        "updated_at": time.time(),
+    }
     _state["last_operation"] = payload
     try:
         stream_publish(
@@ -378,6 +486,453 @@ def _build_display_title(stem: str, title: str, artist: str) -> str:
     return stem
 
 
+def _empty_diagnostics() -> Dict[str, Any]:
+    return {
+        "value": "ready",
+        "label": "Диагностика модели",
+        "subtitle": "ожидает сканирования",
+        "description": "Выберите папку, чтобы показать работу NER, распознавания музыки, OCR и метаданных.",
+        "color": "#93C5FD",
+        "files_found": 0,
+        "indexed_count": 0,
+        "by_type": {},
+        "summary": {
+            "value": "0",
+            "label": "Медиатека",
+            "subtitle": "ожидает сканирования",
+            "description": "После сканирования здесь появится состав коллекции.",
+            "color": "#93C5FD",
+        },
+        "ner": {
+            "value": "0/0",
+            "label": "Модель NER",
+            "subtitle": "модель готова",
+            "description": "Извлекает название, исполнителя, год и качество из имён файлов.",
+            "color": "#93C5FD",
+        },
+        "audio": {
+            "value": "0/0",
+            "label": "Музыка",
+            "subtitle": "ожидает распознавания",
+            "description": "Распознаёт треки и добавляет их в семантический индекс.",
+            "color": "#93C5FD",
+        },
+        "image": {
+            "value": "0",
+            "label": "Изображения",
+            "subtitle": "OCR не запускался",
+            "description": "Проверяет картинки на текст и добавляет визуальные признаки.",
+            "color": "#93C5FD",
+        },
+        "metadata": {
+            "value": "0",
+            "label": "Полнота данных",
+            "subtitle": "без предупреждений",
+            "description": "Показывает, сколько файлов удалось обогатить техническими метаданными.",
+            "color": "#6EE7B7",
+        },
+        "ner_parsed": 0,
+        "shazam_matched": 0,
+        "ocr_checked": 0,
+        "ocr_text_found": 0,
+        "technical_errors": 0,
+    }
+
+
+def _empty_diagnostics() -> Dict[str, Any]:
+    return {
+        "value": "ready",
+        "label": "Model diagnostics",
+        "subtitle": "Waiting for scan",
+        "description": "Scan a folder to show NER coverage, audio recognition, OCR and metadata quality.",
+        "color": "#93C5FD",
+        "files_found": 0,
+        "indexed_count": 0,
+        "by_type": {},
+        "summary": {
+            "value": "0",
+            "label": "Indexed media",
+            "subtitle": "Waiting for scan",
+            "description": "The indexed collection will appear after scanning.",
+            "color": "#93C5FD",
+        },
+        "ner": {
+            "value": "0/0",
+            "label": "Filename NER",
+            "subtitle": "Custom model ready",
+            "description": "Extracts title, artist, year and quality from filenames.",
+            "color": "#93C5FD",
+        },
+        "audio": {
+            "value": "0/0",
+            "label": "Audio ID",
+            "subtitle": "Waiting for recognition",
+            "description": "Recognized tracks are added to the semantic index.",
+            "color": "#93C5FD",
+        },
+        "image": {
+            "value": "0",
+            "label": "Image OCR",
+            "subtitle": "Waiting for OCR",
+            "description": "Images are checked for text and visual search payloads.",
+            "color": "#93C5FD",
+        },
+        "metadata": {
+            "value": "0/0",
+            "label": "Metadata quality",
+            "subtitle": "No warnings",
+            "description": "Shows how much of the media library has complete technical metadata.",
+            "color": "#6EE7B7",
+        },
+        "ner_parsed": 0,
+        "shazam_matched": 0,
+        "ocr_checked": 0,
+        "ocr_text_found": 0,
+        "technical_errors": 0,
+    }
+
+
+def _type_counts(inventory: Dict[str, List[Any]]) -> Dict[str, int]:
+    return {str(m_type): len(m_list or []) for m_type, m_list in inventory.items()}
+
+
+def _has_ner_entities(ner_result: Dict[str, Any]) -> bool:
+    return any(str(ner_result.get(key) or "").strip() for key in ("title", "year", "quality", "artist"))
+
+
+def _scan_diagnostics(
+    *,
+    type_counts: Dict[str, int],
+    files_found: int,
+    indexed_count: int,
+    ner_parsed: int,
+    shazam_matched: int,
+    ocr_checked: int,
+    ocr_text_found: int,
+    technical_errors: int,
+    error_count: int,
+) -> Dict[str, Any]:
+    type_text = ", ".join(f"{TYPE_LABELS.get(name, name)}: {count}" for name, count in sorted(type_counts.items())) or "медиа не найдено"
+    audio_count = int(type_counts.get("audio") or 0)
+    image_count = int(type_counts.get("image") or 0)
+    video_count = int(type_counts.get("video") or 0)
+    description_parts = [
+        f"{type_text}",
+        f"NER: {ner_parsed}/{files_found}",
+    ]
+    if audio_count:
+        description_parts.append(f"музыка распознана: {shazam_matched}/{audio_count}")
+    if ocr_checked:
+        description_parts.append(f"OCR: проверено {ocr_checked}, текст найден {ocr_text_found}")
+    if technical_errors:
+        description_parts.append(f"неполные метаданные: {technical_errors}")
+    if error_count:
+        description_parts.append(f"ошибки индексации: {error_count}")
+    files_color = "#34D399" if files_found and indexed_count == files_found and not error_count else "#FBBF24"
+    ner_color = "#34D399" if files_found and ner_parsed else "#93C5FD"
+    audio_color = "#34D399" if audio_count and shazam_matched == audio_count else "#93C5FD"
+    image_color = "#34D399" if ocr_checked else "#93C5FD"
+    metadata_color = "#FB7185" if technical_errors or error_count else "#6EE7B7"
+    metadata_ok = max(0, indexed_count - technical_errors - error_count)
+    return {
+        "value": str(indexed_count),
+        "label": "Диагностика модели",
+        "subtitle": f"{indexed_count}/{files_found} файлов в индексе",
+        "description": "; ".join(description_parts),
+        "color": files_color,
+        "files_found": files_found,
+        "indexed_count": indexed_count,
+        "by_type": type_counts,
+        "summary": {
+            "value": str(indexed_count),
+            "label": "Медиатека",
+            "subtitle": f"{indexed_count}/{files_found} файлов готово",
+            "description": f"{video_count} видео, {audio_count} аудио, {image_count} изображения",
+            "color": files_color,
+        },
+        "ner": {
+            "value": f"{ner_parsed}/{files_found}",
+            "label": "Модель NER",
+            "subtitle": "покрытие дообученной модели",
+            "description": "Извлечены название, исполнитель, год или качество из имён файлов.",
+            "color": ner_color,
+        },
+        "audio": {
+            "value": f"{shazam_matched}/{audio_count}",
+            "label": "Музыка",
+            "subtitle": "распознавание треков",
+            "description": "Найденные треки добавлены в семантический индекс.",
+            "color": audio_color,
+        },
+        "image": {
+            "value": str(ocr_checked),
+            "label": "Изображения",
+            "subtitle": f"найдено текстовых фрагментов: {ocr_text_found}",
+            "description": "Картинки проверены OCR и добавлены в визуальный поиск.",
+            "color": image_color,
+        },
+        "metadata": {
+            "value": f"{metadata_ok}/{indexed_count}" if indexed_count else "0/0",
+            "label": "Полнота данных",
+            "subtitle": f"{technical_errors + error_count} предупреждений",
+            "description": f"{metadata_ok} файлов с полными данными, {technical_errors} без части тех. метаданных",
+            "color": metadata_color,
+        },
+        "ner_parsed": ner_parsed,
+        "shazam_matched": shazam_matched,
+        "ocr_checked": ocr_checked,
+        "ocr_text_found": ocr_text_found,
+        "technical_errors": technical_errors,
+        "error_count": error_count,
+    }
+
+
+def _scan_diagnostics(
+    *,
+    type_counts: Dict[str, int],
+    files_found: int,
+    indexed_count: int,
+    ner_parsed: int,
+    shazam_matched: int,
+    ocr_checked: int,
+    ocr_text_found: int,
+    technical_errors: int,
+    error_count: int,
+) -> Dict[str, Any]:
+    audio_count = int(type_counts.get("audio") or 0)
+    image_count = int(type_counts.get("image") or 0)
+    video_count = int(type_counts.get("video") or 0)
+    type_text = f"{video_count} video, {audio_count} audio, {image_count} images"
+    files_color = "#34D399" if files_found and indexed_count == files_found and not error_count else "#FBBF24"
+    ner_color = "#34D399" if files_found and ner_parsed else "#93C5FD"
+    audio_color = "#34D399" if audio_count and shazam_matched == audio_count else "#93C5FD"
+    image_color = "#34D399" if ocr_checked else "#93C5FD"
+    metadata_color = "#FB7185" if technical_errors or error_count else "#6EE7B7"
+    metadata_ok = max(0, indexed_count - technical_errors - error_count)
+    warnings = technical_errors + error_count
+    return {
+        "value": str(indexed_count),
+        "label": "Model diagnostics",
+        "subtitle": f"{indexed_count}/{files_found} files indexed",
+        "description": f"{type_text}; NER {ner_parsed}/{files_found}; audio matches {shazam_matched}/{audio_count}; OCR checked {ocr_checked}",
+        "color": files_color,
+        "files_found": files_found,
+        "indexed_count": indexed_count,
+        "by_type": type_counts,
+        "summary": {
+            "value": str(indexed_count),
+            "label": "Indexed media",
+            "subtitle": f"{indexed_count}/{files_found} ready",
+            "description": type_text,
+            "color": files_color,
+        },
+        "ner": {
+            "value": f"{ner_parsed}/{files_found}",
+            "label": "Filename NER",
+            "subtitle": "Custom model coverage",
+            "description": "Filename model extracted title, artist, year or quality.",
+            "color": ner_color,
+        },
+        "audio": {
+            "value": f"{shazam_matched}/{audio_count}",
+            "label": "Audio ID",
+            "subtitle": "Track recognition",
+            "description": "Recognized tracks are enriched and searchable.",
+            "color": audio_color,
+        },
+        "image": {
+            "value": str(ocr_checked),
+            "label": "Image OCR",
+            "subtitle": f"{ocr_text_found} text fragments",
+            "description": "Images are checked for OCR text and visual search payloads.",
+            "color": image_color,
+        },
+        "metadata": {
+            "value": f"{metadata_ok}/{indexed_count}" if indexed_count else "0/0",
+            "label": "Metadata quality",
+            "subtitle": f"{warnings} warnings",
+            "description": f"{metadata_ok} files have complete metadata; {technical_errors} have partial technical metadata.",
+            "color": metadata_color,
+        },
+        "ner_parsed": ner_parsed,
+        "shazam_matched": shazam_matched,
+        "ocr_checked": ocr_checked,
+        "ocr_text_found": ocr_text_found,
+        "technical_errors": technical_errors,
+        "error_count": error_count,
+    }
+
+
+def _best_results_by_path(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    best: Dict[str, Dict[str, Any]] = {}
+    for result in results:
+        payload = result.get("payload") if isinstance(result.get("payload"), dict) else {}
+        key = str(payload.get("full_path") or payload.get("real_file_name") or result.get("text") or id(result))
+        current = best.get(key)
+        if current is None or float(result.get("score") or 0.0) > float(current.get("score") or 0.0):
+            best[key] = result
+    deduped = list(best.values())
+    deduped.sort(key=lambda item: float(item.get("score") or 0.0), reverse=True)
+    return deduped
+
+
+def _result_payload(result: Dict[str, Any]) -> Dict[str, Any]:
+    payload = result.get("payload")
+    return payload if isinstance(payload, dict) else {}
+
+
+def _result_title(payload: Dict[str, Any]) -> str:
+    return str(
+        payload.get("display_title")
+        or payload.get("title")
+        or payload.get("real_file_name")
+        or pathlib.Path(str(payload.get("full_path") or "")).name
+        or "Медиафайл"
+    )
+
+
+def _result_subtitle(result: Dict[str, Any], payload: Dict[str, Any]) -> str:
+    raw_type = str(payload.get("ftype") or payload.get("type") or result.get("type") or "media")
+    parts = [
+        TYPE_LABELS.get(raw_type, raw_type),
+        f"точность {float(result.get('score') or 0.0):.1f}",
+    ]
+    for key in ("year", "quality", "artist"):
+        value = str(payload.get(key) or "").strip()
+        if value and value != "---":
+            parts.append(value)
+    match_type = str(result.get("type") or "").strip()
+    if match_type:
+        parts.append(f"совпадение: {TYPE_LABELS.get(match_type, match_type)}")
+    return " • ".join(parts)
+
+
+def _result_details(result: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "file": payload.get("real_file_name") or pathlib.Path(str(payload.get("full_path") or "")).name,
+        "path": payload.get("full_path") or "",
+        "type": payload.get("ftype") or payload.get("type") or "",
+        "score": float(result.get("score") or 0.0),
+            "match_type": result.get("type") or "",
+            "summary": _result_subtitle(result, payload),
+            "ner": {
+                "title": payload.get("ner_title") or payload.get("display_title") or "",
+                "year": payload.get("year") or "",
+            "quality": payload.get("quality") or "",
+            "artist": payload.get("artist") or "",
+        },
+        "technical_metadata": payload.get("technical_metadata") or {},
+        "enriched": payload.get("enriched") or {},
+    }
+
+
+def _result_title(payload: Dict[str, Any]) -> str:
+    return str(
+        payload.get("display_title")
+        or payload.get("title")
+        or payload.get("real_file_name")
+        or pathlib.Path(str(payload.get("full_path") or "")).name
+        or "Untitled media"
+    )
+
+
+def _result_subtitle(result: Dict[str, Any], payload: Dict[str, Any]) -> str:
+    raw_type = str(payload.get("ftype") or payload.get("type") or result.get("type") or "media")
+    parts = [TYPE_LABELS.get(raw_type, raw_type), f"score {float(result.get('score') or 0.0):.1f}"]
+    for key in ("year", "quality", "artist"):
+        value = str(payload.get(key) or "").strip()
+        if value and value != "---":
+            parts.append(value)
+    match_type = str(result.get("type") or "").strip()
+    if match_type:
+        parts.append(f"match: {TYPE_LABELS.get(match_type, match_type)}")
+    return " | ".join(parts)
+
+
+def _result_details(result: Dict[str, Any], payload: Dict[str, Any]) -> Dict[str, Any]:
+    technical = payload.get("technical_metadata") if isinstance(payload.get("technical_metadata"), dict) else {}
+    enriched = payload.get("enriched") if isinstance(payload.get("enriched"), dict) else {}
+    metadata_bits = []
+    for key in ("width", "height", "duration_seconds", "image_format", "audio_codec", "video_codec"):
+        value = technical.get(key)
+        if value not in (None, "", 0, "---"):
+            metadata_bits.append(f"{key}: {value}")
+    enrichment_bits = []
+    if enriched.get("shazam_title"):
+        enrichment_bits.append(f"Shazam: {enriched.get('shazam_title')}")
+    if enriched.get("shazam_subtitle"):
+        enrichment_bits.append(f"Artist: {enriched.get('shazam_subtitle')}")
+    if enriched.get("ocr_text"):
+        enrichment_bits.append("OCR text found")
+    return {
+        "file": payload.get("real_file_name") or pathlib.Path(str(payload.get("full_path") or "")).name,
+        "path": payload.get("full_path") or "",
+        "type": payload.get("ftype") or payload.get("type") or "",
+        "score": float(result.get("score") or 0.0),
+        "match_type": result.get("type") or "",
+        "summary": _result_subtitle(result, payload),
+        "ner": {
+            "title": payload.get("ner_title") or payload.get("display_title") or "",
+            "year": payload.get("year") or "",
+            "quality": payload.get("quality") or "",
+            "artist": payload.get("artist") or "",
+        },
+        "metadata": ", ".join(metadata_bits) or "No extra technical metadata",
+        "enrichment": ", ".join(enrichment_bits) or "No external enrichment",
+    }
+
+
+def _result_details_text(result: Dict[str, Any], payload: Dict[str, Any]) -> str:
+    details = _result_details(result, payload)
+    ner = details["ner"]
+    ner_bits = []
+    if ner.get("title"):
+        ner_bits.append(f"title: {ner['title']}")
+    if ner.get("artist"):
+        ner_bits.append(f"artist: {ner['artist']}")
+    if ner.get("year") and ner.get("year") != "---":
+        ner_bits.append(f"year: {ner['year']}")
+    if ner.get("quality") and ner.get("quality") != "---":
+        ner_bits.append(f"quality: {ner['quality']}")
+    return "\n".join(
+        [
+            f"File: {details['file']}",
+            f"Path: {details['path']}",
+            f"Matched by: {TYPE_LABELS.get(str(details['match_type']), details['match_type'])}",
+            f"Score: {details['score']:.1f}",
+            f"NER: {', '.join(ner_bits) if ner_bits else 'no filename entities'}",
+            f"Metadata: {details['metadata']}",
+            f"Enrichment: {details['enrichment']}",
+        ]
+    )
+
+
+def _library_item(payload: Dict[str, Any], *, signals: List[str]) -> Dict[str, Any]:
+    media_type = str(payload.get("ftype") or payload.get("type") or "media")
+    year = str(payload.get("year") or "").strip()
+    quality = str(payload.get("quality") or "").strip()
+    extras = [value for value in (year, quality) if value and value != "---"]
+    subtitle_parts = [TYPE_LABELS.get(media_type, media_type), *extras]
+    signal_text = ", ".join(signals) if signals else "metadata"
+    if signal_text:
+        subtitle_parts.append(signal_text)
+    return {
+        "title": _result_title(payload),
+        "subtitle": " | ".join(subtitle_parts),
+        "type": TYPE_LABELS.get(media_type, media_type),
+        "signals": signal_text,
+        "source": payload.get("real_file_name") or pathlib.Path(str(payload.get("full_path") or "")).name,
+        "path": payload.get("full_path") or "",
+        "details": {
+            "path": payload.get("full_path") or "",
+            "ner_title": payload.get("ner_title") or "",
+            "artist": payload.get("artist") or "",
+            "technical_metadata": payload.get("technical_metadata") or {},
+            "enriched": payload.get("enriched") or {},
+        },
+    }
+
+
 def _trim_for_log(value: Any, *, limit: int = 1000) -> Any:
     if isinstance(value, dict):
         return {str(k): _trim_for_log(v, limit=limit) for k, v in value.items()}
@@ -419,15 +974,15 @@ def scan_and_index(directory: str) -> Dict[str, Any]:
 
 def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] | None = None) -> Dict[str, Any]:
     if not str(directory or "").strip():
-        return {"status": "error", "indexed_count": 0, "errors": ["Directory is empty. Set a directory first."]}
+        return {"status": "error", "indexed_count": 0, "errors": ["Set a media directory first."]}
 
     path = pathlib.Path(directory).expanduser()
     if not path.exists() or not path.is_dir():
-        return {"status": "error", "indexed_count": 0, "errors": [f"Directory not found or not a directory: {directory}"]}
+        return {"status": "error", "indexed_count": 0, "errors": [f"Directory not found: {directory}"]}
 
     try:
         if progress:
-            progress({"value": "scanning", "subtitle": "walking directory", "description": f"Scanning {path}"})
+            progress({"value": "scanning", "subtitle": "Reading directory", "description": f"Scanning {path}"})
         scanner = DirectoryScanner(str(path), compute_hashes=False)
         _state["scanner"] = scanner
         inventory = scanner.scan()
@@ -436,11 +991,25 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
         return {"status": "error", "indexed_count": 0, "errors": [str(exc)]}
 
     all_files = _flatten_inventory(inventory)
+    type_counts = _type_counts(inventory)
     if not all_files:
         _state["indexed_directory"] = str(path)
+        _state["library_items"] = []
         _save_settings(selected_directory=str(path), default_directory=str(path))
         index_meta = _clear_persisted_index(str(path))
-        return {"status": "ok", "indexed_count": 0, "errors": [], "index": index_meta}
+        diagnostics = _scan_diagnostics(
+            type_counts=type_counts,
+            files_found=0,
+            indexed_count=0,
+            ner_parsed=0,
+            shazam_matched=0,
+            ocr_checked=0,
+            ocr_text_found=0,
+            technical_errors=0,
+            error_count=0,
+        )
+        _state["last_diagnostics"] = diagnostics
+        return {"status": "ok", "indexed_count": 0, "errors": [], "index": index_meta, "diagnostics": diagnostics}
 
     logger.info("Preparing media index ML initialization for %s files", len(all_files))
     if progress:
@@ -464,6 +1033,12 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
 
     errors: List[str] = []
     indexed = 0
+    ner_parsed = 0
+    shazam_matched = 0
+    ocr_checked = 0
+    ocr_text_found = 0
+    technical_errors = 0
+    library_items: List[Dict[str, Any]] = []
 
     total = len(all_files)
     for ordinal, (media, ftype) in enumerate(all_files, start=1):
@@ -488,6 +1063,8 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
             started = time.perf_counter()
             ner_result = ner.extract_entities(media.name)
             timings["ner"] = time.perf_counter() - started
+            if _has_ner_entities(ner_result):
+                ner_parsed += 1
             title = ner_result.get("title") or ""
             year = ner_result.get("year") or "---"
             quality = ner_result.get("quality") or "---"
@@ -498,6 +1075,14 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
             if ftype == "video" and title:
                 enriched.update(enricher.enrich_video(title))
             timings["enrichment"] = time.perf_counter() - started
+            if technical_metadata.get("status") == "error":
+                technical_errors += 1
+            if ftype == "audio" and (enriched.get("shazam_title") or enriched.get("shazam_subtitle")):
+                shazam_matched += 1
+            if ftype == "image":
+                ocr_checked += 1
+                if enriched.get("ocr_text"):
+                    ocr_text_found += 1
 
             stem = pathlib.Path(media.name).stem
             display_title = _build_display_title(stem, title, artist)
@@ -515,6 +1100,15 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
                 "technical_metadata": technical_metadata,
                 "enriched": enriched,
             }
+            signals: List[str] = []
+            if _has_ner_entities(ner_result):
+                signals.append("NER")
+            if ftype == "audio" and (enriched.get("shazam_title") or enriched.get("shazam_subtitle")):
+                signals.append("Shazam")
+            if ftype == "image":
+                signals.append("OCR" if enriched.get("ocr_text") else "visual")
+            if technical_metadata and technical_metadata.get("status") != "error":
+                signals.append("metadata")
 
             index_text = ""
             started = time.perf_counter()
@@ -578,6 +1172,7 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
                 timings=timings,
             )
 
+            library_items.append(_library_item(payload, signals=signals))
             indexed += 1
         except Exception as exc:
             logger.exception("Failed to index %s", getattr(media, "name", "unknown"))
@@ -594,9 +1189,22 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
                 )
 
     _state["indexed_directory"] = str(path)
+    _state["library_items"] = library_items[:50]
     _save_settings(selected_directory=str(path), default_directory=str(path))
     index_meta = _persist_index(str(path), indexed)
-    return {"status": "ok", "indexed_count": indexed, "errors": errors, "index": index_meta}
+    diagnostics = _scan_diagnostics(
+        type_counts=type_counts,
+        files_found=total,
+        indexed_count=indexed,
+        ner_parsed=ner_parsed,
+        shazam_matched=shazam_matched,
+        ocr_checked=ocr_checked,
+        ocr_text_found=ocr_text_found,
+        technical_errors=technical_errors,
+        error_count=len(errors),
+    )
+    _state["last_diagnostics"] = diagnostics
+    return {"status": "ok", "indexed_count": indexed, "errors": errors, "index": index_meta, "diagnostics": diagnostics}
 
 
 @tool("search_media")
@@ -605,16 +1213,16 @@ def search_media(query: str, k: int = 5) -> Dict[str, Any]:
         return {"status": "ok", "results": []}
 
     if _state.get("scan_in_progress"):
-        return {"status": "error", "results": [], "message": "Indexing is still in progress. Wait for the final indexed status."}
+        return {"status": "error", "results": [], "message": "Indexing is still in progress. Wait until the library is ready."}
 
     if _state["vector_db"] is None and not _has_persisted_index():
-        return {"status": "error", "results": [], "message": "Index is empty. Call scan_and_index first."}
+        return {"status": "error", "results": [], "message": "The index is empty. Scan a folder first."}
 
     _ensure_initialized(load_index=True)
     vector_db = _state.get("vector_db")
     has_docs = bool(getattr(vector_db, "text_docs", None) or getattr(vector_db, "image_docs", None))
     if not _state.get("index_loaded") and not has_docs:
-        return {"status": "error", "results": [], "message": "Index is empty. Call scan_and_index first."}
+        return {"status": "error", "results": [], "message": "The index is empty. Scan a folder first."}
 
     try:
         limit = max(1, min(MAX_RESULTS, int(k or 5)))
@@ -623,15 +1231,23 @@ def search_media(query: str, k: int = 5) -> Dict[str, Any]:
 
     _save_settings(selected_query=query.strip(), k=limit)
     raw_results = _state["vector_db"].search(query.strip(), k=limit)
-    valid_results = [result for result in raw_results if result.get("score", 0) >= SCORE_THRESHOLD]
-    formatted = [
-        {
-            "score": float(result.get("score", 0.0)),
-            "path": result.get("payload", {}).get("full_path", ""),
-            "payload": result.get("payload", {}),
-        }
-        for result in valid_results[:MAX_RESULTS]
-    ]
+    valid_results = _best_results_by_path([result for result in raw_results if result.get("score", 0) >= SCORE_THRESHOLD])
+    formatted = []
+    for result in valid_results[:MAX_RESULTS]:
+        payload = _result_payload(result)
+        formatted.append(
+            {
+                "score": float(result.get("score", 0.0)),
+                "path": payload.get("full_path", ""),
+                "payload": payload,
+                "title": _result_title(payload),
+                "subtitle": _result_subtitle(result, payload),
+                "description": str(payload.get("real_file_name") or ""),
+                "details": _result_details(result, payload),
+                "details_text": _result_details_text(result, payload),
+                "match_type": result.get("type") or "",
+            }
+        )
     return {"status": "ok", "results": formatted}
 
 
@@ -663,6 +1279,9 @@ def dispose() -> Dict[str, Any]:
             "enricher": None,
             "vector_db": None,
             "index_loaded": False,
+            "last_diagnostics": None,
+            "library_items": [],
+            "scan_in_progress": False,
         }
     )
     return {"status": "ok"}
@@ -691,7 +1310,7 @@ async def on_media_indexer_action(evt: Any) -> None:
     if action_id in {"set_directory", "directory"}:
         _project_snapshot(
             _snapshot_payload(
-                status=_status_payload(value="ready", subtitle="directory selected", description=f"Selected {directory or '(empty)'}"),
+                status=_status_payload(value="ready", subtitle="Directory selected", description=f"Media source: {directory or 'not set'}"),
                 form=form,
             ),
             webspace_id=webspace_id,
@@ -701,7 +1320,7 @@ async def on_media_indexer_action(evt: Any) -> None:
     if action_id in {"set_query", "query"}:
         _project_snapshot(
             _snapshot_payload(
-                status=_status_payload(value="ready", subtitle="query selected", description=f"Query: {query}"),
+                status=_status_payload(value="ready", subtitle="Query selected", description=f"Query: {query or 'not set'}"),
                 form=form,
             ),
             webspace_id=webspace_id,
@@ -709,9 +1328,19 @@ async def on_media_indexer_action(evt: Any) -> None:
         return
 
     if action_id == "scan":
-        status = _status_payload(value="scanning", subtitle="indexing media files", description=f"Scanning {directory or '(empty)'}")
+        if _state.get("scan_in_progress"):
+            status = _status_payload(
+                value="scanning",
+                subtitle="Indexing is already running",
+                description="Wait for the current scan to finish.",
+            )
+            _project_snapshot(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
+            _publish_operation({"value": status["value"], "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
+            return
+
+        status = _status_payload(value="scanning", subtitle="Building media library", description=f"Scanning {directory or 'no directory'}")
         _project_snapshot(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
-        _publish_operation({"value": "scanning", "subtitle": "indexing media files", "description": status["description"]}, webspace_id=webspace_id)
+        _publish_operation({"value": "scanning", "subtitle": "Building media library", "description": status["description"]}, webspace_id=webspace_id)
         _state["scan_in_progress"] = True
         progress_queue: asyncio.Queue[Dict[str, Any]] = asyncio.Queue()
         loop = asyncio.get_running_loop()
@@ -725,7 +1354,7 @@ async def on_media_indexer_action(evt: Any) -> None:
         def emit_progress(update: Dict[str, Any]) -> None:
             progress_status = _status_payload(
                 value=str(update.get("value") or "indexing"),
-                subtitle=str(update.get("subtitle") or "indexing media files"),
+                subtitle=str(update.get("subtitle") or "Indexing files"),
                 description=str(update.get("description") or ""),
                 indexed_count=int(update["indexed_count"]) if update.get("indexed_count") is not None else None,
             )
@@ -746,29 +1375,37 @@ async def on_media_indexer_action(evt: Any) -> None:
         errors = list(result.get("errors") or [])
         ok = str(result.get("status") or "").lower() == "ok"
         indexed_count = int(result.get("indexed_count") or 0)
+        diagnostics = result.get("diagnostics") if isinstance(result.get("diagnostics"), dict) else _empty_diagnostics()
+        _state["last_diagnostics"] = diagnostics
         final_status = _status_payload(
             value="indexed" if ok else "error",
-            subtitle=f"{indexed_count} files indexed" if ok else "scan failed",
-            description="Index is ready for semantic search." if ok else "; ".join(errors[:3]),
+            subtitle=f"Library ready: {indexed_count} files" if ok else "Scan failed",
+            description=str(diagnostics.get("description") or "The semantic index is ready.") if ok else "; ".join(errors[:3]),
             error="" if ok else "; ".join(errors[:3]),
             indexed_count=indexed_count,
         )
-        _project_snapshot(_snapshot_payload(status=final_status, form=_current_form(k=k)), webspace_id=webspace_id)
+        _project_snapshot(_snapshot_payload(status=final_status, form=_current_form(k=k), diagnostics=diagnostics), webspace_id=webspace_id)
         _publish_operation(
             {
                 "value": final_status["value"],
                 "subtitle": final_status["subtitle"],
                 "description": final_status["description"],
                 "indexed_count": indexed_count,
+                "diagnostics": diagnostics,
             },
             webspace_id=webspace_id,
         )
         return
 
     if action_id == "search":
-        status = _status_payload(value="searching", subtitle="semantic search", description=f"Searching for: {query}")
+        if not query.strip():
+            status = _status_payload(value="ready", subtitle="Enter a search query", description="Try: movie, music, Queen, Inception, sunset.")
+            _project_snapshot(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
+            _publish_operation({"value": "ready", "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
+            return
+        status = _status_payload(value="searching", subtitle="Semantic search", description=f"Searching for: {query}")
         _project_snapshot(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
-        _publish_operation({"value": "searching", "subtitle": "semantic search", "description": status["description"]}, webspace_id=webspace_id)
+        _publish_operation({"value": "searching", "subtitle": "Semantic search", "description": status["description"]}, webspace_id=webspace_id)
         result = await asyncio.to_thread(search_media, query, k=k)
         results = list(result.get("results") or [])
         error = str(result.get("message") or "") if str(result.get("status") or "").lower() != "ok" else ""
@@ -801,10 +1438,10 @@ async def on_stream_snapshot_requested(evt: Any) -> None:
         return
     _publish_operation(
         _state.get("last_operation")
-        or {
-            "value": "ready",
-            "subtitle": "waiting for action",
-            "description": "Set a directory, build an index, then search.",
-        },
+            or {
+                "value": "ready",
+                "subtitle": "Waiting for action",
+                "description": "Choose a folder, build the index, then search.",
+            },
         webspace_id=webspace_id,
     )
