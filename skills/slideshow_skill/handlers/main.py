@@ -1223,7 +1223,7 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
             {"id": "next", "label": "Next"},
             {"id": "fav", "label": "Fav"},
         ],
-        "last_command": dict(last_command or {}),
+        "last_command": _compact_command_payload(last_command),
         "updated_at": _now(),
     }
 
@@ -1262,15 +1262,42 @@ def _select_device(devices: list[Mapping[str, Any]], code: str | None = None) ->
     return admitted[0]
 
 
+def _slideshow_endpoint_item(endpoint: Mapping[str, Any], selected_codes: set[str]) -> dict[str, Any]:
+    compact = compact_endpoint(endpoint, selected_codes=selected_codes)
+    return {
+        "id": _text(compact.get("id")),
+        "code": _text(compact.get("code")),
+        "endpoint_id": _text(compact.get("endpoint_id")),
+        "title": _text(compact.get("title")),
+        "display_name": _text(compact.get("display_name")),
+        "state": _text(compact.get("state")),
+        "selected": bool(compact.get("selected")),
+        "selected_label": _text(compact.get("selected_label")),
+        "online_state": _text(compact.get("online_state")),
+        "online": bool(compact.get("online")),
+        "last_seen_age_s": compact.get("last_seen_age_s"),
+        "last_seen": _text(compact.get("last_seen")),
+        "zone_id": _text(compact.get("zone_id")),
+        "trust_level": _text(compact.get("trust_level")),
+        "selectable": bool(compact.get("selectable")),
+        "aliases": _unique_texts(compact.get("aliases")),
+    }
+
+
 def _endpoint_payload(devices: list[dict[str, Any]], state: Mapping[str, Any]) -> dict[str, Any]:
     selected_codes = set(_unique_texts(state.get("selected_codes")))
-    items = [compact_endpoint(item, selected_codes=selected_codes) for item in devices]
+    items = [_slideshow_endpoint_item(item, selected_codes) for item in devices]
     selected_items = [
         {
             "id": f"selected:{item['code']}",
             "title": item["title"],
             "subtitle": f"{item['online_state']} | seen {item['last_seen']} | code {item['code']}",
-            "content": item,
+            "content": {
+                "code": item["code"],
+                "title": item["title"],
+                "online_state": item["online_state"],
+                "last_seen": item["last_seen"],
+            },
         }
         for item in items
         if item.get("selected")
@@ -1309,9 +1336,67 @@ def _command_items(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
             "id": _text(payload.get("command_id")) or "last-command",
             "title": title,
             "subtitle": f"{len(results)} endpoints | {payload.get('item_count', 0)} cached photos",
-            "content": dict(payload),
+            "content": _compact_command_payload(payload, include_items=False),
         }
     ]
+
+
+def _compact_transport(transport: Mapping[str, Any] | None) -> dict[str, Any]:
+    data = _mapping(transport)
+    content = _mapping(data.get("content"))
+    return {
+        "selected_transport": _text(data.get("selected_transport")),
+        "degraded": bool(data.get("degraded")),
+        "requires_root_relay": bool(data.get("requires_root_relay")),
+        "legacy_safe": bool(data.get("legacy_safe")),
+        "content_transport": _text(content.get("transport")),
+        "content_state": _text(content.get("state")),
+    }
+
+
+def _compact_result(item: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "code": _text(item.get("code")),
+        "ok": bool(item.get("ok")),
+        "error": item.get("error"),
+        "command_id": _text(item.get("command_id")),
+        "state": _text(item.get("state")),
+        "item_count": int(item.get("item_count") or 0),
+        "content_bytes": int(item.get("content_bytes") or 0),
+        "cache_budget_limited": bool(item.get("cache_budget_limited")),
+        "transport": _compact_transport(_mapping(item.get("transport"))),
+    }
+
+
+def _compact_command_payload(payload: Mapping[str, Any] | None, *, include_items: bool = True) -> dict[str, Any]:
+    data = _mapping(payload)
+    if not data:
+        return {}
+    compact = {
+        "ok": bool(data.get("ok")),
+        "error": data.get("error"),
+        "command_id": _text(data.get("command_id")),
+        "source_dir": _text(data.get("source_dir")),
+        "selected_codes": _unique_texts(data.get("selected_codes")),
+        "target_codes": _unique_texts(data.get("target_codes")),
+        "item_count": int(data.get("item_count") or 0),
+        "cache_target": int(data.get("cache_target") or 0),
+        "cache_budget_limited": bool(data.get("cache_budget_limited")),
+        "content_bytes": int(data.get("content_bytes") or 0),
+        "transport": _compact_transport(_mapping(data.get("transport"))),
+        "results": [_compact_result(_mapping(item)) for item in list(data.get("results") or [])[:16]],
+        "updated_at": _text(data.get("updated_at")),
+    }
+    if include_items:
+        compact["items"] = [
+            {
+                "source_name": _text(item.get("source_name")),
+                "cached": bool(item.get("cached")),
+            }
+            for item in list(data.get("items") or [])[:8]
+            if isinstance(item, Mapping)
+        ]
+    return compact
 
 
 def _empty_command_payload() -> dict[str, Any]:
@@ -1325,7 +1410,7 @@ def _empty_command_payload() -> dict[str, Any]:
 
 
 def _remember_command_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
-    compact = dict(payload)
+    compact = _compact_command_payload(payload)
     if "command_items" not in compact:
         compact["command_items"] = _command_items(compact)
     _memory_set(_COMMAND_STATE_KEY, compact)
@@ -1335,7 +1420,7 @@ def _remember_command_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
 def _last_command_payload() -> dict[str, Any]:
     data = _memory_get(_COMMAND_STATE_KEY, {})
     if isinstance(data, Mapping):
-        payload = dict(data)
+        payload = _compact_command_payload(data)
         payload.setdefault("command_items", _command_items(payload))
         return payload
     return _empty_command_payload()

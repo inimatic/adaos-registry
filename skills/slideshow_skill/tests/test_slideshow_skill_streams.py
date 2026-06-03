@@ -239,6 +239,47 @@ def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeyp
     assert payload["label"] == "Tablet"
 
 
+def test_endpoint_payload_omits_raw_endpoint_details(monkeypatch):
+    mod = _load_slideshow_module()
+
+    devices = []
+    for idx in range(24):
+        devices.append(
+            {
+                "pair_code": f"CODE{idx:02d}",
+                "endpoint_id": f"endpoint-{idx}",
+                "state": "approved",
+                "display_name": f"Tablet {idx}",
+                "last_seen_at": 1,
+                "endpoint_policy": {"trust_level": "limited", "large": "x" * 4000},
+                "endpoint_manifest": {"services": ["camera"] * 100},
+                "service_state": {"logs": ["line"] * 500},
+                "diagnostics": {"raw": "y" * 8000},
+                "aliases": ["kitchen", "legacy"],
+            }
+        )
+
+    payload = mod._endpoint_payload(
+        devices,
+        {
+            "selected_codes": ["CODE02"],
+            "source_dir": r"C:\photos",
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+            "display_mode": "fit",
+            "fullscreen": True,
+            "running": False,
+        },
+    )
+
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    assert len(raw) < 20_000
+    assert payload["items"][0].get("raw") is None
+    assert payload["items"][0].get("transport_profile") is None
+    assert payload["selected_items"][0]["content"]["code"] == "CODE02"
+
+
 def test_endpoint_next_refreshes_independent_endpoint_window(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 
