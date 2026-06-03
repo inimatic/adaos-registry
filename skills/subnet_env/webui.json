@@ -4,6 +4,13 @@
     {
       "id": "subnet_env_app",
       "title": "Subnet Env",
+      "aliases": [
+        "переменные окружения подсети",
+        "переменные подсети",
+        "окружение подсети",
+        "subnet environment variables",
+        "subnet env"
+      ],
       "icon": "git-network-outline",
       "launchModal": "subnet_env_modal"
     }
@@ -23,6 +30,14 @@
     "modals": {
       "subnet_env_modal": {
         "title": "Subnet Environment",
+        "aliases": [
+          "переменные окружения подсети",
+          "переменные подсети",
+          "окружение подсети",
+          "переменные окружения",
+          "subnet environment variables",
+          "subnet env"
+        ],
         "schema": {
           "id": "subnet_env_modal",
           "layout": {
