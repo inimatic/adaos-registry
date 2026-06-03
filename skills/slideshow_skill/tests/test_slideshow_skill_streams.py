@@ -239,6 +239,59 @@ def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeyp
     assert payload["label"] == "Tablet"
 
 
+def test_session_payload_exposes_fullscreen_and_next_media(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = []
+    for idx in range(2):
+        photo = tmp_path / f"photo-{idx}.jpg"
+        Image.new("RGB", (1200, 800), color=(idx * 40, 64, 128)).save(photo, "JPEG")
+        photos.append(photo)
+
+    monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "ABC123", "state": "approved", "display_name": "Tablet"}])
+    monkeypatch.setattr(mod, "_favorite_refs", lambda _root: [])
+    monkeypatch.setattr(mod, "_widget_thumbnail", lambda path: (path, True))
+    monkeypatch.setattr(mod, "_fullscreen_image", lambda path: (path, True))
+
+    published: list[tuple[str, str]] = []
+
+    def _publish(path, ref, **kwargs):
+        variant = str(kwargs.get("variant") or "widget")
+        published.append((Path(path).name, variant))
+        return {
+            "ok": True,
+            "url": f"/api/node/media/files/content/{Path(path).stem}-{variant}.jpg",
+            "node_url": f"/api/node/media/files/content/{Path(path).stem}-{variant}.jpg",
+            "browser_path": f"/media/files/content/{Path(path).stem}-{variant}.jpg",
+            "browser_route": "hub_browser_media",
+            "filename": f"{Path(path).stem}-{variant}.jpg",
+            "content_ref": ref,
+            "size_bytes": 1234,
+        }
+
+    monkeypatch.setattr(mod, "_publish_media_file", _publish)
+
+    payload = mod._session_payload(
+        {
+            "source_dir": str(tmp_path),
+            "selected_codes": ["ABC123"],
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+            "display_mode": "fit",
+            "fullscreen": True,
+            "running": True,
+            "current_index": 0,
+        },
+        photos,
+    )
+
+    assert payload["image"]["media"]["path"].endswith("photo-0-widget.jpg")
+    assert payload["image"]["fullscreen_media"]["path"].endswith("photo-0-fullscreen.jpg")
+    assert payload["image"]["next_media"]["path"].endswith("photo-1-fullscreen.jpg")
+    assert [item[1] for item in published] == ["widget", "fullscreen", "fullscreen"]
+
+
 def test_endpoint_payload_omits_raw_endpoint_details(monkeypatch):
     mod = _load_slideshow_module()
 
@@ -426,6 +479,36 @@ def test_service_tick_reasserts_surface_without_advancing(monkeypatch, tmp_path)
     assert state["current_index"] == 2
     assert state["last_surface_sync_reason"] == "periodic_reassert"
     assert sent == [["photo-2.jpg", "photo-3.jpg", "photo-4.jpg", "photo-5.jpg"]]
+
+
+def test_activate_runtime_rehydrates_running_slideshow(monkeypatch):
+    mod = _load_slideshow_module()
+
+    started: list[str | None] = []
+    polled: list[str | None] = []
+    monkeypatch.setattr(
+        mod,
+        "_load_state",
+        lambda: {
+            "selected_codes": ["A"],
+            "sync": True,
+            "running": True,
+            "interval_ms": 7000,
+            "last_service_tick_at": 0,
+            "current_index": 0,
+            "mode": "sequential",
+            "scope": "all",
+        },
+    )
+    monkeypatch.setattr(mod, "_ensure_polling", lambda webspace_id=None: started.append(webspace_id))
+    monkeypatch.setattr(mod, "_poll_once", lambda webspace_id=None: polled.append(webspace_id))
+
+    result = mod.activate_slideshow_runtime(webspace_id="ws-restore")
+
+    assert result["ok"] is True
+    assert result["polling"] is True
+    assert started == ["ws-restore"]
+    assert polled == ["ws-restore"]
 
 
 def test_select_folder_resends_running_surface(monkeypatch, tmp_path):

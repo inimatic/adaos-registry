@@ -316,6 +316,16 @@
             "local": "closeFullscreen"
           },
           {
+            "id": "prev",
+            "label": "Previous",
+            "icon": "chevron-back-outline"
+          },
+          {
+            "id": "next",
+            "label": "Next",
+            "icon": "chevron-forward-outline"
+          },
+          {
             "id": "fav",
             "label": "Favorite",
             "icon": "star-outline",

@@ -6,7 +6,6 @@ import json
 import logging
 import os
 import random
-import shutil
 import socket
 import sqlite3
 import threading
@@ -14,16 +13,17 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
-from urllib.parse import quote
 
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import skill_memory
 from adaos.sdk.data.skill_env import skill_env_path
 from adaos.sdk.io import stream_publish, telegram_photo
+from adaos.sdk.io.media import (
+    browser_media_descriptor,
+    cached_image_variant,
+    publish_media_file as sdk_publish_media_file,
+)
 from adaos.sdk.redevice import ReDeviceBridge, compact_endpoint, list_endpoints as sdk_list_endpoints, select_transport
-from adaos.services.agent_context import get_ctx
-from adaos.services.media_library import media_file_path
-from PIL import Image, ImageOps
 
 try:
     from adaos.services.yjs.webspace import default_webspace_id
@@ -41,6 +41,7 @@ _INDEX_RECEIVER = "slideshow_skill.index"
 _SUPPORTED = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp", ".tif", ".tiff"}
 _ENDPOINT_SIZE = (480, 300)
 _WIDGET_SIZE = (720, 405)
+_FULLSCREEN_SIZE = (3840, 2160)
 _WIDGET_IMAGE_BUDGET_BYTES = 60_000
 _MAX_SCAN = 2000
 _MAX_CONTROL_SCAN = 240
@@ -127,17 +128,6 @@ def _internal_data_dir() -> Path:
 
 def _index_path() -> Path:
     return _internal_data_dir() / "photos.sqlite3"
-
-
-def _thumb_dir(path: Path) -> Path:
-    base = path.parent / ".adaos-thumbs"
-    try:
-        base.mkdir(parents=True, exist_ok=True)
-        return base
-    except Exception:
-        fallback = _internal_data_dir() / "thumbs"
-        fallback.mkdir(parents=True, exist_ok=True)
-        return fallback
 
 
 def _default_state() -> dict[str, Any]:
@@ -873,25 +863,18 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
 
 
 def _thumbnail(path: Path, size: tuple[int, int], label: str) -> tuple[Path, bool]:
-    cache_path = _thumb_dir(path) / f"{_fingerprint(path)}-{label}.jpg"
-    if cache_path.exists():
-        return cache_path, True
-    with Image.open(path) as image:
-        image = ImageOps.exif_transpose(image)
-        if getattr(image, "is_animated", False):
-            image.seek(0)
-        image.thumbnail(size, Image.Resampling.LANCZOS)
-        canvas = Image.new("RGB", image.size, "black")
-        if image.mode in {"RGBA", "LA"}:
-            canvas.paste(image, mask=image.getchannel("A"))
-        else:
-            canvas.paste(image.convert("RGB"))
-        if label.startswith("endpoint-cache"):
-            quality = 62
-        else:
-            quality = 62 if label.startswith("endpoint") else _thumbnail_quality(label, default=78)
-        canvas.save(cache_path, "JPEG", quality=quality, optimize=True)
-    return cache_path, False
+    if label.startswith("endpoint-cache"):
+        quality = 62
+    else:
+        quality = 62 if label.startswith("endpoint") else _thumbnail_quality(label, default=78)
+    return cached_image_variant(
+        path,
+        max_size=size,
+        label=label,
+        quality=quality,
+        background="black",
+        fallback_dir=_internal_data_dir() / "thumbs",
+    )
 
 
 def _thumbnail_quality(label: str, *, default: int) -> int:
@@ -928,6 +911,17 @@ def _widget_thumbnail(path: Path) -> tuple[Path, bool]:
     return last if last is not None else _thumbnail(path, _WIDGET_SIZE, "widget-v4")
 
 
+def _fullscreen_image(path: Path) -> tuple[Path, bool]:
+    return cached_image_variant(
+        path,
+        max_size=_FULLSCREEN_SIZE,
+        label=f"fullscreen-v1-{_FULLSCREEN_SIZE[0]}x{_FULLSCREEN_SIZE[1]}-q88",
+        quality=88,
+        background="black",
+        fallback_dir=_internal_data_dir() / "thumbs",
+    )
+
+
 def _data_uri(path: Path) -> str:
     return "data:image/jpeg;base64," + base64.b64encode(path.read_bytes()).decode("ascii")
 
@@ -936,43 +930,19 @@ def _api_token() -> str:
     token = _text(os.environ.get("ADAOS_TOKEN"))
     if token:
         return token
-    try:
-        return _text(get_ctx().config.token) or "dev-local-token"
-    except Exception:
-        return "dev-local-token"
-
-
-def _media_content_url(filename: str, *, browser: bool = False) -> str:
-    token = _api_token()
-    query = f"?token={quote(token)}" if token else ""
-    prefix = "/media" if browser else "/api/node/media"
-    return f"{prefix}/files/content/{quote(filename)}{query}"
-
-
-def _media_content_path(filename: str) -> str:
-    return f"/media/files/content/{quote(filename)}"
+    return "dev-local-token"
 
 
 def _publish_media_file(path: Path, content_ref: str, *, variant: str = "widget") -> dict[str, Any]:
-    suffix = "".join(ch for ch in _text(variant).lower() if ch.isalnum() or ch in {"-", "_"}) or "media"
-    filename = f"slideshow-{hashlib.sha256(_text(content_ref).encode('utf-8')).hexdigest()[:24]}-{suffix}.jpg"
     try:
-        target = media_file_path(filename)
-        if not target.exists() or target.stat().st_size != path.stat().st_size:
-            shutil.copyfile(path, target)
-        payload = {
-            "ok": True,
-            "filename": target.name,
-            "path": str(target),
-            "url": _media_content_url(target.name),
-            "node_url": _media_content_url(target.name),
-            "browser_path": _media_content_path(target.name),
-            "mime": "image/jpeg",
-            "size_bytes": int(target.stat().st_size),
-            "content_ref": content_ref,
-            "route": "node_media_file",
-            "browser_route": "hub_browser_media",
-        }
+        payload = sdk_publish_media_file(
+            path,
+            content_ref=content_ref,
+            namespace="slideshow",
+            variant=variant,
+            mime="image/jpeg",
+            api_token=_api_token(),
+        )
         _memory_set(_LAST_MEDIA_KEY, payload)
         return payload
     except Exception as exc:
@@ -1163,6 +1133,7 @@ def _selected_endpoint_label(selected_codes: list[str]) -> str:
 
 
 def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_command: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    selected = _selected_photos(files, state)
     current = _current_photo(files, state)
     image: dict[str, Any] = {"src": "", "mime": "image/jpeg"}
     title = "No photo"
@@ -1173,16 +1144,29 @@ def _session_payload(state: Mapping[str, Any], files: list[Path], *, last_comman
         title = current.name
         content_ref = _content_ref(current)
         media = _publish_media_file(thumb, content_ref, variant="widget")
+        fullscreen_media: dict[str, Any] = {}
+        next_media: dict[str, Any] = {}
+        try:
+            full_image, _full_cached = _fullscreen_image(current)
+            fullscreen_media = _publish_media_file(full_image, content_ref, variant="fullscreen")
+        except Exception:
+            _log.debug("failed to prepare fullscreen slideshow image", exc_info=True)
+        if selected:
+            try:
+                current_idx = _current_index(state) % len(selected)
+                next_photo = selected[(current_idx + 1) % len(selected)]
+                if next_photo != current:
+                    next_ref = _content_ref(next_photo)
+                    next_full, _next_cached = _fullscreen_image(next_photo)
+                    next_media = _publish_media_file(next_full, next_ref, variant="fullscreen")
+            except Exception:
+                _log.debug("failed to prepare next fullscreen slideshow image", exc_info=True)
         image = {
             "mime": "image/jpeg",
             "route": media.get("browser_route") or media.get("route") or "hub_browser_media",
-            "media": {
-                "route": media.get("browser_route") or "hub_browser_media",
-                "path": _text(media.get("browser_path")),
-                "filename": _text(media.get("filename")),
-                "mime": "image/jpeg",
-                "content_ref": content_ref,
-            },
+            "media": browser_media_descriptor(media, content_ref=content_ref),
+            "fullscreen_media": browser_media_descriptor(fullscreen_media, content_ref=content_ref) if fullscreen_media.get("ok") else {},
+            "next_media": browser_media_descriptor(next_media) if next_media.get("ok") else {},
             "node_src": _text(media.get("node_url") or media.get("url")) if media.get("ok") else "",
             "content_ref": content_ref,
         }
