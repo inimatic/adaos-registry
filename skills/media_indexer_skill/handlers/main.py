@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -41,6 +42,8 @@ SETTINGS_KEY = "media_indexer.settings"
 INDEX_META_KEY = "media_indexer.index"
 OPERATION_RECEIVER = "media_indexer.operations"
 MAX_RESULTS = 20
+LIBRARY_PREVIEW_LIMIT = 10
+FILE_CHECKSUM_ALGORITHM = "sha256"
 STATUS_COLORS = {
     "ready": "#6EE7B7",
     "scanning": "#60A5FA",
@@ -175,6 +178,137 @@ def _index_dir() -> pathlib.Path:
     return path
 
 
+def _metadata_db_dir() -> pathlib.Path:
+    override = os.getenv("MEDIA_INDEXER_DB_DIR")
+    if override:
+        path = pathlib.Path(override)
+    elif os.getenv("MEDIA_INDEXER_DATA_DIR"):
+        path = pathlib.Path(os.environ["MEDIA_INDEXER_DATA_DIR"]) / "db" / "media_indexer"
+    else:
+        try:
+            env_path = skill_env_path()
+            db_root = env_path.parent if env_path.parent.name == "db" else env_path.parent / "db"
+            path = db_root / "media_indexer"
+        except Exception:
+            path = _SKILL_ROOT / ".skill_state" / "db"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _metadata_manifest_path() -> pathlib.Path:
+    return _metadata_db_dir() / "manifest.json"
+
+
+def _metadata_library_path() -> pathlib.Path:
+    return _metadata_db_dir() / "library.json"
+
+
+def _write_json_atomic(path: pathlib.Path, value: Any) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    tmp.replace(path)
+
+
+def _read_json_file(path: pathlib.Path, default: Any) -> Any:
+    if not path.exists():
+        return default
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        logger.warning("failed to read media indexer json file=%s", path, exc_info=True)
+        return default
+
+
+def _file_checksum(path: pathlib.Path, chunk_size: int = 1024 * 1024) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(chunk_size), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _file_fingerprint(path: pathlib.Path) -> Dict[str, Any]:
+    stat = path.stat()
+    return {
+        "algorithm": FILE_CHECKSUM_ALGORITHM,
+        "sha256": _file_checksum(path),
+        "size_bytes": int(stat.st_size),
+        "mtime_ns": int(stat.st_mtime_ns),
+        "name": path.name,
+        "suffix": path.suffix.lower(),
+    }
+
+
+def _read_metadata_library() -> List[Dict[str, Any]]:
+    raw = _read_json_file(_metadata_library_path(), [])
+    if isinstance(raw, dict) and isinstance(raw.get("items"), list):
+        return [item for item in raw["items"] if isinstance(item, dict)]
+    if isinstance(raw, list):
+        return [item for item in raw if isinstance(item, dict)]
+    return []
+
+
+def _read_metadata_manifest() -> Dict[str, Any]:
+    raw = _read_json_file(_metadata_manifest_path(), {})
+    return raw if isinstance(raw, dict) else {}
+
+
+def _records_by_checksum(records: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    by_checksum: Dict[str, Dict[str, Any]] = {}
+    for record in records:
+        fingerprint = record.get("fingerprint") if isinstance(record.get("fingerprint"), dict) else {}
+        checksum = str(record.get("checksum_sha256") or fingerprint.get("sha256") or "").strip()
+        if checksum and checksum not in by_checksum:
+            by_checksum[checksum] = record
+    return by_checksum
+
+
+def _persist_metadata_db(
+    *,
+    directory: str,
+    records: List[Dict[str, Any]],
+    diagnostics: Dict[str, Any],
+    vector_metadata: Dict[str, Any],
+) -> Dict[str, Any]:
+    saved_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    manifest = {
+        "schema": 1,
+        "saved_at": saved_at,
+        "indexed_directory": directory,
+        "db_dir": str(_metadata_db_dir()),
+        "library_path": str(_metadata_library_path()),
+        "checksum_algorithm": FILE_CHECKSUM_ALGORITHM,
+        "fingerprint_version": 1,
+        "record_count": len(records),
+        "diagnostics": diagnostics,
+        "faiss": {
+            "index_dir": str(_index_dir()),
+            "schema": vector_metadata.get("schema"),
+            "text_count": vector_metadata.get("text_count"),
+            "image_count": vector_metadata.get("image_count"),
+            "total_count": vector_metadata.get("total_count"),
+        },
+    }
+    _write_json_atomic(_metadata_library_path(), {"schema": 1, "items": records})
+    _write_json_atomic(_metadata_manifest_path(), manifest)
+    return manifest
+
+
+def _clear_metadata_db(directory: str) -> Dict[str, Any]:
+    db_dir = _metadata_db_dir()
+    for filename in ("library.json", "manifest.json"):
+        try:
+            (db_dir / filename).unlink(missing_ok=True)
+        except Exception:
+            logger.debug("failed to remove media metadata db file=%s", filename, exc_info=True)
+    return {
+        "indexed_directory": directory,
+        "db_dir": str(db_dir),
+        "cleared": True,
+    }
+
+
 def _has_persisted_index() -> bool:
     path = _index_dir()
     return (path / "metadata.json").exists() and (path / "text.index").exists() and (path / "image.index").exists()
@@ -196,9 +330,13 @@ def _read_persisted_index_metadata() -> Dict[str, Any]:
         "indexed_directory": "",
         "indexed_count": int(metadata.get("total_count") or metadata.get("text_count") or 0),
         "index_dir": str(path),
+        "db_dir": str(_metadata_db_dir()),
         "restored_from": "skill_data",
         **metadata,
     }
+    manifest = _read_metadata_manifest()
+    if manifest:
+        payload["metadata_db"] = manifest
     return payload
 
 
@@ -369,13 +507,15 @@ def _snapshot_payload(
     diagnostics: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     diagnostics_payload = diagnostics or _state.get("last_diagnostics") or _empty_diagnostics()
+    library = list(_state.get("library_items") or [])
     return {
         "status": status,
         "overview": _overview_payload(status, diagnostics_payload),
         "form": form or _current_form(),
         "results": list(results or [])[:MAX_RESULTS],
         "diagnostics": diagnostics_payload,
-        "library": list(_state.get("library_items") or [])[:50],
+        "library_preview": library[:LIBRARY_PREVIEW_LIMIT],
+        "library": library,
     }
 
 
@@ -428,16 +568,29 @@ def _ensure_initialized(*, load_index: bool = False) -> None:
             logger.info("Loaded persisted media index: %s", loaded)
 
 
-def _persist_index(directory: str, indexed_count: int) -> Dict[str, Any]:
+def _persist_index(
+    directory: str,
+    indexed_count: int,
+    diagnostics: Dict[str, Any] | None = None,
+    library_records: List[Dict[str, Any]] | None = None,
+) -> Dict[str, Any]:
     vector_db = _state.get("vector_db")
     if vector_db is None:
         return {"saved": False, "reason": "not_initialized"}
     metadata = vector_db.save(_index_dir())
+    metadata_db = _persist_metadata_db(
+        directory=directory,
+        records=list(library_records or []),
+        diagnostics=diagnostics or {},
+        vector_metadata=metadata,
+    )
     payload = {
         "indexed_directory": directory,
         "indexed_count": indexed_count,
         "saved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "index_dir": str(_index_dir()),
+        "db_dir": str(_metadata_db_dir()),
+        "metadata_db": metadata_db,
         **metadata,
     }
     _safe_memory_set(INDEX_META_KEY, payload)
@@ -452,11 +605,14 @@ def _clear_persisted_index(directory: str) -> Dict[str, Any]:
             (path / filename).unlink(missing_ok=True)
         except Exception:
             logger.debug("failed to remove persisted media index file=%s", filename, exc_info=True)
+    metadata_db = _clear_metadata_db(directory)
     payload = {
         "indexed_directory": directory,
         "indexed_count": 0,
         "saved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "index_dir": str(path),
+        "db_dir": str(_metadata_db_dir()),
+        "metadata_db": metadata_db,
         "cleared": True,
     }
     _safe_memory_set(INDEX_META_KEY, payload)
@@ -923,14 +1079,50 @@ def _library_item(payload: Dict[str, Any], *, signals: List[str]) -> Dict[str, A
         "signals": signal_text,
         "source": payload.get("real_file_name") or pathlib.Path(str(payload.get("full_path") or "")).name,
         "path": payload.get("full_path") or "",
+        "checksum": payload.get("checksum_sha256") or "",
         "details": {
             "path": payload.get("full_path") or "",
+            "checksum_sha256": payload.get("checksum_sha256") or "",
             "ner_title": payload.get("ner_title") or "",
             "artist": payload.get("artist") or "",
             "technical_metadata": payload.get("technical_metadata") or {},
             "enriched": payload.get("enriched") or {},
         },
     }
+
+
+def _library_items_from_records(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    items: List[Dict[str, Any]] = []
+    for record in records:
+        payload = {
+            "real_file_name": record.get("real_file_name") or pathlib.Path(str(record.get("path") or "")).name,
+            "display_title": record.get("display_title") or record.get("title") or "",
+            "full_path": record.get("path") or "",
+            "type": record.get("type") or "media",
+            "ftype": record.get("type") or "media",
+            "title": record.get("title") or record.get("display_title") or "",
+            "ner_title": record.get("ner_title") or "",
+            "year": record.get("year") or "",
+            "quality": record.get("quality") or "",
+            "artist": record.get("artist") or "",
+            "technical_metadata": record.get("technical_metadata") or {},
+            "enriched": record.get("enriched") or {},
+            "checksum_sha256": record.get("checksum_sha256") or "",
+            "fingerprint": record.get("fingerprint") or {},
+        }
+        signals = record.get("signals") if isinstance(record.get("signals"), list) else []
+        items.append(_library_item(payload, signals=[str(signal) for signal in signals]))
+    return items
+
+
+def _restore_metadata_state() -> None:
+    records = _read_metadata_library()
+    if records:
+        _state["library_items"] = _library_items_from_records(records)
+    manifest = _read_metadata_manifest()
+    diagnostics = manifest.get("diagnostics") if isinstance(manifest.get("diagnostics"), dict) else None
+    if diagnostics:
+        _state["last_diagnostics"] = diagnostics
 
 
 def _trim_for_log(value: Any, *, limit: int = 1000) -> Any:
@@ -965,6 +1157,36 @@ def _log_index_document(
         "timings_sec": {key: round(value, 3) for key, value in timings.items()},
     }
     logger.info("Index document: %s", json.dumps(_trim_for_log(diagnostics), ensure_ascii=False, sort_keys=True))
+
+
+def _metadata_record(
+    *,
+    payload: Dict[str, Any],
+    signals: List[str],
+    index_text: str,
+    timings: Dict[str, float],
+) -> Dict[str, Any]:
+    fingerprint = payload.get("fingerprint") if isinstance(payload.get("fingerprint"), dict) else {}
+    return {
+        "id": str(payload.get("checksum_sha256") or fingerprint.get("sha256") or payload.get("full_path") or ""),
+        "checksum_sha256": payload.get("checksum_sha256") or fingerprint.get("sha256") or "",
+        "fingerprint": fingerprint,
+        "path": payload.get("full_path") or "",
+        "real_file_name": payload.get("real_file_name") or "",
+        "display_title": payload.get("display_title") or "",
+        "type": payload.get("ftype") or payload.get("type") or "",
+        "title": payload.get("title") or "",
+        "ner_title": payload.get("ner_title") or "",
+        "year": payload.get("year") or "",
+        "quality": payload.get("quality") or "",
+        "artist": payload.get("artist") or "",
+        "technical_metadata": payload.get("technical_metadata") or {},
+        "enriched": payload.get("enriched") or {},
+        "signals": list(signals),
+        "index_text": index_text,
+        "indexed_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "timings_sec": {key: round(value, 3) for key, value in timings.items()},
+    }
 
 
 @tool("scan_and_index")
@@ -1039,6 +1261,8 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
     ocr_text_found = 0
     technical_errors = 0
     library_items: List[Dict[str, Any]] = []
+    library_records: List[Dict[str, Any]] = []
+    existing_records = _records_by_checksum(_read_metadata_library())
 
     total = len(all_files)
     for ordinal, (media, ftype) in enumerate(all_files, start=1):
@@ -1055,9 +1279,19 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
                         "total_count": total,
                     }
                 )
+            media_path = pathlib.Path(media.full_path)
             started = time.perf_counter()
-            technical = extractor.extract(media.full_path, ftype)
-            technical_metadata = technical.to_dict() if hasattr(technical, "to_dict") else {}
+            fingerprint = _file_fingerprint(media_path)
+            timings["checksum"] = time.perf_counter() - started
+            existing_record = existing_records.get(str(fingerprint.get("sha256") or ""))
+
+            started = time.perf_counter()
+            if existing_record and isinstance(existing_record.get("technical_metadata"), dict):
+                technical_metadata = dict(existing_record.get("technical_metadata") or {})
+                timings["technical_metadata_reused"] = 0.0
+            else:
+                technical = extractor.extract(media.full_path, ftype)
+                technical_metadata = technical.to_dict() if hasattr(technical, "to_dict") else {}
             timings["technical_metadata"] = time.perf_counter() - started
 
             started = time.perf_counter()
@@ -1071,9 +1305,13 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
             artist = ner_result.get("artist") or ""
 
             started = time.perf_counter()
-            enriched = enricher.enrich(media.full_path, ftype)
-            if ftype == "video" and title:
-                enriched.update(enricher.enrich_video(title))
+            if existing_record and isinstance(existing_record.get("enriched"), dict):
+                enriched = dict(existing_record.get("enriched") or {})
+                timings["enrichment_reused"] = 0.0
+            else:
+                enriched = enricher.enrich(media.full_path, ftype)
+                if ftype == "video" and title:
+                    enriched.update(enricher.enrich_video(title))
             timings["enrichment"] = time.perf_counter() - started
             if technical_metadata.get("status") == "error":
                 technical_errors += 1
@@ -1099,6 +1337,8 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
                 "artist": artist,
                 "technical_metadata": technical_metadata,
                 "enriched": enriched,
+                "checksum_sha256": fingerprint["sha256"],
+                "fingerprint": fingerprint,
             }
             signals: List[str] = []
             if _has_ner_entities(ner_result):
@@ -1173,6 +1413,7 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
             )
 
             library_items.append(_library_item(payload, signals=signals))
+            library_records.append(_metadata_record(payload=payload, signals=signals, index_text=index_text, timings=timings))
             indexed += 1
         except Exception as exc:
             logger.exception("Failed to index %s", getattr(media, "name", "unknown"))
@@ -1189,9 +1430,8 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
                 )
 
     _state["indexed_directory"] = str(path)
-    _state["library_items"] = library_items[:50]
+    _state["library_items"] = library_items
     _save_settings(selected_directory=str(path), default_directory=str(path))
-    index_meta = _persist_index(str(path), indexed)
     diagnostics = _scan_diagnostics(
         type_counts=type_counts,
         files_found=total,
@@ -1203,6 +1443,7 @@ def _scan_and_index(directory: str, progress: Callable[[Dict[str, Any]], None] |
         technical_errors=technical_errors,
         error_count=len(errors),
     )
+    index_meta = _persist_index(str(path), indexed, diagnostics=diagnostics, library_records=library_records)
     _state["last_diagnostics"] = diagnostics
     return {"status": "ok", "indexed_count": indexed, "errors": errors, "index": index_meta, "diagnostics": diagnostics}
 
@@ -1266,6 +1507,7 @@ def rehydrate() -> Dict[str, Any]:
     settings = _settings()
     _state["selected_directory"] = settings.get("selected_directory") or settings.get("default_directory") or ""
     _state["selected_query"] = settings.get("selected_query") or DEFAULT_QUERY
+    _restore_metadata_state()
     return {"status": "ok", "settings": settings, "index": _index_metadata()}
 
 
@@ -1436,6 +1678,17 @@ async def on_stream_snapshot_requested(evt: Any) -> None:
     allowed, webspace_id = _target_context(payload)
     if not allowed:
         return
+    _restore_metadata_state()
+    _project_snapshot(
+        _snapshot_payload(
+            status=_status_payload(
+                value="ready",
+                subtitle="Waiting for action",
+                description="Choose a folder, build the index, then search.",
+            )
+        ),
+        webspace_id=webspace_id,
+    )
     _publish_operation(
         _state.get("last_operation")
             or {

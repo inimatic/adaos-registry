@@ -101,40 +101,6 @@
               }
             },
             {
-              "id": "media-indexer-library",
-              "type": "ui.table",
-              "area": "main",
-              "title": "Indexed media",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/media_indexer/library",
-                "observeRoot": true
-              },
-              "inputs": {
-                "emptyText": "Scan a folder to see indexed media here.",
-                "columns": [
-                  {
-                    "key": "title",
-                    "label": "Title"
-                  },
-                  {
-                    "key": "type",
-                    "label": "Type",
-                    "width": "96px"
-                  },
-                  {
-                    "key": "signals",
-                    "label": "Signals",
-                    "width": "180px"
-                  },
-                  {
-                    "key": "source",
-                    "label": "Source"
-                  }
-                ]
-              }
-            },
-            {
               "id": "media-indexer-directory",
               "type": "input.text",
               "area": "main",
@@ -180,6 +146,11 @@
                     "id": "scan_selected",
                     "label": "Scan directory",
                     "icon": "scan-outline"
+                  },
+                  {
+                    "id": "view_library",
+                    "label": "Open library",
+                    "icon": "albums-outline"
                   }
                 ]
               },
@@ -196,6 +167,13 @@
                       "scope": "node",
                       "timeout_ms": 600000
                     }
+                  }
+                },
+                {
+                  "on": "click:view_library",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_indexer_library_modal"
                   }
                 }
               ]
@@ -370,6 +348,76 @@
             }
           ]
         }
+      },
+      "media_indexer_library_modal": {
+        "title": "Indexed Media",
+        "presentation": {
+          "kind": "fullscreen"
+        },
+        "schema": {
+          "id": "media_indexer_library_modal",
+          "title": "Indexed Media",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "media-indexer-library-table",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Indexed media",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/media_indexer/library",
+                "observeRoot": true
+              },
+              "inputs": {
+                "emptyText": "Scan a folder to see indexed media here.",
+                "pagination": true,
+                "pageSize": 25,
+                "pageSizeOptions": [10, 25, 50, 100],
+                "columns": [
+                  {
+                    "key": "title",
+                    "label": "Title"
+                  },
+                  {
+                    "key": "type",
+                    "label": "Type",
+                    "width": "96px"
+                  },
+                  {
+                    "key": "signals",
+                    "label": "Signals",
+                    "width": "180px"
+                  },
+                  {
+                    "key": "checksum",
+                    "label": "SHA-256",
+                    "width": "220px",
+                    "mono": true
+                  },
+                  {
+                    "key": "source",
+                    "label": "Source"
+                  },
+                  {
+                    "key": "path",
+                    "label": "Path",
+                    "mono": true
+                  }
+                ]
+              }
+            }
+          ]
+        }
       }
     },
     "widgets": {}
@@ -447,6 +495,7 @@
         "query": "",
         "k": 5
       },
+      "library_preview": [],
       "library": [],
       "results": []
     }

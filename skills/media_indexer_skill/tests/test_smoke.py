@@ -42,16 +42,21 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
     assert defaults["overview"]["label"] == "Library overview"
     assert defaults["diagnostics"]["label"] == "Model diagnostics"
     assert defaults["diagnostics"]["summary"]["label"] == "Indexed media"
+    assert defaults["library_preview"] == []
     assert defaults["library"] == []
     receiver = webui["webio"]["receivers"]["media_indexer.operations"]
     assert receiver["mode"] == "replace"
     assert receiver["snapshotPolicy"] == "on_subscribe"
     schema = webui["registry"]["modals"]["media_indexer_modal"]["schema"]
     assert schema["layout"]["pattern"] == "split"
-    library_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-library")
-    assert library_widget["type"] == "ui.table"
     actions_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-controls")
-    assert [button["id"] for button in actions_widget["inputs"]["buttons"]] == ["scan_selected"]
+    assert [button["id"] for button in actions_widget["inputs"]["buttons"]] == ["scan_selected", "view_library"]
+    assert any(action["type"] == "openModal" and action["params"]["modalId"] == "media_indexer_library_modal" for action in actions_widget["actions"])
+    library_schema = webui["registry"]["modals"]["media_indexer_library_modal"]["schema"]
+    library_widget = next(widget for widget in library_schema["widgets"] if widget["id"] == "media-indexer-library-table")
+    assert library_widget["type"] == "ui.table"
+    assert library_widget["inputs"]["pagination"] is True
+    assert library_widget["inputs"]["pageSize"] == 25
     results_widget = next(
         widget
         for widget in schema["widgets"]
@@ -183,6 +188,7 @@ def test_rehydrate_restores_index_metadata_from_skill_data(monkeypatch, tmp_path
     assert result["index"]["total_count"] == 3
     stored = json.loads((tmp_path / "skill_env.json").read_text(encoding="utf-8"))
     assert stored["media_indexer.index"]["index_dir"] == str(index_dir)
+    assert stored["media_indexer.index"]["db_dir"] == str(tmp_path / "data" / "db" / "media_indexer")
 
 
 def test_empty_scan_clears_stale_skill_data_index(monkeypatch, tmp_path: pathlib.Path) -> None:
@@ -215,6 +221,7 @@ def test_empty_scan_clears_stale_skill_data_index(monkeypatch, tmp_path: pathlib
     assert result["indexed_count"] == 0
     assert result["index"]["cleared"] is True
     assert not (index_dir / "metadata.json").exists()
+    assert not (tmp_path / "data" / "db" / "media_indexer" / "library.json").exists()
     assert reset_seen["called"] is True
     stored = json.loads((tmp_path / "skill_env.json").read_text(encoding="utf-8"))
     assert stored["media_indexer.index"]["indexed_count"] == 0
@@ -274,6 +281,16 @@ def test_scan_resets_loaded_vector_index_before_reindexing(monkeypatch, tmp_path
 
     assert fake_vector.reset_called is True
     assert result["index"]["text_count"] == 1
+    db_dir = tmp_path / "data" / "db" / "media_indexer"
+    library = json.loads((db_dir / "library.json").read_text(encoding="utf-8"))
+    manifest = json.loads((db_dir / "manifest.json").read_text(encoding="utf-8"))
+    record = library["items"][0]
+    assert record["checksum_sha256"]
+    assert record["fingerprint"]["algorithm"] == "sha256"
+    assert record["path"] == str(media_path)
+    assert manifest["checksum_algorithm"] == "sha256"
+    assert manifest["record_count"] == 1
+    assert result["index"]["db_dir"] == str(db_dir)
     assert result["diagnostics"]["by_type"] == {"video": 1}
     assert result["diagnostics"]["ner_parsed"] == 0
     assert result["diagnostics"]["indexed_count"] == 1
