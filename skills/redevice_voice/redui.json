@@ -1,0 +1,27 @@
+{
+  "schema": "adaos.redui.v1",
+  "version": "0.1.0",
+  "surfaces": [
+    {
+      "id": "voice.ptt",
+      "type": "audio_input_endpoint",
+      "title": "ReDevice Voice Push-To-Talk",
+      "policy": {
+        "microphone_required": true,
+        "capture": "only_while_button_held",
+        "local_stt": false,
+        "local_tts": false
+      },
+      "commands": [
+        "audio.capture.ptt"
+      ],
+      "events": [
+        "endpoint.audio.record_button",
+        "endpoint.audio.segment"
+      ],
+      "formats": [
+        "audio/wav; codec=pcm16; rate=16000; channels=1"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,302 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "webio": {
+    "receivers": {
+      "redevice_voice.state": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": false,
+          "selected_code": "",
+          "count": 0,
+          "items": [],
+          "last_command": {},
+          "last_segment": {},
+          "stt": {
+            "available": false,
+            "state": "not_checked"
+          },
+          "events": [],
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 1,
+          "maxSnapshotHz": 1,
+          "maxItems": 32
+        },
+        "guardVisibility": {
+          "degradedState": "Keep last ReDevice voice endpoint state.",
+          "log": "service.redevice_voice.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.redevice_voice.state"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:redevice_voice_modal",
+          "owner": "skill:redevice_voice",
+          "firstPaint": "empty ReDevice voice state",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "redevice_voice.action",
+            "redevice.endpoint.event"
+          ]
+        }
+      }
+    }
+  },
+  "apps": [
+    {
+      "id": "redevice_voice_app",
+      "title": "ReDevice Voice",
+      "icon": "mic-outline",
+      "launchModal": "redevice_voice_modal"
+    }
+  ],
+  "registry": {
+    "modals": {
+      "redevice_voice_modal": {
+        "title": "ReDevice Voice",
+        "schema": {
+          "id": "redevice_voice_modal",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "voice-actions",
+              "type": "ui.actions",
+              "area": "main",
+              "title": "",
+              "inputs": {
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "refresh",
+                    "label": "Refresh"
+                  },
+                  {
+                    "id": "start",
+                    "label": "Start PTT"
+                  },
+                  {
+                    "id": "start_ru",
+                    "label": "RU PTT"
+                  },
+                  {
+                    "id": "start_en",
+                    "label": "EN PTT"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:refresh",
+                  "type": "callSkill",
+                  "target": "redevice_voice.refresh_redevice_voice_state",
+                  "params": {}
+                },
+                {
+                  "on": "click:start",
+                  "type": "callSkill",
+                  "target": "redevice_voice.start_redevice_voice",
+                  "params": {
+                    "code": "$state.redeviceVoiceCode",
+                    "lang": "ru",
+                    "max_duration_ms": 5000
+                  }
+                },
+                {
+                  "on": "click:start_ru",
+                  "type": "callSkill",
+                  "target": "redevice_voice.start_redevice_voice",
+                  "params": {
+                    "code": "$state.redeviceVoiceCode",
+                    "lang": "ru",
+                    "max_duration_ms": 5000
+                  }
+                },
+                {
+                  "on": "click:start_en",
+                  "type": "callSkill",
+                  "target": "redevice_voice.start_redevice_voice",
+                  "params": {
+                    "code": "$state.redeviceVoiceCode",
+                    "lang": "en",
+                    "max_duration_ms": 5000
+                  }
+                }
+              ]
+            },
+            {
+              "id": "voice-summary",
+              "type": "ui.summary",
+              "area": "main",
+              "title": "Voice endpoint",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "redevice_voice.state"
+              },
+              "inputs": {
+                "valuePath": "selected_code",
+                "statusPath": "stt.state",
+                "descriptionPath": "stt.detail",
+                "emptyText": "Select a ReDevice endpoint and start push-to-talk."
+              }
+            },
+            {
+              "id": "voice-code-input",
+              "type": "input.text",
+              "area": "main",
+              "title": "Pair code",
+              "inputs": {
+                "initialValue": "",
+                "placeholder": "FMRS7WTB",
+                "commitMode": "manual",
+                "saveLabel": "Use code",
+                "helper": "Optional. Leave empty to use the first online admitted ReDevice."
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "redeviceVoiceCode": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "voice-endpoints",
+              "type": "ui.table",
+              "area": "main",
+              "title": "ReDevice endpoints",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "redevice_voice.state",
+                "path": "items"
+              },
+              "inputs": {
+                "emptyText": "No admitted ReDevice endpoints",
+                "columns": [
+                  {
+                    "key": "selected_label",
+                    "label": "Selected",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "title",
+                    "label": "Device"
+                  },
+                  {
+                    "key": "online_state",
+                    "label": "Online",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "last_seen",
+                    "label": "Last seen",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "code",
+                    "label": "Code",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "subtitle",
+                    "label": "Policy"
+                  },
+                  {
+                    "key": "_actions",
+                    "label": "Actions",
+                    "kind": "buttons",
+                    "width": "190px",
+                    "buttons": [
+                      {
+                        "id": "use",
+                        "label": "Use"
+                      },
+                      {
+                        "id": "start",
+                        "label": "Start PTT"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:use",
+                  "type": "callSkill",
+                  "target": "redevice_voice.select_redevice_voice_endpoint",
+                  "params": {
+                    "code": "$event.code"
+                  }
+                },
+                {
+                  "on": "click:start",
+                  "type": "callSkill",
+                  "target": "redevice_voice.start_redevice_voice",
+                  "params": {
+                    "code": "$event.code",
+                    "lang": "ru",
+                    "max_duration_ms": 5000
+                  }
+                }
+              ]
+            },
+            {
+              "id": "voice-events",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Endpoint audio events",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "redevice_voice.state",
+                "path": "events"
+              },
+              "inputs": {
+                "titleKey": "type",
+                "subtitleKey": "updated_at",
+                "detailsPath": "result",
+                "showDetails": true,
+                "emptyText": "No audio events yet"
+              }
+            },
+            {
+              "id": "voice-json",
+              "type": "ui.json",
+              "area": "main",
+              "title": "Debug state",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "redevice_voice.state"
+              },
+              "inputs": {
+                "maxHeight": "360px"
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "redevice_voice_app",
+      "autoInstall": true
+    }
+  ]
+}
