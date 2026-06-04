@@ -4,12 +4,12 @@
     "adaos-rasa-nlu @ git+https://github.com/inimatic/rasa-port.git@main"
   ],
   "files": {
-    "skill.yaml": "cc81e5bd91d02f7f0f535d62d5c814747e88f4b061c3a21c6a44432f4e7301b0",
+    "skill.yaml": "c58d1b3116bc47c9ebdaa3812173fe981f455ad4eace36ce1f56270a8fede433",
     "requirements.in": "e12ba9d343d3661ea9ea0cb3a52e72b4fbd3e20c2d2ec99bd99c637287cf0cdb",
     "README.md": "666b3b038e885c32d82e1ee728416e403ddff142e6332d99b9e16e185be67cbc",
     "handlers/__init__.py": "7eb70257593da06f682a3ddda54a9d260d4fc514f645237f5ca74b08f8da61a6",
-    "handlers/main.py": "8ea4758b860a1d433f41c12f4c861330eeb5809428a4c38c8a5171de9558f343",
+    "handlers/main.py": "c90c49747afc5d59d9518d5206ea7c1b4ca5808a1fdd40137c8b53c2c3c116a2",
     "handlers/service.py": "4a624fbc6ba4b98f8bf34a688942272e33b67c285c972972c171c76ae95f7ba1"
   },
-  "fingerprint": "7c88e0c7ed00a9a3d11893125cfb265b4a75692cc22abd94c965b50750c860e3"
+  "fingerprint": "7fa134d0c3a5f267f4e28b2ed3997060525602ae5bc497b30d347aed1646f685"
 }
