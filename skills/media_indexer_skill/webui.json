@@ -80,6 +80,12 @@
               }
             ]
           },
+          "interaction": {
+            "initialFocus": "widget:media-indexer-directory",
+            "submit": {
+              "defaultAction": "media_indexer.set_directory"
+            }
+          },
           "widgets": [
             {
               "id": "media-indexer-overview",
@@ -97,6 +103,10 @@
                 "subtitlePath": "subtitle",
                 "descriptionPath": "description",
                 "colorPath": "color",
+                "emptyText": "No index"
+              },
+              "loading": {
+                "loadingText": "Loading media index...",
                 "emptyText": "No index"
               }
             },
@@ -150,11 +160,28 @@
                 "commitMode": "manual",
                 "saveLabel": "Set directory"
               },
+              "interaction": {
+                "submit": {
+                  "defaultAction": "media_indexer.set_directory"
+                }
+              },
               "actions": [
                 {
+                  "id": "media_indexer.set_directory",
                   "on": "change",
                   "type": "callHost",
                   "target": "media_indexer.action",
+                  "feedback": {
+                    "pending": {
+                      "label": "Setting..."
+                    },
+                    "observe": {
+                      "kind": "y",
+                      "path": "data/media_indexer/status",
+                      "scope": "node",
+                      "timeout_ms": 9000
+                    }
+                  },
                   "params": {
                     "id": "set_directory",
                     "directory": "$event.value",
@@ -185,9 +212,21 @@
               },
               "actions": [
                 {
+                  "id": "media_indexer.scan",
                   "on": "click:scan_selected",
                   "type": "callHost",
                   "target": "media_indexer.action",
+                  "feedback": {
+                    "pending": {
+                      "label": "Scanning..."
+                    },
+                    "observe": {
+                      "kind": "y",
+                      "path": "data/media_indexer/status",
+                      "scope": "node",
+                      "timeout_ms": 600000
+                    }
+                  },
                   "params": {
                     "id": "scan",
                     "_observe": {
@@ -216,11 +255,28 @@
                 "commitMode": "manual",
                 "saveLabel": "Search"
               },
+              "interaction": {
+                "submit": {
+                  "defaultAction": "media_indexer.search"
+                }
+              },
               "actions": [
                 {
+                  "id": "media_indexer.search",
                   "on": "change",
                   "type": "callHost",
                   "target": "media_indexer.action",
+                  "feedback": {
+                    "pending": {
+                      "label": "Searching..."
+                    },
+                    "observe": {
+                      "kind": "y",
+                      "path": "data/media_indexer/results",
+                      "scope": "node",
+                      "timeout_ms": 60000
+                    }
+                  },
                   "params": {
                     "id": "search",
                     "query": "$event.value",
