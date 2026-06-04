@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-04T11:31:37+00:00",
+  "updated_at": "2026-06-02T00:00:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -379,8 +379,8 @@
       "kind": "skill",
       "id": "redevice_list",
       "name": "redevice_list",
-      "version": "0.1.1",
-      "updated_at": "2026-05-31T21:09:02+00:00",
+      "version": "0.1.3",
+      "updated_at": "2026-06-02T00:00:00+00:00",
       "path": "skills/redevice_list",
       "manifest": "skills/redevice_list/skill.yaml",
       "source": {
@@ -395,7 +395,7 @@
       "description": "Workspace dashboard for ReDevice endpoint inventory, diagnostics, manifest, policy, revoke, and retire operations.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 3
+      "tools_count": 4
     },
     {
       "kind": "skill",
