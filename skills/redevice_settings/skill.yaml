@@ -1,0 +1,157 @@
+name: redevice_settings
+version: 0.1.1
+description: Service skill for ReDevice endpoint settings, assignment, status, and
+  policy-bound device actions.
+runtime:
+  python: '3.11'
+entry: handlers/main.py
+webui:
+  file: webui.json
+activation:
+  mode: lazy
+  when:
+    scenarios_active:
+    - redevice_user_face
+    - web_desktop
+    client_presence: true
+    webspace_scope: active
+  startup_allowed: true
+  background_refresh: false
+permissions:
+  events:
+    publish:
+    - io.out.stream.publish
+    subscribe:
+    - webio.stream.snapshot.requested
+    - webio.stream.subscription.changed
+tools:
+- name: refresh_redevice_settings_state
+  description: Refresh ReDevice settings state from Endpoint Registry and live ReDevice
+    snapshots.
+  entry: handlers.main:refresh_redevice_settings_state
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+- name: select_redevice_settings_endpoint
+  description: Select the ReDevice endpoint controlled by the settings scenario.
+  entry: handlers.main:select_redevice_settings_endpoint
+  input_schema:
+    type: object
+    properties:
+      device_ref:
+        type: string
+      code:
+        type: string
+      webspace_id:
+        type: string
+- name: rename_redevice_settings_endpoint
+  description: Rename a ReDevice endpoint and update comma-separated aliases.
+  entry: handlers.main:rename_redevice_settings_endpoint
+  input_schema:
+    type: object
+    properties:
+      device_ref:
+        type: string
+      code:
+        type: string
+      display_name:
+        type: string
+      aliases:
+        type: string
+      webspace_id:
+        type: string
+- name: set_redevice_assignment
+  description: Set the scenario-level assignment for the selected ReDevice endpoint.
+  entry: handlers.main:set_redevice_assignment
+  input_schema:
+    type: object
+    required:
+    - assignment
+    properties:
+      assignment:
+        type: string
+        enum:
+        - assistant
+        - slideshow
+        - voice_endpoint
+        - media_center
+        - webcam
+        - idle
+      device_ref:
+        type: string
+      code:
+        type: string
+      webspace_id:
+        type: string
+- name: send_redevice_settings_command
+  description: Send a policy-bound settings command to the selected ReDevice endpoint.
+  entry: handlers.main:send_redevice_settings_command
+  input_schema:
+    type: object
+    required:
+    - action
+    properties:
+      action:
+        type: string
+        enum:
+        - open_wifi
+        - open_bluetooth
+        - bluetooth_reconnect
+        - speaker_test
+        - volume_up
+        - volume_down
+        - keep_awake
+        - run_diagnostics
+        - logout
+      device_ref:
+        type: string
+      code:
+        type: string
+      webspace_id:
+        type: string
+- name: revoke_redevice_settings_endpoint
+  description: Revoke selected ReDevice endpoint admission.
+  entry: handlers.main:revoke_redevice_settings_endpoint
+  input_schema:
+    type: object
+    properties:
+      device_ref:
+        type: string
+      code:
+        type: string
+      webspace_id:
+        type: string
+- name: retire_redevice_settings_endpoint
+  description: Retire selected ReDevice endpoint from active use.
+  entry: handlers.main:retire_redevice_settings_endpoint
+  input_schema:
+    type: object
+    properties:
+      device_ref:
+        type: string
+      code:
+        type: string
+      webspace_id:
+        type: string
+data_routes:
+- surface: modal:redevice_settings_modal
+  route: stream
+  receiver: redevice_settings.state
+  first_paint: empty ReDevice settings state
+  recovery: latest endpoint settings snapshot is restored on subscribe
+  update_source:
+  - webio.stream.snapshot.requested
+  - redevice_settings.action
+  budget:
+    max_payload_bytes: 98304
+    max_publish_hz: 1
+    max_items: 128
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the last ReDevice settings state
+    log: service.redevice_settings.runtime.log
+    quarantine: false
+updated_at: '2026-06-04T20:55:10+00:00'
+
