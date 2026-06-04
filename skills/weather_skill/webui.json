@@ -19,6 +19,10 @@
         "path": "data/weather/current",
         "observeRoot": true
       },
+      "loading": {
+        "loadingText": "Loading weather...",
+        "emptyText": "--"
+      },
       "inputs": {
         "valuePath": "temp_c",
         "format": "number",
@@ -58,6 +62,12 @@
               }
             ]
           },
+          "interaction": {
+            "initialFocus": "widget:weather-city-input",
+            "submit": {
+              "defaultAction": "weather.update_city"
+            }
+          },
           "widgets": [
             {
               "id": "weather-summary",
@@ -68,6 +78,10 @@
                 "kind": "y",
                 "path": "data/weather/current",
                 "observeRoot": true
+              },
+              "loading": {
+                "loadingText": "Loading weather...",
+                "emptyText": "--"
               },
               "inputs": {
                 "valuePath": "temp_c",
@@ -97,9 +111,26 @@
               },
               "actions": [
                 {
+                  "id": "weather.use_current_location",
                   "on": "click:browser-location",
                   "type": "callHost",
                   "target": "skill.event.publish",
+                  "feedback": {
+                    "pending": {
+                      "label": "Locating..."
+                    },
+                    "observe": {
+                      "kind": "y",
+                      "path": "data/weather/current",
+                      "scope": "node",
+                      "timeout_ms": 9000,
+                      "match": {
+                        "request_id": "$client.requestId",
+                        "pending": false
+                      },
+                      "advanceFields": ["request_id", "updated_at", "pending"]
+                    }
+                  },
                   "params": {
                     "event_type": "weather.location.requested",
                     "payload": {
@@ -137,11 +168,33 @@
                 "commitMode": "manual",
                 "saveLabel": "Update"
               },
+              "interaction": {
+                "submit": {
+                  "defaultAction": "weather.update_city"
+                }
+              },
               "actions": [
                 {
+                  "id": "weather.update_city",
                   "on": "change",
                   "type": "callHost",
                   "target": "skill.event.publish",
+                  "feedback": {
+                    "pending": {
+                      "label": "Updating..."
+                    },
+                    "observe": {
+                      "kind": "y",
+                      "path": "data/weather/current",
+                      "scope": "node",
+                      "timeout_ms": 9000,
+                      "match": {
+                        "request_id": "$client.requestId",
+                        "pending": false
+                      },
+                      "advanceFields": ["request_id", "updated_at", "pending"]
+                    }
+                  },
                   "params": {
                     "event_type": "weather.location.requested",
                     "payload": {
@@ -185,9 +238,26 @@
               },
               "actions": [
                 {
+                  "id": "weather.select_city",
                   "on": "change",
                   "type": "callHost",
                   "target": "skill.event.publish",
+                  "feedback": {
+                    "pending": {
+                      "label": "Updating..."
+                    },
+                    "observe": {
+                      "kind": "y",
+                      "path": "data/weather/current",
+                      "scope": "node",
+                      "timeout_ms": 9000,
+                      "match": {
+                        "request_id": "$client.requestId",
+                        "pending": false
+                      },
+                      "advanceFields": ["request_id", "updated_at", "pending"]
+                    }
+                  },
                   "params": {
                     "event_type": "weather.location.requested",
                     "payload": {
