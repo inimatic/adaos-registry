@@ -139,7 +139,7 @@
             },
             {
               "id": "voice-summary",
-              "type": "ui.summary",
+              "type": "visual.metricTile",
               "area": "main",
               "title": "Voice endpoint",
               "dataSource": {
@@ -275,7 +275,7 @@
             },
             {
               "id": "voice-json",
-              "type": "ui.json",
+              "type": "ui.jsonViewer",
               "area": "main",
               "title": "Debug state",
               "dataSource": {

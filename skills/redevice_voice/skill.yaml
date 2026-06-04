@@ -29,7 +29,8 @@ permissions:
 tools:
   - name: refresh_redevice_voice_state
     description: Refresh ReDevice voice endpoint state and process the latest endpoint audio/control event.
-    parameters:
+    entry: handlers.main:refresh_redevice_voice_state
+    input_schema:
       type: object
       properties:
         code:
@@ -40,7 +41,8 @@ tools:
           description: Optional webspace id.
   - name: start_redevice_voice
     description: Start a debug push-to-talk voice endpoint session on a selected ReDevice.
-    parameters:
+    entry: handlers.main:start_redevice_voice
+    input_schema:
       type: object
       properties:
         code:
@@ -64,7 +66,8 @@ tools:
           description: Optional webspace id.
   - name: select_redevice_voice_endpoint
     description: Select the ReDevice endpoint used by the voice debug surface.
-    parameters:
+    entry: handlers.main:select_redevice_voice_endpoint
+    input_schema:
       type: object
       properties:
         code:
