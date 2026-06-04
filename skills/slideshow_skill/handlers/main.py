@@ -1717,6 +1717,31 @@ def _sync_running_surface(
     return _send_to_selected(state, selected_files, code=code, webspace_id=webspace_id)
 
 
+def _active_app_conflicts(
+    devices: list[Mapping[str, Any]],
+    selected_codes: list[str],
+) -> list[dict[str, str]]:
+    selected = set(_unique_texts(selected_codes))
+    conflicts: list[dict[str, str]] = []
+    if not selected:
+        return conflicts
+    for item in devices:
+        code = _text(item.get("code"))
+        if code not in selected:
+            continue
+        active_app = _mapping(item.get("active_app"))
+        owner = _text(active_app.get("skill_id") or active_app.get("app_id"))
+        if owner and owner != "slideshow_skill":
+            conflicts.append(
+                {
+                    "code": code,
+                    "skill_id": owner,
+                    "label": _text(active_app.get("label")) or owner,
+                }
+            )
+    return conflicts
+
+
 def _stop_selected(
     state: Mapping[str, Any],
     *,
@@ -1839,11 +1864,21 @@ def _apply_service_tick(
     state: dict[str, Any],
     files: list[Path],
     *,
+    devices: list[Mapping[str, Any]] | None = None,
     webspace_id: str | None = None,
 ) -> bool:
     if not state.get("running"):
         return False
-    if not _unique_texts(state.get("selected_codes")):
+    selected_codes = _unique_texts(state.get("selected_codes"))
+    if not selected_codes:
+        return False
+    conflicts = _active_app_conflicts(devices or [], selected_codes)
+    if conflicts:
+        state["running"] = False
+        state["last_surface_sync_reason"] = "paused_active_app_conflict"
+        state["last_active_app_conflict"] = conflicts[0]
+        state["last_service_tick_at"] = time.time()
+        _save_state(state)
         return False
     if not _selected_photos(files, state):
         return False
@@ -1876,7 +1911,7 @@ def _poll_once(webspace_id: str | None = None) -> None:
         devices = _load_devices()
         files = _files_for_state(state, _MAX_CONTROL_SCAN)
         state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=True)
-        _apply_service_tick(state, files, webspace_id=webspace_id)
+        _apply_service_tick(state, files, devices=devices, webspace_id=webspace_id)
         _publish(
             _SESSION_RECEIVER,
             _session_payload(
