@@ -49,6 +49,9 @@
 				"title": "Voice",
 				"schema": {
 					"id": "voice_chat_modal",
+					"interaction": {
+						"initialFocus": "widget:chat"
+					},
 				"layout": {
 					"type": "single",
 					"pattern": "stack",
