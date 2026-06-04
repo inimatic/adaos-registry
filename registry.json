@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-04T11:47:26+00:00",
+  "updated_at": "2026-06-04T12:44:21+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -396,6 +396,28 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "tools_count": 4
+    },
+    {
+      "kind": "skill",
+      "id": "redevice_voice",
+      "name": "redevice_voice",
+      "version": "0.1.0",
+      "updated_at": "2026-06-04T12:44:21+00:00",
+      "path": "skills/redevice_voice",
+      "manifest": "skills/redevice_voice/skill.yaml",
+      "source": {
+        "path": "skills/redevice_voice",
+        "manifest": "skills/redevice_voice/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "redevice_voice",
+        "id": "redevice_voice"
+      },
+      "description": "Debug ReDevice voice endpoint skill with push-to-talk audio capture and member-side STT routing.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 3
     },
     {
       "kind": "skill",
