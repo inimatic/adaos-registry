@@ -106,6 +106,10 @@
                     {
                       "id": "signals",
                       "label": "Signals"
+                    },
+                    {
+                      "id": "check",
+                      "label": "Check"
                     }
                   ]
                 },
@@ -130,8 +134,58 @@
                     "params": {
                       "nluTeacherTab": "signals"
                     }
+                  },
+                  {
+                    "on": "click:check",
+                    "type": "updateState",
+                    "params": {
+                      "nluTeacherTab": "check"
+                    }
                   }
                 ]
+              },
+              {
+                "id": "nlu-check-form",
+                "type": "ui.form",
+                "area": "main",
+                "title": "Check phrase",
+                "inputs": {
+                  "submitLabel": "Check",
+                  "fields": [
+                    {
+                      "id": "phrase",
+                      "type": "text",
+                      "label": "Phrase",
+                      "placeholder": "Покажи переменные окружения подсети"
+                    }
+                  ]
+                },
+                "visibleIf": "$state.nluTeacherTab === 'check'",
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "callHost",
+                    "target": "nlu.teacher.probe",
+                    "params": {
+                      "text": "$event.values.phrase",
+                      "result_state_key": "nluTeacherProbeResult",
+                      "use_rasa": true,
+                      "emit_trace": true
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "nlu-check-result",
+                "type": "ui.jsonViewer",
+                "area": "main",
+                "title": "Probe result",
+                "inputs": {
+                  "stateKey": "nluTeacherProbeResult",
+                  "emptyText": "No phrase checked yet"
+                },
+                "visibleIf": "$state.nluTeacherTab === 'check'",
+                "actions": []
               },
               {
                 "id": "nlu-requests",
@@ -150,7 +204,7 @@
                   "subtitleKey": "subtitle",
                   "itemAccordion": true,
                   "detailsPath": "details",
-                  "detailsModal": true,
+                  "detailsModal": false,
                   "detailsModalTitleKey": "title",
                   "buttons": [
                     {
@@ -193,7 +247,7 @@
                   "subtitleKey": "candidate_meta",
                   "itemAccordion": true,
                   "detailsPath": "details",
-                  "detailsModal": true,
+                  "detailsModal": false,
                   "detailsModalTitleKey": "candidate_name",
                   "buttons": [
                     {
@@ -204,11 +258,11 @@
                       "whenEquals": "pending"
                     },
                     {
-                      "id": "applyScenario",
-                      "label": "Apply to Scenario",
-                      "icon": "checkmark-circle-outline",
+                      "id": "rollback",
+                      "label": "Rollback",
+                      "icon": "refresh-outline",
                       "whenKey": "candidate_status",
-                      "whenEquals": "pending"
+                      "whenEquals": "applied"
                     }
                   ]
                 },
@@ -224,15 +278,12 @@
                     }
                   },
                   {
-                    "on": "click:applyScenario",
+                    "on": "click:rollback",
                     "type": "callHost",
-                    "target": "nlp.teacher.candidate.apply",
+                    "target": "nlp.teacher.candidate.rollback",
                     "params": {
                       "candidate_id": "$event.candidate_id",
-                      "target": {
-                        "type": "scenario",
-                        "id": "$event.candidate_origin_scenario_id"
-                      }
+                      "target": "$event.candidate_target"
                     }
                   }
                 ]
@@ -254,7 +305,7 @@
                   "subtitleKey": "subtitle",
                   "itemAccordion": true,
                   "detailsPath": "details",
-                  "detailsModal": true,
+                  "detailsModal": false,
                   "detailsModalTitleKey": "title"
                 },
                 "visibleIf": "$state.nluTeacherTab === 'signals'",
@@ -269,6 +320,7 @@
   "registry": {
     "widgets": [
       "input.commandBar",
+      "ui.form",
       "ui.list",
       "ui.jsonViewer"
     ],
