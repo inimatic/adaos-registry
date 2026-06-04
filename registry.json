@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-04T08:30:06+00:00",
+  "updated_at": "2026-06-01T16:45:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -91,8 +91,8 @@
       "kind": "skill",
       "id": "greet_on_boot_skill",
       "name": "greet_on_boot_skill",
-      "version": "0.2.0",
-      "updated_at": "2026-04-07T19:49:12+00:00",
+      "version": "0.2.1",
+      "updated_at": "2026-06-01T16:45:00+00:00",
       "path": "skills/greet_on_boot_skill",
       "manifest": "skills/greet_on_boot_skill/skill.yaml",
       "source": {
