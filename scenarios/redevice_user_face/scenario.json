@@ -1,0 +1,29 @@
+{
+  "id": "redevice_user_face",
+  "version": "0.1.1",
+  "ui": {
+    "application": {
+      "version": "0.1",
+      "desktop": {
+        "topbar": [],
+        "iconTemplate": {
+          "icon": "apps-outline"
+        },
+        "widgetTemplate": {
+          "style": {
+            "minWidth": 240
+          }
+        },
+        "pinnedWidgets": []
+      }
+    }
+  },
+  "catalog": {
+    "apps": [],
+    "widgets": []
+  },
+  "registry": {
+    "widgets": [],
+    "modals": []
+  }
+}
