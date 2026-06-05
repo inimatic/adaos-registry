@@ -12,7 +12,9 @@
           "selected": {},
           "items": [],
           "count": 0,
+          "summary": {},
           "status": [],
+          "inspection": [],
           "sections": {},
           "assignment_presets": [],
           "last_command": {},
@@ -71,15 +73,14 @@
             "type": "split",
             "pattern": "split",
             "areas": [
-              {
-                "id": "main",
-                "role": "main"
-              },
-              {
-                "id": "right",
-                "role": "aux"
-              }
+              { "id": "main", "role": "main" },
+              { "id": "right", "role": "aux" }
             ]
+          },
+          "initialState": {
+            "redeviceSettingsRef": "",
+            "redeviceSettingsName": "",
+            "redeviceSettingsAliases": ""
           },
           "widgets": [
             {
@@ -90,101 +91,51 @@
               "inputs": {
                 "size": "small",
                 "buttons": [
-                  {
-                    "id": "refresh",
-                    "label": "Refresh"
-                  },
-                  {
-                    "id": "wifi",
-                    "label": "Wi-Fi"
-                  },
-                  {
-                    "id": "bluetooth",
-                    "label": "Bluetooth"
-                  },
-                  {
-                    "id": "speaker",
-                    "label": "Speaker test"
-                  },
-                  {
-                    "id": "diagnostics",
-                    "label": "Diagnostics"
-                  },
-                  {
-                    "id": "logout",
-                    "label": "Logout"
-                  }
+                  { "id": "refresh", "label": "Refresh" },
+                  { "id": "wifi", "label": "Wi-Fi" },
+                  { "id": "bluetooth", "label": "Bluetooth" },
+                  { "id": "speaker", "label": "Speaker" },
+                  { "id": "diagnostics", "label": "Diagnostics" },
+                  { "id": "logout", "label": "Logout" }
                 ]
               },
               "actions": [
-                {
-                  "on": "click:refresh",
-                  "type": "callSkill",
-                  "target": "redevice_settings.refresh_redevice_settings_state",
-                  "params": {}
-                },
-                {
-                  "on": "click:wifi",
-                  "type": "callSkill",
-                  "target": "redevice_settings.send_redevice_settings_command",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "action": "open_wifi"
-                  }
-                },
-                {
-                  "on": "click:bluetooth",
-                  "type": "callSkill",
-                  "target": "redevice_settings.send_redevice_settings_command",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "action": "open_bluetooth"
-                  }
-                },
-                {
-                  "on": "click:speaker",
-                  "type": "callSkill",
-                  "target": "redevice_settings.send_redevice_settings_command",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "action": "speaker_test"
-                  }
-                },
-                {
-                  "on": "click:diagnostics",
-                  "type": "callSkill",
-                  "target": "redevice_settings.send_redevice_settings_command",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "action": "run_diagnostics"
-                  }
-                },
-                {
-                  "on": "click:logout",
-                  "type": "callSkill",
-                  "target": "redevice_settings.send_redevice_settings_command",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "action": "logout"
-                  }
-                }
+                { "on": "click:refresh", "type": "callSkill", "target": "redevice_settings.refresh_redevice_settings_state", "params": {} },
+                { "on": "click:wifi", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "open_wifi" } },
+                { "on": "click:bluetooth", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "open_bluetooth" } },
+                { "on": "click:speaker", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "speaker_test" } },
+                { "on": "click:diagnostics", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "run_diagnostics" } },
+                { "on": "click:logout", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "logout" } }
               ]
             },
             {
-              "id": "settings-status",
-              "type": "ui.list",
+              "id": "settings-fleet-tile",
+              "type": "visual.metricTile",
               "area": "main",
-              "title": "Endpoint summary",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "redevice_settings.state",
-                "path": "status"
-              },
+              "title": "Endpoint Registry",
+              "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "summary.fleet" },
               "inputs": {
-                "titleKey": "title",
-                "subtitleKey": "subtitle",
-                "descriptionKey": "value",
-                "emptyText": "No ReDevice endpoint selected"
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "0"
+              }
+            },
+            {
+              "id": "settings-selected-tile",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Selected endpoint",
+              "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "summary.selected" },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "-"
               }
             },
             {
@@ -192,289 +143,89 @@
               "type": "ui.table",
               "area": "main",
               "title": "ReDevice endpoints",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "redevice_settings.state",
-                "path": "items"
-              },
+              "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "items" },
               "inputs": {
                 "emptyText": "No ReDevice endpoints",
                 "columns": [
-                  {
-                    "key": "selected_label",
-                    "label": "Selected",
-                    "width": "90px"
-                  },
-                  {
-                    "key": "title",
-                    "label": "Device"
-                  },
-                  {
-                    "key": "online_state",
-                    "label": "Online",
-                    "width": "90px"
-                  },
-                  {
-                    "key": "last_seen",
-                    "label": "Last seen",
-                    "width": "100px"
-                  },
-                  {
-                    "key": "assignment",
-                    "label": "Assignment",
-                    "width": "130px"
-                  },
-                  {
-                    "key": "active_app",
-                    "label": "Active app",
-                    "width": "130px"
-                  },
-                  {
-                    "key": "trust_level",
-                    "label": "Trust",
-                    "width": "90px"
-                  },
-                  {
-                    "key": "code",
-                    "label": "Code",
-                    "width": "100px"
-                  },
+                  { "key": "selected_label", "label": "Selected", "width": "82px" },
+                  { "key": "title", "label": "Device" },
+                  { "key": "online_state", "label": "State", "width": "90px" },
+                  { "key": "last_seen", "label": "Seen", "width": "72px" },
+                  { "key": "assignment", "label": "Role", "width": "116px" },
                   {
                     "key": "_actions",
                     "label": "Actions",
                     "kind": "buttons",
-                    "width": "260px",
+                    "width": "250px",
                     "buttons": [
-                      {
-                        "id": "select",
-                        "label": "Use"
-                      },
-                      {
-                        "id": "slideshow",
-                        "label": "Slideshow"
-                      },
-                      {
-                        "id": "voice",
-                        "label": "Voice"
-                      },
-                      {
-                        "id": "revoke",
-                        "label": "Revoke"
-                      }
+                      { "id": "select", "label": "Use" },
+                      { "id": "slideshow", "label": "Slideshow" },
+                      { "id": "voice", "label": "Voice" },
+                      { "id": "revoke", "label": "Revoke" }
                     ]
                   }
                 ]
               },
               "actions": [
-                {
-                  "on": "click:select",
-                  "type": "callSkill",
-                  "target": "redevice_settings.select_redevice_settings_endpoint",
-                  "params": {
-                    "device_ref": "$event.ref"
-                  }
-                },
-                {
-                  "on": "click:slideshow",
-                  "type": "callSkill",
-                  "target": "slideshow_skill.select_redevice_endpoint",
-                  "params": {
-                    "code": "$event.code"
-                  }
-                },
-                {
-                  "on": "click:voice",
-                  "type": "callSkill",
-                  "target": "redevice_voice.start_redevice_voice",
-                  "params": {
-                    "code": "$event.code",
-                    "lang": "ru",
-                    "mode": "vad",
-                    "max_duration_ms": 8000
-                  }
-                },
-                {
-                  "on": "click:revoke",
-                  "type": "callSkill",
-                  "target": "redevice_settings.revoke_redevice_settings_endpoint",
-                  "params": {
-                    "device_ref": "$event.ref",
-                    "code": "$event.code"
-                  }
-                }
+                { "on": "click:select", "type": "updateState", "params": { "redeviceSettingsRef": "$event.ref", "redeviceSettingsName": "$event.title", "redeviceSettingsAliases": "$event.aliases" } },
+                { "on": "click:select", "type": "callSkill", "target": "redevice_settings.select_redevice_settings_endpoint", "params": { "device_ref": "$event.ref" } },
+                { "on": "click:slideshow", "type": "callSkill", "target": "slideshow_skill.select_redevice_endpoint", "params": { "code": "$event.code" } },
+                { "on": "click:voice", "type": "callSkill", "target": "redevice_voice.start_redevice_voice", "params": { "code": "$event.code", "lang": "ru", "mode": "vad", "max_duration_ms": 8000 } },
+                { "on": "click:revoke", "type": "callSkill", "target": "redevice_settings.revoke_redevice_settings_endpoint", "params": { "device_ref": "$event.ref", "code": "$event.code" } }
               ]
             },
             {
               "id": "settings-assignment",
               "type": "ui.actions",
               "area": "main",
-              "title": "Current assignment",
+              "title": "Assignment",
               "inputs": {
                 "size": "small",
                 "buttons": [
-                  {
-                    "id": "assistant",
-                    "label": "Assistant"
-                  },
-                  {
-                    "id": "slideshow",
-                    "label": "Slideshow"
-                  },
-                  {
-                    "id": "voice",
-                    "label": "Voice"
-                  },
-                  {
-                    "id": "media",
-                    "label": "Media center"
-                  },
-                  {
-                    "id": "idle",
-                    "label": "Idle"
-                  }
+                  { "id": "assistant", "label": "Assistant" },
+                  { "id": "slideshow", "label": "Slideshow" },
+                  { "id": "voice", "label": "Voice" },
+                  { "id": "media", "label": "Media center" },
+                  { "id": "idle", "label": "Idle" }
                 ]
               },
               "actions": [
-                {
-                  "on": "click:assistant",
-                  "type": "callSkill",
-                  "target": "redevice_settings.set_redevice_assignment",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "assignment": "assistant"
-                  }
-                },
-                {
-                  "on": "click:slideshow",
-                  "type": "callSkill",
-                  "target": "redevice_settings.set_redevice_assignment",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "assignment": "slideshow"
-                  }
-                },
-                {
-                  "on": "click:voice",
-                  "type": "callSkill",
-                  "target": "redevice_settings.set_redevice_assignment",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "assignment": "voice_endpoint"
-                  }
-                },
-                {
-                  "on": "click:media",
-                  "type": "callSkill",
-                  "target": "redevice_settings.set_redevice_assignment",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "assignment": "media_center"
-                  }
-                },
-                {
-                  "on": "click:idle",
-                  "type": "callSkill",
-                  "target": "redevice_settings.set_redevice_assignment",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "assignment": "idle"
-                  }
-                }
+                { "on": "click:assistant", "type": "callSkill", "target": "redevice_settings.set_redevice_assignment", "params": { "device_ref": "$state.redeviceSettingsRef", "assignment": "assistant" } },
+                { "on": "click:slideshow", "type": "callSkill", "target": "redevice_settings.set_redevice_assignment", "params": { "device_ref": "$state.redeviceSettingsRef", "assignment": "slideshow" } },
+                { "on": "click:voice", "type": "callSkill", "target": "redevice_settings.set_redevice_assignment", "params": { "device_ref": "$state.redeviceSettingsRef", "assignment": "voice_endpoint" } },
+                { "on": "click:media", "type": "callSkill", "target": "redevice_settings.set_redevice_assignment", "params": { "device_ref": "$state.redeviceSettingsRef", "assignment": "media_center" } },
+                { "on": "click:idle", "type": "callSkill", "target": "redevice_settings.set_redevice_assignment", "params": { "device_ref": "$state.redeviceSettingsRef", "assignment": "idle" } }
               ]
             },
             {
-              "id": "settings-display-name",
-              "type": "input.text",
-              "area": "right",
-              "title": "Display name",
-              "inputs": {
-                "initialValue": "",
-                "placeholder": "Kitchen tablet",
-                "commitMode": "manual",
-                "saveLabel": "Use name",
-                "helper": "Fill this value, then press Rename selected."
-              },
-              "actions": [
-                {
-                  "on": "change",
-                  "type": "updateState",
-                  "params": {
-                    "redeviceSettingsName": "$event.value"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "settings-aliases",
-              "type": "input.text",
-              "area": "right",
-              "title": "Aliases",
-              "inputs": {
-                "initialValue": "",
-                "placeholder": "Kitchen tablet, TF201",
-                "commitMode": "manual",
-                "saveLabel": "Use aliases",
-                "helper": "Comma-separated names for voice and UI matching."
-              },
-              "actions": [
-                {
-                  "on": "change",
-                  "type": "updateState",
-                  "params": {
-                    "redeviceSettingsAliases": "$event.value"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "settings-profile-actions",
+              "id": "settings-inspect-actions",
               "type": "ui.actions",
-              "area": "right",
-              "title": "Profile",
+              "area": "main",
+              "title": "Inspect",
               "inputs": {
                 "size": "small",
                 "buttons": [
-                  {
-                    "id": "rename",
-                    "label": "Rename selected"
-                  },
-                  {
-                    "id": "retire",
-                    "label": "Retire"
-                  }
+                  { "id": "connectivity", "label": "Connectivity" },
+                  { "id": "io", "label": "I/O" },
+                  { "id": "contracts", "label": "Contracts" },
+                  { "id": "slideshow", "label": "Open slideshow" },
+                  { "id": "voice", "label": "Open voice" }
                 ]
               },
               "actions": [
-                {
-                  "on": "click:rename",
-                  "type": "callSkill",
-                  "target": "redevice_settings.rename_redevice_settings_endpoint",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef",
-                    "display_name": "$state.redeviceSettingsName",
-                    "aliases": "$state.redeviceSettingsAliases"
-                  }
-                },
-                {
-                  "on": "click:retire",
-                  "type": "callSkill",
-                  "target": "redevice_settings.retire_redevice_settings_endpoint",
-                  "params": {
-                    "device_ref": "$state.redeviceSettingsRef"
-                  }
-                }
+                { "on": "click:connectivity", "type": "openModal", "params": { "modalId": "redevice_settings_connectivity_modal" } },
+                { "on": "click:io", "type": "openModal", "params": { "modalId": "redevice_settings_io_modal" } },
+                { "on": "click:contracts", "type": "openModal", "params": { "modalId": "redevice_settings_contracts_modal" } },
+                { "on": "click:slideshow", "type": "openModal", "params": { "modalId": "slideshow_modal" } },
+                { "on": "click:voice", "type": "openModal", "params": { "modalId": "redevice_voice_modal" } }
               ]
             },
             {
-              "id": "settings-overview",
+              "id": "settings-selected-compact",
               "type": "ui.list",
               "area": "right",
-              "title": "Overview",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "redevice_settings.state",
-                "path": "sections.overview"
-              },
+              "title": "Selected",
+              "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.right_summary" },
               "inputs": {
                 "titleKey": "title",
                 "descriptionKey": "description",
@@ -483,116 +234,108 @@
               }
             },
             {
-              "id": "settings-network",
-              "type": "ui.list",
+              "id": "settings-display-name",
+              "type": "input.text",
               "area": "right",
-              "title": "Network",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "redevice_settings.state",
-                "path": "sections.network"
-              },
-              "inputs": {
-                "titleKey": "title",
-                "descriptionKey": "description",
-                "subtitleKey": "subtitle",
-                "emptyText": "No network diagnostics"
-              }
+              "title": "Display name",
+              "inputs": { "initialValue": "", "placeholder": "Kitchen tablet", "commitMode": "manual", "saveLabel": "Use name", "helper": "Fill this value, then press Rename selected." },
+              "actions": [{ "on": "change", "type": "updateState", "params": { "redeviceSettingsName": "$event.value" } }]
             },
             {
-              "id": "settings-bluetooth",
-              "type": "ui.list",
+              "id": "settings-aliases",
+              "type": "input.text",
               "area": "right",
-              "title": "Bluetooth",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "redevice_settings.state",
-                "path": "sections.bluetooth"
-              },
-              "inputs": {
-                "titleKey": "title",
-                "descriptionKey": "description",
-                "subtitleKey": "subtitle",
-                "emptyText": "No Bluetooth diagnostics"
-              }
+              "title": "Aliases",
+              "inputs": { "initialValue": "", "placeholder": "Kitchen tablet, TF201", "commitMode": "manual", "saveLabel": "Use aliases", "helper": "Comma-separated names for voice and UI matching." },
+              "actions": [{ "on": "change", "type": "updateState", "params": { "redeviceSettingsAliases": "$event.value" } }]
             },
             {
-              "id": "settings-audio",
-              "type": "ui.list",
+              "id": "settings-profile-actions",
+              "type": "ui.actions",
               "area": "right",
-              "title": "Audio",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "redevice_settings.state",
-                "path": "sections.audio"
-              },
-              "inputs": {
-                "titleKey": "title",
-                "descriptionKey": "description",
-                "subtitleKey": "subtitle",
-                "emptyText": "No audio diagnostics"
-              }
+              "title": "Profile",
+              "inputs": { "size": "small", "buttons": [{ "id": "rename", "label": "Rename" }, { "id": "retire", "label": "Retire" }] },
+              "actions": [
+                { "on": "click:rename", "type": "callSkill", "target": "redevice_settings.rename_redevice_settings_endpoint", "params": { "device_ref": "$state.redeviceSettingsRef", "display_name": "$state.redeviceSettingsName", "aliases": "$state.redeviceSettingsAliases" } },
+                { "on": "click:retire", "type": "callSkill", "target": "redevice_settings.retire_redevice_settings_endpoint", "params": { "device_ref": "$state.redeviceSettingsRef" } }
+              ]
             },
             {
-              "id": "settings-display",
+              "id": "settings-inspection-list",
               "type": "ui.list",
               "area": "right",
-              "title": "Display",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "redevice_settings.state",
-                "path": "sections.display"
-              },
-              "inputs": {
-                "titleKey": "title",
-                "descriptionKey": "description",
-                "subtitleKey": "subtitle",
-                "emptyText": "No display diagnostics"
-              }
-            },
-            {
-              "id": "settings-about",
-              "type": "ui.list",
-              "area": "right",
-              "title": "About",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "redevice_settings.state",
-                "path": "sections.about"
-              },
-              "inputs": {
-                "titleKey": "title",
-                "descriptionKey": "description",
-                "detailsPath": "details",
-                "showDetails": true,
-                "emptyText": "No endpoint details"
-              }
-            },
-            {
-              "id": "settings-last-command",
-              "type": "ui.jsonViewer",
-              "area": "right",
-              "title": "Last command",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "redevice_settings.state",
-                "path": "last_command"
-              },
-              "inputs": {
-                "maxHeight": "280px"
-              }
+              "title": "Details",
+              "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "inspection" },
+              "inputs": { "titleKey": "title", "descriptionKey": "description", "subtitleKey": "subtitle", "iconKey": "icon", "emptyText": "No selected endpoint" }
             }
+          ]
+        }
+      },
+      "redevice_settings_connectivity_modal": {
+        "title": "ReDevice Connectivity",
+        "schema": {
+          "id": "redevice_settings_connectivity_modal",
+          "layout": { "type": "split", "pattern": "split", "areas": [{ "id": "main", "role": "main" }, { "id": "right", "role": "aux" }] },
+          "widgets": [
+            { "id": "settings-network", "type": "ui.list", "area": "main", "title": "Network", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.network" }, "inputs": { "titleKey": "title", "descriptionKey": "description", "subtitleKey": "subtitle", "emptyText": "No network diagnostics" } },
+            { "id": "settings-bluetooth", "type": "ui.list", "area": "main", "title": "Bluetooth", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.bluetooth" }, "inputs": { "titleKey": "title", "descriptionKey": "description", "subtitleKey": "subtitle", "emptyText": "No Bluetooth diagnostics" } },
+            {
+              "id": "settings-connectivity-actions",
+              "type": "ui.actions",
+              "area": "right",
+              "title": "Actions",
+              "inputs": { "variant": "stack", "buttons": [{ "id": "wifi", "label": "Open Wi-Fi settings" }, { "id": "bluetooth", "label": "Open Bluetooth settings" }, { "id": "reconnect", "label": "Reconnect speaker" }] },
+              "actions": [
+                { "on": "click:wifi", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "open_wifi" } },
+                { "on": "click:bluetooth", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "open_bluetooth" } },
+                { "on": "click:reconnect", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "bluetooth_reconnect" } }
+              ]
+            }
+          ]
+        }
+      },
+      "redevice_settings_io_modal": {
+        "title": "ReDevice I/O",
+        "schema": {
+          "id": "redevice_settings_io_modal",
+          "layout": { "type": "split", "pattern": "split", "areas": [{ "id": "main", "role": "main" }, { "id": "right", "role": "aux" }] },
+          "widgets": [
+            { "id": "settings-audio", "type": "ui.list", "area": "main", "title": "Audio", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.audio" }, "inputs": { "titleKey": "title", "descriptionKey": "description", "subtitleKey": "subtitle", "emptyText": "No audio diagnostics" } },
+            { "id": "settings-display", "type": "ui.list", "area": "main", "title": "Display", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.display" }, "inputs": { "titleKey": "title", "descriptionKey": "description", "subtitleKey": "subtitle", "emptyText": "No display diagnostics" } },
+            { "id": "settings-battery", "type": "ui.list", "area": "main", "title": "Battery", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.battery" }, "inputs": { "titleKey": "title", "descriptionKey": "description", "subtitleKey": "subtitle", "emptyText": "No battery diagnostics" } },
+            { "id": "settings-location", "type": "ui.list", "area": "main", "title": "Location", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.location" }, "inputs": { "titleKey": "title", "descriptionKey": "description", "subtitleKey": "subtitle", "emptyText": "No location diagnostics" } },
+            {
+              "id": "settings-io-actions",
+              "type": "ui.actions",
+              "area": "right",
+              "title": "Actions",
+              "inputs": { "variant": "stack", "buttons": [{ "id": "speaker", "label": "Speaker test" }, { "id": "up", "label": "Volume up" }, { "id": "down", "label": "Volume down" }, { "id": "diagnostics", "label": "Run diagnostics" }] },
+              "actions": [
+                { "on": "click:speaker", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "speaker_test" } },
+                { "on": "click:up", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "volume_up" } },
+                { "on": "click:down", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "volume_down" } },
+                { "on": "click:diagnostics", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "run_diagnostics" } }
+              ]
+            }
+          ]
+        }
+      },
+      "redevice_settings_contracts_modal": {
+        "title": "ReDevice Contracts",
+        "schema": {
+          "id": "redevice_settings_contracts_modal",
+          "layout": { "type": "split", "pattern": "split", "areas": [{ "id": "main", "role": "main" }, { "id": "right", "role": "aux" }] },
+          "widgets": [
+            { "id": "settings-overview", "type": "ui.list", "area": "main", "title": "Overview", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.overview" }, "inputs": { "titleKey": "title", "descriptionKey": "description", "subtitleKey": "subtitle", "emptyText": "No selected endpoint" } },
+            { "id": "settings-apps", "type": "ui.list", "area": "main", "title": "Scenario skills", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.apps" }, "inputs": { "titleKey": "title", "descriptionKey": "description", "subtitleKey": "subtitle", "emptyText": "No scenario details" } },
+            { "id": "settings-about", "type": "ui.list", "area": "right", "title": "Manifest and policy", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "sections.about" }, "inputs": { "titleKey": "title", "descriptionKey": "description", "detailsPath": "details", "showDetails": true, "itemAccordion": true, "emptyText": "No endpoint details" } },
+            { "id": "settings-last-command", "type": "ui.jsonViewer", "area": "right", "title": "Last command", "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "last_command" }, "inputs": { "emptyText": "No command sent yet" } }
           ]
         }
       }
     }
   },
   "contributions": [
-    {
-      "extensionPoint": "desktop.apps",
-      "type": "app",
-      "id": "redevice_settings_app",
-      "autoInstall": true
-    }
+    { "extensionPoint": "desktop.apps", "type": "app", "id": "redevice_settings_app", "autoInstall": true }
   ]
 }

@@ -1,5 +1,5 @@
 name: redevice_settings
-version: 0.1.1
+version: 0.1.2
 description: Service skill for ReDevice endpoint settings, assignment, status, and
   policy-bound device actions.
 runtime:
@@ -153,5 +153,56 @@ data_routes:
     degraded_state: keep the last ReDevice settings state
     log: service.redevice_settings.runtime.log
     quarantine: false
-updated_at: '2026-06-04T20:55:10+00:00'
+- surface: modal:redevice_settings_connectivity_modal
+  route: stream
+  receiver: redevice_settings.state
+  first_paint: selected endpoint connectivity snapshot
+  recovery: latest endpoint settings snapshot is restored on subscribe
+  update_source:
+  - webio.stream.snapshot.requested
+  - redevice_settings.action
+  budget:
+    max_payload_bytes: 98304
+    max_publish_hz: 1
+    max_items: 128
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the last ReDevice settings state
+    log: service.redevice_settings.runtime.log
+    quarantine: false
+- surface: modal:redevice_settings_io_modal
+  route: stream
+  receiver: redevice_settings.state
+  first_paint: selected endpoint I/O snapshot
+  recovery: latest endpoint settings snapshot is restored on subscribe
+  update_source:
+  - webio.stream.snapshot.requested
+  - redevice_settings.action
+  budget:
+    max_payload_bytes: 98304
+    max_publish_hz: 1
+    max_items: 128
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the last ReDevice settings state
+    log: service.redevice_settings.runtime.log
+    quarantine: false
+- surface: modal:redevice_settings_contracts_modal
+  route: stream
+  receiver: redevice_settings.state
+  first_paint: selected endpoint manifest and policy snapshot
+  recovery: latest endpoint settings snapshot is restored on subscribe
+  update_source:
+  - webio.stream.snapshot.requested
+  - redevice_settings.action
+  budget:
+    max_payload_bytes: 98304
+    max_publish_hz: 1
+    max_items: 128
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the last ReDevice settings state
+    log: service.redevice_settings.runtime.log
+    quarantine: false
+updated_at: '2026-06-05T00:00:00+00:00'
 

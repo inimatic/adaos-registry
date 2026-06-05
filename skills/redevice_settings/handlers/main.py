@@ -175,12 +175,13 @@ def _first_selected(items: list[dict[str, Any]], webspace_id: str | None = None)
 
 def _status_cards(selected: Mapping[str, Any] | None, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     selected_map = dict(selected or {})
+    online_count = sum(1 for item in items if item.get("online"))
     return [
         {
             "id": "fleet",
             "title": "Endpoints",
             "value": len(items),
-            "subtitle": f"{sum(1 for item in items if item.get('online'))} online",
+            "subtitle": f"{online_count} online",
         },
         {
             "id": "selected",
@@ -199,6 +200,87 @@ def _status_cards(selected: Mapping[str, Any] | None, items: list[dict[str, Any]
             "title": "Trust",
             "value": _text(selected_map.get("trust_level")) or "-",
             "subtitle": f"last seen {_text(selected_map.get('last_seen')) or '-'}",
+        },
+    ]
+
+
+def _summary(selected: Mapping[str, Any] | None, items: list[dict[str, Any]]) -> dict[str, Any]:
+    selected_map = dict(selected or {})
+    online_count = sum(1 for item in items if item.get("online"))
+    assignment = _text(selected_map.get("assignment")) or "idle"
+    last_seen = _text(selected_map.get("last_seen")) or "-"
+    code = _text(selected_map.get("code")) or "-"
+    trust_level = _text(selected_map.get("trust_level")) or "-"
+    return {
+        "fleet": {
+            "value": len(items),
+            "label": "ReDevice endpoints",
+            "subtitle": f"{online_count} online",
+            "description": "Endpoint Registry snapshot",
+            "color": "success" if online_count else "warning",
+        },
+        "selected": {
+            "value": _text(selected_map.get("title")) or "No endpoint selected",
+            "label": _text(selected_map.get("online_state")) or "not selected",
+            "subtitle": f"seen {last_seen} | code {code}",
+            "description": f"{assignment} | trust {trust_level}",
+            "color": "success" if selected_map.get("online") else "warning" if selected_map else "danger",
+        },
+        "assignment": {
+            "value": assignment.replace("_", " ").title(),
+            "label": _text(selected_map.get("active_app")) or "-",
+            "subtitle": _text(selected_map.get("active_surface")) or "-",
+            "description": "Current endpoint role and active surface",
+            "color": "primary" if assignment and assignment != "idle" else "",
+        },
+    }
+
+
+def _inspection_groups(selected: Mapping[str, Any] | None) -> list[dict[str, Any]]:
+    item = dict(selected or {})
+    network = _mapping(item.get("network"))
+    bluetooth = _mapping(item.get("bluetooth"))
+    audio = _mapping(item.get("audio"))
+    display = _mapping(item.get("display"))
+    battery = _mapping(item.get("battery"))
+    diagnostics = _mapping(item.get("diagnostics"))
+    manifest = _mapping(diagnostics.get("endpoint_manifest"))
+    policy = _mapping(diagnostics.get("endpoint_policy"))
+    return [
+        {
+            "id": "connectivity",
+            "title": "Connectivity",
+            "description": _text(network.get("ssid") or network.get("state")) or _text(item.get("online_state")) or "unknown",
+            "subtitle": "Wi-Fi and subnet reachability",
+            "icon": "wifi-outline",
+        },
+        {
+            "id": "bluetooth",
+            "title": "Bluetooth",
+            "description": _text(bluetooth.get("state")) or "unknown",
+            "subtitle": "Output pairing and reconnect hints",
+            "icon": "bluetooth-outline",
+        },
+        {
+            "id": "io",
+            "title": "Audio and display",
+            "description": f"audio {_text(audio.get('state') or audio.get('quality')) or 'unknown'} | screen {_text(display.get('readability') or display.get('state')) or 'unknown'}",
+            "subtitle": "Speaker, microphone, screen and active surface",
+            "icon": "tablet-landscape-outline",
+        },
+        {
+            "id": "power",
+            "title": "Power and sensors",
+            "description": _text(battery.get("level") or battery.get("state")) or "unknown",
+            "subtitle": "Battery, location and degraded role hints",
+            "icon": "battery-half-outline",
+        },
+        {
+            "id": "contracts",
+            "title": "Contracts",
+            "description": f"manifest {_text(manifest.get('schema_version')) or '-'} | policy {_text(policy.get('policy_id') or policy.get('id')) or '-'}",
+            "subtitle": "Manifest, policy and diagnostics payload",
+            "icon": "document-text-outline",
         },
     ]
 
@@ -256,6 +338,12 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
             {"id": "policy", "title": "Policy", "description": _text(policy.get("policy_id") or policy.get("id") or "-"), "details": policy},
             {"id": "diagnostics", "title": "Diagnostics", "description": _text(diagnostics.get("policy_source") or "-"), "details": diagnostics},
         ],
+        "right_summary": [
+            {"id": "name", "title": "Name", "description": _text(item.get("title")) or "-"},
+            {"id": "state", "title": "State", "description": _text(item.get("online_state")) or "-", "subtitle": f"seen {_text(item.get('last_seen')) or '-'}"},
+            {"id": "role", "title": "Role", "description": _text(item.get("assignment")) or "idle", "subtitle": _text(item.get("active_app")) or "-"},
+            {"id": "trust", "title": "Trust", "description": _text(item.get("trust_level")) or "-", "subtitle": f"code {_text(item.get('code')) or '-'}"},
+        ],
     }
 
 
@@ -272,7 +360,9 @@ def _build_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
         "selected": selected or {},
         "items": items,
         "count": len(items),
+        "summary": _summary(selected, items),
         "status": _status_cards(selected, items),
+        "inspection": _inspection_groups(selected),
         "sections": _section_rows(selected),
         "assignment_presets": [{"id": item, "label": item.replace("_", " ").title()} for item in _ASSIGNMENT_PRESETS],
         "last_command": last_command,
