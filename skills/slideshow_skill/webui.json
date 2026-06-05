@@ -251,6 +251,12 @@
       "title": "Slideshow",
       "subtitle": "Project photos to ReDevice endpoints",
       "icon": "image",
+      "aliases": [
+        "slideshow",
+        "слайдшоу",
+        "слайд шоу",
+        "показ слайдов"
+      ],
       "launchModal": "slideshow_modal",
       "action": {
         "openModal": "slideshow_modal"
@@ -1284,6 +1290,12 @@
       "title": "Slideshow",
       "subtitle": "Project photos to ReDevice endpoints",
       "icon": "image",
+      "aliases": [
+        "slideshow",
+        "слайдшоу",
+        "слайд шоу",
+        "показ слайдов"
+      ],
       "launchModal": "slideshow_modal",
       "action": {
         "openModal": "slideshow_modal"
