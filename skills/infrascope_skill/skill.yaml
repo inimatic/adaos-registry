@@ -1,5 +1,5 @@
 name: infrascope_skill
-version: 0.28.10
+version: 0.28.11
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -370,13 +370,13 @@ tools:
     type: object
 exports: {}
 prototype: default
-updated_at: '2026-06-06T16:39:52+00:00'
+updated_at: '2026-06-06T18:49:23+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2745.09dbdee6
-    recorded_at: '2026-06-06T16:39:52+00:00'
+    min_version: 0.1.0+2748.e1234db7
+    recorded_at: '2026-06-06T18:49:23+00:00'
     source: skill_push
-    build_date: '2026-06-06T14:18:05+00:00'
-    min_commit: 09dbdee63ae4687daabb2e44e28c2e7bb226d0f1
-    min_short_commit: 09dbdee6
+    build_date: '2026-06-06T21:48:57+03:00'
+    min_commit: e1234db787a95c0db402ce03b289c57072322967
+    min_short_commit: e1234db7
 
