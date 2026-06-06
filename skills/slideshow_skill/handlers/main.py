@@ -51,6 +51,8 @@ _MAX_FOLDER_STREAM_ITEMS = 250
 _INLINE_CONTENT_BUDGET_BYTES = 45_000
 _INDEX_BATCH_SIZE = 500
 _INDEX_PUBLISH_INTERVAL_S = 1.5
+_INDEX_YIELD_EVERY_FILES = 200
+_INDEX_YIELD_S = 0.001
 _STATE_KEY = "slideshow_skill.state"
 _INDEX_META_KEY = "slideshow_skill.photo_index"
 _INDEX_STATUS_KEY = "slideshow_skill.index_status"
@@ -92,6 +94,13 @@ def _count_label(value: Any) -> str:
         return f"{int(value):,}".replace(",", " ")
     except Exception:
         return "0"
+
+
+def _count_int(value: Any) -> int:
+    try:
+        return max(0, int(value or 0))
+    except Exception:
+        return 0
 
 
 def _memory_get(key: str, default: Any = None) -> Any:
@@ -341,7 +350,7 @@ def _index_meta(root: Path) -> dict[str, Any]:
     return {"root_dir": str(root), "indexed_at": float(row["indexed_at"]), "photo_count": int(row["photo_count"])}
 
 
-def _index_status(root: Path | None = None) -> dict[str, Any]:
+def _index_status(root: Path | None = None, *, verify_liveness: bool = True) -> dict[str, Any]:
     data = _memory_get(_INDEX_STATUS_KEY, {})
     status = dict(data) if isinstance(data, Mapping) else {}
     requested_source_dir = str(root) if root is not None else ""
@@ -350,20 +359,22 @@ def _index_status(root: Path | None = None) -> dict[str, Any]:
         status = {}
     source_dir = _text(status.get("source_dir")) or requested_source_dir
     meta = _index_meta(_source_dir(source_dir)) if source_dir else {}
+    meta_photo_count = _count_int(meta.get("photo_count"))
     if not status:
         status = {
             "ok": bool(meta),
             "status": "ready" if meta else "idle",
             "source_dir": source_dir,
             "visited_files": 0,
-            "indexed_count": int(meta.get("photo_count") or 0),
-            "photo_count": int(meta.get("photo_count") or 0),
+            "indexed_count": meta_photo_count,
+            "photo_count": meta_photo_count,
+            "display_count": meta_photo_count,
             "folder_count": 0,
             "started_at": None,
             "updated_at": _now(),
             "completed_at": None,
         }
-    if _text(status.get("status")) == "running":
+    if verify_liveness and _text(status.get("status")) == "running":
         with _index_lock:
             alive = _index_thread is not None and _index_thread.is_alive()
         if not alive:
@@ -371,9 +382,15 @@ def _index_status(root: Path | None = None) -> dict[str, Any]:
             status["message"] = "Indexing was interrupted. Press Refresh index to resume."
             _memory_set(_INDEX_STATUS_KEY, status)
     if meta and _text(status.get("status")) not in {"running", "canceling"}:
-        status["photo_count"] = int(meta.get("photo_count") or status.get("photo_count") or 0)
-        status["indexed_count"] = int(meta.get("photo_count") or status.get("indexed_count") or 0)
-    status["value"] = _count_label(status.get("indexed_count") or status.get("photo_count"))
+        status["photo_count"] = meta_photo_count or _count_int(status.get("photo_count"))
+        status["indexed_count"] = meta_photo_count or _count_int(status.get("indexed_count"))
+    display_count = max(
+        _count_int(status.get("display_count")),
+        _count_int(status.get("photo_count")),
+        _count_int(status.get("indexed_count")),
+    )
+    status["display_count"] = display_count
+    status["value"] = _count_label(display_count)
     status["label"] = _text(status.get("status")) or "idle"
     status["description"] = _text(status.get("message")) or _index_message(status)
     status["color"] = {
@@ -391,7 +408,7 @@ def _index_status(root: Path | None = None) -> dict[str, Any]:
 def _index_message(status: Mapping[str, Any]) -> str:
     state = _text(status.get("status")) or "idle"
     source = _text(status.get("source_dir"))
-    indexed = _count_label(status.get("indexed_count") or status.get("photo_count"))
+    indexed = _count_label(status.get("display_count") or status.get("indexed_count") or status.get("photo_count"))
     visited = _count_label(status.get("visited_files"))
     folders = _count_label(status.get("folder_count"))
     if state == "running":
@@ -409,12 +426,20 @@ def _index_message(status: Mapping[str, Any]) -> str:
     return "Index idle."
 
 
-def _set_index_status(payload: Mapping[str, Any], webspace_id: str | None = None) -> dict[str, Any]:
+def _set_index_status(
+    payload: Mapping[str, Any],
+    webspace_id: str | None = None,
+    *,
+    verify_liveness: bool = True,
+) -> dict[str, Any]:
     status = dict(payload)
     status["updated_at"] = _now()
     status["message"] = _index_message(status)
     _memory_set(_INDEX_STATUS_KEY, status)
-    normalized = _index_status(_source_dir(status.get("source_dir")))
+    if verify_liveness:
+        normalized = _index_status(_source_dir(status.get("source_dir")))
+    else:
+        normalized = _index_status(_source_dir(status.get("source_dir")), verify_liveness=False)
     _publish(_INDEX_RECEIVER, normalized, webspace_id)
     return normalized
 
@@ -504,6 +529,7 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
     scan_started = time.time()
     visited_files = 0
     indexed_count = 0
+    previous_photo_count = _count_int(_index_meta(root).get("photo_count"))
     folders: set[str] = set()
     last_publish = 0.0
     _set_index_status(
@@ -514,7 +540,8 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
             "source_dir": str(root),
             "visited_files": 0,
             "indexed_count": 0,
-            "photo_count": int(_index_meta(root).get("photo_count") or 0),
+            "photo_count": previous_photo_count,
+            "display_count": previous_photo_count,
             "folder_count": 0,
             "started_at": started_at,
             "completed_at": None,
@@ -536,7 +563,8 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
                             "source_dir": str(root),
                             "visited_files": visited_files,
                             "indexed_count": indexed_count,
-                            "photo_count": indexed_count,
+                            "photo_count": max(indexed_count, previous_photo_count),
+                            "display_count": max(indexed_count, previous_photo_count),
                             "folder_count": len(folders),
                             "started_at": started_at,
                             "completed_at": _now(),
@@ -554,9 +582,12 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
                             folders.add(folder)
                     if indexed_count and indexed_count % _INDEX_BATCH_SIZE == 0:
                         conn.commit()
+                    if visited_files % _INDEX_YIELD_EVERY_FILES == 0:
+                        time.sleep(_INDEX_YIELD_S)
                     now = time.time()
                     if now - last_publish >= _INDEX_PUBLISH_INTERVAL_S:
                         last_publish = now
+                        display_count = max(indexed_count, previous_photo_count)
                         _set_index_status(
                             {
                                 "ok": True,
@@ -565,7 +596,8 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
                                 "source_dir": str(root),
                                 "visited_files": visited_files,
                                 "indexed_count": indexed_count,
-                                "photo_count": indexed_count,
+                                "photo_count": display_count,
+                                "display_count": display_count,
                                 "folder_count": len(folders),
                                 "started_at": started_at,
                                 "completed_at": None,
@@ -592,7 +624,8 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
                 "error": str(exc),
                 "visited_files": visited_files,
                 "indexed_count": indexed_count,
-                "photo_count": indexed_count,
+                "photo_count": max(indexed_count, previous_photo_count),
+                "display_count": max(indexed_count, previous_photo_count),
                 "folder_count": len(folders),
                 "started_at": started_at,
                 "completed_at": _now(),
@@ -647,21 +680,78 @@ def _start_index_job(root: Path, *, webspace_id: str | None = None) -> dict[str,
     global _index_thread
     root = root.expanduser()
     job_id = "idx:" + hashlib.sha256(f"{root}:{time.time()}".encode("utf-8")).hexdigest()[:16]
+
+    def _busy_status() -> dict[str, Any]:
+        current = _index_status()
+        if _text(current.get("source_dir")).casefold() == str(root).casefold():
+            return current
+        return {**current, "ok": False, "error": "indexer_busy", "requested_source_dir": str(root)}
+
+    with _index_lock:
+        running = _index_thread is not None and _index_thread.is_alive()
+    if running:
+        return _busy_status()
+    if not root.exists():
+        return _scan_index(root, job_id=job_id, webspace_id=webspace_id)
+
+    started_at = _now()
+    previous_photo_count = _count_int(_index_meta(root).get("photo_count"))
+    thread = threading.Thread(
+        target=_scan_index,
+        kwargs={"root": root, "job_id": job_id, "webspace_id": webspace_id},
+        name="slideshow-photo-index",
+        daemon=True,
+    )
     with _index_lock:
         if _index_thread is not None and _index_thread.is_alive():
-            current = _index_status()
-            if _text(current.get("source_dir")).casefold() == str(root).casefold():
-                return current
-            return {**current, "ok": False, "error": "indexer_busy", "requested_source_dir": str(root)}
-        _index_stop.clear()
-        _index_thread = threading.Thread(
-            target=_scan_index,
-            kwargs={"root": root, "job_id": job_id, "webspace_id": webspace_id},
-            name="slideshow-photo-index",
-            daemon=True,
+            running = True
+        else:
+            _index_stop.clear()
+            _index_thread = thread
+            running = False
+    if running:
+        return _busy_status()
+    try:
+        thread.start()
+    except Exception as exc:
+        with _index_lock:
+            if _index_thread is thread:
+                _index_thread = None
+        return _set_index_status(
+            {
+                "ok": False,
+                "job_id": job_id,
+                "status": "failed",
+                "source_dir": str(root),
+                "error": str(exc),
+                "visited_files": 0,
+                "indexed_count": 0,
+                "photo_count": previous_photo_count,
+                "display_count": previous_photo_count,
+                "folder_count": 0,
+                "started_at": started_at,
+                "completed_at": _now(),
+            },
+            webspace_id,
         )
-        _index_thread.start()
-    return _index_status(root)
+    if not thread.is_alive():
+        return _index_status(root)
+    return _set_index_status(
+        {
+            "ok": True,
+            "job_id": job_id,
+            "status": "running",
+            "source_dir": str(root),
+            "visited_files": 0,
+            "indexed_count": 0,
+            "photo_count": previous_photo_count,
+            "display_count": previous_photo_count,
+            "folder_count": 0,
+            "started_at": started_at,
+            "completed_at": None,
+        },
+        webspace_id,
+    )
 
 
 def _cancel_index_job(webspace_id: str | None = None) -> dict[str, Any]:
@@ -2087,6 +2177,27 @@ def _preview_payload(state: Mapping[str, Any], limit: int = 48) -> dict[str, Any
     }
 
 
+def _index_refresh_payload(state: Mapping[str, Any], status: Mapping[str, Any]) -> dict[str, Any]:
+    root = _source_dir(state.get("source_dir"))
+    photo_count = _count_int(status.get("photo_count") or status.get("display_count"))
+    return {
+        "ok": bool(status.get("ok", True)),
+        "source_dir": str(root),
+        "selected_folder": _text(state.get("selected_folder")),
+        "count": 0,
+        "items": [],
+        "folders": [],
+        "index": {
+            "ok": bool(status.get("ok", True)),
+            "root_dir": str(root),
+            "photo_count": photo_count,
+            "source": "status",
+        },
+        "status": dict(status),
+        "updated_at": _now(),
+    }
+
+
 @tool
 def refresh_slideshow_photo_index(
     source_dir: str | None = None,
@@ -2097,20 +2208,8 @@ def refresh_slideshow_photo_index(
         state["source_dir"] = str(_source_dir(source_dir))
         state = _save_state(state)
     status = _start_index_job(_source_dir(state.get("source_dir")), webspace_id=webspace_id)
-    files = _files_for_state(state, _MAX_CONTROL_SCAN)
-    command = _sync_running_surface(state, files, webspace_id=webspace_id, reason="index_refresh_requested")
-    preview = _preview_payload(state, 48)
-    preview["folders"] = _folder_items(state)
-    preview["status"] = status
-    _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
-    _publish(_PREVIEW_RECEIVER, preview, webspace_id)
-    _publish(
-        _SESSION_RECEIVER,
-        _session_payload(state, files, last_command=command or None, webspace_id=webspace_id, schedule_prewarm=True),
-        webspace_id,
-    )
     _publish(_INDEX_RECEIVER, status, webspace_id)
-    return preview
+    return _index_refresh_payload(state, status)
 
 
 @tool

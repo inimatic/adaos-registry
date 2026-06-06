@@ -151,6 +151,86 @@ def test_duplicate_snapshot_requests_are_coalesced(monkeypatch):
     assert published == ["slideshow_skill.index"]
 
 
+def test_start_index_job_reports_running_status_with_previous_count(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    memory: dict[str, object] = {}
+    published: list[tuple[str, dict[str, object]]] = []
+
+    class FakeThread:
+        def __init__(self, *args, **kwargs):
+            self.started = False
+
+        def start(self):
+            self.started = True
+
+        def is_alive(self):
+            return self.started
+
+    monkeypatch.setattr(mod.threading, "Thread", FakeThread)
+    monkeypatch.setattr(mod, "_index_meta", lambda _root: {"photo_count": 32500})
+    monkeypatch.setattr(mod, "_memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(mod, "_memory_set", lambda key, value: memory.__setitem__(key, value))
+    monkeypatch.setattr(
+        mod,
+        "_publish",
+        lambda receiver, payload, *_args, **_kwargs: published.append((receiver, payload)) or {"ok": True},
+    )
+
+    status = mod._start_index_job(tmp_path, webspace_id="ws-1")
+
+    assert status["status"] == "running"
+    assert status["display_count"] == 32500
+    assert status["value"] == "32 500"
+    assert published[-1][0] == "slideshow_skill.index"
+
+
+def test_refresh_index_does_not_build_preview_surfaces(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    status = {
+        "ok": True,
+        "status": "running",
+        "source_dir": str(tmp_path),
+        "photo_count": 32500,
+        "display_count": 32500,
+        "value": "32 500",
+    }
+    published: list[str] = []
+
+    monkeypatch.setattr(mod, "_load_state", lambda: {"source_dir": str(tmp_path), "selected_folder": ""})
+    monkeypatch.setattr(mod, "_save_state", lambda state: state)
+    monkeypatch.setattr(mod, "_start_index_job", lambda _root, webspace_id=None: status)
+    monkeypatch.setattr(
+        mod,
+        "_files_for_state",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("refresh must not scan files synchronously")),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_sync_running_surface",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("refresh must not sync surfaces synchronously")),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_preview_payload",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("refresh must not build preview synchronously")),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_folders_payload",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("refresh must not build folders synchronously")),
+    )
+    monkeypatch.setattr(mod, "_publish", lambda receiver, *_args, **_kwargs: published.append(receiver) or {"ok": True})
+
+    result = mod.refresh_slideshow_photo_index(webspace_id="ws-1")
+
+    assert result["status"] == status
+    assert result["items"] == []
+    assert result["index"]["photo_count"] == 32500
+    assert published == ["slideshow_skill.index"]
+
+
 def test_endpoint_window_prefetches_from_current_frame(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 

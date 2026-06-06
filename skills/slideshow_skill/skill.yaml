@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.36
+version: 0.1.37
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -419,7 +419,6 @@ data_routes:
     max_publish_hz: 1
     max_items: 32
     snapshot_policy: on_subscribe
-    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last ReDevice endpoint inventory
     log: service.slideshow_skill.runtime.log
@@ -436,7 +435,6 @@ data_routes:
     max_publish_hz: 1
     max_items: 64
     snapshot_policy: on_subscribe
-    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last photo preview list
     log: service.slideshow_skill.runtime.log
@@ -453,7 +451,6 @@ data_routes:
     max_publish_hz: 1
     max_items: 16
     snapshot_policy: on_subscribe
-    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last slideshow session state
     log: service.slideshow_skill.runtime.log
@@ -471,7 +468,6 @@ data_routes:
     max_publish_hz: 1
     max_items: 256
     snapshot_policy: on_subscribe
-    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last indexed folder list
     log: service.slideshow_skill.runtime.log
@@ -488,7 +484,6 @@ data_routes:
     max_publish_hz: 1
     max_items: 32
     snapshot_policy: on_subscribe
-    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last slideshow command state
     log: service.slideshow_skill.runtime.log
@@ -507,7 +502,6 @@ data_routes:
     max_publish_hz: 2
     max_items: 1
     snapshot_policy: on_subscribe
-    snapshot_debounce_s: 1.0
   guard_visibility:
     degraded_state: keep the last photo index status
     log: service.slideshow_skill.runtime.log
@@ -538,13 +532,13 @@ memory_budget:
     max_threads: 1
     cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-06-06T14:17:45+00:00'
+updated_at: '2026-06-06T16:40:22+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2744.a23877d6
-    recorded_at: '2026-06-06T14:17:45+00:00'
+    min_version: 0.1.0+2745.09dbdee6
+    recorded_at: '2026-06-06T16:40:22+00:00'
     source: skill_push
-    min_commit: a23877d6b8609fd6e7c5ed7dcc4da95ed0463c45
-    min_short_commit: a23877d6
-    build_date: '2026-06-06T17:16:19+03:00'
+    min_commit: 09dbdee63ae4687daabb2e44e28c2e7bb226d0f1
+    min_short_commit: 09dbdee6
+    build_date: '2026-06-06T14:18:05+00:00'
 
