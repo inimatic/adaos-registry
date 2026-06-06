@@ -3625,6 +3625,34 @@ def _core_version_label(value: Any) -> str:
     return public.strip() or text
 
 
+def _core_version_label_is_semver(value: Any) -> bool:
+    label = _core_version_label(value)
+    parts = label.split(".")
+    return len(parts) >= 3 and all(part.isdigit() for part in parts[:3])
+
+
+def _core_inferred_version_label(*values: Any) -> str:
+    for value in values:
+        text = str(value or "").strip()
+        if not text:
+            continue
+        for raw_token in text.replace("=", " ").replace(":", " ").split():
+            token = raw_token.strip(".,;()[]{}")
+            label = _core_version_label(token)
+            if _core_version_label_is_semver(label):
+                parts = label.split(".")
+                return ".".join(parts[:3])
+    return ""
+
+
+def _core_first_version_label(*values: Any) -> str:
+    for value in values:
+        label = _core_version_label(value)
+        if label:
+            return label
+    return ""
+
+
 def _core_slot_manifest(slots_payload: dict[str, Any], active_slot: str | None = None) -> dict[str, Any]:
     active = str(active_slot or slots_payload.get("active_slot") or "").strip()
     lookup_active = active.upper()
@@ -3640,19 +3668,39 @@ def _core_slot_manifest(slots_payload: dict[str, Any], active_slot: str | None =
 
 
 def _core_slot_version(manifest: dict[str, Any], build: dict[str, Any]) -> str:
-    for value in (
+    manifest_label = _core_first_version_label(
         manifest.get("build_version"),
         manifest.get("base_version"),
+    )
+    build_label = _core_first_version_label(
         build.get("runtime_build_version"),
         build.get("runtime_base_version"),
         build.get("runtime_version"),
         build.get("version"),
-        manifest.get("target_version"),
+    )
+    if manifest_label and manifest_label != "0.1.0":
+        return manifest_label
+    if (
+        manifest_label == "0.1.0"
+        and build_label
+        and build_label != "0.1.0"
+        and _core_version_label_is_semver(build_label)
     ):
-        label = _core_version_label(value)
-        if label:
-            return label
-    return ""
+        return build_label
+    inferred_label = _core_inferred_version_label(
+        manifest.get("git_subject"),
+        build.get("runtime_git_subject"),
+        build.get("git_subject"),
+    )
+    if manifest_label == "0.1.0" and inferred_label and inferred_label != "0.1.0":
+        return inferred_label
+    if manifest_label:
+        return manifest_label
+    if build_label:
+        return build_label
+    return _core_first_version_label(
+        manifest.get("target_version"),
+    )
 
 
 def _core_slot_commit(manifest: dict[str, Any], build: dict[str, Any]) -> str:
@@ -5919,6 +5967,7 @@ def _summary(
     summary_label = "Core update"
     summary_value = state
     summary_subtitle = _core_slot_summary_subtitle(slots_payload, build, active_slot=active)
+    summary_version = _core_slot_version(_core_slot_manifest(slots_payload, active), build) or str(build.get("version") or "")
     selected_member = selected_member if isinstance(selected_member, dict) else {}
     if selected_kind != "local":
         remote_control = _remote_control_payload(
@@ -5930,6 +5979,7 @@ def _summary(
         remote_state = str(status.get("state") or lifecycle.get("node_state") or selected_member.get("state") or "connected")
         summary_value = "Offline" if not remote_connected or remote_state.strip().lower() == "offline" else remote_state
         build_ref = _core_slot_summary_subtitle(slots_payload, build, active_slot=active)
+        summary_version = _core_slot_version(_core_slot_manifest(slots_payload, active), build) or summary_version
         selected_compact = str(selected_node.get("node_compact_label") or "").strip()
         summary_subtitle = f"{selected_label} | {selected_compact or 'N?'}"
         if build_ref:
@@ -5980,7 +6030,7 @@ def _summary(
         "last_action_at": last_action_at or None,
         "last_refresh_at": last_refresh_at or None,
         "draining": bool(lifecycle.get("draining")),
-        "version": str(build.get("version") or ""),
+        "version": summary_version,
         "git_short_sha": str(build.get("git_short_sha") or ""),
         "runtime_git_commit": str(build.get("runtime_git_commit") or ""),
         "runtime_git_short_commit": str(build.get("runtime_git_short_commit") or ""),
