@@ -1,11 +1,13 @@
 name: slideshow_skill
-version: 0.1.35
+version: 0.1.36
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
   type: python
   kind: service
   module: handlers.main
+  env:
+    mode: venv
 service:
   host: 127.0.0.1
   port: 18104
@@ -536,13 +538,13 @@ memory_budget:
     max_threads: 1
     cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-06-05T07:29:14+00:00'
+updated_at: '2026-06-06T14:17:45+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2719.fefd78cd
-    recorded_at: '2026-06-05T07:29:14+00:00'
+    min_version: 0.1.0+2744.a23877d6
+    recorded_at: '2026-06-06T14:17:45+00:00'
     source: skill_push
-    min_commit: fefd78cdd28d4196f798cdb4da49f7cdd4fde80a
-    min_short_commit: fefd78cd
-    build_date: '2026-06-05T10:24:26+03:00'
+    min_commit: a23877d6b8609fd6e7c5ed7dcc4da95ed0463c45
+    min_short_commit: a23877d6
+    build_date: '2026-06-06T17:16:19+03:00'
 
