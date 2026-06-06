@@ -1018,7 +1018,7 @@ def _project_snapshot(snapshot: dict[str, Any], *, webspace_id: str) -> bool:
     def _mutator(ydoc: Any, txn: Any) -> None:
         ydoc.get_map("data").set(txn, "infrascope", deepcopy(compact))
 
-    mutate_live_room(
+    live_applied = mutate_live_room(
         webspace_id,
         _mutator,
         root_names=["data"],
@@ -1027,12 +1027,13 @@ def _project_snapshot(snapshot: dict[str, Any], *, webspace_id: str) -> bool:
         channel="projection.yjs.live_room",
         governed=True,
     )
-    try:
-        with get_ydoc(webspace_id, load_mark_roots=["data"], governed=True) as ydoc:
-            with ydoc.begin_transaction() as txn:
-                _mutator(ydoc, txn)
-    except RuntimeError:
-        ctx_subnet.set("infrascope.snapshot", compact, webspace_id=webspace_id)
+    if not live_applied:
+        try:
+            with get_ydoc(webspace_id, load_mark_roots=["data"], governed=True) as ydoc:
+                with ydoc.begin_transaction() as txn:
+                    _mutator(ydoc, txn)
+        except RuntimeError:
+            ctx_subnet.set("infrascope.snapshot", compact, webspace_id=webspace_id)
     _last_projected_fingerprints[webspace_id] = fingerprint
     _last_projected_at_mono[webspace_id] = now
     return True
