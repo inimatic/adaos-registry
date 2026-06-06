@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import signal
+import sys
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -32,7 +33,38 @@ def _bootstrap_runtime_env() -> None:
     os.environ["ADAOS_SKILL_INTERNAL_DATA_ROOT"] = str(runtime_root / "data" / "internal" / "slideshow_skill")
 
 
+def _bootstrap_core_path() -> None:
+    candidates: list[Path] = []
+    for env_name in ("ADAOS_PACKAGE_DIR", "ADAOS_REPO_ROOT"):
+        raw = os.environ.get(env_name)
+        if raw:
+            path = Path(raw).expanduser()
+            candidates.append(path.parent if path.name == "adaos" else path / "src")
+
+    path = Path(__file__).resolve()
+    parts = path.parts
+    try:
+        idx = parts.index(".adaos")
+    except ValueError:
+        idx = -1
+    if idx > 0:
+        candidates.append(Path(*parts[:idx]) / "src")
+
+    for candidate in candidates:
+        try:
+            resolved = candidate.resolve()
+        except Exception:
+            continue
+        if not (resolved / "adaos").exists():
+            continue
+        token = str(resolved)
+        if token not in sys.path:
+            sys.path.insert(0, token)
+        return
+
+
 _bootstrap_runtime_env()
+_bootstrap_core_path()
 
 from handlers import main
 
