@@ -62,6 +62,7 @@ _LAST_MEDIA_KEY = "slideshow_skill.last_media"
 _POLL_INTERVAL_S = 2.5
 _SNAPSHOT_DEBOUNCE_S = 1.0
 _SURFACE_REASSERT_INTERVAL_S = 20.0
+_VOLATILE_STREAM_KEYS = {"updated_at"}
 _log = logging.getLogger("skills.slideshow_skill")
 _poll_lock = threading.Lock()
 _poll_thread: threading.Thread | None = None
@@ -250,6 +251,18 @@ def _json_fingerprint(value: Any) -> str:
     except Exception:
         raw = repr(value).encode("utf-8", errors="replace")
     return hashlib.sha256(raw).hexdigest()
+
+
+def _stream_fingerprint_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _stream_fingerprint_value(item)
+            for key, item in value.items()
+            if str(key) not in _VOLATILE_STREAM_KEYS
+        }
+    if isinstance(value, list):
+        return [_stream_fingerprint_value(item) for item in value]
+    return value
 
 
 def _stream_key(webspace_id: str | None, receiver: str) -> tuple[str, str]:
@@ -909,6 +922,18 @@ def _favorite_refs(root: Path) -> list[str]:
         return []
 
 
+def _favorite_count(root: Path) -> int:
+    try:
+        with _connect_index() as conn:
+            row = conn.execute(
+                "SELECT COUNT(*) AS count FROM photos WHERE root_dir = ? AND favorite = 1",
+                (str(root),),
+            ).fetchone()
+        return int(row["count"] or 0) if row is not None else 0
+    except Exception:
+        return 0
+
+
 def _set_favorite(root: Path, content_ref: str, favorite: bool) -> None:
     try:
         with _connect_index() as conn:
@@ -1417,6 +1442,8 @@ def _session_payload(
     webspace_id: str | None = None,
     schedule_prewarm: bool = False,
     defer_media: bool | None = None,
+    defer_reason: str = "index_running",
+    resolve_endpoint_label: bool = True,
 ) -> dict[str, Any]:
     selected = _selected_photos(files, state)
     current, next_photo = _current_and_next_photos(files, state)
@@ -1442,7 +1469,7 @@ def _session_payload(
         if not content_ref:
             pass
         elif media_deferred:
-            image = _deferred_session_image(content_ref, reason="index_running")
+            image = _deferred_session_image(content_ref, reason=defer_reason)
         elif not _media_lock.acquire(blocking=False):
             image = _deferred_session_image(content_ref, reason="media_busy")
         else:
@@ -1472,17 +1499,20 @@ def _session_payload(
             finally:
                 _media_lock.release()
     selected_codes = _unique_texts(state.get("selected_codes"))
-    header = _selected_endpoint_label(selected_codes)
-    favorites = _favorite_refs(root)
+    if resolve_endpoint_label:
+        header = _selected_endpoint_label(selected_codes)
+    else:
+        header = _text(state.get("selected_label")) or ", ".join(selected_codes) or "No endpoint"
+    favorite_count = _favorite_count(root)
     favorite = bool(content_ref and _is_favorite(root, content_ref))
-    filtered_count = len(_selected_photos(files, state))
+    filtered_count = len(selected)
     payload = {
         "ok": bool(current),
         "title": title,
         "subtitle": f"{header} | {state.get('mode')} | {state.get('scope')}",
         "value": title,
         "label": header,
-        "description": f"{filtered_count} photos, {len(favorites)} favorites",
+        "description": f"{filtered_count} photos, {favorite_count} favorites",
         "image": image,
         "media": media,
         "frame": {"label": f"{(int(state.get('current_index') or 0) + 1) if files else 0}/{filtered_count}"},
@@ -1522,7 +1552,7 @@ def _publish(receiver: str, payload: Mapping[str, Any], webspace_id: str | None 
     if not token:
         return
     ws = _text(webspace_id) or default_webspace_id()
-    fingerprint = _json_fingerprint(payload)
+    fingerprint = _json_fingerprint(_stream_fingerprint_value(payload))
     key = (ws, token)
     with _stream_lock:
         if not force and _last_stream_fingerprints.get(key) == fingerprint:
@@ -2139,20 +2169,23 @@ def _poll_once(webspace_id: str | None = None) -> None:
         if not _unique_texts(state.get("selected_codes")):
             return
         devices = _load_devices()
-        files = _files_for_state(state, _MAX_CONTROL_SCAN)
-        state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=True)
-        _apply_service_tick(state, files, devices=devices, webspace_id=webspace_id)
-        _publish(
-            _SESSION_RECEIVER,
-            _session_payload(
-                state,
-                _files_for_state(state, _MAX_CONTROL_SCAN),
-                webspace_id=webspace_id,
-                schedule_prewarm=True,
-                defer_media=_index_busy_for_state(state),
-            ),
-            webspace_id,
-        )
+        running = bool(state.get("running"))
+        files = _files_for_state(state, _MAX_CONTROL_SCAN) if running else []
+        state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=running)
+        if running:
+            ticked = _apply_service_tick(state, files, devices=devices, webspace_id=webspace_id)
+            if ticked:
+                _publish(
+                    _SESSION_RECEIVER,
+                    _session_payload(
+                        state,
+                        files,
+                        webspace_id=webspace_id,
+                        schedule_prewarm=True,
+                        defer_media=_index_busy_for_state(state),
+                    ),
+                    webspace_id,
+                )
         _publish(_ENDPOINTS_RECEIVER, _endpoint_payload(devices, state), webspace_id)
     except Exception:
         _log.debug("slideshow root event poll failed", exc_info=True)
@@ -2660,6 +2693,7 @@ def _publish_receiver_snapshot(receiver: str, state: Mapping[str, Any], webspace
         _publish(receiver, _endpoint_payload(devices, state), webspace_id, force=True)
         return
     if receiver == _SESSION_RECEIVER:
+        index_busy = _index_busy_for_state(state)
         files = _files_for_state(state, _MAX_CONTROL_SCAN)
         _publish(
             receiver,
@@ -2668,8 +2702,10 @@ def _publish_receiver_snapshot(receiver: str, state: Mapping[str, Any], webspace
                 files,
                 last_command=_last_command_payload(),
                 webspace_id=webspace_id,
-                schedule_prewarm=True,
-                defer_media=_index_busy_for_state(state),
+                schedule_prewarm=False,
+                defer_media=True,
+                defer_reason="index_running" if index_busy else "snapshot_reconnect",
+                resolve_endpoint_label=False,
             ),
             webspace_id,
             force=True,

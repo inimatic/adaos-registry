@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.39
+version: 0.1.40
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:

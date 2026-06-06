@@ -151,6 +151,129 @@ def test_duplicate_snapshot_requests_are_coalesced(monkeypatch):
     assert published == ["slideshow_skill.index"]
 
 
+def test_stream_publish_dedupes_volatile_updated_at(monkeypatch):
+    mod = _load_slideshow_module()
+
+    published: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        mod,
+        "stream_publish",
+        lambda receiver, data=None, **_kwargs: published.append((receiver, data)) or {"ok": True},
+    )
+
+    mod._publish("slideshow_skill.index", {"ok": True, "value": "1", "updated_at": "one"}, "ws-1")
+    mod._publish("slideshow_skill.index", {"ok": True, "value": "1", "updated_at": "two"}, "ws-1")
+
+    assert [item[0] for item in published] == ["slideshow_skill.index"]
+
+
+def test_session_snapshot_defers_media_and_endpoint_lookup(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photo = tmp_path / "photo with spaces.jpg"
+    photo.write_bytes(b"jpeg")
+    published: list[tuple[str, dict[str, object]]] = []
+
+    monkeypatch.setattr(
+        mod,
+        "stream_publish",
+        lambda receiver, data=None, **_kwargs: published.append((receiver, data)) or {"ok": True},
+    )
+    monkeypatch.setattr(
+        mod,
+        "_load_state",
+        lambda: {
+            "source_dir": str(tmp_path),
+            "selected_codes": ["ABC123"],
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+            "display_mode": "fit",
+            "fullscreen": True,
+            "running": False,
+            "current_index": 0,
+        },
+    )
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: [photo])
+    monkeypatch.setattr(mod, "_favorite_count", lambda _root: 7)
+    monkeypatch.setattr(mod, "_is_favorite", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(mod, "_ensure_polling", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        mod,
+        "_load_devices",
+        lambda: (_ for _ in ()).throw(AssertionError("session snapshot must not query endpoints")),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_widget_thumbnail",
+        lambda _path: (_ for _ in ()).throw(AssertionError("session snapshot must not build thumbnails")),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_fullscreen_media_descriptor",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("session snapshot must not build fullscreen media")
+        ),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_schedule_fullscreen_prewarm",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("session snapshot must not schedule media prewarm")
+        ),
+    )
+
+    mod.on_webio_stream_snapshot_requested({"webspace_id": "ws-1", "receiver": "slideshow_skill.session"})
+
+    assert [item[0] for item in published] == ["slideshow_skill.session"]
+    payload = published[0][1]
+    assert payload["media_deferred"] is True
+    assert payload["image"]["reason"] == "snapshot_reconnect"
+    assert payload["label"] == "ABC123"
+    assert payload["description"] == "1 photos, 7 favorites"
+
+
+def test_stopped_poll_does_not_publish_session_or_query_files(monkeypatch):
+    mod = _load_slideshow_module()
+
+    published: list[str] = []
+    monkeypatch.setattr(
+        mod,
+        "_load_state",
+        lambda: {
+            "source_dir": r"C:\photos",
+            "selected_codes": ["ABC123"],
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+            "display_mode": "fit",
+            "fullscreen": False,
+            "running": False,
+        },
+    )
+    monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "ABC123", "state": "approved", "last_seen_at": 1}])
+    monkeypatch.setattr(
+        mod,
+        "_files_for_state",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("stopped poll must not query slideshow files")
+        ),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_session_payload",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("stopped poll must not build session payload")
+        ),
+    )
+    monkeypatch.setattr(mod, "_endpoint_payload", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(mod, "stream_publish", lambda receiver, data=None, **_kwargs: published.append(receiver))
+
+    mod._poll_once("ws-1")
+
+    assert published == ["slideshow_skill.endpoints"]
+
+
 def test_start_index_job_reports_running_status_with_previous_count(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 
