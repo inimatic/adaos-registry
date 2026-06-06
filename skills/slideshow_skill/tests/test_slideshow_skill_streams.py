@@ -185,6 +185,65 @@ def test_start_index_job_reports_running_status_with_previous_count(monkeypatch,
     assert published[-1][0] == "slideshow_skill.index"
 
 
+def test_index_status_keeps_fresh_running_status_without_local_thread(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    memory = {
+        mod._INDEX_STATUS_KEY: {
+            "ok": True,
+            "status": "running",
+            "source_dir": str(tmp_path),
+            "visited_files": 123,
+            "indexed_count": 10,
+            "photo_count": 100,
+            "display_count": 100,
+            "folder_count": 2,
+            "updated_at": mod._now(),
+        }
+    }
+    writes: list[dict[str, object]] = []
+
+    monkeypatch.setattr(mod, "_index_thread", None)
+    monkeypatch.setattr(mod, "_index_meta", lambda _root: {})
+    monkeypatch.setattr(mod, "_memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(mod, "_memory_set", lambda _key, value: writes.append(dict(value)))
+
+    status = mod._index_status(tmp_path)
+
+    assert status["status"] == "running"
+    assert status["value"] == "100"
+    assert writes == []
+
+
+def test_index_status_marks_stale_running_status_interrupted(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    memory = {
+        mod._INDEX_STATUS_KEY: {
+            "ok": True,
+            "status": "running",
+            "source_dir": str(tmp_path),
+            "visited_files": 123,
+            "indexed_count": 10,
+            "photo_count": 100,
+            "display_count": 100,
+            "folder_count": 2,
+            "updated_at": "2000-01-01T00:00:00+00:00",
+        }
+    }
+    writes: list[dict[str, object]] = []
+
+    monkeypatch.setattr(mod, "_index_thread", None)
+    monkeypatch.setattr(mod, "_index_meta", lambda _root: {})
+    monkeypatch.setattr(mod, "_memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(mod, "_memory_set", lambda _key, value: writes.append(dict(value)))
+
+    status = mod._index_status(tmp_path)
+
+    assert status["status"] == "interrupted"
+    assert writes[-1]["status"] == "interrupted"
+
+
 def test_refresh_index_does_not_build_preview_surfaces(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 
@@ -268,6 +327,37 @@ def test_endpoint_content_items_stop_at_inline_budget(monkeypatch, tmp_path):
     assert limited is True
 
 
+def test_endpoint_content_items_skip_unreadable_images(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / "bad.jpg", tmp_path / "good.jpg"]
+    for photo in photos:
+        photo.write_bytes(b"not really a jpeg")
+
+    failures: list[tuple[str, str]] = []
+
+    def _content_item(path: Path) -> dict[str, object]:
+        if path.name == "bad.jpg":
+            raise OSError("cannot identify image file")
+        return {
+            "source_name": path.name,
+            "thumbnail_path": str(path),
+            "cached": True,
+            "thumbnail_bytes": 6,
+            "data_uri": "",
+        }
+
+    monkeypatch.setattr(mod, "_content_item", _content_item)
+    monkeypatch.setattr(mod, "_record_media_failure", lambda path, phase, _exc: failures.append((path.name, phase)))
+
+    items, content_bytes, limited = mod._content_items_for_window(photos)
+
+    assert [item["source_name"] for item in items] == ["good.jpg"]
+    assert content_bytes == 6
+    assert limited is False
+    assert failures == [("bad.jpg", "endpoint_content")]
+
+
 def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 
@@ -317,6 +407,42 @@ def test_session_payload_keeps_inline_widget_preview_under_stream_budget(monkeyp
     assert payload["image"]["node_src"].startswith("/api/node/media/files/content/")
     assert payload["image"]["route"] == "hub_browser_media"
     assert payload["label"] == "Tablet"
+
+
+def test_session_payload_defer_media_does_not_build_thumbnail(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photo = tmp_path / "фото с пробелом.jpg"
+    photo.write_bytes(b"jpeg")
+
+    monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "ABC123", "state": "approved", "display_name": "Tablet"}])
+    monkeypatch.setattr(mod, "_favorite_refs", lambda _root: [])
+    monkeypatch.setattr(
+        mod,
+        "_widget_thumbnail",
+        lambda _path: (_ for _ in ()).throw(AssertionError("deferred session must not build thumbnails")),
+    )
+
+    payload = mod._session_payload(
+        {
+            "source_dir": str(tmp_path),
+            "selected_codes": ["ABC123"],
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+            "display_mode": "fit",
+            "fullscreen": True,
+            "running": True,
+            "current_index": 0,
+        },
+        [photo],
+        defer_media=True,
+    )
+
+    assert payload["media_deferred"] is True
+    assert payload["image"]["reason"] == "index_running"
+    assert payload["image"]["content_ref"].startswith("content:sha256:")
+    assert payload["title"] == photo.name
 
 
 def test_session_payload_exposes_ready_fullscreen_and_next_media(monkeypatch, tmp_path):
@@ -626,6 +752,44 @@ def test_service_tick_reasserts_surface_without_advancing(monkeypatch, tmp_path)
     assert state["current_index"] == 2
     assert state["last_surface_sync_reason"] == "periodic_reassert"
     assert sent == [["photo-2.jpg", "photo-3.jpg", "photo-4.jpg", "photo-5.jpg"]]
+
+
+def test_service_tick_defers_surface_sync_while_index_running(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(4)]
+    for photo in photos:
+        photo.write_bytes(b"jpeg")
+
+    saved: list[dict[str, object]] = []
+    monkeypatch.setattr(mod.time, "time", lambda: 100.0)
+    monkeypatch.setattr(mod, "_index_busy_for_state", lambda _state: True)
+    monkeypatch.setattr(mod, "_save_state", lambda state: saved.append(dict(state)) or state)
+    monkeypatch.setattr(
+        mod,
+        "_send_to_selected",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("service tick must not sync surfaces while indexing")
+        ),
+    )
+
+    state = {
+        "source_dir": str(tmp_path),
+        "selected_codes": ["A"],
+        "sync": True,
+        "running": True,
+        "interval_ms": 7000,
+        "last_service_tick_at": 90.0,
+        "last_surface_sync_at": 70.0,
+        "current_index": 2,
+        "mode": "sequential",
+        "scope": "all",
+    }
+
+    assert mod._apply_service_tick(state, photos, webspace_id="ws-1") is False
+    assert state["current_index"] == 2
+    assert state["last_surface_sync_reason"] == "index_running_deferred"
+    assert saved[-1]["last_service_tick_at"] == 100.0
 
 
 def test_activate_runtime_rehydrates_running_slideshow(monkeypatch):
