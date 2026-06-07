@@ -181,6 +181,28 @@ def test_browsers_skill_browser_tiles_include_online_flag(monkeypatch) -> None:
     assert tiles[1]["status"] == "offline"
 
 
+def test_browsers_skill_surfaces_client_build_version(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    monkeypatch.setattr(mod.sdk_access_links, "lifetime_label", lambda _entry: "Permanent")
+    entry = {
+        "id": "browser-1",
+        "display_name": "Dev Browser",
+        "access_class": "client",
+        "online": True,
+        "client_build_version": "0.0.67+08ad430",
+    }
+
+    tiles = mod._browser_tiles([dict(entry)])
+    monkeypatch.setattr(mod.sdk_access_links, "get_browser_link", lambda device_id: dict(entry))
+
+    summary, _name = mod._current_browser_payload("browser-1")
+
+    assert tiles[0]["client_build_version"] == "0.0.67+08ad430"
+    assert "client 0.0.67+08ad430" in tiles[0]["subtitle"]
+    assert "Client version: 0.0.67+08ad430" in tiles[0]["content"]
+    assert {"title": "Client version", "description": "0.0.67+08ad430"} in summary
+
+
 def test_browsers_skill_explicit_refresh_recomputes_without_rewriting_identical_yjs(monkeypatch) -> None:
     mod = _load_browsers_skill_module()
     mod._SELECTED_BROWSER_BY_WS.clear()

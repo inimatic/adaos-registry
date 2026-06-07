@@ -16,7 +16,7 @@ from typing import Any
 import requests
 import yaml
 
-from adaos.build_info import BUILD_INFO
+from adaos.build_info import BUILD_INFO, base_version
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.core.errors import SdkRuntimeNotInitialized
 from adaos.sdk.data.context import clear_current_skill, set_current_skill
@@ -39,6 +39,7 @@ from adaos.services import node_config as _node_config
 from adaos.sdk.manage import node as _sdk_node
 from adaos.services.realtime_sidecar import realtime_sidecar_diag_path, realtime_sidecar_enabled
 from adaos.services.reliability import assess_transport_diagnostics, reliability_snapshot
+from adaos.services.runtime_paths import current_repo_root, is_core_slot_path
 from adaos.services.runtime_lifecycle import runtime_lifecycle_snapshot
 from adaos.services.runtime_refresh import rebuild_webspace_projection_sync, refresh_skill_runtime
 from adaos.services.capacity import get_local_capacity, install_scenario_in_capacity
@@ -1836,6 +1837,12 @@ def _base_dir() -> Path:
 
 
 def _repo_root() -> Path | None:
+    try:
+        root = current_repo_root()
+        if root is not None:
+            return Path(root).expanduser().resolve()
+    except Exception:
+        pass
     for parent in Path(__file__).resolve().parents:
         if (parent / ".git").exists() and (parent / "src" / "adaos" / "build_info.py").exists():
             return parent
@@ -2144,9 +2151,9 @@ def _version_status(
 ) -> dict[str, Any]:
     statuses: list[dict[str, str]] = []
     kind_label = str(artifact_kind or "artifact").strip() or "artifact"
-    active_label = "Installed version" if kind_label == "scenario" else "Active runtime"
+    active_label = "Active registry version" if kind_label == "scenario" else "Active runtime"
     inactive_text = (
-        f"{kind_label} is not installed."
+        f"{kind_label} has no active registry entry."
         if kind_label == "scenario"
         else f"{kind_label} has no active runtime slot."
     )
@@ -2186,7 +2193,11 @@ def _version_status(
                 {
                     "code": "catalog_unknown",
                     "icon": "help-circle-outline",
-                    "tooltip": f"{kind_label} is installed but is not present in the current catalog snapshot ({source_label}).",
+                    "tooltip": (
+                        f"{kind_label} has an active registry entry but is not present in the current catalog snapshot ({source_label})."
+                        if kind_label == "scenario"
+                        else f"{kind_label} is installed but is not present in the current catalog snapshot ({source_label})."
+                    ),
                 }
             )
 
@@ -2799,6 +2810,7 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
             "catalog_state": catalog_state,
             "catalog_display": catalog_version or "unknown",
             "workspace_display": workspace_source_version or "unknown",
+            "active_display": active_version or "none",
             "installed_display": active_version or "none",
             "runtime_display": active_version or "none",
             "runtime_bucket": "",
@@ -3593,27 +3605,83 @@ def _git_text(*args: str) -> str:
         return ""
 
 
+def _is_dev_core_runtime(repo_root: Path | None = None) -> bool:
+    env_type = str(os.getenv("ENV_TYPE") or os.getenv("ADAOS_ENV_TYPE") or os.getenv("ADAOS_ENV") or "").strip().lower()
+    if env_type != "dev":
+        return False
+    runtime_slot = str(os.getenv("ADAOS_ACTIVE_CORE_SLOT") or "").strip().upper()
+    if runtime_slot:
+        return False
+    root = repo_root or _repo_root()
+    if root is None:
+        return False
+    try:
+        return not is_core_slot_path(root)
+    except Exception:
+        return True
+
+
+def _core_runtime_mode(build: dict[str, Any] | None = None) -> str:
+    payload = build if isinstance(build, dict) else {}
+    mode = str(payload.get("runtime_mode") or payload.get("mode") or "").strip().lower()
+    if mode:
+        return mode
+    return "dev" if _is_dev_core_runtime() else "slot"
+
+
 def _build_meta() -> dict[str, Any]:
-    active_manifest = active_slot_manifest() or {}
+    repo_root = _repo_root()
+    dev_runtime = _is_dev_core_runtime(repo_root)
+    active_manifest = {} if dev_runtime else (active_slot_manifest() or {})
+    git_sha = _git_text("rev-parse", "HEAD")
+    git_short_sha = _git_text("rev-parse", "--short", "HEAD")
+    git_branch = _git_text("rev-parse", "--abbrev-ref", "HEAD")
+    git_subject = _git_text("show", "-s", "--format=%s", "HEAD")
+    source_base_version = ""
+    if repo_root is not None:
+        try:
+            source_base_version = str(base_version(repo_root) or "").strip()
+        except Exception:
+            source_base_version = ""
+    source_version = str(BUILD_INFO.version or "").strip()
+    if _core_version_label(source_version) == "0.1.0":
+        replacement = _core_non_default_version_label(
+            source_base_version,
+            _core_inferred_version_label(git_subject),
+        )
+        if replacement:
+            source_version = _core_build_version_with_label(source_version, replacement)
     runtime_build_version = str(active_manifest.get("build_version") or "").strip()
     runtime_base_version = str(active_manifest.get("base_version") or "").strip()
     runtime_target_version = str(active_manifest.get("target_version") or "").strip()
+    if dev_runtime:
+        runtime_base_version = source_base_version
+        runtime_build_version = _core_build_version_with_label(source_version, source_base_version) or source_version
+        runtime_target_version = ""
+    elif _core_version_label(runtime_build_version) == "0.1.0":
+        replacement = _core_non_default_version_label(
+            runtime_base_version,
+            _core_inferred_version_label(active_manifest.get("git_subject"), git_subject),
+        )
+        if replacement:
+            runtime_build_version = _core_build_version_with_label(runtime_build_version, replacement)
     return {
-        "version": BUILD_INFO.version,
+        "version": source_version or BUILD_INFO.version,
         "build_date": BUILD_INFO.build_date,
-        "git_sha": _git_text("rev-parse", "HEAD"),
-        "git_short_sha": _git_text("rev-parse", "--short", "HEAD"),
-        "git_branch": _git_text("rev-parse", "--abbrev-ref", "HEAD"),
-        "git_subject": _git_text("show", "-s", "--format=%s", "HEAD"),
-        "repo_root": str(_repo_root() or ""),
+        "git_sha": git_sha,
+        "git_short_sha": git_short_sha,
+        "git_branch": git_branch,
+        "git_subject": git_subject,
+        "repo_root": str(repo_root or ""),
+        "runtime_mode": "dev" if dev_runtime else "slot",
         "runtime_version": runtime_build_version or runtime_base_version or BUILD_INFO.version or runtime_target_version,
         "runtime_base_version": runtime_base_version,
-        "runtime_build_version": runtime_build_version or BUILD_INFO.version,
+        "runtime_build_version": runtime_build_version or source_version or BUILD_INFO.version,
         "runtime_target_version": runtime_target_version,
-        "runtime_git_commit": str(active_manifest.get("git_commit") or ""),
-        "runtime_git_short_commit": str(active_manifest.get("git_short_commit") or ""),
-        "runtime_git_branch": str(active_manifest.get("git_branch") or active_manifest.get("target_rev") or ""),
-        "runtime_git_subject": str(active_manifest.get("git_subject") or ""),
+        "runtime_git_commit": git_sha if dev_runtime else str(active_manifest.get("git_commit") or ""),
+        "runtime_git_short_commit": git_short_sha if dev_runtime else str(active_manifest.get("git_short_commit") or ""),
+        "runtime_git_branch": git_branch if dev_runtime else str(active_manifest.get("git_branch") or active_manifest.get("target_rev") or ""),
+        "runtime_git_subject": git_subject if dev_runtime else str(active_manifest.get("git_subject") or ""),
     }
 
 
@@ -3629,6 +3697,25 @@ def _core_version_label_is_semver(value: Any) -> bool:
     label = _core_version_label(value)
     parts = label.split(".")
     return len(parts) >= 3 and all(part.isdigit() for part in parts[:3])
+
+
+def _core_build_version_with_label(build_version: Any, label: Any) -> str:
+    build = str(build_version or "").strip()
+    public = _core_version_label(label)
+    if not build or not public:
+        return build
+    _old_public, sep, local = build.partition("+")
+    if not sep:
+        return public
+    return f"{public}+{local}" if local else public
+
+
+def _core_non_default_version_label(*values: Any) -> str:
+    for value in values:
+        label = _core_version_label(value)
+        if label and label != "0.1.0" and _core_version_label_is_semver(label):
+            return label
+    return ""
 
 
 def _core_inferred_version_label(*values: Any) -> str:
@@ -3670,34 +3757,38 @@ def _core_slot_manifest(slots_payload: dict[str, Any], active_slot: str | None =
 def _core_slot_version(manifest: dict[str, Any], build: dict[str, Any]) -> str:
     manifest_label = _core_first_version_label(
         manifest.get("build_version"),
+    )
+    base_label = _core_first_version_label(
         manifest.get("base_version"),
+        build.get("runtime_base_version"),
     )
     build_label = _core_first_version_label(
         build.get("runtime_build_version"),
-        build.get("runtime_base_version"),
         build.get("runtime_version"),
         build.get("version"),
     )
     if manifest_label and manifest_label != "0.1.0":
         return manifest_label
-    if (
-        manifest_label == "0.1.0"
-        and build_label
-        and build_label != "0.1.0"
-        and _core_version_label_is_semver(build_label)
-    ):
-        return build_label
     inferred_label = _core_inferred_version_label(
         manifest.get("git_subject"),
         build.get("runtime_git_subject"),
         build.get("git_subject"),
     )
-    if manifest_label == "0.1.0" and inferred_label and inferred_label != "0.1.0":
-        return inferred_label
+    if manifest_label == "0.1.0":
+        replacement = _core_non_default_version_label(base_label, build_label, inferred_label)
+        if replacement:
+            return replacement
+        return manifest_label
     if manifest_label:
         return manifest_label
     if build_label:
+        if build_label == "0.1.0":
+            replacement = _core_non_default_version_label(base_label, inferred_label)
+            if replacement:
+                return replacement
         return build_label
+    if base_label:
+        return base_label
     return _core_first_version_label(
         manifest.get("target_version"),
     )
@@ -3726,10 +3817,13 @@ def _core_slot_summary_subtitle(
     active_slot: str | None = None,
 ) -> str:
     active = str(active_slot or slots_payload.get("active_slot") or "").strip()
+    runtime_mode = _core_runtime_mode(build)
+    if runtime_mode == "dev":
+        active = "dev"
     if not active:
         active = "--"
     manifest = _core_slot_manifest(slots_payload, active)
-    parts = [f"slot {active}"]
+    parts = ["dev" if str(active).strip().lower() == "dev" else f"slot {active}"]
     version = _core_slot_version(manifest, build)
     commit = _core_slot_commit(manifest, build)
     if version:
@@ -3762,12 +3856,35 @@ def _validated_runtime_source(status: dict[str, Any], last_result: dict[str, Any
     return {}
 
 
+def _dev_core_manifest(build: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "slot": "dev",
+        "build_version": str(build.get("runtime_build_version") or build.get("version") or "").strip(),
+        "base_version": str(build.get("runtime_base_version") or "").strip(),
+        "git_commit": str(build.get("runtime_git_commit") or build.get("git_sha") or "").strip(),
+        "git_short_commit": str(build.get("runtime_git_short_commit") or build.get("git_short_sha") or "").strip(),
+        "git_branch": str(build.get("runtime_git_branch") or build.get("git_branch") or "").strip(),
+        "git_subject": str(build.get("runtime_git_subject") or build.get("git_subject") or "").strip(),
+    }
+
+
 def _effective_runtime_projection(
     status: dict[str, Any],
     last_result: dict[str, Any],
     slots_payload: dict[str, Any],
     build: dict[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
+    if _core_runtime_mode(build) == "dev":
+        effective_build = dict(build or {})
+        effective_build["runtime_mode"] = "dev"
+        manifest = _dev_core_manifest(effective_build)
+        return {
+            "active_slot": "dev",
+            "previous_slot": "",
+            "slots": {},
+            "active_manifest": manifest,
+        }, effective_build
+
     validated = _validated_runtime_source(status, last_result)
     if not validated:
         return slots_payload, build
@@ -4342,6 +4459,7 @@ def _remote_build_meta(snapshot: dict[str, Any]) -> dict[str, Any]:
         "git_branch": "",
         "git_subject": "",
         "repo_root": "",
+        "runtime_mode": str(build.get("runtime_mode") or "slot").strip().lower() or "slot",
         "runtime_version": runtime_build_version or runtime_base_version or str(build.get("runtime_version") or build.get("version") or "unknown"),
         "runtime_base_version": runtime_base_version,
         "runtime_build_version": runtime_build_version or str(build.get("version") or ""),
@@ -4600,6 +4718,7 @@ def _remote_capacity_inventory_items(selected_member: dict[str, Any], kind: str)
             item["rollout_quarantine"] = False
             item["rollout_quarantine_reason"] = ""
         else:
+            item["active_display"] = version or "active"
             item["installed_display"] = version or "active"
             item["dependency_lifecycle_failed"] = False
             item["dependency_failure_summary"] = ""
@@ -4960,6 +5079,13 @@ def _skill_post_commit_checks_note(report: dict[str, Any]) -> str:
 
 def _build_items(build: dict[str, Any]) -> list[dict[str, Any]]:
     return [
+        {
+            "id": "runtime_mode",
+            "title": "Runtime mode",
+            "status": "ok",
+            "description": _core_runtime_mode(build),
+            "subtitle": str(build.get("repo_root") or ""),
+        },
         {
             "id": "runtime_version",
             "title": "Runtime version",
@@ -5860,7 +5986,9 @@ def _summary(
     selected_node_id = str(selected_node.get("node_id") or getattr(conf, "node_id", "") or "")
     selected_label = str(selected_node.get("label") or ("hub" if str(getattr(conf, "role", "") or "") == "hub" else "member"))
     active = str(slots_payload.get("active_slot") or "").strip()
-    if not active and selected_kind == "local":
+    if selected_kind == "local" and _core_runtime_mode(build) == "dev":
+        active = "dev"
+    elif not active and selected_kind == "local":
         env_type = str(os.getenv("ENV_TYPE") or "").strip().lower()
         runtime_slot = str(os.getenv("ADAOS_ACTIVE_CORE_SLOT") or "").strip().upper()
         if not runtime_slot and env_type == "dev" and _repo_root() is not None:
@@ -6191,7 +6319,7 @@ def _action_items(status: dict[str, Any], ui_state: dict[str, Any], reliability:
             "id": "toggle_drift_only",
             "title": "Drift only",
             "status": "warn" if drift_only else "idle",
-            "description": "Toggle Installed skills/scenarios between full inventory and drift-only view",
+            "description": "Toggle skills and scenarios between full inventory and drift-only view",
             "subtitle": "on" if drift_only else "off",
         },
         {

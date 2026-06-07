@@ -87,7 +87,7 @@
         "mode": "replace",
         "transport": "hub",
         "snapshotPolicy": "on_subscribe",
-        "initialState": { "status": "init", "message": "Loading installed scenarios...", "items": [] },
+        "initialState": { "status": "init", "message": "Loading scenario registry...", "items": [] },
         "budget": { "maxPayloadBytes": 65536, "maxPublishHz": 0.5, "maxSnapshotHz": 1, "maxItems": 256 },
         "guardVisibility": { "degradedState": "Keep last scenarios inventory stream value.", "log": "service.infrastate_skill.runtime.log", "quarantine": false, "metric": "webio_stream_guard.infrastate.scenarios" },
         "route": { "kind": "stream", "surface": "modal:installed_scenarios", "owner": "skill:infrastate_skill", "firstPaint": "loading scenarios initial state", "recovery": "stream snapshot requested on stream subscribe", "updateSource": ["scenario.installed", "scenario.removed", "scenarios.synced"] }
@@ -620,14 +620,14 @@
 							"id": "infrastate-scenarios",
 							"type": "ui.table",
 							"area": "main",
-							"title": "Installed scenarios",
+							"title": "Scenario registry",
               "visibleIf": "$state.infrastateTab === 'inventory'",
 							"dataSource": {
 								"kind": "stream",
 								"receiver": "infrastate.scenarios"
 							},
 							"inputs": {
-								"emptyText": "No installed scenarios",
+								"emptyText": "No active scenarios",
 								"columns": [
 									{ "key": "status_icon", "label": "", "kind": "icon", "tooltipKey": "status_tooltip", "width": "44px" },
 									{ "key": "name", "label": "Name" },
@@ -640,7 +640,7 @@
 										"width": "100px",
 										"buttons": []
 									},
-									{ "key": "installed_display", "label": "Installed", "mono": true, "width": "120px" },
+									{ "key": "active_display", "label": "Active", "mono": true, "width": "120px" },
 									{
 										"key": "_runtime_actions",
 										"label": "Actions",

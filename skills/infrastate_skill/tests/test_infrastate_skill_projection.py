@@ -1109,17 +1109,22 @@ def test_infrastate_summary_uses_dev_slot_for_local_root_runtime(monkeypatch):
     summary = mod._summary(
         status={"state": "ready", "message": "ok", "phase": "validate"},
         last_result={},
-        slots_payload={},
+        slots_payload={"active_slot": "A"},
         lifecycle={},
         conf=SimpleNamespace(role="hub", node_id="hub-1"),
-        build={"runtime_git_short_commit": "77fab7d"},
+        build={
+            "runtime_mode": "dev",
+            "runtime_build_version": "0.1.0+1.77fab7d",
+            "runtime_base_version": "0.1.218",
+            "runtime_git_short_commit": "77fab7d",
+        },
         ui_state={},
         reliability={"runtime": {}},
         transport_diag={},
         selected_member=None,
     )
 
-    assert summary["subtitle"] == "slot dev | 77fab7d"
+    assert summary["subtitle"] == "dev | 0.1.218 | 77fab7d"
 
 
 def test_infrastate_summary_marks_disconnected_remote_node_offline(monkeypatch):
@@ -2882,6 +2887,10 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         "kind": "stream",
         "receiver": "infrastate.scenarios",
     }
+    assert by_id["infrastate-scenarios"]["title"] == "Scenario registry"
+    scenario_columns = by_id["infrastate-scenarios"]["inputs"]["columns"]
+    assert any(column.get("key") == "active_display" and column.get("label") == "Active" for column in scenario_columns)
+    assert not any(column.get("label") == "Installed" for column in scenario_columns)
     assert by_id["marketplace-skills"]["dataSource"] == {
         "kind": "stream",
         "receiver": "infrastate.marketplace.skills",
@@ -2989,6 +2998,40 @@ def test_infrastate_effective_runtime_projection_prefers_validated_target_slot()
     assert effective_slots["slots"]["B"]["manifest"]["git_short_commit"] == "8dd3543"
     assert effective_build["runtime_git_short_commit"] == "8dd3543"
     assert effective_build["runtime_git_commit"] == "8dd3543c72f912ef0d7932f4c5754ce4c6700849"
+
+
+def test_infrastate_effective_runtime_projection_ignores_stale_slots_for_dev_runtime():
+    mod = _load_infrastate_module()
+
+    slots_payload = {
+        "active_slot": "A",
+        "previous_slot": "B",
+        "slots": {
+            "A": {"manifest": {"slot": "A", "build_version": "0.1.0+1.8c698078", "git_short_commit": "8c698078"}},
+            "B": {"manifest": {"slot": "B", "build_version": "0.1.217+1.b10da50", "git_short_commit": "b10da50"}},
+        },
+    }
+    build = {
+        "runtime_mode": "dev",
+        "runtime_build_version": "0.1.0+22.8c698078",
+        "runtime_base_version": "0.1.218",
+        "runtime_git_short_commit": "8c698078",
+        "runtime_git_branch": "rev2026",
+    }
+    status = {
+        "state": "succeeded",
+        "phase": "validate",
+        "target_slot": "B",
+        "manifest": {"slot": "B", "build_version": "0.1.217+1.b10da50"},
+    }
+
+    effective_slots, effective_build = mod._effective_runtime_projection(status, {}, slots_payload, build)
+
+    assert effective_slots["active_slot"] == "dev"
+    assert effective_slots["slots"] == {}
+    assert effective_slots["active_manifest"]["slot"] == "dev"
+    assert effective_slots["active_manifest"]["base_version"] == "0.1.218"
+    assert effective_build["runtime_mode"] == "dev"
 
 
 def test_infrastate_skill_runtime_migration_helpers_report_failures():

@@ -323,12 +323,26 @@ def _browser_title(entry: Mapping[str, Any]) -> str:
     )
 
 
+def _browser_client_version(entry: Mapping[str, Any]) -> str:
+    return (
+        str(
+            entry.get("client_build_version")
+            or entry.get("client_version")
+            or entry.get("build_version")
+            or ""
+        ).strip()
+    )
+
+
 def _browser_subtitle(entry: Mapping[str, Any]) -> str:
     bits: list[str] = []
     webspace_id = str(entry.get("last_webspace_id") or "").strip()
     if webspace_id:
         bits.append(f"Webspace {webspace_id}")
     bits.append("online" if bool(entry.get("online")) else "offline")
+    client_version = _browser_client_version(entry)
+    if client_version:
+        bits.append(f"client {client_version}")
     bits.append(sdk_access_links.lifetime_label(dict(entry)))
     return " | ".join(bits)
 
@@ -337,6 +351,7 @@ def _browser_details(entry: Mapping[str, Any]) -> str:
     rows = [
         f"ID: {str(entry.get('id') or '').strip() or '-'}",
         f"Access: {str(entry.get('access_class') or 'device').strip() or 'device'}",
+        f"Client version: {_browser_client_version(entry) or '-'}",
         f"Lifetime: {sdk_access_links.lifetime_label(dict(entry))}",
         f"Last webspace: {str(entry.get('last_webspace_id') or '').strip() or '-'}",
         f"Last seen: {_iso(entry.get('last_seen_at')) or '-'}",
@@ -356,6 +371,7 @@ def _browser_tiles(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "icon": "browsers-outline",
             "online": bool(entry.get("online")),
             "status": "online" if bool(entry.get("online")) else "offline",
+            "client_build_version": _browser_client_version(entry),
             "uiSubtitle": _browser_subtitle(entry),
         }
         for entry in entries
@@ -418,6 +434,7 @@ def _current_browser_payload(device_id: str | None) -> tuple[list[dict[str, Any]
         {"title": "Device ID", "description": device_id or "-"},
         {"title": "Browser", "description": _browser_title(entry)},
         {"title": "Access", "description": str(entry.get("access_class") or "device").strip() or "device"},
+        {"title": "Client version", "description": _browser_client_version(entry) or "-"},
         {"title": "Lifetime", "description": sdk_access_links.lifetime_label(entry)},
         {"title": "Last webspace", "description": str(entry.get("last_webspace_id") or "").strip() or "-"},
         {"title": "Last seen", "description": _iso(entry.get("last_seen_at")) or "-"},
