@@ -2810,6 +2810,8 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
             "catalog_state": catalog_state,
             "catalog_display": catalog_version or "unknown",
             "workspace_display": workspace_source_version or "unknown",
+            "active_registry_version": active_version,
+            "active_registry_display": active_version or "none",
             "active_display": active_version or "none",
             "installed_display": active_version or "none",
             "runtime_display": active_version or "none",
@@ -4718,6 +4720,8 @@ def _remote_capacity_inventory_items(selected_member: dict[str, Any], kind: str)
             item["rollout_quarantine"] = False
             item["rollout_quarantine_reason"] = ""
         else:
+            item["active_registry_version"] = version
+            item["active_registry_display"] = version or "active"
             item["active_display"] = version or "active"
             item["installed_display"] = version or "active"
             item["dependency_lifecycle_failed"] = False

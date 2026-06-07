@@ -170,6 +170,23 @@
                     "width": "110px"
                   },
                   {
+                    "key": "software_version",
+                    "label": "Used",
+                    "mono": true,
+                    "width": "110px"
+                  },
+                  {
+                    "key": "served_version",
+                    "label": "Served",
+                    "mono": true,
+                    "width": "110px"
+                  },
+                  {
+                    "key": "version_status",
+                    "label": "Version",
+                    "width": "90px"
+                  },
+                  {
                     "key": "active_app_label",
                     "label": "Active app",
                     "width": "130px"
@@ -269,7 +286,7 @@
               "id": "redevice-details",
               "type": "ui.list",
               "area": "main",
-              "title": "Diagnostics, manifest, and policy",
+              "title": "Version, diagnostics, manifest, and policy",
               "dataSource": {
                 "kind": "stream",
                 "receiver": "redevice_list.devices"

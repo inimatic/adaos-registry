@@ -285,7 +285,7 @@ data_routes:
     degraded_state: Skills table keeps last stream value with loading/degraded state.
     log: service.infrastate_skill.runtime.log
     quarantine: false
-- surface: modal:installed_scenarios
+- surface: modal:scenario_registry
   route: stream
   owner: skill:infrastate_skill
   receiver: infrastate.scenarios

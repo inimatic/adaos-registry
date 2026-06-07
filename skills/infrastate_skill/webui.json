@@ -90,7 +90,7 @@
         "initialState": { "status": "init", "message": "Loading scenario registry...", "items": [] },
         "budget": { "maxPayloadBytes": 65536, "maxPublishHz": 0.5, "maxSnapshotHz": 1, "maxItems": 256 },
         "guardVisibility": { "degradedState": "Keep last scenarios inventory stream value.", "log": "service.infrastate_skill.runtime.log", "quarantine": false, "metric": "webio_stream_guard.infrastate.scenarios" },
-        "route": { "kind": "stream", "surface": "modal:installed_scenarios", "owner": "skill:infrastate_skill", "firstPaint": "loading scenarios initial state", "recovery": "stream snapshot requested on stream subscribe", "updateSource": ["scenario.installed", "scenario.removed", "scenarios.synced"] }
+        "route": { "kind": "stream", "surface": "modal:scenario_registry", "owner": "skill:infrastate_skill", "firstPaint": "loading scenarios initial state", "recovery": "stream snapshot requested on stream subscribe", "updateSource": ["scenario.installed", "scenario.removed", "scenarios.synced"] }
       },
       "infrastate.marketplace.skills": {
         "mode": "replace",
@@ -640,7 +640,7 @@
 										"width": "100px",
 										"buttons": []
 									},
-									{ "key": "active_display", "label": "Active", "mono": true, "width": "120px" },
+									{ "key": "active_registry_display", "label": "Active registry", "mono": true, "width": "150px" },
 									{
 										"key": "_runtime_actions",
 										"label": "Actions",

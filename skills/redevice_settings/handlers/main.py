@@ -9,6 +9,7 @@ from adaos.sdk.data import device_access as sdk_device_access
 from adaos.sdk.data import devices as sdk_devices
 from adaos.sdk.data import skill_memory_get, skill_memory_set
 from adaos.sdk.io import stream_publish
+from adaos.services.redevice_versions import endpoint_version_info
 
 try:
     from adaos.services.yjs.webspace import default_webspace_id
@@ -118,6 +119,10 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
     location = _mapping(diagnostic_report.get("location") or service_state.get("location_endpoint"))
     selected = bool(ref and ref == _text(selected_ref))
     endpoint_policy = _mapping(diagnostics.get("endpoint_policy"))
+    version_info = endpoint_version_info(item)
+    software_version = _text(version_info.get("software_version")) or "-"
+    served_version = _text(version_info.get("served_version")) or "unknown"
+    version_status = _text(version_info.get("version_status")) or "unknown"
     return {
         "id": ref or pair_code or endpoint_id,
         "ref": ref,
@@ -133,6 +138,10 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
         "assignment": assignment,
         "active_app": _text(active_app.get("label") or active_app.get("app_id")) or "-",
         "active_surface": _text(active_surface.get("surface_ref") or active_surface.get("surface_id")) or "-",
+        "software_version": software_version,
+        "served_version": served_version,
+        "version_status": version_status,
+        "version_info": version_info,
         "aliases": ", ".join(str(item or "").strip() for item in list(policy.get("aliases") or policy.get("labels") or []) if str(item or "").strip()),
         "battery": battery or {},
         "network": network or {},
@@ -196,6 +205,12 @@ def _status_cards(selected: Mapping[str, Any] | None, items: list[dict[str, Any]
             "subtitle": _text(selected_map.get("active_app")) or "-",
         },
         {
+            "id": "version",
+            "title": "Agent",
+            "value": _text(selected_map.get("software_version")) or "-",
+            "subtitle": f"served {_text(selected_map.get('served_version')) or 'unknown'} | {_text(selected_map.get('version_status')) or 'unknown'}",
+        },
+        {
             "id": "trust",
             "title": "Trust",
             "value": _text(selected_map.get("trust_level")) or "-",
@@ -211,6 +226,8 @@ def _summary(selected: Mapping[str, Any] | None, items: list[dict[str, Any]]) ->
     last_seen = _text(selected_map.get("last_seen")) or "-"
     code = _text(selected_map.get("code")) or "-"
     trust_level = _text(selected_map.get("trust_level")) or "-"
+    version = _text(selected_map.get("software_version")) or "-"
+    served_version = _text(selected_map.get("served_version")) or "unknown"
     return {
         "fleet": {
             "value": len(items),
@@ -223,7 +240,7 @@ def _summary(selected: Mapping[str, Any] | None, items: list[dict[str, Any]]) ->
             "value": _text(selected_map.get("title")) or "No endpoint selected",
             "label": _text(selected_map.get("online_state")) or "not selected",
             "subtitle": f"seen {last_seen} | code {code}",
-            "description": f"{assignment} | trust {trust_level}",
+            "description": f"{assignment} | trust {trust_level} | agent {version}/{served_version}",
             "color": "success" if selected_map.get("online") else "warning" if selected_map else "danger",
         },
         "assignment": {
@@ -246,6 +263,9 @@ def _inspection_groups(selected: Mapping[str, Any] | None) -> list[dict[str, Any
     diagnostics = _mapping(item.get("diagnostics"))
     manifest = _mapping(diagnostics.get("endpoint_manifest"))
     policy = _mapping(diagnostics.get("endpoint_policy"))
+    software_version = _text(item.get("software_version")) or "-"
+    served_version = _text(item.get("served_version")) or "unknown"
+    version_status = _text(item.get("version_status")) or "unknown"
     return [
         {
             "id": "connectivity",
@@ -278,7 +298,7 @@ def _inspection_groups(selected: Mapping[str, Any] | None) -> list[dict[str, Any
         {
             "id": "contracts",
             "title": "Contracts",
-            "description": f"manifest {_text(manifest.get('schema_version')) or '-'} | policy {_text(policy.get('policy_id') or policy.get('id')) or '-'}",
+            "description": f"agent {software_version}/{served_version} | {version_status}",
             "subtitle": "Manifest, policy and diagnostics payload",
             "icon": "document-text-outline",
         },
@@ -297,12 +317,14 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
     endpoint_health = _mapping(diagnostics.get("endpoint_health"))
     manifest = _mapping(diagnostics.get("endpoint_manifest"))
     policy = _mapping(diagnostics.get("endpoint_policy"))
+    version_info = _mapping(item.get("version_info"))
     return {
         "overview": [
             {"id": "name", "title": "Name", "description": _text(item.get("title")) or "-"},
             {"id": "ref", "title": "Device ref", "description": _text(item.get("ref")) or "-", "subtitle": _text(item.get("endpoint_id")) or "-"},
             {"id": "assignment", "title": "Current assignment", "description": _text(item.get("assignment")) or "idle"},
             {"id": "active", "title": "Active app", "description": _text(item.get("active_app")) or "-", "subtitle": _text(item.get("active_surface")) or "-"},
+            {"id": "agent_version", "title": "Agent version", "description": _text(item.get("software_version")) or "-", "subtitle": f"served {_text(item.get('served_version')) or 'unknown'} | {_text(item.get('version_status')) or 'unknown'}"},
         ],
         "network": [
             {"id": "wifi", "title": "Wi-Fi", "description": _text(network.get("ssid") or network.get("state")) or "read-only", "subtitle": "Agent can assist but does not manage physical network."},
@@ -334,6 +356,7 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
             {"id": "voice", "title": "ReDevice Voice", "description": "scenario dependency", "subtitle": "PTT and VAD debug surfaces."},
         ],
         "about": [
+            {"id": "version", "title": "Version", "description": _text(item.get("version_status")) or "unknown", "subtitle": f"used {_text(item.get('software_version')) or '-'} | served {_text(item.get('served_version')) or 'unknown'}", "details": version_info},
             {"id": "manifest", "title": "Manifest", "description": _text(manifest.get("schema_version") or "-"), "details": manifest},
             {"id": "policy", "title": "Policy", "description": _text(policy.get("policy_id") or policy.get("id") or "-"), "details": policy},
             {"id": "diagnostics", "title": "Diagnostics", "description": _text(diagnostics.get("policy_source") or "-"), "details": diagnostics},
@@ -342,6 +365,7 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
             {"id": "name", "title": "Name", "description": _text(item.get("title")) or "-"},
             {"id": "state", "title": "State", "description": _text(item.get("online_state")) or "-", "subtitle": f"seen {_text(item.get('last_seen')) or '-'}"},
             {"id": "role", "title": "Role", "description": _text(item.get("assignment")) or "idle", "subtitle": _text(item.get("active_app")) or "-"},
+            {"id": "version", "title": "Agent", "description": _text(item.get("software_version")) or "-", "subtitle": f"served {_text(item.get('served_version')) or 'unknown'}"},
             {"id": "trust", "title": "Trust", "description": _text(item.get("trust_level")) or "-", "subtitle": f"code {_text(item.get('code')) or '-'}"},
         ],
     }

@@ -7,6 +7,7 @@ from typing import Any, Mapping
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.io import stream_publish
 from adaos.sdk.redevice import ReDeviceBridge
+from adaos.services.redevice_versions import endpoint_version_info
 
 try:
     from adaos.services.yjs.webspace import default_webspace_id
@@ -17,6 +18,10 @@ except Exception:  # pragma: no cover
 
 _LOG = logging.getLogger("adaos.skill.redevice_list")
 _RECEIVER = "redevice_list.devices"
+
+
+def _text(value: Any) -> str:
+    return str(value or "").strip()
 
 
 def _age(value: Any) -> str:
@@ -55,6 +60,10 @@ def _compact_device(item: Mapping[str, Any]) -> dict[str, Any]:
     diagnostics = item.get("diagnostic_report") if isinstance(item.get("diagnostic_report"), Mapping) else {}
     active_app = item.get("active_app") if isinstance(item.get("active_app"), Mapping) else {}
     active_surface = item.get("active_surface") if isinstance(item.get("active_surface"), Mapping) else {}
+    version_info = endpoint_version_info(item)
+    software_version = _text(version_info.get("software_version")) or "-"
+    served_version = _text(version_info.get("served_version")) or "unknown"
+    version_status = _text(version_info.get("version_status")) or "unknown"
     code = str(item.get("code") or "")
     endpoint_id = str(item.get("endpoint_id") or manifest.get("endpoint_id") or "")
     label = str(item.get("display_name") or item.get("device_label") or manifest.get("display_name") or endpoint_id or code)
@@ -67,7 +76,10 @@ def _compact_device(item: Mapping[str, Any]) -> dict[str, Any]:
         "id": code or endpoint_id,
         "code": code,
         "title": label,
-        "subtitle": f"state={state} online={online_state} last_seen={last_seen} zone={zone} trust={trust}",
+        "subtitle": (
+            f"state={state} online={online_state} last_seen={last_seen} "
+            f"zone={zone} trust={trust} version={software_version}/{served_version}"
+        ),
         "state": state,
         "online_state": online_state,
         "last_seen": last_seen,
@@ -76,6 +88,12 @@ def _compact_device(item: Mapping[str, Any]) -> dict[str, Any]:
         "trust_level": trust,
         "endpoint_id": endpoint_id,
         "hub_id": item.get("hub_id"),
+        "software_version": software_version,
+        "served_version": served_version,
+        "version_status": version_status,
+        "version_source": _text(version_info.get("software_version_source")) or "-",
+        "served_version_source": _text(version_info.get("served_version_source")) or "-",
+        "version_summary": f"used={software_version} served={served_version} status={version_status}",
         "diagnostic_report": diagnostics or None,
         "endpoint_manifest": manifest or None,
         "endpoint_policy": policy or None,
@@ -86,6 +104,7 @@ def _compact_device(item: Mapping[str, Any]) -> dict[str, Any]:
             "diagnostic_report": diagnostics or None,
             "endpoint_manifest": manifest or None,
             "endpoint_policy": policy or None,
+            "version_info": version_info,
             "active_app": active_app or None,
             "active_surface": active_surface or None,
             "service_state": item.get("service_state") if isinstance(item.get("service_state"), Mapping) else None,
