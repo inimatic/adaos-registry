@@ -637,14 +637,21 @@
 										"key": "_runtime_actions",
 										"label": "Actions",
 										"kind": "buttons",
-										"width": "90px",
+										"width": "140px",
 										"buttons": [
+											{ "id": "hard_pull", "icon": "cloud-download-outline", "tooltip": "Update scenario from catalog", "whenKey": "can_hard_pull", "whenEquals": true },
 											{ "id": "uninstall", "icon": "trash-outline", "tooltip": "Uninstall scenario", "disabledKey": "uninstall_disabled" }
 										]
 									}
 								]
 							},
 							"actions": [
+								{
+									"on": "click:hard_pull",
+									"type": "callHost",
+									"target": "infrastate.action",
+									"params": { "id": "scenario_hard_pull", "name": "$event.name" }
+								},
 								{
 									"on": "click:uninstall",
 									"type": "callHost",

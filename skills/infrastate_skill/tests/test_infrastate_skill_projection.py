@@ -1480,6 +1480,50 @@ def test_infrastate_catalog_record_exposes_source_and_commit(monkeypatch, tmp_pa
     }
 
 
+def test_infrastate_catalog_record_matches_scenario_by_name_when_manifest_id_differs(monkeypatch, tmp_path: Path):
+    mod = _load_infrastate_module()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    mod._registry_catalog_cache.clear()
+    mod._registry_catalog_meta_cache.clear()
+
+    monkeypatch.setattr(mod, "_REMOTE_VERSION_PROBE_ENABLED", True)
+    monkeypatch.setattr(mod, "_allow_marketplace_remote_fetch", lambda: False)
+    monkeypatch.setattr(mod, "_allow_marketplace_git_ref_lookup", lambda: True)
+    monkeypatch.setattr(
+        mod,
+        "_registry_payload_from_git_ref",
+        lambda workspace_root: {
+            "scenarios": [
+                {
+                    "id": "new_face_vision_scenario",
+                    "name": "new_face_vision",
+                    "manifest_id": "new_face_vision_scenario",
+                    "path": "scenarios/new_face_vision",
+                    "install": {"name": "new_face_vision", "id": "new_face_vision_scenario"},
+                    "version": "0.2.15",
+                }
+            ]
+        },
+    )
+    monkeypatch.setattr(mod, "_registry_ref_config", lambda: ("origin", "main"))
+    monkeypatch.setattr(mod, "_registry_git_ref_commit", lambda workspace_root, *, remote, branch: "abc123")
+    monkeypatch.setattr(
+        mod,
+        "get_ctx",
+        lambda: SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: workspace)),
+    )
+
+    record = mod._read_catalog_record(kind_plural="scenarios", artifact_id="new_face_vision")
+
+    assert record == {
+        "version": "0.2.15",
+        "catalog_source": "git_ref:origin/main",
+        "catalog_commit": "abc123",
+        "catalog_state": "available",
+    }
+
+
 def test_infrastate_catalog_record_reports_no_git(monkeypatch, tmp_path: Path):
     mod = _load_infrastate_module()
     workspace = tmp_path / "workspace"
@@ -2421,6 +2465,46 @@ def test_infrastate_action_invalidates_cache_and_refreshes_inventory_streams(mon
     assert snapshot_refreshes == [{"webspace_id": "desktop", "reason": "infrastate.action:skill_activate"}]
 
 
+def test_infrastate_scenario_hard_pull_submits_update_operation(monkeypatch):
+    mod = _load_infrastate_module()
+    submitted: list[dict[str, object]] = []
+    ui_writes: list[dict[str, object]] = []
+
+    monkeypatch.setattr(mod, "read_core_update_status", lambda: {})
+    monkeypatch.setattr(mod, "_ui_state", lambda: {})
+    monkeypatch.setattr(mod, "_write_ui_state", lambda **kwargs: ui_writes.append(dict(kwargs)))
+    monkeypatch.setattr(
+        mod,
+        "submit_update_operation",
+        lambda **kwargs: submitted.append(dict(kwargs))
+        or {"operation_id": "op-1", "target_kind": "scenario", "target_id": "new_face_vision", "action": "update"},
+    )
+
+    result = mod._perform_action(
+        "scenario_hard_pull",
+        SimpleNamespace(node_id="local", role="hub"),
+        {"name": "new_face_vision", "webspace_id": "desktop"},
+    )
+
+    assert submitted == [
+        {
+            "target_kind": "scenario",
+            "target_id": "new_face_vision",
+            "webspace_id": "desktop",
+            "initiator": {
+                "kind": "ui",
+                "id": "infrastate",
+                "node_id": "local",
+                "target_node_id": "local",
+            },
+        }
+    ]
+    assert result["ok"] is True
+    assert result["accepted"] is True
+    assert result["operation_id"] == "op-1"
+    assert ui_writes[-1]["last_action"] == "scenario_hard_pull"
+
+
 def test_infrastate_stream_snapshot_request_publishes_requested_receiver(monkeypatch):
     mod = _load_infrastate_module()
     published: list[tuple[str, object, str | None]] = []
@@ -2932,6 +3016,20 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         for column in scenario_columns
     )
     assert not any(column.get("key") in {"active_registry_display", "_workspace_actions"} for column in scenario_columns)
+    scenario_action_column = next(column for column in scenario_columns if column.get("key") == "_runtime_actions")
+    scenario_buttons = scenario_action_column.get("buttons") or []
+    assert any(
+        button.get("id") == "hard_pull"
+        and button.get("icon") == "cloud-download-outline"
+        and button.get("whenKey") == "can_hard_pull"
+        for button in scenario_buttons
+    )
+    scenario_actions = by_id["infrastate-scenarios"].get("actions") or []
+    assert any(
+        action.get("on") == "click:hard_pull"
+        and ((action.get("params") or {}).get("id") == "scenario_hard_pull")
+        for action in scenario_actions
+    )
     assert by_id["marketplace-skills"]["dataSource"] == {
         "kind": "stream",
         "receiver": "infrastate.marketplace.skills",

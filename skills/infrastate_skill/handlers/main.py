@@ -44,7 +44,7 @@ from adaos.services.runtime_lifecycle import runtime_lifecycle_snapshot
 from adaos.services.runtime_refresh import rebuild_webspace_projection_sync, refresh_skill_runtime
 from adaos.services.capacity import get_local_capacity, install_scenario_in_capacity
 from adaos.services.scenario.webspace_runtime import WebspaceService
-from adaos.services.operations import get_operation_manager, submit_install_operation
+from adaos.services.operations import get_operation_manager, submit_install_operation, submit_update_operation
 from adaos.services.skill.update import SkillUpdateService
 from adaos.services.scenarios.loader import read_manifest
 from adaos.services.scenario.manager import ScenarioManager
@@ -379,6 +379,7 @@ def _action_invalidates_marketplace(action_id: str) -> bool:
         "adaos_update",
         "marketplace",
         "marketplace_install",
+        "scenario_hard_pull",
         "scenario_uninstall",
         "skill_activate",
         "skill_hard_pull",
@@ -398,7 +399,7 @@ def _action_inventory_receivers(action_id: str) -> tuple[str, ...]:
         "skill_update",
     }:
         return (_skills_receiver(), _marketplace_skills_receiver())
-    if token == "scenario_uninstall":
+    if token in {"scenario_hard_pull", "scenario_uninstall"}:
         return (_scenarios_receiver(), _marketplace_scenarios_receiver())
     if token in {"adaos_update", "marketplace", "marketplace_install"}:
         return (
@@ -2008,6 +2009,37 @@ def _read_catalog_version(*, kind_plural: str, artifact_id: str) -> str | None:
     return _read_catalog_record(kind_plural=kind_plural, artifact_id=artifact_id).get("version") or None
 
 
+def _catalog_entry_keys(entry: dict[str, Any]) -> set[str]:
+    keys: set[str] = set()
+    for field in ("name", "id", "manifest_id"):
+        token = str(entry.get(field) or "").strip()
+        if token:
+            keys.add(token)
+    install = entry.get("install")
+    if isinstance(install, dict):
+        for field in ("name", "id"):
+            token = str(install.get(field) or "").strip()
+            if token:
+                keys.add(token)
+    path = str(entry.get("path") or "").strip().strip("/")
+    if path:
+        keys.add(path)
+        if "/" in path:
+            tail = path.rsplit("/", 1)[-1].strip()
+            if tail:
+                keys.add(tail)
+    source = entry.get("source")
+    if isinstance(source, dict):
+        source_path = str(source.get("path") or "").strip().strip("/")
+        if source_path:
+            keys.add(source_path)
+            if "/" in source_path:
+                tail = source_path.rsplit("/", 1)[-1].strip()
+                if tail:
+                    keys.add(tail)
+    return keys
+
+
 def _registry_catalog_meta(kind_plural: str, workspace_root: Path) -> dict[str, str]:
     cache_key = (str(Path(workspace_root)), str(kind_plural or "").strip())
     cached = _registry_catalog_meta_cache.get(cache_key)
@@ -2049,8 +2081,7 @@ def _read_catalog_record(*, kind_plural: str, artifact_id: str) -> dict[str, str
     for entry in entries:
         if not isinstance(entry, dict):
             continue
-        entry_id = str(entry.get("id") or entry.get("name") or "").strip()
-        if entry_id != target:
+        if target not in _catalog_entry_keys(entry):
             continue
         version = entry.get("version")
         if version is None:
@@ -6447,6 +6478,7 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
             "skill_push",
             "skill_logs",
             "skill_uninstall",
+            "scenario_hard_pull",
             "scenario_uninstall",
         }
         and selected_node_id
@@ -6648,25 +6680,49 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
             last_error="",
         )
         return result
-    if action_id == "scenario_uninstall":
+    if action_id in {"scenario_hard_pull", "scenario_uninstall"}:
         name = str(_extract_param(payload, "name") or "").strip()
         if not name:
             raise ValueError("scenario action requires scenario name")
-        ctx = get_ctx()
-        mgr = ScenarioManager(
-            repo=ctx.scenarios_repo,
-            registry=SqliteScenarioRegistry(ctx.sql),
-            git=ctx.git,
-            paths=ctx.paths,
-            bus=getattr(ctx, "bus", None),
-            caps=ctx.caps,
-        )
-        mgr.uninstall(name)
-        result = {
-            "ok": True,
-            "action": action_id,
-            "name": name,
-        }
+        webspace_id = str(_extract_param(payload, "webspace_id") or default_webspace_id()).strip() or default_webspace_id()
+        if action_id == "scenario_hard_pull":
+            result = submit_update_operation(
+                target_kind="scenario",
+                target_id=name,
+                webspace_id=webspace_id,
+                initiator={
+                    "kind": "ui",
+                    "id": "infrastate",
+                    "node_id": local_node_id or None,
+                    "target_node_id": local_node_id or None,
+                },
+            )
+            result = {
+                "ok": True,
+                "accepted": True,
+                "action": action_id,
+                "name": name,
+                "operation_id": result.get("operation_id"),
+                "operation": result,
+                "webspace_id": webspace_id,
+            }
+        else:
+            ctx = get_ctx()
+            mgr = ScenarioManager(
+                repo=ctx.scenarios_repo,
+                registry=SqliteScenarioRegistry(ctx.sql),
+                git=ctx.git,
+                paths=ctx.paths,
+                bus=getattr(ctx, "bus", None),
+                caps=ctx.caps,
+            )
+            mgr.uninstall(name)
+            result = {
+                "ok": True,
+                "action": action_id,
+                "name": name,
+                "webspace_id": webspace_id,
+            }
         _write_ui_state(
             last_action=action_id,
             last_action_ts=time.time(),
