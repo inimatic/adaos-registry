@@ -2151,10 +2151,12 @@ def _version_status(
 ) -> dict[str, Any]:
     statuses: list[dict[str, str]] = []
     kind_label = str(artifact_kind or "artifact").strip() or "artifact"
-    active_label = "Active registry version" if kind_label == "scenario" else "Active runtime"
+    is_scenario = kind_label == "scenario"
+    active_label = "Runtime version" if kind_label == "scenario" else "Active runtime"
+    local_source_label = "Runtime" if is_scenario else "Workspace source"
     inactive_text = (
-        f"{kind_label} has no active registry entry."
-        if kind_label == "scenario"
+        f"{kind_label} is not available in the local runtime inventory."
+        if is_scenario
         else f"{kind_label} has no active runtime slot."
     )
     catalog_source = str(catalog_source or "").strip()
@@ -2179,24 +2181,24 @@ def _version_status(
                 }
             )
         elif catalog_state == "unavailable":
-            source_label = catalog_source or "catalog"
+            catalog_source_label = catalog_source or "catalog"
             statuses.append(
                 {
                     "code": "catalog_unavailable",
                     "icon": "cloud-offline-outline",
-                    "tooltip": f"Catalog drift for {kind_label} cannot be checked: {source_label} is unavailable.",
+                    "tooltip": f"Catalog drift for {kind_label} cannot be checked: {catalog_source_label} is unavailable.",
                 }
             )
         elif catalog_state == "unknown":
-            source_label = catalog_source or "catalog"
+            catalog_source_label = catalog_source or "catalog"
             statuses.append(
                 {
                     "code": "catalog_unknown",
                     "icon": "help-circle-outline",
                     "tooltip": (
-                        f"{kind_label} has an active registry entry but is not present in the current catalog snapshot ({source_label})."
-                        if kind_label == "scenario"
-                        else f"{kind_label} is installed but is not present in the current catalog snapshot ({source_label})."
+                        f"{kind_label} runtime is not present in the current catalog snapshot ({catalog_source_label})."
+                        if is_scenario
+                        else f"{kind_label} is installed but is not present in the current catalog snapshot ({catalog_source_label})."
                     ),
                 }
             )
@@ -2233,7 +2235,7 @@ def _version_status(
             {
                 "code": "workspace_catalog_differs",
                 "icon": "git-compare-outline",
-                "tooltip": f"Workspace source {workspace_source_version} differs from catalog {catalog_version}.",
+                "tooltip": f"{local_source_label} {workspace_source_version} differs from catalog {catalog_version}.",
             }
         )
 
@@ -2243,7 +2245,7 @@ def _version_status(
             {
                 "code": "workspace_runtime_differs",
                 "icon": "layers-outline",
-                "tooltip": f"Workspace source {workspace_source_version} differs from {active_label.lower()} {active_version}.",
+                "tooltip": f"{local_source_label} {workspace_source_version} differs from {active_label.lower()} {active_version}.",
             }
         )
 
@@ -2716,6 +2718,11 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
     workspace_root = Path(ctx.paths.workspace_dir())
 
     try:
+        reconcile_workspace_db_to_materialized(ctx)
+    except Exception:
+        pass
+
+    try:
         registry_rows = SqliteScenarioRegistry(ctx.sql).list() or []
     except Exception:
         registry_rows = []
@@ -2753,7 +2760,7 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
             or _clean_version_text(capacity_entry.get("version"))
             or ""
         )
-        version = active_version or workspace_source_version
+        display_version = workspace_source_version or active_version
         catalog_record = _read_catalog_record(kind_plural="scenarios", artifact_id=name)
         catalog_version = str(catalog_record.get("version") or "").strip()
         catalog_source = str(catalog_record.get("catalog_source") or "").strip()
@@ -2765,10 +2772,10 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
             catalog_source=catalog_source,
             catalog_state=catalog_state,
             workspace_source_version=workspace_source_version,
-            active_version=active_version,
-            active=bool(active_version or row is not None or capacity_entry),
+            active_version=display_version,
+            active=bool(display_version or row is not None or capacity_entry),
         )
-        active_dependency_failure = dependency_failures.get(name) if active_version else None
+        active_dependency_failure = dependency_failures.get(name) if display_version else None
         if active_dependency_failure:
             version_status = _prepend_drift_status(
                 version_status,
@@ -2783,14 +2790,14 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
             )
         registry_mismatch = bool(
             catalog_version
-            and active_version
-            and _version_relation(catalog_version, active_version) in {"newer", "older", "differs"}
+            and display_version
+            and _version_relation(catalog_version, display_version) in {"newer", "older", "differs"}
         )
-        workspace_runtime_relation = _version_relation(workspace_source_version, active_version)
+        workspace_runtime_relation = _version_relation(workspace_source_version, display_version)
         workspace_catalog_relation = _version_relation(workspace_source_version, catalog_version)
         workspace_runtime_differs = bool(
             workspace_source_version
-            and active_version
+            and display_version
             and workspace_runtime_relation in {"newer", "older", "differs"}
         )
         workspace_catalog_differs = bool(
@@ -2801,23 +2808,23 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
         updated_at = getattr(row, "last_updated", None) if row is not None else capacity_entry.get("updated_at")
         item = {
             "name": name,
-            "version": version,
-            "active_version": active_version,
+            "version": display_version,
+            "active_version": display_version,
             "workspace_source_version": workspace_source_version,
             "catalog_version": catalog_version,
             "catalog_source": catalog_source,
             "catalog_commit": catalog_commit,
             "catalog_state": catalog_state,
             "catalog_display": catalog_version or "unknown",
-            "workspace_display": workspace_source_version or "unknown",
+            "workspace_display": display_version or "unknown",
             "active_registry_version": active_version,
             "active_registry_display": active_version or "none",
-            "active_display": active_version or "none",
-            "installed_display": active_version or "none",
-            "runtime_display": active_version or "none",
+            "active_display": display_version or "none",
+            "installed_display": display_version or "none",
+            "runtime_display": display_version or "none",
             "runtime_bucket": "",
             "remote_version": catalog_version,
-            "version_display": f"{version or 'unknown'}*" if registry_mismatch else (version or "unknown"),
+            "version_display": f"{display_version or 'unknown'}*" if registry_mismatch else (display_version or "unknown"),
             "updated_at": updated_at,
             "can_hard_pull": bool(catalog_version and (workspace_catalog_differs or not workspace_source_version)),
             "can_push": bool(
@@ -2827,9 +2834,9 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
                     or _version_relation(workspace_source_version, catalog_version) in {"newer", "differs"}
                 )
             ),
-            "can_activate": not bool(active_version) or workspace_runtime_differs,
+            "can_activate": False,
             "can_validate": bool(workspace_source_version),
-            "can_test": bool(active_version or workspace_source_version),
+            "can_test": bool(display_version),
             "can_logs": True,
             "uninstall_disabled": False,
             "registry_mismatch": registry_mismatch,

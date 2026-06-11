@@ -1254,7 +1254,7 @@ def test_infrastate_step_items_include_supervisor_transition():
     assert "root promotion" in supervisor_item["description"]
 
 
-def test_infrastate_scenario_items_only_show_installed_registry_entries(monkeypatch, tmp_path: Path):
+def test_infrastate_scenario_items_reconcile_sql_registry_to_local_runtime(monkeypatch, tmp_path: Path):
     mod = _load_infrastate_module()
     workspace = tmp_path / "workspace"
     alpha_dir = workspace / "scenarios" / "alpha"
@@ -1270,6 +1270,26 @@ def test_infrastate_scenario_items_only_show_installed_registry_entries(monkeypa
             self.active_version = active_version
             self.last_updated = last_updated
 
+    class _ScenarioRegistry:
+        def __init__(self):
+            self.rows = {
+                "alpha": _ScenarioRecord("alpha", "1.0.0", 1.0),
+                "gamma": _ScenarioRecord("gamma", "3.0.0", 2.0),
+            }
+
+        def list(self):
+            return [self.rows[name] for name in sorted(self.rows)]
+
+        def register(self, name: str, *, active_version: str | None = None, **_kwargs):
+            self.rows[name] = _ScenarioRecord(name, active_version or "", 10.0)
+            return self.rows[name]
+
+        def unregister(self, name: str):
+            self.rows.pop(name, None)
+
+    scenario_registry = _ScenarioRegistry()
+    reconcile_calls: list[Path] = []
+
     monkeypatch.setattr(
         mod,
         "get_ctx",
@@ -1281,14 +1301,21 @@ def test_infrastate_scenario_items_only_show_installed_registry_entries(monkeypa
     )
     monkeypatch.setattr(
         mod,
-        "SqliteScenarioRegistry",
-        lambda sql: SimpleNamespace(
-            list=lambda: [
-                _ScenarioRecord("alpha", "1.0.0", 1.0),
-                _ScenarioRecord("gamma", "3.0.0", 2.0),
-            ]
-        ),
+        "reconcile_workspace_db_to_materialized",
+        lambda ctx: (
+            reconcile_calls.append(Path(ctx.paths.workspace_dir())),
+            scenario_registry.register("alpha", active_version="1.2.3"),
+            scenario_registry.register("beta", active_version="2.0.0"),
+            scenario_registry.unregister("gamma"),
+            {"ok": True, "scenarios": ["alpha", "beta"], "scenarios_removed": ["gamma"]},
+        )[-1],
     )
+    monkeypatch.setattr(
+        mod,
+        "SqliteScenarioRegistry",
+        lambda sql: scenario_registry,
+    )
+    monkeypatch.setattr(mod, "SqliteSkillRegistry", lambda sql: SimpleNamespace(list=lambda: []))
     monkeypatch.setattr(
         mod,
         "get_local_capacity",
@@ -1298,23 +1325,30 @@ def test_infrastate_scenario_items_only_show_installed_registry_entries(monkeypa
     monkeypatch.setattr(mod, "_REMOTE_VERSION_PROBE_ENABLED", False)
 
     all_items = mod._scenario_items(include_all=True)
+    assert reconcile_calls == [workspace]
     assert [(item["name"], item["version"]) for item in all_items] == [
-        ("alpha", "1.0.0"),
+        ("alpha", "1.2.3"),
+        ("beta", "2.0.0"),
         ("delta", "4.0.0"),
-        ("gamma", "3.0.0"),
     ]
     assert all_items[0]["workspace_source_version"] == "1.2.3"
-    assert all_items[0]["has_drift"] is True
+    assert all_items[0]["active_version"] == "1.2.3"
+    assert [(item["name"], item["workspace_display"]) for item in all_items] == [
+        ("alpha", "1.2.3"),
+        ("beta", "2.0.0"),
+        ("delta", "4.0.0"),
+    ]
 
     default_items = mod._scenario_items()
+    assert reconcile_calls == [workspace, workspace]
     assert [(item["name"], item["version"]) for item in default_items] == [
-        ("alpha", "1.0.0"),
+        ("alpha", "1.2.3"),
+        ("beta", "2.0.0"),
         ("delta", "4.0.0"),
-        ("gamma", "3.0.0"),
     ]
 
     drift_items = mod._filter_inventory_drift(default_items, drift_only=True)
-    assert [item["name"] for item in drift_items] == ["alpha"]
+    assert [item["name"] for item in drift_items] == []
 
 
 def test_infrastate_scenario_items_surface_dependency_failures_for_active_scenarios(monkeypatch, tmp_path: Path):
@@ -1391,8 +1425,9 @@ def test_infrastate_scenario_items_surface_dependency_failures_for_active_scenar
     assert items["alpha"]["status"] == "dependency_lifecycle_failed"
     assert items["alpha"]["status_icon"] == "warning-outline"
     assert "bad_skill" in items["alpha"]["status_tooltip"]
-    assert items["beta"]["dependency_lifecycle_failed"] is False
-    assert items["beta"]["status"] != "dependency_lifecycle_failed"
+    assert items["beta"]["dependency_lifecycle_failed"] is True
+    assert items["beta"]["dependency_failure_operation_id"] == "op-beta"
+    assert items["beta"]["status"] == "dependency_lifecycle_failed"
 
 
 def test_infrastate_inventory_stream_honors_drift_only_toggle(monkeypatch):
@@ -2888,11 +2923,15 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         "receiver": "infrastate.scenarios",
     }
     assert webui["webio"]["receivers"]["infrastate.scenarios"]["route"]["surface"] == "modal:scenario_registry"
-    assert by_id["infrastate-scenarios"]["title"] == "Scenario registry"
+    assert by_id["infrastate-scenarios"]["title"] == "Scenarios"
     scenario_columns = by_id["infrastate-scenarios"]["inputs"]["columns"]
-    assert any(column.get("key") == "workspace_display" and column.get("label") == "Local source" for column in scenario_columns)
-    assert any(column.get("key") == "active_registry_display" and column.get("label") == "Registry" for column in scenario_columns)
-    assert not any(column.get("label") == "Installed" for column in scenario_columns)
+    assert any(column.get("key") == "catalog_display" and column.get("label") == "Catalog" for column in scenario_columns)
+    assert any(column.get("key") == "workspace_display" and column.get("label") == "Runtime" for column in scenario_columns)
+    assert not any(
+        column.get("label") in {"Local source", "Registry", "Active registry", "Installed"}
+        for column in scenario_columns
+    )
+    assert not any(column.get("key") in {"active_registry_display", "_workspace_actions"} for column in scenario_columns)
     assert by_id["marketplace-skills"]["dataSource"] == {
         "kind": "stream",
         "receiver": "infrastate.marketplace.skills",

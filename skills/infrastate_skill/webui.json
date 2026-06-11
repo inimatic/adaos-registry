@@ -620,27 +620,19 @@
 							"id": "infrastate-scenarios",
 							"type": "ui.table",
 							"area": "main",
-							"title": "Scenario registry",
+							"title": "Scenarios",
               "visibleIf": "$state.infrastateTab === 'inventory'",
 							"dataSource": {
 								"kind": "stream",
 								"receiver": "infrastate.scenarios"
 							},
 							"inputs": {
-								"emptyText": "No active scenarios",
+								"emptyText": "No scenarios",
 								"columns": [
 									{ "key": "status_icon", "label": "", "kind": "icon", "tooltipKey": "status_tooltip", "width": "44px" },
 									{ "key": "name", "label": "Name" },
 									{ "key": "catalog_display", "label": "Catalog", "mono": true, "width": "120px" },
-									{ "key": "workspace_display", "label": "Local source", "mono": true, "width": "130px" },
-									{
-										"key": "_workspace_actions",
-										"label": "Actions",
-										"kind": "buttons",
-										"width": "100px",
-										"buttons": []
-									},
-									{ "key": "active_registry_display", "label": "Registry", "mono": true, "width": "120px" },
+									{ "key": "workspace_display", "label": "Runtime", "mono": true, "width": "120px" },
 									{
 										"key": "_runtime_actions",
 										"label": "Actions",
