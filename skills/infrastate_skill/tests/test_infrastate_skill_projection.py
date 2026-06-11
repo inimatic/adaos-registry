@@ -2890,10 +2890,8 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     assert webui["webio"]["receivers"]["infrastate.scenarios"]["route"]["surface"] == "modal:scenario_registry"
     assert by_id["infrastate-scenarios"]["title"] == "Scenario registry"
     scenario_columns = by_id["infrastate-scenarios"]["inputs"]["columns"]
-    assert any(
-        column.get("key") == "active_registry_display" and column.get("label") == "Active registry"
-        for column in scenario_columns
-    )
+    assert any(column.get("key") == "workspace_display" and column.get("label") == "Local source" for column in scenario_columns)
+    assert any(column.get("key") == "active_registry_display" and column.get("label") == "Registry" for column in scenario_columns)
     assert not any(column.get("label") == "Installed" for column in scenario_columns)
     assert by_id["marketplace-skills"]["dataSource"] == {
         "kind": "stream",
