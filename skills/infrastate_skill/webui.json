@@ -130,6 +130,133 @@
       }
     }
   },
+  "voice_capabilities": [
+    {
+      "id": "infrastate.state.open",
+      "kind": "interface_action",
+      "title": "Open Infra State",
+      "labels": {
+        "en": ["infra state", "infrastructure state", "system state"],
+        "ru": ["состояние инфраструктуры", "инфраструктура", "инфрастейт"]
+      },
+      "aliases": ["Infra State", "Infrastate"],
+      "result_modes": ["open_ui"],
+      "default_result_mode": "open_ui",
+      "side_effect_class": "ui_navigation",
+      "activation": [
+        { "type": "desktop.open_modal", "params": { "modal_id": "infrastate_modal" } }
+      ],
+      "verify": { "modal_id": "infrastate_modal" }
+    },
+    {
+      "id": "infrastate.inventory.installed_skills.query",
+      "kind": "queryable_ui_section",
+      "title": "Installed skills inventory",
+      "labels": {
+        "en": ["installed skills", "skills inventory", "which skills are installed"],
+        "ru": ["установленные навыки", "список навыков", "какие навыки установлены"]
+      },
+      "result_modes": ["open_ui", "voice_summary", "voice_and_ui"],
+      "default_result_mode": "open_ui",
+      "side_effect_class": "read_only",
+      "query_contract": {
+        "dataset": "infrastate.skills",
+        "fields": ["name", "display_name", "catalog_display", "workspace_display", "runtime_display"]
+      },
+      "activation": [
+        { "type": "desktop.open_modal", "params": { "modal_id": "infrastate_modal" } },
+        { "type": "ui.state.set", "params": { "key": "infrastateTab", "value": "inventory" } },
+        { "type": "ui.affordance.activate", "params": { "affordance_id": "infrastate.inventory.installed_skills" } }
+      ],
+      "verify": { "modal_id": "infrastate_modal", "state": { "infrastateTab": "inventory" }, "widget_id": "infrastate-skills" }
+    },
+    {
+      "id": "infrastate.inventory.installed_scenarios.query",
+      "kind": "queryable_ui_section",
+      "title": "Installed scenarios inventory",
+      "labels": {
+        "en": ["installed scenarios", "scenario registry", "which scenarios are installed"],
+        "ru": ["установленные сценарии", "список сценариев", "какие сценарии установлены"]
+      },
+      "result_modes": ["open_ui", "voice_summary", "voice_and_ui"],
+      "default_result_mode": "open_ui",
+      "side_effect_class": "read_only",
+      "query_contract": {
+        "dataset": "infrastate.scenarios",
+        "fields": ["name", "catalog_display", "workspace_display"]
+      },
+      "activation": [
+        { "type": "desktop.open_modal", "params": { "modal_id": "infrastate_modal" } },
+        { "type": "ui.state.set", "params": { "key": "infrastateTab", "value": "inventory" } },
+        { "type": "ui.affordance.activate", "params": { "affordance_id": "infrastate.inventory.installed_scenarios" } }
+      ],
+      "verify": { "modal_id": "infrastate_modal", "state": { "infrastateTab": "inventory" }, "widget_id": "infrastate-scenarios" }
+    }
+  ],
+  "voice_affordances": [
+    {
+      "id": "infrastate.overview",
+      "kind": "modal_tab",
+      "parent": "infrastate_modal",
+      "title": "Overview",
+      "labels": { "en": ["overview"], "ru": ["обзор", "состояние"] },
+      "side_effect_class": "ui_navigation",
+      "activation": [
+        { "type": "desktop.open_modal", "params": { "modal_id": "infrastate_modal" } },
+        { "type": "ui.state.set", "params": { "key": "infrastateTab", "value": "overview" } }
+      ],
+      "verify": { "modal_id": "infrastate_modal", "state": { "infrastateTab": "overview" } }
+    },
+    {
+      "id": "infrastate.inventory",
+      "kind": "modal_tab",
+      "parent": "infrastate_modal",
+      "title": "Inventory",
+      "labels": { "en": ["inventory"], "ru": ["инвентарь", "установленное"] },
+      "side_effect_class": "ui_navigation",
+      "activation": [
+        { "type": "desktop.open_modal", "params": { "modal_id": "infrastate_modal" } },
+        { "type": "ui.state.set", "params": { "key": "infrastateTab", "value": "inventory" } }
+      ],
+      "verify": { "modal_id": "infrastate_modal", "state": { "infrastateTab": "inventory" } }
+    },
+    {
+      "id": "infrastate.inventory.installed_skills",
+      "kind": "ui_section",
+      "parent": "infrastate_modal",
+      "title": "Installed skills",
+      "labels": {
+        "en": ["installed skills", "skills inventory"],
+        "ru": ["установленные навыки", "список навыков"]
+      },
+      "side_effect_class": "ui_navigation",
+      "visibility": { "state": { "infrastateTab": "inventory" } },
+      "activation": [
+        { "type": "desktop.open_modal", "params": { "modal_id": "infrastate_modal" } },
+        { "type": "ui.state.set", "params": { "key": "infrastateTab", "value": "inventory" } },
+        { "type": "ui.focus_widget", "params": { "widget_id": "infrastate-skills" } }
+      ],
+      "verify": { "modal_id": "infrastate_modal", "state": { "infrastateTab": "inventory" }, "widget_id": "infrastate-skills" }
+    },
+    {
+      "id": "infrastate.inventory.installed_scenarios",
+      "kind": "ui_section",
+      "parent": "infrastate_modal",
+      "title": "Installed scenarios",
+      "labels": {
+        "en": ["installed scenarios", "scenario registry"],
+        "ru": ["установленные сценарии", "список сценариев"]
+      },
+      "side_effect_class": "ui_navigation",
+      "visibility": { "state": { "infrastateTab": "inventory" } },
+      "activation": [
+        { "type": "desktop.open_modal", "params": { "modal_id": "infrastate_modal" } },
+        { "type": "ui.state.set", "params": { "key": "infrastateTab", "value": "inventory" } },
+        { "type": "ui.focus_widget", "params": { "widget_id": "infrastate-scenarios" } }
+      ],
+      "verify": { "modal_id": "infrastate_modal", "state": { "infrastateTab": "inventory" }, "widget_id": "infrastate-scenarios" }
+    }
+  ],
 	"apps": [
 		{
 			"id": "infrastate_app",
