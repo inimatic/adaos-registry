@@ -1,5 +1,46 @@
 {
   "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "voice_capabilities": [
+    {
+      "id": "subnet_env.environment.open",
+      "kind": "queryable_ui_section",
+      "title": "Subnet environment variables",
+      "labels": {
+        "en": ["subnet environment variables", "subnet env", "environment variables"],
+        "ru": ["переменные окружения подсети", "переменные подсети", "окружение подсети"]
+      },
+      "result_modes": ["open_ui", "voice_summary", "voice_and_ui"],
+      "default_result_mode": "open_ui",
+      "side_effect_class": "read_only",
+      "query_contract": {
+        "dataset": "subnet_env.effective_environment",
+        "fields": ["name", "value_state", "source", "scope"]
+      },
+      "activation": [
+        { "type": "desktop.open_modal", "params": { "modal_id": "subnet_env_modal" } },
+        { "type": "ui.affordance.activate", "params": { "affordance_id": "subnet_env.environment.effective" } }
+      ],
+      "verify": { "modal_id": "subnet_env_modal", "widget_id": "subnet-env-effective" }
+    }
+  ],
+  "voice_affordances": [
+    {
+      "id": "subnet_env.environment.effective",
+      "kind": "ui_section",
+      "parent": "subnet_env_modal",
+      "title": "Effective environment",
+      "labels": {
+        "en": ["effective environment", "subnet environment variables"],
+        "ru": ["эффективные переменные окружения", "переменные окружения подсети"]
+      },
+      "side_effect_class": "ui_navigation",
+      "activation": [
+        { "type": "desktop.open_modal", "params": { "modal_id": "subnet_env_modal" } },
+        { "type": "ui.focus_widget", "params": { "widget_id": "subnet-env-effective" } }
+      ],
+      "verify": { "modal_id": "subnet_env_modal", "widget_id": "subnet-env-effective" }
+    }
+  ],
   "apps": [
     {
       "id": "subnet_env_app",

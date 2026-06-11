@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-11T08:21:59+00:00",
+  "updated_at": "2026-06-11T08:22:27+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -507,8 +507,8 @@
       "kind": "skill",
       "id": "subnet_env",
       "name": "subnet_env",
-      "version": "0.8.2",
-      "updated_at": "2026-06-03T20:22:58+00:00",
+      "version": "0.8.3",
+      "updated_at": "2026-06-11T08:22:27+00:00",
       "path": "skills/subnet_env",
       "manifest": "skills/subnet_env/skill.yaml",
       "source": {
