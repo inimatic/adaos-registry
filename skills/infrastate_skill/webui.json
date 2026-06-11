@@ -78,6 +78,9 @@
         "mode": "replace",
         "transport": "hub",
         "snapshotPolicy": "on_subscribe",
+        "patches": true,
+        "itemPath": "/items",
+        "idField": "name",
         "initialState": { "status": "init", "message": "Loading installed skills...", "items": [] },
         "budget": { "maxPayloadBytes": 65536, "maxPublishHz": 0.5, "maxSnapshotHz": 1, "maxItems": 256 },
         "guardVisibility": { "degradedState": "Keep last skills inventory stream value.", "log": "service.infrastate_skill.runtime.log", "quarantine": false, "metric": "webio_stream_guard.infrastate.skills" },
@@ -87,6 +90,9 @@
         "mode": "replace",
         "transport": "hub",
         "snapshotPolicy": "on_subscribe",
+        "patches": true,
+        "itemPath": "/items",
+        "idField": "name",
         "initialState": { "status": "init", "message": "Loading scenario registry...", "items": [] },
         "budget": { "maxPayloadBytes": 65536, "maxPublishHz": 0.5, "maxSnapshotHz": 1, "maxItems": 256 },
         "guardVisibility": { "degradedState": "Keep last scenarios inventory stream value.", "log": "service.infrastate_skill.runtime.log", "quarantine": false, "metric": "webio_stream_guard.infrastate.scenarios" },
@@ -674,7 +680,7 @@
 										"kind": "buttons",
 										"width": "120px",
 										"buttons": [
-											{ "id": "hard_pull", "icon": "cloud-download-outline", "tooltip": "Hard pull workspace from catalog", "whenKey": "can_hard_pull", "whenEquals": true },
+											{ "id": "hard_pull", "icon": "cloud-download-outline", "tooltip": "Hard pull workspace from catalog", "whenKey": "can_hard_pull", "whenEquals": true, "disabledKey": "pending" },
 											{ "id": "push", "icon": "cloud-upload-outline", "tooltip": "Push workspace changes", "whenKey": "can_push", "whenEquals": true }
 										]
 									},
@@ -685,7 +691,7 @@
 										"kind": "buttons",
 										"width": "190px",
 										"buttons": [
-											{ "id": "activate", "icon": "rocket-outline", "tooltip": "Activate prepared runtime", "whenKey": "can_activate", "whenEquals": true },
+											{ "id": "activate", "icon": "rocket-outline", "tooltip": "Activate prepared runtime", "whenKey": "can_activate", "whenEquals": true, "disabledKey": "pending" },
 											{ "id": "validate", "icon": "checkmark-done-outline", "tooltip": "Validate workspace skill", "whenKey": "can_validate", "whenEquals": true },
 											{ "id": "test", "icon": "flask-outline", "tooltip": "Run skill tests", "whenKey": "can_test", "whenEquals": true },
 											{ "id": "logs", "icon": "document-text-outline", "tooltip": "Open skill logs", "whenKey": "can_logs", "whenEquals": true },
@@ -699,13 +705,39 @@
 									"on": "click:activate",
 									"type": "callHost",
 									"target": "infrastate.action",
-									"params": { "id": "skill_activate", "name": "$event.name" }
+									"params": { "id": "skill_activate", "name": "$event.name", "request_id": "$client.requestId" },
+                  "feedback": {
+                    "pending": { "disable": true, "icon": "sync-outline", "label": "Activating" },
+                    "observe": {
+                      "kind": "stream",
+                      "receiver": "infrastate.skills",
+                      "path": "/items",
+                      "key": "$event.name",
+                      "idField": "name",
+                      "match": { "last_request_id": "$client.requestId", "pending": false },
+                      "advanceFields": ["last_action_at", "updated_at", "operation_status", "pending"],
+                      "timeoutMs": 90000
+                    }
+                  }
 								},
 								{
 									"on": "click:hard_pull",
 									"type": "callHost",
 									"target": "infrastate.action",
-									"params": { "id": "skill_hard_pull", "name": "$event.name" }
+									"params": { "id": "skill_hard_pull", "name": "$event.name", "request_id": "$client.requestId" },
+                  "feedback": {
+                    "pending": { "disable": true, "icon": "sync-outline", "label": "Updating" },
+                    "observe": {
+                      "kind": "stream",
+                      "receiver": "infrastate.skills",
+                      "path": "/items",
+                      "key": "$event.name",
+                      "idField": "name",
+                      "match": { "last_request_id": "$client.requestId", "pending": false },
+                      "advanceFields": ["last_action_at", "updated_at", "operation_status", "pending"],
+                      "timeoutMs": 90000
+                    }
+                  }
 								},
 								{
 									"on": "click:push",
@@ -766,7 +798,7 @@
 										"kind": "buttons",
 										"width": "140px",
 										"buttons": [
-											{ "id": "hard_pull", "icon": "cloud-download-outline", "tooltip": "Update scenario from catalog", "whenKey": "can_hard_pull", "whenEquals": true },
+											{ "id": "hard_pull", "icon": "cloud-download-outline", "tooltip": "Update scenario from catalog", "whenKey": "can_hard_pull", "whenEquals": true, "disabledKey": "pending" },
 											{ "id": "uninstall", "icon": "trash-outline", "tooltip": "Uninstall scenario", "disabledKey": "uninstall_disabled" }
 										]
 									}
@@ -777,7 +809,20 @@
 									"on": "click:hard_pull",
 									"type": "callHost",
 									"target": "infrastate.action",
-									"params": { "id": "scenario_hard_pull", "name": "$event.name" }
+									"params": { "id": "scenario_hard_pull", "name": "$event.name", "request_id": "$client.requestId" },
+                  "feedback": {
+                    "pending": { "disable": true, "icon": "sync-outline", "label": "Updating" },
+                    "observe": {
+                      "kind": "stream",
+                      "receiver": "infrastate.scenarios",
+                      "path": "/items",
+                      "key": "$event.name",
+                      "idField": "name",
+                      "match": { "last_request_id": "$client.requestId", "pending": true },
+                      "advanceFields": ["last_action_at", "updated_at", "operation_id", "operation_status", "pending"],
+                      "timeoutMs": 30000
+                    }
+                  }
 								},
 								{
 									"on": "click:uninstall",

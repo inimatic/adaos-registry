@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.38
+version: 0.75.39
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -640,13 +640,13 @@ tools:
   output_schema:
     type: object
     properties: {}
-updated_at: '2026-06-11T08:21:59+00:00'
+updated_at: '2026-06-11T09:21:54+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2802.6453edb2
-    recorded_at: '2026-06-11T08:22:00+00:00'
+    min_version: 0.1.0+2807.7be0bbab
+    recorded_at: '2026-06-11T09:21:54+00:00'
     source: skill_push
-    min_commit: 6453edb2e5d91d83ea3526d7da4be313af29ff05
-    min_short_commit: 6453edb2
-    build_date: '2026-06-11T11:19:29+03:00'
+    min_commit: 7be0bbab0fbe1d2c509325889c5f46b486c1b7ce
+    min_short_commit: 7be0bbab
+    build_date: '2026-06-11T12:16:58+03:00'
 

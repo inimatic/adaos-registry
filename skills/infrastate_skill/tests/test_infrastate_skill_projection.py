@@ -2465,6 +2465,59 @@ def test_infrastate_action_invalidates_cache_and_refreshes_inventory_streams(mon
     assert snapshot_refreshes == [{"webspace_id": "desktop", "reason": "infrastate.action:skill_activate"}]
 
 
+def test_infrastate_inventory_action_publishes_row_patches(monkeypatch):
+    mod = _load_infrastate_module()
+    published: list[dict[str, object]] = []
+
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="local", role="hub"))
+    monkeypatch.setattr(mod, "_invalidate_after_action", lambda action_id, *, webspace_id: None)
+    monkeypatch.setattr(mod, "_schedule_action_inventory_streams", lambda action_id, *, webspace_id: None)
+    monkeypatch.setattr(mod, "_schedule_snapshot_refresh", lambda **kwargs: None)
+    monkeypatch.setattr(mod, "_stream_receiver_is_active", lambda webspace_id, receiver: receiver == mod._skills_receiver())
+    monkeypatch.setattr(
+        mod,
+        "_inventory_item_for_kind",
+        lambda kind, name: {
+            "name": name,
+            "workspace_display": "0.1.0",
+            "runtime_display": "0.1.0 A",
+        },
+    )
+    monkeypatch.setattr(mod, "_publish_stream_payload", lambda **kwargs: published.append(dict(kwargs)))
+    monkeypatch.setattr(
+        mod,
+        "_perform_action",
+        lambda action_id, conf, payload: {
+            "ok": True,
+            "action": action_id,
+            "name": payload["name"],
+        },
+    )
+
+    mod.on_action(
+        SimpleNamespace(
+            payload={
+                "id": "skill_hard_pull",
+                "name": "demo_skill",
+                "request_id": "req-1",
+                "webspace_id": "desktop",
+            }
+        )
+    )
+
+    assert len(published) == 2
+    pending_patch = published[0]["data"]
+    final_patch = published[1]["data"]
+    assert published[0]["receiver"] == mod._skills_receiver()
+    assert pending_patch["schema"] == "adaos.stream.patch.v1"
+    assert pending_patch["path"] == "/items"
+    assert pending_patch["key"] == "demo_skill"
+    assert pending_patch["item"]["pending"] is True
+    assert pending_patch["item"]["last_request_id"] == "req-1"
+    assert final_patch["item"]["pending"] is False
+    assert final_patch["item"]["last_request_id"] == "req-1"
+
+
 def test_infrastate_scenario_hard_pull_submits_update_operation(monkeypatch):
     mod = _load_infrastate_module()
     submitted: list[dict[str, object]] = []

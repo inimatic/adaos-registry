@@ -161,6 +161,9 @@ _active_stream_receivers_by_webspace: dict[str, set[str]] = {}
 _stream_fingerprints: dict[str, str] = {}
 _stream_last_published_at: dict[str, float] = {}
 _stream_request_seen_at: dict[str, float] = {}
+_inventory_stream_patch_lock = threading.Lock()
+_inventory_stream_patch_rev = 0
+_inventory_request_by_operation: dict[str, dict[str, str]] = {}
 _projection_diag = {
     "apply_total": 0,
     "skip_total": 0,
@@ -1032,6 +1035,249 @@ def _publish_stream_payload(*, receiver: str, data: Any, webspace_id: str | None
         webspace_id=str(webspace_id or "").strip() or default_webspace_id(),
         force=force,
     )
+
+
+def _now_iso_text() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _next_inventory_stream_patch_rev() -> int:
+    global _inventory_stream_patch_rev
+    with _inventory_stream_patch_lock:
+        _inventory_stream_patch_rev += 1
+        return _inventory_stream_patch_rev
+
+
+def _inventory_kind_for_action(action_id: str) -> str:
+    token = str(action_id or "").strip()
+    if token.startswith("skill_"):
+        return "skill"
+    if token.startswith("scenario_"):
+        return "scenario"
+    return ""
+
+
+def _inventory_receiver_for_kind(kind: str) -> str:
+    token = str(kind or "").strip()
+    if token == "skill":
+        return _skills_receiver()
+    if token == "scenario":
+        return _scenarios_receiver()
+    return ""
+
+
+def _inventory_builder_for_kind(kind: str):
+    token = str(kind or "").strip()
+    if token == "skill":
+        return _skills_items
+    if token == "scenario":
+        return _scenario_items
+    return None
+
+
+def _inventory_item_for_kind(kind: str, name: str) -> dict[str, Any] | None:
+    builder = _inventory_builder_for_kind(kind)
+    token = str(name or "").strip()
+    if not builder or not token:
+        return None
+    for item in _inventory_items_from(builder):
+        if str(item.get("name") or "").strip() == token:
+            return dict(item)
+    return None
+
+
+def _remember_inventory_operation_request(
+    operation_id: str,
+    *,
+    kind: str,
+    name: str,
+    request_id: str,
+) -> None:
+    op_id = str(operation_id or "").strip()
+    req_id = str(request_id or "").strip()
+    item_name = str(name or "").strip()
+    item_kind = str(kind or "").strip()
+    if not op_id or not item_kind or not item_name or not req_id:
+        return
+    with _inventory_stream_patch_lock:
+        _inventory_request_by_operation[op_id] = {
+            "kind": item_kind,
+            "name": item_name,
+            "request_id": req_id,
+        }
+
+
+def _remembered_inventory_operation_request(operation_id: str) -> dict[str, str]:
+    op_id = str(operation_id or "").strip()
+    if not op_id:
+        return {}
+    with _inventory_stream_patch_lock:
+        return dict(_inventory_request_by_operation.get(op_id) or {})
+
+
+def _forget_inventory_operation_request(operation_id: str) -> None:
+    op_id = str(operation_id or "").strip()
+    if not op_id:
+        return
+    with _inventory_stream_patch_lock:
+        _inventory_request_by_operation.pop(op_id, None)
+
+
+def _publish_inventory_row_patch(
+    *,
+    kind: str,
+    name: str,
+    webspace_id: str | None,
+    request_id: str | None = None,
+    action_id: str | None = None,
+    pending: bool | None = None,
+    operation_id: str | None = None,
+    operation_status: str | None = None,
+    error: str | None = None,
+) -> None:
+    receiver = _inventory_receiver_for_kind(kind)
+    item_name = str(name or "").strip()
+    if not receiver or not item_name:
+        return
+    if not _stream_receiver_is_active(webspace_id, receiver):
+        return
+    row = _inventory_item_for_kind(kind, item_name) or {"name": item_name}
+    now = _now_iso_text()
+    req_id = str(request_id or "").strip()
+    action = str(action_id or "").strip()
+    op_id = str(operation_id or "").strip()
+    op_status = str(operation_status or "").strip()
+    err_text = str(error or "").strip()
+    if pending is not None:
+        row["pending"] = bool(pending)
+    if req_id:
+        row["request_id"] = req_id
+        row["last_request_id"] = req_id
+    if action:
+        row["last_action"] = action
+    if op_id:
+        row["operation_id"] = op_id
+        row["last_operation_id"] = op_id
+    if op_status:
+        row["operation_status"] = op_status
+    if err_text:
+        row["last_error"] = err_text
+    elif pending is False:
+        row["last_error"] = ""
+    row["updated_at"] = now
+    row["last_action_at"] = now
+    patch = {
+        "schema": "adaos.stream.patch.v1",
+        "receiver": receiver,
+        "webspace_id": str(webspace_id or "").strip() or default_webspace_id(),
+        "op": "upsert",
+        "path": "/items",
+        "key": item_name,
+        "idField": "name",
+        "item": row,
+        "rev": _next_inventory_stream_patch_rev(),
+        "updated_at": now,
+    }
+    if req_id:
+        patch["request_id"] = req_id
+    _publish_stream_payload(receiver=receiver, data=patch, webspace_id=webspace_id, force=True)
+
+
+def _publish_inventory_action_pending_patch(
+    action_id: str,
+    *,
+    payload: Any,
+    webspace_id: str | None,
+) -> None:
+    request_id = str(_extract_param(payload, "request_id") or "").strip()
+    name = str(_extract_param(payload, "name") or "").strip()
+    kind = _inventory_kind_for_action(action_id)
+    if not request_id or not name or not kind:
+        return
+    _publish_inventory_row_patch(
+        kind=kind,
+        name=name,
+        webspace_id=webspace_id,
+        request_id=request_id,
+        action_id=action_id,
+        pending=True,
+    )
+
+
+def _publish_inventory_action_result_patch(
+    action_id: str,
+    *,
+    payload: Any,
+    webspace_id: str | None,
+    result: dict[str, Any] | None = None,
+    error: BaseException | None = None,
+) -> None:
+    request_id = str(_extract_param(payload, "request_id") or "").strip()
+    name = str(_extract_param(payload, "name") or "").strip()
+    kind = _inventory_kind_for_action(action_id)
+    if not request_id or not name or not kind:
+        return
+    result_payload = result if isinstance(result, dict) else {}
+    operation_id = str(
+        result_payload.get("operation_id")
+        or (result_payload.get("operation") or {}).get("operation_id")
+        or ""
+    ).strip()
+    if operation_id:
+        _remember_inventory_operation_request(
+            operation_id,
+            kind=kind,
+            name=name,
+            request_id=request_id,
+        )
+    if action_id == "scenario_hard_pull" and operation_id and error is None:
+        _publish_inventory_row_patch(
+            kind=kind,
+            name=name,
+            webspace_id=webspace_id,
+            request_id=request_id,
+            action_id=action_id,
+            pending=True,
+            operation_id=operation_id,
+            operation_status="accepted",
+        )
+        return
+    _publish_inventory_row_patch(
+        kind=kind,
+        name=name,
+        webspace_id=webspace_id,
+        request_id=request_id,
+        action_id=action_id,
+        pending=False,
+        operation_id=operation_id,
+        error=str(error or ""),
+    )
+
+
+def _publish_inventory_row_patch_for_operation(payload: Any) -> None:
+    if not isinstance(payload, dict):
+        return
+    operation_id = str(payload.get("operation_id") or "").strip()
+    target_kind = str(payload.get("target_kind") or "").strip()
+    target_id = str(payload.get("target_id") or "").strip()
+    if target_kind not in {"skill", "scenario"} or not target_id:
+        return
+    remembered = _remembered_inventory_operation_request(operation_id)
+    request_id = str(remembered.get("request_id") or "").strip()
+    status = str(payload.get("status") or "").strip().lower()
+    pending = status in {"accepted", "queued", "running", "pending"}
+    _publish_inventory_row_patch(
+        kind=target_kind,
+        name=target_id,
+        webspace_id=_webspace_id_from_payload(payload),
+        request_id=request_id,
+        action_id=f"{target_kind}_operation",
+        pending=pending,
+        operation_id=operation_id,
+        operation_status=status,
+    )
+    if status and not pending:
+        _forget_inventory_operation_request(operation_id)
 
 
 def _publish_registered_stream_receiver_snapshot(
@@ -7843,6 +8089,7 @@ def on_refresh(evt: Any) -> None:
 def on_operations_changed(evt: Any) -> None:
     payload = getattr(evt, "payload", evt)
     _invalidate_runtime_caches(webspace_id=_webspace_id_from_payload(payload))
+    _publish_inventory_row_patch_for_operation(payload)
     _schedule_snapshot_refresh(
         webspace_id=_webspace_id_from_payload(payload),
         reason="operations.changed",
@@ -7855,16 +8102,27 @@ def on_action(evt: Any) -> None:
     conf = load_config()
     action_id = _extract_action_id(payload)
     webspace_id = _webspace_id_from_payload(payload)
+    result: dict[str, Any] | None = None
+    action_error: BaseException | None = None
     try:
         if action_id:
             _invalidate_after_action(action_id, webspace_id=webspace_id)
-            _perform_action(action_id, conf, payload)
+            _publish_inventory_action_pending_patch(action_id, payload=payload, webspace_id=webspace_id)
+            result = _perform_action(action_id, conf, payload)
     except Exception as exc:
+        action_error = exc
         _write_ui_state(last_action=action_id, last_action_ts=time.time(), last_error=str(exc))
         _log.warning("infrastate action failed: %s", action_id, exc_info=True)
     finally:
         if action_id:
             _invalidate_after_action(action_id, webspace_id=webspace_id)
+            _publish_inventory_action_result_patch(
+                action_id,
+                payload=payload,
+                webspace_id=webspace_id,
+                result=result,
+                error=action_error,
+            )
             _schedule_action_inventory_streams(action_id, webspace_id=webspace_id)
     _schedule_snapshot_refresh(
         webspace_id=webspace_id,
