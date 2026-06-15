@@ -1,0 +1,231 @@
+name: notebook_skill
+version: 0.1.1
+description: Shared plain-text notebook with one active editable note, a live note
+  list stream, and Telegram export.
+runtime:
+  python: '3.11'
+events:
+  subscribe:
+  - webio.stream.snapshot.requested
+  - webio.stream.subscription.changed
+data_projections:
+- scope: subnet
+  slot: notebook.snapshot
+  targets:
+  - backend: yjs
+    path: data/notebook
+data_routes:
+- surface: modal:notebook_modal
+  route: yjs
+  projection_slot: notebook.snapshot
+  path: data/notebook/editor
+  first_paint: default selected note from webui defaults
+  recovery: latest active note content is restored from Yjs projection
+  update_source:
+  - notebook_skill.action
+  budget:
+    max_payload_bytes: 32768
+    max_publish_hz: 2
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: editor keeps the last projected note
+    log: skill:notebook_skill.runtime
+    quarantine: false
+- surface: modal:notebook_modal
+  route: stream
+  receiver: notebook_skill.notes
+  first_paint: initial note list from receiver initial state
+  recovery: skill republishes the in-memory note list on stream subscribe
+  update_source:
+  - notebook_skill.action
+  - webio.stream.snapshot.requested
+  budget:
+    max_payload_bytes: 32768
+    max_publish_hz: 2
+    max_items: 64
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: note list keeps the last stream snapshot
+    log: skill:notebook_skill.runtime
+    quarantine: false
+memory_budget:
+  expected_rss_mb: 64
+  caches:
+  - name: notebook.notes
+    storage: skill_memory_process
+    max_items: 64
+    cleanup_hook: reset_notebook
+tools:
+- name: get_notebook_snapshot
+  entry: handlers.main:get_notebook_snapshot
+  description: Return the current in-memory notebook snapshot and publish it to Yjs
+    and stream outputs.
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - snapshot
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: create_note
+  entry: handlers.main:create_note
+  description: Create a plain-text note and select it for editing.
+  input_schema:
+    type: object
+    properties:
+      title:
+        type: string
+      content:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - note
+    properties:
+      ok:
+        type: boolean
+      note:
+        type: object
+- name: select_note
+  entry: handlers.main:select_note
+  description: Select one note as the active editor note.
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+      id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      note:
+        type: object
+- name: save_note
+  entry: handlers.main:save_note
+  description: Save the active note content and publish updated Yjs/stream state.
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+      content:
+        type: string
+      title:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      note:
+        type: object
+- name: rename_note
+  entry: handlers.main:rename_note
+  description: Rename the selected note.
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+      title:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      note:
+        type: object
+- name: delete_note
+  entry: handlers.main:delete_note
+  description: Delete a note from the in-memory notebook.
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+      id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+- name: send_note_to_telegram
+  entry: handlers.main:send_note_to_telegram
+  description: Send the selected note text to the configured Telegram outbox.
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+      chat_id:
+        type: string
+      bot_id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      telegram:
+        type: object
+- name: reset_notebook
+  entry: handlers.main:reset_notebook
+  description: Reset the process-local notebook state to the default note.
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+updated_at: '2026-06-15T15:01:22+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.0+2864.c2af3094
+    recorded_at: '2026-06-15T15:01:22+00:00'
+    source: skill_push
+    min_commit: c2af309412a4f5d80abf871ea118dd11eb41e9bb
+    min_short_commit: c2af3094
+    build_date: '2026-06-15T17:50:31+03:00'
+
