@@ -2084,6 +2084,14 @@ def _base_dir() -> Path:
 
 
 def _repo_root() -> Path | None:
+    runtime_root = str(os.getenv("ADAOS_SLOT_REPO_ROOT") or "").strip()
+    if runtime_root:
+        try:
+            resolved = Path(runtime_root).expanduser().resolve()
+            if (resolved / "src" / "adaos" / "build_info.py").exists() or (resolved / "pyproject.toml").exists():
+                return resolved
+        except Exception:
+            pass
     try:
         root = current_repo_root()
         if root is not None:
@@ -3930,6 +3938,24 @@ def _build_meta() -> dict[str, Any]:
         except Exception:
             source_base_version = ""
     source_version = str(BUILD_INFO.version or "").strip()
+    try:
+        slot_repo_root = bool(repo_root is not None and is_core_slot_path(repo_root))
+    except Exception:
+        slot_repo_root = False
+    runtime_root = str(os.getenv("ADAOS_SLOT_REPO_ROOT") or "").strip()
+    if not slot_repo_root and runtime_root and repo_root is not None:
+        try:
+            slot_repo_root = Path(runtime_root).expanduser().resolve() == repo_root
+        except Exception:
+            slot_repo_root = False
+    if slot_repo_root:
+        replacement = _core_non_default_version_label(source_base_version)
+        if replacement:
+            source_version = _core_build_version_with_label(source_version, replacement) or replacement
+    elif _core_version_label(source_version) == "0.1.0":
+        replacement = _core_non_default_version_label(source_base_version)
+        if replacement:
+            source_version = _core_build_version_with_label(source_version, replacement) or replacement
     if _core_version_label(source_version) == "0.1.0":
         replacement = _core_non_default_version_label(
             source_base_version,
@@ -3947,6 +3973,7 @@ def _build_meta() -> dict[str, Any]:
     elif _core_version_label(runtime_build_version) == "0.1.0":
         replacement = _core_non_default_version_label(
             runtime_base_version,
+            source_base_version,
             _core_inferred_version_label(active_manifest.get("git_subject"), git_subject),
         )
         if replacement:
