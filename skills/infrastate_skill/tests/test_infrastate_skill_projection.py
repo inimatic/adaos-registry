@@ -2425,7 +2425,7 @@ def test_infrastate_get_snapshot_force_refresh_bypasses_snapshot_cache(monkeypat
     assert calls == [{"webspace_id": "desktop", "allow_cache": False, "selected_node_id": None}]
 
 
-def test_infrastate_action_invalidates_cache_and_refreshes_inventory_streams(monkeypatch):
+def test_infrastate_inventory_action_invalidates_cache_without_full_stream_refresh(monkeypatch):
     mod = _load_infrastate_module()
     cache_key = mod._snapshot_cache_key("desktop")
     mod._snapshot_cache[cache_key] = (time.monotonic(), {"summary": {"value": "old"}})
@@ -2458,11 +2458,33 @@ def test_infrastate_action_invalidates_cache_and_refreshes_inventory_streams(mon
     assert mod._marketplace_catalog_cache == {}
     assert mod._registry_catalog_cache == {}
     assert mod._registry_catalog_meta_cache == {}
-    assert stream_refreshes == [
-        (mod._skills_receiver(), "desktop", "infrastate.action:skill_activate"),
-        (mod._marketplace_skills_receiver(), "desktop", "infrastate.action:skill_activate"),
-    ]
+    assert stream_refreshes == []
     assert snapshot_refreshes == [{"webspace_id": "desktop", "reason": "infrastate.action:skill_activate"}]
+
+
+def test_infrastate_broad_action_still_refreshes_inventory_streams(monkeypatch):
+    mod = _load_infrastate_module()
+    stream_refreshes: list[tuple[str, str | None, str]] = []
+
+    monkeypatch.setattr(
+        mod,
+        "_schedule_stream_receiver_snapshot",
+        lambda receiver, webspace_id, *, reason: stream_refreshes.append((receiver, webspace_id, reason)),
+    )
+
+    mod._remember_stream_receiver("desktop", mod._skills_receiver())
+    mod._remember_stream_receiver("desktop", mod._scenarios_receiver())
+    mod._remember_stream_receiver("desktop", mod._marketplace_skills_receiver())
+    mod._remember_stream_receiver("desktop", mod._marketplace_scenarios_receiver())
+
+    mod._schedule_action_inventory_streams("marketplace_install", webspace_id="desktop")
+
+    assert stream_refreshes == [
+        (mod._skills_receiver(), "desktop", "infrastate.action:marketplace_install"),
+        (mod._scenarios_receiver(), "desktop", "infrastate.action:marketplace_install"),
+        (mod._marketplace_skills_receiver(), "desktop", "infrastate.action:marketplace_install"),
+        (mod._marketplace_scenarios_receiver(), "desktop", "infrastate.action:marketplace_install"),
+    ]
 
 
 def test_infrastate_inventory_action_publishes_row_patches(monkeypatch):

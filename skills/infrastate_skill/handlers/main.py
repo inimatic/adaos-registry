@@ -392,19 +392,27 @@ def _action_invalidates_marketplace(action_id: str) -> bool:
     }
 
 
-def _action_inventory_receivers(action_id: str) -> tuple[str, ...]:
-    token = str(action_id or "").strip()
-    if token in {
+def _patch_first_inventory_action(action_id: str) -> bool:
+    return str(action_id or "").strip() in {
+        "scenario_hard_pull",
+        "scenario_uninstall",
         "skill_activate",
         "skill_hard_pull",
         "skill_push",
         "skill_uninstall",
         "skill_update",
+    }
+
+
+def _action_inventory_receivers(action_id: str) -> tuple[str, ...]:
+    token = str(action_id or "").strip()
+    if _patch_first_inventory_action(token):
+        return ()
+    if token in {
+        "adaos_update",
+        "marketplace",
+        "marketplace_install",
     }:
-        return (_skills_receiver(), _marketplace_skills_receiver())
-    if token in {"scenario_hard_pull", "scenario_uninstall"}:
-        return (_scenarios_receiver(), _marketplace_scenarios_receiver())
-    if token in {"adaos_update", "marketplace", "marketplace_install"}:
         return (
             _skills_receiver(),
             _scenarios_receiver(),
