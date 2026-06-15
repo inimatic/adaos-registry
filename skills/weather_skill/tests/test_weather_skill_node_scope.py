@@ -356,7 +356,7 @@ def test_weather_intent_success_appends_chat_when_route_missing(monkeypatch):
     assert emitted[1][1]["_meta"] == {"webspace_id": "desktop"}
 
 
-def test_weather_intent_api_error_appends_chat_for_voice_route(monkeypatch):
+def test_weather_intent_api_error_keeps_existing_route_single_delivery(monkeypatch):
     mod = _load_weather_module()
     emitted: list[tuple[str, dict, dict]] = []
 
@@ -375,13 +375,11 @@ def test_weather_intent_api_error_appends_chat_for_voice_route(monkeypatch):
 
     asyncio.run(mod.on_weather_intent({"city": "Berlin", "_meta": {"webspace_id": "desktop", "route_id": "voice_chat"}}))
 
-    assert [entry[0] for entry in emitted] == ["ui.notify", "io.out.chat.append"]
+    assert [entry[0] for entry in emitted] == ["ui.notify"]
     assert emitted[0][1]["text"] == mod._WEATHER_UNAVAILABLE_TEXT
-    assert emitted[1][1]["text"] == mod._WEATHER_UNAVAILABLE_TEXT
-    assert emitted[1][1]["_meta"] == {"webspace_id": "desktop", "route_id": "voice_chat"}
 
 
-def test_weather_intent_success_appends_chat_and_tts_for_voice_route(monkeypatch):
+def test_weather_intent_success_keeps_existing_route_single_delivery(monkeypatch):
     mod = _load_weather_module()
     emitted: list[tuple[str, dict, dict]] = []
 
@@ -401,6 +399,5 @@ def test_weather_intent_success_appends_chat_and_tts_for_voice_route(monkeypatch
 
     asyncio.run(mod.on_weather_intent({"city": "Moscow", "_meta": {"webspace_id": "desktop", "route_id": "voice_chat"}}))
 
-    assert [entry[0] for entry in emitted] == ["ui.notify", "io.out.chat.append", "io.out.say"]
-    assert emitted[1][1]["text"] == "In Moscow the temperature is 19.5. "
-    assert emitted[2][1]["text"] == "In Moscow the temperature is 19.5. "
+    assert [entry[0] for entry in emitted] == ["ui.notify"]
+    assert emitted[0][1]["text"] == "In Moscow the temperature is 19.5. "

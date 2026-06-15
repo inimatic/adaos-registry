@@ -756,7 +756,7 @@ def _route_wants_chat(meta: Dict[str, Any]) -> bool:
 async def _emit_weather_failure(text: str, meta: Dict[str, Any], extra: Dict[str, Any]) -> None:
     await emit("ui.notify", {"text": text, "_meta": meta}, **extra)
     route_id = meta.get("route_id") or meta.get("route")
-    if isinstance(route_id, str) and route_id.strip() and not _route_wants_chat(meta):
+    if isinstance(route_id, str) and route_id.strip():
         return
     await emit("io.out.chat.append", {"text": text, "from": "hub", "ts": time.time(), "_meta": meta}, **extra)
 
@@ -885,7 +885,7 @@ async def on_weather_intent(payload) -> None:
     text_out = _("prep.weather.success", city=data["city"], temp=data.get("temp") or data.get("temp_c"), description=data.get("description") or "")
     await emit("ui.notify", {"text": text_out, "_meta": meta}, **extra)
     route_id = meta.get("route_id") or meta.get("route")
-    if isinstance(route_id, str) and route_id.strip() and not _route_wants_chat(meta):
+    if isinstance(route_id, str) and route_id.strip():
         return
     await emit("io.out.chat.append", {"text": text_out, "from": "hub", "ts": time.time(), "_meta": meta}, **extra)
     if _route_wants_chat(meta):
