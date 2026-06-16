@@ -3,6 +3,31 @@
   "version": "0.1.0",
   "surfaces": [
     {
+      "id": "voice.vad",
+      "type": "audio_input_endpoint",
+      "title": "ReDevice Voice Activation",
+      "policy": {
+        "microphone_required": true,
+        "capture": "voice_activity",
+        "local_stt": false,
+        "local_tts": false,
+        "retention": {
+          "debug_clip_limit": 10
+        }
+      },
+      "commands": [
+        "audio.capture.vad"
+      ],
+      "events": [
+        "endpoint.audio.voice_activity",
+        "endpoint.audio.segment",
+        "endpoint.audio.transcript"
+      ],
+      "formats": [
+        "audio/wav; codec=pcm16; rate=16000; channels=1"
+      ]
+    },
+    {
       "id": "voice.ptt",
       "type": "audio_input_endpoint",
       "title": "ReDevice Voice Push-To-Talk",
@@ -17,7 +42,8 @@
       ],
       "events": [
         "endpoint.audio.record_button",
-        "endpoint.audio.segment"
+        "endpoint.audio.segment",
+        "endpoint.audio.transcript"
       ],
       "formats": [
         "audio/wav; codec=pcm16; rate=16000; channels=1"

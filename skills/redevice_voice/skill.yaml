@@ -1,7 +1,7 @@
 name: redevice_voice
-version: 0.1.1
-description: Debug ReDevice voice endpoint skill with push-to-talk audio capture and
-  member-side STT routing.
+version: 0.1.2
+description: Debug ReDevice voice endpoint skill over EndpointAudioService with VAD
+  or push-to-talk capture and member-side STT routing.
 runtime:
   kind: python
   python: '3.11'
@@ -42,7 +42,7 @@ tools:
         type: string
         description: Optional webspace id.
 - name: start_redevice_voice
-  description: Start a debug push-to-talk voice endpoint session on a selected ReDevice.
+  description: Start a debug voice endpoint session on a selected ReDevice.
   entry: handlers.main:start_redevice_voice
   input_schema:
     type: object
@@ -58,6 +58,14 @@ tools:
         - en
         - en-us
         default: ru
+      mode:
+        type: string
+        enum:
+        - vad
+        - ptt
+        default: vad
+        description: Capture mode. Legacy default is VAD/sound activation; PTT remains
+          a fallback.
       max_duration_ms:
         type: integer
         minimum: 1000

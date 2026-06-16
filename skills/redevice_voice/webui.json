@@ -86,15 +86,19 @@
                   },
                   {
                     "id": "start",
-                    "label": "Start PTT"
+                    "label": "Start VAD"
                   },
                   {
                     "id": "start_ru",
-                    "label": "RU PTT"
+                    "label": "RU VAD"
                   },
                   {
                     "id": "start_en",
-                    "label": "EN PTT"
+                    "label": "EN VAD"
+                  },
+                  {
+                    "id": "ptt",
+                    "label": "PTT"
                   }
                 ]
               },
@@ -112,6 +116,7 @@
                   "params": {
                     "code": "$state.redeviceVoiceCode",
                     "lang": "ru",
+                    "mode": "vad",
                     "max_duration_ms": 5000
                   }
                 },
@@ -122,6 +127,7 @@
                   "params": {
                     "code": "$state.redeviceVoiceCode",
                     "lang": "ru",
+                    "mode": "vad",
                     "max_duration_ms": 5000
                   }
                 },
@@ -132,6 +138,18 @@
                   "params": {
                     "code": "$state.redeviceVoiceCode",
                     "lang": "en",
+                    "mode": "vad",
+                    "max_duration_ms": 5000
+                  }
+                },
+                {
+                  "on": "click:ptt",
+                  "type": "callSkill",
+                  "target": "redevice_voice.start_redevice_voice",
+                  "params": {
+                    "code": "$state.redeviceVoiceCode",
+                    "lang": "ru",
+                    "mode": "ptt",
                     "max_duration_ms": 5000
                   }
                 }
@@ -150,7 +168,7 @@
                 "valuePath": "selected_code",
                 "statusPath": "stt.state",
                 "descriptionPath": "stt.detail",
-                "emptyText": "Select a ReDevice endpoint and start push-to-talk."
+                "emptyText": "Select a ReDevice endpoint and start VAD or push-to-talk."
               }
             },
             {
@@ -228,7 +246,7 @@
                       },
                       {
                         "id": "start",
-                        "label": "Start PTT"
+                        "label": "Start VAD"
                       }
                     ]
                   }
@@ -250,7 +268,8 @@
                   "params": {
                     "code": "$event.code",
                     "lang": "ru",
-                    "max_duration_ms": 5000
+                    "mode": "vad",
+                    "max_duration_ms": 8000
                   }
                 }
               ]
