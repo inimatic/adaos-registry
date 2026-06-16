@@ -111,14 +111,37 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
     endpoint_health = _mapping(diagnostics.get("endpoint_health"))
     diagnostic_report = _mapping(diagnostics.get("diagnostic_report"))
     service_state = _mapping(diagnostics.get("service_state"))
+    capabilities = _mapping(diagnostic_report.get("capabilities"))
     battery = _mapping(endpoint_health.get("battery") or diagnostic_report.get("battery"))
+    if not battery and ("battery_level" in diagnostic_report or "charging" in diagnostic_report):
+        battery = {
+            "level": diagnostic_report.get("battery_level"),
+            "charging": diagnostic_report.get("charging"),
+            "state": "charging" if diagnostic_report.get("charging") else "battery",
+        }
     network = _mapping(endpoint_health.get("network") or endpoint_health.get("connectivity") or diagnostic_report.get("network"))
+    if not network:
+        network = {
+            "state": "online" if diagnostic_report.get("network_online") else "offline",
+            "wifi": _mapping(capabilities.get("network.wifi")),
+        }
     audio = _mapping(diagnostic_report.get("audio") or service_state.get("audio_output_endpoint"))
-    display = _mapping(diagnostic_report.get("screen") or diagnostic_report.get("display") or service_state.get("display_endpoint"))
-    bluetooth = _mapping(diagnostic_report.get("bluetooth") or service_state.get("bluetooth_endpoint"))
+    audio_input = _mapping(audio.get("input") or capabilities.get("audio.input") or service_state.get("audio_input_endpoint"))
+    audio_output = _mapping(audio.get("output") or capabilities.get("audio.output") or service_state.get("audio_output_endpoint"))
+    if audio_input or audio_output:
+        audio = {
+            **audio,
+            "input": audio_input,
+            "output": audio_output,
+            "state": _text(audio.get("state") or audio_output.get("quality") or audio_input.get("quality")),
+            "quality": _text(audio.get("quality") or audio_output.get("quality") or audio_input.get("quality")),
+        }
+    display = _mapping(diagnostic_report.get("screen") or diagnostic_report.get("display") or service_state.get("display_endpoint") or capabilities.get("screen"))
+    bluetooth = _mapping(diagnostic_report.get("bluetooth") or service_state.get("bluetooth_endpoint") or capabilities.get("network.bluetooth"))
     location = _mapping(diagnostic_report.get("location") or service_state.get("location_endpoint"))
     selected = bool(ref and ref == _text(selected_ref))
     endpoint_policy = _mapping(diagnostics.get("endpoint_policy"))
+    manifest = _mapping(diagnostics.get("endpoint_manifest"))
     version_info = endpoint_version_info(item)
     software_version = _text(version_info.get("software_version")) or "-"
     served_version = _text(version_info.get("served_version")) or "unknown"
@@ -149,6 +172,13 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
         "display": display or {},
         "bluetooth": bluetooth or {},
         "location": location or {},
+        "subnet": {
+            "zone_id": _text(manifest.get("zone_id") or policy.get("zone_id") or endpoint_policy.get("zone_id")),
+            "assistant_name": _text(manifest.get("assistant_name") or manifest.get("subnet_name") or policy.get("assistant_name")),
+            "hub_id": _text(manifest.get("hub_id") or endpoint_policy.get("hub_id") or policy.get("hub_id")),
+            "node_name": _text(manifest.get("node_name") or manifest.get("hub_name") or policy.get("node_name")),
+            "policy_id": _text(endpoint_policy.get("policy_id") or endpoint_policy.get("id")),
+        },
         "diagnostics": diagnostics,
     }
 
@@ -313,6 +343,7 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
     display = _mapping(item.get("display"))
     battery = _mapping(item.get("battery"))
     location = _mapping(item.get("location"))
+    subnet = _mapping(item.get("subnet"))
     diagnostics = _mapping(item.get("diagnostics"))
     endpoint_health = _mapping(diagnostics.get("endpoint_health"))
     manifest = _mapping(diagnostics.get("endpoint_manifest"))
@@ -322,6 +353,7 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
         "overview": [
             {"id": "name", "title": "Name", "description": _text(item.get("title")) or "-"},
             {"id": "ref", "title": "Device ref", "description": _text(item.get("ref")) or "-", "subtitle": _text(item.get("endpoint_id")) or "-"},
+            {"id": "subnet", "title": "Subnet", "description": _text(subnet.get("assistant_name")) or _text(subnet.get("zone_id")) or "-", "subtitle": f"node {_text(subnet.get('node_name') or subnet.get('hub_id')) or '-'}"},
             {"id": "assignment", "title": "Current assignment", "description": _text(item.get("assignment")) or "idle"},
             {"id": "active", "title": "Active app", "description": _text(item.get("active_app")) or "-", "subtitle": _text(item.get("active_surface")) or "-"},
             {"id": "agent_version", "title": "Agent version", "description": _text(item.get("software_version")) or "-", "subtitle": f"served {_text(item.get('served_version')) or 'unknown'} | {_text(item.get('version_status')) or 'unknown'}"},
@@ -329,13 +361,17 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
         "network": [
             {"id": "wifi", "title": "Wi-Fi", "description": _text(network.get("ssid") or network.get("state")) or "read-only", "subtitle": "Agent can assist but does not manage physical network."},
             {"id": "connected", "title": "Subnet", "description": _text(item.get("online_state")) or "-", "subtitle": f"last seen {_text(item.get('last_seen')) or '-'}"},
+            {"id": "hub", "title": "Hub", "description": _text(subnet.get("node_name") or subnet.get("hub_id")) or "-", "subtitle": _text(subnet.get("policy_id")) or "policy unknown"},
         ],
         "bluetooth": [
-            {"id": "available", "title": "Bluetooth", "description": _text(bluetooth.get("state")) or "unknown", "subtitle": "A2DP auto-connect is best-effort unless privileged."},
+            {"id": "available", "title": "Bluetooth", "description": _text(bluetooth.get("state") or bluetooth.get("quality")) or "unknown", "subtitle": "A2DP auto-connect is best-effort unless privileged."},
             {"id": "preferred", "title": "Preferred speaker", "description": _text(bluetooth.get("preferred_output") or bluetooth.get("preferred_device") or "-")},
+            {"id": "headset", "title": "Headset", "description": _text(bluetooth.get("headset") or bluetooth.get("input_device") or "-"), "subtitle": "Headset microphone routing requires OS support and policy."},
+            {"id": "diagnostic", "title": "Diagnostics", "description": "open Bluetooth settings or reconnect output", "subtitle": "Remote pairing is guided; legacy Android may require local confirmation."},
         ],
         "audio": [
-            {"id": "output", "title": "Audio output", "description": _text(audio.get("state") or audio.get("quality")) or "unknown"},
+            {"id": "input", "title": "Audio input", "description": _text(_mapping(audio.get("input")).get("quality") or _mapping(audio.get("input")).get("state")) or "unknown", "subtitle": "Used by endpoint_audio_service VAD/PTT."},
+            {"id": "output", "title": "Audio output", "description": _text(_mapping(audio.get("output")).get("quality") or audio.get("state") or audio.get("quality")) or "unknown", "subtitle": "Speaker or Bluetooth output."},
             {"id": "volume", "title": "Volume", "description": _text(audio.get("volume") or "-"), "subtitle": "Volume commands are policy-bound and may be OS-limited."},
         ],
         "display": [
