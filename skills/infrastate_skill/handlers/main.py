@@ -579,6 +579,12 @@ def _compact_summary_for_yjs(value: Any) -> dict[str, Any]:
         "root_control_stability",
         "draining",
         "node_tab_total",
+        "target_rev",
+        "target_version",
+        "runtime_git_commit",
+        "runtime_git_short_commit",
+        "runtime_git_branch",
+        "runtime_git_subject",
     ):
         if key in value:
             out[key] = _cache_copy(value.get(key))

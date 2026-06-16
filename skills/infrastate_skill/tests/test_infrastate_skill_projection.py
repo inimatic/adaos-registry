@@ -152,6 +152,27 @@ def test_infrastate_compact_summary_keeps_full_description():
     assert "truncated; full diagnostics" not in compact["description"]
 
 
+def test_infrastate_compact_summary_keeps_runtime_identity():
+    mod = _load_infrastate_module()
+
+    compact = mod._compact_summary_for_yjs(
+        {
+            "value": "succeeded",
+            "subtitle": "slot B | 0.1.272 | 392083c",
+            "target_version": "392083c8afffdcb862de277c58e5a914a4cf5970",
+            "runtime_git_short_commit": "392083c",
+            "runtime_git_commit": "392083c8afffdcb862de277c58e5a914a4cf5970",
+            "runtime_git_branch": "HEAD",
+            "runtime_git_subject": "chore: bump adaos version to 0.1.272",
+        }
+    )
+
+    assert compact["target_version"] == "392083c8afffdcb862de277c58e5a914a4cf5970"
+    assert compact["runtime_git_short_commit"] == "392083c"
+    assert compact["runtime_git_commit"] == "392083c8afffdcb862de277c58e5a914a4cf5970"
+    assert compact["runtime_git_subject"] == "chore: bump adaos version to 0.1.272"
+
+
 def test_infrastate_compact_snapshot_excludes_yjs_controls():
     mod = _load_infrastate_module()
 
