@@ -11,8 +11,25 @@
           "selected_code": "",
           "count": 0,
           "items": [],
+          "diagnostics": {
+            "vad": {
+              "state": "idle"
+            },
+            "stt": {
+              "state": "not_checked"
+            },
+            "retention": {
+              "debug_clip_limit": 10,
+              "stored_debug_clips": 0
+            }
+          },
           "last_command": {},
           "last_segment": {},
+          "vad": {
+            "state": "idle"
+          },
+          "record_button": {},
+          "retention": {},
           "stt": {
             "available": false,
             "state": "not_checked"
@@ -117,7 +134,11 @@
                     "code": "$state.redeviceVoiceCode",
                     "lang": "ru",
                     "mode": "vad",
-                    "max_duration_ms": 5000
+                    "max_duration_ms": 5000,
+                    "min_rms": "$state.redeviceVoiceMinRms",
+                    "silence_ms": "$state.redeviceVoiceSilenceMs",
+                    "pre_roll_ms": "$state.redeviceVoicePreRollMs",
+                    "min_segment_ms": "$state.redeviceVoiceMinSegmentMs"
                   }
                 },
                 {
@@ -128,7 +149,11 @@
                     "code": "$state.redeviceVoiceCode",
                     "lang": "ru",
                     "mode": "vad",
-                    "max_duration_ms": 5000
+                    "max_duration_ms": 5000,
+                    "min_rms": "$state.redeviceVoiceMinRms",
+                    "silence_ms": "$state.redeviceVoiceSilenceMs",
+                    "pre_roll_ms": "$state.redeviceVoicePreRollMs",
+                    "min_segment_ms": "$state.redeviceVoiceMinSegmentMs"
                   }
                 },
                 {
@@ -139,7 +164,11 @@
                     "code": "$state.redeviceVoiceCode",
                     "lang": "en",
                     "mode": "vad",
-                    "max_duration_ms": 5000
+                    "max_duration_ms": 5000,
+                    "min_rms": "$state.redeviceVoiceMinRms",
+                    "silence_ms": "$state.redeviceVoiceSilenceMs",
+                    "pre_roll_ms": "$state.redeviceVoicePreRollMs",
+                    "min_segment_ms": "$state.redeviceVoiceMinSegmentMs"
                   }
                 },
                 {
@@ -156,6 +185,22 @@
               ]
             },
             {
+              "id": "voice-vad-summary",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "VAD state",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "redevice_voice.state"
+              },
+              "inputs": {
+                "valuePath": "diagnostics.vad.state",
+                "statusPath": "diagnostics.vad.reason",
+                "descriptionPath": "diagnostics.last_audio_event.action",
+                "emptyText": "No VAD event yet"
+              }
+            },
+            {
               "id": "voice-summary",
               "type": "visual.metricTile",
               "area": "main",
@@ -169,6 +214,22 @@
                 "statusPath": "stt.state",
                 "descriptionPath": "stt.detail",
                 "emptyText": "Select a ReDevice endpoint and start VAD or push-to-talk."
+              }
+            },
+            {
+              "id": "voice-retention-summary",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Debug clips",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "redevice_voice.state"
+              },
+              "inputs": {
+                "valuePath": "diagnostics.retention.stored_debug_clips",
+                "statusPath": "diagnostics.retention.debug_clip_limit",
+                "descriptionPath": "last_segment.path",
+                "emptyText": "No retained clips"
               }
             },
             {
@@ -189,6 +250,94 @@
                   "type": "updateState",
                   "params": {
                     "redeviceVoiceCode": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "voice-vad-rms-input",
+              "type": "input.text",
+              "area": "main",
+              "title": "VAD min RMS",
+              "inputs": {
+                "initialValue": "1200",
+                "placeholder": "1200",
+                "commitMode": "manual",
+                "saveLabel": "Use RMS",
+                "helper": "Raise this on noisy rooms, lower it when speech is missed."
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "redeviceVoiceMinRms": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "voice-vad-silence-input",
+              "type": "input.text",
+              "area": "main",
+              "title": "VAD silence ms",
+              "inputs": {
+                "initialValue": "900",
+                "placeholder": "900",
+                "commitMode": "manual",
+                "saveLabel": "Use silence",
+                "helper": "Silence interval that closes a spoken segment."
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "redeviceVoiceSilenceMs": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "voice-vad-preroll-input",
+              "type": "input.text",
+              "area": "main",
+              "title": "VAD pre-roll ms",
+              "inputs": {
+                "initialValue": "700",
+                "placeholder": "700",
+                "commitMode": "manual",
+                "saveLabel": "Use pre-roll",
+                "helper": "Audio kept before speech detection starts."
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "redeviceVoicePreRollMs": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "voice-vad-minseg-input",
+              "type": "input.text",
+              "area": "main",
+              "title": "VAD min segment ms",
+              "inputs": {
+                "initialValue": "700",
+                "placeholder": "700",
+                "commitMode": "manual",
+                "saveLabel": "Use min segment",
+                "helper": "Shorter captures are treated as noise."
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "redeviceVoiceMinSegmentMs": "$event.value"
                   }
                 }
               ]
@@ -269,7 +418,11 @@
                     "code": "$event.code",
                     "lang": "ru",
                     "mode": "vad",
-                    "max_duration_ms": 8000
+                    "max_duration_ms": 8000,
+                    "min_rms": "$state.redeviceVoiceMinRms",
+                    "silence_ms": "$state.redeviceVoiceSilenceMs",
+                    "pre_roll_ms": "$state.redeviceVoicePreRollMs",
+                    "min_segment_ms": "$state.redeviceVoiceMinSegmentMs"
                   }
                 }
               ]

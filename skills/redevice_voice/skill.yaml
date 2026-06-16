@@ -1,5 +1,5 @@
 name: redevice_voice
-version: 0.1.2
+version: 0.1.4
 description: Debug ReDevice voice endpoint skill over EndpointAudioService with VAD
   or push-to-talk capture and member-side STT routing.
 runtime:
@@ -71,6 +71,30 @@ tools:
         minimum: 1000
         maximum: 12000
         default: 5000
+      min_rms:
+        type: integer
+        minimum: 200
+        maximum: 8000
+        default: 1200
+        description: VAD RMS threshold floor for legacy sound activation.
+      silence_ms:
+        type: integer
+        minimum: 300
+        maximum: 3000
+        default: 900
+        description: Silence duration that closes a VAD segment.
+      pre_roll_ms:
+        type: integer
+        minimum: 0
+        maximum: 1500
+        default: 700
+        description: Audio kept before speech detection starts.
+      min_segment_ms:
+        type: integer
+        minimum: 300
+        maximum: 3000
+        default: 700
+        description: Shorter VAD captures are rejected as noise.
       webspace_id:
         type: string
         description: Optional webspace id.
@@ -89,5 +113,13 @@ data_routes:
   - receiver: redevice_voice.state
     schema: redevice-voice-state.v1
     description: Debug ReDevice voice endpoint state stream.
-updated_at: '2026-06-04T13:16:16+00:00'
+updated_at: '2026-06-16T17:11:50+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.0+2927.7d26a1b5
+    recorded_at: '2026-06-16T17:11:50+00:00'
+    source: skill_push
+    min_commit: 7d26a1b56a904f7b777e7a99f98644462edd222f
+    min_short_commit: 7d26a1b5
+    build_date: '2026-06-16T20:10:10+03:00'
 

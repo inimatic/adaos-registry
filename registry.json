@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-16T15:58:12+00:00",
+  "updated_at": "2026-06-16T17:11:50+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -422,8 +422,8 @@
       "kind": "skill",
       "id": "redevice_settings",
       "name": "redevice_settings",
-      "version": "0.1.3",
-      "updated_at": "2026-06-07T04:35:54+00:00",
+      "version": "0.1.5",
+      "updated_at": "2026-06-16T17:11:50+00:00",
       "path": "skills/redevice_settings",
       "manifest": "skills/redevice_settings/skill.yaml",
       "source": {
@@ -444,8 +444,8 @@
       "kind": "skill",
       "id": "redevice_voice",
       "name": "redevice_voice",
-      "version": "0.1.2",
-      "updated_at": "2026-06-04T13:16:16+00:00",
+      "version": "0.1.4",
+      "updated_at": "2026-06-16T17:11:50+00:00",
       "path": "skills/redevice_voice",
       "manifest": "skills/redevice_voice/skill.yaml",
       "source": {

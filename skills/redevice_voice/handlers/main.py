@@ -10,6 +10,7 @@ from adaos.sdk.data import skill_memory
 from adaos.sdk.io import (
     build_capture_command,
     compact_audio_endpoint,
+    endpoint_audio_diagnostics,
     endpoint_audio_policy,
     endpoint_audio_stt_status,
     process_endpoint_audio_event,
@@ -39,6 +40,16 @@ def _mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
 
+def _int_or_default(value: Any, default: int) -> int:
+    token = _text(value)
+    if not token or token.startswith("$"):
+        return default
+    try:
+        return int(token)
+    except (TypeError, ValueError):
+        return default
+
+
 def _now() -> str:
     return datetime.now(tz=timezone.utc).isoformat()
 
@@ -64,6 +75,9 @@ def _load_state() -> dict[str, Any]:
     state.setdefault("events", [])
     state.setdefault("last_command", {})
     state.setdefault("last_segment", {})
+    state.setdefault("vad", {"state": "idle"})
+    state.setdefault("record_button", {})
+    state.setdefault("retention", {})
     state.setdefault("stt", {"available": False, "state": "not_checked"})
     return state
 
@@ -118,14 +132,20 @@ def _choose_endpoint(endpoints: list[Mapping[str, Any]], code: str | None = None
 def _payload(state: Mapping[str, Any], endpoints: list[Mapping[str, Any]]) -> dict[str, Any]:
     selected = _text(state.get("selected_code"))
     items = [_compact_endpoint(item, selected) for item in endpoints]
+    selected_endpoint = _choose_endpoint(endpoints, selected)
+    diagnostics = endpoint_audio_diagnostics(state, selected_endpoint)
     return {
         "ok": True,
         "selected_code": selected,
         "count": len(items),
         "items": items,
+        "diagnostics": diagnostics,
         "last_command": _mapping(state.get("last_command")),
         "last_segment": _mapping(state.get("last_segment")),
         "stt": _mapping(state.get("stt")) or _vosk_status(),
+        "vad": _mapping(state.get("vad")) or _mapping(diagnostics.get("vad")),
+        "record_button": _mapping(state.get("record_button")),
+        "retention": _mapping(state.get("retention")) or _mapping(diagnostics.get("retention")),
         "events": list(state.get("events") or [])[-_MAX_EVENTS:],
         "updated_at": _now(),
     }
@@ -168,6 +188,10 @@ def start_redevice_voice(
     lang: str | None = "ru",
     mode: str | None = "vad",
     max_duration_ms: int = 5000,
+    min_rms: int = 1200,
+    silence_ms: int = 900,
+    pre_roll_ms: int = 700,
+    min_segment_ms: int = 700,
     webspace_id: str | None = None,
 ) -> dict[str, Any]:
     state = _load_state()
@@ -185,6 +209,12 @@ def start_redevice_voice(
         max_duration_ms=max_duration_ms,
         owner_node_id="member",
         owner_skill_id="redevice_voice",
+        activation={
+            "min_rms": _int_or_default(min_rms, 1200),
+            "silence_ms": _int_or_default(silence_ms, 900),
+            "pre_roll_ms": _int_or_default(pre_roll_ms, 700),
+            "min_segment_ms": _int_or_default(min_segment_ms, 700),
+        },
     )
     command_id = _text(command.get("command_id"))
     session_id = _text(_mapping(command.get("payload")).get("session_id"))
@@ -200,6 +230,7 @@ def start_redevice_voice(
         "type": _text(command.get("type")),
         "policy": policy,
         "transport": transport,
+        "activation": _mapping(_mapping(_mapping(command.get("payload")).get("input_policy")).get("activation")),
         "result": result,
         "updated_at": _now(),
     }
