@@ -450,14 +450,13 @@ def test_infrastate_marketplace_stream_honors_explicit_target_node(monkeypatch):
 def test_infrastate_direct_marketplace_tool_returns_items(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
     monkeypatch.setattr(
         mod,
-        "_snapshot_or_fallback_cached",
+        "_marketplace_items",
         lambda **kwargs: {
-            "marketplace": {
-                "skills": [{"id": "weather_skill"}],
-                "scenarios": [{"id": "web_desktop"}],
-            }
+            "skills": [{"id": "weather_skill"}],
+            "scenarios": [{"id": "web_desktop"}],
         },
     )
 
@@ -472,14 +471,10 @@ def test_infrastate_direct_marketplace_tool_returns_items(monkeypatch):
 def test_infrastate_direct_inventory_tool_returns_items(monkeypatch):
     mod = _load_infrastate_module()
 
-    monkeypatch.setattr(
-        mod,
-        "_snapshot_or_fallback_cached",
-        lambda **kwargs: {
-            "skills": [{"name": "weather_skill"}],
-            "scenarios": [{"name": "web_desktop"}],
-        },
-    )
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
+    monkeypatch.setattr(mod, "_operations_snapshot", lambda webspace_id=None: {"active_items": []})
+    monkeypatch.setattr(mod, "_inventory_items_from", lambda _builder: [{"name": "web_desktop"}])
+    monkeypatch.setattr(mod, "_inventory_drift_only_enabled", lambda *_args, **_kwargs: False)
 
     result = mod.get_inventory(kind="scenarios", webspace_id="desktop", target_node_id="hub-1")
 
@@ -838,38 +833,24 @@ def test_infrastate_forget_subnet_clears_directory_and_requests_member_refresh(m
     assert manager.requests == [("member-1", "infrastate.forget_subnet")]
 
 
-def test_infrastate_get_snapshot_projects_fallback_when_snapshot_crashes(monkeypatch):
+def test_infrastate_get_snapshot_ignores_legacy_full_snapshot_crashes(monkeypatch):
     mod = _load_infrastate_module()
-    projected: dict[str, object] = {}
 
     def _boom(*, webspace_id=None):
         raise UnboundLocalError("cannot access local variable 'sync_runtime' where it is not associated with a value")
 
     monkeypatch.setattr(mod, "_snapshot", _boom)
-    monkeypatch.setattr(mod, "_project", lambda snapshot, webspace_id=None: projected.update({"snapshot": snapshot, "webspace_id": webspace_id}))
     monkeypatch.setattr(mod, "runtime_lifecycle_snapshot", lambda: {"node_state": "ready"})
-    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace())
-    monkeypatch.setattr(
-        mod,
-        "_reliability_snapshot",
-        lambda conf, lifecycle: {
-            "runtime": {
-                "sync_runtime": {
-                    "assessment": {"state": "nominal", "reason": "test"},
-                    "selected_webspace_id": "default",
-                }
-            }
-        },
-    )
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(role="hub", node_id="hub-1"))
+    monkeypatch.setattr(mod, "_should_project_snapshot_result", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(mod, "_event_state", lambda: [])
 
     snapshot = mod.get_snapshot(webspace_id="default", project=True)
 
-    assert snapshot["fallback"] is True
-    assert "sync_runtime" in snapshot["errors"][0]
-    assert projected["webspace_id"] == "default"
-    assert isinstance(projected["snapshot"], dict)
-    assert projected["snapshot"]["fallback"] is True
+    assert snapshot["ok"] is True
+    assert snapshot["full_snapshot_removed"] is True
+    assert snapshot["projection"] == "lightweight_control"
+    assert snapshot["summary"]["value"] == "idle"
 
 
 def test_infrastate_snapshot_tolerates_section_failures(monkeypatch):
@@ -2204,21 +2185,20 @@ def test_infrastate_project_async_blocks_primary_yjs_projection_but_keeps_stream
     assert mod._projection_diag["blocked_total"] == 1
 
 
-def test_infrastate_get_snapshot_project_false_does_not_project_fallback(monkeypatch):
+def test_infrastate_get_snapshot_project_false_does_not_project_control(monkeypatch):
     mod = _load_infrastate_module()
 
     monkeypatch.setattr(
         mod,
-        "_snapshot_or_fallback_cached",
+        "_lightweight_projection_sections",
         lambda **_kwargs: {
-            "fallback": True,
-            "summary": {"value": "degraded"},
-            "projection_diag": {},
+            "infrastate.summary": {"value": "degraded"},
+            "infrastate.projection_diag": {},
         },
     )
     monkeypatch.setattr(
         mod,
-        "_project",
+        "_project_sections_async",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("project should not run")),
     )
 
@@ -2240,14 +2220,12 @@ def test_infrastate_get_snapshot_allows_compact_projection_under_yjs_throttle(mo
 
     monkeypatch.setattr(
         mod,
-        "_snapshot_or_fallback_cached",
+        "_lightweight_projection_sections",
         lambda **_kwargs: {
-            "summary": {"value": "succeeded", "subtitle": "slot B | abc123"},
-            "actions": [{"id": "refresh", "title": "Refresh"}],
-            "logs": [{"id": "heavy-log"}],
+            "infrastate.summary": {"value": "succeeded", "subtitle": "slot B | abc123"},
+            "infrastate.actions": [{"id": "refresh", "title": "Refresh"}],
         },
     )
-    monkeypatch.setattr(mod, "_snapshot_projection_is_current", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(
         mod,
         "_projection_pressure_policy",
@@ -2258,7 +2236,11 @@ def test_infrastate_get_snapshot_allows_compact_projection_under_yjs_throttle(mo
             "reason": "write_amplification",
         },
     )
-    monkeypatch.setattr(mod, "_project", lambda snapshot, webspace_id=None: projected.append(webspace_id))
+
+    async def _project_sections(sections, webspace_id=None, reason=""):
+        projected.append(webspace_id)
+
+    monkeypatch.setattr(mod, "_project_sections_async", _project_sections)
 
     result = mod.get_snapshot(webspace_id="desktop", project=True)
 
@@ -2283,10 +2265,9 @@ def test_infrastate_get_snapshot_suppresses_compact_projection_when_yjs_blocked(
 
     monkeypatch.setattr(
         mod,
-        "_snapshot_or_fallback_cached",
-        lambda **_kwargs: {"summary": {"value": "succeeded"}},
+        "_lightweight_projection_sections",
+        lambda **_kwargs: {"infrastate.summary": {"value": "succeeded"}},
     )
-    monkeypatch.setattr(mod, "_snapshot_projection_is_current", lambda *_args, **_kwargs: False)
     monkeypatch.setattr(
         mod,
         "_projection_pressure_policy",
@@ -2299,7 +2280,7 @@ def test_infrastate_get_snapshot_suppresses_compact_projection_when_yjs_blocked(
     )
     monkeypatch.setattr(
         mod,
-        "_project",
+        "_project_sections_async",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("blocked YJS projection should not run")),
     )
 
@@ -2307,7 +2288,7 @@ def test_infrastate_get_snapshot_suppresses_compact_projection_when_yjs_blocked(
 
     assert result["summary"]["value"] == "succeeded"
     assert mod._projection_diag["tool_project_suppressed_total"] == 1
-    assert mod._projection_diag["last_tool_project_suppressed_reason"] == "tool.get_snapshot"
+    assert mod._projection_diag["last_tool_project_suppressed_reason"] == "tool.get_snapshot.lightweight"
     assert mod._projection_diag["last_tool_project_suppressed_policy_state"] == "block"
     assert mod._projection_diag["tool_project_admitted_under_pressure_total"] == 0
 
@@ -2429,7 +2410,7 @@ def test_infrastate_snapshot_cache_skips_store_when_invalidated_during_build(mon
     assert cache_key not in mod._snapshot_cache_projection_fingerprints
 
 
-def test_infrastate_get_snapshot_force_refresh_bypasses_snapshot_cache(monkeypatch):
+def test_infrastate_get_snapshot_force_refresh_does_not_use_snapshot_cache(monkeypatch):
     mod = _load_infrastate_module()
     calls: list[dict[str, object]] = []
 
@@ -2438,12 +2419,17 @@ def test_infrastate_get_snapshot_force_refresh_bypasses_snapshot_cache(monkeypat
         return {"summary": {"label": "Infra State", "value": "fresh"}}
 
     monkeypatch.setattr(mod, "_snapshot_or_fallback_cached", _cached_snapshot)
+    monkeypatch.setattr(
+        mod,
+        "_lightweight_projection_sections",
+        lambda **_kwargs: {"infrastate.summary": {"label": "Infra State", "value": "fresh"}},
+    )
     monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="local"))
 
     snapshot = mod.get_snapshot(webspace_id="desktop", force_refresh=True)
 
     assert snapshot["summary"]["value"] == "fresh"
-    assert calls == [{"webspace_id": "desktop", "allow_cache": False, "selected_node_id": None}]
+    assert calls == []
 
 
 def test_infrastate_inventory_action_invalidates_cache_without_full_stream_refresh(monkeypatch):
@@ -2604,22 +2590,10 @@ def test_infrastate_scenario_hard_pull_submits_update_operation(monkeypatch):
 def test_infrastate_stream_snapshot_request_publishes_requested_receiver(monkeypatch):
     mod = _load_infrastate_module()
     published: list[tuple[str, object, str | None]] = []
-    cache_flags: list[bool] = []
     _run_stream_snapshots_inline(mod, monkeypatch)
 
-    monkeypatch.setattr(
-        mod,
-        "_snapshot_or_fallback_cached",
-        lambda webspace_id=None, allow_cache=True: (
-            cache_flags.append(bool(allow_cache)),
-            {
-                "operations": {"items": [{"id": "op-1"}], "active": [{"id": "op-1"}]},
-                "logs": [{"id": "log-1"}],
-                "events": [{"id": "evt-1"}],
-                "yjs_runtime": {"load_mark": {"selected_webspace": {"items": [{"root": "data"}]}}},
-            },
-        )[1],
-    )
+    monkeypatch.setattr(mod, "_lightweight_control_context", lambda **_kwargs: {"display_last_result": {}})
+    monkeypatch.setattr(mod, "_status_log_items", lambda _report: [{"id": "log-1"}])
     monkeypatch.setattr(
         mod,
         "stream_publish",
@@ -2638,7 +2612,6 @@ def test_infrastate_stream_snapshot_request_publishes_requested_receiver(monkeyp
     assert published == [
         ("infrastate.logs.recent", [{"id": "log-1"}], "default"),
     ]
-    assert cache_flags == [True]
 
 
 def test_infrastate_stream_snapshot_request_schedules_registered_receiver(monkeypatch):
@@ -2879,11 +2852,8 @@ def test_infrastate_stream_snapshot_request_bypasses_noncritical_guardrail(monke
     suppressions: list[dict[str, object]] = []
     _run_stream_snapshots_inline(mod, monkeypatch)
 
-    monkeypatch.setattr(
-        mod,
-        "_snapshot_or_fallback_cached",
-        lambda webspace_id=None, allow_cache=True: {"logs": [{"id": "log-1"}]},
-    )
+    monkeypatch.setattr(mod, "_lightweight_control_context", lambda **_kwargs: {"display_last_result": {}})
+    monkeypatch.setattr(mod, "_status_log_items", lambda _report: [{"id": "log-1"}])
     monkeypatch.setattr(
         mod,
         "_active_noncritical_stream_guardrail",
@@ -2954,10 +2924,8 @@ def test_infrastate_stream_snapshot_request_supports_yjs_load_mark(monkeypatch):
 
     monkeypatch.setattr(
         mod,
-        "_snapshot_or_fallback_cached",
-        lambda webspace_id=None, allow_cache=True: {
-            "yjs_runtime": {"load_mark": {"selected_webspace": {"items": [{"root": "ui", "peak_bps": 12.0}]}}},
-        },
+        "_direct_yjs_load_mark_rows",
+        lambda webspace_id=None: [{"root": "ui", "peak_bps": 12.0, "kind": "root", "id": "ui", "display": "ui"}],
     )
     monkeypatch.setattr(
         mod,
@@ -2983,27 +2951,15 @@ def test_infrastate_stream_snapshot_request_supports_yjs_load_mark(monkeypatch):
     ]
 
 
-def test_infrastate_stream_snapshot_request_supports_yjs_load_mark_from_reliability_runtime(monkeypatch):
+def test_infrastate_stream_snapshot_request_supports_direct_yjs_load_mark_rows(monkeypatch):
     mod = _load_infrastate_module()
     published: list[tuple[str, object, str | None]] = []
     _run_stream_snapshots_inline(mod, monkeypatch)
 
     monkeypatch.setattr(
         mod,
-        "_snapshot_or_fallback_cached",
-        lambda webspace_id=None, allow_cache=True: {
-            "reliability": {
-                "runtime": {
-                    "sync_runtime": {
-                        "load_mark": {
-                            "selected_webspace": {
-                                "items": [{"root": "registry", "avg_bps": 7.0}],
-                            }
-                        }
-                    }
-                }
-            }
-        },
+        "_direct_yjs_load_mark_rows",
+        lambda webspace_id=None: [{"root": "registry", "avg_bps": 7.0, "kind": "root", "id": "registry", "display": "registry"}],
     )
     monkeypatch.setattr(
         mod,

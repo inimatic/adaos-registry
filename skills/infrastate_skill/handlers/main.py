@@ -4012,6 +4012,37 @@ def _build_meta() -> dict[str, Any]:
     }
 
 
+def _build_meta_fast() -> dict[str, Any]:
+    repo_root = _repo_root()
+    dev_runtime = _is_dev_core_runtime(repo_root)
+    active_manifest = {} if dev_runtime else (active_slot_manifest() or {})
+    manifest_commit = str(active_manifest.get("git_commit") or "").strip()
+    manifest_short_commit = str(active_manifest.get("git_short_commit") or "").strip()
+    if not manifest_short_commit and manifest_commit:
+        manifest_short_commit = manifest_commit[:7]
+    manifest_build_version = str(active_manifest.get("build_version") or "").strip()
+    manifest_base_version = str(active_manifest.get("base_version") or "").strip()
+    runtime_version = manifest_build_version or manifest_base_version or str(BUILD_INFO.version or "").strip()
+    return {
+        "version": str(BUILD_INFO.version or "").strip(),
+        "build_date": str(BUILD_INFO.build_date or "").strip(),
+        "git_sha": manifest_commit,
+        "git_short_sha": manifest_short_commit,
+        "git_branch": str(active_manifest.get("git_branch") or ""),
+        "git_subject": str(active_manifest.get("git_subject") or ""),
+        "repo_root": str(repo_root or ""),
+        "runtime_mode": "dev" if dev_runtime else "slot",
+        "runtime_version": runtime_version,
+        "runtime_base_version": manifest_base_version,
+        "runtime_build_version": manifest_build_version or str(BUILD_INFO.version or "").strip(),
+        "runtime_target_version": str(active_manifest.get("target_version") or runtime_version),
+        "runtime_git_commit": manifest_commit,
+        "runtime_git_short_commit": manifest_short_commit,
+        "runtime_git_branch": str(active_manifest.get("git_branch") or ""),
+        "runtime_git_subject": str(active_manifest.get("git_subject") or ""),
+    }
+
+
 def _core_version_label(value: Any) -> str:
     text = str(value or "").strip()
     if not text:
@@ -6555,6 +6586,219 @@ def _summary(
     )
 
 
+def _lightweight_member_reliability(conf, *, lifecycle: dict[str, Any] | None = None) -> dict[str, Any]:
+    route_mode, connected_to_hub = _route_info(conf)
+    try:
+        from adaos.services.reliability import hub_member_connection_state_snapshot
+
+        member_state = hub_member_connection_state_snapshot(
+            role=str(getattr(conf, "role", "") or ""),
+            route_mode=route_mode,
+            connected_to_hub=connected_to_hub,
+            node_id=str(getattr(conf, "node_id", "") or ""),
+            node_names=list(getattr(conf, "node_names", []) or []),
+        )
+    except Exception:
+        _log.debug("failed to build lightweight hub-member state", exc_info=True)
+        member_state = {}
+    return {
+        "ok": True,
+        "node": {
+            "id": str(getattr(conf, "node_id", "") or ""),
+            "role": str(getattr(conf, "role", "") or ""),
+            "state": str((lifecycle or {}).get("node_state") or "ready"),
+        },
+        "runtime": {
+            "hub_member_connection_state": member_state if isinstance(member_state, dict) else {},
+        },
+    }
+
+
+def _lightweight_control_context(
+    *,
+    webspace_id: str | None = None,
+    selected_node_id: str | None = None,
+    include_member_state: bool = True,
+    include_transport_diag: bool = True,
+) -> dict[str, Any]:
+    conf = load_config()
+    status = _safe_snapshot_step("read_core_update_status", read_core_update_status, {}) or {}
+    last_result = _safe_snapshot_step("read_core_update_last_result", read_core_update_last_result, {}) or {}
+    slots_payload = _safe_snapshot_step("slot_status", slot_status, {}) or {}
+    lifecycle = _safe_snapshot_step("runtime_lifecycle_snapshot", runtime_lifecycle_snapshot, {}) or {}
+    build = _safe_snapshot_step("build_meta_fast", _build_meta_fast, {}) or {}
+    slots_payload, build = _safe_snapshot_step(
+        "effective_runtime_projection",
+        lambda: _effective_runtime_projection(status, last_result, slots_payload, build),
+        (slots_payload, build),
+    )
+    ui_state = _safe_snapshot_step("ui_state", _ui_state, {}) or {}
+    selected_node_override = str(selected_node_id or "").strip()
+    if selected_node_override:
+        ui_state = dict(ui_state)
+        ui_state["selected_node_id"] = selected_node_override
+    reliability = (
+        _lightweight_member_reliability(conf, lifecycle=lifecycle)
+        if include_member_state
+        else {"runtime": {}}
+    )
+    node_tabs, selected_node = _safe_snapshot_step(
+        "node_tabs",
+        lambda: _node_tabs(conf, ui_state, reliability),
+        (
+            [
+                {
+                    "id": str(getattr(conf, "node_id", "") or "local"),
+                    "label": "hub" if str(getattr(conf, "role", "") or "").strip().lower() == "hub" else "member",
+                    "title": "Local node",
+                    "role": str(getattr(conf, "role", "") or ""),
+                    "node_id": str(getattr(conf, "node_id", "") or ""),
+                    "node_names": list(getattr(conf, "node_names", []) or []),
+                    "kind": "local",
+                    "selected": True,
+                }
+            ],
+            {
+                "id": str(getattr(conf, "node_id", "") or "local"),
+                "label": "hub" if str(getattr(conf, "role", "") or "").strip().lower() == "hub" else "member",
+                "title": "Local node",
+                "role": str(getattr(conf, "role", "") or ""),
+                "node_id": str(getattr(conf, "node_id", "") or ""),
+                "node_names": list(getattr(conf, "node_names", []) or []),
+                "kind": "local",
+            },
+        ),
+    )
+    node_editor = _safe_snapshot_step(
+        "selected_node_editor",
+        lambda: _selected_node_editor(conf, selected_node),
+        {"names_csv": "", "editable": False, "scope": "fallback"},
+    )
+    selected_projection = _safe_snapshot_step(
+        "selected_node_projection",
+        lambda: _selected_node_projection(
+            selected_node,
+            reliability=reliability,
+            status=status,
+            last_result=last_result,
+            slots_payload=slots_payload,
+            lifecycle=lifecycle,
+            build=build,
+        ),
+        {
+            "status": status,
+            "last_result": last_result,
+            "slots_payload": slots_payload,
+            "lifecycle": lifecycle,
+            "build": build,
+            "selected_member": {},
+        },
+    )
+    transport_diag = (
+        _safe_snapshot_step("transport_diag_snapshot", _transport_diag_snapshot, {}) or {}
+        if include_transport_diag
+        else {}
+    )
+    display_status = selected_projection["status"] if isinstance(selected_projection.get("status"), dict) else status
+    display_last_result = (
+        selected_projection["last_result"]
+        if isinstance(selected_projection.get("last_result"), dict)
+        else last_result
+    )
+    display_slots_payload = (
+        selected_projection["slots_payload"]
+        if isinstance(selected_projection.get("slots_payload"), dict)
+        else slots_payload
+    )
+    display_lifecycle = (
+        selected_projection["lifecycle"]
+        if isinstance(selected_projection.get("lifecycle"), dict)
+        else lifecycle
+    )
+    display_build = selected_projection["build"] if isinstance(selected_projection.get("build"), dict) else build
+    selected_member = (
+        selected_projection["selected_member"]
+        if isinstance(selected_projection.get("selected_member"), dict)
+        else {}
+    )
+    return {
+        "conf": conf,
+        "webspace_id": str(webspace_id or default_webspace_id()).strip() or default_webspace_id(),
+        "status": status,
+        "last_result": last_result,
+        "slots_payload": slots_payload,
+        "lifecycle": lifecycle,
+        "build": build,
+        "ui_state": ui_state,
+        "reliability": reliability,
+        "transport_diag": transport_diag,
+        "node_tabs": node_tabs,
+        "selected_node": selected_node,
+        "selected_member": selected_member,
+        "node_editor": node_editor,
+        "display_status": display_status,
+        "display_last_result": display_last_result,
+        "display_slots_payload": display_slots_payload,
+        "display_lifecycle": display_lifecycle,
+        "display_build": display_build,
+    }
+
+
+def _lightweight_projection_sections(
+    *,
+    webspace_id: str | None = None,
+    selected_node_id: str | None = None,
+) -> dict[str, Any]:
+    ctx = _lightweight_control_context(
+        webspace_id=webspace_id,
+        selected_node_id=selected_node_id,
+        include_member_state=True,
+        include_transport_diag=True,
+    )
+    conf = ctx["conf"]
+    diagnostics = _core_update_diagnostic_items(
+        ctx["display_status"],
+        ctx["display_last_result"],
+        ctx["display_slots_payload"],
+        local_node=False,
+    )
+    return {
+        "infrastate.summary": _compact_summary_for_yjs(
+            _summary(
+                ctx["display_status"],
+                ctx["display_last_result"],
+                ctx["display_slots_payload"],
+                ctx["display_lifecycle"],
+                conf,
+                ctx["display_build"],
+                ctx["ui_state"],
+                ctx["reliability"],
+                ctx["transport_diag"],
+                selected_member=ctx["selected_member"],
+            )
+        ),
+        "infrastate.actions": _compact_action_list_for_yjs(
+            _action_items(ctx["display_status"], ctx["ui_state"], ctx["reliability"])
+        ),
+        "infrastate.core_actions": _compact_action_list_for_yjs(
+            _core_action_items(ctx["display_status"], ctx["ui_state"], ctx["reliability"])
+        ),
+        "infrastate.update_actions": _compact_action_list_for_yjs(
+            _update_actions(conf, ctx["ui_state"], ctx["reliability"])
+        ),
+        "infrastate.core_update_diag_actions": _compact_action_list_for_yjs(
+            _core_update_diagnostic_actions(diagnostics)
+        ),
+        "infrastate.nodes": _compact_node_list_for_yjs(ctx["node_tabs"]),
+        "infrastate.node_editor": _compact_mapping(ctx["node_editor"], max_keys=8),
+        "infrastate.operations.active": list(
+            (_operations_snapshot(webspace_id=webspace_id) or {}).get("active_items") or []
+        ),
+        "infrastate.ui_state": _compact_ui_state_for_yjs(ctx["ui_state"]),
+        "infrastate.projection_diag": _projection_diag_snapshot(),
+    }
+
+
 def _action_items(status: dict[str, Any], ui_state: dict[str, Any], reliability: dict[str, Any]) -> list[dict[str, Any]]:
     last_refresh = float(ui_state.get("last_refresh_ts") or 0.0)
     last_action = str(ui_state.get("last_action") or "").strip()
@@ -6563,7 +6807,7 @@ def _action_items(status: dict[str, Any], ui_state: dict[str, Any], reliability:
     selected_node_id = str(ui_state.get("selected_node_id") or "").strip()
     runtime = reliability.get("runtime") if isinstance(reliability.get("runtime"), dict) else {}
     sidecar_runtime = runtime.get("sidecar_runtime") if isinstance(runtime.get("sidecar_runtime"), dict) else {}
-    local_node_id = str(load_config().node_id or "")
+    local_node_id = str(getattr(load_config(), "node_id", "") or "")
     if selected_node_id and selected_node_id != local_node_id:
         member = _selected_member_entry(reliability, selected_node_id)
         snapshot = member.get("node_snapshot") if isinstance(member.get("node_snapshot"), dict) else {}
@@ -7724,6 +7968,71 @@ def _projection_sections_from_snapshot(snapshot: dict[str, Any]) -> dict[str, An
     return sections
 
 
+def _lookup_direct_detail(receiver: str, *, webspace_id: str | None = None) -> Any:
+    parsed = _detail_section_for_receiver(receiver)
+    if not parsed:
+        return None
+    section, item_id = parsed
+    if section == "operations":
+        operations = _operations_snapshot(webspace_id=webspace_id)
+        for item in _iter_operation_items(operations):
+            op_id = str(item.get("operation_id") or item.get("id") or "").strip()
+            if op_id and op_id == item_id:
+                return _operation_detail_payload(item)
+        return {
+            "id": item_id,
+            "title": "Details unavailable",
+            "status": "warn",
+            "content": f"Details item not found: operations/{item_id}",
+        }
+    rows: list[dict[str, Any]]
+    if section == "realtime":
+        ctx = _lightweight_control_context(webspace_id=webspace_id, include_member_state=True)
+        reliability = _reliability_snapshot(ctx["conf"], ctx["display_lifecycle"])
+        rows = _realtime_items(reliability, ctx["transport_diag"])
+    elif section == "logs":
+        ctx = _lightweight_control_context(
+            webspace_id=webspace_id,
+            include_member_state=False,
+            include_transport_diag=False,
+        )
+        report = _effective_update_log_report(
+            _read_json(_base_dir() / "state" / "core_update" / "status.json") or {},
+            ctx["display_last_result"],
+        )
+        rows = _status_log_items(report)
+    elif section == "events":
+        rows = list(reversed(_event_state()))
+    elif section == "core_update_diagnostics":
+        ctx = _lightweight_control_context(
+            webspace_id=webspace_id,
+            include_member_state=True,
+            include_transport_diag=False,
+        )
+        rows = _core_update_diagnostic_items(
+            ctx["display_status"],
+            ctx["display_last_result"],
+            ctx["display_slots_payload"],
+            local_node=not bool(ctx["selected_member"]),
+        )
+    else:
+        return {
+            "id": item_id,
+            "title": "Details unavailable",
+            "status": "warn",
+            "content": f"Unsupported infrastate details section: {section}",
+        }
+    for item in rows:
+        if isinstance(item, dict) and str(item.get("id") or "").strip() == item_id:
+            return _cache_copy(item)
+    return {
+        "id": item_id,
+        "title": "Details unavailable",
+        "status": "warn",
+        "content": f"Details item not found: {section}/{item_id}",
+    }
+
+
 def _build_stream_payload_for_receiver(
     receiver: str,
     webspace_id: str | None = None,
@@ -7731,6 +8040,9 @@ def _build_stream_payload_for_receiver(
     selected_node_id: str | None = None,
 ) -> Any:
     token = str(receiver or "").strip()
+    detail_payload = _lookup_direct_detail(token, webspace_id=webspace_id)
+    if detail_payload is not None:
+        return detail_payload
     if token == _operations_receiver():
         operations = _operations_snapshot(webspace_id=webspace_id)
         return list(operations.get("active_items") or operations.get("items") or [])
@@ -7740,6 +8052,74 @@ def _build_stream_payload_for_receiver(
         rows = _direct_yjs_load_mark_rows(webspace_id)
         if rows:
             return rows
+    if token == _logs_receiver():
+        ctx = _lightweight_control_context(
+            webspace_id=webspace_id,
+            include_member_state=False,
+            include_transport_diag=False,
+        )
+        report = _effective_update_log_report(
+            _read_json(_base_dir() / "state" / "core_update" / "status.json") or {},
+            ctx["display_last_result"],
+        )
+        return _compact_card_list(_status_log_items(report), include_content=False)
+    if token == _build_receiver():
+        ctx = _lightweight_control_context(
+            webspace_id=webspace_id,
+            selected_node_id=selected_node_id,
+            include_member_state=True,
+            include_transport_diag=False,
+        )
+        return _compact_card_list(_build_items(ctx["display_build"]), include_content=False)
+    if token == _steps_receiver():
+        ctx = _lightweight_control_context(
+            webspace_id=webspace_id,
+            selected_node_id=selected_node_id,
+            include_member_state=True,
+            include_transport_diag=False,
+        )
+        return _compact_card_list(
+            _step_items(
+                ctx["display_status"],
+                ctx["display_slots_payload"],
+                ctx["display_lifecycle"],
+                ctx["display_build"],
+            ),
+            include_content=False,
+        )
+    if token == _realtime_receiver():
+        ctx = _lightweight_control_context(
+            webspace_id=webspace_id,
+            selected_node_id=selected_node_id,
+            include_member_state=True,
+            include_transport_diag=True,
+        )
+        reliability = _reliability_snapshot(ctx["conf"], ctx["display_lifecycle"])
+        return _compact_card_list(_realtime_items(reliability, ctx["transport_diag"]), include_content=False)
+    if token == _slots_receiver():
+        ctx = _lightweight_control_context(
+            webspace_id=webspace_id,
+            selected_node_id=selected_node_id,
+            include_member_state=True,
+            include_transport_diag=False,
+        )
+        return _compact_card_list(_slot_items(ctx["display_slots_payload"]), include_content=False)
+    if token == _core_update_diagnostics_receiver():
+        ctx = _lightweight_control_context(
+            webspace_id=webspace_id,
+            selected_node_id=selected_node_id,
+            include_member_state=True,
+            include_transport_diag=False,
+        )
+        return _compact_card_list(
+            _core_update_diagnostic_items(
+                ctx["display_status"],
+                ctx["display_last_result"],
+                ctx["display_slots_payload"],
+                local_node=not bool(ctx["selected_member"]),
+            ),
+            include_content=False,
+        )
     if token == _skills_receiver():
         try:
             conf = load_config()
@@ -7748,7 +8128,10 @@ def _build_stream_payload_for_receiver(
             local_node_id = str(getattr(conf, "node_id", "") or "").strip()
             if selected_node_id and selected_node_id != local_node_id:
                 lifecycle = runtime_lifecycle_snapshot()
-                reliability = _reliability_snapshot(conf, lifecycle if isinstance(lifecycle, dict) else {})
+                reliability = _lightweight_member_reliability(
+                    conf,
+                    lifecycle=lifecycle if isinstance(lifecycle, dict) else {},
+                )
                 member = _selected_member_entry(reliability, selected_node_id)
                 if member:
                     return _remote_capacity_inventory_items(member, "skills")
@@ -7766,7 +8149,10 @@ def _build_stream_payload_for_receiver(
             local_node_id = str(getattr(conf, "node_id", "") or "").strip()
             if selected_node_id and selected_node_id != local_node_id:
                 lifecycle = runtime_lifecycle_snapshot()
-                reliability = _reliability_snapshot(conf, lifecycle if isinstance(lifecycle, dict) else {})
+                reliability = _lightweight_member_reliability(
+                    conf,
+                    lifecycle=lifecycle if isinstance(lifecycle, dict) else {},
+                )
                 member = _selected_member_entry(reliability, selected_node_id)
                 if member:
                     return _remote_capacity_inventory_items(member, "scenarios")
@@ -7790,8 +8176,7 @@ def _build_stream_payload_for_receiver(
             return list(marketplace.get(key) or [])
         except Exception:
             _log.debug("failed to build direct marketplace stream payload", exc_info=True)
-    snapshot = _snapshot_or_fallback_cached(webspace_id=webspace_id, allow_cache=True)
-    return _stream_payload_for_receiver(snapshot, token)
+    return []
 
 
 def _projection_webspace_ids(webspace_id: str | None = None) -> list[str]:
@@ -7871,15 +8256,128 @@ def _project(snapshot: dict[str, Any], webspace_id: str | None = None) -> None:
     ).result()
 
 
-async def _refresh_snapshot_async(*, webspace_id: str | None = None, allow_cache: bool = True) -> dict[str, Any]:
-    _write_ui_state(last_refresh_ts=time.time())
-    snapshot = await asyncio.to_thread(
-        _snapshot_or_fallback_cached,
-        webspace_id=webspace_id,
-        allow_cache=allow_cache,
+async def _project_sections_async(
+    sections: dict[str, Any],
+    *,
+    webspace_id: str | None = None,
+    reason: str = "infrastate_lightweight_refresh",
+) -> None:
+    if not sections:
+        return
+    compact_sections = {
+        slot_name: _cache_copy(value)
+        for slot_name, value in sections.items()
+        if slot_name in _PROJECTION_SLOT_BY_NAME or slot_name.startswith("infrastate.")
+    }
+    fingerprint = _snapshot_projection_fingerprint(compact_sections)
+    now = time.monotonic()
+    pressure_policy = _projection_pressure_policy(webspace_id)
+    pressure_state = str(pressure_policy.get("policy_state") or "").strip().lower()
+    if pressure_state == "block":
+        _projection_diag["blocked_total"] = int(_projection_diag.get("blocked_total") or 0) + 1
+        return
+    effective_min_interval_s = (
+        _THROTTLED_YJS_PROJECTION_INTERVAL_S
+        if pressure_state == "throttle"
+        else _MIN_YJS_PROJECTION_INTERVAL_S
     )
-    await _project_async(snapshot, webspace_id=webspace_id)
-    return {"ok": True, **_minimal_snapshot_for_client(snapshot)}
+    for target_ws in _projection_webspace_ids(webspace_id):
+        if _projection_fingerprints.get(target_ws) == fingerprint:
+            _projection_diag["skip_total"] = int(_projection_diag.get("skip_total") or 0) + 1
+            continue
+        last_applied_at = float(_projection_last_applied_at.get(target_ws) or 0.0)
+        if last_applied_at > 0 and now - last_applied_at < effective_min_interval_s:
+            _projection_diag["rate_limited_total"] = int(_projection_diag.get("rate_limited_total") or 0) + 1
+            continue
+        applied = False
+        errored = False
+        try:
+            _PROJECTION_RUNTIME.bind_ctx_subnet(ctx_subnet)
+            for slot_name, value in compact_sections.items():
+                slot_pressure_policy = _projection_pressure_policy(target_ws)
+                slot_pressure_state = str(slot_pressure_policy.get("policy_state") or "").strip().lower()
+                if slot_pressure_state == "block":
+                    _projection_diag["blocked_total"] = int(_projection_diag.get("blocked_total") or 0) + 1
+                    return
+                pushed = False
+                try:
+                    pushed = set_current_skill("infrastate_skill")
+                    result = await _PROJECTION_RUNTIME.set_if_changed(
+                        _PROJECTION_SLOT_BY_NAME.get(slot_name) or slot_name,
+                        value,
+                        webspace_id=target_ws,
+                        reason=reason,
+                    )
+                finally:
+                    if pushed:
+                        clear_current_skill()
+                applied = applied or bool(result.written)
+                errored = errored or bool(result.error)
+        finally:
+            pass
+        if errored:
+            _projection_diag["error_total"] = int(_projection_diag.get("error_total") or 0) + 1
+        if applied:
+            _projection_fingerprints[target_ws] = fingerprint
+            _projection_last_applied_at[target_ws] = now
+            _projection_diag["apply_total"] = int(_projection_diag.get("apply_total") or 0) + 1
+        else:
+            _projection_diag["skip_total"] = int(_projection_diag.get("skip_total") or 0) + 1
+
+
+def _publish_active_stream_receiver_snapshots(webspace_id: str | None, *, reason: str) -> None:
+    for receiver in tuple(_active_stream_receivers(webspace_id)):
+        guardrail = _active_noncritical_stream_guardrail(
+            str(webspace_id or "").strip() or default_webspace_id(),
+            receiver,
+        )
+        if guardrail:
+            _record_noncritical_stream_guardrail_suppression(
+                webspace_id=str(webspace_id or "").strip() or default_webspace_id(),
+                receiver=receiver,
+                payload=[],
+                guardrail=guardrail,
+            )
+            continue
+        _schedule_stream_receiver_snapshot(receiver, webspace_id, reason=reason)
+
+
+async def _refresh_live_infrastate_async(
+    *,
+    webspace_id: str | None = None,
+    reason: str = "runtime.event",
+    project_control: bool = True,
+) -> dict[str, Any]:
+    now = time.time()
+    _write_ui_state(last_refresh_ts=now)
+    sections: dict[str, Any] = {}
+    if project_control:
+        sections = await asyncio.to_thread(
+            _lightweight_projection_sections,
+            webspace_id=webspace_id,
+        )
+        await _project_sections_async(
+            sections,
+            webspace_id=webspace_id,
+            reason=f"infrastate_control_refresh:{reason}",
+        )
+    _publish_active_stream_receiver_snapshots(webspace_id, reason=reason)
+    return {
+        "ok": True,
+        "full_snapshot_removed": True,
+        "projection": "lightweight_control",
+        "projected_slots": sorted(str(key) for key in sections.keys()),
+        "webspace_id": str(webspace_id or default_webspace_id()).strip() or default_webspace_id(),
+        "last_refresh_ts": now,
+    }
+
+
+async def _refresh_snapshot_async(*, webspace_id: str | None = None, allow_cache: bool = True) -> dict[str, Any]:
+    return await _refresh_live_infrastate_async(
+        webspace_id=webspace_id,
+        reason="legacy.refresh_snapshot",
+        project_control=True,
+    )
 
 
 def _webspace_id_from_payload(payload: Any) -> str | None:
@@ -7965,10 +8463,9 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
     if is_detail_receiver:
         # Dynamic detail receivers are request-only; they are not registered as
         # stable stream declarations because the item id is part of the receiver.
-        snapshot = _snapshot_or_fallback_cached(webspace_id=webspace_id, allow_cache=True)
         _publish_stream_payload(
             receiver=receiver,
-            data=_stream_payload_for_receiver(snapshot, receiver),
+            data=_build_stream_payload_for_receiver(receiver, webspace_id),
             webspace_id=webspace_id,
             force=True,
         )
@@ -8009,27 +8506,53 @@ def get_snapshot(
     **_: Any,
 ) -> dict[str, Any]:
     requested_node_id = str(target_node_id or node_id or "").strip()
-    snapshot = _snapshot_or_fallback_cached(
+    sections = _lightweight_projection_sections(
         webspace_id=webspace_id,
-        allow_cache=bool(allow_cache) and not bool(force_refresh),
         selected_node_id=requested_node_id or None,
     )
-    projection_required = bool(project)
-    try:
-        local_node_id = str(getattr(load_config(), "node_id", "") or "").strip()
-    except Exception:
-        local_node_id = ""
-    remote_target_requested = bool(requested_node_id and requested_node_id != local_node_id)
-    if remote_target_requested:
-        projection_required = False
-    if projection_required and _snapshot_projection_is_current(webspace_id, snapshot):
-        projection_required = False
-        _projection_diag["tool_project_current_skip_total"] = int(_projection_diag.get("tool_project_current_skip_total") or 0) + 1
-    if projection_required and _should_project_snapshot_result(webspace_id, reason="tool.get_snapshot"):
-        _project(snapshot, webspace_id=webspace_id)
-    if remote_target_requested:
-        return _compact_snapshot_for_client(snapshot)
-    return _minimal_snapshot_for_client(snapshot)
+    if bool(project) and _should_project_snapshot_result(webspace_id, reason="tool.get_snapshot.lightweight"):
+        _projection_executor().submit(
+            lambda: asyncio.run(
+                _project_sections_async(
+                    sections,
+                    webspace_id=webspace_id,
+                    reason="tool.get_snapshot.lightweight",
+                )
+            )
+        ).result()
+    return {
+        "ok": True,
+        "full_snapshot_removed": True,
+        "projection": "lightweight_control",
+        "summary": _cache_copy(sections.get("infrastate.summary") or {}),
+        "actions": _cache_copy(sections.get("infrastate.actions") or []),
+        "core_actions": _cache_copy(sections.get("infrastate.core_actions") or []),
+        "update_actions": _cache_copy(sections.get("infrastate.update_actions") or []),
+        "core_update_diag_actions": _cache_copy(sections.get("infrastate.core_update_diag_actions") or []),
+        "nodes": _cache_copy(sections.get("infrastate.nodes") or []),
+        "node_editor": _cache_copy(sections.get("infrastate.node_editor") or {}),
+        "operations": {
+            "active": _cache_copy(sections.get("infrastate.operations.active") or []),
+            "items": _cache_copy(sections.get("infrastate.operations.active") or []),
+        },
+        "ui_state": _cache_copy(sections.get("infrastate.ui_state") or {}),
+        "projection_diag": _projection_diag_snapshot(),
+        "last_refresh_ts": time.time(),
+        "details": {
+            "delivery": "streams",
+            "receivers": [
+                _build_receiver(),
+                _steps_receiver(),
+                _realtime_receiver(),
+                _slots_receiver(),
+                _skills_receiver(),
+                _scenarios_receiver(),
+                _logs_receiver(),
+                _events_receiver(),
+                _yjs_load_receiver(),
+            ],
+        },
+    }
 
 
 @tool("get_marketplace")
@@ -8052,12 +8575,15 @@ def get_marketplace(
             requested_node_id = str(ui_state.get("selected_node_id") or getattr(conf, "node_id", "") or "").strip()
         except Exception:
             requested_node_id = ""
-    snapshot = _snapshot_or_fallback_cached(
+    try:
+        local_node_id = str(getattr(load_config(), "node_id", "") or "").strip()
+    except Exception:
+        local_node_id = ""
+    marketplace = _marketplace_items(
         webspace_id=webspace_id,
-        allow_cache=bool(allow_cache) and not bool(force_refresh),
-        selected_node_id=requested_node_id or None,
+        selected_node_id=requested_node_id or local_node_id or None,
+        local_node_id=local_node_id or None,
     )
-    marketplace = snapshot.get("marketplace") if isinstance(snapshot.get("marketplace"), dict) else {}
     items = list(marketplace.get(key) or [])
     return {
         "ok": True,
@@ -8089,12 +8615,31 @@ def get_inventory(
             requested_node_id = str(ui_state.get("selected_node_id") or getattr(conf, "node_id", "") or "").strip()
         except Exception:
             requested_node_id = ""
-    snapshot = _snapshot_or_fallback_cached(
-        webspace_id=webspace_id,
-        allow_cache=bool(allow_cache) and not bool(force_refresh),
-        selected_node_id=requested_node_id or None,
-    )
-    items = list(snapshot.get(key) or [])
+    try:
+        conf = load_config()
+        local_node_id = str(getattr(conf, "node_id", "") or "").strip()
+        if requested_node_id and requested_node_id != local_node_id:
+            lifecycle = runtime_lifecycle_snapshot()
+            reliability = _lightweight_member_reliability(
+                conf,
+                lifecycle=lifecycle if isinstance(lifecycle, dict) else {},
+            )
+            member = _selected_member_entry(reliability, requested_node_id)
+            items = _remote_capacity_inventory_items(member, key) if member else []
+        elif key == "scenarios":
+            operations = _operations_snapshot(webspace_id=webspace_id)
+            items = _filter_inventory_drift(
+                _inventory_items_from(lambda include_all=True: _scenario_items(include_all=include_all, operations=operations)),
+                drift_only=_inventory_drift_only_enabled(),
+            )
+        else:
+            items = _filter_inventory_drift(
+                _inventory_items_from(_skills_items),
+                drift_only=_inventory_drift_only_enabled(),
+            )
+    except Exception:
+        _log.debug("failed to build direct inventory payload", exc_info=True)
+        items = []
     return {
         "ok": True,
         "kind": key,
@@ -8111,10 +8656,15 @@ def refresh_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
         asyncio.get_running_loop()
     except RuntimeError:
         return asyncio.run(_refresh_snapshot_async(webspace_id=webspace_id, allow_cache=False))
-    _write_ui_state(last_refresh_ts=time.time())
-    snapshot = _snapshot_or_fallback_cached(webspace_id=webspace_id, allow_cache=False)
-    _project(snapshot, webspace_id=webspace_id)
-    return {"ok": True, **_minimal_snapshot_for_client(snapshot)}
+    return _projection_executor().submit(
+        lambda: asyncio.run(
+            _refresh_live_infrastate_async(
+                webspace_id=webspace_id,
+                reason="tool.refresh_snapshot",
+                project_control=True,
+            )
+        )
+    ).result()
 
 
 @subscribe("infrastate.refresh")
