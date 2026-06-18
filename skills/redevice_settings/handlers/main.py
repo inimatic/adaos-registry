@@ -400,6 +400,81 @@ def _load_devices(selected_ref: str | None = None) -> list[dict[str, Any]]:
     return [item for item in normalized if _is_commandable(item)]
 
 
+def _send_endpoint_command(
+    *,
+    device_ref: str | None = None,
+    code: str | None = None,
+    command: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    send_endpoint_command = getattr(sdk_device_access, "send_endpoint_command", None)
+    if callable(send_endpoint_command):
+        return send_endpoint_command(device_ref=device_ref, code=code, command=command)
+    if sdk_redevice is None:
+        return {"ok": False, "error": "endpoint_command_unavailable", "device_ref": _text(device_ref), "code": _text(code)}
+    pair_code = _text(code)
+    if not pair_code:
+        return {"ok": False, "error": "endpoint_code_required", "device_ref": _text(device_ref)}
+    try:
+        result = sdk_redevice.ReDeviceBridge(timeout=12).send_command(pair_code, dict(command or {}))
+        return {**_mapping(result), "device_ref": _text(device_ref), "code": pair_code}
+    except Exception as exc:
+        return {"ok": False, "error": "endpoint_command_failed", "detail": str(exc), "device_ref": _text(device_ref), "code": pair_code}
+
+
+def _update_endpoint_profile(
+    *,
+    device_ref: str | None = None,
+    code: str | None = None,
+    display_name: str | None = None,
+    aliases: list[str] | None = None,
+) -> dict[str, Any]:
+    update_endpoint_profile = getattr(sdk_device_access, "update_endpoint_profile", None)
+    if callable(update_endpoint_profile):
+        return update_endpoint_profile(device_ref=device_ref, code=code, display_name=display_name, aliases=aliases)
+    if sdk_redevice is None:
+        return {"ok": False, "error": "endpoint_profile_update_unavailable", "device_ref": _text(device_ref), "code": _text(code)}
+    pair_code = _text(code)
+    if not pair_code:
+        return {"ok": False, "error": "endpoint_code_required", "device_ref": _text(device_ref)}
+    try:
+        result = sdk_redevice.ReDeviceBridge(timeout=12).update_profile(pair_code, display_name=display_name, aliases=aliases)
+        return {**_mapping(result), "device_ref": _text(device_ref), "code": pair_code}
+    except Exception as exc:
+        return {"ok": False, "error": "endpoint_profile_update_failed", "detail": str(exc), "device_ref": _text(device_ref), "code": pair_code}
+
+
+def _revoke_endpoint(*, device_ref: str | None = None, code: str | None = None) -> dict[str, Any]:
+    revoke_endpoint = getattr(sdk_device_access, "revoke_endpoint", None)
+    if callable(revoke_endpoint):
+        return revoke_endpoint(device_ref=device_ref, code=code)
+    if sdk_redevice is None:
+        return {"ok": False, "error": "endpoint_revoke_unavailable", "device_ref": _text(device_ref), "code": _text(code)}
+    pair_code = _text(code)
+    if not pair_code:
+        return {"ok": False, "error": "endpoint_code_required", "device_ref": _text(device_ref)}
+    try:
+        result = sdk_redevice.ReDeviceBridge(timeout=12).revoke(pair_code)
+        return {**_mapping(result), "device_ref": _text(device_ref), "code": pair_code}
+    except Exception as exc:
+        return {"ok": False, "error": "endpoint_revoke_failed", "detail": str(exc), "device_ref": _text(device_ref), "code": pair_code}
+
+
+def _retire_endpoint(*, device_ref: str | None = None, code: str | None = None) -> dict[str, Any]:
+    retire_endpoint = getattr(sdk_device_access, "retire_endpoint", None)
+    if callable(retire_endpoint):
+        return retire_endpoint(device_ref=device_ref, code=code)
+    if sdk_redevice is None:
+        return {"ok": False, "error": "endpoint_retire_unavailable", "device_ref": _text(device_ref), "code": _text(code)}
+    pair_code = _text(code)
+    if not pair_code:
+        return {"ok": False, "error": "endpoint_code_required", "device_ref": _text(device_ref)}
+    try:
+        result = sdk_redevice.ReDeviceBridge(timeout=12).retire(pair_code)
+        return {**_mapping(result), "device_ref": _text(device_ref), "code": pair_code}
+    except Exception as exc:
+        return {"ok": False, "error": "endpoint_retire_failed", "detail": str(exc), "device_ref": _text(device_ref), "code": pair_code}
+
+
 def _first_selected(items: list[dict[str, Any]], webspace_id: str | None = None) -> str:
     ws = _webspace_id(webspace_id)
     selected = _selected_by_ws().get(ws, "")
@@ -742,7 +817,7 @@ def rename_redevice_settings_endpoint(
         if alias and folded not in seen:
             seen.add(folded)
             alias_list.append(alias)
-    result = sdk_device_access.update_endpoint_profile(
+    result = _update_endpoint_profile(
         device_ref=resolved_ref,
         code=resolved_code,
         display_name=display_name,
@@ -853,7 +928,7 @@ def send_redevice_settings_command(
             },
         },
     }
-    result = sdk_device_access.send_endpoint_command(device_ref=ref, code=pair_code, command=command)
+    result = _send_endpoint_command(device_ref=ref, code=pair_code, command=command)
     _set_memory_dict(_LAST_COMMAND_KEY, {"action": token, "command": command, "result": result, "updated_at": _now_iso()})
     snapshot = _publish(webspace_id)
     return _ack(snapshot, status="command_sent", ok=bool(result.get("ok")), result=result, action=token)
@@ -862,7 +937,7 @@ def send_redevice_settings_command(
 @tool
 def revoke_redevice_settings_endpoint(device_ref: str | None = None, code: str | None = None, webspace_id: str | None = None) -> dict[str, Any]:
     selected = _build_snapshot(webspace_id).get("selected") or {}
-    result = sdk_device_access.revoke_endpoint(device_ref=device_ref or _text(selected.get("ref")), code=code or _text(selected.get("code")))
+    result = _revoke_endpoint(device_ref=device_ref or _text(selected.get("ref")), code=code or _text(selected.get("code")))
     snapshot = _publish(webspace_id)
     return _ack(snapshot, status="revoked", ok=bool(result.get("ok")), result=result)
 
@@ -870,7 +945,7 @@ def revoke_redevice_settings_endpoint(device_ref: str | None = None, code: str |
 @tool
 def retire_redevice_settings_endpoint(device_ref: str | None = None, code: str | None = None, webspace_id: str | None = None) -> dict[str, Any]:
     selected = _build_snapshot(webspace_id).get("selected") or {}
-    result = sdk_device_access.retire_endpoint(device_ref=device_ref or _text(selected.get("ref")), code=code or _text(selected.get("code")))
+    result = _retire_endpoint(device_ref=device_ref or _text(selected.get("ref")), code=code or _text(selected.get("code")))
     snapshot = _publish(webspace_id)
     return _ack(snapshot, status="retired", ok=bool(result.get("ok")), result=result)
 

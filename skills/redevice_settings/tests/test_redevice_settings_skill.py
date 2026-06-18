@@ -220,6 +220,49 @@ def test_load_devices_uses_redevice_sdk_when_endpoint_inventory_missing(monkeypa
     assert items[0]["online"] is True
 
 
+def test_settings_command_uses_redevice_bridge_when_endpoint_command_missing(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    calls: list[tuple[str, dict]] = []
+    snapshot = {
+        "selected": {
+            "ref": "redevice:redevice-1",
+            "code": "SNX68P2A",
+            "online": True,
+            "online_state": "online",
+            "title": "Kitchen tablet",
+        },
+        "items": [],
+        "count": 1,
+    }
+
+    class LegacyDeviceAccess:
+        pass
+
+    class Bridge:
+        def __init__(self, timeout: int = 12):
+            self.timeout = timeout
+
+        def send_command(self, code, command):
+            calls.append((code, dict(command)))
+            return {"ok": True, "state": "queued", "command_id": command.get("command_id")}
+
+    class ReDeviceSdk:
+        ReDeviceBridge = Bridge
+
+    monkeypatch.setattr(mod, "sdk_device_access", LegacyDeviceAccess())
+    monkeypatch.setattr(mod, "sdk_redevice", ReDeviceSdk())
+    monkeypatch.setattr(mod, "_build_snapshot", lambda webspace_id=None: snapshot)
+    monkeypatch.setattr(mod, "_publish", lambda webspace_id=None: snapshot)
+    monkeypatch.setattr(mod, "_set_memory_dict", lambda key, value: None)
+
+    result = mod.send_redevice_settings_command(action="keep_awake", webspace_id="desktop")
+
+    assert result["ok"] is True
+    assert result["result"]["state"] == "queued"
+    assert calls[0][0] == "SNX68P2A"
+    assert calls[0][1]["type"] == "display.keep_awake"
+
+
 def test_settings_command_refuses_offline_selected_endpoint(monkeypatch) -> None:
     mod = _load_redevice_settings_module()
     snapshot = {
