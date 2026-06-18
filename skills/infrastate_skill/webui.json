@@ -1185,14 +1185,7 @@
 	],
   "nlu": {
     "llm_hints": {
-      "aliases": {
-        "app_id": {
-          "infrastate_app": ["infrastate", "infra state", "инфрастейт", "инфра стейт", "инфраструктура"]
-        },
-        "modal_id": {
-          "infrastate_modal": ["Infra State", "infrastate", "infra state", "инфрастейт", "инфра стейт", "инфраструктура"]
-        }
-      },
+      "aliases": ["Infra State", "infrastate", "infra state", "инфрастейт", "инфра стейт", "инфраструктура"],
       "entities": [
         {
           "lookup": "modal_id",
