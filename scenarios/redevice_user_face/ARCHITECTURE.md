@@ -23,3 +23,17 @@ address ReDevice endpoints through the same SDK surface.
    their surfaces or starts an action.
 5. Endpoint commands are routed through SDK wrappers and later through
    EndpointRouter transport selection.
+
+## Browser Data Contract
+
+- `redevice_settings.state` is the only steady-state browser payload for the
+  settings surface.
+- Settings actions return compact acknowledgements with receiver, selected
+  endpoint, count, and update time. They must not return the full stream
+  snapshot.
+- Endpoint inventory rows carry operational summaries only. Full manifest,
+  policy, diagnostics, logs, or transport evidence belong behind explicit
+  details tools or diagnostic snapshots.
+- The scenario depends on stream resubscribe recovery instead of Yjs for live
+  endpoint diagnostics. Yjs remains for browser/session control state owned by
+  the client and core.
