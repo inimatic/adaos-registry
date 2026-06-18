@@ -167,6 +167,59 @@ def test_first_selected_skips_revoked_endpoint_when_online_available(monkeypatch
     assert selected["desktop"] == "redevice:new-endpoint"
 
 
+def test_load_devices_uses_redevice_sdk_when_endpoint_inventory_missing(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+
+    class LegacyDeviceAccess:
+        pass
+
+    class EmptyDevices:
+        @staticmethod
+        def list_devices(kind: str | None = None):
+            return []
+
+    class ReDeviceSdk:
+        @staticmethod
+        def list_endpoints(sync_registry: bool = True):
+            assert sync_registry is True
+            return [
+                {
+                    "code": "SNX68P2A",
+                    "endpoint_id": "redevice-1",
+                    "state": "consumed",
+                    "last_seen_at": mod.time.time(),
+                    "device_label": "Kitchen tablet",
+                    "hub_id": "sn_92ffc943",
+                    "owner_id": "sn_92ffc943",
+                    "endpoint_policy": {"hub_id": "sn_92ffc943", "trust_level": "limited"},
+                }
+            ]
+
+        @staticmethod
+        def compact_endpoint(endpoint):
+            return {
+                "code": endpoint["code"],
+                "endpoint_id": endpoint["endpoint_id"],
+                "state": endpoint["state"],
+                "online": True,
+                "online_state": "online",
+                "last_seen": "0s",
+                "display_name": endpoint["device_label"],
+                "raw": dict(endpoint),
+            }
+
+    monkeypatch.setattr(mod, "sdk_device_access", LegacyDeviceAccess())
+    monkeypatch.setattr(mod, "sdk_devices", EmptyDevices())
+    monkeypatch.setattr(mod, "sdk_redevice", ReDeviceSdk())
+
+    items = mod._load_devices()
+
+    assert len(items) == 1
+    assert items[0]["ref"] == "redevice:redevice-1"
+    assert items[0]["code"] == "SNX68P2A"
+    assert items[0]["online"] is True
+
+
 def test_settings_command_refuses_offline_selected_endpoint(monkeypatch) -> None:
     mod = _load_redevice_settings_module()
     snapshot = {

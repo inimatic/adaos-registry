@@ -14,6 +14,11 @@ from adaos.sdk.io import stream_publish
 from adaos.services.redevice_versions import endpoint_version_info
 
 try:
+    from adaos.sdk import redevice as sdk_redevice
+except Exception:  # pragma: no cover - older core without ReDevice SDK
+    sdk_redevice = None
+
+try:
     from adaos.services.yjs.webspace import default_webspace_id
 except Exception:  # pragma: no cover
     def default_webspace_id() -> str:
@@ -370,10 +375,22 @@ def _table_item(item: Mapping[str, Any]) -> dict[str, Any]:
 
 def _load_devices(selected_ref: str | None = None) -> list[dict[str, Any]]:
     raw_items: list[Mapping[str, Any]] = []
-    try:
-        raw_items = [item for item in sdk_device_access.list_endpoint_devices("redevice", sync_registry=True) if isinstance(item, Mapping)]
-    except Exception:
-        raw_items = []
+    list_endpoint_devices = getattr(sdk_device_access, "list_endpoint_devices", None)
+    if callable(list_endpoint_devices):
+        try:
+            raw_items = [item for item in list_endpoint_devices("redevice", sync_registry=True) if isinstance(item, Mapping)]
+        except Exception:
+            raw_items = []
+    if not raw_items and sdk_redevice is not None:
+        try:
+            compact = getattr(sdk_redevice, "compact_endpoint", None)
+            endpoints = [item for item in sdk_redevice.list_endpoints(sync_registry=True) if isinstance(item, Mapping)]
+            if callable(compact):
+                raw_items = [compact(item) for item in endpoints]
+            else:
+                raw_items = endpoints
+        except Exception:
+            raw_items = []
     if not raw_items:
         try:
             raw_items = [item for item in sdk_devices.list_devices(kind="redevice") if isinstance(item, Mapping)]

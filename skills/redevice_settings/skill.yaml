@@ -1,5 +1,5 @@
 name: redevice_settings
-version: 0.1.11
+version: 0.1.12
 description: Service skill for ReDevice endpoint settings, assignment, status, and
   policy-bound device actions.
 runtime:
@@ -255,11 +255,11 @@ memory_budget:
     max_items: 32
     cleanup_hook: webio.stream.subscription.changed
   background_workers: []
-updated_at: '2026-06-18T11:24:20+00:00'
+updated_at: '2026-06-18T11:42:14+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+2979.e3e4b8c5
-    recorded_at: '2026-06-18T11:24:21+00:00'
+    recorded_at: '2026-06-18T11:42:15+00:00'
     source: skill_push
     min_commit: e3e4b8c54672b308364188534fd407dc09da3e1d
     min_short_commit: e3e4b8c5
