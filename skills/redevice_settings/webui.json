@@ -29,10 +29,10 @@
           "updated_at": null
         },
         "budget": {
-          "maxPayloadBytes": 98304,
+          "maxPayloadBytes": 32768,
           "maxPublishHz": 1,
           "maxSnapshotHz": 1,
-          "maxItems": 128
+          "maxItems": 32
         },
         "guardVisibility": {
           "degradedState": "Keep last ReDevice settings state.",

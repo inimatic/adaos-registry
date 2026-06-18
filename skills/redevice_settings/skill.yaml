@@ -1,5 +1,5 @@
 name: redevice_settings
-version: 0.1.10
+version: 0.1.11
 description: Service skill for ReDevice endpoint settings, assignment, status, and
   policy-bound device actions.
 runtime:
@@ -176,9 +176,9 @@ data_routes:
   - webio.stream.snapshot.requested
   - redevice_settings.action
   budget:
-    max_payload_bytes: 98304
+    max_payload_bytes: 32768
     max_publish_hz: 1
-    max_items: 128
+    max_items: 32
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: keep the last ReDevice settings state
@@ -193,9 +193,9 @@ data_routes:
   - webio.stream.snapshot.requested
   - redevice_settings.action
   budget:
-    max_payload_bytes: 98304
+    max_payload_bytes: 32768
     max_publish_hz: 1
-    max_items: 128
+    max_items: 32
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: keep the last ReDevice settings state
@@ -210,9 +210,9 @@ data_routes:
   - webio.stream.snapshot.requested
   - redevice_settings.action
   budget:
-    max_payload_bytes: 98304
+    max_payload_bytes: 32768
     max_publish_hz: 1
-    max_items: 128
+    max_items: 32
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: keep the last ReDevice settings state
@@ -227,9 +227,9 @@ data_routes:
   - webio.stream.snapshot.requested
   - redevice_settings.action
   budget:
-    max_payload_bytes: 98304
+    max_payload_bytes: 32768
     max_publish_hz: 1
-    max_items: 128
+    max_items: 32
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: keep the last ReDevice settings state
@@ -252,16 +252,16 @@ memory_budget:
     cleanup_hook: dispose
   - name: redevice_settings.state_snapshot
     storage: stream_replace_snapshot
-    max_items: 128
+    max_items: 32
     cleanup_hook: webio.stream.subscription.changed
   background_workers: []
-updated_at: '2026-06-18T10:14:30+00:00'
+updated_at: '2026-06-18T11:24:20+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2978.ba98d113
-    recorded_at: '2026-06-18T10:14:30+00:00'
+    min_version: 0.1.0+2979.e3e4b8c5
+    recorded_at: '2026-06-18T11:24:21+00:00'
     source: skill_push
-    min_commit: ba98d11375e3832ca41085b0bc3aab28048e2860
-    min_short_commit: ba98d113
-    build_date: '2026-06-18T13:07:25+03:00'
+    min_commit: e3e4b8c54672b308364188534fd407dc09da3e1d
+    min_short_commit: e3e4b8c5
+    build_date: '2026-06-18T13:22:16+03:00'
 

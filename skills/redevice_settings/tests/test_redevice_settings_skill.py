@@ -233,3 +233,51 @@ def test_refresh_returns_small_ack_not_stream_snapshot(monkeypatch) -> None:
         "count": 1,
         "updated_at": "2026-06-18T10:00:00+00:00",
     }
+
+
+def test_build_snapshot_keeps_table_rows_lightweight(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    full_item = {
+        "ref": "redevice:endpoint-1",
+        "code": "FMRS7WTB",
+        "title": "Kitchen tablet",
+        "selected": True,
+        "selected_label": "selected",
+        "online": True,
+        "online_state": "online",
+        "last_seen": "0s",
+        "commandable": True,
+        "diagnostics": {"endpoint_manifest": {"large": "payload"}},
+        "network": {"state": "online"},
+    }
+    monkeypatch.setattr(mod, "_load_devices", lambda selected_ref=None: [dict(full_item)])
+    monkeypatch.setattr(mod, "_first_selected", lambda items, webspace_id=None: "redevice:endpoint-1")
+
+    snapshot = mod._build_snapshot("desktop")
+
+    assert snapshot["selected"]["diagnostics"]["endpoint_manifest"]["large"] == "payload"
+    assert "diagnostics" not in snapshot["items"][0]
+    assert "network" not in snapshot["items"][0]
+    assert snapshot["items_truncated"] == 0
+
+
+def test_publish_deduplicates_identical_snapshots(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    published: list[dict] = []
+    monkeypatch.setattr(
+        mod,
+        "_build_snapshot",
+        lambda webspace_id=None: {
+            "ok": True,
+            "selected": {},
+            "items": [],
+            "count": 0,
+            "updated_at": "ignored-for-fingerprint",
+        },
+    )
+    monkeypatch.setattr(mod, "stream_publish", lambda receiver, snapshot, _meta=None: published.append(dict(snapshot)))
+
+    mod._publish("desktop")
+    mod._publish("desktop")
+
+    assert len(published) == 1

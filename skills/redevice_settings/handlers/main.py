@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import time
+import json
+import hashlib
 from datetime import datetime, timezone
 from typing import Any, Mapping
 
@@ -23,6 +25,10 @@ _SELECTED_BY_WS_KEY = "selected_by_webspace"
 _ASSIGNMENTS_KEY = "endpoint_assignments"
 _LAST_COMMAND_KEY = "last_command"
 _ASSIGNMENT_PRESETS = ["assistant", "slideshow", "voice_endpoint", "media_center", "webcam", "idle"]
+_MAX_TABLE_ITEMS = 32
+_MIN_PUBLISH_INTERVAL_S = 1.0
+_LAST_PUBLISH_AT: dict[str, float] = {}
+_LAST_PUBLISH_FINGERPRINT: dict[str, str] = {}
 
 
 def _text(value: Any) -> str:
@@ -335,6 +341,33 @@ def _is_commandable(item: Mapping[str, Any]) -> bool:
     return bool(item.get("commandable")) and state not in {"revoked", "retired", "expired"}
 
 
+def _table_item(item: Mapping[str, Any]) -> dict[str, Any]:
+    """Keep fleet rows lightweight; selected details carry diagnostics."""
+    allowed = {
+        "id",
+        "ref",
+        "code",
+        "endpoint_id",
+        "lifecycle_state",
+        "title",
+        "selected",
+        "selected_label",
+        "online",
+        "online_state",
+        "last_seen",
+        "trust_level",
+        "assignment",
+        "active_app",
+        "active_surface",
+        "software_version",
+        "served_version",
+        "version_status",
+        "aliases",
+        "commandable",
+    }
+    return {key: item.get(key) for key in allowed if key in item}
+
+
 def _load_devices(selected_ref: str | None = None) -> list[dict[str, Any]]:
     raw_items: list[Mapping[str, Any]] = []
     try:
@@ -573,12 +606,14 @@ def _build_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
     selected_ref = _first_selected(first_items, ws)
     items = _load_devices(selected_ref)
     selected = next((item for item in items if item.get("selected")), None)
+    table_items = [_table_item(item) for item in items[:_MAX_TABLE_ITEMS]]
     last_command = _memory_dict(_LAST_COMMAND_KEY)
     return {
         "ok": True,
         "selected_ref": selected_ref,
         "selected": selected or {},
-        "items": items,
+        "items": table_items,
+        "items_truncated": max(0, len(items) - len(table_items)),
         "count": len(items),
         "summary": _summary(selected, items),
         "status": _status_cards(selected, items),
@@ -595,9 +630,24 @@ def _build_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
     }
 
 
-def _publish(webspace_id: str | None = None) -> dict[str, Any]:
+def _fingerprint_snapshot(snapshot: Mapping[str, Any]) -> str:
+    payload = dict(snapshot)
+    payload.pop("updated_at", None)
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha1(encoded.encode("utf-8")).hexdigest()
+
+
+def _publish(webspace_id: str | None = None, *, force: bool = False) -> dict[str, Any]:
     snapshot = _build_snapshot(webspace_id)
-    stream_publish(_RECEIVER, snapshot, _meta={"webspace_id": _webspace_id(webspace_id)})
+    ws = _webspace_id(webspace_id)
+    now = time.monotonic()
+    fingerprint = _fingerprint_snapshot(snapshot)
+    last_at = float(_LAST_PUBLISH_AT.get(ws) or 0.0)
+    last_fingerprint = _LAST_PUBLISH_FINGERPRINT.get(ws)
+    if force or fingerprint != last_fingerprint or now - last_at >= _MIN_PUBLISH_INTERVAL_S:
+        stream_publish(_RECEIVER, snapshot, _meta={"webspace_id": ws})
+        _LAST_PUBLISH_AT[ws] = now
+        _LAST_PUBLISH_FINGERPRINT[ws] = fingerprint
     return snapshot
 
 
