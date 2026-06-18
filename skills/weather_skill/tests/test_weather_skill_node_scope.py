@@ -185,18 +185,21 @@ def test_weather_legacy_openweathermap_endpoint_uses_open_meteo(monkeypatch):
         def json(self):
             return {"current": {"temperature_2m": 11.25, "wind_speed_10m": 2.5}}
 
-    def _get(url, *, params=None, timeout=None):
+    def _get(url, *, params=None, service=None, timeout=None):
         request["url"] = url
         request["params"] = params
+        request["service"] = service
         request["timeout"] = timeout
-        return _Response()
+        return mod.external_api.ExternalApiResult(ok=True, response=_Response(), mode="local", url=url)
 
-    monkeypatch.setattr(mod.requests, "get", _get)
+    monkeypatch.setattr(mod.external_api, "get", _get)
 
     ok, data = mod._fetch_weather("https://api.openweathermap.org/data/2.5/weather", "Moscow")
 
     assert ok is True
     assert request["url"] == mod.DEFAULT_API_ENDPOINT
+    assert request["service"] == mod.WEATHER_API_CHANNEL
+    assert request["timeout"] == (3, 10)
     assert request["params"]["latitude"] == 55.75
     assert request["params"]["longitude"] == 37.62
     assert "temperature_2m" in request["params"]["current"]
@@ -295,7 +298,16 @@ def test_weather_async_fetch_preserves_skill_i18n_in_worker_thread(monkeypatch):
         def json(self):
             return {}
 
-    monkeypatch.setattr(mod.requests, "get", lambda *_args, **_kwargs: _Response())
+    monkeypatch.setattr(
+        mod.external_api,
+        "get",
+        lambda *_args, **_kwargs: mod.external_api.ExternalApiResult(
+            ok=True,
+            response=_Response(),
+            mode="local",
+            url="https://example.test",
+        ),
+    )
 
     import asyncio
 

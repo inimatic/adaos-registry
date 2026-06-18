@@ -26,6 +26,7 @@ from adaos.sdk.data import ctx_subnet
 from adaos.sdk.data.i18n import _
 from adaos.sdk.data.skill_memory import get as memory_get, set as memory_set
 from adaos.sdk.data.events import publish as publish_event
+from adaos.sdk.net import external_api
 from adaos.services.agent_context import get_ctx
 
 _log = logging.getLogger("skills.weather_skill")
@@ -36,6 +37,7 @@ REQUIRES_DATA_PROJECTIONS = [
 
 DEFAULT_API_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
 DEFAULT_GEOCODING_ENDPOINT = "https://geocoding-api.open-meteo.com/v1/search"
+WEATHER_API_CHANNEL = "weather.open_meteo.forecast"
 _LEGACY_API_ENDPOINT_HOSTS = ("api.openweathermap.org",)
 _CITY_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _GEOCODE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
@@ -550,26 +552,44 @@ def _fetch_weather_for_location(api_entry_point: str, location: Dict[str, Any]) 
     lon = _to_float(location.get("longitude"))
     if lat is None or lon is None:
         return False, {"error_code": "missing_location", "error": _("runtime.weather.errors.missing_city")}
-    try:
-        response = requests.get(
-            _normalize_api_entry_point(api_entry_point).rstrip("/"),
-            params={
-                "latitude": lat,
-                "longitude": lon,
-                "current": ",".join(WEATHER_CURRENT_FIELDS),
-                "hourly": ",".join(WEATHER_HOURLY_FIELDS),
-                "daily": ",".join(WEATHER_DAILY_FIELDS),
-                "forecast_days": 5,
-                "timezone": location.get("timezone") or "auto",
-                "wind_speed_unit": "ms",
-            },
-            timeout=7,
+    params = {
+        "latitude": lat,
+        "longitude": lon,
+        "current": ",".join(WEATHER_CURRENT_FIELDS),
+        "hourly": ",".join(WEATHER_HOURLY_FIELDS),
+        "daily": ",".join(WEATHER_DAILY_FIELDS),
+        "forecast_days": 5,
+        "timezone": location.get("timezone") or "auto",
+        "wind_speed_unit": "ms",
+    }
+    result = external_api.get(
+        _normalize_api_entry_point(api_entry_point).rstrip("/"),
+        params=params,
+        service=WEATHER_API_CHANNEL,
+        timeout=(3, 10),
+    )
+    if result.policy_changed:
+        _log.info(
+            "weather API channel policy updated mode=%s attempts=%s",
+            result.mode,
+            result.attempts,
         )
-    except Exception as exc:
-        return False, {"error": _("runtime.weather.errors.request", reason=str(exc)), "location": location}
+    if not result.ok or result.response is None:
+        return False, {
+            "error": _("runtime.weather.errors.request", reason=result.error or "weather_api_unreachable"),
+            "error_code": "weather_api_unreachable",
+            "location": location,
+            "route_mode": result.mode,
+            "attempts": list(result.attempts),
+        }
+    response = result.response
 
     if response.status_code != 200:
-        return False, {"error": _("runtime.weather.errors.status", status=response.status_code), "location": location}
+        return False, {
+            "error": _("runtime.weather.errors.status", status=response.status_code),
+            "location": location,
+            "route_mode": result.mode,
+        }
 
     try:
         payload = response.json()
@@ -634,6 +654,7 @@ def _fetch_weather_for_location(api_entry_point: str, location: Dict[str, Any]) 
         "location": current["location"],
         "updated_at": current["updated_at"],
         "source": "api",
+        "route_mode": result.mode,
     }
     return True, data
 
