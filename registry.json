@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-18T14:58:08+00:00",
+  "updated_at": "2026-06-18T18:29:51+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -508,8 +508,8 @@
       "kind": "skill",
       "id": "slideshow_skill",
       "name": "slideshow_skill",
-      "version": "0.1.41",
-      "updated_at": "2026-06-06T19:04:58+00:00",
+      "version": "0.1.43",
+      "updated_at": "2026-06-18T18:29:51+00:00",
       "path": "skills/slideshow_skill",
       "manifest": "skills/slideshow_skill/skill.yaml",
       "source": {
@@ -522,7 +522,7 @@
         "id": "slideshow_skill"
       },
       "description": "ReDevice slideshow pilot skill that renders cached thumbnails on an assigned endpoint and records endpoint surface events.",
-      "tools_count": 14
+      "tools_count": 15
     },
     {
       "kind": "skill",
