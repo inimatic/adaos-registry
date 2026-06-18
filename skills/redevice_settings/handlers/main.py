@@ -34,6 +34,11 @@ _MAX_TABLE_ITEMS = 32
 _MIN_PUBLISH_INTERVAL_S = 1.0
 _LAST_PUBLISH_AT: dict[str, float] = {}
 _LAST_PUBLISH_FINGERPRINT: dict[str, str] = {}
+_VOLATILE_FINGERPRINT_KEYS = {
+    "updated_at",
+    "last_seen",
+    "subtitle",
+}
 
 
 def _text(value: Any) -> str:
@@ -723,8 +728,20 @@ def _build_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
 
 
 def _fingerprint_snapshot(snapshot: Mapping[str, Any]) -> str:
-    payload = dict(snapshot)
-    payload.pop("updated_at", None)
+    def stable(value: Any, *, parent_key: str = "") -> Any:
+        if isinstance(value, Mapping):
+            result: dict[str, Any] = {}
+            for key, item in value.items():
+                key_text = str(key)
+                if key_text in _VOLATILE_FINGERPRINT_KEYS:
+                    continue
+                result[key_text] = stable(item, parent_key=key_text)
+            return result
+        if isinstance(value, list):
+            return [stable(item, parent_key=parent_key) for item in value]
+        return value
+
+    payload = stable(snapshot)
     encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
     return hashlib.sha1(encoded.encode("utf-8")).hexdigest()
 

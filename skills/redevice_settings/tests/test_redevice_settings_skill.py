@@ -377,3 +377,36 @@ def test_publish_deduplicates_identical_snapshots(monkeypatch) -> None:
     mod._publish("desktop")
 
     assert len(published) == 1
+
+
+def test_publish_deduplicates_volatile_age_only_snapshots(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    published: list[dict] = []
+    snapshots = [
+        {
+            "ok": True,
+            "selected": {"ref": "redevice:endpoint-1", "last_seen": "0s"},
+            "items": [{"ref": "redevice:endpoint-1", "last_seen": "0s"}],
+            "summary": {"selected": {"value": "Kitchen tablet", "subtitle": "seen 0s | code FMRS7WTB"}},
+            "sections": {"network": [{"id": "connected", "subtitle": "last seen 0s"}]},
+            "count": 1,
+            "updated_at": "2026-06-18T10:00:00+00:00",
+        },
+        {
+            "ok": True,
+            "selected": {"ref": "redevice:endpoint-1", "last_seen": "1s"},
+            "items": [{"ref": "redevice:endpoint-1", "last_seen": "1s"}],
+            "summary": {"selected": {"value": "Kitchen tablet", "subtitle": "seen 1s | code FMRS7WTB"}},
+            "sections": {"network": [{"id": "connected", "subtitle": "last seen 1s"}]},
+            "count": 1,
+            "updated_at": "2026-06-18T10:00:01+00:00",
+        },
+    ]
+
+    monkeypatch.setattr(mod, "_build_snapshot", lambda webspace_id=None: snapshots.pop(0))
+    monkeypatch.setattr(mod, "stream_publish", lambda receiver, snapshot, _meta=None: published.append(dict(snapshot)))
+
+    mod._publish("desktop")
+    mod._publish("desktop")
+
+    assert len(published) == 1
