@@ -52,6 +52,50 @@ def _age(value: Any) -> str:
     return f"{sec // 3600}h {sec % 3600 // 60}m"
 
 
+def _explicit_bool(value: Any) -> bool | None:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        token = value.strip().lower()
+        if token in {"true", "1", "yes", "online"}:
+            return True
+        if token in {"false", "0", "no", "offline"}:
+            return False
+    return None
+
+
+def _last_seen_age_s(value: Any) -> float | None:
+    try:
+        ts = float(value or 0)
+    except Exception:
+        return None
+    if ts <= 0:
+        return None
+    return max(0.0, time.time() - ts)
+
+
+def _recently_seen(value: Any, *, max_age_s: float = 180.0) -> bool:
+    age = _last_seen_age_s(value)
+    return age is not None and age <= max_age_s
+
+
+def _connection_state(value: Any, *, online: bool | None, last_seen_at: Any) -> str:
+    token = _text(value).lower()
+    if token and token != "unknown":
+        if token == "offline" and online is True:
+            return "online"
+        return token
+    if online is True:
+        return "online"
+    if online is False:
+        return "offline"
+    if _recently_seen(last_seen_at):
+        return "online"
+    if _last_seen_age_s(last_seen_at) is not None:
+        return "stale"
+    return "unknown"
+
+
 def _memory_dict(key: str) -> dict[str, Any]:
     try:
         value = skill_memory_get(key, {})
@@ -113,10 +157,17 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
                 "zone_id": _text(raw.get("zone_id") or raw_manifest.get("zone_id")),
             }
         if not observation:
+            last_seen_at = raw.get("last_seen_at") or item.get("last_seen_at")
+            explicit_online = _explicit_bool(item.get("online"))
+            online = explicit_online if explicit_online is not None else _recently_seen(last_seen_at)
             observation = {
-                "online": bool(item.get("online")),
-                "connection_state": _text(item.get("online_state")) or "unknown",
-                "last_seen_at": raw.get("last_seen_at"),
+                "online": online,
+                "connection_state": _connection_state(
+                    item.get("online_state") or item.get("connection_state"),
+                    online=online,
+                    last_seen_at=last_seen_at,
+                ),
+                "last_seen_at": last_seen_at,
             }
         if not runtime:
             runtime = {
@@ -135,7 +186,14 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
     endpoint_id = _text(identity.get("endpoint_id") or identity.get("link_id") or item.get("endpoint_id"))
     pair_code = _text(identity.get("pair_code") or item.get("code"))
     effective_name = _text(policy.get("effective_name") or policy.get("display_name") or item.get("display_name") or item.get("title")) or endpoint_id or pair_code or "ReDevice"
-    connection_state = _text(observation.get("connection_state") or runtime.get("snapshot_state")) or "unknown"
+    last_seen_at = observation.get("last_seen_at")
+    explicit_online = _explicit_bool(observation.get("online"))
+    inferred_online = explicit_online if explicit_online is not None else _recently_seen(last_seen_at)
+    connection_state = _connection_state(
+        observation.get("connection_state") or runtime.get("snapshot_state"),
+        online=inferred_online,
+        last_seen_at=last_seen_at,
+    )
     active_app = _mapping(runtime.get("active_app"))
     active_surface = _mapping(runtime.get("active_surface"))
     assignment = _assignments().get(ref) or _text(active_app.get("app_id")) or "idle"
@@ -187,7 +245,7 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
         "title": effective_name,
         "selected": selected,
         "selected_label": "selected" if selected else "",
-        "online": bool(observation.get("online")),
+        "online": bool(inferred_online),
         "online_state": connection_state,
         "last_seen": _age(observation.get("last_seen_at")),
         "trust_level": _text(policy.get("trust_level")) or _text(endpoint_policy.get("trust_level")) or "limited",

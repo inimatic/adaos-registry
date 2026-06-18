@@ -90,6 +90,28 @@ def test_normalize_device_maps_legacy_android_capabilities() -> None:
     assert bluetooth["available"]["description"] == "unknown"
 
 
+def test_normalize_device_infers_online_from_recent_root_last_seen() -> None:
+    mod = _load_redevice_settings_module()
+    item = mod._normalize_device(
+        {
+            "code": "SNX68P2A",
+            "endpoint_id": "redevice-1",
+            "state": "consumed",
+            "raw": {
+                "code": "SNX68P2A",
+                "endpoint_id": "redevice-1",
+                "state": "consumed",
+                "last_seen_at": mod.time.time(),
+                "endpoint_policy": {"hub_id": "sn_92ffc943", "trust_level": "limited"},
+            },
+        }
+    )
+
+    assert item["online"] is True
+    assert item["online_state"] == "online"
+    assert item["last_seen"] == "0s"
+
+
 def test_first_selected_skips_revoked_endpoint_when_online_available(monkeypatch) -> None:
     mod = _load_redevice_settings_module()
     selected: dict[str, str] = {"desktop": "redevice:old-endpoint"}

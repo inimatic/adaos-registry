@@ -1,5 +1,5 @@
 name: redevice_settings
-version: 0.1.7
+version: 0.1.8
 description: Service skill for ReDevice endpoint settings, assignment, status, and
   policy-bound device actions.
 runtime:
@@ -204,13 +204,13 @@ data_routes:
     degraded_state: keep the last ReDevice settings state
     log: service.redevice_settings.runtime.log
     quarantine: false
-updated_at: '2026-06-18T09:29:47+00:00'
+updated_at: '2026-06-18T10:01:11+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2975.0732b6fd
-    recorded_at: '2026-06-18T09:29:48+00:00'
+    min_version: 0.1.0+2976.a15665d5
+    recorded_at: '2026-06-18T10:01:11+00:00'
     source: skill_push
-    min_commit: 0732b6fd180427730f734b1a0b80feb98e8fdb3c
-    min_short_commit: 0732b6fd
-    build_date: '2026-06-18T12:28:04+03:00'
+    min_commit: a15665d5c4a0ad700f55d42dbbef4bf835c129cd
+    min_short_commit: a15665d5
+    build_date: '2026-06-18T09:29:20+00:00'
 
