@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-18T11:48:36+00:00",
+  "updated_at": "2026-06-18T14:58:08+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -701,8 +701,8 @@
       "kind": "scenario",
       "id": "redevice_user_face",
       "name": "redevice_user_face",
-      "version": "0.1.3",
-      "updated_at": "2026-06-18T10:15:10+00:00",
+      "version": "0.1.5",
+      "updated_at": "2026-06-18T14:58:08+00:00",
       "path": "scenarios/redevice_user_face",
       "manifest": "scenarios/redevice_user_face/scenario.yaml",
       "source": {
