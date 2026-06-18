@@ -139,3 +139,18 @@ def test_settings_command_refuses_offline_selected_endpoint(monkeypatch) -> None
     assert result["result"]["error"] == "endpoint_offline"
     assert result["result"]["code"] == "LCCX54KP"
     assert writes[-1][1]["result"]["error"] == "endpoint_offline"
+
+
+def test_settings_command_requires_selected_endpoint(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    snapshot = {"selected": {}, "items": []}
+    writes: list[tuple[str, dict]] = []
+    monkeypatch.setattr(mod, "_build_snapshot", lambda webspace_id=None: snapshot)
+    monkeypatch.setattr(mod, "_publish", lambda webspace_id=None: snapshot)
+    monkeypatch.setattr(mod, "_set_memory_dict", lambda key, value: writes.append((key, value)))
+
+    result = mod.send_redevice_settings_command(action="open_wifi", webspace_id="desktop")
+
+    assert result["ok"] is False
+    assert result["result"]["error"] == "endpoint_required"
+    assert writes[-1][1]["result"]["error"] == "endpoint_required"

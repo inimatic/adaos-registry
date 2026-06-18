@@ -611,6 +611,16 @@ def send_redevice_settings_command(
     command_type = command_type_by_action.get(token)
     if not command_type:
         return {"ok": False, "error": "unknown_action", "action": token}
+    if not ref and not pair_code:
+        result = {
+            "ok": False,
+            "error": "endpoint_required",
+            "action": token,
+            "message": "Select a ReDevice endpoint before sending settings commands.",
+        }
+        _set_memory_dict(_LAST_COMMAND_KEY, {"action": token, "result": result, "updated_at": _now_iso()})
+        snapshot = _publish(webspace_id)
+        return {"ok": False, "result": result, "state": snapshot}
     if selected and not bool(selected.get("online")):
         result = {
             "ok": False,
