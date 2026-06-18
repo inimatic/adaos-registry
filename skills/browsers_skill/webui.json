@@ -371,14 +371,7 @@
   },
   "nlu": {
     "llm_hints": {
-      "aliases": {
-        "app_id": {
-          "browsers": ["браузеры", "браузер", "browser sessions"]
-        },
-        "modal_id": {
-          "browsers_modal": ["браузеры", "браузер", "browser sessions"]
-        }
-      },
+      "aliases": ["браузеры", "браузер", "browser sessions"],
       "entities": [
         {
           "lookup": "modal_id",
