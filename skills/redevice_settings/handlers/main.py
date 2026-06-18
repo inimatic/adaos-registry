@@ -33,6 +33,61 @@ def _mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
 
 
+def _compact_value(value: Any, *, depth: int = 0, max_fields: int = 16, max_text: int = 180) -> Any:
+    if isinstance(value, Mapping):
+        result: dict[str, Any] = {}
+        for index, (key, item) in enumerate(value.items()):
+            if index >= max_fields:
+                result["_truncated_fields"] = len(value) - max_fields
+                break
+            result[str(key)] = _compact_value(item, depth=depth + 1, max_fields=max_fields, max_text=max_text)
+        return result
+    if isinstance(value, list):
+        if depth >= 2:
+            return f"{len(value)} items"
+        return [_compact_value(item, depth=depth + 1, max_fields=max_fields, max_text=max_text) for item in value[:8]]
+    if isinstance(value, tuple):
+        return _compact_value(list(value), depth=depth, max_fields=max_fields, max_text=max_text)
+    if isinstance(value, str):
+        return value if len(value) <= max_text else value[: max_text - 1] + "..."
+    return value
+
+
+def _compact_result(value: Any) -> dict[str, Any]:
+    result = _mapping(value)
+    if not result:
+        return {}
+    allowed = {
+        "ok",
+        "error",
+        "message",
+        "state",
+        "status",
+        "code",
+        "device_ref",
+        "endpoint_id",
+        "command_id",
+        "online_state",
+        "updated_at",
+    }
+    compact = {key: _compact_value(result.get(key), max_fields=8, max_text=120) for key in allowed if key in result}
+    if not compact:
+        compact = _compact_value(result, max_fields=8, max_text=120)
+    return compact if isinstance(compact, dict) else {"value": compact}
+
+
+def _diagnostics_summary(diagnostics: Mapping[str, Any]) -> dict[str, Any]:
+    payload = _mapping(diagnostics)
+    return {
+        "endpoint_manifest": _compact_value(_mapping(payload.get("endpoint_manifest")), max_fields=14, max_text=160),
+        "endpoint_policy": _compact_value(_mapping(payload.get("endpoint_policy")), max_fields=14, max_text=160),
+        "diagnostic_report": _compact_value(_mapping(payload.get("diagnostic_report")), max_fields=14, max_text=160),
+        "endpoint_health": _compact_value(_mapping(payload.get("endpoint_health")), max_fields=14, max_text=160),
+        "service_state": _compact_value(_mapping(payload.get("service_state")), max_fields=14, max_text=160),
+        "policy_source": _text(payload.get("policy_source")),
+    }
+
+
 def _now_iso() -> str:
     return datetime.now(tz=timezone.utc).replace(microsecond=0).isoformat()
 
@@ -270,7 +325,7 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
             "node_name": _text(manifest.get("node_name") or manifest.get("hub_name") or policy.get("node_name")),
             "policy_id": _text(endpoint_policy.get("policy_id") or endpoint_policy.get("id")),
         },
-        "diagnostics": diagnostics,
+        "diagnostics": _diagnostics_summary(diagnostics),
         "commandable": lifecycle_state in {"approved", "consumed", "unknown"} and bool(pair_code),
     }
 
@@ -546,6 +601,31 @@ def _publish(webspace_id: str | None = None) -> dict[str, Any]:
     return snapshot
 
 
+def _ack(
+    snapshot: Mapping[str, Any],
+    *,
+    status: str,
+    ok: bool = True,
+    result: Mapping[str, Any] | None = None,
+    **extra: Any,
+) -> dict[str, Any]:
+    selected = _mapping(snapshot.get("selected"))
+    payload = {
+        "ok": bool(ok),
+        "status": status,
+        "receiver": _RECEIVER,
+        "selected_ref": _text(snapshot.get("selected_ref") or selected.get("ref")),
+        "selected_code": _text(selected.get("code")),
+        "selected_title": _text(selected.get("title")),
+        "count": int(snapshot.get("count") or 0),
+        "updated_at": _text(snapshot.get("updated_at")) or _now_iso(),
+    }
+    if result is not None:
+        payload["result"] = _compact_result(result)
+    payload.update({key: _compact_value(value, max_fields=8, max_text=120) for key, value in extra.items()})
+    return payload
+
+
 def _event_payload(evt: Any) -> Mapping[str, Any]:
     payload = getattr(evt, "payload", evt)
     return payload if isinstance(payload, Mapping) else {}
@@ -558,7 +638,7 @@ def _matches_receiver(payload: Mapping[str, Any]) -> bool:
 
 @tool
 def refresh_redevice_settings_state(webspace_id: str | None = None) -> dict[str, Any]:
-    return _publish(webspace_id)
+    return _ack(_publish(webspace_id), status="refreshed")
 
 
 @tool
@@ -572,7 +652,7 @@ def select_redevice_settings_endpoint(device_ref: str | None = None, code: str |
     if not token:
         return {"ok": False, "error": "device_ref_required"}
     _set_selected(_webspace_id(webspace_id), token)
-    return _publish(webspace_id)
+    return _ack(_publish(webspace_id), status="selected")
 
 
 @tool
@@ -602,7 +682,7 @@ def rename_redevice_settings_endpoint(
         aliases=alias_list,
     )
     snapshot = _publish(webspace_id)
-    return {"ok": bool(result.get("ok")), "result": result, "state": snapshot}
+    return _ack(snapshot, status="renamed", ok=bool(result.get("ok")), result=result)
 
 
 @tool
@@ -627,7 +707,7 @@ def set_redevice_assignment(
     state = _assignments()
     state[ref] = normalized
     _set_memory_dict(_ASSIGNMENTS_KEY, state)
-    return _publish(webspace_id)
+    return _ack(_publish(webspace_id), status="assignment_updated", assignment=normalized)
 
 
 @tool
@@ -678,7 +758,7 @@ def send_redevice_settings_command(
         }
         _set_memory_dict(_LAST_COMMAND_KEY, {"action": token, "result": result, "updated_at": _now_iso()})
         snapshot = _publish(webspace_id)
-        return {"ok": False, "result": result, "state": snapshot}
+        return _ack(snapshot, status="command_rejected", ok=False, result=result, action=token)
     if selected and not bool(selected.get("online")):
         result = {
             "ok": False,
@@ -689,7 +769,7 @@ def send_redevice_settings_command(
         }
         _set_memory_dict(_LAST_COMMAND_KEY, {"action": token, "result": result, "updated_at": _now_iso()})
         snapshot = _publish(webspace_id)
-        return {"ok": False, "result": result, "state": snapshot}
+        return _ack(snapshot, status="command_rejected", ok=False, result=result, action=token)
     command = {
         "command_id": f"cmd:settings:{int(time.time() * 1000)}",
         "type": command_type,
@@ -709,7 +789,7 @@ def send_redevice_settings_command(
     result = sdk_device_access.send_endpoint_command(device_ref=ref, code=pair_code, command=command)
     _set_memory_dict(_LAST_COMMAND_KEY, {"action": token, "command": command, "result": result, "updated_at": _now_iso()})
     snapshot = _publish(webspace_id)
-    return {"ok": bool(result.get("ok")), "result": result, "state": snapshot}
+    return _ack(snapshot, status="command_sent", ok=bool(result.get("ok")), result=result, action=token)
 
 
 @tool
@@ -717,7 +797,7 @@ def revoke_redevice_settings_endpoint(device_ref: str | None = None, code: str |
     selected = _build_snapshot(webspace_id).get("selected") or {}
     result = sdk_device_access.revoke_endpoint(device_ref=device_ref or _text(selected.get("ref")), code=code or _text(selected.get("code")))
     snapshot = _publish(webspace_id)
-    return {"ok": bool(result.get("ok")), "result": result, "state": snapshot}
+    return _ack(snapshot, status="revoked", ok=bool(result.get("ok")), result=result)
 
 
 @tool
@@ -725,7 +805,31 @@ def retire_redevice_settings_endpoint(device_ref: str | None = None, code: str |
     selected = _build_snapshot(webspace_id).get("selected") or {}
     result = sdk_device_access.retire_endpoint(device_ref=device_ref or _text(selected.get("ref")), code=code or _text(selected.get("code")))
     snapshot = _publish(webspace_id)
-    return {"ok": bool(result.get("ok")), "result": result, "state": snapshot}
+    return _ack(snapshot, status="retired", ok=bool(result.get("ok")), result=result)
+
+
+def dispose(reason: str | None = None, **_: Any) -> dict[str, Any]:
+    _set_memory_dict(_LAST_COMMAND_KEY, {"action": "dispose", "reason": _text(reason) or "dispose", "updated_at": _now_iso()})
+    return {"ok": True, "reason": _text(reason) or "dispose", "updated_at": _now_iso()}
+
+
+def on_quarantine(
+    ttl_s: float | None = None,
+    reason: str | None = None,
+    metrics: Mapping[str, Any] | None = None,
+    webspace_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    incident = {
+        "schema": "adaos.redevice_settings.quarantine.v1",
+        "reason": _text(reason) or "unknown",
+        "ttl_s": ttl_s,
+        "webspace_id": _text(webspace_id) or None,
+        "metrics": _compact_value(dict(metrics or {}), max_fields=12, max_text=120),
+        "updated_at": _now_iso(),
+    }
+    _set_memory_dict(_LAST_COMMAND_KEY, {"action": "quarantine", "result": incident, "updated_at": _now_iso()})
+    return {"ok": True, "incident": incident}
 
 
 @subscribe("webio.stream.snapshot.requested")

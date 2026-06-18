@@ -1,5 +1,5 @@
 name: redevice_settings
-version: 0.1.8
+version: 0.1.10
 description: Service skill for ReDevice endpoint settings, assignment, status, and
   policy-bound device actions.
 runtime:
@@ -34,6 +34,31 @@ tools:
     properties:
       webspace_id:
         type: string
+  output_schema: &id001
+    type: object
+    required:
+    - ok
+    - status
+    - receiver
+    properties:
+      ok:
+        type: boolean
+      status:
+        type: string
+      receiver:
+        type: string
+      selected_ref:
+        type: string
+      selected_code:
+        type: string
+      selected_title:
+        type: string
+      count:
+        type: integer
+      updated_at:
+        type: string
+      result:
+        type: object
 - name: select_redevice_settings_endpoint
   description: Select the ReDevice endpoint controlled by the settings scenario.
   entry: handlers.main:select_redevice_settings_endpoint
@@ -46,6 +71,7 @@ tools:
         type: string
       webspace_id:
         type: string
+  output_schema: *id001
 - name: rename_redevice_settings_endpoint
   description: Rename a ReDevice endpoint and update comma-separated aliases.
   entry: handlers.main:rename_redevice_settings_endpoint
@@ -62,6 +88,7 @@ tools:
         type: string
       webspace_id:
         type: string
+  output_schema: *id001
 - name: set_redevice_assignment
   description: Set the scenario-level assignment for the selected ReDevice endpoint.
   entry: handlers.main:set_redevice_assignment
@@ -85,6 +112,7 @@ tools:
         type: string
       webspace_id:
         type: string
+  output_schema: *id001
 - name: send_redevice_settings_command
   description: Send a policy-bound settings command to the selected ReDevice endpoint.
   entry: handlers.main:send_redevice_settings_command
@@ -111,6 +139,7 @@ tools:
         type: string
       webspace_id:
         type: string
+  output_schema: *id001
 - name: revoke_redevice_settings_endpoint
   description: Revoke selected ReDevice endpoint admission.
   entry: handlers.main:revoke_redevice_settings_endpoint
@@ -123,6 +152,7 @@ tools:
         type: string
       webspace_id:
         type: string
+  output_schema: *id001
 - name: retire_redevice_settings_endpoint
   description: Retire selected ReDevice endpoint from active use.
   entry: handlers.main:retire_redevice_settings_endpoint
@@ -135,6 +165,7 @@ tools:
         type: string
       webspace_id:
         type: string
+  output_schema: *id001
 data_routes:
 - surface: modal:redevice_settings_modal
   route: stream
@@ -204,13 +235,33 @@ data_routes:
     degraded_state: keep the last ReDevice settings state
     log: service.redevice_settings.runtime.log
     quarantine: false
-updated_at: '2026-06-18T10:01:11+00:00'
+memory_budget:
+  expected_rss_mb: 64
+  caches:
+  - name: redevice_settings.selected_by_webspace
+    storage: skill_memory
+    max_items: 32
+    cleanup_hook: dispose
+  - name: redevice_settings.endpoint_assignments
+    storage: skill_memory
+    max_items: 128
+    cleanup_hook: dispose
+  - name: redevice_settings.last_command
+    storage: skill_memory
+    max_items: 1
+    cleanup_hook: dispose
+  - name: redevice_settings.state_snapshot
+    storage: stream_replace_snapshot
+    max_items: 128
+    cleanup_hook: webio.stream.subscription.changed
+  background_workers: []
+updated_at: '2026-06-18T10:14:30+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2976.a15665d5
-    recorded_at: '2026-06-18T10:01:11+00:00'
+    min_version: 0.1.0+2978.ba98d113
+    recorded_at: '2026-06-18T10:14:30+00:00'
     source: skill_push
-    min_commit: a15665d5c4a0ad700f55d42dbbef4bf835c129cd
-    min_short_commit: a15665d5
-    build_date: '2026-06-18T09:29:20+00:00'
+    min_commit: ba98d11375e3832ca41085b0bc3aab28048e2860
+    min_short_commit: ba98d113
+    build_date: '2026-06-18T13:07:25+03:00'
 

@@ -90,6 +90,34 @@ def test_normalize_device_maps_legacy_android_capabilities() -> None:
     assert bluetooth["available"]["description"] == "unknown"
 
 
+def test_normalize_device_keeps_diagnostics_compact() -> None:
+    mod = _load_redevice_settings_module()
+    item = mod._normalize_device(
+        {
+            "ref": "redevice:endpoint-1",
+            "identity": {"endpoint_id": "endpoint-1", "pair_code": "pair-1"},
+            "policy": {"effective_name": "Kitchen tablet"},
+            "observation": {"connection_state": "online", "online": True, "last_seen_at": 0},
+            "diagnostics": {
+                "endpoint_manifest": {
+                    "schema_version": "endpoint-manifest.v1",
+                    "large_nested": {f"k{idx}": f"value-{idx}" for idx in range(40)},
+                },
+                "diagnostic_report": {
+                    "huge_text": "x" * 1000,
+                    "large_list": [{"value": idx} for idx in range(40)],
+                },
+            },
+        }
+    )
+
+    diagnostics = item["diagnostics"]
+    assert diagnostics["endpoint_manifest"]["schema_version"] == "endpoint-manifest.v1"
+    assert "_truncated_fields" in diagnostics["endpoint_manifest"]["large_nested"]
+    assert diagnostics["diagnostic_report"]["huge_text"].endswith("...")
+    assert len(diagnostics["diagnostic_report"]["large_list"]) == 8
+
+
 def test_normalize_device_infers_online_from_recent_root_last_seen() -> None:
     mod = _load_redevice_settings_module()
     item = mod._normalize_device(
@@ -160,6 +188,7 @@ def test_settings_command_refuses_offline_selected_endpoint(monkeypatch) -> None
     assert result["ok"] is False
     assert result["result"]["error"] == "endpoint_offline"
     assert result["result"]["code"] == "LCCX54KP"
+    assert "state" not in result
     assert writes[-1][1]["result"]["error"] == "endpoint_offline"
 
 
@@ -175,4 +204,32 @@ def test_settings_command_requires_selected_endpoint(monkeypatch) -> None:
 
     assert result["ok"] is False
     assert result["result"]["error"] == "endpoint_required"
+    assert "state" not in result
     assert writes[-1][1]["result"]["error"] == "endpoint_required"
+
+
+def test_refresh_returns_small_ack_not_stream_snapshot(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    snapshot = {
+        "ok": True,
+        "selected_ref": "redevice:endpoint-1",
+        "selected": {"ref": "redevice:endpoint-1", "code": "FMRS7WTB", "title": "Kitchen tablet"},
+        "items": [{"ref": "redevice:endpoint-1"}],
+        "sections": {"about": [{"details": {"large": "payload"}}]},
+        "count": 1,
+        "updated_at": "2026-06-18T10:00:00+00:00",
+    }
+    monkeypatch.setattr(mod, "_publish", lambda webspace_id=None: snapshot)
+
+    result = mod.refresh_redevice_settings_state(webspace_id="desktop")
+
+    assert result == {
+        "ok": True,
+        "status": "refreshed",
+        "receiver": "redevice_settings.state",
+        "selected_ref": "redevice:endpoint-1",
+        "selected_code": "FMRS7WTB",
+        "selected_title": "Kitchen tablet",
+        "count": 1,
+        "updated_at": "2026-06-18T10:00:00+00:00",
+    }
