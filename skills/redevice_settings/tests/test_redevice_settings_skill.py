@@ -88,3 +88,54 @@ def test_normalize_device_maps_legacy_android_capabilities() -> None:
     assert audio["input"]["description"] == "unknown"
     assert audio["output"]["description"] == "ok"
     assert bluetooth["available"]["description"] == "unknown"
+
+
+def test_first_selected_skips_revoked_endpoint_when_online_available(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    selected: dict[str, str] = {"desktop": "redevice:old-endpoint"}
+    monkeypatch.setattr(mod, "_selected_by_ws", lambda: dict(selected))
+    monkeypatch.setattr(mod, "_set_memory_dict", lambda key, value: selected.update(value))
+
+    items = [
+        {
+            "ref": "redevice:old-endpoint",
+            "code": "FMRS7WTB",
+            "lifecycle_state": "revoked",
+            "online": False,
+            "commandable": False,
+        },
+        {
+            "ref": "redevice:new-endpoint",
+            "code": "SNX68P2A",
+            "lifecycle_state": "consumed",
+            "online": True,
+            "commandable": True,
+        },
+    ]
+
+    assert mod._first_selected(items, "desktop") == "redevice:new-endpoint"
+    assert selected["desktop"] == "redevice:new-endpoint"
+
+
+def test_settings_command_refuses_offline_selected_endpoint(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    snapshot = {
+        "selected": {
+            "ref": "redevice:old-endpoint",
+            "code": "LCCX54KP",
+            "online": False,
+            "online_state": "offline",
+        },
+        "items": [],
+    }
+    writes: list[tuple[str, dict]] = []
+    monkeypatch.setattr(mod, "_build_snapshot", lambda webspace_id=None: snapshot)
+    monkeypatch.setattr(mod, "_publish", lambda webspace_id=None: snapshot)
+    monkeypatch.setattr(mod, "_set_memory_dict", lambda key, value: writes.append((key, value)))
+
+    result = mod.send_redevice_settings_command(action="open_wifi", webspace_id="desktop")
+
+    assert result["ok"] is False
+    assert result["result"]["error"] == "endpoint_offline"
+    assert result["result"]["code"] == "LCCX54KP"
+    assert writes[-1][1]["result"]["error"] == "endpoint_offline"

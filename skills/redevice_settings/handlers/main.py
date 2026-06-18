@@ -95,11 +95,42 @@ def _device_ref_from_item(item: Mapping[str, Any]) -> str:
 
 
 def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = None) -> dict[str, Any]:
+    raw = _mapping(item.get("raw"))
     identity = _mapping(item.get("identity"))
     policy = _mapping(item.get("policy"))
     observation = _mapping(item.get("observation"))
     runtime = _mapping(item.get("runtime"))
     diagnostics = _mapping(item.get("diagnostics"))
+    if raw:
+        raw_policy = _mapping(raw.get("endpoint_policy"))
+        raw_manifest = _mapping(raw.get("endpoint_manifest"))
+        if not policy:
+            policy = {
+                "trust_level": _text(item.get("trust_level") or raw_policy.get("trust_level") or raw_manifest.get("trust_level")),
+                "display_name": _text(item.get("display_name") or raw.get("display_name") or raw.get("device_label") or raw_manifest.get("display_name")),
+                "aliases": list(raw.get("aliases") or item.get("aliases") or []),
+                "hub_id": _text(raw.get("hub_id") or raw_policy.get("hub_id") or raw_manifest.get("hub_id")),
+                "zone_id": _text(raw.get("zone_id") or raw_manifest.get("zone_id")),
+            }
+        if not observation:
+            observation = {
+                "online": bool(item.get("online")),
+                "connection_state": _text(item.get("online_state")) or "unknown",
+                "last_seen_at": raw.get("last_seen_at"),
+            }
+        if not runtime:
+            runtime = {
+                "active_app": item.get("active_app") or raw.get("active_app"),
+                "active_surface": item.get("active_surface") or raw.get("active_surface"),
+            }
+        if not diagnostics:
+            diagnostics = {
+                "endpoint_manifest": raw_manifest,
+                "endpoint_policy": raw_policy,
+                "diagnostic_report": _mapping(raw.get("diagnostic_report")),
+                "endpoint_health": _mapping(raw.get("endpoint_health")),
+                "service_state": _mapping(raw.get("service_state")),
+            }
     ref = _device_ref_from_item(item)
     endpoint_id = _text(identity.get("endpoint_id") or identity.get("link_id") or item.get("endpoint_id"))
     pair_code = _text(identity.get("pair_code") or item.get("code"))
@@ -146,11 +177,13 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
     software_version = _text(version_info.get("software_version")) or "-"
     served_version = _text(version_info.get("served_version")) or "unknown"
     version_status = _text(version_info.get("version_status")) or "unknown"
+    lifecycle_state = _text(item.get("state") or raw.get("state")) or "unknown"
     return {
         "id": ref or pair_code or endpoint_id,
         "ref": ref,
         "code": pair_code,
         "endpoint_id": endpoint_id,
+        "lifecycle_state": lifecycle_state,
         "title": effective_name,
         "selected": selected,
         "selected_label": "selected" if selected else "",
@@ -180,33 +213,47 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
             "policy_id": _text(endpoint_policy.get("policy_id") or endpoint_policy.get("id")),
         },
         "diagnostics": diagnostics,
+        "commandable": lifecycle_state in {"approved", "consumed", "unknown"} and bool(pair_code),
     }
 
 
+def _is_commandable(item: Mapping[str, Any]) -> bool:
+    state = _text(item.get("lifecycle_state")).lower()
+    return bool(item.get("commandable")) and state not in {"revoked", "retired", "expired"}
+
+
 def _load_devices(selected_ref: str | None = None) -> list[dict[str, Any]]:
+    raw_items: list[Mapping[str, Any]] = []
     try:
-        raw_items = sdk_devices.list_devices(kind="redevice")
-        if not raw_items:
-            raw_items = sdk_device_access.list_endpoint_devices("redevice", sync_registry=True)
+        raw_items = [item for item in sdk_device_access.list_endpoint_devices("redevice", sync_registry=True) if isinstance(item, Mapping)]
     except Exception:
-        raw_items = sdk_device_access.list_endpoint_devices("redevice", sync_registry=True)
-    return [_normalize_device(item, selected_ref=selected_ref) for item in raw_items if isinstance(item, Mapping)]
+        raw_items = []
+    if not raw_items:
+        try:
+            raw_items = [item for item in sdk_devices.list_devices(kind="redevice") if isinstance(item, Mapping)]
+        except Exception:
+            raw_items = []
+    normalized = [_normalize_device(item, selected_ref=selected_ref) for item in raw_items if isinstance(item, Mapping)]
+    return [item for item in normalized if _is_commandable(item)]
 
 
 def _first_selected(items: list[dict[str, Any]], webspace_id: str | None = None) -> str:
     ws = _webspace_id(webspace_id)
     selected = _selected_by_ws().get(ws, "")
-    refs = {_text(item.get("ref")) for item in items}
-    if selected and selected in refs:
+    refs_by_item = [(item, _text(item.get("ref"))) for item in items if _text(item.get("ref"))]
+    selected_item = next((item for item, ref in refs_by_item if ref == selected), None)
+    if selected_item and bool(selected_item.get("online")):
         return selected
     for item in items:
         ref = _text(item.get("ref"))
-        if ref and bool(item.get("online")):
+        if ref and bool(item.get("online")) and _is_commandable(item):
             _set_selected(ws, ref)
             return ref
+    if selected_item and _is_commandable(selected_item):
+        return selected
     for item in items:
         ref = _text(item.get("ref"))
-        if ref:
+        if ref and _is_commandable(item):
             _set_selected(ws, ref)
             return ref
     return ""
@@ -532,9 +579,23 @@ def send_redevice_settings_command(
     code: str | None = None,
     webspace_id: str | None = None,
 ) -> dict[str, Any]:
-    selected = _build_snapshot(webspace_id).get("selected") or {}
-    ref = _text(device_ref) or _text(selected.get("ref"))
-    pair_code = _text(code) or _text(selected.get("code"))
+    snapshot_before = _build_snapshot(webspace_id)
+    items = list(snapshot_before.get("items") or [])
+    requested_ref = _text(device_ref)
+    requested_code = _text(code)
+    selected = _mapping(snapshot_before.get("selected"))
+    if requested_ref or requested_code:
+        selected = next(
+            (
+                _mapping(item)
+                for item in items
+                if (requested_ref and _text(_mapping(item).get("ref")) == requested_ref)
+                or (requested_code and _text(_mapping(item).get("code")) == requested_code)
+            ),
+            selected,
+        )
+    ref = requested_ref or _text(selected.get("ref"))
+    pair_code = requested_code or _text(selected.get("code"))
     command_type_by_action = {
         "open_wifi": "settings.open_wifi",
         "open_bluetooth": "settings.open_bluetooth",
@@ -550,6 +611,17 @@ def send_redevice_settings_command(
     command_type = command_type_by_action.get(token)
     if not command_type:
         return {"ok": False, "error": "unknown_action", "action": token}
+    if selected and not bool(selected.get("online")):
+        result = {
+            "ok": False,
+            "error": "endpoint_offline",
+            "device_ref": ref,
+            "code": pair_code,
+            "online_state": _text(selected.get("online_state")) or "offline",
+        }
+        _set_memory_dict(_LAST_COMMAND_KEY, {"action": token, "result": result, "updated_at": _now_iso()})
+        snapshot = _publish(webspace_id)
+        return {"ok": False, "result": result, "state": snapshot}
     command = {
         "command_id": f"cmd:settings:{int(time.time() * 1000)}",
         "type": command_type,
