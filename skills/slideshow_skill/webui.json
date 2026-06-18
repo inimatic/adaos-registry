@@ -1282,6 +1282,134 @@
       }
     }
   },
+  "voice_capabilities": [
+    {
+      "id": "slideshow.redevice.start",
+      "kind": "endpoint_action",
+      "title": "Start ReDevice slideshow",
+      "labels": {
+        "en": ["start slideshow", "show slideshow", "play slideshow"],
+        "ru": ["показывай слайдшоу", "покажи слайдшоу", "запусти слайдшоу"]
+      },
+      "examples": ["Планшет, показывай слайдшоу", "Kitchen tablet start slideshow"],
+      "result_modes": ["endpoint_command"],
+      "default_result_mode": "endpoint_command",
+      "side_effect_class": "device_control",
+      "activation": [
+        {
+          "type": "callSkill",
+          "target": "slideshow_skill.voice_control_redevice_slideshow",
+          "params": { "action": "start" }
+        }
+      ],
+      "verify": { "skill": "slideshow_skill", "tool": "voice_control_redevice_slideshow" }
+    },
+    {
+      "id": "slideshow.redevice.stop",
+      "kind": "endpoint_action",
+      "title": "Stop ReDevice slideshow",
+      "labels": {
+        "en": ["stop slideshow", "pause slideshow"],
+        "ru": ["останови слайдшоу", "стоп слайдшоу", "пауза слайдшоу"]
+      },
+      "examples": ["Планшет, стоп", "Kitchen tablet stop slideshow"],
+      "result_modes": ["endpoint_command"],
+      "default_result_mode": "endpoint_command",
+      "side_effect_class": "device_control",
+      "activation": [
+        {
+          "type": "callSkill",
+          "target": "slideshow_skill.voice_control_redevice_slideshow",
+          "params": { "action": "stop" }
+        }
+      ],
+      "verify": { "skill": "slideshow_skill", "tool": "voice_control_redevice_slideshow" }
+    },
+    {
+      "id": "slideshow.redevice.next",
+      "kind": "endpoint_action",
+      "title": "Next ReDevice slideshow photo",
+      "labels": {
+        "en": ["next photo", "next slide", "slideshow next"],
+        "ru": ["следующая", "следующий слайд", "следующее фото"]
+      },
+      "examples": ["Планшет, следующая", "Kitchen tablet next photo"],
+      "result_modes": ["endpoint_command"],
+      "default_result_mode": "endpoint_command",
+      "side_effect_class": "device_control",
+      "activation": [
+        {
+          "type": "callSkill",
+          "target": "slideshow_skill.voice_control_redevice_slideshow",
+          "params": { "action": "next" }
+        }
+      ],
+      "verify": { "skill": "slideshow_skill", "tool": "voice_control_redevice_slideshow" }
+    },
+    {
+      "id": "slideshow.redevice.previous",
+      "kind": "endpoint_action",
+      "title": "Previous ReDevice slideshow photo",
+      "labels": {
+        "en": ["previous photo", "previous slide", "slideshow back"],
+        "ru": ["предыдущая", "предыдущий слайд", "назад"]
+      },
+      "examples": ["Планшет, предыдущая", "Kitchen tablet previous photo"],
+      "result_modes": ["endpoint_command"],
+      "default_result_mode": "endpoint_command",
+      "side_effect_class": "device_control",
+      "activation": [
+        {
+          "type": "callSkill",
+          "target": "slideshow_skill.voice_control_redevice_slideshow",
+          "params": { "action": "prev" }
+        }
+      ],
+      "verify": { "skill": "slideshow_skill", "tool": "voice_control_redevice_slideshow" }
+    },
+    {
+      "id": "slideshow.redevice.favorite",
+      "kind": "endpoint_action",
+      "title": "Toggle ReDevice slideshow favorite",
+      "labels": {
+        "en": ["favorite photo", "mark favorite"],
+        "ru": ["в избранное", "фаворит", "отметь фаворит"]
+      },
+      "examples": ["Планшет, в избранное", "Kitchen tablet favorite"],
+      "result_modes": ["endpoint_command"],
+      "default_result_mode": "endpoint_command",
+      "side_effect_class": "device_control",
+      "activation": [
+        {
+          "type": "callSkill",
+          "target": "slideshow_skill.voice_control_redevice_slideshow",
+          "params": { "action": "favorite" }
+        }
+      ],
+      "verify": { "skill": "slideshow_skill", "tool": "voice_control_redevice_slideshow" }
+    },
+    {
+      "id": "slideshow.redevice.telegram",
+      "kind": "endpoint_action",
+      "title": "Send ReDevice slideshow photo to Telegram",
+      "labels": {
+        "en": ["send photo to telegram", "telegram current photo"],
+        "ru": ["отправь в телеграм", "фото в телеграм", "перешли в телеграм"]
+      },
+      "examples": ["Планшет, отправь в телеграм", "Kitchen tablet send to telegram"],
+      "result_modes": ["endpoint_command"],
+      "default_result_mode": "endpoint_command",
+      "side_effect_class": "external_send",
+      "activation": [
+        {
+          "type": "callSkill",
+          "target": "slideshow_skill.voice_control_redevice_slideshow",
+          "params": { "action": "send_telegram" }
+        }
+      ],
+      "verify": { "skill": "slideshow_skill", "tool": "voice_control_redevice_slideshow" }
+    }
+  ],
   "contributions": [
     {
       "extensionPoint": "desktop.apps",

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import subscribe, tool
+from adaos.sdk.data import device_access
 from adaos.sdk.data import skill_memory
 from adaos.sdk.data.skill_env import skill_env_path
 from adaos.sdk.io import stream_publish, telegram_photo
@@ -103,6 +104,59 @@ def _text(value: Any) -> str:
 
 def _mapping(value: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _voice_action(value: Any, text: Any = None) -> str:
+    token = _text(value).lower()
+    raw = _text(text).casefold()
+    if token:
+        return token
+    checks = (
+        ("send_telegram", ("телеграм", "telegram", "tg", "отправ")),
+        ("favorite", ("фаворит", "избран", "favorite", "fav")),
+        ("stop", ("стоп", "останов", "stop", "pause", "пауза")),
+        ("prev", ("предыдущ", "назад", "previous", "prev", "back")),
+        ("next", ("следующ", "дальше", "next", "forward")),
+        ("start", ("слайдшоу", "показывай", "покажи", "start", "play", "show")),
+    )
+    for action, needles in checks:
+        if any(needle in raw for needle in needles):
+            return action
+    return ""
+
+
+def _device_query_from_text(text: Any, action: str) -> str:
+    raw = _text(text)
+    if not raw:
+        return ""
+    folded = raw.casefold()
+    for needle in (
+        "следующая",
+        "следующий",
+        "дальше",
+        "предыдущая",
+        "предыдущий",
+        "назад",
+        "стоп",
+        "останови",
+        "показывай слайдшоу",
+        "покажи слайдшоу",
+        "слайдшоу",
+        "отправь в телеграм",
+        "в телеграм",
+        "фаворит",
+        "в избранное",
+        "next",
+        "previous",
+        "prev",
+        "stop",
+        "start",
+        "play",
+        "telegram",
+        "favorite",
+    ):
+        folded = folded.replace(needle, " ")
+    return " ".join(folded.split())
 
 
 def _count_label(value: Any) -> str:
@@ -2603,6 +2657,49 @@ def control_redevice_slideshow(
     if token == "stop":
         return _stop_selected(state, code=code, webspace_id=webspace_id)
     return _send_to_selected(state, files, code=code, webspace_id=webspace_id)
+
+
+@tool
+def voice_control_redevice_slideshow(
+    action: str | None = None,
+    device_name: str | None = None,
+    text: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    resolved_action = _voice_action(action, text)
+    if not resolved_action:
+        return {"ok": False, "error": "voice_action_not_recognized", "text": _text(text)}
+    query = _text(device_name) or _device_query_from_text(text, resolved_action)
+    resolved = device_access.resolve_endpoint_device(query=query, assignment="slideshow") if query else {}
+    if not resolved.get("ok") and query:
+        resolved = device_access.resolve_endpoint_device(query=query)
+    state = _load_state()
+    code = _text(resolved.get("code")) if resolved.get("ok") else ""
+    if code:
+        state["selected_codes"] = _unique_texts([code])
+        state = _save_state(state)
+        device_access.assign_endpoint(code=code, assignment="slideshow")
+    elif not _unique_texts(state.get("selected_codes")):
+        fallback = device_access.resolve_endpoint_device(assignment="slideshow")
+        if fallback.get("ok"):
+            code = _text(fallback.get("code"))
+            state["selected_codes"] = _unique_texts([code])
+            state = _save_state(state)
+    result = control_redevice_slideshow(
+        resolved_action,
+        code=code or None,
+        webspace_id=webspace_id,
+    )
+    return {
+        **dict(result),
+        "voice_action": resolved_action,
+        "device_query": query,
+        "resolved_endpoint": {
+            "ok": bool(resolved.get("ok")),
+            "device_ref": resolved.get("device_ref"),
+            "code": code,
+        },
+    }
 
 
 @tool

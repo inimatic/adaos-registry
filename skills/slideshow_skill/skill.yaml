@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.41
+version: 0.1.42
 description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
   endpoint and records endpoint surface events.
 runtime:
@@ -358,6 +358,42 @@ tools:
         type: boolean
       error:
         type: string
+- name: voice_control_redevice_slideshow
+  description: Resolve a spoken ReDevice name and limited slideshow command, then
+    apply it through the normal slideshow control path.
+  entry: handlers.main:voice_control_redevice_slideshow
+  input_schema:
+    type: object
+    properties:
+      action:
+        type: string
+        enum:
+        - start
+        - stop
+        - next
+        - prev
+        - favorite
+        - fav
+        - send_telegram
+      device_name:
+        type: string
+      text:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      error:
+        type: string
+      voice_action:
+        type: string
+      resolved_endpoint:
+        type: object
 - name: rename_redevice_endpoint
   description: Rename a ReDevice endpoint and set comma-separated aliases.
   entry: handlers.main:rename_redevice_endpoint
