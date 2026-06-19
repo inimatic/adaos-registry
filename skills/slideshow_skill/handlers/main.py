@@ -1313,8 +1313,11 @@ def _content_item(path: Path) -> dict[str, Any]:
     thumb, cached = _thumbnail(path, _ENDPOINT_SIZE, "endpoint-cache-v6")
     ref = _content_ref(path)
     media = _publish_media_file(thumb, ref, variant="endpoint")
-    candidates = [str(item or "").strip() for item in list(media.get("content_url_candidates") or []) if str(item or "").strip()]
-    content_url = candidates[0] if candidates else _text(media.get("node_url") or media.get("url"))
+    # Endpoint commands may be consumed by old native agents that cannot resolve
+    # browser-relative hub paths. Only send concrete endpoint-reachable direct
+    # URLs here; inline data_uri remains the deterministic fallback.
+    candidates = [str(item or "").strip() for item in list(media.get("direct_urls") or []) if str(item or "").strip()]
+    content_url = candidates[0] if candidates else ""
     return {
         "content_ref": ref,
         "source_path": str(path),
