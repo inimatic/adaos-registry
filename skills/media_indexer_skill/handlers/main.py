@@ -10,6 +10,7 @@ import pathlib
 import re
 import sys
 import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Callable, Dict, List
 
 import yaml
@@ -112,11 +113,26 @@ def _runtime_logs_dir() -> pathlib.Path:
     override = os.getenv("MEDIA_INDEXER_LOG_DIR")
     if override:
         path = pathlib.Path(override)
-    else:
+    elif os.getenv("ADAOS_SKILL_ENV_PATH"):
         slot_root = _SKILL_ROOT.parents[2] if len(_SKILL_ROOT.parents) > 2 else _SKILL_ROOT
         path = slot_root / "runtime" / "logs"
+    else:
+        base_dir = pathlib.Path(os.getenv("ADAOS_BASE_DIR") or pathlib.Path.home() / ".adaos")
+        path = base_dir / "state" / "media_indexer_skill" / "logs"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def _skill_version() -> str:
+    env_version = str(os.getenv("ADAOS_SKILL_VERSION") or "").strip()
+    if env_version:
+        return env_version
+    manifest_path = _SKILL_ROOT / "skill.yaml"
+    try:
+        manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return "0.0.0"
+    return str(manifest.get("version") or "0.0.0")
 
 
 def _configure_logging() -> None:
@@ -164,7 +180,8 @@ def _internal_data_dir() -> pathlib.Path:
             data_root = env_path.parents[1] if env_path.parent.name == "db" else env_path.parent
             path = data_root / "internal" / "media_indexer"
         except Exception:
-            path = _SKILL_ROOT / ".skill_state"
+            base_dir = pathlib.Path(os.getenv("ADAOS_BASE_DIR") or pathlib.Path.home() / ".adaos")
+            path = base_dir / "state" / "media_indexer_skill" / "internal"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -1445,3 +1462,46 @@ async def on_stream_snapshot_requested(evt: Any) -> None:
             },
         webspace_id=webspace_id,
     )
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    server_version = "AdaOSMediaIndexer/0.1"
+
+    def log_message(self, _format: str, *args: Any) -> None:  # noqa: A003
+        if os.getenv("MEDIA_INDEXER_HTTP_LOG", "").strip().lower() in {"1", "true", "yes", "on"}:
+            super().log_message(_format, *args)
+
+    def _json(self, status: int, payload: Dict[str, Any]) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:  # noqa: N802
+        if self.path != "/health":
+            self._json(404, {"ok": False, "error": "not_found"})
+            return
+        model_status = model_weights_status()
+        self._json(
+            200,
+            {
+                "ok": True,
+                "service": "media_indexer_skill",
+                "version": _skill_version(),
+                "index_loaded": bool(_state.get("index_loaded")),
+                "has_persisted_index": _has_persisted_index(),
+                "model_weights": model_status,
+            },
+        )
+
+
+if __name__ == "__main__":
+    host = os.getenv("ADAOS_SERVICE_HOST", "127.0.0.1")
+    try:
+        port = int(os.getenv("ADAOS_SERVICE_PORT", "18092") or "18092")
+    except Exception:
+        port = 18092
+    logger.info("starting media_indexer_skill health service on %s:%s", host, port)
+    ThreadingHTTPServer((host, port), _HealthHandler).serve_forever()

@@ -36,7 +36,8 @@ def _runtime_models_dir() -> Path:
         path = Path(env_path)
         data_root = path.parents[1] if path.parent.name == "db" else path.parent
         return data_root / "files" / "models"
-    return LEGACY_MODEL_WEIGHTS_PATH.parent
+    base_dir = Path(os.getenv("ADAOS_BASE_DIR") or Path.home() / ".adaos")
+    return base_dir / "state" / "media_indexer_skill" / "models"
 
 
 def model_weights_path() -> Path:
