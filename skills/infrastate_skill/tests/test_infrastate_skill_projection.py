@@ -62,10 +62,11 @@ def _run_stream_snapshots_inline(mod, monkeypatch) -> None:
     monkeypatch.setattr(
         mod,
         "_schedule_stream_receiver_snapshot",
-        lambda receiver, webspace_id, *, reason: mod._publish_registered_stream_receiver_snapshot(
+        lambda receiver, webspace_id, *, reason, node_id=None: mod._publish_registered_stream_receiver_snapshot(
             receiver,
             webspace_id,
             reason=reason,
+            node_id=node_id,
         ),
     )
 
@@ -400,7 +401,7 @@ def test_infrastate_marketplace_items_include_selected_node_target(monkeypatch):
     assert items["skills"][0]["target_node_id"] == "member-1"
 
 
-def test_infrastate_marketplace_stream_defaults_to_local_node(monkeypatch):
+def test_infrastate_marketplace_stream_defaults_to_selected_node(monkeypatch):
     mod = _load_infrastate_module()
 
     monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
@@ -418,8 +419,8 @@ def test_infrastate_marketplace_stream_defaults_to_local_node(monkeypatch):
 
     rows = mod._build_stream_payload_for_receiver(mod._marketplace_skills_receiver(), "homepoint")
 
-    assert rows[0]["node_id"] == "hub-1"
-    assert rows[0]["target_node_id"] == "hub-1"
+    assert rows[0]["node_id"] == "member-1"
+    assert rows[0]["target_node_id"] == "member-1"
 
 
 def test_infrastate_marketplace_stream_honors_explicit_target_node(monkeypatch):
@@ -444,6 +445,42 @@ def test_infrastate_marketplace_stream_honors_explicit_target_node(monkeypatch):
     )
 
     assert rows[0]["node_id"] == "member-1"
+    assert rows[0]["target_node_id"] == "member-1"
+
+
+def test_infrastate_marketplace_uses_remote_installed_set(monkeypatch):
+    mod = _load_infrastate_module()
+
+    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
+    monkeypatch.setattr(mod, "runtime_lifecycle_snapshot", lambda: {})
+    monkeypatch.setattr(mod, "_lightweight_member_reliability", lambda conf, lifecycle=None: {"members": []})
+    monkeypatch.setattr(mod, "_selected_member_entry", lambda reliability, node_id: {"node_id": node_id})
+    monkeypatch.setattr(
+        mod,
+        "_remote_capacity_inventory_items",
+        lambda member, kind: [{"name": "weather_skill"}] if kind == "skills" else [],
+    )
+    monkeypatch.setattr(
+        mod,
+        "_marketplace_catalog_entries",
+        lambda kind: [
+            {"kind": "skill", "id": "weather_skill", "name": "weather_skill", "version": "1.0.0"},
+            {"kind": "skill", "id": "calendar_skill", "name": "calendar_skill", "version": "1.0.0"},
+        ] if kind == "skills" else [],
+    )
+    monkeypatch.setattr(mod, "_skills_items", lambda: [])
+    monkeypatch.setattr(mod, "_scenario_items", lambda: [])
+    monkeypatch.setattr(mod, "_operations_snapshot", lambda webspace_id=None: {"active_items": []})
+    monkeypatch.setattr(mod, "read_manifest", lambda name: {})
+
+    rows = mod._marketplace_items(
+        webspace_id="desktop",
+        selected_node_id="member-1",
+        local_node_id="hub-1",
+    )["skills"]
+
+    assert [row["id"] for row in rows] == ["calendar_skill"]
     assert rows[0]["target_node_id"] == "member-1"
 
 
@@ -1449,6 +1486,29 @@ def test_infrastate_inventory_stream_honors_drift_only_toggle(monkeypatch):
     assert [item["name"] for item in drift_rows] == ["behind"]
 
 
+def test_infrastate_inventory_stream_honors_explicit_selected_node(monkeypatch):
+    mod = _load_infrastate_module()
+
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
+    monkeypatch.setattr(mod, "_ui_state", lambda: {"selected_node_id": "hub-1"})
+    monkeypatch.setattr(mod, "runtime_lifecycle_snapshot", lambda: {})
+    monkeypatch.setattr(mod, "_lightweight_member_reliability", lambda conf, lifecycle=None: {"members": []})
+    monkeypatch.setattr(mod, "_selected_member_entry", lambda reliability, node_id: {"node_id": node_id})
+    monkeypatch.setattr(
+        mod,
+        "_remote_capacity_inventory_items",
+        lambda member, kind: [{"name": f"{member['node_id']}-{kind}"}],
+    )
+
+    rows = mod._build_stream_payload_for_receiver(
+        mod._skills_receiver(),
+        "desktop",
+        selected_node_id="member-1",
+    )
+
+    assert rows == [{"name": "member-1-skills"}]
+
+
 def test_infrastate_catalog_record_exposes_source_and_commit(monkeypatch, tmp_path: Path):
     mod = _load_infrastate_module()
     workspace = tmp_path / "workspace"
@@ -2309,7 +2369,7 @@ def test_infrastate_project_async_excludes_stream_sections_from_yjs(monkeypatch)
     monkeypatch.setattr(
         mod,
         "_publish_stream_payload",
-        lambda *, receiver, data, webspace_id=None, force=False: published.append((receiver, data, webspace_id)),
+        lambda *, receiver, data, webspace_id=None, force=False, node_id=None: published.append((receiver, data, webspace_id)),
     )
 
     snapshot = {
@@ -2621,7 +2681,7 @@ def test_infrastate_stream_snapshot_request_schedules_registered_receiver(monkey
     monkeypatch.setattr(
         mod,
         "_schedule_stream_receiver_snapshot",
-        lambda receiver, webspace_id, *, reason: scheduled.append((receiver, webspace_id, reason)),
+        lambda receiver, webspace_id, *, reason, node_id=None: scheduled.append((receiver, webspace_id, reason)),
     )
 
     mod.on_webio_stream_snapshot_requested(
@@ -2644,12 +2704,12 @@ def test_infrastate_stream_subscription_changed_schedules_initial_snapshot(monke
     monkeypatch.setattr(
         mod,
         "_remember_stream_receiver",
-        lambda webspace_id, receiver: remembered.append((webspace_id, receiver)),
+        lambda webspace_id, receiver, node_id=None: remembered.append((webspace_id, receiver)),
     )
     monkeypatch.setattr(
         mod,
         "_schedule_stream_receiver_snapshot",
-        lambda receiver, webspace_id, *, reason: scheduled.append((receiver, webspace_id, reason)),
+        lambda receiver, webspace_id, *, reason, node_id=None: scheduled.append((receiver, webspace_id, reason)),
     )
 
     mod.on_webio_stream_subscription_changed(
@@ -2666,6 +2726,37 @@ def test_infrastate_stream_subscription_changed_schedules_initial_snapshot(monke
     assert scheduled == [(mod._scenarios_receiver(), "desktop", "subscription_changed")]
 
 
+def test_infrastate_stream_subscription_changed_passes_target_node(monkeypatch):
+    mod = _load_infrastate_module()
+    remembered: list[tuple[str | None, str, str | None]] = []
+    scheduled: list[tuple[str, str | None, str, str | None]] = []
+
+    monkeypatch.setattr(
+        mod,
+        "_remember_stream_receiver",
+        lambda webspace_id, receiver, node_id=None: remembered.append((webspace_id, receiver, node_id)),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_schedule_stream_receiver_snapshot",
+        lambda receiver, webspace_id, *, reason, node_id=None: scheduled.append((receiver, webspace_id, reason, node_id)),
+    )
+
+    mod.on_webio_stream_subscription_changed(
+        SimpleNamespace(
+            payload={
+                "receiver": mod._skills_receiver(),
+                "webspace_id": "desktop",
+                "target_node_id": "member-1",
+                "action": "subscribed",
+            }
+        )
+    )
+
+    assert remembered == [("desktop", mod._skills_receiver(), "member-1")]
+    assert scheduled == [(mod._skills_receiver(), "desktop", "subscription_changed", "member-1")]
+
+
 def test_infrastate_stream_subscription_changed_forgets_without_snapshot(monkeypatch):
     mod = _load_infrastate_module()
     forgotten: list[tuple[str | None, str]] = []
@@ -2674,12 +2765,12 @@ def test_infrastate_stream_subscription_changed_forgets_without_snapshot(monkeyp
     monkeypatch.setattr(
         mod,
         "_forget_stream_receiver",
-        lambda webspace_id, receiver: forgotten.append((webspace_id, receiver)),
+        lambda webspace_id, receiver, node_id=None: forgotten.append((webspace_id, receiver)),
     )
     monkeypatch.setattr(
         mod,
         "_schedule_stream_receiver_snapshot",
-        lambda receiver, webspace_id, *, reason: scheduled.append((receiver, webspace_id, reason)),
+        lambda receiver, webspace_id, *, reason, node_id=None: scheduled.append((receiver, webspace_id, reason)),
     )
 
     mod.on_webio_stream_subscription_changed(
@@ -3054,10 +3145,12 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         "kind": "stream",
         "receiver": "infrastate.skills",
     }
+    assert webui["webio"]["receivers"]["infrastate.skills"]["scope"] == "node"
     assert by_id["infrastate-scenarios"]["dataSource"] == {
         "kind": "stream",
         "receiver": "infrastate.scenarios",
     }
+    assert webui["webio"]["receivers"]["infrastate.scenarios"]["scope"] == "node"
     assert webui["webio"]["receivers"]["infrastate.scenarios"]["route"]["surface"] == "modal:scenario_registry"
     assert by_id["infrastate-scenarios"]["title"] == "Scenarios"
     scenario_columns = by_id["infrastate-scenarios"]["inputs"]["columns"]
@@ -3086,10 +3179,12 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         "kind": "stream",
         "receiver": "infrastate.marketplace.skills",
     }
+    assert webui["webio"]["receivers"]["infrastate.marketplace.skills"]["scope"] == "node"
     assert by_id["marketplace-scenarios"]["dataSource"] == {
         "kind": "stream",
         "receiver": "infrastate.marketplace.scenarios",
     }
+    assert webui["webio"]["receivers"]["infrastate.marketplace.scenarios"]["scope"] == "node"
 
 
 def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):

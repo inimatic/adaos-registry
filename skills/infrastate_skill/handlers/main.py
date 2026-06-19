@@ -975,59 +975,122 @@ def _stream_payload_for_receiver(snapshot: dict[str, Any], receiver: str) -> Any
     return None
 
 
-def _stream_cache_key(webspace_id: str | None, receiver: str) -> str:
+def _stream_cache_key(webspace_id: str | None, receiver: str, node_id: str | None = None) -> str:
     ws = str(webspace_id or "").strip() or default_webspace_id()
     token = str(receiver or "").strip()
-    return f"{ws}\0{token}"
+    node = str(node_id or "").strip()
+    return f"{ws}\0{token}\0{node}"
 
 
-def _remember_stream_receiver(webspace_id: str | None, receiver: str) -> None:
+def _stream_subscription_key(receiver: str, node_id: str | None = None) -> str:
+    token = str(receiver or "").strip()
+    node = str(node_id or "").strip()
+    return f"{token}\0{node}" if node else token
+
+
+def _decode_stream_subscription_key(key: str) -> tuple[str, str]:
+    token = str(key or "").strip()
+    if "\0" not in token:
+        return token, ""
+    receiver, _, node = token.partition("\0")
+    return receiver.strip(), node.strip()
+
+
+def _remember_stream_receiver(webspace_id: str | None, receiver: str, node_id: str | None = None) -> None:
     token = str(receiver or "").strip()
     if not token.startswith("infrastate."):
         return
     _STREAM_RUNTIME.remember_receiver(token, webspace_id=str(webspace_id or "").strip() or default_webspace_id())
     ws = str(webspace_id or "").strip() or default_webspace_id()
-    _active_stream_receivers_by_webspace.setdefault(ws, set()).add(token)
+    _active_stream_receivers_by_webspace.setdefault(ws, set()).add(_stream_subscription_key(token, node_id))
 
 
-def _forget_stream_receiver(webspace_id: str | None, receiver: str) -> None:
+def _forget_stream_receiver(webspace_id: str | None, receiver: str, node_id: str | None = None) -> None:
     token = str(receiver or "").strip()
     if not token:
         return
+    node = str(node_id or "").strip()
     ws = str(webspace_id or "").strip() or default_webspace_id()
-    _STREAM_RUNTIME.forget_receiver(token, webspace_id=ws)
     receivers = _active_stream_receivers_by_webspace.get(ws)
+    remaining_for_receiver = False
     if receivers is not None:
-        receivers.discard(token)
+        if node:
+            receivers.discard(_stream_subscription_key(token, node))
+        else:
+            for key in tuple(receivers):
+                key_receiver, _key_node = _decode_stream_subscription_key(key)
+                if key_receiver == token:
+                    receivers.discard(key)
+        remaining_for_receiver = any(
+            _decode_stream_subscription_key(key)[0] == token
+            for key in receivers
+        )
         if not receivers:
             _active_stream_receivers_by_webspace.pop(ws, None)
-    key = _stream_cache_key(ws, token)
-    _stream_fingerprints.pop(key, None)
-    _stream_last_published_at.pop(key, None)
-    _stream_request_seen_at.pop(key, None)
+    if not node or not remaining_for_receiver:
+        _STREAM_RUNTIME.forget_receiver(token, webspace_id=ws)
+    for key in tuple(_stream_fingerprints):
+        key_ws, _, rest = key.partition("\0")
+        key_receiver, _, key_node = rest.partition("\0")
+        if key_ws == ws and key_receiver == token and (not node or key_node == node):
+            _stream_fingerprints.pop(key, None)
+            _stream_last_published_at.pop(key, None)
+            _stream_request_seen_at.pop(key, None)
 
 
 def _active_stream_receivers(webspace_id: str | None) -> list[str]:
+    return sorted({receiver for receiver, _node_id in _active_stream_receiver_specs(webspace_id)})
+
+
+def _active_stream_receiver_specs(webspace_id: str | None) -> list[tuple[str, str]]:
     ws = str(webspace_id or "").strip() or default_webspace_id()
-    sdk_receivers = {
-        str(entry.get("receiver") or "")
+    sdk_specs = {
+        (str(entry.get("receiver") or ""), "")
         for entry in _STREAM_RUNTIME.active_receivers_snapshot()
         if str(entry.get("webspace_id") or "") == ws
     }
-    local_receivers = set(_active_stream_receivers_by_webspace.get(ws) or set())
-    return sorted(local_receivers | sdk_receivers)
+    local_specs = {
+        _decode_stream_subscription_key(key)
+        for key in set(_active_stream_receivers_by_webspace.get(ws) or set())
+    }
+    local_receivers = {receiver for receiver, _node_id in local_specs}
+    effective_sdk_specs = {
+        spec
+        for spec in sdk_specs
+        if spec[0] not in local_receivers
+    }
+    return sorted(
+        (receiver, node_id)
+        for receiver, node_id in (local_specs | effective_sdk_specs)
+        if receiver
+    )
 
 
-def _stream_receiver_is_active(webspace_id: str | None, receiver: str) -> bool:
+def _stream_receiver_is_active(webspace_id: str | None, receiver: str, node_id: str | None = None) -> bool:
     token = str(receiver or "").strip()
-    return bool(token and token in set(_active_stream_receivers(webspace_id)))
+    node = str(node_id or "").strip()
+    if not token:
+        return False
+    for active_receiver, active_node in _active_stream_receiver_specs(webspace_id):
+        if active_receiver != token:
+            continue
+        if not node or active_node == node:
+            return True
+    return False
 
 
 def _stream_payload_fingerprint(data: Any) -> str:
     return hashlib.sha1(_stable_json_bytes(_sanitize_snapshot_for_fingerprint(data))).hexdigest()
 
 
-def _publish_stream_payload(*, receiver: str, data: Any, webspace_id: str | None, force: bool = False) -> None:
+def _publish_stream_payload(
+    *,
+    receiver: str,
+    data: Any,
+    webspace_id: str | None,
+    force: bool = False,
+    node_id: str | None = None,
+) -> None:
     if data is None:
         return
     if not force:
@@ -1043,11 +1106,14 @@ def _publish_stream_payload(*, receiver: str, data: Any, webspace_id: str | None
                 guardrail=guardrail,
             )
             return
+    node_token = str(node_id or "").strip()
+    meta = {"target_node_id": node_token, "node_id": node_token} if node_token else None
     _STREAM_RUNTIME.publish_snapshot(
         receiver,
         data,
         webspace_id=str(webspace_id or "").strip() or default_webspace_id(),
-        force=force,
+        force=force or bool(node_token),
+        meta=meta,
     )
 
 
@@ -1299,24 +1365,35 @@ def _publish_registered_stream_receiver_snapshot(
     webspace_id: str | None,
     *,
     reason: str,
+    node_id: str | None = None,
 ) -> None:
+    node_token = str(node_id or "").strip()
+    meta = {"target_node_id": node_token, "node_id": node_token} if node_token else None
     _STREAM_RUNTIME.publish_receiver_snapshot(
         receiver,
         webspace_id=webspace_id,
         force=True,
+        meta=meta,
         context=ProjectionContext(
             skill_id="infrastate_skill",
             webspace_id=str(webspace_id or "").strip() or default_webspace_id(),
             receiver=receiver,
             reason=reason,
+            node_id=node_token or None,
         ),
     )
 
 
-def _schedule_stream_receiver_snapshot(receiver: str, webspace_id: str | None, *, reason: str) -> None:
+def _schedule_stream_receiver_snapshot(
+    receiver: str,
+    webspace_id: str | None,
+    *,
+    reason: str,
+    node_id: str | None = None,
+) -> None:
     def _publish() -> None:
         try:
-            _publish_registered_stream_receiver_snapshot(receiver, webspace_id, reason=reason)
+            _publish_registered_stream_receiver_snapshot(receiver, webspace_id, reason=reason, node_id=node_id)
         except Exception:
             _log.debug("infrastate scheduled stream snapshot failed receiver=%s", receiver, exc_info=True)
 
@@ -1333,8 +1410,8 @@ def _publish_snapshot_streams(snapshot: dict[str, Any], *, webspace_id: str | No
                 str(webspace_id or "").strip() or default_webspace_id(),
                 total,
             )
-    receivers = tuple(_active_stream_receivers(webspace_id))
-    for receiver in receivers:
+    receivers = tuple(_active_stream_receiver_specs(webspace_id))
+    for receiver, node_id in receivers:
         guardrail = _active_noncritical_stream_guardrail(
             str(webspace_id or "").strip() or default_webspace_id(),
             receiver,
@@ -1349,8 +1426,13 @@ def _publish_snapshot_streams(snapshot: dict[str, Any], *, webspace_id: str | No
             continue
         _publish_stream_payload(
             receiver=receiver,
-            data=_stream_payload_for_receiver(snapshot, receiver),
+            data=(
+                _build_stream_payload_for_receiver(receiver, webspace_id, selected_node_id=node_id)
+                if node_id
+                else _stream_payload_for_receiver(snapshot, receiver)
+            ),
             webspace_id=webspace_id,
+            node_id=node_id,
         )
 
 
@@ -1556,8 +1638,8 @@ def infrastate_runtime_dispose(reason: str = "dispose", **_: Any) -> dict[str, A
     return _cleanup_runtime_state(reason=reason or "dispose", wait=False)
 
 
-def _consume_stream_snapshot_request(*, webspace_id: str | None, receiver: str) -> bool:
-    key = _stream_cache_key(webspace_id, receiver)
+def _consume_stream_snapshot_request(*, webspace_id: str | None, receiver: str, node_id: str | None = None) -> bool:
+    key = _stream_cache_key(webspace_id, receiver, node_id)
     now = time.monotonic()
     _projection_diag["snapshot_request_total"] = int(_projection_diag.get("snapshot_request_total") or 0) + 1
     debounce_s = _stream_request_debounce_s()
@@ -3227,6 +3309,28 @@ def _marketplace_items(
     selected_node_token = str(selected_node_id or "").strip()
     local_node_token = str(local_node_id or "").strip()
     target_node_token = selected_node_token or local_node_token
+    if selected_node_token and local_node_token and selected_node_token != local_node_token:
+        try:
+            conf = load_config()
+            lifecycle = runtime_lifecycle_snapshot()
+            reliability = _lightweight_member_reliability(
+                conf,
+                lifecycle=lifecycle if isinstance(lifecycle, dict) else {},
+            )
+            member = _selected_member_entry(reliability, selected_node_token)
+            if member:
+                installed_skills = {
+                    str(item.get("name") or item.get("id") or "").strip()
+                    for item in _remote_capacity_inventory_items(member, "skills")
+                    if str(item.get("name") or item.get("id") or "").strip()
+                }
+                installed_scenarios = {
+                    str(item.get("name") or item.get("id") or "").strip()
+                    for item in _remote_capacity_inventory_items(member, "scenarios")
+                    if str(item.get("name") or item.get("id") or "").strip()
+                }
+        except Exception:
+            _log.debug("failed to build remote member installed set for marketplace", exc_info=True)
 
     def _rows(kind_plural: str, installed: set[str]) -> list[dict[str, Any]]:
         rows: list[dict[str, Any]] = []
@@ -8124,7 +8228,8 @@ def _build_stream_payload_for_receiver(
         try:
             conf = load_config()
             ui_state = _ui_state()
-            selected_node_id = str(ui_state.get("selected_node_id") or "").strip()
+            requested_node_id = str(selected_node_id or "").strip()
+            selected_node_id = requested_node_id or str(ui_state.get("selected_node_id") or "").strip()
             local_node_id = str(getattr(conf, "node_id", "") or "").strip()
             if selected_node_id and selected_node_id != local_node_id:
                 lifecycle = runtime_lifecycle_snapshot()
@@ -8145,7 +8250,8 @@ def _build_stream_payload_for_receiver(
         try:
             conf = load_config()
             ui_state = _ui_state()
-            selected_node_id = str(ui_state.get("selected_node_id") or "").strip()
+            requested_node_id = str(selected_node_id or "").strip()
+            selected_node_id = requested_node_id or str(ui_state.get("selected_node_id") or "").strip()
             local_node_id = str(getattr(conf, "node_id", "") or "").strip()
             if selected_node_id and selected_node_id != local_node_id:
                 lifecycle = runtime_lifecycle_snapshot()
@@ -8166,6 +8272,9 @@ def _build_stream_payload_for_receiver(
         try:
             conf = load_config()
             requested_node_id = str(selected_node_id or "").strip()
+            if not requested_node_id:
+                ui_state = _ui_state()
+                requested_node_id = str(ui_state.get("selected_node_id") or getattr(conf, "node_id", "") or "").strip()
             selected_node_id = requested_node_id or str(getattr(conf, "node_id", "") or "").strip() or None
             marketplace = _marketplace_items(
                 webspace_id=webspace_id,
@@ -8326,7 +8435,7 @@ async def _project_sections_async(
 
 
 def _publish_active_stream_receiver_snapshots(webspace_id: str | None, *, reason: str) -> None:
-    for receiver in tuple(_active_stream_receivers(webspace_id)):
+    for receiver, node_id in tuple(_active_stream_receiver_specs(webspace_id)):
         guardrail = _active_noncritical_stream_guardrail(
             str(webspace_id or "").strip() or default_webspace_id(),
             receiver,
@@ -8339,7 +8448,7 @@ def _publish_active_stream_receiver_snapshots(webspace_id: str | None, *, reason
                 guardrail=guardrail,
             )
             continue
-        _schedule_stream_receiver_snapshot(receiver, webspace_id, reason=reason)
+        _schedule_stream_receiver_snapshot(receiver, webspace_id, reason=reason, node_id=node_id)
 
 
 async def _refresh_live_infrastate_async(
@@ -8455,10 +8564,11 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
     } and not receiver.startswith(_details_receiver_prefix()):
         return
     webspace_id = _webspace_id_from_payload(payload)
+    node_id = _payload_target_node_id(payload)
     is_detail_receiver = receiver.startswith(_details_receiver_prefix())
     if not is_detail_receiver:
-        _remember_stream_receiver(webspace_id, receiver)
-    if not _consume_stream_snapshot_request(webspace_id=webspace_id, receiver=receiver):
+        _remember_stream_receiver(webspace_id, receiver, node_id=node_id)
+    if not _consume_stream_snapshot_request(webspace_id=webspace_id, receiver=receiver, node_id=node_id):
         return
     if is_detail_receiver:
         # Dynamic detail receivers are request-only; they are not registered as
@@ -8470,7 +8580,7 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
             force=True,
         )
     else:
-        _schedule_stream_receiver_snapshot(receiver, webspace_id, reason="snapshot_requested")
+        _schedule_stream_receiver_snapshot(receiver, webspace_id, reason="snapshot_requested", node_id=node_id)
     if is_detail_receiver:
         _forget_stream_receiver(webspace_id, receiver)
 
@@ -8484,15 +8594,16 @@ def on_webio_stream_subscription_changed(evt: Any) -> None:
     if not receiver.startswith("infrastate."):
         return
     webspace_id = _webspace_id_from_payload(payload)
+    node_id = _payload_target_node_id(payload)
     if receiver.startswith(_details_receiver_prefix()):
-        _forget_stream_receiver(webspace_id, receiver)
+        _forget_stream_receiver(webspace_id, receiver, node_id=node_id)
         return
     action = str(payload.get("action") or "").strip().lower() or "subscribed"
     if action == "unsubscribed":
-        _forget_stream_receiver(webspace_id, receiver)
+        _forget_stream_receiver(webspace_id, receiver, node_id=node_id)
     else:
-        _remember_stream_receiver(webspace_id, receiver)
-        _schedule_stream_receiver_snapshot(receiver, webspace_id, reason="subscription_changed")
+        _remember_stream_receiver(webspace_id, receiver, node_id=node_id)
+        _schedule_stream_receiver_snapshot(receiver, webspace_id, reason="subscription_changed", node_id=node_id)
 
 
 @tool("get_snapshot")

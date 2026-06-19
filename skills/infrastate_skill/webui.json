@@ -77,6 +77,7 @@
       "infrastate.skills": {
         "mode": "replace",
         "transport": "hub",
+        "scope": "node",
         "snapshotPolicy": "on_subscribe",
         "patches": true,
         "itemPath": "/items",
@@ -89,6 +90,7 @@
       "infrastate.scenarios": {
         "mode": "replace",
         "transport": "hub",
+        "scope": "node",
         "snapshotPolicy": "on_subscribe",
         "patches": true,
         "itemPath": "/items",
@@ -101,6 +103,7 @@
       "infrastate.marketplace.skills": {
         "mode": "replace",
         "transport": "hub",
+        "scope": "node",
         "snapshotPolicy": "on_subscribe",
         "initialState": [],
         "budget": { "maxPayloadBytes": 65536, "maxPublishHz": 0.2, "maxSnapshotHz": 1, "maxItems": 256 },
@@ -110,6 +113,7 @@
       "infrastate.marketplace.scenarios": {
         "mode": "replace",
         "transport": "hub",
+        "scope": "node",
         "snapshotPolicy": "on_subscribe",
         "initialState": [],
         "budget": { "maxPayloadBytes": 65536, "maxPublishHz": 0.2, "maxSnapshotHz": 1, "maxItems": 256 },
