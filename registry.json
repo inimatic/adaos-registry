@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-19T11:08:40+00:00",
+  "updated_at": "2026-06-19T11:08:50+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -444,8 +444,8 @@
       "kind": "skill",
       "id": "redevice_voice",
       "name": "redevice_voice",
-      "version": "0.1.6",
-      "updated_at": "2026-06-19T09:26:04+00:00",
+      "version": "0.1.7",
+      "updated_at": "2026-06-19T11:08:50+00:00",
       "path": "skills/redevice_voice",
       "manifest": "skills/redevice_voice/skill.yaml",
       "source": {
