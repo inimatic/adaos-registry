@@ -520,7 +520,7 @@
       "type": "ui.actions",
       "area": "main",
       "title": "Update",
-      "visibleIf": "$state.infrastateTab === 'update'",
+      "visibleIf": "$state.infrastateTab === 'inventory'",
       "dataSource": {
         "kind": "y",
         "path": "data/infrastate/update_actions"
