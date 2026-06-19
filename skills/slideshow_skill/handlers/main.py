@@ -24,7 +24,14 @@ from adaos.sdk.io.media import (
     cached_image_variant,
     publish_media_file as sdk_publish_media_file,
 )
-from adaos.sdk.redevice import ReDeviceBridge, compact_endpoint, list_endpoints as sdk_list_endpoints, select_transport
+from adaos.sdk.redevice import (
+    ReDeviceBridge,
+    choose_endpoint as sdk_choose_endpoint,
+    compact_endpoint,
+    list_endpoints as sdk_list_endpoints,
+    select_transport,
+    with_local_content_route,
+)
 
 try:
     from adaos.services.yjs.webspace import default_webspace_id
@@ -1306,6 +1313,8 @@ def _content_item(path: Path) -> dict[str, Any]:
     thumb, cached = _thumbnail(path, _ENDPOINT_SIZE, "endpoint-cache-v6")
     ref = _content_ref(path)
     media = _publish_media_file(thumb, ref, variant="endpoint")
+    candidates = [str(item or "").strip() for item in list(media.get("content_url_candidates") or []) if str(item or "").strip()]
+    content_url = candidates[0] if candidates else _text(media.get("node_url") or media.get("url"))
     return {
         "content_ref": ref,
         "source_path": str(path),
@@ -1315,8 +1324,10 @@ def _content_item(path: Path) -> dict[str, Any]:
         "cached": cached,
         "thumbnail_path": str(thumb),
         "thumbnail_bytes": thumb.stat().st_size,
-        "content_url": _text(media.get("node_url") or media.get("url")),
+        "content_url": content_url,
+        "content_url_candidates": candidates,
         "browser_content_path": _text(media.get("browser_path")),
+        "delivery": _mapping(media.get("delivery")),
         "media": media,
         "data_uri": _data_uri(thumb),
     }
@@ -1658,7 +1669,7 @@ def _slideshow_endpoint_item(endpoint: Mapping[str, Any], selected_codes: set[st
 
 
 def _endpoint_payload(devices: list[dict[str, Any]], state: Mapping[str, Any]) -> dict[str, Any]:
-    selected_codes = set(_unique_texts(state.get("selected_codes")))
+    selected_codes = set(_healed_pair_codes(devices, _unique_texts(state.get("selected_codes"))))
     items = [_slideshow_endpoint_item(item, selected_codes) for item in devices]
     selected_items = [
         {
@@ -1699,6 +1710,16 @@ def _endpoint_payload(devices: list[dict[str, Any]], state: Mapping[str, Any]) -
         "running": bool(state.get("running")),
         "updated_at": _now(),
     }
+
+
+def _healed_pair_codes(devices: list[Mapping[str, Any]], codes: list[str]) -> list[str]:
+    healed: list[str] = []
+    for code in _unique_texts(codes):
+        endpoint = sdk_choose_endpoint(list(devices), code)
+        resolved = _text(_mapping(endpoint).get("code") or _mapping(endpoint).get("pair_code")) if endpoint else code
+        if resolved and resolved not in healed:
+            healed.append(resolved)
+    return healed
 
 
 def _command_items(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -1889,6 +1910,13 @@ def _send_to_selected(
             _save_state(state)
     if not target_codes:
         return {"ok": False, "error": "no_redevice_endpoint"}
+    target_codes = _healed_pair_codes(devices, target_codes)
+    if configured_codes and isinstance(state, dict):
+        healed_configured = _healed_pair_codes(devices, configured_codes)
+        if healed_configured != configured_codes:
+            state["selected_codes"] = healed_configured
+            configured_codes = healed_configured
+            _save_state(state)
     if not _endpoint_window(files, state, code=target_codes[0] if target_codes else None):
         return {"ok": False, "error": "no_supported_photos", "source_dir": state.get("source_dir")}
     if isinstance(state, dict):
@@ -1926,8 +1954,14 @@ def _send_to_selected(
         first_items = first_items or items
         first_content_bytes = first_content_bytes or content_bytes
         any_budget_limited = any_budget_limited or budget_limited
+        endpoint_for_transport = devices_by_code.get(pair_code, {})
+        if any(item.get("content_url_candidates") for item in items):
+            endpoint_for_transport = with_local_content_route(
+                endpoint_for_transport,
+                reason="slideshow_command_media_candidates",
+            )
         transport = select_transport(
-            devices_by_code.get(pair_code, {}),
+            endpoint_for_transport,
             intent="display.slideshow",
             content_bytes=content_bytes,
             allow_root_relay=True,
