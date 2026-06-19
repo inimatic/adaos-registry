@@ -669,6 +669,7 @@
               "visibleIf": "$state.infrastateTab === 'inventory'",
 							"dataSource": {
 								"kind": "stream",
+								"scope": "node",
 								"receiver": "infrastate.skills"
 							},
 							"inputs": {
@@ -787,6 +788,7 @@
               "visibleIf": "$state.infrastateTab === 'inventory'",
 							"dataSource": {
 								"kind": "stream",
+								"scope": "node",
 								"receiver": "infrastate.scenarios"
 							},
 							"inputs": {
@@ -943,6 +945,7 @@
 							"title": "Installable skills",
 							"dataSource": {
 								"kind": "stream",
+								"scope": "node",
 								"receiver": "infrastate.marketplace.skills"
 							},
 							"inputs": {
@@ -978,6 +981,7 @@
 							"title": "Installable scenarios",
 							"dataSource": {
 								"kind": "stream",
+								"scope": "node",
 								"receiver": "infrastate.marketplace.scenarios"
 							},
 							"inputs": {

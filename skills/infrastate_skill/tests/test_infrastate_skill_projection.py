@@ -3143,11 +3143,13 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
 
     assert by_id["infrastate-skills"]["dataSource"] == {
         "kind": "stream",
+        "scope": "node",
         "receiver": "infrastate.skills",
     }
     assert webui["webio"]["receivers"]["infrastate.skills"]["scope"] == "node"
     assert by_id["infrastate-scenarios"]["dataSource"] == {
         "kind": "stream",
+        "scope": "node",
         "receiver": "infrastate.scenarios",
     }
     assert webui["webio"]["receivers"]["infrastate.scenarios"]["scope"] == "node"
@@ -3177,11 +3179,13 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     )
     assert by_id["marketplace-skills"]["dataSource"] == {
         "kind": "stream",
+        "scope": "node",
         "receiver": "infrastate.marketplace.skills",
     }
     assert webui["webio"]["receivers"]["infrastate.marketplace.skills"]["scope"] == "node"
     assert by_id["marketplace-scenarios"]["dataSource"] == {
         "kind": "stream",
+        "scope": "node",
         "receiver": "infrastate.marketplace.scenarios",
     }
     assert webui["webio"]["receivers"]["infrastate.marketplace.scenarios"]["scope"] == "node"
