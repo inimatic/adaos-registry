@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-19T09:26:34+00:00",
+  "updated_at": "2026-06-19T10:30:17+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -508,8 +508,8 @@
       "kind": "skill",
       "id": "slideshow_skill",
       "name": "slideshow_skill",
-      "version": "0.1.46",
-      "updated_at": "2026-06-19T09:26:19+00:00",
+      "version": "0.1.47",
+      "updated_at": "2026-06-19T10:30:17+00:00",
       "path": "skills/slideshow_skill",
       "manifest": "skills/slideshow_skill/skill.yaml",
       "source": {

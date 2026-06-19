@@ -22,6 +22,7 @@ from adaos.sdk.io import stream_publish, telegram_photo
 from adaos.sdk.io.media import (
     browser_media_descriptor,
     cached_image_variant,
+    direct_media_base_urls,
     publish_media_file as sdk_publish_media_file,
 )
 from adaos.sdk.redevice import (
@@ -1780,6 +1781,8 @@ def _compact_command_payload(payload: Mapping[str, Any] | None, *, include_items
         "cache_target": int(data.get("cache_target") or 0),
         "cache_budget_limited": bool(data.get("cache_budget_limited")),
         "content_bytes": int(data.get("content_bytes") or 0),
+        "direct_candidate_count": int(data.get("direct_candidate_count") or 0),
+        "direct_media_ready": bool(data.get("direct_media_ready")),
         "transport": _compact_transport(_mapping(data.get("transport"))),
         "results": [_compact_result(_mapping(item)) for item in list(data.get("results") or [])[:16]],
         "updated_at": _text(data.get("updated_at")),
@@ -1936,6 +1939,8 @@ def _send_to_selected(
     first_content_bytes = 0
     any_budget_limited = False
     first_command_id = ""
+    first_direct_candidate_count = 0
+    direct_media_ready = bool(direct_media_base_urls())
     for pair_code in target_codes:
         window = _endpoint_window(files, state, code=pair_code)
         items, content_bytes, budget_limited = _content_items_for_window(window)
@@ -1957,8 +1962,10 @@ def _send_to_selected(
         first_items = first_items or items
         first_content_bytes = first_content_bytes or content_bytes
         any_budget_limited = any_budget_limited or budget_limited
+        direct_candidate_count = sum(len(list(item.get("content_url_candidates") or [])) for item in items)
+        first_direct_candidate_count = first_direct_candidate_count or direct_candidate_count
         endpoint_for_transport = devices_by_code.get(pair_code, {})
-        if any(item.get("content_url_candidates") for item in items):
+        if direct_candidate_count or direct_media_ready:
             endpoint_for_transport = with_local_content_route(
                 endpoint_for_transport,
                 reason="slideshow_command_media_candidates",
@@ -1999,6 +2006,8 @@ def _send_to_selected(
         "cache_target": _MAX_ENDPOINT_CURRENT,
         "cache_budget_limited": any_budget_limited,
         "content_bytes": first_content_bytes,
+        "direct_candidate_count": first_direct_candidate_count,
+        "direct_media_ready": direct_media_ready,
         "items": [{"source_name": item["source_name"], "thumbnail_path": item["thumbnail_path"], "cached": item["cached"]} for item in first_items],
         "items_by_code": {
             pair_code: [
