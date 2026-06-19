@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-19T07:52:18+00:00",
+  "updated_at": "2026-06-19T07:53:16+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -444,8 +444,8 @@
       "kind": "skill",
       "id": "redevice_voice",
       "name": "redevice_voice",
-      "version": "0.1.4",
-      "updated_at": "2026-06-16T17:11:50+00:00",
+      "version": "0.1.5",
+      "updated_at": "2026-06-19T07:53:16+00:00",
       "path": "skills/redevice_voice",
       "manifest": "skills/redevice_voice/skill.yaml",
       "source": {
@@ -460,7 +460,7 @@
       "description": "Debug ReDevice voice endpoint skill over EndpointAudioService with VAD or push-to-talk capture and member-side STT routing.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 3
+      "tools_count": 4
     },
     {
       "kind": "skill",

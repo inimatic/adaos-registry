@@ -15,6 +15,9 @@ push-to-talk as deterministic fallback:
 - `EndpointAudioService` stores only the last 10 debug WAV segments.
 - If VOSK and a compatible model are available on the member, the skill transcribes the segment.
 - Recognized text is routed to the normal AdaOS NLU path through `nlp.intent.detect.rasa`.
+- The `Check audio` action verifies the latest received audio segment as a
+  content artifact: endpoint policy, selected transport, retained WAV file,
+  sample metadata, and debug retention.
 
 The endpoint does not require local STT or TTS. VOSK on Android is optional and
 must degrade to member-side STT or segment diagnostics. If STT is unavailable,

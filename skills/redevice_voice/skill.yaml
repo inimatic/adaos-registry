@@ -1,5 +1,5 @@
 name: redevice_voice
-version: 0.1.4
+version: 0.1.5
 description: Debug ReDevice voice endpoint skill over EndpointAudioService with VAD
   or push-to-talk capture and member-side STT routing.
 runtime:
@@ -98,6 +98,19 @@ tools:
       webspace_id:
         type: string
         description: Optional webspace id.
+- name: check_redevice_audio_input
+  description: Verify the latest ReDevice audio input content artifact, policy, transport,
+    WAV metadata, and debug retention.
+  entry: handlers.main:check_redevice_audio_input
+  input_schema:
+    type: object
+    properties:
+      code:
+        type: string
+        description: Optional ReDevice pair code.
+      webspace_id:
+        type: string
+        description: Optional webspace id.
 - name: select_redevice_voice_endpoint
   description: Select the ReDevice endpoint used by the voice debug surface.
   entry: handlers.main:select_redevice_voice_endpoint
@@ -113,13 +126,13 @@ data_routes:
   - receiver: redevice_voice.state
     schema: redevice-voice-state.v1
     description: Debug ReDevice voice endpoint state stream.
-updated_at: '2026-06-16T17:11:50+00:00'
+updated_at: '2026-06-19T07:53:16+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2927.7d26a1b5
-    recorded_at: '2026-06-16T17:11:50+00:00'
+    min_version: 0.1.0+3002.8ad0a670
+    recorded_at: '2026-06-19T07:53:16+00:00'
     source: skill_push
-    min_commit: 7d26a1b56a904f7b777e7a99f98644462edd222f
-    min_short_commit: 7d26a1b5
-    build_date: '2026-06-16T20:10:10+03:00'
+    min_commit: 8ad0a67094b3cfd8ed5ea4200faa83f349e535a9
+    min_short_commit: 8ad0a670
+    build_date: '2026-06-19T10:41:06+03:00'
 

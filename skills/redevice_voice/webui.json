@@ -29,6 +29,9 @@
             "state": "idle"
           },
           "record_button": {},
+          "audio_check": {
+            "state": "not_checked"
+          },
           "retention": {},
           "stt": {
             "available": false,
@@ -116,6 +119,10 @@
                   {
                     "id": "ptt",
                     "label": "PTT"
+                  },
+                  {
+                    "id": "check_audio",
+                    "label": "Check audio"
                   }
                 ]
               },
@@ -181,6 +188,14 @@
                     "mode": "ptt",
                     "max_duration_ms": 5000
                   }
+                },
+                {
+                  "on": "click:check_audio",
+                  "type": "callSkill",
+                  "target": "redevice_voice.check_redevice_audio_input",
+                  "params": {
+                    "code": "$state.redeviceVoiceCode"
+                  }
                 }
               ]
             },
@@ -230,6 +245,22 @@
                 "statusPath": "diagnostics.retention.debug_clip_limit",
                 "descriptionPath": "last_segment.path",
                 "emptyText": "No retained clips"
+              }
+            },
+            {
+              "id": "voice-audio-check-summary",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Audio content",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "redevice_voice.state"
+              },
+              "inputs": {
+                "valuePath": "audio_check.state",
+                "statusPath": "audio_check.bytes",
+                "descriptionPath": "audio_check.path",
+                "emptyText": "No audio content check yet"
               }
             },
             {

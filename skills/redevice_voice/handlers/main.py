@@ -15,6 +15,7 @@ from adaos.sdk.io import (
     endpoint_audio_stt_status,
     process_endpoint_audio_event,
     stream_publish,
+    verify_audio_input_content,
 )
 from adaos.sdk.redevice import ReDeviceBridge, choose_endpoint as sdk_choose_endpoint
 
@@ -79,6 +80,7 @@ def _load_state() -> dict[str, Any]:
     state.setdefault("record_button", {})
     state.setdefault("retention", {})
     state.setdefault("stt", {"available": False, "state": "not_checked"})
+    state.setdefault("audio_check", {"state": "not_checked"})
     return state
 
 
@@ -147,6 +149,7 @@ def _payload(state: Mapping[str, Any], endpoints: list[Mapping[str, Any]]) -> di
         "record_button": _mapping(state.get("record_button")),
         "retention": _mapping(state.get("retention")) or _mapping(diagnostics.get("retention")),
         "events": list(state.get("events") or [])[-_MAX_EVENTS:],
+        "audio_check": _mapping(state.get("audio_check")),
         "updated_at": _now(),
     }
 
@@ -180,6 +183,21 @@ def select_redevice_voice_endpoint(code: str | None = None, webspace_id: str | N
     endpoints = _load_endpoints()
     _publish(state, endpoints, webspace_id)
     return {"ok": True, "selected_code": state["selected_code"]}
+
+
+@tool
+def check_redevice_audio_input(code: str | None = None, webspace_id: str | None = None) -> dict[str, Any]:
+    state = _load_state()
+    endpoints = _load_endpoints()
+    endpoint = _choose_endpoint(endpoints, code or _text(state.get("selected_code")))
+    if endpoint is not None:
+        state["selected_code"] = _text(endpoint.get("code") or endpoint.get("pair_code"))
+        _process_endpoint_event(state, endpoint, webspace_id=webspace_id)
+    check = verify_audio_input_content(state, endpoint)
+    state["audio_check"] = check
+    state = _save_state(state)
+    _publish(state, endpoints, webspace_id)
+    return check
 
 
 @tool
