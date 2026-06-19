@@ -3191,6 +3191,118 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     assert webui["webio"]["receivers"]["infrastate.marketplace.scenarios"]["scope"] == "node"
 
 
+def test_infrastate_skill_inventory_stream_payload_is_compact(monkeypatch):
+    mod = _load_infrastate_module()
+
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="local-node"))
+    monkeypatch.setattr(mod, "_ui_state", lambda: {"selected_node_id": "local-node"})
+    monkeypatch.setattr(mod, "_inventory_drift_only_enabled", lambda: False)
+    monkeypatch.setattr(
+        mod,
+        "_skills_items",
+        lambda include_all=True: [
+            {
+                "name": "infrastate_skill",
+                "display_name": "infrastate_skill",
+                "status_icon": "checkmark-circle-outline",
+                "status_tooltip": "Versions are aligned.",
+                "catalog_display": "0.1.0",
+                "workspace_display": "0.1.0",
+                "runtime_display": "0.1.0 A",
+                "can_activate": False,
+                "can_hard_pull": False,
+                "can_push": True,
+                "can_validate": True,
+                "can_test": True,
+                "can_logs": True,
+                "uninstall_disabled": False,
+                "catalog_version": "0.1.0",
+                "catalog_commit": "abcdef",
+                "catalog_source": "workspace",
+                "active_version": "0.1.0",
+                "workspace_source_version": "0.1.0",
+                "runtime_bucket": "v0.1",
+                "used_by_scenarios": ["web_desktop"],
+                "rollout_quarantine_reason": "large diagnostic reason",
+            }
+        ],
+    )
+
+    rows = mod._build_stream_payload_for_receiver(mod._skills_receiver(), "desktop")
+
+    assert rows == [
+        {
+            "name": "infrastate_skill",
+            "display_name": "infrastate_skill",
+            "status_icon": "checkmark-circle-outline",
+            "status_tooltip": "Versions are aligned.",
+            "catalog_display": "0.1.0",
+            "workspace_display": "0.1.0",
+            "runtime_display": "0.1.0 A",
+            "can_activate": False,
+            "can_hard_pull": False,
+            "can_push": True,
+            "can_validate": True,
+            "can_test": True,
+            "can_logs": True,
+            "uninstall_disabled": False,
+        }
+    ]
+
+
+def test_infrastate_inventory_row_patch_is_compact(monkeypatch):
+    mod = _load_infrastate_module()
+    published: list[dict[str, object]] = []
+
+    monkeypatch.setattr(mod, "_stream_receiver_is_active", lambda webspace_id, receiver: True)
+    monkeypatch.setattr(
+        mod,
+        "_inventory_item_for_kind",
+        lambda kind, name: {
+            "name": name,
+            "display_name": name,
+            "status_icon": "warning-outline",
+            "status_tooltip": "Workspace differs.",
+            "catalog_display": "0.1.0",
+            "workspace_display": "0.2.0",
+            "runtime_display": "0.1.0 A",
+            "can_activate": True,
+            "can_hard_pull": False,
+            "can_push": True,
+            "can_validate": True,
+            "can_test": True,
+            "can_logs": True,
+            "uninstall_disabled": False,
+            "catalog_commit": "abcdef",
+            "used_by_scenarios": ["web_desktop"],
+            "rollout_quarantine_reason": "large diagnostic reason",
+        },
+    )
+    monkeypatch.setattr(
+        mod,
+        "_publish_stream_payload",
+        lambda **kwargs: published.append(dict(kwargs)),
+    )
+
+    mod._publish_inventory_row_patch(
+        kind="skill",
+        name="infrastate_skill",
+        webspace_id="desktop",
+        request_id="req-1",
+        pending=True,
+        operation_status="accepted",
+    )
+
+    item = published[0]["data"]["item"]
+    assert item["name"] == "infrastate_skill"
+    assert item["last_request_id"] == "req-1"
+    assert item["pending"] is True
+    assert item["operation_status"] == "accepted"
+    assert "catalog_commit" not in item
+    assert "used_by_scenarios" not in item
+    assert "rollout_quarantine_reason" not in item
+
+
 def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
     mod = _load_infrastate_module()
     invalidated: list[str | None] = []

@@ -1246,6 +1246,7 @@ def _publish_inventory_row_patch(
         row["last_error"] = ""
     row["updated_at"] = now
     row["last_action_at"] = now
+    row = _compact_inventory_stream_item(kind, row)
     patch = {
         "schema": "adaos.stream.patch.v1",
         "receiver": receiver,
@@ -4427,6 +4428,61 @@ def _filter_inventory_drift(items: list[dict[str, Any]], *, drift_only: bool) ->
     if not drift_only:
         return list(items)
     return [dict(item) for item in items if bool(item.get("has_drift"))]
+
+
+_SKILL_INVENTORY_STREAM_KEYS = {
+    "name",
+    "display_name",
+    "status_icon",
+    "status_tooltip",
+    "catalog_display",
+    "workspace_display",
+    "runtime_display",
+    "can_activate",
+    "can_hard_pull",
+    "can_push",
+    "can_validate",
+    "can_test",
+    "can_logs",
+    "uninstall_disabled",
+    "pending",
+    "last_request_id",
+    "last_action_at",
+    "updated_at",
+    "operation_status",
+    "last_error",
+}
+
+_SCENARIO_INVENTORY_STREAM_KEYS = {
+    "name",
+    "status_icon",
+    "status_tooltip",
+    "catalog_display",
+    "workspace_display",
+    "can_hard_pull",
+    "uninstall_disabled",
+    "pending",
+    "last_request_id",
+    "last_action_at",
+    "updated_at",
+    "operation_id",
+    "operation_status",
+    "last_error",
+}
+
+
+def _compact_inventory_stream_item(kind: str, item: dict[str, Any]) -> dict[str, Any]:
+    token = str(kind or "").strip().lower()
+    allowed = _SCENARIO_INVENTORY_STREAM_KEYS if token == "scenario" else _SKILL_INVENTORY_STREAM_KEYS
+    compact = {key: item.get(key) for key in allowed if key in item}
+    name = str(item.get("name") or item.get("id") or "").strip()
+    if name and not compact.get("name"):
+        compact["name"] = name
+    return compact
+
+
+def _compact_inventory_stream_items(kind: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [_compact_inventory_stream_item(kind, item) for item in items if isinstance(item, dict)]
 
 
 def _inventory_items_from(builder) -> list[dict[str, Any]]:
@@ -8239,12 +8295,18 @@ def _build_stream_payload_for_receiver(
                 )
                 member = _selected_member_entry(reliability, selected_node_id)
                 if member:
-                    return _remote_capacity_inventory_items(member, "skills")
+                    return _compact_inventory_stream_items(
+                        "skill",
+                        _remote_capacity_inventory_items(member, "skills"),
+                    )
         except Exception:
             _log.debug("failed to build remote member skills stream payload", exc_info=True)
-        return _filter_inventory_drift(
-            _inventory_items_from(_skills_items),
-            drift_only=_inventory_drift_only_enabled(),
+        return _compact_inventory_stream_items(
+            "skill",
+            _filter_inventory_drift(
+                _inventory_items_from(_skills_items),
+                drift_only=_inventory_drift_only_enabled(),
+            ),
         )
     if token == _scenarios_receiver():
         try:
@@ -8261,12 +8323,18 @@ def _build_stream_payload_for_receiver(
                 )
                 member = _selected_member_entry(reliability, selected_node_id)
                 if member:
-                    return _remote_capacity_inventory_items(member, "scenarios")
+                    return _compact_inventory_stream_items(
+                        "scenario",
+                        _remote_capacity_inventory_items(member, "scenarios"),
+                    )
         except Exception:
             _log.debug("failed to build remote member scenarios stream payload", exc_info=True)
-        return _filter_inventory_drift(
-            _inventory_items_from(_scenario_items),
-            drift_only=_inventory_drift_only_enabled(),
+        return _compact_inventory_stream_items(
+            "scenario",
+            _filter_inventory_drift(
+                _inventory_items_from(_scenario_items),
+                drift_only=_inventory_drift_only_enabled(),
+            ),
         )
     if token in {_marketplace_skills_receiver(), _marketplace_scenarios_receiver()}:
         try:
