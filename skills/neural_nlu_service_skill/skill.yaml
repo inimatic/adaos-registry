@@ -1,11 +1,12 @@
 name: neural_nlu_service_skill
-version: 0.2.14
+version: 0.2.15
 description: Local neural intent detector service for AdaOS NLU pipeline
 runtime:
   kind: service
   env:
     mode: venv
     python: '3.11'
+    allow_heavy_dependencies: true
 dependencies:
 - --extra-index-url
 - https://download.pytorch.org/whl/cpu
@@ -26,10 +27,16 @@ service:
 permissions:
 - network
 events:
-  subscribe:
-  - nlp.intent.detect.neural
   publish:
   - nlp.intent.detected
   - nlp.intent.detect.rasa
-updated_at: '2026-05-27T14:51:43+00:00'
+updated_at: '2026-06-19T13:28:15+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.0+3040.b179b58f
+    recorded_at: '2026-06-19T13:28:15+00:00'
+    source: skill_push
+    min_commit: b179b58fd56ea699d962eb394026d52be333510f
+    min_short_commit: b179b58f
+    build_date: '2026-06-19T15:52:02+03:00'
 

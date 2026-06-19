@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-19T13:27:50+00:00",
+  "updated_at": "2026-06-19T13:28:15+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -256,8 +256,8 @@
       "kind": "skill",
       "id": "neural_nlu_service_skill",
       "name": "neural_nlu_service_skill",
-      "version": "0.2.14",
-      "updated_at": "2026-05-27T14:51:43+00:00",
+      "version": "0.2.15",
+      "updated_at": "2026-06-19T13:28:15+00:00",
       "path": "skills/neural_nlu_service_skill",
       "manifest": "skills/neural_nlu_service_skill/skill.yaml",
       "source": {
