@@ -1500,8 +1500,8 @@ class _HealthHandler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     host = os.getenv("ADAOS_SERVICE_HOST", "127.0.0.1")
     try:
-        port = int(os.getenv("ADAOS_SERVICE_PORT", "18092") or "18092")
+        port = int(os.getenv("ADAOS_SERVICE_PORT", "18105") or "18105")
     except Exception:
-        port = 18092
+        port = 18105
     logger.info("starting media_indexer_skill health service on %s:%s", host, port)
     ThreadingHTTPServer((host, port), _HealthHandler).serve_forever()

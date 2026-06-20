@@ -1,5 +1,5 @@
 name: media_indexer_skill
-version: 0.1.13
+version: 0.1.14
 description: Semantic indexing and multimodal search for local media files (video,
   audio, images) using NER, FAISS and CLIP.
 runtime:
@@ -105,20 +105,6 @@ service:
   healthcheck:
     path: /health
     timeout_ms: 1000
-  dependencies:
-  - cinemagoer==2023.5.1
-  - easyocr==1.7.2
-  - faiss-cpu==1.13.2
-  - ffmpeg-python==0.2.0
-  - gdown>=5.0
-  - numpy==2.3.5
-  - opencv-python-headless==4.13.0.92
-  - pillow==12.1.1
-  - sentence-transformers==5.2.0
-  - shazamio==0.8.1
-  - static_ffmpeg==3.0
-  - torch==2.10.0
-  - transformers==4.57.5
 default_tool: search_media
 tools:
 - name: scan_and_index
@@ -221,13 +207,13 @@ tools:
     properties:
       status:
         type: string
-updated_at: '2026-06-20T05:30:14+00:00'
+updated_at: '2026-06-20T05:37:57+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3088.b288e9cc
-    recorded_at: '2026-06-20T05:30:15+00:00'
+    min_version: 0.1.0+3089.eb90fca1
+    recorded_at: '2026-06-20T05:37:57+00:00'
     source: skill_push
-    min_commit: b288e9cc47d9b87d2fc022da4920a7a315fa182d
-    min_short_commit: b288e9cc
-    build_date: '2026-06-20T08:20:10+03:00'
+    min_commit: eb90fca1dcc00fd1244ce116fe5f11a32dee962e
+    min_short_commit: eb90fca1
+    build_date: '2026-06-20T08:34:05+03:00'
 
