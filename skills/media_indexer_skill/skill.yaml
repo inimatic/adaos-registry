@@ -1,5 +1,5 @@
 name: media_indexer_skill
-version: 0.1.11
+version: 0.1.12
 description: Semantic indexing and multimodal search for local media files (video,
   audio, images) using NER, FAISS and CLIP.
 runtime:
@@ -8,21 +8,6 @@ runtime:
   env:
     mode: venv
     python: '3.11'
-    allow_heavy_dependencies: true
-dependencies:
-- cinemagoer==2023.5.1
-- easyocr==1.7.2
-- faiss-cpu==1.13.2
-- ffmpeg-python==0.2.0
-- gdown>=5.0
-- numpy==2.3.5
-- opencv-python-headless==4.13.0.92
-- pillow==12.1.1
-- sentence-transformers==5.2.0
-- shazamio==0.8.1
-- static_ffmpeg==3.0
-- torch==2.10.0
-- transformers==4.57.5
 models:
   private: true
   artifacts:
@@ -120,6 +105,20 @@ service:
   healthcheck:
     path: /health
     timeout_ms: 1000
+  dependencies:
+  - cinemagoer==2023.5.1
+  - easyocr==1.7.2
+  - faiss-cpu==1.13.2
+  - ffmpeg-python==0.2.0
+  - gdown>=5.0
+  - numpy==2.3.5
+  - opencv-python-headless==4.13.0.92
+  - pillow==12.1.1
+  - sentence-transformers==5.2.0
+  - shazamio==0.8.1
+  - static_ffmpeg==3.0
+  - torch==2.10.0
+  - transformers==4.57.5
 default_tool: search_media
 tools:
 - name: scan_and_index
@@ -222,13 +221,13 @@ tools:
     properties:
       status:
         type: string
-updated_at: '2026-06-19T13:27:50+00:00'
+updated_at: '2026-06-20T04:39:57+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3040.b179b58f
-    recorded_at: '2026-06-19T13:27:50+00:00'
+    min_version: 0.1.0+3086.64c551f7
+    recorded_at: '2026-06-20T04:39:57+00:00'
     source: skill_push
-    min_commit: b179b58fd56ea699d962eb394026d52be333510f
-    min_short_commit: b179b58f
-    build_date: '2026-06-19T15:52:02+03:00'
+    min_commit: 64c551f74a6df25522b5c8430d7903c42127c6a3
+    min_short_commit: 64c551f7
+    build_date: '2026-06-20T07:39:15+03:00'
 
