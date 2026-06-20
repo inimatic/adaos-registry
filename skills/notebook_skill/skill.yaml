@@ -1,5 +1,5 @@
 name: notebook_skill
-version: 0.1.1
+version: 0.1.2
 description: Shared plain-text notebook with one active editable note, a live note
   list stream, and Telegram export.
 runtime:
@@ -81,8 +81,6 @@ tools:
   input_schema:
     type: object
     properties:
-      title:
-        type: string
       content:
         type: string
       webspace_id:
@@ -107,6 +105,8 @@ tools:
         type: string
       id:
         type: string
+      edit:
+        type: boolean
       webspace_id:
         type: string
   output_schema:
@@ -128,8 +128,6 @@ tools:
         type: string
       content:
         type: string
-      title:
-        type: string
       webspace_id:
         type: string
   output_schema:
@@ -141,15 +139,21 @@ tools:
         type: boolean
       note:
         type: object
-- name: rename_note
-  entry: handlers.main:rename_note
-  description: Rename the selected note.
+- name: attach_note_file
+  entry: handlers.main:attach_note_file
+  description: Attach an uploaded photo or file to the selected note.
   input_schema:
     type: object
     properties:
       note_id:
         type: string
-      title:
+      kind:
+        type: string
+      artifact_ref:
+        type: object
+      file:
+        type: object
+      path:
         type: string
       webspace_id:
         type: string
@@ -160,6 +164,8 @@ tools:
     properties:
       ok:
         type: boolean
+      attachment:
+        type: object
       note:
         type: object
 - name: delete_note
@@ -219,13 +225,13 @@ tools:
     properties:
       ok:
         type: boolean
-updated_at: '2026-06-15T15:01:22+00:00'
+updated_at: '2026-06-20T03:45:57+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2864.c2af3094
-    recorded_at: '2026-06-15T15:01:22+00:00'
+    min_version: 0.1.0+3077.8c23bed7
+    recorded_at: '2026-06-20T03:45:57+00:00'
     source: skill_push
-    min_commit: c2af309412a4f5d80abf871ea118dd11eb41e9bb
-    min_short_commit: c2af3094
-    build_date: '2026-06-15T17:50:31+03:00'
+    min_commit: 8c23bed7346a820e9234c0cf8710fe7c8459b333
+    min_short_commit: 8c23bed7
+    build_date: '2026-06-19T21:20:40+00:00'
 

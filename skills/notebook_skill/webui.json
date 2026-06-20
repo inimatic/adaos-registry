@@ -9,13 +9,18 @@
         "initialState": {
           "ok": true,
           "selected_note_id": "note-1",
+          "display_note_id": "note-1",
+          "editing_note_id": "",
           "items": [
             {
               "id": "note-1",
-              "title": "Quick note",
-              "subtitle": "Empty shared note",
+              "title": "Empty note",
+              "subtitle": "",
+              "text": "",
               "preview": "",
               "selected": "selected",
+              "editing": "",
+              "attachment_count": 0,
               "updated_at": null
             }
           ],
@@ -37,7 +42,7 @@
           "kind": "stream",
           "surface": "modal:notebook_modal",
           "owner": "skill:notebook_skill",
-          "firstPaint": "default note list",
+          "firstPaint": "default note cards",
           "recovery": "snapshot requested on stream subscribe",
           "updateSource": [
             "webio.stream.snapshot.requested",
@@ -51,13 +56,9 @@
     {
       "id": "notebook_skill_app",
       "title": "Notebook",
-      "subtitle": "Shared plain-text notes",
+      "subtitle": "Notes and attachments",
       "icon": "document-text-outline",
-      "aliases": [
-        "notebook",
-        "notes",
-        "gnotes"
-      ],
+      "aliases": ["notebook", "notes", "gnotes"],
       "launchModal": "notebook_modal",
       "action": {
         "openModal": "notebook_modal"
@@ -67,7 +68,7 @@
   "widgets": [
     {
       "id": "notebook_skill_last_note",
-      "title": "Last note",
+      "title": "Notebook",
       "type": "ui.list",
       "icon": "document-text-outline",
       "dataSource": {
@@ -105,25 +106,15 @@
         "schema": {
           "id": "notebook_modal",
           "initialState": {
-            "notebookTitle": "",
             "notebookSelectedNoteId": "note-1"
           },
           "layout": {
             "type": "split",
             "pattern": "split",
             "areas": [
-              {
-                "id": "left",
-                "role": "nav"
-              },
-              {
-                "id": "main",
-                "role": "main"
-              },
-              {
-                "id": "right",
-                "role": "aux"
-              }
+              { "id": "left", "role": "nav" },
+              { "id": "main", "role": "main" },
+              { "id": "right", "role": "aux" }
             ]
           },
           "interaction": {
@@ -131,36 +122,38 @@
           },
           "widgets": [
             {
-              "id": "notebook-note-title",
-              "type": "input.text",
-              "area": "main",
-              "title": "Title",
+              "id": "notebook-notes",
+              "type": "ui.list",
+              "area": "left",
+              "title": "Notes",
               "dataSource": {
-                "kind": "y",
-                "path": "data/notebook/editor",
-                "observeRoot": true
+                "kind": "stream",
+                "receiver": "notebook_skill.notes"
               },
               "inputs": {
-                "bindField": "title",
-                "placeholder": "Note title",
-                "commitMode": "manual",
-                "saveLabel": "Rename"
+                "collectionKey": "items",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "descriptionKey": "preview",
+                "badgeKey": "attachment_count",
+                "emptyText": "Create a note to start.",
+                "itemAccordion": false
               },
               "actions": [
                 {
-                  "on": "change",
+                  "on": "click",
                   "type": "updateState",
                   "params": {
-                    "notebookTitle": "$event.value"
+                    "notebookSelectedNoteId": "$event.id"
                   }
                 },
                 {
-                  "on": "change",
+                  "on": "click",
                   "type": "callSkill",
-                  "target": "notebook_skill.rename_note",
+                  "target": "notebook_skill.select_note",
                   "params": {
-                    "title": "$event.value",
-                    "note_id": "$state.notebookSelectedNoteId"
+                    "note_id": "$event.id",
+                    "edit": true
                   }
                 }
               ]
@@ -169,14 +162,15 @@
               "id": "notebook-editor",
               "type": "item.textEditor",
               "area": "main",
-              "title": "Text",
+              "title": "Editor",
               "dataSource": {
                 "kind": "y",
                 "path": "data/notebook/editor",
                 "observeRoot": true
               },
               "inputs": {
-                "bindField": "content"
+                "bindField": "content",
+                "placeholder": "Write a note"
               },
               "actions": [
                 {
@@ -191,35 +185,89 @@
               ]
             },
             {
+              "id": "notebook-attachments",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Attachments",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/notebook/editor/attachments",
+                "observeRoot": true
+              },
+              "inputs": {
+                "titleKey": "name",
+                "subtitleKey": "mime",
+                "detailsPath": "path",
+                "emptyText": "No attachments"
+              }
+            },
+            {
+              "id": "notebook-photo-upload",
+              "type": "input.fileUpload",
+              "area": "right",
+              "title": "Photo",
+              "inputs": {
+                "skill": "notebook_skill",
+                "purpose": "photos",
+                "accept": "image/*",
+                "label": "Attach photo",
+                "maxBytes": 52428800
+              },
+              "actions": [
+                {
+                  "on": "uploaded",
+                  "type": "callSkill",
+                  "target": "notebook_skill.attach_note_file",
+                  "params": {
+                    "kind": "photo",
+                    "note_id": "$state.notebookSelectedNoteId",
+                    "artifact_ref": "$event.artifact_ref",
+                    "file": "$event.file",
+                    "path": "$event.path"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "notebook-file-upload",
+              "type": "input.fileUpload",
+              "area": "right",
+              "title": "File",
+              "inputs": {
+                "skill": "notebook_skill",
+                "purpose": "attachments",
+                "accept": "*/*",
+                "label": "Attach file",
+                "maxBytes": 134217728
+              },
+              "actions": [
+                {
+                  "on": "uploaded",
+                  "type": "callSkill",
+                  "target": "notebook_skill.attach_note_file",
+                  "params": {
+                    "kind": "file",
+                    "note_id": "$state.notebookSelectedNoteId",
+                    "artifact_ref": "$event.artifact_ref",
+                    "file": "$event.file",
+                    "path": "$event.path"
+                  }
+                }
+              ]
+            },
+            {
               "id": "notebook-actions",
               "type": "input.commandBar",
               "area": "right",
-              "title": "Actions",
+              "title": "Edit",
               "inputs": {
                 "variant": "stack",
                 "size": "small",
                 "buttons": [
-                  {
-                    "id": "new",
-                    "label": "New",
-                    "icon": "add-outline"
-                  },
-                  {
-                    "id": "refresh",
-                    "label": "Refresh",
-                    "icon": "refresh-outline"
-                  },
-                  {
-                    "id": "telegram",
-                    "label": "Telegram",
-                    "icon": "send-outline"
-                  },
-                  {
-                    "id": "delete",
-                    "label": "Delete",
-                    "icon": "trash-outline",
-                    "kind": "danger"
-                  }
+                  { "id": "new", "label": "New", "icon": "add-outline" },
+                  { "id": "refresh", "label": "Refresh", "icon": "refresh-outline" },
+                  { "id": "telegram", "label": "Telegram", "icon": "send-outline" },
+                  { "id": "delete", "label": "Delete", "icon": "trash-outline", "kind": "danger" }
                 ]
               },
               "actions": [
@@ -228,7 +276,7 @@
                   "type": "callSkill",
                   "target": "notebook_skill.create_note",
                   "params": {
-                    "title": "$state.notebookTitle"
+                    "content": ""
                   }
                 },
                 {
@@ -253,84 +301,6 @@
                   }
                 }
               ]
-            },
-            {
-              "id": "notebook-notes",
-              "type": "ui.table",
-              "area": "left",
-              "title": "Notes",
-              "dataSource": {
-                "kind": "stream",
-                "receiver": "notebook_skill.notes"
-              },
-              "inputs": {
-                "emptyText": "Create a note to start.",
-                "columns": [
-                  {
-                    "key": "selected",
-                    "label": "",
-                    "width": "82px"
-                  },
-                  {
-                    "key": "title",
-                    "label": "Title"
-                  },
-                  {
-                    "key": "subtitle",
-                    "label": "Updated",
-                    "width": "150px"
-                  },
-                  {
-                    "key": "_actions",
-                    "label": "Actions",
-                    "kind": "buttons",
-                    "width": "90px",
-                    "buttons": [
-                      {
-                        "id": "open",
-                        "label": "Open"
-                      }
-                    ]
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:open",
-                  "type": "updateState",
-                  "params": {
-                    "notebookSelectedNoteId": "$event.id"
-                  }
-                },
-                {
-                  "on": "click:open",
-                  "type": "callSkill",
-                  "target": "notebook_skill.select_note",
-                  "params": {
-                    "note_id": "$event.id"
-                  }
-                }
-              ]
-            },
-            {
-              "id": "notebook-last-note",
-              "type": "ui.list",
-              "area": "right",
-              "title": "Last note",
-              "dataSource": {
-                "kind": "y",
-                "path": "data/notebook/widget",
-                "observeRoot": true
-              },
-              "inputs": {
-                "collectionKey": "items",
-                "titleKey": "title",
-                "subtitleKey": "subtitle",
-                "detailsPath": "content",
-                "showDetails": true,
-                "itemAccordion": true,
-                "emptyText": "No note yet"
-              }
             }
           ]
         }
@@ -340,20 +310,31 @@
   "ydoc_defaults": {
     "data/notebook": {
       "selected_note_id": "note-1",
-      "editor": {
+      "display_note_id": "note-1",
+      "editing_note_id": "",
+      "display": {
         "id": "note-1",
-        "title": "Quick note",
         "content": "",
+        "attachments": [],
         "updated_at": null,
         "version": 0
+      },
+      "editor": {
+        "id": "note-1",
+        "content": "",
+        "attachments": [],
+        "updated_at": null,
+        "version": 0,
+        "editing": false
       },
       "widget": {
         "items": [
           {
             "id": "note-1",
-            "title": "Quick note",
-            "subtitle": "Empty shared note",
+            "title": "Empty note",
+            "subtitle": "",
             "content": "",
+            "attachments": [],
             "updated_at": null
           }
         ]

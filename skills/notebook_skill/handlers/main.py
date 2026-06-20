@@ -38,8 +38,8 @@ def _default_note() -> dict[str, Any]:
     now = _now()
     return {
         "id": "note-1",
-        "title": "Quick note",
         "content": "",
+        "attachments": [],
         "created_at": now,
         "updated_at": now,
         "version": 0,
@@ -49,7 +49,8 @@ def _default_note() -> dict[str, Any]:
 _STATE: dict[str, Any] = {
     "notes": {"note-1": _default_note()},
     "order": ["note-1"],
-    "selected_note_id": "note-1",
+    "display_note_id": "note-1",
+    "editing_note_id": "",
     "next_id": 2,
 }
 
@@ -109,14 +110,6 @@ def _root_base_candidates(explicit: str | None = None) -> list[str]:
     return out or ["https://api.inimatic.com"]
 
 
-def _clean_title(value: Any, *, fallback: str = "Untitled note") -> str:
-    text = str(value or "").strip()
-    if text.startswith("$"):
-        text = ""
-    text = " ".join(text.split())
-    return (text or fallback)[:160]
-
-
 def _clean_content(value: Any) -> str:
     text = str(value or "")
     if text.startswith("$event."):
@@ -133,14 +126,25 @@ def _preview(content: str, *, limit: int = 120) -> str:
     return text[: max(0, limit - 1)].rstrip() + "..."
 
 
-def _selected_note() -> dict[str, Any]:
+def _note_heading(note: Mapping[str, Any], *, fallback: str = "Empty note") -> str:
+    preview = _preview(str(note.get("content") or ""), limit=48)
+    return preview or fallback
+
+
+def _display_note() -> dict[str, Any]:
     notes = _STATE["notes"]
-    selected = str(_STATE.get("selected_note_id") or "").strip()
+    selected = str(_STATE.get("display_note_id") or "").strip()
     if selected in notes:
         return notes[selected]
     note_id = _STATE["order"][0] if _STATE["order"] else "note-1"
-    _STATE["selected_note_id"] = note_id
+    _STATE["display_note_id"] = note_id
     return notes[note_id]
+
+
+def _editing_note() -> dict[str, Any] | None:
+    note_id = str(_STATE.get("editing_note_id") or "").strip()
+    note = _STATE["notes"].get(note_id)
+    return note if isinstance(note, dict) else None
 
 
 def _note_id_from_payload(payload: Mapping[str, Any], *, fallback_selected: bool = True) -> str:
@@ -153,11 +157,16 @@ def _note_id_from_payload(payload: Mapping[str, Any], *, fallback_selected: bool
         token = str(event.get("note_id") or event.get("id") or "").strip()
         if token:
             return token
-    return str(_STATE.get("selected_note_id") or "") if fallback_selected else ""
+    return (
+        str(_STATE.get("editing_note_id") or _STATE.get("display_note_id") or "")
+        if fallback_selected
+        else ""
+    )
 
 
 def _note_list_items() -> list[dict[str, Any]]:
-    selected = str(_STATE.get("selected_note_id") or "")
+    display_id = str(_STATE.get("display_note_id") or "")
+    editing_id = str(_STATE.get("editing_note_id") or "")
     items: list[dict[str, Any]] = []
     for note_id in list(_STATE.get("order") or []):
         note = _STATE["notes"].get(note_id)
@@ -165,13 +174,18 @@ def _note_list_items() -> list[dict[str, Any]]:
             continue
         updated = float(note.get("updated_at") or 0)
         content = str(note.get("content") or "")
+        attachments = list(note.get("attachments") or [])
         items.append(
             {
                 "id": note_id,
-                "title": str(note.get("title") or "Untitled note"),
+                "title": _note_heading(note),
                 "subtitle": _now_iso(updated) if updated else "",
+                "text": content,
                 "preview": _preview(content),
-                "selected": "selected" if note_id == selected else "",
+                "selected": "selected" if note_id == display_id else "",
+                "editing": "editing" if note_id == editing_id else "",
+                "attachment_count": len(attachments),
+                "image": next((item for item in attachments if isinstance(item, Mapping) and item.get("kind") == "photo"), None),
                 "updated_at": updated or None,
                 "version": int(note.get("version") or 0),
             }
@@ -180,29 +194,43 @@ def _note_list_items() -> list[dict[str, Any]]:
 
 
 def _snapshot() -> dict[str, Any]:
-    note = _selected_note()
+    display_note = _display_note()
+    editing_note = _editing_note()
+    editor_note = editing_note or display_note
     editor = {
-        "id": note["id"],
-        "title": note["title"],
-        "content": note["content"],
-        "updated_at": note.get("updated_at"),
-        "updated_label": _now_iso(float(note.get("updated_at") or _now())),
-        "version": int(note.get("version") or 0),
+        "id": editor_note["id"],
+        "content": editor_note["content"],
+        "attachments": list(editor_note.get("attachments") or []),
+        "updated_at": editor_note.get("updated_at"),
+        "updated_label": _now_iso(float(editor_note.get("updated_at") or _now())),
+        "version": int(editor_note.get("version") or 0),
+        "editing": editing_note is not None,
     }
     items = _note_list_items()
     return {
         "ok": True,
-        "selected_note_id": note["id"],
+        "selected_note_id": display_note["id"],
+        "display_note_id": display_note["id"],
+        "editing_note_id": str(_STATE.get("editing_note_id") or ""),
+        "display": {
+            "id": display_note["id"],
+            "content": display_note["content"],
+            "attachments": list(display_note.get("attachments") or []),
+            "updated_at": display_note.get("updated_at"),
+            "updated_label": _now_iso(float(display_note.get("updated_at") or _now())),
+            "version": int(display_note.get("version") or 0),
+        },
         "editor": editor,
         "notes": {"items": items},
         "widget": {
             "items": [
                 {
-                    "id": note["id"],
-                    "title": note["title"],
-                    "subtitle": editor["updated_label"],
-                    "content": note["content"],
-                    "updated_at": note.get("updated_at"),
+                    "id": display_note["id"],
+                    "title": _note_heading(display_note),
+                    "subtitle": _now_iso(float(display_note.get("updated_at") or _now())),
+                    "content": display_note["content"],
+                    "attachments": list(display_note.get("attachments") or []),
+                    "updated_at": display_note.get("updated_at"),
                 }
             ]
         },
@@ -241,7 +269,8 @@ def _ensure_default_note() -> None:
     note = _default_note()
     _STATE["notes"] = {note["id"]: note}
     _STATE["order"] = [note["id"]]
-    _STATE["selected_note_id"] = note["id"]
+    _STATE["display_note_id"] = note["id"]
+    _STATE["editing_note_id"] = ""
     _STATE["next_id"] = 2
 
 
@@ -260,22 +289,22 @@ def create_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict
     body.update({k: v for k, v in kwargs.items() if v is not None})
     if len(_STATE["order"]) >= _MAX_NOTES:
         return {"ok": False, "error": "note_limit_reached", "limit": _MAX_NOTES}
-    title = _clean_title(body.get("title"), fallback=f"Note {_STATE.get('next_id') or 1}")
     content = _clean_content(body.get("content") or "")
     note_id = f"{_NOTE_PREFIX}{int(_STATE.get('next_id') or 1)}"
     _STATE["next_id"] = int(_STATE.get("next_id") or 1) + 1
     now = _now()
     note = {
         "id": note_id,
-        "title": title,
         "content": content,
+        "attachments": [],
         "created_at": now,
         "updated_at": now,
         "version": 1 if content else 0,
     }
     _STATE["notes"][note_id] = note
     _STATE["order"].insert(0, note_id)
-    _STATE["selected_note_id"] = note_id
+    _STATE["display_note_id"] = note_id
+    _STATE["editing_note_id"] = note_id
     snap = _publish(webspace_id=_webspace_id(body))
     return {"ok": True, "note": deepcopy(note), "snapshot": snap}
 
@@ -287,7 +316,9 @@ def select_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict
     note_id = _note_id_from_payload(body, fallback_selected=False)
     if note_id not in _STATE["notes"]:
         return {"ok": False, "error": "note_not_found", "note_id": note_id}
-    _STATE["selected_note_id"] = note_id
+    _STATE["display_note_id"] = note_id
+    if bool(body.get("edit")):
+        _STATE["editing_note_id"] = note_id
     snap = _publish(webspace_id=_webspace_id(body))
     return {"ok": True, "note": deepcopy(_STATE["notes"][note_id]), "snapshot": snap}
 
@@ -300,12 +331,11 @@ def save_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[s
     note = _STATE["notes"].get(note_id)
     if not isinstance(note, dict):
         return {"ok": False, "error": "note_not_found", "note_id": note_id}
-    if "title" in body and str(body.get("title") or "").strip():
-        note["title"] = _clean_title(body.get("title"))
     note["content"] = _clean_content(body.get("content"))
     note["updated_at"] = _now()
     note["version"] = int(note.get("version") or 0) + 1
-    _STATE["selected_note_id"] = note_id
+    _STATE["display_note_id"] = note_id
+    _STATE["editing_note_id"] = note_id
     if note_id in _STATE["order"]:
         _STATE["order"].remove(note_id)
     _STATE["order"].insert(0, note_id)
@@ -313,20 +343,33 @@ def save_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[s
     return {"ok": True, "note": deepcopy(note), "snapshot": snap}
 
 
-@tool("rename_note")
-def rename_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[str, Any]:
+@tool("attach_note_file")
+def attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[str, Any]:
     body = dict(payload or {})
     body.update({k: v for k, v in kwargs.items() if v is not None})
     note_id = _note_id_from_payload(body)
     note = _STATE["notes"].get(note_id)
     if not isinstance(note, dict):
         return {"ok": False, "error": "note_not_found", "note_id": note_id}
-    note["title"] = _clean_title(body.get("title"))
+    artifact = body.get("artifact_ref") if isinstance(body.get("artifact_ref"), Mapping) else {}
+    file_meta = body.get("file") if isinstance(body.get("file"), Mapping) else {}
+    kind = "photo" if str(body.get("kind") or "").strip() == "photo" else "file"
+    attachment = {
+        "id": f"att-{int(_now() * 1000)}",
+        "kind": kind,
+        "name": str(file_meta.get("name") or artifact.get("filename") or artifact.get("name") or "attachment").strip(),
+        "mime": str(file_meta.get("mime") or artifact.get("mime") or "").strip() or None,
+        "size_bytes": file_meta.get("size_bytes") or artifact.get("size_bytes"),
+        "artifact_ref": dict(artifact),
+        "path": body.get("path") or artifact.get("path") or artifact.get("local_path") or artifact.get("stored_path"),
+    }
+    note.setdefault("attachments", []).append(attachment)
     note["updated_at"] = _now()
     note["version"] = int(note.get("version") or 0) + 1
-    _STATE["selected_note_id"] = note_id
+    _STATE["display_note_id"] = note_id
+    _STATE["editing_note_id"] = note_id
     snap = _publish(webspace_id=_webspace_id(body))
-    return {"ok": True, "note": deepcopy(note), "snapshot": snap}
+    return {"ok": True, "attachment": deepcopy(attachment), "note": deepcopy(note), "snapshot": snap}
 
 
 @tool("delete_note")
@@ -339,7 +382,9 @@ def delete_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict
     _STATE["notes"].pop(note_id, None)
     _STATE["order"] = [item for item in _STATE["order"] if item != note_id]
     _ensure_default_note()
-    _STATE["selected_note_id"] = _STATE["order"][0]
+    fallback = _STATE["order"][0]
+    _STATE["display_note_id"] = fallback
+    _STATE["editing_note_id"] = fallback
     snap = _publish(webspace_id=_webspace_id(body))
     return {"ok": True, "deleted_note_id": note_id, "snapshot": snap}
 
@@ -432,9 +477,8 @@ def send_note_to_telegram(payload: Mapping[str, Any] | None = None, **kwargs: An
     note = _STATE["notes"].get(note_id)
     if not isinstance(note, Mapping):
         return {"ok": False, "error": "note_not_found", "note_id": note_id}
-    title = str(note.get("title") or "Untitled note").strip()
     content = str(note.get("content") or "").strip()
-    text = f"{title}\n\n{content}".strip()
+    text = content
     if not text:
         return {"ok": False, "error": "empty_note", "note_id": note_id}
     result = _send_telegram_text(
@@ -455,7 +499,8 @@ def reset_notebook(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> d
     note = _default_note()
     _STATE["notes"] = {note["id"]: note}
     _STATE["order"] = [note["id"]]
-    _STATE["selected_note_id"] = note["id"]
+    _STATE["display_note_id"] = note["id"]
+    _STATE["editing_note_id"] = ""
     _STATE["next_id"] = 2
     snap = _publish(webspace_id=_webspace_id(body))
     return {"ok": True, "snapshot": snap}
