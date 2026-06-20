@@ -126,7 +126,7 @@ def _preview(content: str, *, limit: int = 120) -> str:
     return text[: max(0, limit - 1)].rstrip() + "..."
 
 
-def _note_heading(note: Mapping[str, Any], *, fallback: str = "Empty note") -> str:
+def _note_heading(note: Mapping[str, Any], *, fallback: str = "New note") -> str:
     preview = _preview(str(note.get("content") or ""), limit=48)
     return preview or fallback
 

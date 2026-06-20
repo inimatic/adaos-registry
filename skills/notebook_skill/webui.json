@@ -14,7 +14,7 @@
           "items": [
             {
               "id": "note-1",
-              "title": "Empty note",
+              "title": "New note",
               "subtitle": "",
               "text": "",
               "preview": "",
@@ -87,7 +87,7 @@
       },
       "actions": [
         {
-          "on": "click",
+          "on": "select",
           "type": "openModal",
           "params": {
             "modalId": "notebook_modal"
@@ -132,28 +132,46 @@
               },
               "inputs": {
                 "collectionKey": "items",
+                "variant": "cards",
+                "search": true,
+                "searchPlaceholder": "Search notes",
+                "addFirstCard": true,
+                "addButton": true,
+                "addButtonLabel": "Add",
+                "addCardLabel": "Add note",
+                "emptyCardTitle": "New note",
                 "titleKey": "title",
                 "subtitleKey": "subtitle",
                 "descriptionKey": "preview",
+                "previewKey": "preview",
+                "imageKey": "image",
                 "badgeKey": "attachment_count",
                 "emptyText": "Create a note to start.",
                 "itemAccordion": false
               },
               "actions": [
                 {
-                  "on": "click",
+                  "on": "select",
                   "type": "updateState",
                   "params": {
                     "notebookSelectedNoteId": "$event.id"
                   }
                 },
                 {
-                  "on": "click",
+                  "on": "select",
                   "type": "callSkill",
                   "target": "notebook_skill.select_note",
                   "params": {
                     "note_id": "$event.id",
                     "edit": true
+                  }
+                },
+                {
+                  "on": "add",
+                  "type": "callSkill",
+                  "target": "notebook_skill.create_note",
+                  "params": {
+                    "content": ""
                   }
                 }
               ]
@@ -170,16 +188,17 @@
               },
               "inputs": {
                 "bindField": "content",
-                "placeholder": "Write a note"
+                "placeholder": "Write a note",
+                "autoSave": true,
+                "autoSaveMs": 250
               },
               "actions": [
                 {
-                  "on": "save",
+                  "on": "change",
                   "type": "callSkill",
                   "target": "notebook_skill.save_note",
                   "params": {
-                    "content": "$event.content",
-                    "note_id": "$state.notebookSelectedNoteId"
+                    "content": "$event.content"
                   }
                 }
               ]
@@ -220,7 +239,6 @@
                   "target": "notebook_skill.attach_note_file",
                   "params": {
                     "kind": "photo",
-                    "note_id": "$state.notebookSelectedNoteId",
                     "artifact_ref": "$event.artifact_ref",
                     "file": "$event.file",
                     "path": "$event.path"
@@ -247,7 +265,6 @@
                   "target": "notebook_skill.attach_note_file",
                   "params": {
                     "kind": "file",
-                    "note_id": "$state.notebookSelectedNoteId",
                     "artifact_ref": "$event.artifact_ref",
                     "file": "$event.file",
                     "path": "$event.path"
@@ -287,18 +304,12 @@
                 {
                   "on": "click:telegram",
                   "type": "callSkill",
-                  "target": "notebook_skill.send_note_to_telegram",
-                  "params": {
-                    "note_id": "$state.notebookSelectedNoteId"
-                  }
+                  "target": "notebook_skill.send_note_to_telegram"
                 },
                 {
                   "on": "click:delete",
                   "type": "callSkill",
-                  "target": "notebook_skill.delete_note",
-                  "params": {
-                    "note_id": "$state.notebookSelectedNoteId"
-                  }
+                  "target": "notebook_skill.delete_note"
                 }
               ]
             }
@@ -331,7 +342,7 @@
         "items": [
           {
             "id": "note-1",
-            "title": "Empty note",
+            "title": "New note",
             "subtitle": "",
             "content": "",
             "attachments": [],
