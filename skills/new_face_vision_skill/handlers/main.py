@@ -1000,7 +1000,9 @@ def on_webio_stream_subscription_changed(evt: Any) -> None:
     action = str(payload.get("action") or "").strip().lower()
     if action == "unsubscribed":
         return
-    on_webio_stream_snapshot_requested(payload)
+    receiver = str(payload.get("receiver") or "").strip()
+    if receiver in {FRAME_RECEIVER, METRICS_RECEIVER, PROGRESS_RECEIVER}:
+        _log.debug("new_face_vision subscription changed receiver=%s action=%s", receiver, action or "subscribed")
 
 
 @subscribe("sys.ready")

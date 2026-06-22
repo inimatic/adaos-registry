@@ -71,9 +71,11 @@ class NewFaceVisionEngine:
         self.frames_dir = self.state_dir / "frames"
         self.masks_dir = self.state_dir / "masks"
         self.cache_dir = self.state_dir / "prediction_cache"
+        self.previews_dir = self.state_dir / "previews"
         self.frames_dir.mkdir(exist_ok=True)
         self.masks_dir.mkdir(exist_ok=True)
         self.cache_dir.mkdir(exist_ok=True)
+        self.previews_dir.mkdir(exist_ok=True)
         self.manifest_path = self.state_dir / _STATE_MANIFEST
         self.upload_root = Path(upload_root).resolve() if upload_root else self._infer_upload_root()
 
@@ -513,6 +515,7 @@ class NewFaceVisionEngine:
 
             side_by_side = self._create_side_by_side_image(frame, gt_mask, predicted_mask)
             preview_base64 = self._encode_preview_jpeg(side_by_side)
+            preview_path = self._store_preview_image(cache_key, frame_idx, preview_base64)
 
             pred_ratio = float(np.mean(np.array(predicted_mask) > 0))
 
@@ -541,6 +544,8 @@ class NewFaceVisionEngine:
                 "metrics": metrics,
                 "cached": False,
                 "cache_key": cache_key,
+                "preview_path": str(preview_path) if preview_path else "",
+                "preview_saved": preview_path is not None,
             }
 
             cache_stored = self._store_cached_result(cache_key, result)
@@ -671,7 +676,7 @@ class NewFaceVisionEngine:
         }
         self.last_error = None
 
-        for dir_path in [self.frames_dir, self.masks_dir]:
+        for dir_path in [self.frames_dir, self.masks_dir, self.previews_dir]:
             if dir_path.exists():
                 shutil.rmtree(dir_path)
                 dir_path.mkdir(exist_ok=True)
@@ -733,6 +738,8 @@ class NewFaceVisionEngine:
                 "dir": str(self.cache_dir),
                 "memory_entries": len(self._prediction_cache),
                 "disk_entries": self._count_cache_files(),
+                "preview_dir": str(self.previews_dir),
+                "preview_entries": self._count_preview_files(),
                 "hits": self._cache_hits,
                 "misses": self._cache_misses,
             },
@@ -1288,6 +1295,12 @@ class NewFaceVisionEngine:
         except Exception:
             return 0
 
+    def _count_preview_files(self) -> int:
+        try:
+            return sum(1 for path in self.previews_dir.glob("*.jpg") if path.is_file())
+        except Exception:
+            return 0
+
     def _remember_prediction(self, cache_key: str, result: Mapping[str, Any]) -> None:
         if len(self._prediction_cache) >= 100:
             self._prediction_cache.pop(next(iter(self._prediction_cache)), None)
@@ -1344,9 +1357,40 @@ class NewFaceVisionEngine:
             _log.warning("failed to store prediction cache key=%s path=%s: %s", cache_key, path, exc)
             return False
 
+    def _store_preview_image(self, cache_key: str, frame_idx: int, preview_base64: str) -> Path | None:
+        if not preview_base64:
+            return None
+        path = self._preview_path(cache_key)
+        tmp = path.with_suffix(".tmp")
+        try:
+            self.previews_dir.mkdir(parents=True, exist_ok=True)
+            payload = preview_base64
+            if "," in payload and payload.strip().lower().startswith("data:"):
+                payload = payload.split(",", 1)[1]
+            data = base64.b64decode(payload)
+            tmp.write_bytes(data)
+            try:
+                os.replace(tmp, path)
+            except Exception as replace_exc:
+                _log.warning("atomic preview replace failed %s -> %s: %s", tmp, path, replace_exc)
+                path.write_bytes(data)
+                try:
+                    tmp.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            _log.info("stored prediction preview frame=%s path=%s", frame_idx, path)
+            return path
+        except Exception as exc:
+            _log.warning("failed to store prediction preview key=%s path=%s: %s", cache_key, path, exc)
+            return None
+
     def _cache_path(self, cache_key: str) -> Path:
         safe_key = "".join(ch for ch in cache_key if ch.isalnum() or ch in {"-", "_"})[:96]
         return self.cache_dir / f"{safe_key}.json"
+
+    def _preview_path(self, cache_key: str) -> Path:
+        safe_key = "".join(ch for ch in cache_key if ch.isalnum() or ch in {"-", "_"})[:96]
+        return self.previews_dir / f"{safe_key}.jpg"
 
     def _result_cache_key(
         self,
