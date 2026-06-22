@@ -384,13 +384,13 @@ data_projections:
   targets:
   - backend: yjs
     path: data/new_face_vision/history
-updated_at: '2026-06-20T09:07:48+00:00'
+updated_at: '2026-06-22T06:20:11+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3093.8f9892b9
-    recorded_at: '2026-06-20T09:07:48+00:00'
+    min_version: 0.1.0+3095.716dfb33
+    recorded_at: '2026-06-22T06:20:11+00:00'
     source: skill_push
-    min_commit: 8f9892b93b63bb084a1c2325ae6b9120c6577d2a
-    min_short_commit: 8f9892b9
-    build_date: '2026-06-20T05:54:40Z'
+    min_commit: 716dfb33942cd1d85e14155e52437be363649a4f
+    min_short_commit: 716dfb33
+    build_date: '2026-06-20T09:10:33+00:00'
 

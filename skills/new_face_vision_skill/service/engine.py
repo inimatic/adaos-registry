@@ -543,7 +543,8 @@ class NewFaceVisionEngine:
                 "cache_key": cache_key,
             }
 
-            self._store_cached_result(cache_key, result)
+            cache_stored = self._store_cached_result(cache_key, result)
+            result["cache_stored"] = cache_stored
             self._remember_prediction(cache_key, result)
             result = self._record_frame_result(
                 result,
@@ -729,6 +730,7 @@ class NewFaceVisionEngine:
                 "cache_misses": self._cache_misses,
             },
             "cache": {
+                "dir": str(self.cache_dir),
                 "memory_entries": len(self._prediction_cache),
                 "disk_entries": self._count_cache_files(),
                 "hits": self._cache_hits,
@@ -1167,13 +1169,16 @@ class NewFaceVisionEngine:
     def _timeline_info(self) -> dict[str, Any]:
         total_frames = len(self._frames)
         current_frame = self._latest.get("frame_idx") if isinstance(self._latest, Mapping) else None
-        calculated_indices: set[int] = set(self._cached_frame_indices())
+        disk_cached_indices: set[int] = set(self._disk_cached_frame_indices())
+        memory_result_indices: set[int] = set()
+        calculated_indices: set[int] = set(disk_cached_indices)
         for key, row in self._result_rows.items():
             try:
                 frame_idx = int(row.get("frame_idx", key))
             except Exception:
                 continue
             if 0 <= frame_idx < total_frames:
+                memory_result_indices.add(frame_idx)
                 calculated_indices.add(frame_idx)
         compact_indices = sorted(calculated_indices)
         return {
@@ -1181,10 +1186,25 @@ class NewFaceVisionEngine:
             "current_frame": current_frame,
             "next_frame": self._current_frame_idx,
             "calculated_count": len(compact_indices),
+            "disk_cached_count": len(disk_cached_indices),
+            "memory_result_count": len(memory_result_indices),
             "calculated_ranges": self._compact_ranges(compact_indices),
         }
 
     def _cached_frame_indices(self) -> list[int]:
+        return sorted(set(self._disk_cached_frame_indices()) | set(self._memory_cached_frame_indices()))
+
+    def _memory_cached_frame_indices(self) -> list[int]:
+        total_frames = len(self._frames)
+        indices: list[int] = []
+        for frame_idx in range(total_frames):
+            frame_ctx = self._frame_context(frame_idx)
+            cache_key = str(frame_ctx.get("cache_key") or "")
+            if cache_key and cache_key in self._prediction_cache:
+                indices.append(frame_idx)
+        return indices
+
+    def _disk_cached_frame_indices(self) -> list[int]:
         total_frames = len(self._frames)
         if total_frames <= 0:
             return []
@@ -1205,7 +1225,7 @@ class NewFaceVisionEngine:
             cache_key = str(frame_ctx.get("cache_key") or "")
             if not cache_key:
                 continue
-            if cache_key in self._prediction_cache or self._cache_path(cache_key).exists():
+            if self._cache_path(cache_key).exists():
                 indices.append(frame_idx)
         self._timeline_scan_signature = signature
         self._timeline_scan_at = now
@@ -1289,9 +1309,11 @@ class NewFaceVisionEngine:
             return None
         return dict(result)
 
-    def _store_cached_result(self, cache_key: str, result: Mapping[str, Any]) -> None:
+    def _store_cached_result(self, cache_key: str, result: Mapping[str, Any]) -> bool:
         if not result.get("ok"):
-            return
+            return False
+        path = self._cache_path(cache_key)
+        tmp = path.with_suffix(".tmp")
         try:
             self.cache_dir.mkdir(parents=True, exist_ok=True)
             payload = {
@@ -1300,12 +1322,27 @@ class NewFaceVisionEngine:
                 "created_at": time.time(),
                 "result": dict(result),
             }
-            path = self._cache_path(cache_key)
-            tmp = path.with_suffix(".tmp")
-            tmp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str), encoding="utf-8")
-            os.replace(tmp, path)
+            text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
+            tmp.write_text(text, encoding="utf-8")
+            try:
+                os.replace(tmp, path)
+            except Exception as replace_exc:
+                _log.warning("atomic prediction cache replace failed %s -> %s: %s", tmp, path, replace_exc)
+                path.write_text(text, encoding="utf-8")
+                try:
+                    tmp.unlink(missing_ok=True)
+                except Exception:
+                    pass
+            self._timeline_scan_signature = ""
+            _log.info(
+                "stored prediction cache frame=%s path=%s",
+                result.get("frame_idx"),
+                path,
+            )
+            return True
         except Exception as exc:
-            _log.warning("failed to store prediction cache %s: %s", cache_key, exc)
+            _log.warning("failed to store prediction cache key=%s path=%s: %s", cache_key, path, exc)
+            return False
 
     def _cache_path(self, cache_key: str) -> Path:
         safe_key = "".join(ch for ch in cache_key if ch.isalnum() or ch in {"-", "_"})[:96]
