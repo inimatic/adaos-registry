@@ -1,5 +1,5 @@
 name: voice_chat_skill
-version: 0.6.10
+version: 0.6.11
 description: Voice chat bridge for web_desktop (text in -> publish chat + TTS via
   io.out.*; shared chat history goes through YJS, with stream receiver kept as a recovery/compatibility
   path).
@@ -88,5 +88,13 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-updated_at: '2026-06-04T11:47:26+00:00'
+updated_at: '2026-06-23T10:23:20+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.0+3105.a819a191
+    recorded_at: '2026-06-23T10:23:20+00:00'
+    source: skill_push
+    min_commit: a819a191d5334d996356635b0856d66d556c2a53
+    min_short_commit: a819a191
+    build_date: '2026-06-23T12:30:16+03:00'
 

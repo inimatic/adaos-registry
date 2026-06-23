@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-22T09:52:32+00:00",
+  "updated_at": "2026-06-23T10:23:20+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -562,8 +562,8 @@
       "kind": "skill",
       "id": "voice_chat_skill",
       "name": "voice_chat_skill",
-      "version": "0.6.10",
-      "updated_at": "2026-06-04T11:47:26+00:00",
+      "version": "0.6.11",
+      "updated_at": "2026-06-23T10:23:20+00:00",
       "path": "skills/voice_chat_skill",
       "manifest": "skills/voice_chat_skill/skill.yaml",
       "source": {
