@@ -29,7 +29,7 @@
           "updated_at": null
         },
         "budget": {
-          "maxPayloadBytes": 32768,
+          "maxPayloadBytes": 16384,
           "maxPublishHz": 1,
           "maxSnapshotHz": 1,
           "maxItems": 32

@@ -30,7 +30,9 @@ _LOG = logging.getLogger("adaos.skill.redevice_voice")
 _RECEIVER = "redevice_voice.state"
 _STATE_KEY = "redevice_voice.state"
 _LAST_EVENT_KEY = "redevice_voice.last_event_id"
+_LAST_SNAPSHOT_KEY = "redevice_voice.last_stream_snapshot_by_webspace"
 _MAX_EVENTS = 12
+_POLL_INTERVAL_S = 4.0
 
 
 def _text(value: Any) -> str:
@@ -91,6 +93,19 @@ def _save_state(state: Mapping[str, Any]) -> dict[str, Any]:
         data["events"] = events[-_MAX_EVENTS:]
     _memory_set(_STATE_KEY, data)
     return data
+
+
+def _last_snapshots() -> dict[str, dict[str, Any]]:
+    raw = _memory_get(_LAST_SNAPSHOT_KEY, {})
+    if not isinstance(raw, Mapping):
+        return {}
+    return {str(key): dict(value) for key, value in raw.items() if isinstance(value, Mapping)}
+
+
+def _set_last_snapshot(webspace_id: str, snapshot: Mapping[str, Any]) -> None:
+    snapshots = _last_snapshots()
+    snapshots[webspace_id or default_webspace_id()] = dict(snapshot)
+    _memory_set(_LAST_SNAPSHOT_KEY, snapshots)
 
 
 def _vosk_status(lang: str | None = None) -> dict[str, Any]:
@@ -155,7 +170,37 @@ def _payload(state: Mapping[str, Any], endpoints: list[Mapping[str, Any]]) -> di
 
 
 def _publish(state: Mapping[str, Any], endpoints: list[Mapping[str, Any]], webspace_id: str | None = None) -> None:
-    stream_publish(_RECEIVER, _payload(state, endpoints), _meta={"webspace_id": webspace_id or default_webspace_id()})
+    ws = webspace_id or default_webspace_id()
+    payload = _payload(state, endpoints)
+    stream_publish(_RECEIVER, payload, _meta={"webspace_id": ws})
+    _set_last_snapshot(ws, payload)
+
+
+def _empty_payload(webspace_id: str | None = None) -> dict[str, Any]:
+    state = _load_state()
+    return {
+        "ok": True,
+        "selected_code": _text(state.get("selected_code")),
+        "count": 0,
+        "items": [],
+        "diagnostics": endpoint_audio_diagnostics(state, None),
+        "last_command": _mapping(state.get("last_command")),
+        "last_segment": _mapping(state.get("last_segment")),
+        "stt": _mapping(state.get("stt")) or _vosk_status(),
+        "vad": _mapping(state.get("vad")) or {"state": "idle"},
+        "record_button": _mapping(state.get("record_button")),
+        "retention": _mapping(state.get("retention")),
+        "events": list(state.get("events") or [])[-_MAX_EVENTS:],
+        "audio_check": _mapping(state.get("audio_check")),
+        "stream_state": "cached_empty",
+        "updated_at": _now(),
+    }
+
+
+def _publish_cached(webspace_id: str | None = None) -> None:
+    ws = webspace_id or default_webspace_id()
+    payload = _last_snapshots().get(ws) or _empty_payload(ws)
+    stream_publish(_RECEIVER, payload, _meta={"webspace_id": ws})
 
 
 @tool
@@ -273,7 +318,7 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
         return
     webspace_id = _text(payload.get("webspace_id") or payload.get("workspace_id")) or default_webspace_id()
     try:
-        refresh_redevice_voice_state(webspace_id=webspace_id)
+        _publish_cached(webspace_id)
     except Exception:
         _LOG.exception("failed to publish ReDevice voice snapshot")
 

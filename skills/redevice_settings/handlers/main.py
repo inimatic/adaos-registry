@@ -29,6 +29,7 @@ _RECEIVER = "redevice_settings.state"
 _SELECTED_BY_WS_KEY = "selected_by_webspace"
 _ASSIGNMENTS_KEY = "endpoint_assignments"
 _LAST_COMMAND_KEY = "last_command"
+_LAST_SNAPSHOT_KEY = "last_stream_snapshot_by_webspace"
 _ASSIGNMENT_PRESETS = ["assistant", "slideshow", "voice_endpoint", "media_center", "webcam", "idle"]
 _MAX_TABLE_ITEMS = 32
 _MIN_PUBLISH_INTERVAL_S = 1.0
@@ -180,6 +181,20 @@ def _set_memory_dict(key: str, value: Mapping[str, Any]) -> None:
         skill_memory_set(key, dict(value))
     except Exception:
         pass
+
+
+def _last_snapshots() -> dict[str, dict[str, Any]]:
+    snapshots: dict[str, dict[str, Any]] = {}
+    for key, value in _memory_dict(_LAST_SNAPSHOT_KEY).items():
+        if isinstance(value, Mapping):
+            snapshots[str(key)] = dict(value)
+    return snapshots
+
+
+def _set_last_snapshot(webspace_id: str, snapshot: Mapping[str, Any]) -> None:
+    snapshots = _last_snapshots()
+    snapshots[_webspace_id(webspace_id)] = dict(snapshot)
+    _set_memory_dict(_LAST_SNAPSHOT_KEY, snapshots)
 
 
 def _webspace_id(value: str | None = None) -> str:
@@ -374,6 +389,35 @@ def _table_item(item: Mapping[str, Any]) -> dict[str, Any]:
         "version_status",
         "aliases",
         "commandable",
+    }
+    return {key: item.get(key) for key in allowed if key in item}
+
+
+def _selected_stream_item(item: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Keep selected endpoint stream state lightweight; details are explicit."""
+    if not isinstance(item, Mapping):
+        return {}
+    allowed = {
+        "id",
+        "ref",
+        "code",
+        "endpoint_id",
+        "lifecycle_state",
+        "title",
+        "selected",
+        "online",
+        "online_state",
+        "last_seen",
+        "trust_level",
+        "assignment",
+        "active_app",
+        "active_surface",
+        "software_version",
+        "served_version",
+        "version_status",
+        "aliases",
+        "commandable",
+        "subnet",
     }
     return {key: item.get(key) for key in allowed if key in item}
 
@@ -682,10 +726,10 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
             {"id": "voice", "title": "ReDevice Voice", "description": "scenario dependency", "subtitle": "PTT and VAD debug surfaces."},
         ],
         "about": [
-            {"id": "version", "title": "Version", "description": _text(item.get("version_status")) or "unknown", "subtitle": f"used {_text(item.get('software_version')) or '-'} | served {_text(item.get('served_version')) or 'unknown'}", "details": version_info},
-            {"id": "manifest", "title": "Manifest", "description": _text(manifest.get("schema_version") or "-"), "details": manifest},
-            {"id": "policy", "title": "Policy", "description": _text(policy.get("policy_id") or policy.get("id") or "-"), "details": policy},
-            {"id": "diagnostics", "title": "Diagnostics", "description": _text(diagnostics.get("policy_source") or "-"), "details": diagnostics},
+            {"id": "version", "title": "Version", "description": _text(item.get("version_status")) or "unknown", "subtitle": f"used {_text(item.get('software_version')) or '-'} | served {_text(item.get('served_version')) or 'unknown'}", "details": _compact_value(version_info, max_fields=8, max_text=96)},
+            {"id": "manifest", "title": "Manifest", "description": _text(manifest.get("schema_version") or "-"), "subtitle": "Full manifest is available through explicit inspect."},
+            {"id": "policy", "title": "Policy", "description": _text(policy.get("policy_id") or policy.get("id") or "-"), "subtitle": "Full policy is available through explicit inspect."},
+            {"id": "diagnostics", "title": "Diagnostics", "description": _text(diagnostics.get("policy_source") or "-"), "subtitle": "Diagnostics are not streamed in the main state."},
         ],
         "right_summary": [
             {"id": "name", "title": "Name", "description": _text(item.get("title")) or "-"},
@@ -708,7 +752,7 @@ def _build_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
     return {
         "ok": True,
         "selected_ref": selected_ref,
-        "selected": selected or {},
+        "selected": _selected_stream_item(selected),
         "items": table_items,
         "items_truncated": max(0, len(items) - len(table_items)),
         "count": len(items),
@@ -757,6 +801,38 @@ def _publish(webspace_id: str | None = None, *, force: bool = False) -> dict[str
         stream_publish(_RECEIVER, snapshot, _meta={"webspace_id": ws})
         _LAST_PUBLISH_AT[ws] = now
         _LAST_PUBLISH_FINGERPRINT[ws] = fingerprint
+        _set_last_snapshot(ws, snapshot)
+    return snapshot
+
+
+def _empty_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
+    return {
+        "ok": True,
+        "selected_ref": _selected_by_ws().get(_webspace_id(webspace_id), ""),
+        "selected": {},
+        "items": [],
+        "items_truncated": 0,
+        "count": 0,
+        "summary": {},
+        "status": [],
+        "inspection": [],
+        "sections": {},
+        "assignment_presets": [{"id": item, "label": item.replace("_", " ").title()} for item in _ASSIGNMENT_PRESETS],
+        "last_command": _memory_dict(_LAST_COMMAND_KEY),
+        "scenario": {
+            "id": "redevice_user_face",
+            "required_skills": ["redevice_settings", "slideshow_skill", "redevice_voice"],
+            "sdk_boundary": "sdk.data.devices + sdk.data.device_access",
+        },
+        "stream_state": "cached_empty",
+        "updated_at": _now_iso(),
+    }
+
+
+def _publish_cached(webspace_id: str | None = None) -> dict[str, Any]:
+    ws = _webspace_id(webspace_id)
+    snapshot = _last_snapshots().get(ws) or _empty_snapshot(ws)
+    stream_publish(_RECEIVER, snapshot, _meta={"webspace_id": ws})
     return snapshot
 
 
@@ -798,6 +874,53 @@ def _matches_receiver(payload: Mapping[str, Any]) -> bool:
 @tool
 def refresh_redevice_settings_state(webspace_id: str | None = None) -> dict[str, Any]:
     return _ack(_publish(webspace_id), status="refreshed")
+
+
+@tool
+def inspect_redevice_settings_endpoint(
+    device_ref: str | None = None,
+    code: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    snapshot = _build_snapshot(webspace_id)
+    selected = _mapping(snapshot.get("selected"))
+    requested_ref = _text(device_ref) or _text(selected.get("ref"))
+    requested_code = _text(code) or _text(selected.get("code"))
+    full_items = _load_devices(_text(snapshot.get("selected_ref")))
+    target = next(
+        (
+            item
+            for item in full_items
+            if (requested_ref and _text(item.get("ref")) == requested_ref)
+            or (requested_code and _text(item.get("code")) == requested_code)
+        ),
+        None,
+    )
+    if not target:
+        return {"ok": False, "error": "endpoint_not_found", "device_ref": requested_ref, "code": requested_code}
+    diagnostics = _mapping(target.get("diagnostics"))
+    return {
+        "ok": True,
+        "schema_version": "redevice-settings-inspect.v1",
+        "device_ref": _text(target.get("ref")),
+        "code": _text(target.get("code")),
+        "title": _text(target.get("title")),
+        "identity": {
+            "endpoint_id": _text(target.get("endpoint_id")),
+            "lifecycle_state": _text(target.get("lifecycle_state")),
+            "online_state": _text(target.get("online_state")),
+        },
+        "subnet": _mapping(target.get("subnet")),
+        "version_info": _mapping(target.get("version_info")),
+        "contracts": {
+            "endpoint_manifest": _mapping(diagnostics.get("endpoint_manifest")),
+            "endpoint_policy": _mapping(diagnostics.get("endpoint_policy")),
+            "diagnostic_report": _mapping(diagnostics.get("diagnostic_report")),
+            "endpoint_health": _mapping(diagnostics.get("endpoint_health")),
+            "service_state": _mapping(diagnostics.get("service_state")),
+        },
+        "updated_at": _now_iso(),
+    }
 
 
 @tool
@@ -996,11 +1119,11 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
     payload = _event_payload(evt)
     if not _matches_receiver(payload):
         return
-    _publish(_text(payload.get("webspace_id") or payload.get("workspace_id")) or None)
+    _publish_cached(_text(payload.get("webspace_id") or payload.get("workspace_id")) or None)
 
 
 @subscribe("webio.stream.subscription.changed")
 def on_webio_stream_subscription_changed(evt: Any) -> None:
     payload = _event_payload(evt)
     if _matches_receiver(payload):
-        _publish(_text(payload.get("webspace_id") or payload.get("workspace_id")) or None)
+        _publish_cached(_text(payload.get("webspace_id") or payload.get("workspace_id")) or None)

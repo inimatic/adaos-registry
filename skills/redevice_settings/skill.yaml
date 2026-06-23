@@ -59,6 +59,44 @@ tools:
         type: string
       result:
         type: object
+- name: inspect_redevice_settings_endpoint
+  description: Return full manifest, policy, diagnostics, and version details for
+    one ReDevice endpoint without publishing them into the browser stream.
+  entry: handlers.main:inspect_redevice_settings_endpoint
+  input_schema:
+    type: object
+    properties:
+      device_ref:
+        type: string
+      code:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      schema_version:
+        type: string
+      device_ref:
+        type: string
+      code:
+        type: string
+      title:
+        type: string
+      identity:
+        type: object
+      subnet:
+        type: object
+      version_info:
+        type: object
+      contracts:
+        type: object
+      updated_at:
+        type: string
 - name: select_redevice_settings_endpoint
   description: Select the ReDevice endpoint controlled by the settings scenario.
   entry: handlers.main:select_redevice_settings_endpoint
@@ -176,7 +214,7 @@ data_routes:
   - webio.stream.snapshot.requested
   - redevice_settings.action
   budget:
-    max_payload_bytes: 32768
+    max_payload_bytes: 16384
     max_publish_hz: 1
     max_items: 32
     snapshot_policy: on_subscribe
@@ -193,7 +231,7 @@ data_routes:
   - webio.stream.snapshot.requested
   - redevice_settings.action
   budget:
-    max_payload_bytes: 32768
+    max_payload_bytes: 16384
     max_publish_hz: 1
     max_items: 32
     snapshot_policy: on_subscribe
@@ -210,7 +248,7 @@ data_routes:
   - webio.stream.snapshot.requested
   - redevice_settings.action
   budget:
-    max_payload_bytes: 32768
+    max_payload_bytes: 16384
     max_publish_hz: 1
     max_items: 32
     snapshot_policy: on_subscribe
@@ -227,7 +265,7 @@ data_routes:
   - webio.stream.snapshot.requested
   - redevice_settings.action
   budget:
-    max_payload_bytes: 32768
+    max_payload_bytes: 16384
     max_publish_hz: 1
     max_items: 32
     snapshot_policy: on_subscribe

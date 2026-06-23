@@ -351,10 +351,37 @@ def test_build_snapshot_keeps_table_rows_lightweight(monkeypatch) -> None:
 
     snapshot = mod._build_snapshot("desktop")
 
-    assert snapshot["selected"]["diagnostics"]["endpoint_manifest"]["large"] == "payload"
+    assert "diagnostics" not in snapshot["selected"]
     assert "diagnostics" not in snapshot["items"][0]
     assert "network" not in snapshot["items"][0]
     assert snapshot["items_truncated"] == 0
+
+
+def test_inspect_endpoint_returns_full_contracts_without_streaming(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    full_item = {
+        "ref": "redevice:endpoint-1",
+        "code": "FMRS7WTB",
+        "title": "Kitchen tablet",
+        "selected": True,
+        "online": True,
+        "online_state": "online",
+        "lifecycle_state": "consumed",
+        "endpoint_id": "endpoint-1",
+        "diagnostics": {
+            "endpoint_manifest": {"schema_version": "endpoint-manifest.v1", "large": "payload"},
+            "endpoint_policy": {"policy_id": "policy-1"},
+        },
+        "version_info": {"version_status": "match"},
+    }
+    monkeypatch.setattr(mod, "_load_devices", lambda selected_ref=None: [dict(full_item)])
+    monkeypatch.setattr(mod, "_first_selected", lambda items, webspace_id=None: "redevice:endpoint-1")
+
+    result = mod.inspect_redevice_settings_endpoint(device_ref="redevice:endpoint-1", webspace_id="desktop")
+
+    assert result["ok"] is True
+    assert result["contracts"]["endpoint_manifest"]["large"] == "payload"
+    assert result["contracts"]["endpoint_policy"]["policy_id"] == "policy-1"
 
 
 def test_publish_deduplicates_identical_snapshots(monkeypatch) -> None:
@@ -410,3 +437,31 @@ def test_publish_deduplicates_volatile_age_only_snapshots(monkeypatch) -> None:
     mod._publish("desktop")
 
     assert len(published) == 1
+
+
+def test_stream_subscription_publishes_cached_snapshot_without_refresh(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    published: list[dict] = []
+    cached = {
+        "desktop": {
+            "ok": True,
+            "selected_ref": "redevice:endpoint-1",
+            "selected": {"ref": "redevice:endpoint-1"},
+            "items": [],
+            "count": 0,
+            "updated_at": "2026-06-18T10:00:00+00:00",
+        }
+    }
+
+    def fail_build(_webspace_id=None):
+        raise AssertionError("subscription snapshots must not rebuild live inventory")
+
+    monkeypatch.setattr(mod, "_last_snapshots", lambda: dict(cached))
+    monkeypatch.setattr(mod, "_build_snapshot", fail_build)
+    monkeypatch.setattr(mod, "stream_publish", lambda receiver, snapshot, _meta=None: published.append(dict(snapshot)))
+
+    mod.on_webio_stream_snapshot_requested(
+        {"receiver": "redevice_settings.state", "webspace_id": "desktop"}
+    )
+
+    assert published == [cached["desktop"]]
