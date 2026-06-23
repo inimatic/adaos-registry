@@ -43,3 +43,29 @@ def test_stream_subscription_publishes_cached_voice_state_without_refresh(monkey
     )
 
     assert published == [cached["desktop"]]
+
+
+def test_payload_includes_compact_audio_readiness(monkeypatch) -> None:
+    mod = _load_redevice_voice_module()
+    endpoint = {"code": "SNX68P2A", "endpoint_manifest": {"services": {"audio_input_endpoint": {"enabled": True}}}}
+    readiness = {
+        "schema_version": "endpoint-audio-readiness.v1",
+        "ok": True,
+        "state": "ready",
+        "retention": {"debug_clip_limit": 10, "stored_debug_clips": 1},
+        "last_segment": {"state": "ready", "bytes": 1024},
+    }
+
+    monkeypatch.setattr(mod, "_compact_endpoint", lambda item, selected_code: {"code": item["code"], "selected": True})
+    monkeypatch.setattr(mod, "endpoint_audio_readiness", lambda state, selected_endpoint: dict(readiness))
+    monkeypatch.setattr(
+        mod,
+        "endpoint_audio_diagnostics",
+        lambda state, selected_endpoint: {"schema_version": "endpoint-audio-diagnostics.v1"},
+    )
+
+    payload = mod._payload({"selected_code": "SNX68P2A", "events": []}, [endpoint])
+
+    assert payload["readiness"]["schema_version"] == "endpoint-audio-readiness.v1"
+    assert payload["readiness"]["state"] == "ready"
+    assert "clips" not in payload["readiness"]["retention"]

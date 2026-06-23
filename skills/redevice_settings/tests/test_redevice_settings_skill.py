@@ -304,6 +304,43 @@ def test_settings_command_requires_selected_endpoint(monkeypatch) -> None:
     assert writes[-1][1]["result"]["error"] == "endpoint_required"
 
 
+def test_assignment_updates_core_endpoint_assignment_via_sdk(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    calls: list[dict] = []
+    snapshot = {
+        "selected": {
+            "ref": "redevice:endpoint-1",
+            "code": "SNX68P2A",
+            "online": True,
+            "online_state": "online",
+            "title": "Kitchen tablet",
+        },
+        "items": [{"ref": "redevice:endpoint-1", "code": "SNX68P2A"}],
+        "count": 1,
+    }
+
+    class DeviceAccess:
+        @staticmethod
+        def assign_endpoint(device_ref=None, code=None, assignment=None):
+            calls.append({"device_ref": device_ref, "code": code, "assignment": assignment})
+            return {
+                "ok": True,
+                "device_ref": device_ref,
+                "code": code,
+                "assignment": assignment,
+            }
+
+    monkeypatch.setattr(mod, "sdk_device_access", DeviceAccess())
+    monkeypatch.setattr(mod, "_build_snapshot", lambda webspace_id=None: dict(snapshot))
+    monkeypatch.setattr(mod, "_publish", lambda webspace_id=None, force=False: dict(snapshot))
+
+    result = mod.set_redevice_assignment(assignment="slideshow", webspace_id="desktop")
+
+    assert result["ok"] is True
+    assert result["status"] == "assignment_updated"
+    assert calls == [{"device_ref": "redevice:endpoint-1", "code": "SNX68P2A", "assignment": "slideshow"}]
+
+
 def test_refresh_returns_small_ack_not_stream_snapshot(monkeypatch) -> None:
     mod = _load_redevice_settings_module()
     snapshot = {

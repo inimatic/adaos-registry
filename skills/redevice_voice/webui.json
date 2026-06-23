@@ -11,6 +11,11 @@
           "selected_code": "",
           "count": 0,
           "items": [],
+          "readiness": {
+            "schema_version": "endpoint-audio-readiness.v1",
+            "ok": false,
+            "state": "no_endpoint"
+          },
           "diagnostics": {
             "vad": {
               "state": "idle"

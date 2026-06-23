@@ -27,7 +27,6 @@ except Exception:  # pragma: no cover
 
 _RECEIVER = "redevice_settings.state"
 _SELECTED_BY_WS_KEY = "selected_by_webspace"
-_ASSIGNMENTS_KEY = "endpoint_assignments"
 _LAST_COMMAND_KEY = "last_command"
 _LAST_SNAPSHOT_KEY = "last_stream_snapshot_by_webspace"
 _ASSIGNMENT_PRESETS = ["assistant", "slideshow", "voice_endpoint", "media_center", "webcam", "idle"]
@@ -205,10 +204,6 @@ def _selected_by_ws() -> dict[str, str]:
     return {str(k): str(v) for k, v in _memory_dict(_SELECTED_BY_WS_KEY).items() if str(k) and str(v)}
 
 
-def _assignments() -> dict[str, str]:
-    return {str(k): str(v) for k, v in _memory_dict(_ASSIGNMENTS_KEY).items() if str(k)}
-
-
 def _set_selected(webspace_id: str, device_ref: str) -> None:
     state = _selected_by_ws()
     state[_webspace_id(webspace_id)] = _text(device_ref)
@@ -282,7 +277,13 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
     )
     active_app = _mapping(runtime.get("active_app"))
     active_surface = _mapping(runtime.get("active_surface"))
-    assignment = _assignments().get(ref) or _text(active_app.get("app_id")) or "idle"
+    assignment = (
+        _text(runtime.get("assignment"))
+        or _text(item.get("assignment"))
+        or _text(raw.get("assignment"))
+        or _text(active_app.get("app_id"))
+        or "idle"
+    )
     endpoint_health = _mapping(diagnostics.get("endpoint_health"))
     diagnostic_report = _mapping(diagnostics.get("diagnostic_report"))
     service_state = _mapping(diagnostics.get("service_state"))
@@ -976,6 +977,7 @@ def set_redevice_assignment(
 ) -> dict[str, Any]:
     selected = _build_snapshot(webspace_id).get("selected") or {}
     ref = _text(device_ref) or _text(selected.get("ref"))
+    pair_code = _text(code) or _text(selected.get("code"))
     if not ref and _text(code):
         for item in _load_devices():
             if _text(item.get("code")) == _text(code):
@@ -986,10 +988,12 @@ def set_redevice_assignment(
     normalized = _text(assignment).lower() or "idle"
     if normalized not in _ASSIGNMENT_PRESETS:
         normalized = "idle"
-    state = _assignments()
-    state[ref] = normalized
-    _set_memory_dict(_ASSIGNMENTS_KEY, state)
-    return _ack(_publish(webspace_id), status="assignment_updated", assignment=normalized)
+    assign = getattr(sdk_device_access, "assign_endpoint", None)
+    if not callable(assign):
+        result = {"ok": False, "error": "endpoint_assignment_unavailable", "device_ref": ref, "assignment": normalized}
+        return _ack(_publish(webspace_id), status="assignment_rejected", ok=False, result=result, assignment=normalized)
+    result = assign(device_ref=ref, code=pair_code, assignment=normalized)
+    return _ack(_publish(webspace_id, force=True), status="assignment_updated" if result.get("ok") else "assignment_rejected", ok=bool(result.get("ok")), result=result, assignment=normalized)
 
 
 @tool

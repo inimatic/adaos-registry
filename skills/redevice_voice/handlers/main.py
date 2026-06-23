@@ -12,6 +12,7 @@ from adaos.sdk.io import (
     compact_audio_endpoint,
     endpoint_audio_diagnostics,
     endpoint_audio_policy,
+    endpoint_audio_readiness,
     endpoint_audio_stt_status,
     process_endpoint_audio_event,
     stream_publish,
@@ -151,11 +152,13 @@ def _payload(state: Mapping[str, Any], endpoints: list[Mapping[str, Any]]) -> di
     items = [_compact_endpoint(item, selected) for item in endpoints]
     selected_endpoint = _choose_endpoint(endpoints, selected)
     diagnostics = endpoint_audio_diagnostics(state, selected_endpoint)
+    readiness = endpoint_audio_readiness(state, selected_endpoint)
     return {
         "ok": True,
         "selected_code": selected,
         "count": len(items),
         "items": items,
+        "readiness": readiness,
         "diagnostics": diagnostics,
         "last_command": _mapping(state.get("last_command")),
         "last_segment": _mapping(state.get("last_segment")),
@@ -183,6 +186,7 @@ def _empty_payload(webspace_id: str | None = None) -> dict[str, Any]:
         "selected_code": _text(state.get("selected_code")),
         "count": 0,
         "items": [],
+        "readiness": endpoint_audio_readiness(state, None),
         "diagnostics": endpoint_audio_diagnostics(state, None),
         "last_command": _mapping(state.get("last_command")),
         "last_segment": _mapping(state.get("last_segment")),
