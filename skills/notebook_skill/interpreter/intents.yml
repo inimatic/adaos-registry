@@ -1,0 +1,8 @@
+intents:
+- intent: notebook.create_note
+  description: null
+  skill: notebook_skill
+  examples:
+  - Напишем заметку
+  - Создать заметку
+  - Добавить заметку
