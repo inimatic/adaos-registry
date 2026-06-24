@@ -1,5 +1,5 @@
 name: browsers_skill
-version: 0.15.13
+version: 0.15.14
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -291,6 +291,26 @@ tools:
         type: string
   output_schema:
     type: object
+- name: deny_device
+  description: Deny future connections from a browser, member, or device access link.
+  entry: handlers.main:deny_device
+  input_schema:
+    type: object
+    properties:
+      device_ref:
+        type: string
+      node_id:
+        type: string
+      target_node_id:
+        type: string
+      browser_device_id:
+        type: string
+      device_id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
 - name: get_device_settings
   description: Return settings/action metadata for a browser, member, or device link.
   entry: handlers.main:get_device_settings
@@ -339,13 +359,13 @@ tools:
   output_schema:
     type: object
 exports: {}
-updated_at: '2026-06-18T06:12:21+00:00'
+updated_at: '2026-06-24T07:00:50+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2959.af2113e5
-    recorded_at: '2026-06-18T06:12:21+00:00'
+    min_version: 0.1.0+3173.c93a94a2
+    recorded_at: '2026-06-24T07:00:50+00:00'
     source: skill_push
-    min_commit: af2113e5bdefbcbf3d46e2a3da08a3bc75bdf8de
-    min_short_commit: af2113e5
-    build_date: '2026-06-18T07:59:05+03:00'
+    min_commit: c93a94a29f4011e31aaa70e1812dc3fc28178401
+    min_short_commit: c93a94a2
+    build_date: '2026-06-24T09:59:53+03:00'
 

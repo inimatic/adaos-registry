@@ -736,6 +736,30 @@ def detach_device(
 
 
 @tool
+def deny_device(
+    device_ref: str | None = None,
+    node_id: str | None = None,
+    target_node_id: str | None = None,
+    browser_device_id: str | None = None,
+    device_id: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    resolved = _coerce_device_ref(
+        device_ref=device_ref,
+        node_id=node_id,
+        target_node_id=target_node_id,
+        browser_device_id=browser_device_id,
+        device_id=device_id,
+        webspace_id=webspace_id,
+    )
+    if not resolved:
+        return {"ok": False, "error": "device_ref_required"}
+    result = sdk_device_access.deny_device(resolved)
+    _refresh_snapshot_sync(webspace_id)
+    return result
+
+
+@tool
 def get_device_settings(
     device_ref: str | None = None,
     node_id: str | None = None,
