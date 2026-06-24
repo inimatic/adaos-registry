@@ -24,6 +24,7 @@ _RECEIVER_NOTES = "notebook_skill.notes"
 _MAX_NOTES = 64
 _MAX_CONTENT_CHARS = 32000
 _NOTE_PREFIX = "note-"
+_DEFAULT_WEBSPACE_ID = "desktop"
 
 
 def _now() -> float:
@@ -64,7 +65,7 @@ def _webspace_id(payload: Mapping[str, Any] | None = None) -> str:
     body = payload if isinstance(payload, Mapping) else {}
     meta = body.get("_meta") if isinstance(body.get("_meta"), Mapping) else {}
     raw = body.get("webspace_id") or body.get("workspace_id") or meta.get("webspace_id") or meta.get("workspace_id")
-    return coerce_webspace_id(raw, fallback="default")
+    return coerce_webspace_id(raw, fallback=_DEFAULT_WEBSPACE_ID)
 
 
 def _local_subnet_id() -> str:
@@ -296,7 +297,7 @@ def _notes_stream_payload(snapshot: Mapping[str, Any] | None = None) -> dict[str
 
 def _publish(snapshot: Mapping[str, Any] | None = None, *, webspace_id: str | None = None) -> dict[str, Any]:
     snap = dict(snapshot or _snapshot())
-    ws = coerce_webspace_id(webspace_id, fallback="default")
+    ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
     try:
         ctx_subnet.set("notebook.snapshot", snap, webspace_id=ws)
     except Exception:
@@ -440,7 +441,7 @@ def _send_telegram_text(
     bot_id: str = "",
     hub_id: str = "",
     root_base: str = "",
-    webspace_id: str = "default",
+    webspace_id: str = _DEFAULT_WEBSPACE_ID,
 ) -> dict[str, Any]:
     import requests
 

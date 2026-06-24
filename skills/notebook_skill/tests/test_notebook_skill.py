@@ -64,6 +64,17 @@ def test_snapshot_request_republishes_note_list(monkeypatch):
     assert meta["webspace_id"] == "desktop"
 
 
+def test_actions_default_to_desktop_webspace(monkeypatch):
+    mod, projected, streams = load_module(monkeypatch)
+
+    result = mod.save_note({"note_id": "note-1", "content": "Desktop note"})
+
+    assert result["ok"] is True
+    assert projected[-1][2] == "desktop"
+    assert streams[-1][2]["webspace_id"] == "desktop"
+    assert projected[-1][1]["widget"]["items"][0]["title"] == "Desktop note"
+
+
 def test_send_note_to_telegram_uses_root_outbox_contract(monkeypatch):
     mod, _projected, _streams = load_module(monkeypatch)
     sent = {}

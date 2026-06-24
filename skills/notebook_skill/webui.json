@@ -172,7 +172,8 @@
                   "on": "add",
                   "type": "updateState",
                   "params": {
-                    "notebookViewMode": "edit"
+                    "notebookViewMode": "edit",
+                    "notebookSelectedNoteId": ""
                   }
                 }
               ]
@@ -222,6 +223,7 @@
                   "type": "callSkill",
                   "target": "notebook_skill.save_note",
                   "params": {
+                    "note_id": "$state.notebookSelectedNoteId",
                     "content": "$event.content"
                   }
                 }
@@ -264,6 +266,7 @@
                   "type": "callSkill",
                   "target": "notebook_skill.attach_note_file",
                   "params": {
+                    "note_id": "$state.notebookSelectedNoteId",
                     "kind": "photo",
                     "artifact_ref": "$event.artifact_ref",
                     "file": "$event.file",
@@ -291,6 +294,7 @@
                   "type": "callSkill",
                   "target": "notebook_skill.attach_note_file",
                   "params": {
+                    "note_id": "$state.notebookSelectedNoteId",
                     "kind": "file",
                     "artifact_ref": "$event.artifact_ref",
                     "file": "$event.file",
@@ -325,6 +329,13 @@
                   }
                 },
                 {
+                  "on": "click:new",
+                  "type": "updateState",
+                  "params": {
+                    "notebookSelectedNoteId": ""
+                  }
+                },
+                {
                   "on": "click:refresh",
                   "type": "callSkill",
                   "target": "notebook_skill.get_notebook_snapshot"
@@ -332,12 +343,18 @@
                 {
                   "on": "click:telegram",
                   "type": "callSkill",
-                  "target": "notebook_skill.send_note_to_telegram"
+                  "target": "notebook_skill.send_note_to_telegram",
+                  "params": {
+                    "note_id": "$state.notebookSelectedNoteId"
+                  }
                 },
                 {
                   "on": "click:delete",
                   "type": "callSkill",
-                  "target": "notebook_skill.delete_note"
+                  "target": "notebook_skill.delete_note",
+                  "params": {
+                    "note_id": "$state.notebookSelectedNoteId"
+                  }
                 },
                 {
                   "on": "click:delete",
