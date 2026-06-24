@@ -126,9 +126,35 @@ def _preview(content: str, *, limit: int = 120) -> str:
     return text[: max(0, limit - 1)].rstrip() + "..."
 
 
+def _content_lines(content: Any) -> list[str]:
+    text = str(content or "").replace("\r\n", "\n").replace("\r", "\n").strip()
+    return text.split("\n") if text else []
+
+
 def _note_heading(note: Mapping[str, Any], *, fallback: str = "New note") -> str:
-    preview = _preview(str(note.get("content") or ""), limit=48)
-    return preview or fallback
+    lines = _content_lines(note.get("content"))
+    if not lines:
+        return fallback
+    heading = str(lines[0] or "").strip()
+    return heading or fallback
+
+
+def _note_card_preview(note: Mapping[str, Any], *, limit: int = 420) -> str:
+    lines = _content_lines(note.get("content"))
+    if len(lines) <= 1:
+        return ""
+    text = "\n".join(line.strip() for line in lines[1:]).strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "..."
+
+
+def _promote_note(note_id: str) -> None:
+    token = str(note_id or "").strip()
+    if not token:
+        return
+    _STATE["order"] = [item for item in list(_STATE.get("order") or []) if item != token]
+    _STATE["order"].insert(0, token)
 
 
 def _display_note() -> dict[str, Any]:
@@ -139,6 +165,15 @@ def _display_note() -> dict[str, Any]:
     note_id = _STATE["order"][0] if _STATE["order"] else "note-1"
     _STATE["display_note_id"] = note_id
     return notes[note_id]
+
+
+def _latest_note() -> dict[str, Any]:
+    notes = _STATE["notes"]
+    for note_id in list(_STATE.get("order") or []):
+        note = notes.get(note_id)
+        if isinstance(note, dict):
+            return note
+    return _display_note()
 
 
 def _editing_note() -> dict[str, Any] | None:
@@ -181,7 +216,7 @@ def _note_list_items() -> list[dict[str, Any]]:
                 "title": _note_heading(note),
                 "subtitle": _now_iso(updated) if updated else "",
                 "text": content,
-                "preview": _preview(content),
+                "preview": _note_card_preview(note),
                 "selected": "selected" if note_id == display_id else "",
                 "editing": "editing" if note_id == editing_id else "",
                 "attachment_count": len(attachments),
@@ -195,6 +230,7 @@ def _note_list_items() -> list[dict[str, Any]]:
 
 def _snapshot() -> dict[str, Any]:
     display_note = _display_note()
+    latest_note = _latest_note()
     editing_note = _editing_note()
     editor_note = editing_note or display_note
     editor = {
@@ -222,15 +258,24 @@ def _snapshot() -> dict[str, Any]:
         },
         "editor": editor,
         "notes": {"items": items},
+        "latest": {
+            "id": latest_note["id"],
+            "title": _note_heading(latest_note),
+            "content": latest_note["content"],
+            "attachments": list(latest_note.get("attachments") or []),
+            "updated_at": latest_note.get("updated_at"),
+            "updated_label": _now_iso(float(latest_note.get("updated_at") or _now())),
+            "version": int(latest_note.get("version") or 0),
+        },
         "widget": {
             "items": [
                 {
-                    "id": display_note["id"],
-                    "title": _note_heading(display_note),
-                    "subtitle": _now_iso(float(display_note.get("updated_at") or _now())),
-                    "content": display_note["content"],
-                    "attachments": list(display_note.get("attachments") or []),
-                    "updated_at": display_note.get("updated_at"),
+                    "id": latest_note["id"],
+                    "title": _note_heading(latest_note),
+                    "subtitle": _now_iso(float(latest_note.get("updated_at") or _now())),
+                    "content": latest_note["content"],
+                    "attachments": list(latest_note.get("attachments") or []),
+                    "updated_at": latest_note.get("updated_at"),
                 }
             ]
         },
@@ -302,7 +347,7 @@ def create_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict
         "version": 1 if content else 0,
     }
     _STATE["notes"][note_id] = note
-    _STATE["order"].insert(0, note_id)
+    _promote_note(note_id)
     _STATE["display_note_id"] = note_id
     _STATE["editing_note_id"] = note_id
     snap = _publish(webspace_id=_webspace_id(body))
@@ -336,9 +381,7 @@ def save_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[s
     note["version"] = int(note.get("version") or 0) + 1
     _STATE["display_note_id"] = note_id
     _STATE["editing_note_id"] = note_id
-    if note_id in _STATE["order"]:
-        _STATE["order"].remove(note_id)
-    _STATE["order"].insert(0, note_id)
+    _promote_note(note_id)
     snap = _publish(webspace_id=_webspace_id(body))
     return {"ok": True, "note": deepcopy(note), "snapshot": snap}
 
@@ -368,6 +411,7 @@ def attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) ->
     note["version"] = int(note.get("version") or 0) + 1
     _STATE["display_note_id"] = note_id
     _STATE["editing_note_id"] = note_id
+    _promote_note(note_id)
     snap = _publish(webspace_id=_webspace_id(body))
     return {"ok": True, "attachment": deepcopy(attachment), "note": deepcopy(note), "snapshot": snap}
 

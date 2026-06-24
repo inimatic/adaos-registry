@@ -1,5 +1,5 @@
 name: notebook_skill
-version: 0.1.4
+version: 0.1.5
 description: Shared plain-text notebook with one active editable note, a live note
   list stream, and Telegram export.
 runtime:
@@ -225,15 +225,15 @@ tools:
     properties:
       ok:
         type: boolean
-updated_at: '2026-06-23T13:43:30+00:00'
+updated_at: '2026-06-24T19:18:41+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.389
-    recorded_at: '2026-06-23T13:43:30+00:00'
+    min_version: 0.1.0+3182.28313b56
+    recorded_at: '2026-06-24T19:18:41+00:00'
     source: skill_push
-    min_commit: eb90fca1dcc00fd1244ce116fe5f11a32dee962e
-    min_short_commit: eb90fca1
-    build_date: '2026-06-23T13:43:29.405039+00:00'
+    min_commit: 28313b565933ce21a2efd5da0a8bc883fe4825dd
+    min_short_commit: 28313b56
+    build_date: '2026-06-24T07:43:32+00:00'
 nlu:
   intents:
     notebook.create_note:

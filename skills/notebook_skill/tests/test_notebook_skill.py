@@ -109,3 +109,26 @@ def test_attach_note_file_updates_editor_and_widget(monkeypatch):
     assert result["ok"] is True
     assert result["attachment"]["kind"] == "photo"
     assert projected[-1][1]["editor"]["attachments"][0]["name"] == "photo.jpg"
+
+
+def test_note_cards_use_first_line_title_and_remaining_preview(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+
+    created = mod.create_note({"content": "Heading\nBody line one\nBody line two"})
+    item = created["snapshot"]["notes"]["items"][0]
+
+    assert item["title"] == "Heading"
+    assert item["preview"] == "Body line one\nBody line two"
+
+
+def test_widget_snapshot_uses_latest_changed_note(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+
+    first = mod.create_note({"content": "First note"})
+    second = mod.create_note({"content": "Second note"})
+    mod.save_note({"note_id": first["note"]["id"], "content": "First note\nupdated"})
+    snapshot = mod.select_note({"note_id": second["note"]["id"], "edit": True})["snapshot"]
+
+    assert snapshot["editor"]["id"] == second["note"]["id"]
+    assert snapshot["widget"]["items"][0]["id"] == first["note"]["id"]
+    assert snapshot["widget"]["items"][0]["title"] == "First note"

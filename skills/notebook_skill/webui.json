@@ -8,22 +8,12 @@
         "snapshotPolicy": "on_subscribe",
         "initialState": {
           "ok": true,
-          "selected_note_id": "note-1",
-          "display_note_id": "note-1",
+          "status": "loading",
+          "message": "Loading notes",
+          "selected_note_id": "",
+          "display_note_id": "",
           "editing_note_id": "",
-          "items": [
-            {
-              "id": "note-1",
-              "title": "New note",
-              "subtitle": "",
-              "text": "",
-              "preview": "",
-              "selected": "selected",
-              "editing": "",
-              "attachment_count": 0,
-              "updated_at": null
-            }
-          ],
+          "items": [],
           "updated_at": null
         },
         "budget": {
@@ -79,10 +69,10 @@
       "inputs": {
         "collectionKey": "items",
         "titleKey": "title",
-        "subtitleKey": "subtitle",
+        "subtitleKey": "updated_at",
         "detailsPath": "content",
         "showDetails": true,
-        "itemAccordion": true,
+        "itemAccordion": false,
         "emptyText": "No note yet"
       },
       "actions": [
@@ -106,26 +96,27 @@
         "schema": {
           "id": "notebook_modal",
           "initialState": {
-            "notebookSelectedNoteId": "note-1"
+            "notebookViewMode": "list",
+            "notebookSelectedNoteId": ""
           },
           "layout": {
-            "type": "split",
-            "pattern": "split",
+            "type": "single",
+            "pattern": "stack",
             "areas": [
-              { "id": "left", "role": "nav" },
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" }
+              { "id": "list", "role": "main" },
+              { "id": "edit", "role": "main" }
             ]
           },
           "interaction": {
-            "initialFocus": "widget:notebook-editor"
+            "initialFocus": "widget:notebook-notes"
           },
           "widgets": [
             {
               "id": "notebook-notes",
               "type": "ui.list",
-              "area": "left",
+              "area": "list",
               "title": "Notes",
+              "visibleIf": "$state.notebookViewMode === 'list'",
               "dataSource": {
                 "kind": "stream",
                 "receiver": "notebook_skill.notes"
@@ -141,12 +132,14 @@
                 "addCardLabel": "Add note",
                 "emptyCardTitle": "New note",
                 "titleKey": "title",
-                "subtitleKey": "subtitle",
+                "subtitleKey": "updated_at",
                 "descriptionKey": "preview",
                 "previewKey": "preview",
                 "imageKey": "image",
                 "badgeKey": "attachment_count",
                 "emptyText": "Create a note to start.",
+                "loadingText": "Loading notes...",
+                "loadingUntilUpdatedAt": true,
                 "itemAccordion": false
               },
               "actions": [
@@ -154,6 +147,7 @@
                   "on": "select",
                   "type": "updateState",
                   "params": {
+                    "notebookViewMode": "edit",
                     "notebookSelectedNoteId": "$event.id"
                   }
                 },
@@ -173,14 +167,44 @@
                   "params": {
                     "content": ""
                   }
+                },
+                {
+                  "on": "add",
+                  "type": "updateState",
+                  "params": {
+                    "notebookViewMode": "edit"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "notebook-back",
+              "type": "input.commandBar",
+              "area": "edit",
+              "title": "Navigation",
+              "visibleIf": "$state.notebookViewMode === 'edit'",
+              "inputs": {
+                "size": "small",
+                "buttons": [
+                  { "id": "back", "label": "Back", "icon": "arrow-back-outline" }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:back",
+                  "type": "updateState",
+                  "params": {
+                    "notebookViewMode": "list"
+                  }
                 }
               ]
             },
             {
               "id": "notebook-editor",
               "type": "item.textEditor",
-              "area": "main",
+              "area": "edit",
               "title": "Editor",
+              "visibleIf": "$state.notebookViewMode === 'edit'",
               "dataSource": {
                 "kind": "y",
                 "path": "data/notebook/editor",
@@ -206,8 +230,9 @@
             {
               "id": "notebook-attachments",
               "type": "ui.list",
-              "area": "main",
+              "area": "edit",
               "title": "Attachments",
+              "visibleIf": "$state.notebookViewMode === 'edit'",
               "dataSource": {
                 "kind": "y",
                 "path": "data/notebook/editor/attachments",
@@ -223,8 +248,9 @@
             {
               "id": "notebook-photo-upload",
               "type": "input.fileUpload",
-              "area": "right",
+              "area": "edit",
               "title": "Photo",
+              "visibleIf": "$state.notebookViewMode === 'edit'",
               "inputs": {
                 "skill": "notebook_skill",
                 "purpose": "photos",
@@ -249,8 +275,9 @@
             {
               "id": "notebook-file-upload",
               "type": "input.fileUpload",
-              "area": "right",
+              "area": "edit",
               "title": "File",
+              "visibleIf": "$state.notebookViewMode === 'edit'",
               "inputs": {
                 "skill": "notebook_skill",
                 "purpose": "attachments",
@@ -275,8 +302,9 @@
             {
               "id": "notebook-actions",
               "type": "input.commandBar",
-              "area": "right",
+              "area": "edit",
               "title": "Edit",
+              "visibleIf": "$state.notebookViewMode === 'edit'",
               "inputs": {
                 "variant": "stack",
                 "size": "small",
@@ -310,6 +338,13 @@
                   "on": "click:delete",
                   "type": "callSkill",
                   "target": "notebook_skill.delete_note"
+                },
+                {
+                  "on": "click:delete",
+                  "type": "updateState",
+                  "params": {
+                    "notebookViewMode": "list"
+                  }
                 }
               ]
             }
