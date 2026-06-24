@@ -4,10 +4,13 @@ description: Semantic indexing and multimodal search for local media files (vide
   audio, images) using NER, FAISS and CLIP.
 runtime:
   kind: service
+  in_process_events: true
   python: '3.11'
   env:
     mode: venv
     python: '3.11'
+dependencies:
+- shazamio
 models:
   private: true
   artifacts:
@@ -169,6 +172,26 @@ tools:
               type: string
             payload:
               type: object
+- name: play_media
+  entry: handlers.main:play_media
+  description: Prepare an indexed media item for browser preview
+  input_schema:
+    type: object
+    required:
+    - path
+    properties:
+      path:
+        type: string
+        description: Indexed media file path.
+  output_schema:
+    type: object
+    required:
+    - status
+    properties:
+      status:
+        type: string
+      playback:
+        type: object
 - name: get_settings
   entry: handlers.main:get_settings
   description: Return persisted media indexer settings and index metadata

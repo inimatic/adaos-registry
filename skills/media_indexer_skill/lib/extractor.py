@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import json
 import os
+import subprocess
 from typing import Any, Optional
 
 from lib.models import MediaMetadata
@@ -17,8 +19,15 @@ class TechnicalMetadataExtractor:
             import static_ffmpeg
 
             static_ffmpeg.add_paths()
-        except ImportError:
-            logger.warning("static_ffmpeg is not installed; system FFmpeg must be available")
+        except Exception:
+            logger.warning("static_ffmpeg is not available; system FFmpeg must be available")
+
+    @staticmethod
+    def _metadata_timeout_sec() -> float:
+        try:
+            return max(1.0, float(os.getenv("MEDIA_INDEXER_METADATA_TIMEOUT_SEC") or 8.0))
+        except Exception:
+            return 8.0
 
     def extract(self, media: Any, media_type: Optional[str] = None) -> MediaMetadata:
         if hasattr(media, "media_type"):
@@ -49,12 +58,29 @@ class TechnicalMetadataExtractor:
 
     def _extract_av_data(self, file_path: str, media_type: str, metadata: MediaMetadata) -> MediaMetadata:
         try:
-            import ffmpeg
-
             if os.path.getsize(file_path) == 0:
                 raise ValueError("empty file")
 
-            probe = ffmpeg.probe(file_path)
+            proc = subprocess.run(
+                [
+                    "ffprobe",
+                    "-v",
+                    "error",
+                    "-print_format",
+                    "json",
+                    "-show_format",
+                    "-show_streams",
+                    file_path,
+                ],
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=self._metadata_timeout_sec(),
+            )
+            if proc.returncode != 0:
+                raise RuntimeError((proc.stderr or proc.stdout or "ffprobe failed").strip()[:500])
+            probe = json.loads(proc.stdout or "{}")
             fmt = probe.get("format", {})
             metadata.duration_seconds = float(fmt.get("duration", 0))
             metadata.size_bytes = int(fmt.get("size", 0))

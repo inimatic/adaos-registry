@@ -7,6 +7,7 @@ import sys
 import types
 from types import SimpleNamespace
 
+import pytest
 import yaml
 
 
@@ -20,11 +21,11 @@ def test_manifest_declares_runtime_contracts() -> None:
 
     assert manifest["name"] == "media_indexer_skill"
     assert "requirements.txt" not in {path.name for path in SKILL_ROOT.iterdir()}
-    assert "faiss-cpu==1.13.2" in manifest["dependencies"]
-    assert "torch==2.10.0" in manifest["dependencies"]
+    assert manifest.get("dependencies") == ["shazamio"]
     weights = manifest["models"]["artifacts"]["weights"]
     assert weights["path"] == "ml/weights/model2.pt"
     assert weights["install_path"] == "data/files/models/model2.pt"
+    assert weights["dependency_profile"] == "torch-cpu-py311"
     assert "media_indexer.action" in manifest["events"]["subscribe"]
     assert "webio.stream.snapshot.requested" in manifest["events"]["subscribe"]
     assert any(route["route"] == "stream" and route["receiver"] == "media_indexer.operations" for route in manifest["data_routes"])
@@ -50,6 +51,7 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
     assert schema["layout"]["pattern"] == "split"
     library_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-library")
     assert library_widget["type"] == "ui.table"
+    assert [button["id"] for button in library_widget["inputs"]["buttons"]] == ["play"]
     actions_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-controls")
     assert [button["id"] for button in actions_widget["inputs"]["buttons"]] == ["scan_selected"]
     results_widget = next(
@@ -61,6 +63,10 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
     assert results_widget["inputs"]["titleKey"] == "title"
     assert results_widget["inputs"]["subtitleKey"] == "subtitle"
     assert results_widget["inputs"]["detailsPath"] == "details_text"
+    assert [button["id"] for button in results_widget["inputs"]["buttons"]] == ["play"]
+    player_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-player")
+    assert player_widget["type"] == "media.videoBrowser"
+    assert player_widget["inputs"]["readOnly"] is True
 
 
 def test_scanner_finds_supported_media_without_hashing(tmp_path: pathlib.Path) -> None:
@@ -97,6 +103,152 @@ def test_handler_import_is_passive_and_search_without_index_does_not_load_models
     assert result["status"] == "error"
     assert result["results"] == []
     assert main._state["vector_db"] is None
+
+
+@pytest.mark.asyncio
+async def test_scan_action_uses_webspace_form_directory_when_payload_omits_directory(
+    monkeypatch,
+    tmp_path: pathlib.Path,
+) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    memory: dict[str, dict] = {}
+    projected: list[dict] = []
+    seen: dict[str, str] = {}
+
+    async def fake_read_directory(webspace_id: str | None, payload: dict) -> str:
+        assert webspace_id == "ws-1"
+        return str(media_dir)
+
+    def fake_scan(directory: str, progress=None) -> dict:
+        seen["directory"] = directory
+        return {
+            "status": "ok",
+            "indexed_count": 1,
+            "errors": [],
+            "diagnostics": {
+                "indexed_count": 1,
+                "files_found": 1,
+                "by_type": {"video": 1},
+                "description": "Indexed 1 media files.",
+            },
+        }
+
+    monkeypatch.setattr(main, "_safe_memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(main, "_safe_memory_set", lambda key, value: memory.__setitem__(key, value))
+    monkeypatch.setattr(main, "_read_directory_from_webspace_form", fake_read_directory)
+    monkeypatch.setattr(main, "_scan_and_index", fake_scan)
+
+    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+        projected.append(snapshot)
+
+    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+
+    await main.on_media_indexer_action(SimpleNamespace(payload={"id": "scan", "webspace_id": "ws-1"}))
+
+    assert seen["directory"] == str(media_dir)
+    assert memory[main.SETTINGS_KEY]["selected_directory"] == str(media_dir)
+    assert projected[-1]["status"]["value"] == "indexed"
+    assert projected[-1]["form"]["directory"] == str(media_dir)
+
+
+@pytest.mark.asyncio
+async def test_scan_action_projects_error_when_indexer_raises(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    memory: dict[str, dict] = {}
+    projected: list[dict] = []
+
+    def fake_scan(directory: str, progress=None) -> dict:
+        raise RuntimeError("model init failed")
+
+    monkeypatch.setattr(main, "_safe_memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(main, "_safe_memory_set", lambda key, value: memory.__setitem__(key, value))
+    monkeypatch.setattr(main, "_scan_and_index", fake_scan)
+
+    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+        projected.append(snapshot)
+
+    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+
+    await main.on_media_indexer_action(
+        SimpleNamespace(payload={"id": "scan", "directory": str(media_dir), "webspace_id": "ws-1"})
+    )
+
+    assert projected[-1]["status"]["value"] == "error"
+    assert "model init failed" in projected[-1]["status"]["error"]
+    assert main._state["scan_in_progress"] is False
+
+
+@pytest.mark.asyncio
+async def test_scan_action_coalesces_lightweight_progress(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    projected: list[dict] = []
+
+    main._state["library_items"] = [{"title": "old", "details": {"large": "x" * 1000}}]
+    main._state["last_results"] = [{"title": "old result"}]
+
+    def fake_scan(directory: str, progress=None) -> dict:
+        assert directory == str(media_dir)
+        for idx in range(20):
+            progress(
+                {
+                    "value": "indexing",
+                    "subtitle": f"{idx}/20 files",
+                    "description": f"file-{idx}.mp4",
+                    "indexed_count": idx,
+                    "total_count": 20,
+                }
+            )
+        return {
+            "status": "ok",
+            "indexed_count": 20,
+            "errors": [],
+            "diagnostics": {
+                "indexed_count": 20,
+                "files_found": 20,
+                "by_type": {"video": 20},
+                "description": "Indexed 20 media files.",
+            },
+        }
+
+    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+        projected.append(snapshot)
+
+    monkeypatch.setattr(main, "_scan_and_index", fake_scan)
+    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+
+    await main.on_media_indexer_action(
+        SimpleNamespace(payload={"id": "scan", "directory": str(media_dir), "webspace_id": "ws-1"})
+    )
+
+    progress_snapshots = [item for item in projected if item["status"]["value"] == "indexing"]
+    assert len(progress_snapshots) <= 2
+    assert progress_snapshots
+    for snapshot in progress_snapshots:
+        assert snapshot["library"] == []
+        assert snapshot["results"] == []
+        assert snapshot["playback"]["items"] == []
+    assert projected[-1]["status"]["value"] == "indexed"
 
 
 def test_search_formats_results_and_dedupes_same_media_path(monkeypatch, tmp_path: pathlib.Path) -> None:
@@ -160,6 +312,19 @@ def test_ner_weights_prefers_skill_runtime_models_dir(monkeypatch, tmp_path: pat
     assert status["path"] == str(weights)
     assert status["exists"] is True
     assert status["source"] == "skill_data_models"
+
+
+def test_filename_parser_extracts_safe_demo_entities() -> None:
+    from lib.filename_parser import parse_filename
+
+    audio = parse_filename("01 Queen - Bohemian Rhapsody.mp3", "audio")
+    assert audio["artist"] == "Queen"
+    assert audio["title"] == "Bohemian Rhapsody"
+
+    video = parse_filename("Inception.2010.1080p.BluRay.x264.mkv", "video")
+    assert video["title"] == "Inception"
+    assert video["year"] == "2010"
+    assert video["quality"] == "1080p"
 
 
 def test_rehydrate_restores_index_metadata_from_skill_data(monkeypatch, tmp_path: pathlib.Path) -> None:
@@ -262,7 +427,7 @@ def test_scan_resets_loaded_vector_index_before_reindexing(monkeypatch, tmp_path
             {
                 "extractor": SimpleNamespace(extract=lambda *_args, **_kwargs: SimpleNamespace(to_dict=lambda: {})),
                 "ner": SimpleNamespace(extract_entities=lambda _name: {}),
-                "enricher": SimpleNamespace(enrich=lambda *_args, **_kwargs: {}),
+                "enricher": SimpleNamespace(enrich=lambda *_args, **_kwargs: {}, enrich_video=lambda *_args, **_kwargs: {}),
                 "vector_db": fake_vector,
             }
         )
@@ -275,5 +440,96 @@ def test_scan_resets_loaded_vector_index_before_reindexing(monkeypatch, tmp_path
     assert fake_vector.reset_called is True
     assert result["index"]["text_count"] == 1
     assert result["diagnostics"]["by_type"] == {"video": 1}
-    assert result["diagnostics"]["ner_parsed"] == 0
+    assert result["diagnostics"]["ner_parsed"] == 1
     assert result["diagnostics"]["indexed_count"] == 1
+    payload = fake_vector.text_docs[0]["payload"]
+    assert payload["playback_id"]
+    assert payload["content_path"].startswith("/api/node/media-indexer/content/")
+
+
+def test_vector_db_uses_lexical_backend_by_default(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.delenv("MEDIA_INDEXER_ENABLE_ML", raising=False)
+    monkeypatch.delenv("MEDIA_INDEXER_ENABLE_TEXT_EMBEDDINGS", raising=False)
+    monkeypatch.delenv("MEDIA_INDEXER_ENABLE_IMAGE_EMBEDDINGS", raising=False)
+
+    from lib.vector_db import VectorDatabase
+
+    db = VectorDatabase()
+    db.add_text("Queen Bohemian Rhapsody music audio", {"title": "Bohemian Rhapsody"})
+
+    results = db.search("queen", k=5)
+    assert results
+    assert results[0]["payload"]["title"] == "Bohemian Rhapsody"
+    assert results[0]["type"] == "media/text"
+
+    metadata = db.save(tmp_path)
+    assert metadata["backend"] == "lexical"
+    assert not (tmp_path / "text.index").exists()
+
+    restored = VectorDatabase()
+    assert restored.load(tmp_path)["loaded"] is True
+    assert restored.search("rhapsody", k=5)[0]["payload"]["title"] == "Bohemian Rhapsody"
+
+
+def test_global_ml_flag_does_not_enable_heavy_media_indexer_features(monkeypatch) -> None:
+    monkeypatch.setenv("MEDIA_INDEXER_ENABLE_ML", "1")
+    monkeypatch.delenv("MEDIA_INDEXER_ENABLE_TEXT_EMBEDDINGS", raising=False)
+    monkeypatch.delenv("MEDIA_INDEXER_ENABLE_IMAGE_EMBEDDINGS", raising=False)
+    monkeypatch.delenv("MEDIA_INDEXER_ENABLE_AUDIO_ID", raising=False)
+    monkeypatch.delenv("MEDIA_INDEXER_ENABLE_NER", raising=False)
+
+    main = importlib.import_module("handlers.main")
+    from lib.vector_db import VectorDatabase
+
+    assert main._feature_enabled("MEDIA_INDEXER_ENABLE_AUDIO_ID") is False
+    assert main._feature_enabled("MEDIA_INDEXER_ENABLE_NER") is False
+    db = VectorDatabase()
+    assert db.text_embeddings_enabled is False
+    assert db.faiss is None
+
+
+def test_media_indexer_playback_resolver_requires_indexed_root(monkeypatch, tmp_path: pathlib.Path) -> None:
+    module_path = next(
+        (
+            candidate / "src" / "adaos" / "services" / "media_indexer_library.py"
+            for candidate in [SKILL_ROOT, *SKILL_ROOT.parents, pathlib.Path("/root/adaos")]
+            if (candidate / "src" / "adaos" / "services" / "media_indexer_library.py").exists()
+        ),
+        None,
+    )
+    if module_path is not None:
+        spec = importlib.util.spec_from_file_location("media_indexer_library_under_test", module_path)
+        assert spec and spec.loader
+        library = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(library)
+    else:
+        library = importlib.import_module("adaos.services.media_indexer_library")
+
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    clip = media_dir / "clip.mp4"
+    clip.write_bytes(b"fake")
+    outside = tmp_path / "outside.mp4"
+    outside.write_bytes(b"fake")
+    metadata_path = tmp_path / "metadata.json"
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "schema": 1,
+                "indexed_directory": str(media_dir),
+                "text_docs": [
+                    {"payload": {"playback_id": "a" * 32, "full_path": str(clip), "mime_type": "video/mp4"}},
+                    {"payload": {"playback_id": "b" * 32, "full_path": str(outside), "mime_type": "video/mp4"}},
+                ],
+                "image_docs": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(library, "_metadata_candidates", lambda: [metadata_path])
+
+    resolved, payload = library.resolve_media_indexer_content("a" * 32)
+    assert resolved == clip.resolve()
+    assert payload["mime_type"] == "video/mp4"
+    with pytest.raises(PermissionError):
+        library.resolve_media_indexer_content("b" * 32)

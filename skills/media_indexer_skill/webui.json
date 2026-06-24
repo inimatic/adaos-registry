@@ -141,8 +141,45 @@
                     "key": "source",
                     "label": "Source"
                   }
+                ],
+                "buttons": [
+                  {
+                    "id": "play",
+                    "label": "Play",
+                    "icon": "play-outline",
+                    "tooltip": "Preview this media item"
+                  }
                 ]
-              }
+              },
+              "actions": [
+                {
+                  "id": "media_indexer.play_library",
+                  "on": "click:play",
+                  "type": "callHost",
+                  "target": "media_indexer.action",
+                  "feedback": {
+                    "pending": {
+                      "label": "Opening..."
+                    },
+                    "observe": {
+                      "kind": "y",
+                      "path": "data/media_indexer/playback",
+                      "scope": "node",
+                      "timeout_ms": 9000
+                    }
+                  },
+                  "params": {
+                    "id": "play",
+                    "path": "$event.path",
+                    "_observe": {
+                      "kind": "y",
+                      "path": "data/media_indexer/playback",
+                      "scope": "node",
+                      "timeout_ms": 9000
+                    }
+                  }
+                }
+              ]
             },
             {
               "id": "media-indexer-directory",
@@ -421,7 +458,59 @@
                 "detailsPath": "details_text",
                 "showDetails": false,
                 "itemAccordion": true,
+                "buttons": [
+                  {
+                    "id": "play",
+                    "label": "Play",
+                    "icon": "play-outline"
+                  }
+                ],
                 "emptyText": "Search the indexed library by title, artist, scene, filename clues or media type."
+              },
+              "actions": [
+                {
+                  "id": "media_indexer.play_result",
+                  "on": "click:play",
+                  "type": "callHost",
+                  "target": "media_indexer.action",
+                  "feedback": {
+                    "pending": {
+                      "label": "Opening..."
+                    },
+                    "observe": {
+                      "kind": "y",
+                      "path": "data/media_indexer/playback",
+                      "scope": "node",
+                      "timeout_ms": 9000
+                    }
+                  },
+                  "params": {
+                    "id": "play",
+                    "path": "$event.path",
+                    "_observe": {
+                      "kind": "y",
+                      "path": "data/media_indexer/playback",
+                      "scope": "node",
+                      "timeout_ms": 9000
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "media-indexer-player",
+              "type": "media.videoBrowser",
+              "area": "bottom",
+              "title": "Preview",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/media_indexer/playback",
+                "observeRoot": true
+              },
+              "inputs": {
+                "compact": true,
+                "readOnly": true,
+                "showDiagnostics": false
               }
             }
           ]
@@ -502,6 +591,20 @@
         "directory": "",
         "query": "",
         "k": 5
+      },
+      "playback": {
+        "ok": true,
+        "items": [],
+        "count": 0,
+        "total_bytes": 0,
+        "runtime": {
+          "recommended_path": "direct_local_http"
+        },
+        "capabilities": {
+          "notes": [
+            "Select a media item from Media Indexer results to preview it."
+          ]
+        }
       },
       "library": [],
       "results": []
