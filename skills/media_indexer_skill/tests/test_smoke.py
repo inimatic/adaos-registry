@@ -488,7 +488,7 @@ def test_global_ml_flag_does_not_enable_heavy_media_indexer_features(monkeypatch
     assert db.faiss is None
 
 
-def test_media_indexer_playback_resolver_requires_indexed_root(monkeypatch, tmp_path: pathlib.Path) -> None:
+def _load_media_indexer_library():
     module_path = next(
         (
             candidate / "src" / "adaos" / "services" / "media_indexer_library.py"
@@ -504,7 +504,30 @@ def test_media_indexer_playback_resolver_requires_indexed_root(monkeypatch, tmp_
         spec.loader.exec_module(library)
     else:
         library = importlib.import_module("adaos.services.media_indexer_library")
+    return library
 
+
+def test_media_indexer_playback_resolver_uses_state_metadata_path(monkeypatch, tmp_path: pathlib.Path) -> None:
+    library = _load_media_indexer_library()
+    base_dir = tmp_path / "adaos"
+    skills_dir = tmp_path / "skills"
+    monkeypatch.delenv("MEDIA_INDEXER_DATA_DIR", raising=False)
+    monkeypatch.setattr(
+        library,
+        "get_ctx",
+        lambda: SimpleNamespace(
+            paths=SimpleNamespace(
+                base_dir=lambda: base_dir,
+                skills_workspace_dir=lambda: skills_dir,
+            )
+        ),
+    )
+
+    assert base_dir / "state" / "media_indexer_skill" / "internal" / "faiss" / "metadata.json" in library._metadata_candidates()
+
+
+def test_media_indexer_playback_resolver_requires_indexed_root(monkeypatch, tmp_path: pathlib.Path) -> None:
+    library = _load_media_indexer_library()
     media_dir = tmp_path / "media"
     media_dir.mkdir()
     clip = media_dir / "clip.mp4"
