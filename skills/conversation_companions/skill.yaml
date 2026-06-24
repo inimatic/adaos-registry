@@ -1,0 +1,296 @@
+name: conversation_companions
+version: 0.1.1
+description: Draft conversational character skill for onboarding, profile tuning,
+  and controlled user trials.
+entry: handlers/main.py
+runtime:
+  python: '3.11'
+default_tool: talk
+dependencies: []
+events:
+  subscribe: []
+  publish:
+  - io.out.chat.append
+exports:
+  tools:
+  - start
+  - list_characters
+  - switch_character
+  - talk
+  - update_profile
+  - capture_feedback
+  - reset_session
+tools:
+- name: start
+  description: Start or resume the first-run character onboarding flow.
+  entry: handlers.main:start
+  input_schema:
+    type: object
+    properties:
+      profile_hint:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - next_actions
+- name: list_characters
+  description: List available character profiles and the active character.
+  entry: handlers.main:list_characters
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - characters
+- name: switch_character
+  description: Switch the active character or use a character temporarily.
+  entry: handlers.main:switch_character
+  input_schema:
+    type: object
+    required:
+    - character_id
+    properties:
+      character_id:
+        type: string
+      temporary:
+        type: boolean
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+- name: talk
+  description: Reply to a user message as the active character, a chosen character,
+    or a small panel.
+  entry: handlers.main:talk
+  input_schema:
+    type: object
+    properties:
+      text:
+        type: string
+      character_id:
+        type: string
+      mode:
+        type: string
+        enum:
+        - single
+        - temporary
+        - panel
+      preview:
+        type: boolean
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+- name: update_profile
+  description: Apply a bounded style/profile correction to a character.
+  entry: handlers.main:update_profile
+  input_schema:
+    type: object
+    required:
+    - instruction
+    properties:
+      character_id:
+        type: string
+      instruction:
+        type: string
+      persist:
+        type: boolean
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - patch
+- name: capture_feedback
+  description: Capture structured control-group feedback without exposing private
+    conversation content.
+  entry: handlers.main:capture_feedback
+  input_schema:
+    type: object
+    properties:
+      rating:
+        type: integer
+        minimum: 1
+        maximum: 5
+      expectation:
+        type: string
+      observation:
+        type: string
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+- name: reset_session
+  description: Reset active character and short conversation memory for one webspace.
+  entry: handlers.main:reset_session
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+data_routes:
+- surface: conversation trial feedback
+  route: skill-local
+  path: skill_memory:conversation_companions.feedback
+  owner: skill:conversation_companions
+  first_paint: deterministic onboarding, no LLM dependency
+  recovery: reset_session clears local session state only
+  guard_visibility: local skill state; no device-control side effects
+llm_hints:
+  description: Conversational character skill. It creates a low-friction first impression,
+    helps users choose or tune a persona, and answers without device-control tools.
+  aliases:
+  - разговорные персонажи
+  - персонаж для разговора
+  - советник
+  - собеседник
+  - поговорим
+  side_effect_class: local_write
+  primary_actions:
+  - id: conversation.start
+    intent: conversation.start
+    tool: start
+    side_effect_class: local_write
+    examples:
+    - поговорим
+    - создай разговорного персонажа
+    - хочу выбрать собеседника
+  - id: conversation.talk
+    intent: conversation.talk
+    tool: talk
+    side_effect_class: local_write
+    examples:
+    - дай совет
+    - что думаешь об этом
+    - развлеки меня
+  - id: conversation.switch_character
+    intent: conversation.switch_character
+    tool: switch_character
+    side_effect_class: local_write
+    examples:
+    - позови Нику
+    - переключись на советника
+    - ответь как рассказчик
+  - id: conversation.update_profile
+    intent: conversation.update_profile
+    tool: update_profile
+    side_effect_class: local_write
+    examples:
+    - говори короче
+    - будь теплее
+    - не задавай вопрос в конце
+nlu_hints:
+  aliases:
+  - разговор
+  - персонажи
+  - собеседник
+  - советник
+  examples:
+  - text: поговорим
+    locale: ru
+    intent: conversation.start
+  - text: создай персонажа для разговора
+    locale: ru
+    intent: conversation.start
+  - text: дай совет по ситуации
+    locale: ru
+    intent: conversation.talk
+  - text: переключись на Нику
+    locale: ru
+    intent: conversation.switch_character
+    slots:
+      character_id: nika
+  - text: говори короче и теплее
+    locale: ru
+    intent: conversation.update_profile
+nlu:
+  intents:
+    conversation.start:
+      examples:
+      - поговорим
+      - создай персонажа
+      - хочу разговорного помощника
+      - выбери собеседника
+      actions:
+      - type: skillTool
+        skill: conversation_companions
+        tool: start
+        params:
+          profile_hint: $text
+    conversation.talk:
+      examples:
+      - дай совет
+      - что думаешь
+      - помоги разобраться
+      - развлеки меня
+      actions:
+      - type: skillTool
+        skill: conversation_companions
+        tool: talk
+        params:
+          text: $text
+    conversation.switch_character:
+      examples:
+      - позови Нику
+      - переключись на Арсения
+      - пусть ответит рассказчик
+      - ответь как скептик
+      actions:
+      - type: skillTool
+        skill: conversation_companions
+        tool: switch_character
+        params:
+          character_id: $slot.character_id
+    conversation.update_profile:
+      examples:
+      - говори короче
+      - будь теплее
+      - не задавай вопросы в конце
+      - не спорь так резко
+      actions:
+      - type: skillTool
+        skill: conversation_companions
+        tool: update_profile
+        params:
+          instruction: $text
+updated_at: '2026-06-24T22:29:01+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.411+3184.6dde5681
+    recorded_at: '2026-06-24T22:29:01+00:00'
+    source: skill_push
+    min_commit: 6dde568172bbeeee4f003b6fbe04145c981ee13e
+    min_short_commit: 6dde5681
+    build_date: '2026-06-25T01:21:34+03:00'
+
