@@ -41,6 +41,9 @@ def test_detector_template_rules_detect_core_commands_without_model(monkeypatch,
         ("weather", "desktop.open_weather", {}),
         ("weather in Berlin", "desktop.open_weather", {"city": "Berlin"}),
         ("\u043e\u0442\u043a\u0440\u043e\u0439 \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441", "desktop.open_marketplace", {}),
+        ("\u043e\u0442\u043a\u0440\u043e\u0439 \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0430\u0441\u0435", "desktop.open_marketplace", {}),
+        ("\u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0437\u0430\u043c\u0435\u0442\u043a\u0438", "notebook.create_note", {}),
+        ("\u043e\u0442\u043a\u0440\u043e\u0439 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443", "desktop.open_modal", {"modal_id": "slideshow_modal"}),
         ("\u0441\u043a\u043e\u043b\u044c\u043a\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438", "voice.time.now", {}),
         (
             "\u043f\u043e\u0441\u0442\u0430\u0432\u044c \u0442\u0430\u0439\u043c\u0435\u0440 \u043d\u0430 10 \u043c\u0438\u043d\u0443\u0442",
@@ -118,7 +121,7 @@ def test_detector_artifact_root_prefers_runtime_data_from_source(monkeypatch, tm
     assert module.Detector._artifacts_root() == expected
 
 
-def test_detector_prefers_neural_result_over_template(monkeypatch, tmp_path):
+def test_detector_prefers_template_result_over_neural_for_explicit_commands(monkeypatch, tmp_path):
     monkeypatch.setenv("ADAOS_BASE_DIR", str(tmp_path))
     module = _load_detector_module()
     detector = object.__new__(module.Detector)
@@ -147,9 +150,8 @@ def test_detector_prefers_neural_result_over_template(monkeypatch, tmp_path):
 
     result = detector.detect("открой маркетплейс", webspace_id="desktop", locale="ru")
 
-    assert result["top_intent"] == "desktop.open_marketplace"
-    assert result["evidence"]["backend"] == "charcnn_bilstm"
-    assert result["evidence"]["ranker"] == "faiss_knn"
+    assert result["top_intent"] == "desktop.open_weather"
+    assert result["evidence"]["backend"] == "template_rules"
 
 
 def test_detector_prefers_faiss_pairs_when_index_backend_is_faiss(monkeypatch):

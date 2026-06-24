@@ -142,7 +142,7 @@ EXCLUSION_KEYWORDS = {
 }
 
 _FALSE_VALUES = {"0", "false", "no", "off", "disable", "disabled", "none"}
-_TEMPLATE_PATTERNS_TOTAL = 4
+_TEMPLATE_PATTERNS_TOTAL = 6
 _TEMPLATE_WEATHER_KEYWORD_RE = re.compile(
     r"\b(?:\u043f\u043e\u0433\u043e\u0434\u0430|\u043f\u0440\u043e\u0433\u043d\u043e\u0437|\u0442\u0435\u043c\u043f\u0435\u0440\u0430\u0442\u0443\u0440\u0430|weather|forecast|temperature)\b",
     re.IGNORECASE | re.UNICODE,
@@ -156,7 +156,15 @@ _TEMPLATE_WEATHER_CITY_EN_RE = re.compile(
     re.IGNORECASE | re.UNICODE,
 )
 _TEMPLATE_MARKETPLACE_RE = re.compile(
-    r"\b(?:\u043e\u0442\u043a\u0440\u043e\u0439|\u043f\u043e\u043a\u0430\u0436\u0438|\u0437\u0430\u043f\u0443\u0441\u0442\u0438|open|show)\s+(?:\u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441|marketplace)\b",
+    r"\b(?:\u043e\u0442\u043a\u0440\u043e\u0439|\u043f\u043e\u043a\u0430\u0436\u0438|\u0437\u0430\u043f\u0443\u0441\u0442\u0438|open|show)\s+(?:\u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b(?:\u0435\u0439\u0441|\u0430\u0441\u0435)|marketplace)\b",
+    re.IGNORECASE | re.UNICODE,
+)
+_TEMPLATE_NOTEBOOK_CREATE_NOTE_RE = re.compile(
+    r"\b(?:\u0434\u043e\u0431\u0430\u0432\u0438\u0442\u044c|\u0434\u043e\u0431\u0430\u0432\u044c|\u0441\u043e\u0437\u0434\u0430\u0442\u044c|\u0441\u043e\u0437\u0434\u0430\u0439|\u043d\u0430\u043f\u0438\u0448\u0438|\u043d\u0430\u043f\u0438\u0448\u0435\u043c|create|add)\s+(?:\u0437\u0430\u043c\u0435\u0442\u043a\u0443|\u0437\u0430\u043c\u0435\u0442\u043a\u0438|note|notes)\b",
+    re.IGNORECASE | re.UNICODE,
+)
+_TEMPLATE_SLIDESHOW_MODAL_RE = re.compile(
+    r"\b(?:\u043e\u0442\u043a\u0440\u043e\u0439|\u043f\u043e\u043a\u0430\u0436\u0438|\u0437\u0430\u043f\u0443\u0441\u0442\u0438|open|show|launch)\s+(?:\u0441\u043b\u0430\u0439\u0434\s?\u0448\u043e\u0443|slideshow)\b",
     re.IGNORECASE | re.UNICODE,
 )
 _TEMPLATE_TIME_NOW_RE = re.compile(
@@ -1171,6 +1179,28 @@ class Detector:
                 entity_resolution=entity_resolution,
             )
 
+        if _TEMPLATE_NOTEBOOK_CREATE_NOTE_RE.search(model_text):
+            return self._template_result(
+                intent="notebook.create_note",
+                template_id="builtin.notebook.create_note",
+                confidence=0.99,
+                slots={},
+                mask=mask,
+                model_text=model_text,
+                entity_resolution=entity_resolution,
+            )
+
+        if _TEMPLATE_SLIDESHOW_MODAL_RE.search(model_text):
+            return self._template_result(
+                intent="desktop.open_modal",
+                template_id="builtin.desktop.open_modal.slideshow",
+                confidence=0.99,
+                slots={"modal_id": "slideshow_modal"},
+                mask=mask,
+                model_text=model_text,
+                entity_resolution=entity_resolution,
+            )
+
         if _TEMPLATE_WEATHER_KEYWORD_RE.search(model_text):
             city: str | None = None
             city_match = _TEMPLATE_WEATHER_CITY_RU_RE.search(model_text) or _TEMPLATE_WEATHER_CITY_EN_RE.search(model_text)
@@ -1291,12 +1321,12 @@ class Detector:
                     return self._normalize_adapter_result(out, model_text=model_text, entity_resolution=entity_payload)
             except Exception:
                 pass
-        neural = self._neural_detect(text=text, model_text=model_text, entity_resolution=entity_payload)
-        if isinstance(neural, dict):
-            return neural
         template = self._template_detect(model_text=model_text, entity_resolution=entity_payload)
         if isinstance(template, dict):
             return template
+        neural = self._neural_detect(text=text, model_text=model_text, entity_resolution=entity_payload)
+        if isinstance(neural, dict):
+            return neural
         return self._abstain(text=text, model_text=model_text, entity_resolution=entity_payload)
 
     def _purge_example_indexes(self) -> list[str]:

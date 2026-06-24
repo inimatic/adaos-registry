@@ -1,5 +1,5 @@
 name: neural_nlu_service_skill
-version: 0.2.16
+version: 0.2.17
 description: Local neural intent detector service for AdaOS NLU pipeline
 runtime:
   kind: service
@@ -29,13 +29,13 @@ events:
   publish:
   - nlp.intent.detected
   - nlp.intent.detect.rasa
-updated_at: '2026-06-20T04:40:09+00:00'
+updated_at: '2026-06-24T05:18:23+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3086.64c551f7
-    recorded_at: '2026-06-20T04:40:09+00:00'
+    min_version: 0.1.0+3164.02b8c810
+    recorded_at: '2026-06-24T05:18:23+00:00'
     source: skill_push
-    min_commit: 64c551f74a6df25522b5c8430d7903c42127c6a3
-    min_short_commit: 64c551f7
-    build_date: '2026-06-20T07:39:15+03:00'
+    min_commit: 02b8c81043ecf97f52798a6a4e4b0a31df592754
+    min_short_commit: 02b8c810
+    build_date: '2026-06-24T08:17:54+03:00'
 
