@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-24T05:18:43+00:00",
+  "updated_at": "2026-06-24T05:18:59+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -755,8 +755,8 @@
       "kind": "scenario",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.8",
-      "updated_at": "2026-06-23T10:23:34+00:00",
+      "version": "0.3.9",
+      "updated_at": "2026-06-24T05:18:59+00:00",
       "path": "scenarios/web_desktop",
       "manifest": "scenarios/web_desktop/scenario.yaml",
       "source": {
