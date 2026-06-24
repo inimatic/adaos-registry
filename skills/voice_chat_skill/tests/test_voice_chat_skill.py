@@ -172,7 +172,7 @@ def test_voice_chat_marketplace_command_opens_modal_once(monkeypatch):
 
     assert result and result["ok"] is True
     assert result["intent"] == "desktop.open_marketplace"
-    assert opened[0]["modal_id"] == "apps_catalog"
+    assert opened[0]["modal_id"] == "marketplace_modal"
     assert opened[0]["suppress_voice_ack"] is True
     assert replies == ["\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e Marketplace."]
 
@@ -190,7 +190,7 @@ def test_voice_chat_modal_open_event_acknowledges_voice_marketplace(monkeypatch)
 
     mod.on_desktop_modal_open(
         {
-            "modal_id": "apps_catalog",
+            "modal_id": "marketplace_modal",
             "webspace_id": "desktop",
             "_meta": {"route_id": "voice_chat", "target_node_id": "member-1"},
         }

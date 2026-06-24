@@ -77,7 +77,7 @@ _TIME_RE = re.compile(
     re.IGNORECASE | re.UNICODE,
 )
 _MARKETPLACE_RE = re.compile(
-    r"\b(?:\u043e\u0442\u043a\u0440\u043e\u0439|\u043f\u043e\u043a\u0430\u0436\u0438|\u0437\u0430\u043f\u0443\u0441\u0442\u0438|open|show)\s+(?:\u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441|marketplace)\b",
+    r"\b(?:\u043e\u0442\u043a\u0440\u043e\u0439|\u043f\u043e\u043a\u0430\u0436\u0438|\u0437\u0430\u043f\u0443\u0441\u0442\u0438|open|show)\s+(?:\u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b(?:\u0435\u0439\u0441|\u0430\u0441\u0435)|marketplace)\b",
     re.IGNORECASE | re.UNICODE,
 )
 _TIMER_RE = re.compile(
@@ -408,7 +408,7 @@ def _try_handle_local_command(text: str, *, webspace_id: str, target_node_id: st
     if _MARKETPLACE_RE.search(text):
         reply = "\u041e\u0442\u043a\u0440\u044b\u0432\u0430\u044e Marketplace."
         _publish_modal_open(
-            modal_id="apps_catalog",
+            modal_id="marketplace_modal",
             webspace_id=webspace_id,
             target_node_id=target_node_id,
             meta=meta,
@@ -606,7 +606,7 @@ def on_desktop_modal_open(evt: Any) -> None:
     if _route_id(meta) != "voice_chat" or bool(meta.get("_voice_chat_ack_suppressed")):
         return
     modal_id = str(payload.get("modal_id") or payload.get("modalId") or "").strip()
-    if modal_id != "apps_catalog":
+    if modal_id != "marketplace_modal":
         return
     webspace_id = _webspace_id_from_meta({**meta, **payload})
     target_node_id = _target_node_id_from_meta({**meta, **payload})
