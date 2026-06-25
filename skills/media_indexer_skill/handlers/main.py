@@ -1005,6 +1005,21 @@ def _payload_by_path(path: str) -> Dict[str, Any] | None:
     return fallback
 
 
+def _resolve_playback_payload(path: str) -> tuple[Dict[str, Any] | None, str]:
+    selected_path = str(path or "").strip()
+    selected_payload = _payload_by_path(selected_path)
+    if selected_payload is None and selected_path:
+        selected_payload = {
+            "full_path": selected_path,
+            "real_file_name": pathlib.Path(selected_path).name,
+            "display_title": pathlib.Path(selected_path).stem,
+        }
+    if not selected_payload:
+        return None, ""
+    playback_path = str(selected_payload.get("full_path") or selected_path).strip()
+    return selected_payload, playback_path
+
+
 def _empty_diagnostics() -> Dict[str, Any]:
     return {
         "value": "ready",
@@ -1958,14 +1973,8 @@ async def on_media_indexer_action(evt: Any) -> None:
 
     if action_id in {"play", "preview"}:
         selected_path = _path_from_action_payload(payload)
-        selected_payload = _payload_by_path(selected_path)
-        if selected_payload is None and selected_path:
-            selected_payload = {
-                "full_path": selected_path,
-                "real_file_name": pathlib.Path(selected_path).name,
-                "display_title": pathlib.Path(selected_path).stem,
-            }
-        exists = pathlib.Path(selected_path).is_file() if selected_path else False
+        selected_payload, playback_path = _resolve_playback_payload(selected_path)
+        exists = pathlib.Path(playback_path).is_file() if playback_path else False
         if not selected_payload or not exists:
             status = _status_payload(
                 value="error",
@@ -1980,7 +1989,7 @@ async def on_media_indexer_action(evt: Any) -> None:
         status = _status_payload(
             value="ready",
             subtitle="Preview selected",
-            description=str(selected_payload.get("real_file_name") or pathlib.Path(selected_path).name),
+            description=str(selected_payload.get("real_file_name") or pathlib.Path(playback_path or selected_path).name),
         )
         await _project_snapshot_async(_snapshot_payload(status=status, form=form, include_library=False), webspace_id=webspace_id)
         _publish_operation({"value": "ready", "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)

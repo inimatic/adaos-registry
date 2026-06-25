@@ -331,6 +331,50 @@ def test_payload_lookup_falls_back_to_filename_for_lossy_paths(monkeypatch, tmp_
     assert resolved is payload
 
 
+def test_play_action_uses_indexed_payload_for_lossy_path(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    clip = media_dir / "Aristocats.1970.HDRip.AVI.avi"
+    clip.write_bytes(b"video")
+    payload = {
+        "full_path": str(clip),
+        "real_file_name": clip.name,
+        "display_title": "Aristocats",
+        "ftype": "video",
+    }
+
+    class FakeVectorDb:
+        text_docs = [{"text": "aristocats", "payload": payload}]
+        image_docs = []
+
+    projected: list[dict] = []
+
+    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+        projected.append(snapshot)
+
+    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(main, "_read_persisted_index_metadata", lambda: {"indexed_directory": str(media_dir)})
+    main._state["selected_directory"] = str(media_dir)
+    main._state["vector_db"] = FakeVectorDb()
+    main._state["index_loaded"] = True
+
+    asyncio.run(
+        main.on_media_indexer_action(
+            SimpleNamespace(payload={"id": "play", "path": f"/mnt/disk1/Video/share/!???/test/{clip.name}"})
+        )
+    )
+
+    assert projected
+    assert projected[-1]["status"]["value"] == "ready"
+    assert projected[-1]["playback"]["items"][0]["source_path"] == str(clip)
+
+
 def test_lossy_directory_value_repairs_from_persisted_index(monkeypatch, tmp_path: pathlib.Path) -> None:
     monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
     monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
