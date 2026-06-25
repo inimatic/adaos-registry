@@ -42,6 +42,18 @@ from lib.vector_db import VectorDatabase
 
 logger = logging.getLogger(__name__)
 
+
+def _env_float(name: str, default: float) -> float:
+    raw = os.getenv(name)
+    if raw in (None, ""):
+        return default
+    try:
+        return float(str(raw).strip())
+    except (TypeError, ValueError):
+        logger.warning("invalid float env %s=%r, using %.1f", name, raw, default)
+        return default
+
+
 REQUIRES_DATA_PROJECTIONS = True
 SCORE_THRESHOLD = 25.0
 DEFAULT_QUERY = ""
@@ -51,6 +63,7 @@ OPERATION_RECEIVER = "media_indexer.operations"
 MAX_RESULTS = 20
 SNAPSHOT_LIBRARY_LIMIT = 25
 PROGRESS_MIN_INTERVAL_SEC = 1.0
+PROJECTION_TIMEOUT_SEC = _env_float("MEDIA_INDEXER_PROJECTION_TIMEOUT_SEC", 2.0)
 PROGRESS_QUEUE_MAXSIZE = 1
 STATUS_COLORS = {
     "ready": "#6EE7B7",
@@ -299,16 +312,34 @@ def _read_persisted_index_metadata() -> Dict[str, Any]:
     return payload
 
 
+def _compact_index_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    if not isinstance(metadata, dict) or not metadata:
+        return {}
+    compact = dict(metadata)
+    compact.pop("text_docs", None)
+    compact.pop("image_docs", None)
+    compact.setdefault("indexed_count", int(metadata.get("indexed_count") or metadata.get("total_count") or metadata.get("text_count") or 0))
+    compact.setdefault("text_count", int(metadata.get("text_count") or compact.get("indexed_count") or 0))
+    compact.setdefault("image_count", int(metadata.get("image_count") or 0))
+    compact.setdefault("total_count", int(metadata.get("total_count") or compact.get("indexed_count") or 0))
+    return compact
+
+
 def _index_metadata() -> Dict[str, Any]:
     stored = _safe_memory_get(INDEX_META_KEY, {})
     if isinstance(stored, dict) and stored:
-        return dict(stored)
+        compact = _compact_index_metadata(stored)
+        if compact != stored:
+            _safe_memory_set(INDEX_META_KEY, compact)
+        return compact
     if not _has_persisted_index():
         return {}
     restored = _read_persisted_index_metadata()
     if restored:
-        _safe_memory_set(INDEX_META_KEY, restored)
-    return restored
+        compact = _compact_index_metadata(restored)
+        _safe_memory_set(INDEX_META_KEY, compact)
+        return compact
+    return {}
 
 
 def _settings() -> Dict[str, Any]:
@@ -574,6 +605,7 @@ def _snapshot_payload(
         "playback": playback,
         "diagnostics": diagnostics_payload,
         "library": list(_state.get("library_items") or [])[:SNAPSHOT_LIBRARY_LIMIT] if include_library else [],
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
     }
     return payload
 
@@ -608,9 +640,15 @@ async def _project_snapshot_async(snapshot: Dict[str, Any], *, webspace_id: str 
         pushed = set_current_skill("media_indexer_skill")
         set_async = getattr(ctx_subnet, "set_async", None)
         if callable(set_async):
-            await set_async("media_indexer.snapshot", snapshot, webspace_id=webspace_id)
+            await asyncio.wait_for(
+                set_async("media_indexer.snapshot", snapshot, webspace_id=webspace_id),
+                timeout=max(0.1, PROJECTION_TIMEOUT_SEC),
+            )
         else:
-            await asyncio.to_thread(_project_snapshot, snapshot, webspace_id=webspace_id)
+            await asyncio.wait_for(
+                asyncio.to_thread(_project_snapshot, snapshot, webspace_id=webspace_id),
+                timeout=max(0.1, PROJECTION_TIMEOUT_SEC),
+            )
         status = snapshot.get("status") if isinstance(snapshot.get("status"), dict) else {}
         form = snapshot.get("form") if isinstance(snapshot.get("form"), dict) else {}
         logger.info(
@@ -618,6 +656,12 @@ async def _project_snapshot_async(snapshot: Dict[str, Any], *, webspace_id: str 
             webspace_id or "default",
             status.get("value") or "-",
             form.get("directory") or "",
+        )
+    except asyncio.TimeoutError:
+        logger.warning(
+            "timed out projecting media_indexer.snapshot webspace=%s timeout_sec=%.1f",
+            webspace_id or "default",
+            PROJECTION_TIMEOUT_SEC,
         )
     except Exception:
         logger.warning("failed to project media_indexer.snapshot", exc_info=True)
@@ -834,9 +878,10 @@ def _persist_index(directory: str, indexed_count: int) -> Dict[str, Any]:
         (_index_dir() / "metadata.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     except Exception:
         logger.warning("failed to update persisted media index metadata with playback root", exc_info=True)
-    _safe_memory_set(INDEX_META_KEY, payload)
+    compact = _compact_index_metadata(payload)
+    _safe_memory_set(INDEX_META_KEY, compact)
     _state["index_loaded"] = True
-    return payload
+    return compact
 
 
 def _clear_persisted_index(directory: str) -> Dict[str, Any]:
@@ -935,6 +980,7 @@ def _player_item_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _playback_snapshot(payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    updated_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     if not payload:
         return {
             "ok": True,
@@ -943,6 +989,7 @@ def _playback_snapshot(payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "total_bytes": 0,
             "runtime": {"recommended_path": "direct_local_http"},
             "capabilities": {"notes": ["Select a media item from Media Indexer results to preview it."]},
+            "updated_at": updated_at,
         }
     item = _player_item_from_payload(payload)
     return {
@@ -955,6 +1002,7 @@ def _playback_snapshot(payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "notes": ["Read-only preview from the indexed media directory."],
             "playback": {"direct_local": {"ready": True, "mode": "media_indexer_read_only"}},
         },
+        "updated_at": updated_at,
     }
 
 

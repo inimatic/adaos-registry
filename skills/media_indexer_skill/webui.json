@@ -309,7 +309,7 @@
                     },
                     "observe": {
                       "kind": "y",
-                      "path": "data/media_indexer/results",
+                      "path": "data/media_indexer/status",
                       "scope": "node",
                       "timeout_ms": 60000
                     }
@@ -320,7 +320,7 @@
                     "k": 5,
                     "_observe": {
                       "kind": "y",
-                      "path": "data/media_indexer/results",
+                      "path": "data/media_indexer/status",
                       "scope": "node",
                       "timeout_ms": 60000
                     }

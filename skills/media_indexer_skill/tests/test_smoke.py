@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 import importlib
 import json
 import pathlib
@@ -65,6 +66,10 @@ def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
     player_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-player")
     assert player_widget["type"] == "media.videoBrowser"
     assert player_widget["inputs"]["readOnly"] is True
+    query_widget = next(widget for widget in schema["widgets"] if widget["id"] == "media-indexer-query")
+    search_action = query_widget["actions"][0]
+    assert search_action["feedback"]["observe"]["path"] == "data/media_indexer/status"
+    assert search_action["params"]["_observe"]["path"] == "data/media_indexer/status"
 
 
 def test_scanner_finds_supported_media_without_hashing(tmp_path: pathlib.Path) -> None:
@@ -79,6 +84,27 @@ def test_scanner_finds_supported_media_without_hashing(tmp_path: pathlib.Path) -
 
     assert [item.name for item in inventory["video"]] == ["clip.mp4"]
     assert "audio" not in inventory
+
+
+def test_lexical_search_does_not_require_numpy(monkeypatch) -> None:
+    from lib.vector_db import VectorDatabase
+
+    db = VectorDatabase()
+    db.text_embeddings_enabled = False
+    db.text_docs = [{"text": "movie video title Sing", "payload": {"full_path": "/media/Sing.mkv"}}]
+    real_import = builtins.__import__
+
+    def fake_import(name, *args, **kwargs):
+        if name == "numpy":
+            raise ModuleNotFoundError("No module named 'numpy'")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", fake_import)
+
+    results = db.search("Sing", k=5)
+
+    assert results
+    assert results[0]["payload"]["full_path"] == "/media/Sing.mkv"
 
 
 def test_handler_import_is_passive_and_search_without_index_does_not_load_models(monkeypatch, tmp_path: pathlib.Path) -> None:
@@ -432,6 +458,47 @@ def test_play_action_loads_persisted_index_for_lossy_path(monkeypatch, tmp_path:
     assert projected[-1]["overview"]["value"] == "1 files"
     assert projected[-1]["diagnostics"]["indexed_count"] == 1
     assert projected[-1]["playback"]["items"][0]["source_path"] == str(clip)
+
+
+def test_get_settings_returns_compact_index_metadata(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    metadata = {
+        "schema": 1,
+        "backend": "lexical",
+        "indexed_directory": str(media_dir),
+        "text_docs": [{"text": "song", "payload": {"full_path": str(media_dir / "song.mp3")}}],
+        "image_docs": [{"text": "image", "payload": {"full_path": str(media_dir / "image.jpg")}}],
+        "text_count": 1,
+        "image_count": 1,
+        "total_count": 2,
+    }
+    (main._index_dir() / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+
+    result = main.get_settings()
+
+    assert result["status"] == "ok"
+    assert result["index"]["indexed_count"] == 2
+    assert result["index"]["total_count"] == 2
+    assert "text_docs" not in result["index"]
+    assert "image_docs" not in result["index"]
+
+
+def test_playback_snapshot_has_observable_freshness_marker(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+
+    snapshot = main._playback_snapshot()
+
+    assert snapshot["updated_at"]
 
 
 def test_lossy_directory_value_repairs_from_persisted_index(monkeypatch, tmp_path: pathlib.Path) -> None:

@@ -268,13 +268,13 @@ class VectorDatabase:
             logger.warning("CLIP failed to read %s: %s", image_path, exc)
 
     def search(self, query: str, k: int = 5) -> List[Dict[str, Any]]:
-        import numpy as np
-
         results: List[Dict[str, Any]] = []
 
         if not self.text_embeddings_enabled:
             results.extend(self._search_lexical(query, k))
             return results[:k]
+
+        import numpy as np
 
         if self.text_docs:
             q_text_emb = self.text_model.encode(query, normalize_embeddings=True).astype("float32")
