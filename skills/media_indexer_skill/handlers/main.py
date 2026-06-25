@@ -973,7 +973,7 @@ def _player_item_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         "mime_type": _guess_mime_type(path or name),
         "modified_at": modified_at,
         "content_path": f"/api/node/media-indexer/content/{playback_id}",
-        "routed_content_path": f"/media/media-indexer/content/{playback_id}",
+        "routed_content_path": f"/api/node/media-indexer/content/{playback_id}",
         "playback_id": playback_id,
         "source_path": path,
     }
@@ -1626,7 +1626,7 @@ def _log_index_document(
         "index_text": index_text,
         "timings_sec": {key: round(value, 3) for key, value in timings.items()},
     }
-    logger.info("Index document: %s", json.dumps(_trim_for_log(diagnostics), ensure_ascii=False, sort_keys=True))
+    logger.debug("Index document: %s", json.dumps(_trim_for_log(diagnostics), ensure_ascii=False, sort_keys=True))
 
 
 @tool("scan_and_index")
