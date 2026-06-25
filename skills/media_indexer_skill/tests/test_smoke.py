@@ -302,6 +302,50 @@ def test_play_action_keeps_directory_when_payload_path_is_media_file(monkeypatch
     assert projected[-1]["playback"]["items"][0]["routed_content_path"].startswith("/media/media-indexer/content/")
 
 
+def test_payload_lookup_falls_back_to_filename_for_lossy_paths(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    clip = media_dir / "Aristocats.1970.HDRip.AVI.avi"
+    clip.write_bytes(b"video")
+    payload = {
+        "full_path": str(clip),
+        "real_file_name": clip.name,
+        "display_title": "Aristocats",
+        "ftype": "video",
+    }
+
+    class FakeVectorDb:
+        text_docs = [{"text": "aristocats", "payload": payload}]
+        image_docs = []
+
+    main._state["vector_db"] = FakeVectorDb()
+    main._state["index_loaded"] = True
+
+    resolved = main._payload_by_path(f"/mnt/disk1/Video/share/!???/test/{clip.name}")
+
+    assert resolved is payload
+
+
+def test_lossy_directory_value_repairs_from_persisted_index(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    monkeypatch.setattr(main, "_read_persisted_index_metadata", lambda: {"indexed_directory": str(media_dir)})
+
+    repaired = main._directory_value_or_parent("/mnt/disk1/Video/share/!???/test")
+
+    assert repaired == str(media_dir)
+
+
 def test_search_action_projects_compact_snapshots(monkeypatch, tmp_path: pathlib.Path) -> None:
     monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
     monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
@@ -621,6 +665,20 @@ def test_media_indexer_playback_resolver_uses_state_metadata_path(monkeypatch, t
                 skills_workspace_dir=lambda: skills_dir,
             )
         ),
+    )
+
+    assert base_dir / "state" / "media_indexer_skill" / "internal" / "faiss" / "metadata.json" in library._metadata_candidates()
+
+
+def test_media_indexer_playback_resolver_uses_base_dir_env_without_context(monkeypatch, tmp_path: pathlib.Path) -> None:
+    library = _load_media_indexer_library()
+    base_dir = tmp_path / "adaos"
+    monkeypatch.delenv("MEDIA_INDEXER_DATA_DIR", raising=False)
+    monkeypatch.setenv("ADAOS_BASE_DIR", str(base_dir))
+    monkeypatch.setattr(
+        library,
+        "get_ctx",
+        lambda: (_ for _ in ()).throw(RuntimeError("context unavailable")),
     )
 
     assert base_dir / "state" / "media_indexer_skill" / "internal" / "faiss" / "metadata.json" in library._metadata_candidates()

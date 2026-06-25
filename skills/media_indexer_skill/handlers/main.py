@@ -210,9 +210,31 @@ def _directory_value_or_parent(value: Any) -> str:
         path = pathlib.Path(raw).expanduser()
         if path.exists() and path.is_file():
             return str(path.parent)
+        if not path.exists() and _looks_lossy_path(raw):
+            repaired = _directory_from_index_for_lossy_path(raw)
+            if repaired:
+                return repaired
     except Exception:
         return raw
     return raw
+
+
+def _looks_lossy_path(value: str) -> bool:
+    return "?" in value or "\ufffd" in value
+
+
+def _directory_from_index_for_lossy_path(value: str) -> str:
+    metadata = _read_persisted_index_metadata()
+    indexed_directory = str(metadata.get("indexed_directory") or "").strip()
+    if not indexed_directory:
+        return ""
+    try:
+        indexed_root = pathlib.Path(indexed_directory).expanduser()
+        if indexed_root.exists() and indexed_root.is_dir():
+            return str(indexed_root)
+    except Exception:
+        return ""
+    return ""
 
 
 def _internal_data_dir() -> pathlib.Path:
@@ -948,12 +970,21 @@ def _payload_by_path(path: str) -> Dict[str, Any] | None:
     needle = str(path or "").strip()
     if not needle:
         return None
+    needle_name = pathlib.Path(needle).name
+    fallback: Dict[str, Any] | None = None
     vector_db = _state.get("vector_db")
     docs = list(getattr(vector_db, "text_docs", None) or []) + list(getattr(vector_db, "image_docs", None) or [])
     for doc in docs:
         payload = doc.get("payload") if isinstance(doc.get("payload"), dict) else {}
         if str(payload.get("full_path") or "").strip() == needle:
             return payload
+        payload_path = str(payload.get("full_path") or "").strip()
+        payload_names = {
+            str(payload.get("real_file_name") or "").strip(),
+            pathlib.Path(payload_path).name if payload_path else "",
+        }
+        if needle_name and needle_name in payload_names and fallback is None:
+            fallback = payload
     for item in _state.get("library_items") or []:
         if isinstance(item, dict) and str(item.get("path") or "").strip() == needle:
             return {
@@ -962,7 +993,16 @@ def _payload_by_path(path: str) -> Dict[str, Any] | None:
                 "display_title": item.get("title"),
                 "ftype": item.get("type"),
             }
-    return None
+        item_path = str(item.get("path") or "") if isinstance(item, dict) else ""
+        item_name = str(item.get("source") or pathlib.Path(item_path).name) if isinstance(item, dict) else ""
+        if needle_name and needle_name == item_name:
+            return {
+                "full_path": item.get("path"),
+                "real_file_name": item.get("source"),
+                "display_title": item.get("title"),
+                "ftype": item.get("type"),
+            }
+    return fallback
 
 
 def _empty_diagnostics() -> Dict[str, Any]:
