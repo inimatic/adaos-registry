@@ -1,5 +1,5 @@
 name: notebook_skill
-version: 0.1.6
+version: 0.1.7
 description: Shared plain-text notebook with one active editable note, a live note
   list stream, and Telegram export.
 runtime:

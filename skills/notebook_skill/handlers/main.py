@@ -113,11 +113,18 @@ def _root_base_candidates(explicit: str | None = None) -> list[str]:
 
 def _clean_content(value: Any) -> str:
     text = str(value or "")
-    if text.startswith("$event."):
+    if text.startswith(("$event.", "$state.", "$client.")):
         text = ""
     if len(text) > _MAX_CONTENT_CHARS:
         return text[:_MAX_CONTENT_CHARS]
     return text
+
+
+def _has_resolved_content(payload: Mapping[str, Any]) -> bool:
+    if "content" not in payload or payload.get("content") is None:
+        return False
+    text = str(payload.get("content") or "")
+    return not text.startswith(("$event.", "$state.", "$client."))
 
 
 def _preview(content: str, *, limit: int = 120) -> str:
@@ -377,6 +384,8 @@ def save_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[s
     note = _STATE["notes"].get(note_id)
     if not isinstance(note, dict):
         return {"ok": False, "error": "note_not_found", "note_id": note_id}
+    if not _has_resolved_content(body):
+        return {"ok": False, "error": "content_required", "note_id": note_id, "note": deepcopy(note)}
     note["content"] = _clean_content(body.get("content"))
     note["updated_at"] = _now()
     note["version"] = int(note.get("version") or 0) + 1

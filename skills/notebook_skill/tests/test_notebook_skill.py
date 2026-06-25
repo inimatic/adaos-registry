@@ -75,6 +75,18 @@ def test_actions_default_to_desktop_webspace(monkeypatch):
     assert projected[-1][1]["widget"]["items"][0]["title"] == "Desktop note"
 
 
+def test_save_note_ignores_unresolved_content_placeholders(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+
+    mod.save_note({"note_id": "note-1", "content": "Keep me"})
+
+    result = mod.save_note({"note_id": "note-1", "content": "$state.notebookEditorContent"})
+
+    assert result["ok"] is False
+    assert result["error"] == "content_required"
+    assert mod.get_notebook_snapshot()["snapshot"]["editor"]["content"] == "Keep me"
+
+
 def test_send_note_to_telegram_uses_root_outbox_contract(monkeypatch):
     mod, _projected, _streams = load_module(monkeypatch)
     sent = {}

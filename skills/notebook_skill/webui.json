@@ -173,7 +173,8 @@
                   "type": "updateState",
                   "params": {
                     "notebookViewMode": "edit",
-                    "notebookSelectedNoteId": ""
+                    "notebookSelectedNoteId": "",
+                    "notebookEditorContent": ""
                   }
                 }
               ]
@@ -191,6 +192,15 @@
                 ]
               },
               "actions": [
+                {
+                  "on": "click:back",
+                  "type": "callSkill",
+                  "target": "notebook_skill.save_note",
+                  "params": {
+                    "note_id": "$state.notebookSelectedNoteId",
+                    "content": "$state.notebookEditorContent"
+                  }
+                },
                 {
                   "on": "click:back",
                   "type": "updateState",
@@ -215,7 +225,10 @@
                 "bindField": "content",
                 "placeholder": "Write a note",
                 "autoSave": true,
-                "autoSaveMs": 250
+                "autoSaveMs": 250,
+                "stateKey": "notebookEditorContent",
+                "loadingText": "Loading note...",
+                "loadingUntilUpdatedAt": true
               },
               "actions": [
                 {
@@ -332,13 +345,23 @@
                   "on": "click:new",
                   "type": "updateState",
                   "params": {
-                    "notebookSelectedNoteId": ""
+                    "notebookSelectedNoteId": "",
+                    "notebookEditorContent": ""
                   }
                 },
                 {
                   "on": "click:refresh",
                   "type": "callSkill",
                   "target": "notebook_skill.get_notebook_snapshot"
+                },
+                {
+                  "on": "click:telegram",
+                  "type": "callSkill",
+                  "target": "notebook_skill.save_note",
+                  "params": {
+                    "note_id": "$state.notebookSelectedNoteId",
+                    "content": "$state.notebookEditorContent"
+                  }
                 },
                 {
                   "on": "click:telegram",
