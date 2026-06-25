@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
 import pathlib
@@ -105,150 +106,156 @@ def test_handler_import_is_passive_and_search_without_index_does_not_load_models
     assert main._state["vector_db"] is None
 
 
-@pytest.mark.asyncio
-async def test_scan_action_uses_webspace_form_directory_when_payload_omits_directory(
+def test_scan_action_uses_webspace_form_directory_when_payload_omits_directory(
     monkeypatch,
     tmp_path: pathlib.Path,
 ) -> None:
-    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
-    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+    async def run_case() -> None:
+        monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+        monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
 
-    main = importlib.import_module("handlers.main")
-    main.dispose()
-    media_dir = tmp_path / "media"
-    media_dir.mkdir()
-    memory: dict[str, dict] = {}
-    projected: list[dict] = []
-    seen: dict[str, str] = {}
+        main = importlib.import_module("handlers.main")
+        main.dispose()
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        memory: dict[str, dict] = {}
+        projected: list[dict] = []
+        seen: dict[str, str] = {}
 
-    async def fake_read_directory(webspace_id: str | None, payload: dict) -> str:
-        assert webspace_id == "ws-1"
-        return str(media_dir)
+        async def fake_read_directory(webspace_id: str | None, payload: dict) -> str:
+            assert webspace_id == "ws-1"
+            return str(media_dir)
 
-    def fake_scan(directory: str, progress=None) -> dict:
-        seen["directory"] = directory
-        return {
-            "status": "ok",
-            "indexed_count": 1,
-            "errors": [],
-            "diagnostics": {
+        def fake_scan(directory: str, progress=None) -> dict:
+            seen["directory"] = directory
+            return {
+                "status": "ok",
                 "indexed_count": 1,
-                "files_found": 1,
-                "by_type": {"video": 1},
-                "description": "Indexed 1 media files.",
-            },
-        }
+                "errors": [],
+                "diagnostics": {
+                    "indexed_count": 1,
+                    "files_found": 1,
+                    "by_type": {"video": 1},
+                    "description": "Indexed 1 media files.",
+                },
+            }
 
-    monkeypatch.setattr(main, "_safe_memory_get", lambda key, default=None: memory.get(key, default))
-    monkeypatch.setattr(main, "_safe_memory_set", lambda key, value: memory.__setitem__(key, value))
-    monkeypatch.setattr(main, "_read_directory_from_webspace_form", fake_read_directory)
-    monkeypatch.setattr(main, "_scan_and_index", fake_scan)
+        monkeypatch.setattr(main, "_safe_memory_get", lambda key, default=None: memory.get(key, default))
+        monkeypatch.setattr(main, "_safe_memory_set", lambda key, value: memory.__setitem__(key, value))
+        monkeypatch.setattr(main, "_read_directory_from_webspace_form", fake_read_directory)
+        monkeypatch.setattr(main, "_scan_and_index", fake_scan)
 
-    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
-        projected.append(snapshot)
+        async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+            projected.append(snapshot)
 
-    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
-    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+        monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
 
-    await main.on_media_indexer_action(SimpleNamespace(payload={"id": "scan", "webspace_id": "ws-1"}))
+        await main.on_media_indexer_action(SimpleNamespace(payload={"id": "scan", "webspace_id": "ws-1"}))
 
-    assert seen["directory"] == str(media_dir)
-    assert memory[main.SETTINGS_KEY]["selected_directory"] == str(media_dir)
-    assert projected[-1]["status"]["value"] == "indexed"
-    assert projected[-1]["form"]["directory"] == str(media_dir)
+        assert seen["directory"] == str(media_dir)
+        assert memory[main.SETTINGS_KEY]["selected_directory"] == str(media_dir)
+        assert projected[-1]["status"]["value"] == "indexed"
+        assert projected[-1]["form"]["directory"] == str(media_dir)
 
-
-@pytest.mark.asyncio
-async def test_scan_action_projects_error_when_indexer_raises(monkeypatch, tmp_path: pathlib.Path) -> None:
-    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
-    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
-
-    main = importlib.import_module("handlers.main")
-    main.dispose()
-    media_dir = tmp_path / "media"
-    media_dir.mkdir()
-    memory: dict[str, dict] = {}
-    projected: list[dict] = []
-
-    def fake_scan(directory: str, progress=None) -> dict:
-        raise RuntimeError("model init failed")
-
-    monkeypatch.setattr(main, "_safe_memory_get", lambda key, default=None: memory.get(key, default))
-    monkeypatch.setattr(main, "_safe_memory_set", lambda key, value: memory.__setitem__(key, value))
-    monkeypatch.setattr(main, "_scan_and_index", fake_scan)
-
-    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
-        projected.append(snapshot)
-
-    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
-    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
-
-    await main.on_media_indexer_action(
-        SimpleNamespace(payload={"id": "scan", "directory": str(media_dir), "webspace_id": "ws-1"})
-    )
-
-    assert projected[-1]["status"]["value"] == "error"
-    assert "model init failed" in projected[-1]["status"]["error"]
-    assert main._state["scan_in_progress"] is False
+    asyncio.run(run_case())
 
 
-@pytest.mark.asyncio
-async def test_scan_action_coalesces_lightweight_progress(monkeypatch, tmp_path: pathlib.Path) -> None:
-    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
-    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+def test_scan_action_projects_error_when_indexer_raises(monkeypatch, tmp_path: pathlib.Path) -> None:
+    async def run_case() -> None:
+        monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+        monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
 
-    main = importlib.import_module("handlers.main")
-    main.dispose()
-    media_dir = tmp_path / "media"
-    media_dir.mkdir()
-    projected: list[dict] = []
+        main = importlib.import_module("handlers.main")
+        main.dispose()
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        memory: dict[str, dict] = {}
+        projected: list[dict] = []
 
-    main._state["library_items"] = [{"title": "old", "details": {"large": "x" * 1000}}]
-    main._state["last_results"] = [{"title": "old result"}]
+        def fake_scan(directory: str, progress=None) -> dict:
+            raise RuntimeError("model init failed")
 
-    def fake_scan(directory: str, progress=None) -> dict:
-        assert directory == str(media_dir)
-        for idx in range(20):
-            progress(
-                {
-                    "value": "indexing",
-                    "subtitle": f"{idx}/20 files",
-                    "description": f"file-{idx}.mp4",
-                    "indexed_count": idx,
-                    "total_count": 20,
-                }
-            )
-        return {
-            "status": "ok",
-            "indexed_count": 20,
-            "errors": [],
-            "diagnostics": {
+        monkeypatch.setattr(main, "_safe_memory_get", lambda key, default=None: memory.get(key, default))
+        monkeypatch.setattr(main, "_safe_memory_set", lambda key, value: memory.__setitem__(key, value))
+        monkeypatch.setattr(main, "_scan_and_index", fake_scan)
+
+        async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+            projected.append(snapshot)
+
+        monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+        monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+
+        await main.on_media_indexer_action(
+            SimpleNamespace(payload={"id": "scan", "directory": str(media_dir), "webspace_id": "ws-1"})
+        )
+
+        assert projected[-1]["status"]["value"] == "error"
+        assert "model init failed" in projected[-1]["status"]["error"]
+        assert main._state["scan_in_progress"] is False
+
+    asyncio.run(run_case())
+
+
+def test_scan_action_coalesces_lightweight_progress(monkeypatch, tmp_path: pathlib.Path) -> None:
+    async def run_case() -> None:
+        monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+        monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+        main = importlib.import_module("handlers.main")
+        main.dispose()
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        projected: list[dict] = []
+
+        main._state["library_items"] = [{"title": "old", "details": {"large": "x" * 1000}}]
+        main._state["last_results"] = [{"title": "old result"}]
+
+        def fake_scan(directory: str, progress=None) -> dict:
+            assert directory == str(media_dir)
+            for idx in range(20):
+                progress(
+                    {
+                        "value": "indexing",
+                        "subtitle": f"{idx}/20 files",
+                        "description": f"file-{idx}.mp4",
+                        "indexed_count": idx,
+                        "total_count": 20,
+                    }
+                )
+            return {
+                "status": "ok",
                 "indexed_count": 20,
-                "files_found": 20,
-                "by_type": {"video": 20},
-                "description": "Indexed 20 media files.",
-            },
-        }
+                "errors": [],
+                "diagnostics": {
+                    "indexed_count": 20,
+                    "files_found": 20,
+                    "by_type": {"video": 20},
+                    "description": "Indexed 20 media files.",
+                },
+            }
 
-    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
-        projected.append(snapshot)
+        async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+            projected.append(snapshot)
 
-    monkeypatch.setattr(main, "_scan_and_index", fake_scan)
-    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
-    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+        monkeypatch.setattr(main, "_scan_and_index", fake_scan)
+        monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+        monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
 
-    await main.on_media_indexer_action(
-        SimpleNamespace(payload={"id": "scan", "directory": str(media_dir), "webspace_id": "ws-1"})
-    )
+        await main.on_media_indexer_action(
+            SimpleNamespace(payload={"id": "scan", "directory": str(media_dir), "webspace_id": "ws-1"})
+        )
 
-    progress_snapshots = [item for item in projected if item["status"]["value"] == "indexing"]
-    assert len(progress_snapshots) <= 2
-    assert progress_snapshots
-    for snapshot in progress_snapshots:
-        assert snapshot["library"] == []
-        assert snapshot["results"] == []
-        assert snapshot["playback"]["items"] == []
-    assert projected[-1]["status"]["value"] == "indexed"
+        progress_snapshots = [item for item in projected if item["status"]["value"] == "indexing"]
+        assert len(progress_snapshots) <= 2
+        assert progress_snapshots
+        for snapshot in progress_snapshots:
+            assert snapshot["library"] == []
+            assert snapshot["results"] == []
+            assert snapshot["playback"]["items"] == []
+        assert projected[-1]["status"]["value"] == "indexed"
+
+    asyncio.run(run_case())
 
 
 def test_search_formats_results_and_dedupes_same_media_path(monkeypatch, tmp_path: pathlib.Path) -> None:
