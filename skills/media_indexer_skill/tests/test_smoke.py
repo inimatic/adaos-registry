@@ -23,10 +23,7 @@ def test_manifest_declares_runtime_contracts() -> None:
     assert manifest["name"] == "media_indexer_skill"
     assert "requirements.txt" not in {path.name for path in SKILL_ROOT.iterdir()}
     assert manifest.get("dependencies") == ["shazamio"]
-    weights = manifest["models"]["artifacts"]["weights"]
-    assert weights["path"] == "ml/weights/model2.pt"
-    assert weights["install_path"] == "data/files/models/model2.pt"
-    assert weights["dependency_profile"] == "torch-cpu-py311"
+    assert not (manifest.get("models") or {}).get("artifacts")
     assert "media_indexer.action" in manifest["events"]["subscribe"]
     assert "webio.stream.snapshot.requested" in manifest["events"]["subscribe"]
     assert any(route["route"] == "stream" and route["receiver"] == "media_indexer.operations" for route in manifest["data_routes"])

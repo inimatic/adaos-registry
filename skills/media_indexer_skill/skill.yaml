@@ -1,5 +1,5 @@
 name: media_indexer_skill
-version: 0.1.17
+version: 0.1.18
 description: Semantic indexing and multimodal search for local media files (video,
   audio, images) using NER, FAISS and CLIP.
 runtime:
@@ -11,16 +11,6 @@ runtime:
     python: '3.11'
 dependencies:
 - shazamio
-models:
-  private: true
-  artifacts:
-    weights:
-      path: ml/weights/model2.pt
-      install_path: data/files/models/model2.pt
-      capability: media-filename-ner
-      dependency_profile: torch-cpu-py311
-      temporary_source: google_drive
-      google_drive_id: 19YBXzTYLoizbm8RF8gigUQ0fApZVmpoZ
 events:
   subscribe:
   - media_indexer.action
@@ -230,7 +220,7 @@ tools:
     properties:
       status:
         type: string
-updated_at: '2026-06-25T03:35:16+00:00'
+updated_at: '2026-06-25T03:39:14+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3089.eb90fca1
