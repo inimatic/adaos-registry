@@ -429,6 +429,8 @@ def test_play_action_loads_persisted_index_for_lossy_path(monkeypatch, tmp_path:
     assert main._state["index_loaded"] is True
     assert projected
     assert projected[-1]["status"]["value"] == "ready"
+    assert projected[-1]["overview"]["value"] == "1 files"
+    assert projected[-1]["diagnostics"]["indexed_count"] == 1
     assert projected[-1]["playback"]["items"][0]["source_path"] == str(clip)
 
 

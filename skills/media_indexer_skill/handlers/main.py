@@ -812,6 +812,9 @@ def _ensure_initialized(*, load_index: bool = False) -> None:
         loaded = _state["vector_db"].load(_index_dir())
         _state["index_loaded"] = bool(loaded.get("loaded"))
         if loaded.get("loaded"):
+            restored_diagnostics = _diagnostics_from_index_metadata(_read_persisted_index_metadata())
+            if restored_diagnostics:
+                _state["last_diagnostics"] = restored_diagnostics
             logger.info("Loaded persisted media index: %s", loaded)
 
 
@@ -1327,6 +1330,47 @@ def _scan_diagnostics(
         "technical_errors": technical_errors,
         "error_count": error_count,
     }
+
+
+def _diagnostics_from_index_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    if not metadata:
+        return {}
+    docs = list(metadata.get("text_docs") or []) + list(metadata.get("image_docs") or [])
+    indexed_count = int(metadata.get("indexed_count") or metadata.get("total_count") or len(docs) or 0)
+    if indexed_count <= 0:
+        return {}
+    type_counts = {"video": 0, "audio": 0, "image": 0}
+    ner_parsed = 0
+    shazam_matched = 0
+    ocr_checked = 0
+    ocr_text_found = 0
+    for doc in docs:
+        payload = doc.get("payload") if isinstance(doc, dict) and isinstance(doc.get("payload"), dict) else {}
+        ftype = str(payload.get("ftype") or payload.get("type") or "").strip().lower()
+        if ftype in type_counts:
+            type_counts[ftype] += 1
+        if any(payload.get(key) not in (None, "", "---") for key in ("ner_title", "artist", "year", "quality")):
+            ner_parsed += 1
+        enriched = payload.get("enriched") if isinstance(payload.get("enriched"), dict) else {}
+        if enriched.get("shazam_title") or enriched.get("shazam_subtitle"):
+            shazam_matched += 1
+        if ftype == "image":
+            ocr_checked += 1
+            if enriched.get("ocr_text"):
+                ocr_text_found += 1
+    return _scan_diagnostics(
+        type_counts=type_counts,
+        files_found=indexed_count,
+        indexed_count=indexed_count,
+        ner_parsed=ner_parsed,
+        shazam_matched=shazam_matched,
+        ocr_checked=ocr_checked,
+        ocr_text_found=ocr_text_found,
+        technical_errors=0,
+        error_count=0,
+        technical_metadata_enabled=_feature_enabled("MEDIA_INDEXER_ENABLE_TECHNICAL_METADATA"),
+        audio_id_enabled=_feature_enabled("MEDIA_INDEXER_ENABLE_AUDIO_ID"),
+    )
 
 
 def _best_results_by_path(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
