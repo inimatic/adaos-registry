@@ -255,6 +255,102 @@ def test_scan_action_coalesces_lightweight_progress(monkeypatch, tmp_path: pathl
     asyncio.run(run_case())
 
 
+def test_play_action_keeps_directory_when_payload_path_is_media_file(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    clip = media_dir / "song.mp3"
+    clip.write_bytes(b"audio")
+    payload = {
+        "full_path": str(clip),
+        "real_file_name": clip.name,
+        "display_title": "song",
+        "ftype": "audio",
+    }
+
+    class FakeVectorDb:
+        text_docs = [{"text": "song", "payload": payload}]
+        image_docs = []
+
+    projected: list[dict] = []
+
+    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+        projected.append(snapshot)
+
+    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+    main._state["selected_directory"] = str(clip)
+    main._state["selected_query"] = "song"
+    main._state["vector_db"] = FakeVectorDb()
+    main._state["index_loaded"] = True
+
+    asyncio.run(
+        main.on_media_indexer_action(
+            SimpleNamespace(payload={"id": "play", "path": str(clip), "webspace_id": "ws-1"})
+        )
+    )
+
+    assert projected
+    assert projected[-1]["status"]["value"] == "ready"
+    assert projected[-1]["form"]["directory"] == str(media_dir)
+    assert main._state["selected_directory"] == str(media_dir)
+    assert projected[-1]["playback"]["items"][0]["content_path"].startswith("/api/node/media-indexer/content/")
+    assert projected[-1]["playback"]["items"][0]["routed_content_path"].startswith("/media/media-indexer/content/")
+
+
+def test_search_action_projects_compact_snapshots(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    clip = media_dir / "song.mp3"
+    clip.write_bytes(b"audio")
+    payload = {
+        "full_path": str(clip),
+        "real_file_name": clip.name,
+        "display_title": "song",
+        "ftype": "audio",
+    }
+
+    class FakeVectorDb:
+        text_docs = [{"text": "song", "payload": payload}]
+        image_docs = []
+
+        def search(self, query: str, k: int = 5) -> list[dict]:
+            return [{"score": 100.0, "type": "media/text", "payload": payload}]
+
+    projected: list[dict] = []
+
+    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+        projected.append(snapshot)
+
+    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+    main._state["selected_directory"] = str(media_dir)
+    main._state["selected_query"] = "song"
+    main._state["library_items"] = [{"title": f"item-{idx}", "path": str(clip)} for idx in range(30)]
+    main._state["vector_db"] = FakeVectorDb()
+    main._state["index_loaded"] = True
+
+    asyncio.run(
+        main.on_media_indexer_action(
+            SimpleNamespace(payload={"id": "search", "query": "song", "webspace_id": "ws-1"})
+        )
+    )
+
+    assert [snapshot["status"]["value"] for snapshot in projected] == ["searching", "done"]
+    assert all(snapshot["library"] == [] for snapshot in projected)
+    assert projected[-1]["results"][0]["title"] == "song"
+    assert projected[-1]["form"]["directory"] == str(media_dir)
+
+
 def test_search_formats_results_and_dedupes_same_media_path(monkeypatch, tmp_path: pathlib.Path) -> None:
     monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
     monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))

@@ -202,6 +202,19 @@ def _safe_memory_set(key: str, value: Any) -> None:
         logger.debug("failed to write skill memory key=%s", key, exc_info=True)
 
 
+def _directory_value_or_parent(value: Any) -> str:
+    raw = str(value or "").strip()
+    if not raw or raw.startswith("$"):
+        return ""
+    try:
+        path = pathlib.Path(raw).expanduser()
+        if path.exists() and path.is_file():
+            return str(path.parent)
+    except Exception:
+        return raw
+    return raw
+
+
 def _internal_data_dir() -> pathlib.Path:
     override = os.getenv("MEDIA_INDEXER_DATA_DIR")
     if override:
@@ -280,6 +293,15 @@ def _settings() -> Dict[str, Any]:
     settings.setdefault("selected_directory", "")
     settings.setdefault("selected_query", DEFAULT_QUERY)
     settings.setdefault("k", 5)
+    repaired = False
+    for key in ("default_directory", "selected_directory"):
+        current = settings.get(key)
+        normalized = _directory_value_or_parent(current)
+        if normalized != current:
+            settings[key] = normalized
+            repaired = True
+    if repaired:
+        _safe_memory_set(SETTINGS_KEY, settings)
     return settings
 
 
@@ -287,6 +309,8 @@ def _save_settings(**updates: Any) -> Dict[str, Any]:
     settings = _settings()
     for key, value in updates.items():
         if value is not None:
+            if key in {"default_directory", "selected_directory"}:
+                value = _directory_value_or_parent(value)
             settings[key] = value
     _safe_memory_set(SETTINGS_KEY, settings)
     return settings
@@ -338,17 +362,18 @@ def _current_form(directory: str | None = None, query: str | None = None, k: int
     selected_directory = directory if directory is not None else (
         _state.get("selected_directory") or settings.get("selected_directory") or settings.get("default_directory") or ""
     )
+    selected_directory = _directory_value_or_parent(selected_directory)
     selected_query = query if query is not None else (_state.get("selected_query") or settings.get("selected_query") or DEFAULT_QUERY)
     return {"directory": selected_directory, "query": selected_query, "k": int(k or settings.get("k") or 5)}
 
 
 def _clean_directory_value(value: Any) -> str:
-    raw = str(value or "").strip()
-    return "" if raw.startswith("$") else raw
+    return _directory_value_or_parent(value)
 
 
-def _directory_from_payload(payload: Dict[str, Any]) -> str:
-    for key in ("directory", "path", "value"):
+def _directory_from_payload(payload: Dict[str, Any], *, include_path: bool = False) -> str:
+    keys = ("directory", "path", "value") if include_path else ("directory", "value")
+    for key in keys:
         if key in payload:
             raw = _clean_directory_value(payload.get(key))
             if raw:
@@ -359,12 +384,12 @@ def _directory_from_payload(payload: Dict[str, Any]) -> str:
     return ""
 
 
-def _payload_has_directory(payload: Dict[str, Any]) -> bool:
-    return bool(_directory_from_payload(payload))
+def _payload_has_directory(payload: Dict[str, Any], *, include_path: bool = False) -> bool:
+    return bool(_directory_from_payload(payload, include_path=include_path))
 
 
-def _resolve_directory(payload: Dict[str, Any]) -> str:
-    raw = _directory_from_payload(payload)
+def _resolve_directory(payload: Dict[str, Any], *, include_path: bool = False) -> str:
+    raw = _directory_from_payload(payload, include_path=include_path)
     if not raw:
         raw = str(_current_form().get("directory") or "").strip()
     return raw
@@ -875,6 +900,7 @@ def _player_item_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         "mime_type": _guess_mime_type(path or name),
         "modified_at": modified_at,
         "content_path": f"/api/node/media-indexer/content/{playback_id}",
+        "routed_content_path": f"/media/media-indexer/content/{playback_id}",
         "playback_id": playback_id,
         "source_path": path,
     }
@@ -1845,14 +1871,15 @@ async def on_media_indexer_action(evt: Any) -> None:
         return
 
     action_id = str(payload.get("id") or payload.get("action") or "").strip().lower()
-    directory = _resolve_directory(payload)
+    directory_action = action_id in {"scan", "set_directory", "directory"}
+    directory = _resolve_directory(payload, include_path=directory_action)
     query = _resolve_query(payload)
     try:
         k = max(1, min(MAX_RESULTS, int(payload.get("k") or 5)))
     except (TypeError, ValueError):
         k = 5
 
-    if action_id == "scan" and not _payload_has_directory(payload):
+    if action_id == "scan" and not _payload_has_directory(payload, include_path=True):
         form_directory = await _read_directory_from_webspace_form(webspace_id, payload)
         if form_directory:
             directory = form_directory
@@ -1861,7 +1888,7 @@ async def on_media_indexer_action(evt: Any) -> None:
         "media_indexer.action received id=%s webspace=%s has_directory=%s directory=%s",
         action_id or "-",
         webspace_id or "default",
-        _payload_has_directory(payload),
+        _payload_has_directory(payload, include_path=directory_action),
         directory or "",
     )
     _state["selected_directory"] = directory
@@ -1906,7 +1933,7 @@ async def on_media_indexer_action(evt: Any) -> None:
                 description=f"File is not indexed or missing: {selected_path or 'no path'}",
                 error="file_not_found",
             )
-            await _project_snapshot_async(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
+            await _project_snapshot_async(_snapshot_payload(status=status, form=form, include_library=False), webspace_id=webspace_id)
             _publish_operation({"value": "error", "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
             return
         _state["playback"] = _playback_snapshot(selected_payload)
@@ -1915,7 +1942,7 @@ async def on_media_indexer_action(evt: Any) -> None:
             subtitle="Preview selected",
             description=str(selected_payload.get("real_file_name") or pathlib.Path(selected_path).name),
         )
-        await _project_snapshot_async(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
+        await _project_snapshot_async(_snapshot_payload(status=status, form=form, include_library=False), webspace_id=webspace_id)
         _publish_operation({"value": "ready", "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
         return
 
@@ -2045,11 +2072,11 @@ async def on_media_indexer_action(evt: Any) -> None:
     if action_id == "search":
         if not query.strip():
             status = _status_payload(value="ready", subtitle="Enter a search query", description="Try: movie, music, Queen, Inception, sunset.")
-            await _project_snapshot_async(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
+            await _project_snapshot_async(_snapshot_payload(status=status, form=form, include_library=False), webspace_id=webspace_id)
             _publish_operation({"value": "ready", "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
             return
         status = _status_payload(value="searching", subtitle="Semantic search", description=f"Searching for: {query}")
-        await _project_snapshot_async(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
+        await _project_snapshot_async(_snapshot_payload(status=status, form=form, include_library=False), webspace_id=webspace_id)
         _publish_operation({"value": "searching", "subtitle": "Semantic search", "description": status["description"]}, webspace_id=webspace_id)
         result = await asyncio.to_thread(search_media, query, k=k)
         results = list(result.get("results") or [])
@@ -2060,7 +2087,10 @@ async def on_media_indexer_action(evt: Any) -> None:
             description=f"Query: {query}" if not error else error,
             error=error,
         )
-        await _project_snapshot_async(_snapshot_payload(status=final_status, form=_current_form(k=k), results=results), webspace_id=webspace_id)
+        await _project_snapshot_async(
+            _snapshot_payload(status=final_status, form=_current_form(k=k), results=results, include_library=False),
+            webspace_id=webspace_id,
+        )
         _publish_operation(
             {
                 "value": final_status["value"],
