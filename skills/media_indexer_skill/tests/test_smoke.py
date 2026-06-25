@@ -103,6 +103,15 @@ def test_handler_import_is_passive_and_search_without_index_does_not_load_models
     assert main._state["vector_db"] is None
 
 
+def test_internal_data_dir_defaults_to_stable_skill_state(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.delenv("MEDIA_INDEXER_DATA_DIR", raising=False)
+    monkeypatch.setenv("ADAOS_BASE_DIR", str(tmp_path / "adaos"))
+
+    main = importlib.import_module("handlers.main")
+
+    assert main._internal_data_dir() == tmp_path / "adaos" / "state" / "media_indexer_skill" / "internal"
+
+
 def test_scan_action_uses_webspace_form_directory_when_payload_omits_directory(
     monkeypatch,
     tmp_path: pathlib.Path,

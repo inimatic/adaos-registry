@@ -243,9 +243,12 @@ def _internal_data_dir() -> pathlib.Path:
         path = pathlib.Path(override)
     else:
         try:
-            env_path = skill_env_path()
-            data_root = env_path.parents[1] if env_path.parent.name == "db" else env_path.parent
-            path = data_root / "internal" / "media_indexer"
+            base_dir = pathlib.Path(os.getenv("ADAOS_BASE_DIR") or "").expanduser()
+            if not str(base_dir):
+                ctx = get_ctx()
+                base_dir_value = ctx.paths.base_dir()
+                base_dir = pathlib.Path(base_dir_value() if callable(base_dir_value) else base_dir_value).expanduser()
+            path = base_dir / "state" / "media_indexer_skill" / "internal"
         except Exception:
             base_dir = pathlib.Path(os.getenv("ADAOS_BASE_DIR") or pathlib.Path.home() / ".adaos")
             path = base_dir / "state" / "media_indexer_skill" / "internal"
