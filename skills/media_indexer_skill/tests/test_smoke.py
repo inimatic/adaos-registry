@@ -375,6 +375,54 @@ def test_play_action_uses_indexed_payload_for_lossy_path(monkeypatch, tmp_path: 
     assert projected[-1]["playback"]["items"][0]["source_path"] == str(clip)
 
 
+def test_play_action_loads_persisted_index_for_lossy_path(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+    monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+    main = importlib.import_module("handlers.main")
+    main.dispose()
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    clip = media_dir / "Aristocats.1970.HDRip.AVI.avi"
+    clip.write_bytes(b"video")
+    payload = {
+        "full_path": str(clip),
+        "real_file_name": clip.name,
+        "display_title": "Aristocats",
+        "ftype": "video",
+    }
+    metadata = {
+        "schema": 1,
+        "backend": "lexical",
+        "indexed_directory": str(media_dir),
+        "text_docs": [{"text": "aristocats", "payload": payload}],
+        "image_docs": [],
+        "text_count": 1,
+        "image_count": 0,
+        "total_count": 1,
+    }
+    (main._index_dir() / "metadata.json").write_text(json.dumps(metadata), encoding="utf-8")
+
+    projected: list[dict] = []
+
+    async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+        projected.append(snapshot)
+
+    monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+    monkeypatch.setattr(main, "_publish_operation", lambda *_args, **_kwargs: None)
+
+    asyncio.run(
+        main.on_media_indexer_action(
+            SimpleNamespace(payload={"id": "play", "path": f"/mnt/disk1/Video/share/!???/test/{clip.name}"})
+        )
+    )
+
+    assert main._state["index_loaded"] is True
+    assert projected
+    assert projected[-1]["status"]["value"] == "ready"
+    assert projected[-1]["playback"]["items"][0]["source_path"] == str(clip)
+
+
 def test_lossy_directory_value_repairs_from_persisted_index(monkeypatch, tmp_path: pathlib.Path) -> None:
     monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
     monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))

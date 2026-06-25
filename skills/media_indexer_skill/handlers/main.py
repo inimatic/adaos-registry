@@ -1868,12 +1868,9 @@ def search_media(query: str, k: int = 5) -> Dict[str, Any]:
 
 @tool("play_media")
 def play_media(path: str) -> Dict[str, Any]:
-    payload = _payload_by_path(path) or {
-        "full_path": path,
-        "real_file_name": pathlib.Path(str(path or "")).name,
-        "display_title": pathlib.Path(str(path or "")).stem,
-    }
-    if not str(path or "").strip() or not pathlib.Path(str(path)).is_file():
+    _ensure_initialized(load_index=True)
+    payload, playback_path = _resolve_playback_payload(path)
+    if not payload or not playback_path or not pathlib.Path(playback_path).is_file():
         return {"status": "error", "message": "file_not_found", "playback": _playback_snapshot()}
     snapshot = _playback_snapshot(payload)
     _state["playback"] = snapshot
@@ -1892,6 +1889,8 @@ def get_settings() -> Dict[str, Any]:
 
 @tool("rehydrate")
 def rehydrate() -> Dict[str, Any]:
+    if _has_persisted_index():
+        _ensure_initialized(load_index=True)
     settings = _settings()
     _state["selected_directory"] = settings.get("selected_directory") or settings.get("default_directory") or ""
     _state["selected_query"] = settings.get("selected_query") or DEFAULT_QUERY
@@ -1972,6 +1971,8 @@ async def on_media_indexer_action(evt: Any) -> None:
         return
 
     if action_id in {"play", "preview"}:
+        if _has_persisted_index():
+            _ensure_initialized(load_index=True)
         selected_path = _path_from_action_payload(payload)
         selected_payload, playback_path = _resolve_playback_payload(selected_path)
         exists = pathlib.Path(playback_path).is_file() if playback_path else False
