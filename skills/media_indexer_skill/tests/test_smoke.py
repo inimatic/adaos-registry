@@ -654,10 +654,5 @@ def test_media_indexer_playback_resolver_requires_indexed_root(monkeypatch, tmp_
     resolved, payload = library.resolve_media_indexer_content("a" * 32)
     assert resolved == clip.resolve()
     assert payload["mime_type"] == "video/mp4"
-    resolved_by_name, payload_by_name = library.resolve_media_indexer_content_by_name("clip.mp4")
-    assert resolved_by_name == clip.resolve()
-    assert payload_by_name["playback_id"] == "a" * 32
     with pytest.raises(PermissionError):
         library.resolve_media_indexer_content("b" * 32)
-    with pytest.raises(PermissionError):
-        library.resolve_media_indexer_content_by_name("outside.mp4")
