@@ -16,7 +16,7 @@ core guards can detect and explain it.
   mutation.
 - [x] Record attempted bytes, compacted bytes, item counts, path, slot, owner,
   and guard reason.
-- [ ] Preserve attribution when a large branch owned by one skill amplifies
+- [x] Preserve attribution when a large branch owned by one skill amplifies
   another writer's small node-scoped update.
 - [x] Expose guard state in reliability and status cards.
 - [x] Verify the current mediaserver projection is visible as an oversized
@@ -41,6 +41,11 @@ core guards can detect and explain it.
   events to `state/observability/yjs_projection_guard.ndjson` so runtime
   reliability can aggregate events left by separate CLI/tool processes after
   the next deployment.
+- Local core now uses those guarded projection rows as large-branch evidence:
+  sibling writes in the same Yjs root/top-key domain (for example `data/nodes`)
+  carry `last_write_amplification_suspects` in primary-doc governance and
+  reliability, preserving the original branch owner (`skill:mediaserver`) even
+  when another writer triggers the amplified update.
 - Stand `.30` has severe I/O pressure: `/mnt/disk1` is full and PSI I/O was
   high during migration/testing. Heavy skill dependency installation can enter
   `D` state and cause SQLite lock symptoms.
