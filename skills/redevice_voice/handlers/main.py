@@ -10,12 +10,15 @@ from adaos.sdk.data import skill_memory
 from adaos.sdk.io import (
     build_capture_command,
     compact_audio_endpoint,
+    create_endpoint_audio_session,
     endpoint_audio_diagnostics,
     endpoint_audio_policy,
     endpoint_audio_readiness,
+    endpoint_audio_session,
     endpoint_audio_stt_status,
     process_endpoint_audio_event,
     stream_publish,
+    stop_endpoint_audio_session,
     verify_audio_input_content,
 )
 from adaos.sdk.redevice import ReDeviceBridge, choose_endpoint as sdk_choose_endpoint
@@ -84,6 +87,7 @@ def _load_state() -> dict[str, Any]:
     state.setdefault("retention", {})
     state.setdefault("stt", {"available": False, "state": "not_checked"})
     state.setdefault("audio_check", {"state": "not_checked"})
+    state.setdefault("session", {})
     return state
 
 
@@ -153,6 +157,7 @@ def _payload(state: Mapping[str, Any], endpoints: list[Mapping[str, Any]]) -> di
     selected_endpoint = _choose_endpoint(endpoints, selected)
     diagnostics = endpoint_audio_diagnostics(state, selected_endpoint)
     readiness = endpoint_audio_readiness(state, selected_endpoint)
+    session = endpoint_audio_session(state, selected_endpoint)
     return {
         "ok": True,
         "selected_code": selected,
@@ -160,6 +165,7 @@ def _payload(state: Mapping[str, Any], endpoints: list[Mapping[str, Any]]) -> di
         "items": items,
         "readiness": readiness,
         "diagnostics": diagnostics,
+        "session": session,
         "last_command": _mapping(state.get("last_command")),
         "last_segment": _mapping(state.get("last_segment")),
         "stt": _mapping(state.get("stt")) or _vosk_status(),
@@ -188,6 +194,7 @@ def _empty_payload(webspace_id: str | None = None) -> dict[str, Any]:
         "items": [],
         "readiness": endpoint_audio_readiness(state, None),
         "diagnostics": endpoint_audio_diagnostics(state, None),
+        "session": endpoint_audio_session(state, None),
         "last_command": _mapping(state.get("last_command")),
         "last_segment": _mapping(state.get("last_segment")),
         "stt": _mapping(state.get("stt")) or _vosk_status(),
@@ -268,6 +275,15 @@ def start_redevice_voice(
         return {"ok": False, "error": "no_redevice_endpoint"}
     pair_code = _text(endpoint.get("code") or endpoint.get("pair_code"))
     state["selected_code"] = pair_code
+    session = create_endpoint_audio_session(
+        state,
+        endpoint,
+        mode="command",
+        owner_node_id="member",
+        owner_skill_id="redevice_voice",
+        lang=lang,
+        response_route={"display_endpoint": True, "audio_output_endpoint": False},
+    )
     command = build_capture_command(
         endpoint,
         code=pair_code,
@@ -284,10 +300,15 @@ def start_redevice_voice(
         },
     )
     command_id = _text(command.get("command_id"))
-    session_id = _text(_mapping(command.get("payload")).get("session_id"))
+    session_id = _text(session.get("session_id")) or _text(_mapping(command.get("payload")).get("session_id"))
+    payload = _mapping(command.get("payload"))
+    payload["session_id"] = session_id
+    command["payload"] = payload
     policy = _mapping(_mapping(command.get("payload")).get("endpoint_policy_check"))
     transport = _mapping(_mapping(command.get("payload")).get("transport"))
     result = ReDeviceBridge(timeout=12).send_command(pair_code, command)
+    if not bool(result.get("ok")):
+        session = stop_endpoint_audio_session(state, reason="command_enqueue_failed")
     state["last_command"] = {
         "ok": bool(result.get("ok")),
         "command_id": command_id,
@@ -298,12 +319,13 @@ def start_redevice_voice(
         "policy": policy,
         "transport": transport,
         "activation": _mapping(_mapping(_mapping(command.get("payload")).get("input_policy")).get("activation")),
+        "session": session,
         "result": result,
         "updated_at": _now(),
     }
     state = _save_state(state)
     _publish(state, endpoints, webspace_id)
-    return {"ok": bool(result.get("ok")), "command_id": command_id, "code": pair_code, "result": result}
+    return {"ok": bool(result.get("ok")), "command_id": command_id, "code": pair_code, "session": session, "result": result}
 
 
 def _event_payload(evt: Any) -> Mapping[str, Any]:
