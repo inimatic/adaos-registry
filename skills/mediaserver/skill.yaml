@@ -1,5 +1,5 @@
 name: mediaserver
-version: 0.8.3
+version: 0.8.4
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -36,13 +36,27 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-updated_at: '2026-06-26T07:19:48+00:00'
+- name: get_diagnostics
+  description: Return compact operator diagnostics for mediaserver projection pressure
+    and media runtime readiness.
+  entry: handlers.main:get_diagnostics
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - media
+    - reliability
+updated_at: '2026-06-26T07:52:56+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3210.85b52336
-    recorded_at: '2026-06-26T07:19:48+00:00'
+    min_version: 0.1.421+3213.0d242e29
+    recorded_at: '2026-06-26T07:52:57+00:00'
     source: skill_push
-    min_commit: 85b5233677b895435a206981a6097d563c788a3f
-    min_short_commit: 85b52336
-    build_date: '2026-06-26T10:19:34+03:00'
+    min_commit: 0d242e29996f07ef9fe33bf3f797401998377fa4
+    min_short_commit: 0d242e29
+    build_date: '2026-06-26T10:51:38+03:00'
 

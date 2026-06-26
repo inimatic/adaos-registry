@@ -14,6 +14,18 @@
         "медиа библиотека",
         "медиатека"
       ]
+    },
+    {
+      "id": "mediaserver_diagnostics_app",
+      "title": "Media Diagnostics",
+      "icon": "pulse-outline",
+      "launchModal": "mediaserver_diagnostics_modal",
+      "nlu_aliases": [
+        "media diagnostics",
+        "mediaserver diagnostics",
+        "media projection diagnostics",
+        "media yjs guard"
+      ]
     }
   ],
   "widgets": [
@@ -74,6 +86,82 @@
             }
           ]
         }
+      },
+      "mediaserver_diagnostics_modal": {
+        "title": "Media Diagnostics",
+        "nlu_aliases": [
+          "media diagnostics",
+          "mediaserver diagnostics",
+          "media projection diagnostics",
+          "media yjs guard"
+        ],
+        "schema": {
+          "id": "mediaserver_diagnostics_modal",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "mediaserver-diagnostic-cards",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Projection and guard state",
+              "dataSource": {
+                "kind": "skill",
+                "name": "mediaserver.get_diagnostics",
+                "params": {
+                  "source": "webui.diagnostics"
+                }
+              },
+              "inputs": {
+                "refreshMs": 5000,
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "iconKey": "icon",
+                "detailsPath": "details",
+                "showDetails": false,
+                "itemAccordion": true,
+                "emptyText": "No media diagnostics yet"
+              }
+            },
+            {
+              "id": "mediaserver-runtime-reliability",
+              "type": "ui.jsonViewer",
+              "area": "main",
+              "title": "Runtime reliability snapshot",
+              "dataSource": {
+                "kind": "y",
+                "transform": "runtime.reliability"
+              },
+              "inputs": {
+                "emptyText": "Reliability snapshot is not available yet"
+              }
+            },
+            {
+              "id": "mediaserver-diagnostic-payload",
+              "type": "ui.jsonViewer",
+              "area": "main",
+              "title": "Mediaserver diagnostic payload",
+              "dataSource": {
+                "kind": "skill",
+                "name": "mediaserver.get_diagnostics",
+                "params": {
+                  "source": "webui.diagnostics.raw"
+                }
+              },
+              "inputs": {
+                "emptyText": "No diagnostic payload yet"
+              }
+            }
+          ]
+        }
       }
     },
     "widgets": {}
@@ -95,6 +183,12 @@
       "extensionPoint": "desktop.apps",
       "type": "app",
       "id": "mediaserver_app",
+      "autoInstall": true
+    },
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "mediaserver_diagnostics_app",
       "autoInstall": true
     },
     {
