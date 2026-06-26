@@ -24,7 +24,7 @@ core guards can detect and explain it.
 - [x] Deploy guardrails to stand `.30` and capture before/after evidence.
 - [x] Persist or forward projection guard telemetry from short-lived CLI/tool
   processes so runtime reliability sees operator-triggered guard decisions.
-- [ ] Add lifecycle observability for runtime migrations that stall on disk I/O,
+- [x] Add lifecycle observability for runtime migrations that stall on disk I/O,
   dependency installation, or SQLite locks.
 
 ## Current Evidence - 2026-06-26
@@ -52,6 +52,12 @@ core guards can detect and explain it.
 - `mediaserver` runtime `0.8.4` is quarantined by migration because its pytest
   suite cannot find the webui schema from the runtime test CWD. Keep this as a
   skill repair item for the later mediaserver phase, not a core bypass.
+- Local core now enriches `state/skill_runtime_migration/status.json` with
+  `diagnostics`: stale age, current skill/stage, suspected blocker
+  (`dependency_install_or_runtime_prepare_stalled`, `sqlite_lock`,
+  `host_io_or_disk_pressure`, etc.), host disk/PSI hints, and recommended
+  operator checks. The same payload is included in runtime reliability after
+  deployment.
 
 ## Phase 2 - Builder Guidance
 
