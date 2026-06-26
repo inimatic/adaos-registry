@@ -1,0 +1,94 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "apps": [
+    {
+      "id": "conversation_companions_diagnostics_app",
+      "title": "Conversation Diagnostics",
+      "icon": "chatbubbles-outline",
+      "launchModal": "conversation_companions_diagnostics_modal",
+      "nlu_aliases": [
+        "conversation diagnostics",
+        "conversation companions diagnostics",
+        "character diagnostics",
+        "persona diagnostics"
+      ]
+    }
+  ],
+  "widgets": [],
+  "registry": {
+    "modals": {
+      "conversation_companions_diagnostics_modal": {
+        "title": "Conversation Diagnostics",
+        "nlu_aliases": [
+          "conversation diagnostics",
+          "conversation companions diagnostics",
+          "character diagnostics",
+          "persona diagnostics"
+        ],
+        "schema": {
+          "id": "conversation_companions_diagnostics_modal",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "conversation-companions-diagnostic-cards",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Trial and persona state",
+              "dataSource": {
+                "kind": "skill",
+                "name": "conversation_companions.get_diagnostics",
+                "params": {
+                  "source": "webui.diagnostics"
+                }
+              },
+              "inputs": {
+                "refreshMs": 5000,
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "iconKey": "icon",
+                "detailsPath": "details",
+                "showDetails": false,
+                "itemAccordion": true,
+                "emptyText": "No conversation diagnostics yet"
+              }
+            },
+            {
+              "id": "conversation-companions-diagnostic-payload",
+              "type": "ui.jsonViewer",
+              "area": "main",
+              "title": "Redacted diagnostic payload",
+              "dataSource": {
+                "kind": "skill",
+                "name": "conversation_companions.get_diagnostics",
+                "params": {
+                  "source": "webui.diagnostics.raw"
+                }
+              },
+              "inputs": {
+                "emptyText": "No diagnostic payload yet"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "widgets": {}
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "conversation_companions_diagnostics_app",
+      "autoInstall": true
+    }
+  ]
+}

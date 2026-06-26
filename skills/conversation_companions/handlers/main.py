@@ -17,6 +17,7 @@ PROFILES_KEY = "conversation_companions.profiles"
 FEEDBACK_KEY = "conversation_companions.feedback"
 MAX_HISTORY = 12
 PANEL_CHARACTERS = ("arseni", "nika", "mira")
+DIAGNOSTICS_SCHEMA = "conversation_companions.diagnostics.v1"
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
 
@@ -315,6 +316,200 @@ def _apply_patch(profile: Mapping[str, Any], patch: Mapping[str, Any]) -> dict[s
     return updated
 
 
+def _safe_list(value: Any) -> list[Any]:
+    return list(value) if isinstance(value, list) else []
+
+
+def _history_summary(session: Mapping[str, Any]) -> dict[str, Any]:
+    history = _safe_list(session.get("history"))
+    by_role: dict[str, int] = {}
+    by_character: dict[str, int] = {}
+    recent: list[dict[str, Any]] = []
+    for item in history:
+        if not isinstance(item, Mapping):
+            continue
+        role = str(item.get("role") or "unknown").strip() or "unknown"
+        character_id = str(item.get("character_id") or "").strip()
+        by_role[role] = by_role.get(role, 0) + 1
+        if character_id:
+            by_character[character_id] = by_character.get(character_id, 0) + 1
+        recent.append(
+            {
+                "role": role,
+                "character_id": character_id or None,
+                "ts": item.get("ts"),
+                "text_chars": len(str(item.get("text") or "")),
+            }
+        )
+    return {
+        "count": len(history),
+        "max_history": MAX_HISTORY,
+        "by_role": by_role,
+        "by_character": by_character,
+        "recent": recent[-5:],
+        "redaction": "message text is omitted from diagnostics",
+    }
+
+
+def _feedback_summary(webspace_id: str) -> dict[str, Any]:
+    items = _safe_list(_mem_get(_scoped_key(FEEDBACK_KEY, webspace_id), []))
+    ratings = [int(item.get("rating")) for item in items if isinstance(item, Mapping) and isinstance(item.get("rating"), int)]
+    latest = None
+    for item in reversed(items):
+        if isinstance(item, Mapping):
+            latest = {
+                "rating": item.get("rating"),
+                "active_character": item.get("active_character"),
+                "has_expectation": bool(str(item.get("expectation") or "").strip()),
+                "has_observation": bool(str(item.get("observation") or "").strip()),
+                "ts": item.get("ts"),
+            }
+            break
+    average = round(sum(ratings) / len(ratings), 2) if ratings else None
+    return {
+        "count": len(items),
+        "ratings_count": len(ratings),
+        "rating_average": average,
+        "latest": latest,
+        "redaction": "free-form feedback text is omitted from diagnostics",
+    }
+
+
+def _profile_override_summary(profiles: Mapping[str, Mapping[str, Any]]) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for char_id, profile in profiles.items():
+        default = DEFAULT_PROFILES.get(char_id, {})
+        changed_fields = []
+        for key in ("name", "archetype", "purpose", "tone", "verbosity", "style_rules", "boundaries", "opening", "first_impression"):
+            if profile.get(key) != default.get(key):
+                changed_fields.append(key)
+        rows.append(
+            {
+                "id": char_id,
+                "name": profile.get("name"),
+                "archetype": profile.get("archetype"),
+                "changed": bool(changed_fields),
+                "changed_fields": changed_fields,
+                "style_rules_count": len(_safe_list(profile.get("style_rules"))),
+                "boundaries_count": len(_safe_list(profile.get("boundaries"))),
+            }
+        )
+    return rows
+
+
+def _diagnostic_row(row_id: str, title: str, status: str, subtitle: str, details: Mapping[str, Any]) -> dict[str, Any]:
+    icon_by_status = {
+        "ready": "checkmark-circle-outline",
+        "warning": "warning-outline",
+        "degraded": "alert-circle-outline",
+        "unknown": "information-circle-outline",
+    }
+    return {
+        "id": row_id,
+        "title": title,
+        "status": status,
+        "icon": icon_by_status.get(status, "information-circle-outline"),
+        "subtitle": subtitle,
+        "details": dict(details),
+    }
+
+
+def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
+    session = _session(webspace_id)
+    profiles = _profiles(webspace_id)
+    active_id = str(session.get("active_character") or DEFAULT_ACTIVE_CHARACTER)
+    if active_id not in profiles:
+        active_id = DEFAULT_ACTIVE_CHARACTER
+    history = _history_summary(session)
+    feedback = _feedback_summary(webspace_id)
+    profile_rows = _profile_override_summary(profiles)
+    changed_profiles = [row for row in profile_rows if row["changed"]]
+    active_profile = profiles.get(active_id, profiles[DEFAULT_ACTIVE_CHARACTER])
+    rows = [
+        _diagnostic_row(
+            "conversation.session",
+            "Session state",
+            "ready",
+            f"active={active_id} history={history['count']}/{MAX_HISTORY}",
+            {
+                "webspace_id": webspace_id,
+                "active_character": active_id,
+                "created_at": session.get("created_at"),
+                "updated_at": session.get("updated_at"),
+                "history": history,
+            },
+        ),
+        _diagnostic_row(
+            "conversation.active_profile",
+            "Active character profile",
+            "ready",
+            f"{active_profile.get('name')} / {active_profile.get('archetype')}",
+            {
+                "id": active_id,
+                "name": active_profile.get("name"),
+                "archetype": active_profile.get("archetype"),
+                "tone": active_profile.get("tone"),
+                "verbosity": active_profile.get("verbosity"),
+                "style_rules_count": len(_safe_list(active_profile.get("style_rules"))),
+                "boundaries_count": len(_safe_list(active_profile.get("boundaries"))),
+            },
+        ),
+        _diagnostic_row(
+            "conversation.profile_overrides",
+            "Profile overrides",
+            "warning" if changed_profiles else "ready",
+            f"{len(changed_profiles)} changed profiles",
+            {"profiles": profile_rows},
+        ),
+        _diagnostic_row(
+            "conversation.feedback",
+            "Control-group feedback",
+            "ready" if feedback["count"] else "unknown",
+            f"{feedback['count']} entries; avg={feedback['rating_average'] if feedback['rating_average'] is not None else '-'}",
+            feedback,
+        ),
+        _diagnostic_row(
+            "conversation.safety_contract",
+            "Safety and scope",
+            "ready",
+            "local conversation state only; no device-control tools",
+            {
+                "side_effects": ["skill_memory.session", "skill_memory.profiles", "skill_memory.feedback", "io.out.chat.append"],
+                "no_device_control": True,
+                "default_tool": "talk",
+                "panel_characters": list(PANEL_CHARACTERS),
+            },
+        ),
+    ]
+    return {
+        "ok": True,
+        "schema": DIAGNOSTICS_SCHEMA,
+        "webspace_id": webspace_id,
+        "summary": {
+            "title": "Conversation Companions",
+            "value": len(profiles),
+            "subtitle": f"active={active_id}; feedback={feedback['count']}; history={history['count']}",
+            "details": "operator diagnostics; conversation text redacted",
+            "status": "ready",
+        },
+        "items": rows,
+        "session": {
+            "active_character": active_id,
+            "history": history,
+        },
+        "profiles": {
+            "count": len(profiles),
+            "changed_count": len(changed_profiles),
+            "items": profile_rows,
+        },
+        "feedback": feedback,
+        "privacy": {
+            "conversation_text_redacted": True,
+            "feedback_text_redacted": True,
+        },
+    }
+
+
 @tool(summary="Start character onboarding.", side_effects="local_write")
 def start(
     profile_hint: str | None = None,
@@ -552,6 +747,14 @@ def reset_session(
     return {"ok": True, "webspace_id": ws, "message": message, "active_character": DEFAULT_ACTIVE_CHARACTER}
 
 
+@tool(summary="Return compact diagnostics for character trial state.", side_effects="none")
+def get_diagnostics(
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    return _build_diagnostics(_webspace_id(webspace_id, _meta))
+
+
 def handle(topic: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
     data = dict(payload or {})
     if topic.endswith("start"):
@@ -562,4 +765,6 @@ def handle(topic: str, payload: Mapping[str, Any] | None = None) -> dict[str, An
         return update_profile(**data)
     if topic.endswith("feedback"):
         return capture_feedback(**data)
+    if topic.endswith("diagnostics"):
+        return get_diagnostics(**data)
     return talk(**data)
