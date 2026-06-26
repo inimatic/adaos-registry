@@ -1,5 +1,5 @@
 name: mediaserver
-version: 0.8.4
+version: 0.8.5
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -50,13 +50,13 @@ tools:
     - items
     - media
     - reliability
-updated_at: '2026-06-26T07:52:56+00:00'
+updated_at: '2026-06-26T08:29:46+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.421+3213.0d242e29
-    recorded_at: '2026-06-26T07:52:57+00:00'
+    min_version: 0.1.0+3225.8dbb89e5
+    recorded_at: '2026-06-26T08:29:46+00:00'
     source: skill_push
-    min_commit: 0d242e29996f07ef9fe33bf3f797401998377fa4
-    min_short_commit: 0d242e29
-    build_date: '2026-06-26T10:51:38+03:00'
+    min_commit: 8dbb89e56250cbf2f8e4fca162214dc92edf58d3
+    min_short_commit: 8dbb89e5
+    build_date: '2026-06-26T11:14:25+03:00'
 
