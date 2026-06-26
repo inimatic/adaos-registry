@@ -10,9 +10,25 @@ from jsonschema import Draft202012Validator
 
 
 SKILL_ROOT = pathlib.Path(__file__).resolve().parents[1]
-REPO_ROOT = SKILL_ROOT.parents[3]
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
+
+
+def _find_repo_root() -> pathlib.Path:
+    marker = pathlib.Path("src") / "adaos" / "abi" / "webui.v1.schema.json"
+    candidates = [
+        pathlib.Path.cwd(),
+        SKILL_ROOT.parents[3],
+        SKILL_ROOT.parents[3] / "adaos",
+        *SKILL_ROOT.parents,
+    ]
+    for root in candidates:
+        if (root / marker).exists():
+            return root
+    raise FileNotFoundError(f"Cannot find repo root containing {marker}")
+
+
+REPO_ROOT = _find_repo_root()
 
 
 def _load_webui_schema() -> dict:
