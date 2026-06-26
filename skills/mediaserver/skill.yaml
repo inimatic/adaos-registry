@@ -1,5 +1,5 @@
 name: mediaserver
-version: 0.9.4
+version: 0.9.5
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -116,7 +116,7 @@ tools:
     - items
     - media
     - reliability
-updated_at: '2026-06-26T09:51:02+00:00'
+updated_at: '2026-06-26T11:00:12+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3235.e7324e95

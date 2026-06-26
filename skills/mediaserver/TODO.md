@@ -26,6 +26,10 @@ core guards can detect and explain it.
   processes so runtime reliability sees operator-triggered guard decisions.
 - [x] Add lifecycle observability for runtime migrations that stall on disk I/O,
   dependency installation, or SQLite locks.
+- [x] Record post-write encoded Yjs update bytes and amplification ratio in
+  runtime reliability so compact logical payloads can still be diagnosed.
+- [x] Add active-slot marker reconciliation so an interrupted core update cannot
+  leave `active=B` pointing at an empty slot and force mixed root/slot imports.
 
 ## Current Evidence - 2026-06-26
 
@@ -58,6 +62,23 @@ core guards can detect and explain it.
   `host_io_or_disk_pressure`, etc.), host disk/PSI hints, and recommended
   operator checks. The same payload is included in runtime reliability after
   deployment.
+- After deployment to stand `.30` on active slot `B` (`0.1.429+1.5a0ac89`),
+  `mediaserver.get_snapshot` returned a constant-size summary:
+  `count=1534`, `items=[]`, logical `payload_bytes=1567`.
+- The new post-write guard still recorded
+  `reason=yjs_projection_write_amplification` for `skill:mediaserver`:
+  `update_bytes=88494`, `amplification_ratio=56.474`,
+  path `data/nodes/<node_id>/media/library`. This confirms the remaining
+  problem is retained/shared Yjs update history, not current mediaserver row
+  payload size.
+- The same guard surfaced `skill:infrastate_skill`:
+  `payload_bytes=984`, `update_bytes=465757`, `amplification_ratio=473.33`.
+  Keep mediaserver as the stress case, but solve the core class for every
+  skill-owned projection branch.
+- Core rollout itself exposed a separate reliability defect: the old supervisor
+  could stop a passive candidate and leave `active=B` without launching an
+  active runtime until systemd restart. This is now documented as a core
+  rollout-hardening task, separate from mediaserver behavior.
 
 ## Phase 2 - Builder Guidance
 
@@ -89,8 +110,16 @@ core guards can detect and explain it.
   case.
 - [ ] Run synthetic large-library tests at 10k, 100k, and 500k metadata rows.
 - [ ] Confirm sibling node updates do not emit large media-driven Yjs diffs.
-- [ ] Confirm reliability shows owner, slot, path, payload bytes, item count,
-  and suggested repair route.
+- [x] Confirm reliability shows owner, slot, path, payload bytes, encoded update
+  bytes, amplification ratio, and suggested repair route.
+- [ ] Implement or validate Yjs history recovery: projection path migration,
+  room/doc compaction, or guarded room reset for branches that keep amplifying
+  after logical payloads are compact.
+- [ ] Add an LLM Builder repair packet for repeated post-write amplification
+  that names the owner, route, path, payload bytes, update bytes, ratio, and
+  recommended bounded-route/compaction action.
+- [ ] Harden rollout automation so root promotion, active slot launch, and
+  active runtime port converge without manual systemd intervention.
 - [ ] Confirm parent runtime RSS plateaus after warmup and relaxes after guard
   cleanup or room reset.
 

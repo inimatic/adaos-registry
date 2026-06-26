@@ -1,8 +1,9 @@
 # Mediaserver Target Architecture
 
 Status: target contract and implementation checklist for the mediaserver stress
-case. Phase 3 migration is in progress: the skill now targets a summary-only
-Yjs projection plus a bounded page route for media rows.
+case. Phase 3 migration is implemented: the skill now publishes a summary-only
+Yjs projection plus a bounded page route for media rows. Phase 4 is now focused
+on post-write Yjs update amplification and runtime relaxation.
 
 This skill is intentionally kept as a stress case while the core protections are
 implemented. A skill-generated media library must not be able to overload the
@@ -19,11 +20,17 @@ skill:mediaserver -> ctx_subnet.set("mediaserver.library")
 data/media/library -> data/nodes/<node_id>/media/library
 ```
 
-With 1,520 files this branch is already hundreds of KB. Because node-scoped
-projections are stored under the shared `data.nodes` top-level JSON blob, a
-small sibling update such as `infrastate.summary` can rewrite the whole
-`nodes` branch and emit a large Yjs update. At larger library sizes this becomes
-unbounded write amplification.
+With 1,520 files the original branch was already hundreds of KB. The current
+skill no longer publishes row data into Yjs: `get_snapshot` writes a compact
+summary and `mediaserver.list_library_page` returns bounded rows. However, the
+2026-06-26 stand rollout showed that a 1.5 KB logical summary can still emit an
+88 KB encoded Yjs update on the old branch. This points to retained Yjs branch
+history/shared-doc encoding, not just current payload size.
+
+The same post-write guard also identified `skill:infrastate_skill` with a
+sub-1 KB payload producing a 465 KB encoded update. Mediaserver remains the
+primary stress case, but the target architecture must protect the core against
+any skill that triggers repeated Yjs update amplification.
 
 ## Target Data Contract
 
@@ -49,9 +56,10 @@ Detailed media data belongs behind bounded routes:
 ## Scale Assumption
 
 The design target is a large household media library, not the current test
-directory. The working capacity target is 100,000 media rows with a safety
-margin toward 500,000 rows for stress testing. The normal Yjs projection must
-stay effectively constant size across that range.
+directory. Until real installation telemetry is available, treat 25,000-100,000
+media rows as the normal large-family planning range and keep 500,000 rows as a
+stress envelope, not the common case. The normal Yjs projection must stay
+effectively constant size across that range.
 
 The library route should support:
 
@@ -75,8 +83,11 @@ The runtime owns safety even when a skill is wrong:
 - reject or degrade oversized Yjs projections before mutating the primary doc
 - preserve owner attribution for both current writer and amplified branch owner
 - record payload bytes, item counts, path, slot, owner, and reason
+- record encoded Yjs update bytes and amplification ratio after mutation
 - surface guard state in reliability/status cards and skill-local repair
   evidence
+- schedule compaction, path migration, quarantine, or room reset when repeated
+  post-write amplification continues after payloads are compact
 - allow the parent process memory to relax after pressure stops or after a
   guarded room reset/compaction
 
@@ -110,13 +121,20 @@ growth.
    confirm guard visibility, and confirm parent RSS plateaus or relaxes after
    pressure ends.
 
+6. Yjs history recovery.
+   When compact logical payloads still produce large encoded updates, migrate
+   the projection to a fresh bounded branch or compact/reset the affected Yjs
+   room with explicit repair evidence. This phase is complete only when
+   repeated mediaserver refreshes stop producing large updates and RSS relaxes
+   after warmup.
+
 ## Exit Criteria
 
 - A full-list mediaserver projection is blocked or degraded by core guards.
 - Reliability identifies `skill:mediaserver`, `mediaserver.library`, the Yjs
-  path, payload bytes, and item count.
-- A sibling node update no longer repeatedly emits hundreds of KB due to a media
-  branch.
+  path, payload bytes, encoded update bytes, and amplification ratio.
+- A sibling node update no longer repeatedly emits hundreds of KB due to retained
+  media or infrastate Yjs history.
 - Mediaserver Yjs payload size remains within budget for 100k+ library rows.
 - The full media library is available only through bounded page/search/detail
   routes.
