@@ -4,7 +4,7 @@ Status: target contract and implementation checklist for the mediaserver stress
 case. Phase 3 migration is implemented: the skill now publishes a summary-only
 Yjs projection plus a bounded page route for media rows. Phase 4 has migrated
 that summary onto a fresh Yjs branch and is now focused on validating post-write
-Yjs amplification and runtime relaxation.
+Yjs amplification recovery, YStore compaction, and runtime relaxation.
 
 This skill is intentionally kept as a stress case while the core protections are
 implemented. A skill-generated media library must not be able to overload the
@@ -88,8 +88,8 @@ The runtime owns safety even when a skill is wrong:
 - preserve owner attribution for both current writer and amplified branch owner
 - record payload bytes, item counts, path, slot, owner, and reason
 - record encoded Yjs update bytes and amplification ratio after mutation
-- surface guard state in reliability/status cards and skill-local repair
-  evidence
+- surface guard state, recovery mode, and YStore replay-tail context in
+  reliability/status cards and skill-local repair evidence
 - schedule compaction, path migration, quarantine, or room reset when repeated
   post-write amplification continues after payloads are compact
 - allow the parent process memory to relax after pressure stops or after a
@@ -128,9 +128,11 @@ growth.
 6. Yjs history recovery.
    When compact logical payloads still produce large encoded updates, migrate
    the projection to a fresh bounded branch or compact/reset the affected Yjs
-   room with explicit repair evidence. This phase is complete only when
-   repeated mediaserver refreshes stop producing large updates and RSS relaxes
-   after warmup.
+   room with explicit repair evidence. Detached skill-tool writes must await
+   inline YStore compaction before process exit; live-room writes may use
+   background compaction plus GC/allocator trim. This phase is complete only
+   when repeated mediaserver refreshes stop producing large updates and RSS
+   relaxes after warmup.
 
 ## Exit Criteria
 

@@ -83,6 +83,13 @@ projection evidence visible until core guards can explain and recover it.
   slot `mediaserver.library_summary`, path `data/media/library_summary`. The
   legacy `data/media/library` branch remains only as incident evidence and is
   no longer a writer target.
+- Local core now distinguishes live-room and detached writer recovery for
+  post-write amplification. Detached skill-tool writes record
+  `recovery.mode=inline_after_detached_write` and await YStore compaction before
+  process exit; live-room writes use background compaction plus GC/allocator
+  trim. Runtime reliability now includes a `yjs_projection_guard.recovery`
+  section with inline/background counts and selected-webspace YStore replay
+  tail context. Stand validation is still pending.
 
 ## Phase 2 - Builder Guidance
 
@@ -122,6 +129,14 @@ projection evidence visible until core guards can explain and recover it.
   after logical payloads are compact.
 - [x] Migrate mediaserver summary writes from the amplified legacy
   `data/media/library` branch to fresh `data/media/library_summary`.
+- [x] Implement core post-write recovery modes for projection amplification:
+  inline compaction for detached tool-run writers, background compaction for
+  live-room writers, and allocator trim after compaction.
+- [x] Surface projection recovery mode and YStore replay-tail context in
+  reliability/CLI output.
+- [ ] Deploy the post-write recovery core batch to stand `.30` and confirm
+  repeated `mediaserver.get_snapshot` calls no longer leave a growing replay
+  tail or sustained runtime RSS ratchet.
 - [ ] Add an LLM Builder repair packet for repeated post-write amplification
   that names the owner, route, path, payload bytes, update bytes, ratio, and
   recommended bounded-route/compaction action.
