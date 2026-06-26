@@ -1,5 +1,57 @@
 {
   "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "webio": {
+    "receivers": {
+      "conversation_companions.diagnostics": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": true,
+          "schema": "conversation_companions.diagnostics.v1",
+          "items": [
+            {
+              "id": "conversation.awaiting_snapshot",
+              "title": "Diagnostics stream",
+              "status": "unknown",
+              "icon": "information-circle-outline",
+              "subtitle": "waiting for first snapshot",
+              "details": {
+                "reason": "snapshot requested on stream subscribe"
+              }
+            }
+          ],
+          "privacy": {
+            "conversation_text_redacted": true,
+            "feedback_text_redacted": true
+          }
+        },
+        "budget": {
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 1,
+          "maxSnapshotHz": 1,
+          "maxItems": 16
+        },
+        "guardVisibility": {
+          "degradedState": "Keep last redacted conversation diagnostics.",
+          "log": "service.conversation_companions.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.conversation_companions.diagnostics"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:conversation_companions_diagnostics_modal",
+          "owner": "skill:conversation_companions",
+          "firstPaint": "redacted diagnostics placeholder",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "conversation_companions.publish_diagnostics"
+          ]
+        }
+      }
+    }
+  },
   "apps": [
     {
       "id": "conversation_companions_diagnostics_app",
@@ -39,19 +91,38 @@
           },
           "widgets": [
             {
+              "id": "conversation-companions-diagnostic-actions",
+              "type": "ui.actions",
+              "area": "main",
+              "title": "",
+              "inputs": {
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "refresh",
+                    "label": "Refresh"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:refresh",
+                  "type": "callSkill",
+                  "target": "conversation_companions.publish_diagnostics",
+                  "params": {}
+                }
+              ]
+            },
+            {
               "id": "conversation-companions-diagnostic-cards",
               "type": "ui.list",
               "area": "main",
               "title": "Trial and persona state",
               "dataSource": {
-                "kind": "skill",
-                "name": "conversation_companions.get_diagnostics",
-                "params": {
-                  "source": "webui.diagnostics"
-                }
+                "kind": "stream",
+                "receiver": "conversation_companions.diagnostics"
               },
               "inputs": {
-                "refreshMs": 5000,
                 "titleKey": "title",
                 "subtitleKey": "subtitle",
                 "iconKey": "icon",
@@ -67,11 +138,8 @@
               "area": "main",
               "title": "Redacted diagnostic payload",
               "dataSource": {
-                "kind": "skill",
-                "name": "conversation_companions.get_diagnostics",
-                "params": {
-                  "source": "webui.diagnostics.raw"
-                }
+                "kind": "stream",
+                "receiver": "conversation_companions.diagnostics"
               },
               "inputs": {
                 "emptyText": "No diagnostic payload yet"

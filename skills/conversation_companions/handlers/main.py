@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Any, Mapping
 
-from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.decorators import subscribe, tool
 
 
 SKILL_ID = "conversation_companions"
@@ -18,6 +18,7 @@ FEEDBACK_KEY = "conversation_companions.feedback"
 MAX_HISTORY = 12
 PANEL_CHARACTERS = ("arseni", "nika", "mira")
 DIAGNOSTICS_SCHEMA = "conversation_companions.diagnostics.v1"
+DIAGNOSTICS_RECEIVER = "conversation_companions.diagnostics"
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
 
@@ -510,6 +511,37 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
     }
 
 
+def _publish_diagnostics_snapshot(webspace_id: str, _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    payload = _build_diagnostics(webspace_id)
+    try:
+        from adaos.sdk.io import stream_publish
+
+        meta = dict(_meta or {})
+        meta.setdefault("webspace_id", webspace_id)
+        stream_publish(DIAGNOSTICS_RECEIVER, payload, _meta=meta)
+    except Exception:
+        return payload
+    return payload
+
+
+def _event_payload(evt: Any) -> Mapping[str, Any]:
+    payload = getattr(evt, "payload", evt)
+    if isinstance(payload, Mapping):
+        nested = payload.get("payload") if "payload" in payload and "type" in payload else None
+        return nested if isinstance(nested, Mapping) else payload
+    return {}
+
+
+def _matches_diagnostics_receiver(payload: Mapping[str, Any]) -> bool:
+    receiver = str(payload.get("receiver") or "").strip()
+    return receiver in {DIAGNOSTICS_RECEIVER, "conversation_companions.*"}
+
+
+def _webspace_from_event_payload(payload: Mapping[str, Any]) -> str:
+    meta = payload.get("_meta") if isinstance(payload.get("_meta"), Mapping) else None
+    return _webspace_id(str(payload.get("webspace_id") or payload.get("workspace_id") or "").strip() or None, meta)
+
+
 @tool(summary="Start character onboarding.", side_effects="local_write")
 def start(
     profile_hint: str | None = None,
@@ -755,6 +787,29 @@ def get_diagnostics(
     return _build_diagnostics(_webspace_id(webspace_id, _meta))
 
 
+@tool(summary="Publish compact diagnostics for the WebUI stream.", side_effects="external_io")
+def publish_diagnostics(
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    return _publish_diagnostics_snapshot(_webspace_id(webspace_id, _meta), _meta)
+
+
+@subscribe("webio.stream.snapshot.requested")
+def on_webio_stream_snapshot_requested(evt: Any) -> None:
+    payload = _event_payload(evt)
+    if not _matches_diagnostics_receiver(payload):
+        return
+    _publish_diagnostics_snapshot(_webspace_from_event_payload(payload), payload.get("_meta") if isinstance(payload.get("_meta"), Mapping) else None)
+
+
+@subscribe("webio.stream.subscription.changed")
+def on_webio_stream_subscription_changed(evt: Any) -> None:
+    payload = _event_payload(evt)
+    if _matches_diagnostics_receiver(payload):
+        on_webio_stream_snapshot_requested(evt)
+
+
 def handle(topic: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
     data = dict(payload or {})
     if topic.endswith("start"):
@@ -765,6 +820,8 @@ def handle(topic: str, payload: Mapping[str, Any] | None = None) -> dict[str, An
         return update_profile(**data)
     if topic.endswith("feedback"):
         return capture_feedback(**data)
+    if topic.endswith("publish_diagnostics"):
+        return publish_diagnostics(**data)
     if topic.endswith("diagnostics"):
         return get_diagnostics(**data)
     return talk(**data)

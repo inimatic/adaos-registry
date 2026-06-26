@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.1.3
+version: 0.1.4
 description: Draft conversational character skill for onboarding, profile tuning,
   and controlled user trials.
 entry: handlers/main.py
@@ -8,9 +8,12 @@ runtime:
 default_tool: talk
 dependencies: []
 events:
-  subscribe: []
+  subscribe:
+  - webio.stream.snapshot.requested
+  - webio.stream.subscription.changed
   publish:
   - io.out.chat.append
+  - io.out.stream.publish
 exports:
   tools:
   - start
@@ -21,6 +24,7 @@ exports:
   - capture_feedback
   - reset_session
   - get_diagnostics
+  - publish_diagnostics
 tools:
 - name: start
   description: Start or resume the first-run character onboarding flow.
@@ -176,6 +180,22 @@ tools:
     - ok
     - items
     - privacy
+- name: publish_diagnostics
+  description: Publish compact operator diagnostics into the WebUI stream without
+    exposing conversation or feedback text.
+  entry: handlers.main:publish_diagnostics
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - privacy
 data_routes:
 - surface: conversation trial feedback
   route: skill-local
@@ -301,13 +321,13 @@ nlu:
         tool: update_profile
         params:
           instruction: $text
-updated_at: '2026-06-26T08:09:58+00:00'
+updated_at: '2026-06-26T08:15:07+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.422+3221.9f179f39
-    recorded_at: '2026-06-26T08:09:58+00:00'
+    min_version: 0.1.423+3225.8dbb89e5
+    recorded_at: '2026-06-26T08:15:07+00:00'
     source: skill_push
-    min_commit: 9f179f39f037fc8b5197238e9373a8f3ad6561e7
-    min_short_commit: 9f179f39
-    build_date: '2026-06-26T11:08:27+03:00'
+    min_commit: 8dbb89e56250cbf2f8e4fca162214dc92edf58d3
+    min_short_commit: 8dbb89e5
+    build_date: '2026-06-26T11:14:25+03:00'
 

@@ -55,10 +55,14 @@ def test_manifest_declares_diagnostics_tool() -> None:
 
     tools = {item["name"]: item for item in manifest["tools"]}
     assert "get_diagnostics" in tools
+    assert "publish_diagnostics" in tools
     assert "get_diagnostics" in manifest["exports"]["tools"]
+    assert "publish_diagnostics" in manifest["exports"]["tools"]
     assert tools["get_diagnostics"]["entry"] == "handlers.main:get_diagnostics"
+    assert tools["publish_diagnostics"]["entry"] == "handlers.main:publish_diagnostics"
     assert "items" in tools["get_diagnostics"]["output_schema"]["required"]
     assert "privacy" in tools["get_diagnostics"]["output_schema"]["required"]
+    assert "webio.stream.snapshot.requested" in manifest["events"]["subscribe"]
 
 
 def test_webui_declares_diagnostics_modal_with_skill_sources() -> None:
@@ -67,19 +71,27 @@ def test_webui_declares_diagnostics_modal_with_skill_sources() -> None:
 
     app_ids = {item["id"] for item in webui["apps"]}
     assert "conversation_companions_diagnostics_app" in app_ids
+    assert webui["webio"]["receivers"]["conversation_companions.diagnostics"]["snapshotPolicy"] == "on_subscribe"
 
     modal = webui["registry"]["modals"]["conversation_companions_diagnostics_modal"]["schema"]
     widgets = {item["id"]: item for item in modal["widgets"]}
+    actions = widgets["conversation-companions-diagnostic-actions"]
     cards = widgets["conversation-companions-diagnostic-cards"]
     payload = widgets["conversation-companions-diagnostic-payload"]
+    assert actions["type"] == "ui.actions"
+    assert actions["actions"][0]["type"] == "callSkill"
+    assert actions["actions"][0]["target"] == "conversation_companions.publish_diagnostics"
     assert cards["type"] == "ui.list"
     assert cards["dataSource"] == {
-        "kind": "skill",
-        "name": "conversation_companions.get_diagnostics",
-        "params": {"source": "webui.diagnostics"},
+        "kind": "stream",
+        "receiver": "conversation_companions.diagnostics",
     }
     assert payload["type"] == "ui.jsonViewer"
-    assert payload["dataSource"]["name"] == "conversation_companions.get_diagnostics"
+    assert payload["dataSource"] == {
+        "kind": "stream",
+        "receiver": "conversation_companions.diagnostics",
+    }
+    assert '"kind": "skill"' not in json.dumps(modal)
 
 
 def test_get_diagnostics_redacts_conversation_and_feedback_text(monkeypatch) -> None:
@@ -102,7 +114,7 @@ def test_get_diagnostics_redacts_conversation_and_feedback_text(monkeypatch) -> 
         webspace_id=ws,
     )
 
-    payload = main.get_diagnostics(webspace_id=ws)
+    payload = main.publish_diagnostics(webspace_id=ws)
 
     assert payload["ok"] is True
     assert payload["schema"] == "conversation_companions.diagnostics.v1"
@@ -125,3 +137,26 @@ def test_get_diagnostics_redacts_conversation_and_feedback_text(monkeypatch) -> 
     assert private_expectation not in serialized
     assert private_observation not in serialized
     assert private_profile_note not in serialized
+
+
+def test_webio_snapshot_subscription_publishes_matching_receiver(monkeypatch) -> None:
+    from handlers import main
+
+    calls: list[tuple[str, object]] = []
+
+    def publish_snapshot(webspace_id: str, _meta: object = None) -> dict[str, object]:
+        calls.append((webspace_id, _meta))
+        return {"ok": True, "items": []}
+
+    monkeypatch.setattr(main, "_publish_diagnostics_snapshot", publish_snapshot)
+
+    main.on_webio_stream_snapshot_requested(
+        {
+            "receiver": "conversation_companions.diagnostics",
+            "webspace_id": "operator-desktop",
+            "_meta": {"webspace_id": "operator-desktop"},
+        }
+    )
+    main.on_webio_stream_snapshot_requested({"receiver": "other.receiver", "webspace_id": "ignored"})
+
+    assert calls == [("operator-desktop", {"webspace_id": "operator-desktop"})]
