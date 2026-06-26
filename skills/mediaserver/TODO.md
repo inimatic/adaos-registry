@@ -90,6 +90,18 @@ projection evidence visible until core guards can explain and recover it.
   trim. Runtime reliability now includes a `yjs_projection_guard.recovery`
   section with inline/background counts and selected-webspace YStore replay
   tail context. Stand validation is still pending.
+- Stand `.30` rollout of core `0.1.440+1.9227e72` exposed public runtime memory
+  attribution: after boot the runtime family was about 1.0 GB, split between
+  parent autostart runner and child skill processes. Top child RSS contributors
+  were `neural_nlu_service_skill` (~249 MB), `rasa_nlu_service_skill` (~148 MB),
+  `slideshow_skill` (~45 MB), `media_indexer_skill` (~43 MB), and
+  `neuro_nlu_lite_skill` (~26 MB).
+- The same rollout validated baseline maturation: cold baseline stayed in
+  `warming`, then `maturity_blocked_slope`, and finally `mature` once slope
+  settled. After five `mediaserver.get_snapshot` stress calls, family RSS
+  later relaxed from about 1.07 GB to about 676 MB with `suspicion_state=stable`.
+  This is a positive relaxation signal, but parent RSS still needs longer soak
+  validation.
 
 ## Phase 2 - Builder Guidance
 
@@ -157,9 +169,9 @@ projection evidence visible until core guards can explain and recover it.
   signal, not only a memory leak signal.
 - [x] Expose current process RSS, child RSS, family RSS, sample freshness, and
   top child skill processes in supervisor memory status.
-- [ ] Deploy public memory attribution to stand `.30` and confirm it names the
+- [x] Deploy public memory attribution to stand `.30` and confirm it names the
   largest child runtimes during the mediaserver stress run.
-- [ ] Mature the memory baseline after warmup/import pressure so cold-start RSS
+- [x] Mature the memory baseline after warmup/import pressure so cold-start RSS
   does not become a permanent false growth reference.
 - [ ] Add per-skill child-process memory policy hooks: observe first, then
   degrade/quarantine/restart only with Builder-facing evidence.
