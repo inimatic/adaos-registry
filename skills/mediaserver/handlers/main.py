@@ -1,16 +1,26 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from adaos.sdk.core.decorators import tool
-from adaos.services.media_library import list_media_files, media_runtime_snapshot, media_snapshot
+from adaos.services.media_library import (
+    MEDIA_LIBRARY_DEFAULT_PAGE_SIZE,
+    MEDIA_LIBRARY_MAX_PAGE_SIZE,
+    list_media_files,
+    list_media_files_page,
+    media_capabilities,
+    media_library_summary,
+    media_runtime_snapshot,
+)
 
 REQUIRES_DATA_PROJECTIONS = ["mediaserver.library"]
 PROJECTION_SLOT = "mediaserver.library"
 PROJECTION_PATH = "data/media/library"
+LIBRARY_PAGE_TOOL = "mediaserver.list_library_page"
 PROJECTION_BUDGET_HINT = {
     "max_payload_bytes": 65536,
-    "max_items": 1,
+    "max_items": 0,
     "target_shape": "constant_size_summary",
 }
 
@@ -33,12 +43,15 @@ def _webspace_id(webspace_id: str | None = None, payload: dict[str, Any] | None 
 
 
 def _summary(snapshot: dict[str, Any]) -> dict[str, Any]:
-    items = snapshot.get("items") if isinstance(snapshot.get("items"), list) else []
+    count = _safe_int(snapshot.get("count"))
+    if not count:
+        items = snapshot.get("items") if isinstance(snapshot.get("items"), list) else []
+        count = len(items)
     capabilities = snapshot.get("capabilities") if isinstance(snapshot.get("capabilities"), dict) else {}
     return {
         "title": "Media Server",
-        "value": len(items),
-        "subtitle": f"{len(items)} media files",
+        "value": count,
+        "subtitle": f"{count} media files",
         "details": str(capabilities.get("state") or capabilities.get("status") or "ready"),
     }
 
@@ -171,20 +184,20 @@ def _stream_guard_row(runtime: dict[str, Any]) -> dict[str, Any]:
 
 
 def _projection_contract_row(*, item_count: int, total_bytes: int) -> dict[str, Any]:
-    status = "warning" if item_count else "ready"
+    status = "ready"
     return {
         "id": "mediaserver.full_list_projection_contract",
         "title": "Current mediaserver projection shape",
         "status": status,
         "icon": _status_icon(status),
-        "subtitle": f"{item_count} rows, {total_bytes} bytes; Yjs path {PROJECTION_PATH}",
+        "subtitle": f"{item_count} rows indexed outside Yjs; {total_bytes} bytes on disk",
         "details": {
             "owner": "skill:mediaserver",
             "slot": PROJECTION_SLOT,
             "path": PROJECTION_PATH,
-            "current_shape": "full_items_projection",
+            "current_shape": "constant_size_summary",
             "budget_hint": PROJECTION_BUDGET_HINT,
-            "repair_route": "Publish only summary/counts to Yjs and move rows behind page/search/detail routes.",
+            "page_route": LIBRARY_PAGE_TOOL,
         },
     }
 
@@ -208,15 +221,16 @@ def _media_runtime_row(runtime: dict[str, Any]) -> dict[str, Any]:
 
 
 def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
-    items = list_media_files()
-    total_bytes = sum(_safe_int(item.get("size_bytes")) for item in items)
-    runtime = media_runtime_snapshot(items)
+    summary = _library_scan_summary()
+    item_count = _safe_int(summary.get("count"))
+    total_bytes = _safe_int(summary.get("total_bytes"))
+    runtime = _summary_runtime(summary)
     reliability, reliability_error = _safe_reliability_payload(webspace_id)
     reliability_runtime = (
         reliability.get("runtime") if isinstance(reliability.get("runtime"), dict) else {}
     )
     rows = [
-        _projection_contract_row(item_count=len(items), total_bytes=total_bytes),
+        _projection_contract_row(item_count=item_count, total_bytes=total_bytes),
         _projection_guard_row(reliability_runtime),
         _yjs_pressure_row(reliability_runtime),
         _stream_guard_row(reliability_runtime),
@@ -239,10 +253,10 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
         "webspace_id": webspace_id,
         "summary": {
             "title": "Media diagnostics",
-            "value": len(items),
-            "subtitle": f"{len(items)} media rows in current full-list projection",
+            "value": item_count,
+            "subtitle": f"{item_count} media rows behind bounded page route",
             "details": f"{total_bytes} bytes on disk; Yjs slot {PROJECTION_SLOT}",
-            "status": "warning" if len(items) else "ready",
+            "status": "ready",
         },
         "items": rows,
         "media": {
@@ -250,9 +264,11 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
                 "owner": "skill:mediaserver",
                 "slot": PROJECTION_SLOT,
                 "path": PROJECTION_PATH,
-                "item_total": len(items),
+                "item_total": item_count,
                 "total_bytes": total_bytes,
                 "budget_hint": PROJECTION_BUDGET_HINT,
+                "shape": "constant_size_summary",
+                "page_route": LIBRARY_PAGE_TOOL,
             },
             "runtime": runtime,
         },
@@ -266,11 +282,116 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
             "state_sync": reliability_runtime.get("state_sync"),
         },
         "next_actions": [
-            "Keep the diagnostic UI as the evidence surface while core Yjs projection guards are hardened.",
-            "Migrate mediaserver.library to a constant-size summary after guard visibility is proven.",
-            "Move full media rows behind bounded page/search/detail routes.",
+            "Keep Yjs limited to count, bytes, freshness, capability, and route contract fields.",
+            "Use mediaserver.list_library_page for browser rows and searches.",
+            "Watch reliability guard cards after large-library stress runs.",
         ],
     }
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+def _library_scan_summary() -> dict[str, Any]:
+    try:
+        summary = media_library_summary()
+        if isinstance(summary, dict):
+            return {
+                "count": _safe_int(summary.get("count")),
+                "total_bytes": _safe_int(summary.get("total_bytes")),
+                "latest_modified_at": str(summary.get("latest_modified_at") or ""),
+            }
+    except Exception:
+        pass
+    items = list_media_files()
+    latest_modified_at = ""
+    if items:
+        latest_modified_at = max(str(item.get("modified_at") or "") for item in items)
+    return {
+        "count": len(items),
+        "total_bytes": sum(_safe_int(item.get("size_bytes")) for item in items),
+        "latest_modified_at": latest_modified_at,
+    }
+
+
+def _summary_runtime(summary: dict[str, Any]) -> dict[str, Any]:
+    runtime = media_runtime_snapshot([])
+    counts = runtime.get("counts") if isinstance(runtime.get("counts"), dict) else {}
+    runtime["counts"] = {
+        **counts,
+        "file_total": _safe_int(summary.get("count")),
+        "total_bytes": _safe_int(summary.get("total_bytes")),
+    }
+    return runtime
+
+
+def _compact_capabilities() -> dict[str, Any]:
+    capabilities = media_capabilities()
+    route_profiles = capabilities.get("route_profiles") if isinstance(capabilities.get("route_profiles"), dict) else {}
+    upload = capabilities.get("upload") if isinstance(capabilities.get("upload"), dict) else {}
+    playback = capabilities.get("playback") if isinstance(capabilities.get("playback"), dict) else {}
+    broadcast = capabilities.get("broadcast") if isinstance(capabilities.get("broadcast"), dict) else {}
+    notes = capabilities.get("notes") if isinstance(capabilities.get("notes"), list) else []
+    return {
+        "status": "ready",
+        "state": "ready",
+        "upload": upload,
+        "playback": playback,
+        "broadcast": {
+            "ready": bool(broadcast.get("ready")),
+            "mode": broadcast.get("mode"),
+            "reason": broadcast.get("reason"),
+            "peer_total": broadcast.get("peer_total"),
+            "connected_peers": broadcast.get("connected_peers"),
+        },
+        "route_profiles": route_profiles,
+        "notes": notes[:8],
+    }
+
+
+def _library_summary_snapshot() -> dict[str, Any]:
+    summary = _library_scan_summary()
+    capabilities = _compact_capabilities()
+    runtime = _summary_runtime(summary)
+    count = _safe_int(summary.get("count"))
+    total_bytes = _safe_int(summary.get("total_bytes"))
+    payload = {
+        "ok": True,
+        "schema": "mediaserver.library_summary.v1",
+        "items": [],
+        "count": count,
+        "total_bytes": total_bytes,
+        "latest_modified_at": str(summary.get("latest_modified_at") or ""),
+        "updated_at": _utc_now(),
+        "summary": {
+            "title": "Media Server",
+            "value": count,
+            "subtitle": f"{count} media files",
+            "details": f"{total_bytes} bytes; rows load via {LIBRARY_PAGE_TOOL}",
+            "status": "ready",
+        },
+        "capabilities": capabilities,
+        "runtime": runtime,
+        "library": {
+            "route": {
+                "kind": "skill",
+                "name": LIBRARY_PAGE_TOOL,
+                "default_limit": MEDIA_LIBRARY_DEFAULT_PAGE_SIZE,
+                "max_limit": MEDIA_LIBRARY_MAX_PAGE_SIZE,
+                "supports_cursor": True,
+                "filters": ["query", "mime_type"],
+            },
+            "projection": {
+                "owner": "skill:mediaserver",
+                "slot": PROJECTION_SLOT,
+                "path": PROJECTION_PATH,
+                "shape": "constant_size_summary",
+                "budget_hint": PROJECTION_BUDGET_HINT,
+            },
+        },
+    }
+    return payload
 
 
 def _publish_snapshot(snapshot: dict[str, Any], *, webspace_id: str) -> None:
@@ -278,6 +399,71 @@ def _publish_snapshot(snapshot: dict[str, Any], *, webspace_id: str) -> None:
 
     payload = {**snapshot, "summary": _summary(snapshot)}
     ctx_subnet.set(PROJECTION_SLOT, payload, webspace_id=webspace_id)
+
+
+def _payload_value(payload: dict[str, Any] | None, key: str, fallback: Any = None) -> Any:
+    if isinstance(payload, dict) and key in payload:
+        return payload.get(key)
+    return fallback
+
+
+def _safe_limit(value: Any) -> int:
+    parsed = _safe_int(value)
+    if parsed <= 0:
+        parsed = MEDIA_LIBRARY_DEFAULT_PAGE_SIZE
+    return min(max(1, parsed), MEDIA_LIBRARY_MAX_PAGE_SIZE)
+
+
+def _library_page(
+    *,
+    payload: dict[str, Any] | None = None,
+    limit: Any = None,
+    offset: Any = None,
+    cursor: Any = None,
+    query: Any = None,
+    mime_type: Any = None,
+) -> dict[str, Any]:
+    page = list_media_files_page(
+        limit=_safe_limit(_payload_value(payload, "limit", _payload_value(payload, "page_size", limit))),
+        offset=_safe_int(_payload_value(payload, "offset", offset)),
+        cursor=str(_payload_value(payload, "cursor", cursor) or ""),
+        query=str(_payload_value(payload, "query", query) or ""),
+        mime_type=str(_payload_value(payload, "mime_type", mime_type) or ""),
+    )
+    items = page.get("items") if isinstance(page.get("items"), list) else []
+    pagination = page.get("pagination") if isinstance(page.get("pagination"), dict) else {}
+    summary = page.get("summary") if isinstance(page.get("summary"), dict) else {}
+    return {
+        "ok": True,
+        "schema": "mediaserver.library_page.v1",
+        "items": items,
+        "count": _safe_int(summary.get("count")),
+        "total_bytes": _safe_int(summary.get("total_bytes")),
+        "pagination": {
+            "limit": _safe_int(pagination.get("limit")),
+            "offset": _safe_int(pagination.get("offset")),
+            "cursor": str(pagination.get("cursor") or ""),
+            "next_cursor": str(pagination.get("next_cursor") or ""),
+            "has_more": bool(pagination.get("has_more")),
+            "total_count": _safe_int(pagination.get("total_count")),
+            "scanned_count": _safe_int(pagination.get("scanned_count")),
+        },
+        "summary": {
+            "title": "Media Library",
+            "value": _safe_int(summary.get("count")),
+            "subtitle": f"{len(items)} rows loaded",
+            "details": "bounded page route",
+            "query": str(summary.get("query") or ""),
+            "mime_type": str(summary.get("mime_type") or ""),
+        },
+        "capabilities": _compact_capabilities(),
+        "runtime": _summary_runtime(
+            {
+                "count": _safe_int(summary.get("count")),
+                "total_bytes": _safe_int(summary.get("total_bytes")),
+            }
+        ),
+    }
 
 
 @tool(
@@ -292,9 +478,37 @@ def get_snapshot(
     target_node_id: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
-    snapshot = media_snapshot()
+    snapshot = _library_summary_snapshot()
     _publish_snapshot(snapshot, webspace_id=_webspace_id(webspace_id, _payload))
     return snapshot
+
+
+@tool(
+    "list_library_page",
+    summary="return a bounded page of mediaserver library rows",
+    stability="experimental",
+)
+def list_library_page(
+    _payload: dict[str, Any] | None = None,
+    limit: int | None = None,
+    page_size: int | None = None,
+    offset: int | None = None,
+    cursor: str | None = None,
+    query: str | None = None,
+    mime_type: str | None = None,
+    webspace_id: str | None = None,
+    node_id: str | None = None,
+    target_node_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    return _library_page(
+        payload=_payload,
+        limit=limit if limit is not None else page_size,
+        offset=offset,
+        cursor=cursor,
+        query=query,
+        mime_type=mime_type,
+    )
 
 
 @tool(
@@ -309,7 +523,7 @@ def refresh_snapshot(
     target_node_id: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
-    snapshot = media_snapshot()
+    snapshot = _library_summary_snapshot()
     _publish_snapshot(snapshot, webspace_id=_webspace_id(webspace_id, _payload))
     return {"ok": True, "summary": _summary(snapshot), "delivery": "yjs_projection"}
 

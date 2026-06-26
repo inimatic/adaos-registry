@@ -23,10 +23,15 @@ def test_manifest_declares_diagnostics_tool() -> None:
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
 
     tools = {item["name"]: item for item in manifest["tools"]}
+    routes = {item["surface"]: item for item in manifest["data_routes"]}
     assert "get_diagnostics" in tools
     assert tools["get_diagnostics"]["entry"] == "handlers.main:get_diagnostics"
     assert "media" in tools["get_diagnostics"]["output_schema"]["required"]
     assert "reliability" in tools["get_diagnostics"]["output_schema"]["required"]
+    assert tools["get_snapshot"]["entry"] == "handlers.main:get_snapshot"
+    assert tools["list_library_page"]["entry"] == "handlers.main:list_library_page"
+    assert routes["widget:mediaserver.summary"]["budget"]["max_items"] == 0
+    assert routes["modal:mediaserver.library_page"]["budget"]["max_items"] == 100
 
 
 def test_webui_declares_diagnostics_modal_without_full_library_source() -> None:
@@ -35,6 +40,19 @@ def test_webui_declares_diagnostics_modal_without_full_library_source() -> None:
 
     app_ids = {item["id"] for item in webui["apps"]}
     assert "mediaserver_diagnostics_app" in app_ids
+    assert webui["widgets"][0]["dataSource"] == {
+        "kind": "skill",
+        "name": "mediaserver.list_library_page",
+        "params": {"limit": 50, "source": "webui.widget"},
+    }
+
+    media_modal = webui["registry"]["modals"]["mediaserver_modal"]["schema"]
+    media_widget = media_modal["widgets"][0]
+    assert media_widget["dataSource"] == {
+        "kind": "skill",
+        "name": "mediaserver.list_library_page",
+        "params": {"limit": 50, "source": "webui.modal"},
+    }
 
     modal = webui["registry"]["modals"]["mediaserver_diagnostics_modal"]["schema"]
     widgets = {item["id"]: item for item in modal["widgets"]}
@@ -57,11 +75,8 @@ def test_get_diagnostics_returns_compact_operator_evidence(monkeypatch) -> None:
 
     monkeypatch.setattr(
         main,
-        "list_media_files",
-        lambda: [
-            {"name": "clip-a.mp4", "size_bytes": 120},
-            {"name": "clip-b.mp4", "size_bytes": 80},
-        ],
+        "media_library_summary",
+        lambda: {"count": 2, "total_bytes": 200, "latest_modified_at": "2026-06-26T00:00:00+00:00"},
     )
     monkeypatch.setattr(
         main,
@@ -119,3 +134,84 @@ def test_get_diagnostics_returns_compact_operator_evidence(monkeypatch) -> None:
     serialized = json.dumps(payload)
     assert "clip-a.mp4" not in serialized
     assert "clip-b.mp4" not in serialized
+
+
+def test_get_snapshot_projects_constant_size_summary_for_large_library(monkeypatch) -> None:
+    from handlers import main
+
+    projected: list[dict] = []
+    monkeypatch.setattr(
+        main,
+        "media_library_summary",
+        lambda: {
+            "count": 500_000,
+            "total_bytes": 8_000_000_000_000,
+            "latest_modified_at": "2026-06-26T00:00:00+00:00",
+        },
+    )
+    monkeypatch.setattr(
+        main,
+        "media_runtime_snapshot",
+        lambda items: {
+            "available": True,
+            "assessment": {"state": "ready", "reason": "media runtime ready"},
+            "counts": {"file_total": len(items), "total_bytes": 0},
+            "recommended_path": "direct_local_http",
+            "paths": {"direct_local_http": {"ready": True}},
+        },
+    )
+    monkeypatch.setattr(main, "media_capabilities", lambda: {"status": "ready", "notes": ["ok"]})
+    monkeypatch.setattr(main, "list_media_files", lambda: (_ for _ in ()).throw(AssertionError("full list used")))
+    monkeypatch.setattr(main, "_publish_snapshot", lambda snapshot, **_kwargs: projected.append(snapshot))
+
+    payload = main.get_snapshot(webspace_id="desktop")
+    serialized = json.dumps(payload)
+
+    assert payload["schema"] == "mediaserver.library_summary.v1"
+    assert payload["items"] == []
+    assert payload["count"] == 500_000
+    assert payload["library"]["route"]["name"] == "mediaserver.list_library_page"
+    assert len(serialized) < 20_000
+    assert projected and projected[0]["items"] == []
+
+
+def test_list_library_page_clamps_rows_and_keeps_summary(monkeypatch) -> None:
+    from handlers import main
+
+    def fake_page(**kwargs):
+        assert kwargs["limit"] == 100
+        return {
+            "ok": True,
+            "items": [{"name": f"clip-{idx}.mp4", "size_bytes": idx} for idx in range(100)],
+            "pagination": {
+                "limit": 100,
+                "offset": 0,
+                "cursor": "",
+                "next_cursor": "cursor-2",
+                "has_more": True,
+                "total_count": 500_000,
+                "scanned_count": 500_000,
+            },
+            "summary": {
+                "count": 500_000,
+                "total_bytes": 8_000_000_000_000,
+                "query": "",
+                "mime_type": "",
+            },
+        }
+
+    monkeypatch.setattr(main, "list_media_files_page", fake_page)
+    monkeypatch.setattr(main, "media_capabilities", lambda: {"status": "ready", "notes": []})
+    monkeypatch.setattr(
+        main,
+        "media_runtime_snapshot",
+        lambda items: {"available": True, "counts": {"file_total": len(items), "total_bytes": 0}},
+    )
+
+    payload = main.list_library_page(_payload={"limit": 500})
+
+    assert payload["ok"] is True
+    assert len(payload["items"]) == 100
+    assert payload["pagination"]["next_cursor"] == "cursor-2"
+    assert payload["pagination"]["total_count"] == 500_000
+    assert payload["summary"]["value"] == 500_000

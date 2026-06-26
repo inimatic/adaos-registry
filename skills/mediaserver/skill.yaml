@@ -1,5 +1,5 @@
 name: mediaserver
-version: 0.8.9
+version: 0.9.1
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -13,11 +13,45 @@ data_projections:
   targets:
   - backend: yjs
     path: data/media/library
+data_routes:
+- surface: widget:mediaserver.summary
+  route: yjs
+  projection_slot: mediaserver.library
+  path: data/media/library
+  first_paint: compact summary from ydoc defaults
+  recovery: Yjs replay restores count, bytes, capability, freshness, and route contract
+  update_source:
+  - mediaserver.refresh_snapshot
+  - mediaserver.get_snapshot
+  budget:
+    max_payload_bytes: 65536
+    max_items: 0
+    max_publish_hz: 0.2
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: media summary reports projection guard decision
+    log: skill:mediaserver.runtime
+    quarantine: true
+- surface: modal:mediaserver.library_page
+  route: tool
+  tool: mediaserver.list_library_page
+  first_paint: first bounded page of media rows
+  recovery: browser requests another bounded page; rows are not replayed from Yjs
+  update_source:
+  - mediaserver.list_library_page
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+    snapshot_policy: on_request
+  guard_visibility:
+    degraded_state: media browser shows page-route error without mutating Yjs
+    log: skill:mediaserver.runtime
+    quarantine: false
 default_tool: get_snapshot
 tools:
 - name: get_snapshot
-  description: Return current media library snapshot and media-channel capability
-    diagnostics.
+  description: Return current compact media library summary and media-channel capability
+    diagnostics. Full rows are available only through list_library_page.
   entry: handlers.main:get_snapshot
   input_schema:
     type: object
@@ -26,8 +60,40 @@ tools:
     type: object
     required:
     - ok
+    - count
+    - total_bytes
+    - summary
+- name: list_library_page
+  description: Return a bounded page of media library rows with cursor pagination
+    and optional name/mime filters.
+  entry: handlers.main:list_library_page
+  input_schema:
+    type: object
+    additionalProperties: true
+    properties:
+      limit:
+        type: integer
+        default: 50
+        maximum: 100
+      page_size:
+        type: integer
+        default: 50
+        maximum: 100
+      offset:
+        type: integer
+        default: 0
+      cursor:
+        type: string
+      query:
+        type: string
+      mime_type:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
     - items
-    - capabilities
+    - pagination
 - name: refresh_snapshot
   description: Refresh media library projection and return a lightweight acknowledgement.
   entry: handlers.main:refresh_snapshot
@@ -50,13 +116,13 @@ tools:
     - items
     - media
     - reliability
-updated_at: '2026-06-26T08:48:00+00:00'
+updated_at: '2026-06-26T09:20:23+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3228.5eb15269
-    recorded_at: '2026-06-26T08:48:00+00:00'
+    min_version: 0.1.0+3234.7950c3b4
+    recorded_at: '2026-06-26T09:20:23+00:00'
     source: skill_push
-    min_commit: 5eb152697544bef247f9350237ab5256d8313b58
-    min_short_commit: 5eb15269
-    build_date: '2026-06-26T11:45:37+03:00'
+    min_commit: 7950c3b459e0f8f0be2547ab2b55c81481327869
+    min_short_commit: 7950c3b4
+    build_date: '2026-06-26T12:20:01+03:00'
 

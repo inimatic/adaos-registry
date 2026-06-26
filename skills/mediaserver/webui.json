@@ -34,8 +34,12 @@
       "title": "Media Server",
       "type": "media.videoBrowser",
       "dataSource": {
-        "kind": "y",
-        "path": "data/media/library"
+        "kind": "skill",
+        "name": "mediaserver.list_library_page",
+        "params": {
+          "limit": 50,
+          "source": "webui.widget"
+        }
       },
       "inputs": {
         "compact": true,
@@ -75,8 +79,12 @@
               "area": "main",
               "title": "Media Library",
               "dataSource": {
-                "kind": "y",
-                "path": "data/media/library"
+                "kind": "skill",
+                "name": "mediaserver.list_library_page",
+                "params": {
+                  "limit": 50,
+                  "source": "webui.modal"
+                }
               },
               "inputs": {
                 "compact": false,
@@ -169,12 +177,25 @@
   "ydoc_defaults": {
     "data/media/library": {
       "items": [],
-      "capabilities": {},
+      "count": 0,
+      "total_bytes": 0,
+      "capabilities": {
+        "status": "waiting"
+      },
       "summary": {
         "title": "Media Server",
         "value": 0,
         "subtitle": "0 media files",
-        "details": "waiting for projection"
+        "details": "summary only; rows load via mediaserver.list_library_page"
+      },
+      "library": {
+        "route": {
+          "kind": "skill",
+          "name": "mediaserver.list_library_page",
+          "default_limit": 50,
+          "max_limit": 100,
+          "supports_cursor": true
+        }
       }
     }
   },

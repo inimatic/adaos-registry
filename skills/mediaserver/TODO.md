@@ -69,15 +69,19 @@ core guards can detect and explain it.
 
 ## Phase 3 - Mediaserver Migration
 
-- [ ] Change `mediaserver.library` Yjs projection to a constant-size summary.
-- [ ] Move full library rows behind a bounded page/search route.
-- [ ] Keep `refresh_snapshot` as a compact acknowledgement, not a data
+- [x] Change `mediaserver.library` Yjs projection to a constant-size summary.
+- [x] Move full library rows behind a bounded page route
+  (`mediaserver.list_library_page`).
+- [x] Keep `refresh_snapshot` as a compact acknowledgement, not a data
   transport.
-- [ ] Add count, total bytes, freshness, capability, and degraded-state fields
+- [x] Add count, total bytes, freshness, capability, and degraded-state fields
   to the Yjs summary.
-- [ ] Add pagination/search limits suitable for 100k+ rows, with stress margin
+- [x] Add pagination/search limits suitable for 100k+ rows, with stress margin
   toward 500k rows.
-- [ ] Add tests proving Yjs payload size does not scale with library row count.
+- [x] Add tests proving Yjs payload size does not scale with library row count.
+- [ ] Add explicit search UI controls over `mediaserver.list_library_page`.
+- [ ] Re-check media upload/delete refresh behavior in browser after switching
+  the widget to skill-backed page data.
 
 ## Phase 4 - Stress And Relaxation Validation
 

@@ -1,7 +1,8 @@
 # Mediaserver Target Architecture
 
 Status: target contract and implementation checklist for the mediaserver stress
-case.
+case. Phase 3 migration is in progress: the skill now targets a summary-only
+Yjs projection plus a bounded page route for media rows.
 
 This skill is intentionally kept as a stress case while the core protections are
 implemented. A skill-generated media library must not be able to overload the
@@ -61,6 +62,11 @@ The library route should support:
 - bounded per-request response size
 - no full-list materialization in the browser steady state
 
+The first implemented route is `mediaserver.list_library_page`. It returns at
+most 100 rows, supports cursor pagination, and keeps the browser off the
+`data/media/library` Yjs path for row data. Offset remains accepted for small
+diagnostic jumps, but cursor is the intended path for large libraries.
+
 ## Core Protection Contract
 
 The runtime owns safety even when a skill is wrong:
@@ -96,6 +102,8 @@ growth.
 4. Mediaserver migration.
    Change the projection to a constant-size summary. Move library rows to a
    paged/searchable details route and keep action responses as compact acks.
+   The current implementation uses `data/media/library` only for count, bytes,
+   freshness, capability, and route metadata.
 
 5. Stress validation.
    Exercise the old and new behavior against synthetic large-library cases,
