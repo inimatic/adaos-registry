@@ -61,11 +61,11 @@ core guards can detect and explain it.
 
 ## Phase 2 - Builder Guidance
 
-- [ ] Split `docs/guides/llm-skill-development.md` guidance into smaller
+- [x] Split `docs/guides/llm-skill-development.md` guidance into smaller
   machine-checkable route contracts.
-- [ ] Require Yjs projection budgets for generated browser-facing skills.
-- [ ] Add examples for compact Yjs summary plus paged/search/details routes.
-- [ ] Add Builder repair evidence expectations for guard/quarantine events.
+- [x] Require Yjs projection budgets for generated browser-facing skills.
+- [x] Add examples for compact Yjs summary plus paged/search/details routes.
+- [x] Add Builder repair evidence expectations for guard/quarantine events.
 
 ## Phase 3 - Mediaserver Migration
 
