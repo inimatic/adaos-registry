@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import pathlib
 import sys
+from importlib import resources
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -13,7 +14,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 
-def _find_repo_root() -> pathlib.Path:
+def _find_repo_schema_path() -> pathlib.Path:
     marker = pathlib.Path("src") / "adaos" / "abi" / "webui.v1.schema.json"
     candidates = [
         pathlib.Path.cwd(),
@@ -23,15 +24,16 @@ def _find_repo_root() -> pathlib.Path:
     ]
     for root in candidates:
         if (root / marker).exists():
-            return root
+            return root / marker
     raise FileNotFoundError(f"Cannot find repo root containing {marker}")
 
 
-REPO_ROOT = _find_repo_root()
-
-
 def _load_webui_schema() -> dict:
-    path = REPO_ROOT / "src" / "adaos" / "abi" / "webui.v1.schema.json"
+    try:
+        path = resources.files("adaos.abi").joinpath("webui.v1.schema.json")
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, ModuleNotFoundError):
+        path = _find_repo_schema_path()
     return json.loads(path.read_text(encoding="utf-8"))
 
 
