@@ -224,7 +224,7 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
     summary = _library_scan_summary()
     item_count = _safe_int(summary.get("count"))
     total_bytes = _safe_int(summary.get("total_bytes"))
-    runtime = _summary_runtime(summary)
+    runtime = _diagnostic_runtime(summary)
     reliability, reliability_error = _safe_reliability_payload(webspace_id)
     reliability_runtime = (
         reliability.get("runtime") if isinstance(reliability.get("runtime"), dict) else {}
@@ -318,6 +318,37 @@ def _library_scan_summary() -> dict[str, Any]:
 def _summary_runtime(summary: dict[str, Any]) -> dict[str, Any]:
     runtime = media_runtime_snapshot([])
     counts = runtime.get("counts") if isinstance(runtime.get("counts"), dict) else {}
+    assessment = runtime.get("assessment") if isinstance(runtime.get("assessment"), dict) else {}
+    paths = runtime.get("paths") if isinstance(runtime.get("paths"), dict) else {}
+    compact_paths: dict[str, Any] = {}
+    for name in ("direct_local_http", "hub_http_proxy", "member_browser_direct", "hub_webrtc_loopback"):
+        route = paths.get(name) if isinstance(paths.get(name), dict) else {}
+        if route:
+            compact_paths[name] = {
+                "ready": bool(route.get("ready")),
+                "reason": route.get("reason"),
+                "url": route.get("url"),
+            }
+    return {
+        "available": bool(runtime.get("available")),
+        "recommended_path": runtime.get("recommended_path"),
+        "selection_reason": runtime.get("selection_reason"),
+        "assessment": {
+            "state": assessment.get("state"),
+            "reason": assessment.get("reason"),
+        },
+        "counts": {
+            **counts,
+            "file_total": _safe_int(summary.get("count")),
+            "total_bytes": _safe_int(summary.get("total_bytes")),
+        },
+        "paths": compact_paths,
+    }
+
+
+def _diagnostic_runtime(summary: dict[str, Any]) -> dict[str, Any]:
+    runtime = media_runtime_snapshot([])
+    counts = runtime.get("counts") if isinstance(runtime.get("counts"), dict) else {}
     runtime["counts"] = {
         **counts,
         "file_total": _safe_int(summary.get("count")),
@@ -328,16 +359,20 @@ def _summary_runtime(summary: dict[str, Any]) -> dict[str, Any]:
 
 def _compact_capabilities() -> dict[str, Any]:
     capabilities = media_capabilities()
-    route_profiles = capabilities.get("route_profiles") if isinstance(capabilities.get("route_profiles"), dict) else {}
     upload = capabilities.get("upload") if isinstance(capabilities.get("upload"), dict) else {}
     playback = capabilities.get("playback") if isinstance(capabilities.get("playback"), dict) else {}
     broadcast = capabilities.get("broadcast") if isinstance(capabilities.get("broadcast"), dict) else {}
-    notes = capabilities.get("notes") if isinstance(capabilities.get("notes"), list) else []
     return {
         "status": "ready",
         "state": "ready",
-        "upload": upload,
-        "playback": playback,
+        "upload": {
+            "ready": bool(upload.get("ready", True)),
+            "max_bytes": upload.get("max_bytes"),
+        },
+        "playback": {
+            "ready": bool(playback.get("ready", True)),
+            "mode": playback.get("mode"),
+        },
         "broadcast": {
             "ready": bool(broadcast.get("ready")),
             "mode": broadcast.get("mode"),
@@ -345,8 +380,6 @@ def _compact_capabilities() -> dict[str, Any]:
             "peer_total": broadcast.get("peer_total"),
             "connected_peers": broadcast.get("connected_peers"),
         },
-        "route_profiles": route_profiles,
-        "notes": notes[:8],
     }
 
 

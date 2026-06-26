@@ -189,6 +189,7 @@ def test_get_snapshot_projects_constant_size_summary_for_large_library(monkeypat
     assert payload["items"] == []
     assert payload["count"] == 500_000
     assert payload["library"]["route"]["name"] == "mediaserver.list_library_page"
+    assert "route_profiles" not in json.dumps(payload)
     assert len(serialized) < 20_000
     assert projected and projected[0]["items"] == []
 
@@ -233,3 +234,4 @@ def test_list_library_page_clamps_rows_and_keeps_summary(monkeypatch) -> None:
     assert payload["pagination"]["next_cursor"] == "cursor-2"
     assert payload["pagination"]["total_count"] == 500_000
     assert payload["summary"]["value"] == 500_000
+    assert "route_profiles" not in json.dumps(payload)
