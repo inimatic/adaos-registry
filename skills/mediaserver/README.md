@@ -99,6 +99,34 @@ Unsafe skill behavior must result in a visible degraded/quarantined state and a
 repair packet for the LLM Builder. It must not silently become long-term runtime
 growth.
 
+## Core Runtime Memory Contract
+
+The memory incident class is wider than a single large Yjs projection. A skill
+can keep memory alive through child runtimes, retained Yjs history, blocking
+startup work, dependency import cost, or long-lived caches. The core must make
+that visible before changing the skill:
+
+- runtime memory status must expose parent RSS, child RSS, family RSS, PID,
+  runtime instance, and top child processes by RSS
+- each child process entry should identify the skill runtime when it can be
+  derived from `.adaos/workspace/skills/.runtime/...`
+- public status must separate a fresh live RSS sample from the last telemetry
+  sample, so stale growth is not presented as current fact
+- warmup baseline must mature after startup/import pressure instead of treating
+  a cold 100 MB process as the permanent zero point for a 1 GB steady state
+- event-loop lag and self-heal evidence must explain API starvation separately
+  from memory pressure
+- repeated skill-caused pressure must produce repair evidence for the Builder,
+  not just a restart
+- recovery is complete only when RSS plateaus after warmup and relaxes after
+  compaction, cleanup, skill quarantine, or guarded restart
+
+Current stand evidence after the 2026-06-26 rollout shows a runtime family near
+1 GB: roughly half in the parent autostart runner and half in child skill
+processes. The largest children are NLU skills, not mediaserver. Mediaserver
+still remains the selected stress case for Yjs amplification because it gives a
+repeatable bounded route workload without changing skill behavior first.
+
 ## Implementation Roadmap
 
 1. Core guardrails first.
@@ -134,6 +162,13 @@ growth.
    when repeated mediaserver refreshes stop producing large updates and RSS
    relaxes after warmup.
 
+7. Runtime memory attribution and relaxation.
+   Keep skills unchanged as stress cases while the core exposes parent/child
+   RSS attribution, sample freshness, event-loop lag, and self-heal evidence.
+   Then tune baseline maturation, per-skill memory budgets, and guarded
+   quarantine/restart so anomalous skills cannot make the system ratchet upward
+   indefinitely.
+
 ## Exit Criteria
 
 - A full-list mediaserver projection is blocked or degraded by core guards.
@@ -146,3 +181,5 @@ growth.
   routes.
 - After a pressure burst, parent runtime RSS stops growing and relaxes after
   room cleanup/allocator trim instead of ratcheting indefinitely.
+- Public memory status names the top RSS contributors in the runtime process
+  family and marks whether the RSS sample is fresh or stale/unavailable.

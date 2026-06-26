@@ -145,6 +145,31 @@ projection evidence visible until core guards can explain and recover it.
 - [ ] Confirm parent runtime RSS plateaus after warmup and relaxes after guard
   cleanup or room reset.
 
+## Phase 5 - Runtime Memory Attribution And Relaxation
+
+- [x] Capture runtime self-heal evidence before supervisor restarts an
+  API-unready or listener-lost runtime.
+- [x] Surface runtime self-heal decision/evidence in public update status,
+  reliability, and CLI output.
+- [x] Add runtime event-loop lag telemetry so API starvation is visible as a
+  separate signal from RSS growth.
+- [x] Verify on stand `.30` that the current long boot is an event-loop stall
+  signal, not only a memory leak signal.
+- [x] Expose current process RSS, child RSS, family RSS, sample freshness, and
+  top child skill processes in supervisor memory status.
+- [ ] Deploy public memory attribution to stand `.30` and confirm it names the
+  largest child runtimes during the mediaserver stress run.
+- [ ] Mature the memory baseline after warmup/import pressure so cold-start RSS
+  does not become a permanent false growth reference.
+- [ ] Add per-skill child-process memory policy hooks: observe first, then
+  degrade/quarantine/restart only with Builder-facing evidence.
+- [ ] Add long-window RSS relaxation validation: after mediaserver/Yjs pressure
+  stops, family RSS must plateau and eventually drop or produce a named blocker.
+- [ ] Feed memory attribution and event-loop/self-heal evidence into the LLM
+  Builder repair packet format before updating skill guidance.
+- [ ] After core protection is stable, update LLM skill guidance and then use
+  mediaserver changes only to validate the guidance.
+
 ## Exit Criteria
 
 - [ ] A skill cannot publish an unbounded Yjs list without a visible guard
