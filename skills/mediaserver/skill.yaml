@@ -1,5 +1,5 @@
 name: mediaserver
-version: 0.9.5
+version: 0.9.6
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -9,15 +9,15 @@ dependencies: []
 events: {}
 data_projections:
 - scope: subnet
-  slot: mediaserver.library
+  slot: mediaserver.library_summary
   targets:
   - backend: yjs
-    path: data/media/library
+    path: data/media/library_summary
 data_routes:
 - surface: widget:mediaserver.summary
   route: yjs
-  projection_slot: mediaserver.library
-  path: data/media/library
+  projection_slot: mediaserver.library_summary
+  path: data/media/library_summary
   first_paint: compact summary from ydoc defaults
   recovery: Yjs replay restores count, bytes, capability, freshness, and route contract
   update_source:
@@ -116,7 +116,7 @@ tools:
     - items
     - media
     - reliability
-updated_at: '2026-06-26T11:00:12+00:00'
+updated_at: '2026-06-26T11:06:33+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3235.e7324e95

@@ -49,6 +49,8 @@ def test_manifest_declares_diagnostics_tool() -> None:
     assert tools["get_snapshot"]["entry"] == "handlers.main:get_snapshot"
     assert tools["list_library_page"]["entry"] == "handlers.main:list_library_page"
     assert routes["widget:mediaserver.summary"]["budget"]["max_items"] == 0
+    assert routes["widget:mediaserver.summary"]["projection_slot"] == "mediaserver.library_summary"
+    assert routes["widget:mediaserver.summary"]["path"] == "data/media/library_summary"
     assert routes["modal:mediaserver.library_page"]["budget"]["max_items"] == 100
 
 
@@ -120,8 +122,8 @@ def test_get_diagnostics_returns_compact_operator_evidence(monkeypatch) -> None:
                         "items": [
                             {
                                 "owner": "skill:mediaserver",
-                                "slot": "mediaserver.library",
-                                "path": "data/media/library",
+                                "slot": "mediaserver.library_summary",
+                                "path": "data/media/library_summary",
                                 "payload_bytes": 70000,
                                 "max_payload_bytes": 65536,
                                 "reason": "payload_too_large",
@@ -189,6 +191,8 @@ def test_get_snapshot_projects_constant_size_summary_for_large_library(monkeypat
     assert payload["items"] == []
     assert payload["count"] == 500_000
     assert payload["library"]["route"]["name"] == "mediaserver.list_library_page"
+    assert payload["library"]["projection"]["slot"] == "mediaserver.library_summary"
+    assert payload["library"]["projection"]["path"] == "data/media/library_summary"
     assert "route_profiles" not in json.dumps(payload)
     assert len(serialized) < 20_000
     assert projected and projected[0]["items"] == []

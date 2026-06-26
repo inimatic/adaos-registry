@@ -14,9 +14,9 @@ from adaos.services.media_library import (
     media_runtime_snapshot,
 )
 
-REQUIRES_DATA_PROJECTIONS = ["mediaserver.library"]
-PROJECTION_SLOT = "mediaserver.library"
-PROJECTION_PATH = "data/media/library"
+REQUIRES_DATA_PROJECTIONS = ["mediaserver.library_summary"]
+PROJECTION_SLOT = "mediaserver.library_summary"
+PROJECTION_PATH = "data/media/library_summary"
 LIBRARY_PAGE_TOOL = "mediaserver.list_library_page"
 PROJECTION_BUDGET_HINT = {
     "max_payload_bytes": 65536,

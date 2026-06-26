@@ -2,8 +2,9 @@
 
 Status: target contract and implementation checklist for the mediaserver stress
 case. Phase 3 migration is implemented: the skill now publishes a summary-only
-Yjs projection plus a bounded page route for media rows. Phase 4 is now focused
-on post-write Yjs update amplification and runtime relaxation.
+Yjs projection plus a bounded page route for media rows. Phase 4 has migrated
+that summary onto a fresh Yjs branch and is now focused on validating post-write
+Yjs amplification and runtime relaxation.
 
 This skill is intentionally kept as a stress case while the core protections are
 implemented. A skill-generated media library must not be able to overload the
@@ -13,7 +14,7 @@ grow into YRoom pressure or sustained RSS growth.
 
 ## Incident Summary
 
-The current mediaserver projection publishes a full media library into Yjs:
+The original mediaserver projection published a full media library into Yjs:
 
 ```text
 skill:mediaserver -> ctx_subnet.set("mediaserver.library")
@@ -23,9 +24,12 @@ data/media/library -> data/nodes/<node_id>/media/library
 With 1,520 files the original branch was already hundreds of KB. The current
 skill no longer publishes row data into Yjs: `get_snapshot` writes a compact
 summary and `mediaserver.list_library_page` returns bounded rows. However, the
-2026-06-26 stand rollout showed that a 1.5 KB logical summary can still emit an
-88 KB encoded Yjs update on the old branch. This points to retained Yjs branch
-history/shared-doc encoding, not just current payload size.
+2026-06-26 stand rollout showed that a 1.5 KB logical summary could still emit
+an 88 KB encoded Yjs update on the old branch. This points to retained Yjs
+branch history/shared-doc encoding, not just current payload size. The active
+summary projection now writes to `mediaserver.library_summary` at
+`data/media/library_summary`; the legacy `data/media/library` branch is no
+longer a writer target.
 
 The same post-write guard also identified `skill:infrastate_skill` with a
 sub-1 KB payload producing a 465 KB encoded update. Mediaserver remains the
@@ -71,9 +75,9 @@ The library route should support:
 - no full-list materialization in the browser steady state
 
 The first implemented route is `mediaserver.list_library_page`. It returns at
-most 100 rows, supports cursor pagination, and keeps the browser off the
-`data/media/library` Yjs path for row data. Offset remains accepted for small
-diagnostic jumps, but cursor is the intended path for large libraries.
+most 100 rows, supports cursor pagination, and keeps the browser off Yjs paths
+for row data. Offset remains accepted for small diagnostic jumps, but cursor is
+the intended path for large libraries.
 
 ## Core Protection Contract
 
@@ -113,8 +117,8 @@ growth.
 4. Mediaserver migration.
    Change the projection to a constant-size summary. Move library rows to a
    paged/searchable details route and keep action responses as compact acks.
-   The current implementation uses `data/media/library` only for count, bytes,
-   freshness, capability, and route metadata.
+   The current implementation uses `data/media/library_summary` only for count,
+   bytes, freshness, capability, and route metadata.
 
 5. Stress validation.
    Exercise the old and new behavior against synthetic large-library cases,
@@ -131,8 +135,8 @@ growth.
 ## Exit Criteria
 
 - A full-list mediaserver projection is blocked or degraded by core guards.
-- Reliability identifies `skill:mediaserver`, `mediaserver.library`, the Yjs
-  path, payload bytes, encoded update bytes, and amplification ratio.
+- Reliability identifies `skill:mediaserver`, `mediaserver.library_summary`,
+  the Yjs path, payload bytes, encoded update bytes, and amplification ratio.
 - A sibling node update no longer repeatedly emits hundreds of KB due to retained
   media or infrastate Yjs history.
 - Mediaserver Yjs payload size remains within budget for 100k+ library rows.

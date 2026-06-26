@@ -1,7 +1,7 @@
 # Mediaserver Roadmap Checklist
 
-Status: active stress case. Do not hide the current full-list projection until
-core guards can detect and explain it.
+Status: active post-write amplification stress case. Keep the legacy full-list
+projection evidence visible until core guards can explain and recover it.
 
 ## Phase 0 - Architecture Record
 
@@ -79,6 +79,10 @@ core guards can detect and explain it.
   could stop a passive candidate and leave `active=B` without launching an
   active runtime until systemd restart. This is now documented as a core
   rollout-hardening task, separate from mediaserver behavior.
+- The mediaserver summary projection has now moved to a fresh branch:
+  slot `mediaserver.library_summary`, path `data/media/library_summary`. The
+  legacy `data/media/library` branch remains only as incident evidence and is
+  no longer a writer target.
 
 ## Phase 2 - Builder Guidance
 
@@ -90,7 +94,8 @@ core guards can detect and explain it.
 
 ## Phase 3 - Mediaserver Migration
 
-- [x] Change `mediaserver.library` Yjs projection to a constant-size summary.
+- [x] Change legacy `mediaserver.library` Yjs projection to a constant-size
+  summary.
 - [x] Move full library rows behind a bounded page route
   (`mediaserver.list_library_page`).
 - [x] Keep `refresh_snapshot` as a compact acknowledgement, not a data
@@ -115,6 +120,8 @@ core guards can detect and explain it.
 - [ ] Implement or validate Yjs history recovery: projection path migration,
   room/doc compaction, or guarded room reset for branches that keep amplifying
   after logical payloads are compact.
+- [x] Migrate mediaserver summary writes from the amplified legacy
+  `data/media/library` branch to fresh `data/media/library_summary`.
 - [ ] Add an LLM Builder repair packet for repeated post-write amplification
   that names the owner, route, path, payload bytes, update bytes, ratio, and
   recommended bounded-route/compaction action.

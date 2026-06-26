@@ -175,7 +175,7 @@
     "widgets": {}
   },
   "ydoc_defaults": {
-    "data/media/library": {
+    "data/media/library_summary": {
       "items": [],
       "count": 0,
       "total_bytes": 0,
