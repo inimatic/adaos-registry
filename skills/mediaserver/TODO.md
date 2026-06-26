@@ -22,7 +22,7 @@ core guards can detect and explain it.
 - [x] Verify the current mediaserver projection is visible as an oversized
   projection anomaly.
 - [x] Deploy guardrails to stand `.30` and capture before/after evidence.
-- [ ] Persist or forward projection guard telemetry from short-lived CLI/tool
+- [x] Persist or forward projection guard telemetry from short-lived CLI/tool
   processes so runtime reliability sees operator-triggered guard decisions.
 - [ ] Add lifecycle observability for runtime migrations that stall on disk I/O,
   dependency installation, or SQLite locks.
@@ -37,7 +37,10 @@ core guards can detect and explain it.
   tool-run processes did not load runtime `data_projections`; core now loads
   them from `resolved.manifest.json` before tool execution.
 - Runtime API reliability currently reports only guard events from its own
-  process; separate CLI-process guard events are not yet aggregated.
+  process in deployed `0.1.422+1.391f8d7`; local core now persists guard
+  events to `state/observability/yjs_projection_guard.ndjson` so runtime
+  reliability can aggregate events left by separate CLI/tool processes after
+  the next deployment.
 - Stand `.30` has severe I/O pressure: `/mnt/disk1` is full and PSI I/O was
   high during migration/testing. Heavy skill dependency installation can enter
   `D` state and cause SQLite lock symptoms.
