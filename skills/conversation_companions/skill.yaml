@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.1.4
+version: 0.1.5
 description: Draft conversational character skill for onboarding, profile tuning,
   and controlled user trials.
 entry: handlers/main.py
@@ -272,6 +272,19 @@ nlu_hints:
     locale: ru
     intent: conversation.update_profile
 nlu:
+  regex_rules:
+  - id: conversation.start.ru
+    intent: conversation.start
+    pattern: ^\s*(?:поговорим|давай\s+поговорим|хочу\s+поговорить|хочу\s+выбрать\s+собеседника|выбери\s+собеседника|создай(?:\s+\S+){0,4}\s+персонаж[а]?|запусти\s+(?:собеседника|советника)|собеседник)\s*[.!?]*\s*$
+  - id: conversation.switch_character.ru
+    intent: conversation.switch_character
+    pattern: \b(?:позови|зови|переключись\s+на|пусть\s+ответит|ответь\s+как)\s+(?P<character_id>Арсени[йя]|Ник[ауи]?|Мир[ау]?|советник|скептик|рассказчик|собеседник)\b
+  - id: conversation.update_profile.ru
+    intent: conversation.update_profile
+    pattern: \b(?:говори\s+короче|будь\s+(?:теплее|мягче|строже|скептичнее)|не\s+задавай\s+вопросы|без\s+вопросов|не\s+спорь|спорь\s+меньше|без\s+сюсю)\b
+  - id: conversation.talk.ru
+    intent: conversation.talk
+    pattern: \b(?:дай\s+совет|посоветуй|что\s+думаешь|помоги\s+разобраться|развлеки\s+меня|обсудим|поговори\s+со\s+мной)\b
   intents:
     conversation.start:
       examples:
@@ -321,13 +334,13 @@ nlu:
         tool: update_profile
         params:
           instruction: $text
-updated_at: '2026-06-26T08:15:07+00:00'
+updated_at: '2026-06-27T07:43:56+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.423+3225.8dbb89e5
-    recorded_at: '2026-06-26T08:15:07+00:00'
+    min_version: 0.1.442+3278.829413b4
+    recorded_at: '2026-06-27T07:43:56+00:00'
     source: skill_push
-    min_commit: 8dbb89e56250cbf2f8e4fca162214dc92edf58d3
-    min_short_commit: 8dbb89e5
-    build_date: '2026-06-26T11:14:25+03:00'
+    min_commit: 829413b44a64fbe87b55bc87bfb6f0de6f23cdf3
+    min_short_commit: 829413b4
+    build_date: '2026-06-26T22:24:54+03:00'
 

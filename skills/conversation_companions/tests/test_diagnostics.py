@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import json
 import pathlib
+import re
 import sys
 
 import yaml
@@ -63,6 +64,23 @@ def test_manifest_declares_diagnostics_tool() -> None:
     assert "items" in tools["get_diagnostics"]["output_schema"]["required"]
     assert "privacy" in tools["get_diagnostics"]["output_schema"]["required"]
     assert "webio.stream.snapshot.requested" in manifest["events"]["subscribe"]
+
+
+def test_manifest_declares_deterministic_conversation_regex_rules() -> None:
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+
+    rules = {item["id"]: item for item in manifest["nlu"]["regex_rules"]}
+    assert rules["conversation.start.ru"]["intent"] == "conversation.start"
+    assert rules["conversation.switch_character.ru"]["intent"] == "conversation.switch_character"
+    assert rules["conversation.update_profile.ru"]["intent"] == "conversation.update_profile"
+    assert rules["conversation.talk.ru"]["intent"] == "conversation.talk"
+
+    compiled = {rule_id: re.compile(item["pattern"], re.IGNORECASE | re.UNICODE) for rule_id, item in rules.items()}
+    assert compiled["conversation.start.ru"].search("поговорим")
+    assert compiled["conversation.start.ru"].search("давай поговорим")
+    assert compiled["conversation.switch_character.ru"].search("позови Нику").groupdict()["character_id"] == "Нику"
+    assert compiled["conversation.update_profile.ru"].search("говори короче")
+    assert compiled["conversation.talk.ru"].search("дай совет")
 
 
 def test_webui_declares_diagnostics_modal_with_skill_sources() -> None:
