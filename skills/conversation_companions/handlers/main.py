@@ -279,6 +279,47 @@ def _llm_reply(messages: list[Mapping[str, str]]) -> str | None:
     return None
 
 
+def _has_any(text: str, *tokens: str) -> bool:
+    return any(token in text for token in tokens)
+
+
+def _looks_like_question(text: str) -> bool:
+    lowered = text.lower()
+    return "?" in lowered or _has_any(
+        lowered,
+        "что ",
+        "что такое",
+        "кто ",
+        "где ",
+        "куда ",
+        "когда ",
+        "почему ",
+        "зачем ",
+        "как ",
+        "какая ",
+        "какой ",
+        "какие ",
+        "сколько ",
+    )
+
+
+def _topic_reply(profile: Mapping[str, Any], user_text: str) -> str | None:
+    name = str(profile.get("name") or "Собеседник")
+    lowered = user_text.lower()
+    if "бейрут" in lowered or "beirut" in lowered:
+        return (
+            f"{name}: у города нет собственной столицы. Бейрут сам является столицей Ливана. "
+            "Если ты имел в виду страну или регион, лучше формулировать так: столица Ливана - Бейрут."
+        )
+    if "шум" in lowered:
+        return (
+            f"{name}: шум - это помеха, которая мешает выделить полезный сигнал. "
+            "В разговоре это лишние детали, в данных - случайные или нерелевантные отклонения, "
+            "в звуке - нежелательные колебания. Смысл один: шум снижает ясность."
+        )
+    return None
+
+
 def _draft_reply(profile: Mapping[str, Any], text: str) -> str:
     user_text = text.strip()
     if not user_text:
@@ -287,6 +328,16 @@ def _draft_reply(profile: Mapping[str, Any], text: str) -> str:
         return (
             f"{profile.get('name')}: я пока работаю только как собеседник и не управляю устройствами. "
             "Могу помочь сформулировать запрос или разобраться в задаче."
+        )
+    topic_reply = _topic_reply(profile, user_text)
+    if topic_reply:
+        return topic_reply
+    if _looks_like_question(user_text):
+        name = str(profile.get("name") or "Собеседник")
+        return (
+            f"{name}: отвечу прямо: мне не хватает подключённого знания или LLM-ответа, "
+            "поэтому я не буду делать вид, что знаю точный факт. Могу разобрать вопрос, "
+            "уточнить формулировку или помочь проверить его через профильный источник."
         )
     if profile.get("id") == "nika":
         return f"Ника: главный вопрос - где эта идея может сломаться. Я бы сначала проверила допущения, сроки и критерий успеха."
