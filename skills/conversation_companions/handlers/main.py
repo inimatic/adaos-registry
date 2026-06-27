@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import re
 import time
 from pathlib import Path
@@ -23,6 +24,7 @@ DIALOG_CHANNEL_ID = "conversational"
 CONVERSATION_ID = "conv.skill.conversation_companions.default"
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
+_LOG = logging.getLogger("adaos.skill.conversation_companions")
 
 
 def _load_default_profiles() -> dict[str, dict[str, Any]]:
@@ -274,7 +276,13 @@ def _llm_reply(messages: list[Mapping[str, str]]) -> str | None:
         text = result.get("output_text")
         if isinstance(text, str) and text.strip():
             return text.strip()
-    except Exception:
+    except Exception as exc:
+        details = {
+            key: getattr(exc, key, None)
+            for key in ("status_code", "error_code", "payload")
+            if getattr(exc, key, None) not in (None, "")
+        }
+        _LOG.warning("conversation_companions LLM reply failed: %s details=%s", exc, details, exc_info=True)
         return None
     return None
 
