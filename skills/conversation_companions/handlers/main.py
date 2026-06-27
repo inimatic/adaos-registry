@@ -19,6 +19,8 @@ MAX_HISTORY = 12
 PANEL_CHARACTERS = ("arseni", "nika", "mira")
 DIAGNOSTICS_SCHEMA = "conversation_companions.diagnostics.v1"
 DIAGNOSTICS_RECEIVER = "conversation_companions.diagnostics"
+DIALOG_CHANNEL_ID = "conversational"
+CONVERSATION_ID = "conv.skill.conversation_companions.default"
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
 
@@ -99,6 +101,18 @@ def _session(webspace_id: str) -> dict[str, Any]:
 
 def _save_session(webspace_id: str, session: Mapping[str, Any]) -> None:
     _mem_set(_scoped_key(SESSION_KEY, webspace_id), dict(session))
+
+
+def _dialog_state(webspace_id: str, active_character: str | None = None, *, state: str = "active") -> dict[str, Any]:
+    return {
+        "state": state,
+        "dialog_channel_id": DIALOG_CHANNEL_ID,
+        "conversation_id": f"{CONVERSATION_ID}.{webspace_id or 'default'}",
+        "owner": f"skill:{SKILL_ID}",
+        "surface": f"skill:{SKILL_ID}",
+        "default_tool": f"{SKILL_ID}.talk",
+        "active_agent_id": f"agent:{SKILL_ID}:{active_character or DEFAULT_ACTIVE_CHARACTER}",
+    }
 
 
 def _normalize_character_id(value: Any, profiles: Mapping[str, Mapping[str, Any]]) -> str | None:
@@ -567,6 +581,7 @@ def start(
         "ok": True,
         "webspace_id": ws,
         "active_character": active,
+        "dialog": _dialog_state(ws, active),
         "message": message,
         "characters": [_short_character_card(p, active=(cid == active)) for cid, p in profiles.items()],
         "next_actions": [
@@ -590,6 +605,7 @@ def list_characters(
         "ok": True,
         "webspace_id": ws,
         "active_character": active,
+        "dialog": _dialog_state(ws, active),
         "characters": [_short_character_card(p, active=(cid == active)) for cid, p in profiles.items()],
     }
 
@@ -626,6 +642,7 @@ def switch_character(
         "webspace_id": ws,
         "active_character": session.get("active_character", DEFAULT_ACTIVE_CHARACTER),
         "selected_character": resolved,
+        "dialog": _dialog_state(ws, resolved if not temporary else session.get("active_character", DEFAULT_ACTIVE_CHARACTER)),
         "temporary": bool(temporary),
         "message": message,
         "profile": _short_character_card(profile, active=not temporary),
@@ -685,6 +702,7 @@ def talk(
         "webspace_id": ws,
         "active_character": _session(ws).get("active_character", DEFAULT_ACTIVE_CHARACTER),
         "selected_character": selected,
+        "dialog": _dialog_state(ws, selected),
         "mode": "panel" if panel else mode,
         "message": reply,
         "used_llm": used_llm,
@@ -725,6 +743,7 @@ def update_profile(
         "ok": True,
         "webspace_id": ws,
         "character_id": selected,
+        "dialog": _dialog_state(ws, selected),
         "persisted": bool(persist),
         "message": message,
         "patch": patch,
@@ -776,7 +795,13 @@ def reset_session(
     )
     message = "Сессия сброшена. Активный персонаж снова Арсений."
     _safe_emit_chat(message, webspace_id=ws, _meta=_meta)
-    return {"ok": True, "webspace_id": ws, "message": message, "active_character": DEFAULT_ACTIVE_CHARACTER}
+    return {
+        "ok": True,
+        "webspace_id": ws,
+        "message": message,
+        "active_character": DEFAULT_ACTIVE_CHARACTER,
+        "dialog": _dialog_state(ws, DEFAULT_ACTIVE_CHARACTER),
+    }
 
 
 @tool(summary="Return compact diagnostics for character trial state.", side_effects="none")
