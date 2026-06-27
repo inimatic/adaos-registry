@@ -105,7 +105,24 @@ def _save_session(webspace_id: str, session: Mapping[str, Any]) -> None:
     _mem_set(_scoped_key(SESSION_KEY, webspace_id), dict(session))
 
 
+def _agent_projection(active_character: str | None, profiles: Mapping[str, Mapping[str, Any]] | None = None) -> dict[str, Any]:
+    char_id = str(active_character or DEFAULT_ACTIVE_CHARACTER).strip() or DEFAULT_ACTIVE_CHARACTER
+    profile = (profiles or DEFAULT_PROFILES).get(char_id, {})
+    label = str(profile.get("name") or char_id).strip() or char_id
+    return {
+        "id": f"agent:{SKILL_ID}:{char_id}",
+        "label": label,
+        "owner": f"skill:{SKILL_ID}",
+        "kind": "skill_agent",
+        "skill_id": SKILL_ID,
+        "character_id": char_id,
+        "memory_scope": "agent_user",
+    }
+
+
 def _dialog_state(webspace_id: str, active_character: str | None = None, *, state: str = "active") -> dict[str, Any]:
+    profiles = _profiles(webspace_id or "default")
+    agent = _agent_projection(active_character, profiles)
     return {
         "state": state,
         "dialog_channel_id": DIALOG_CHANNEL_ID,
@@ -113,7 +130,15 @@ def _dialog_state(webspace_id: str, active_character: str | None = None, *, stat
         "owner": f"skill:{SKILL_ID}",
         "surface": f"skill:{SKILL_ID}",
         "default_tool": f"{SKILL_ID}.talk",
-        "active_agent_id": f"agent:{SKILL_ID}:{active_character or DEFAULT_ACTIVE_CHARACTER}",
+        "active_agent_id": agent["id"],
+        "active_agent_label": agent["label"],
+        "active_agent": agent,
+        "memory": {
+            "status": "skill_memory_compat",
+            "scopes": ["skill_user", "agent_user", "conversation"],
+            "owner": f"skill:{SKILL_ID}",
+            "active_agent_id": agent["id"],
+        },
     }
 
 
@@ -217,6 +242,7 @@ def _build_system_prompt(
         "Не выполняй команды управления устройствами и не делай вид, что выполнил действие.",
         "Если вопрос требует профессиональной экспертизы, отвечай как общий помощник и обозначай пределы уверенности.",
         "Отвечай по-русски, без markdown-заголовков и без искусственной торжественности.",
+        "Если пользователь спрашивает о тебе, имени, роли или стиле, отвечай от имени персонажа: назови имя, роль и манеру общения, без фразы 'я не имею мнения о себе'.",
     ]
     if panel and profiles:
         panel_lines = []
@@ -499,6 +525,7 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
     profile_rows = _profile_override_summary(profiles)
     changed_profiles = [row for row in profile_rows if row["changed"]]
     active_profile = profiles.get(active_id, profiles[DEFAULT_ACTIVE_CHARACTER])
+    active_agent = _agent_projection(active_id, profiles)
     rows = [
         _diagnostic_row(
             "conversation.session",
@@ -508,6 +535,7 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
             {
                 "webspace_id": webspace_id,
                 "active_character": active_id,
+                "active_agent": active_agent,
                 "created_at": session.get("created_at"),
                 "updated_at": session.get("updated_at"),
                 "history": history,
@@ -569,6 +597,7 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
         "items": rows,
         "session": {
             "active_character": active_id,
+            "active_agent": active_agent,
             "history": history,
         },
         "profiles": {
