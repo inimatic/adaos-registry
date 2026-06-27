@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.1.6
+version: 0.1.7
 description: Draft conversational character skill for onboarding, profile tuning,
   and controlled user trials.
 entry: handlers/main.py
@@ -334,13 +334,13 @@ nlu:
         tool: update_profile
         params:
           instruction: $text
-updated_at: '2026-06-27T12:40:00+00:00'
+updated_at: '2026-06-27T21:01:25+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.442+3278.829413b4
-    recorded_at: '2026-06-27T07:43:56+00:00'
+    min_version: 0.1.0+3286.fb22e6d6
+    recorded_at: '2026-06-27T21:01:25+00:00'
     source: skill_push
-    min_commit: 829413b44a64fbe87b55bc87bfb6f0de6f23cdf3
-    min_short_commit: 829413b4
-    build_date: '2026-06-26T22:24:54+03:00'
+    min_commit: fb22e6d696b1300fb9bff9f0784fa90971c75f3b
+    min_short_commit: fb22e6d6
+    build_date: '2026-06-28T00:00:58+03:00'
 
