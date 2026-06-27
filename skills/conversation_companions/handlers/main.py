@@ -23,9 +23,27 @@ DIAGNOSTICS_RECEIVER = "conversation_companions.diagnostics"
 DIALOG_CHANNEL_ID = "conversational"
 CONVERSATION_ID = "conv.skill.conversation_companions.default"
 VOICE_PROFILES = {
-    "arseni": {"gender": "male", "voice": "ru-male", "lang": "ru-RU", "browser_voice_hint": "male"},
-    "nika": {"gender": "female", "voice": "ru-female", "lang": "ru-RU", "browser_voice_hint": "female"},
-    "mira": {"gender": "female", "voice": "ru-female", "lang": "ru-RU", "browser_voice_hint": "female"},
+    "arseni": {
+        "gender": "male",
+        "voice": "ru-male",
+        "lang": "ru-RU",
+        "browser_voice_hint": "male",
+        "icon": "male-outline",
+    },
+    "nika": {
+        "gender": "female",
+        "voice": "ru-female",
+        "lang": "ru-RU",
+        "browser_voice_hint": "female",
+        "icon": "female-outline",
+    },
+    "mira": {
+        "gender": "female",
+        "voice": "ru-female",
+        "lang": "ru-RU",
+        "browser_voice_hint": "female",
+        "icon": "heart-circle-outline",
+    },
 }
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
@@ -125,6 +143,7 @@ def _agent_projection(active_character: str | None, profiles: Mapping[str, Mappi
         "memory_scope": "agent_user",
         "gender": voice_profile.get("gender"),
         "voice": voice_profile.get("voice"),
+        "icon": voice_profile.get("icon"),
         "voice_profile": voice_profile,
     }
 
@@ -256,6 +275,9 @@ def _agent_chat_meta(
     if agent.get("voice"):
         meta.setdefault("active_agent_voice", agent["voice"])
         meta.setdefault("voice", agent["voice"])
+    if agent.get("icon"):
+        meta.setdefault("active_agent_icon", agent["icon"])
+        meta.setdefault("agent_icon", agent["icon"])
     if isinstance(agent.get("voice_profile"), Mapping):
         meta.setdefault("voice_profile", dict(agent["voice_profile"]))
     return meta

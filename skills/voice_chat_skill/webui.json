@@ -12,7 +12,7 @@
 					"maxPayloadBytes": 32768,
 					"maxPublishHz": 8,
 					"maxSnapshotHz": 1,
-					"maxItems": 8
+					"maxItems": 32
 				},
 				"guardVisibility": {
 					"degradedState": "Keep last local chat tail; YJS only carries compact voice status.",
@@ -167,7 +167,32 @@
 			"updated_by": "webui.default"
 		}
 	},
-	"widgets": [],
+	"widgets": [
+		{
+			"id": "voice_chat_widget",
+			"title": "Voice Chat",
+			"subtitle": "Shared voice discussion",
+			"icon": "mic-outline",
+			"type": "ui.chat",
+			"source": "skill:voice_chat_skill",
+			"dataSource": {
+				"kind": "stream",
+				"receiver": "voice_chat.messages",
+				"transport": "hub",
+				"scope": "shared"
+			},
+			"inputs": {
+				"openCommand": "voice.chat.open",
+				"sendCommand": "voice.chat.user",
+				"scope": "shared",
+				"meta": { "route_id": "voice_chat", "voice_chat_scope": "shared" },
+				"alignRightFrom": "user",
+				"autoSpeak": false,
+				"autoSpeakFrom": "hub",
+				"autoSpeakLang": "ru-RU"
+			}
+		}
+	],
 	"contributions": [
 		{
 			"extensionPoint": "desktop.apps",
