@@ -73,7 +73,23 @@
 								"stopLabel": "⏹️ Стоп",
 								"sendCommand": "voice.chat.user",
 								"scope": "shared",
+								"nonBlocking": true,
 								"meta": { "route_id": "voice_chat", "voice_chat_scope": "shared" },
+								"ttsProfiles": {
+									"core": { "agent_id": "agent:core:general", "gender": "female", "voice": "ru-female" },
+									"arseni": { "agent_id": "agent:conversation_companions:arseni", "gender": "male", "voice": "ru-male" },
+									"nika": { "agent_id": "agent:conversation_companions:nika", "gender": "female", "voice": "ru-female" },
+									"mira": { "agent_id": "agent:conversation_companions:mira", "gender": "female", "voice": "ru-female" }
+								},
+								"voiceSession": {
+									"noInputTimeoutMs": 5000,
+									"bargeIn": true,
+									"ttsCache": {
+										"provider": "openai",
+										"enabled": false,
+										"scope": "node"
+									}
+								},
 								"stt": {
 									"provider": "phone",
 									"pushToTalk": false,
@@ -185,6 +201,7 @@
 				"openCommand": "voice.chat.open",
 				"sendCommand": "voice.chat.user",
 				"scope": "shared",
+				"nonBlocking": true,
 				"meta": { "route_id": "voice_chat", "voice_chat_scope": "shared" },
 				"alignRightFrom": "user",
 				"autoSpeak": false,

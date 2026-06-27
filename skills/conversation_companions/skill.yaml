@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.1.7
+version: 0.1.8
 description: Draft conversational character skill for onboarding, profile tuning,
   and controlled user trials.
 entry: handlers/main.py
@@ -14,6 +14,54 @@ events:
   publish:
   - io.out.chat.append
   - io.out.stream.publish
+conversation:
+  channels:
+  - id: conversational
+    label: Conversational
+    owner: skill:conversation_companions
+    route_id: voice_chat
+    default_tool: talk
+    history_policy: node_local
+  agents:
+  - id: agent:conversation_companions:arseni
+    label: Арсений
+    owner: skill:conversation_companions
+    kind: skill_agent
+    channel_id: conversational
+    skill: conversation_companions
+    talk_tool: talk
+    switch_tool: switch_character
+    character_id: arseni
+    gender: male
+    voice: ru-male
+    icon: male-outline
+    aliases: [Арсений, Arseni, Arseniy, советник, консультант]
+  - id: agent:conversation_companions:nika
+    label: Ника
+    owner: skill:conversation_companions
+    kind: skill_agent
+    channel_id: conversational
+    skill: conversation_companions
+    talk_tool: talk
+    switch_tool: switch_character
+    character_id: nika
+    gender: female
+    voice: ru-female
+    icon: female-outline
+    aliases: [Ника, Nika, скептик]
+  - id: agent:conversation_companions:mira
+    label: Мира
+    owner: skill:conversation_companions
+    kind: skill_agent
+    channel_id: conversational
+    skill: conversation_companions
+    talk_tool: talk
+    switch_tool: switch_character
+    character_id: mira
+    gender: female
+    voice: ru-female
+    icon: heart-circle-outline
+    aliases: [Мира, Mira, собеседник, рассказчик]
 exports:
   tools:
   - start
