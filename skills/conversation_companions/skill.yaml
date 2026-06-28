@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.1.8
+version: 0.1.9
 description: Draft conversational character skill for onboarding, profile tuning,
   and controlled user trials.
 entry: handlers/main.py
@@ -35,7 +35,12 @@ conversation:
     gender: male
     voice: ru-male
     icon: male-outline
-    aliases: [Арсений, Arseni, Arseniy, советник, консультант]
+    aliases:
+    - Арсений
+    - Arseni
+    - Arseniy
+    - советник
+    - консультант
   - id: agent:conversation_companions:nika
     label: Ника
     owner: skill:conversation_companions
@@ -48,7 +53,10 @@ conversation:
     gender: female
     voice: ru-female
     icon: female-outline
-    aliases: [Ника, Nika, скептик]
+    aliases:
+    - Ника
+    - Nika
+    - скептик
   - id: agent:conversation_companions:mira
     label: Мира
     owner: skill:conversation_companions
@@ -61,7 +69,11 @@ conversation:
     gender: female
     voice: ru-female
     icon: heart-circle-outline
-    aliases: [Мира, Mira, собеседник, рассказчик]
+    aliases:
+    - Мира
+    - Mira
+    - собеседник
+    - рассказчик
 exports:
   tools:
   - start
@@ -382,13 +394,13 @@ nlu:
         tool: update_profile
         params:
           instruction: $text
-updated_at: '2026-06-27T21:01:25+00:00'
+updated_at: '2026-06-28T06:43:03+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3286.fb22e6d6
-    recorded_at: '2026-06-27T21:01:25+00:00'
+    min_version: 0.1.0+3292.bbcbaa10
+    recorded_at: '2026-06-28T06:43:03+00:00'
     source: skill_push
-    min_commit: fb22e6d696b1300fb9bff9f0784fa90971c75f3b
-    min_short_commit: fb22e6d6
-    build_date: '2026-06-28T00:00:58+03:00'
+    min_commit: bbcbaa10634a1f63d1788be69ca2a00a8f9972fd
+    min_short_commit: bbcbaa10
+    build_date: '2026-06-28T06:10:46+00:00'
 

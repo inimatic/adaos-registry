@@ -455,6 +455,31 @@ def _profile_patch_from_instruction(instruction: str) -> dict[str, Any]:
     return patch
 
 
+def _looks_like_profile_update_instruction(instruction: str) -> bool:
+    text = instruction.lower().strip()
+    if not text:
+        return False
+    patch = _profile_patch_from_instruction(text)
+    has_style_signal = bool(patch.get("verbosity") or patch.get("tone_append") or patch.get("style_rules_add"))
+    if not has_style_signal:
+        return False
+    return _has_any(
+        text,
+        "говори",
+        "отвечай",
+        "будь",
+        "стиль",
+        "тон",
+        "манер",
+        "короче",
+        "кратко",
+        "теплее",
+        "мягче",
+        "строже",
+        "скептич",
+    )
+
+
 def _apply_patch(profile: Mapping[str, Any], patch: Mapping[str, Any]) -> dict[str, Any]:
     updated = copy.deepcopy(dict(profile))
     if patch.get("verbosity"):
@@ -812,6 +837,9 @@ def talk(
     selected = detected or str(session.get("active_character") or DEFAULT_ACTIVE_CHARACTER)
     if selected not in profiles:
         selected = DEFAULT_ACTIVE_CHARACTER
+
+    if mode != "panel" and _looks_like_profile_update_instruction(user_text):
+        return update_profile(user_text, character_id=selected, webspace_id=ws, _meta=_meta)
 
     panel = mode == "panel"
     if panel:

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-27T21:01:25+00:00",
+  "updated_at": "2026-06-28T06:43:03+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -70,8 +70,8 @@
       "kind": "skill",
       "id": "conversation_companions",
       "name": "conversation_companions",
-      "version": "0.1.7",
-      "updated_at": "2026-06-27T21:01:25+00:00",
+      "version": "0.1.9",
+      "updated_at": "2026-06-28T06:43:03+00:00",
       "path": "skills/conversation_companions",
       "manifest": "skills/conversation_companions/skill.yaml",
       "source": {
