@@ -325,7 +325,15 @@ def _build_fields(idea: str) -> list[dict[str, Any]]:
 
 def _component_for_field(field: Mapping[str, Any]) -> dict[str, Any]:
     field_type = str(field.get("type") or "string")
-    component_type = "checkbox" if field_type == "boolean" else "number_input" if field_type == "number" else "text_input"
+    component_type = (
+        "checkbox"
+        if field_type == "boolean"
+        else "number_input"
+        if field_type == "number"
+        else "date_input"
+        if field_type == "date"
+        else "text_input"
+    )
     return {
         "id": f"input_{field['id']}",
         "type": component_type,
@@ -341,6 +349,7 @@ def _preview_state(*, session: Mapping[str, Any]) -> dict[str, Any]:
     table_columns = [{"field": item["id"], "label": item.get("label") or item["id"]} for item in fields]
     stored_mock_rows = session.get("mock_rows")
     mock_rows = [dict(item) for item in stored_mock_rows if isinstance(item, Mapping)] if isinstance(stored_mock_rows, list) else _mock_rows(fields)
+    action_position = str(session.get("form_action_position") or "").strip().lower()
     ui = {
         "schema": "adaos.declarative_ui.v1",
         "id": str(session.get("scenario_id") or "prototype"),
@@ -352,6 +361,7 @@ def _preview_state(*, session: Mapping[str, Any]) -> dict[str, Any]:
                 "type": "section",
                 "label": "\u0412\u0432\u043e\u0434",
                 "children": [_component_for_field(item) for item in fields],
+                "action_position": "top" if action_position == "top" else "bottom",
                 "actions": [{"id": "add_item", "type": "button", "label": "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c"}],
             },
             {
@@ -390,6 +400,7 @@ def _preview_state(*, session: Mapping[str, Any]) -> dict[str, Any]:
             }
         ],
         "mock_data": {datasource_id: mock_rows},
+        "form_action_position": "top" if action_position == "top" else "bottom",
         "pending_patches": [item for item in session.get("patches", []) if item.get("status") == "proposed"],
         "version": str(session.get("version") or "v1"),
     }
@@ -406,6 +417,8 @@ def _mock_rows(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 row[field_id] = index
             elif field_type == "boolean":
                 row[field_id] = index == 1
+            elif field_type == "date":
+                row[field_id] = f"2026-07-0{index}"
             else:
                 row[field_id] = f"{field.get('label') or field_id} {index}"
         rows.append(row)
@@ -418,6 +431,7 @@ def _food_mock_rows(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
         {"item": "\u0425\u043b\u0435\u0431", "quantity": 1, "category": "\u0411\u0430\u043a\u0430\u043b\u0435\u044f", "done": True, "price": 54.0},
         {"item": "\u042f\u0431\u043b\u043e\u043a\u0438", "quantity": 6, "category": "\u0424\u0440\u0443\u043a\u0442\u044b", "done": False, "price": 129.5},
     ]
+    dates = ["2026-07-01", "2026-07-02", "2026-07-03"]
     rows: list[dict[str, Any]] = []
     for index, product in enumerate(products, start=1):
         row: dict[str, Any] = {}
@@ -432,6 +446,8 @@ def _food_mock_rows(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 row[field_id] = index
             elif field_type == "boolean":
                 row[field_id] = index == 2
+            elif field_type == "date" or field_id == "date":
+                row[field_id] = dates[index - 1]
             else:
                 row[field_id] = str(field.get("label") or field_id or "value")
         rows.append(row)
@@ -455,6 +471,14 @@ def _write_webui(artifact_root: str | None, preview_state: Mapping[str, Any]) ->
                     {
                         "intent": "builder.chat",
                         "notes": "Prototype UI is edited through builder_skill.chat.",
+                        "supported_operations": [
+                            "add_field",
+                            "remove_field",
+                            "update_mock_data",
+                            "change_view_representation",
+                            "move_form_action",
+                            "set_checkbox_column",
+                        ],
                     }
                 ],
             }
@@ -470,6 +494,8 @@ def _form_field_type(field: Mapping[str, Any]) -> str:
         return "toggle"
     if field_type == "number":
         return "number"
+    if field_type == "date":
+        return "date"
     return "text"
 
 
@@ -486,23 +512,35 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
         isinstance(child, Mapping) and str(child.get("type") or "") == "card_list"
         for child in (ui.get("children") if isinstance(ui.get("children"), list) else [])
     )
+    editor = next(
+        (
+            dict(child)
+            for child in (ui.get("children") if isinstance(ui.get("children"), list) else [])
+            if isinstance(child, Mapping) and str(child.get("id") or "") == "editor"
+        ),
+        {},
+    )
+    submit_placement = str(editor.get("action_position") or preview_state.get("form_action_position") or "").strip().lower()
+    form_inputs = {
+        "fields": [
+            {
+                "id": str(field.get("id") or f"field_{index}"),
+                "type": _form_field_type(field),
+                "label": field.get("label") or field.get("id") or f"Field {index + 1}",
+            }
+            for index, field in enumerate(fields)
+        ],
+        "submitLabel": "Add",
+    }
+    if submit_placement == "top":
+        form_inputs["submitPlacement"] = "top"
     widgets: list[dict[str, Any]] = [
         {
             "id": "prototype-form",
             "type": "ui.form",
             "area": "main",
             "title": "Input",
-            "inputs": {
-                "fields": [
-                    {
-                        "id": str(field.get("id") or f"field_{index}"),
-                        "type": _form_field_type(field),
-                        "label": field.get("label") or field.get("id") or f"Field {index + 1}",
-                    }
-                    for index, field in enumerate(fields)
-                ],
-                "submitLabel": "Add",
-            },
+            "inputs": form_inputs,
             "actions": [{"on": "submit", "type": "updateState", "params": {"lastPrototypeSubmit": "$event.values"}}],
         },
         {
@@ -516,6 +554,7 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
                     {
                         "key": str(field.get("id") or f"field_{index}"),
                         "label": field.get("label") or field.get("id") or f"Field {index + 1}",
+                        **({"kind": "boolean", "width": "72px"} if str(field.get("type") or "") == "boolean" else {}),
                     }
                     for index, field in enumerate(fields)
                 ],
@@ -617,24 +656,137 @@ def _message_created(session: Mapping[str, Any]) -> str:
 def _extract_field_label(instruction: str) -> str | None:
     quoted = re.search(r"[\"'«](.*?)[\"'»]", instruction)
     if quoted:
-        return quoted.group(1).strip()
-    match = re.search(r"(?:field|поле)\s+([A-Za-zА-Яа-я0-9 _-]{2,40})", instruction, re.IGNORECASE)
+        return _clean_field_label(quoted.group(1))
+    match = re.search(r"(?:field|поле|column|колонк[ауи]?)\s+([A-Za-zА-Яа-я0-9 _-]{2,40})", instruction, re.IGNORECASE)
     if match:
-        return match.group(1).strip()
+        return _clean_field_label(match.group(1))
     return None
+
+
+def _clean_field_label(label: str) -> str:
+    token = str(label or "").strip(" \t\r\n:;,.!?()[]{}")
+    token = re.split(r"\s+(?:в|на|к|для|со|с|to|in|as)\s+", token, maxsplit=1, flags=re.IGNORECASE)[0]
+    return token.strip(" \t\r\n:;,.!?()[]{}")
 
 
 def _field_id(label: str) -> str:
     lowered = str(label or "").strip().lower()
     known = {
         "\u0446\u0435\u043d\u0430": "price",
+        "\u0434\u0430\u0442\u0430": "date",
+        "\u043a\u0443\u043f\u043b\u0435\u043d\u043e": "done",
+        "\u0442\u043e\u0432\u0430\u0440": "item",
+        "\u043a\u043e\u043b-\u0432\u043e": "quantity",
+        "\u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u043e": "quantity",
+        "\u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f": "category",
         "\u0442\u0435\u043b\u0435\u0444\u043e\u043d": "phone",
         "\u043e\u0440\u0433\u0430\u043d\u0438\u0437\u0430\u0446\u0438\u044f": "organization",
+        "date": "date",
+        "done": "done",
+        "purchased": "done",
     }
     if lowered in known:
         return known[lowered]
     ascii_id = re.sub(r"[^a-z0-9]+", "_", lowered).strip("_")
     return ascii_id or f"field_{_hash_suffix(label)}"
+
+
+def _field_type_for_id(field_id: str, label: str | None = None) -> str:
+    token = f"{field_id} {label or ''}".lower()
+    if field_id == "done" or any(item in token for item in ("checkbox", "check box", "чекбокс", "куплено")):
+        return "boolean"
+    if field_id == "price" or any(item in token for item in ("price", "цена", "стоимость")):
+        return "number"
+    if field_id == "date" or any(item in token for item in ("date", "дата")):
+        return "date"
+    return "string"
+
+
+def _default_label_for_field(field_id: str, fallback: str | None = None) -> str:
+    labels = {
+        "date": "\u0414\u0430\u0442\u0430",
+        "done": "\u041a\u0443\u043f\u043b\u0435\u043d\u043e",
+        "price": "\u0426\u0435\u043d\u0430",
+    }
+    return labels.get(field_id) or _clean_field_label(fallback or field_id).title()
+
+
+def _ensure_field(
+    fields: list[dict[str, Any]],
+    *,
+    label: str,
+    field_id: str | None = None,
+    field_type: str | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, Any], bool]:
+    fid = str(field_id or _field_id(label)).strip()
+    for item in fields:
+        if str(item.get("id") or "") == fid:
+            if field_type and str(item.get("type") or "") != field_type:
+                item["type"] = field_type
+            if not str(item.get("label") or "").strip():
+                item["label"] = _default_label_for_field(fid, label)
+            return fields, item, False
+    field = {
+        "id": fid,
+        "type": field_type or _field_type_for_id(fid, label),
+        "label": _default_label_for_field(fid, label),
+        "required": False,
+    }
+    fields.append(field)
+    return fields, field, True
+
+
+def _move_field_first(fields: list[dict[str, Any]], field_id: str) -> list[dict[str, Any]]:
+    fid = str(field_id or "").strip()
+    if not fid:
+        return fields
+    selected = [item for item in fields if str(item.get("id") or "") == fid]
+    if not selected:
+        return fields
+    rest = [item for item in fields if str(item.get("id") or "") != fid]
+    return [selected[0], *rest]
+
+
+def _date_mock_rows(fields: list[dict[str, Any]], existing_rows: Any = None) -> list[dict[str, Any]]:
+    base_rows = [dict(item) for item in existing_rows if isinstance(item, Mapping)] if isinstance(existing_rows, list) else _food_mock_rows(fields)
+    if not base_rows:
+        base_rows = _mock_rows(fields)
+    dates = ["2026-07-01", "2026-07-02", "2026-07-03"]
+    for index, row in enumerate(base_rows):
+        row["date"] = dates[index % len(dates)]
+    return base_rows
+
+
+def _mentions_date(text: str) -> bool:
+    lowered = str(text or "").lower()
+    return "date" in lowered or "\u0434\u0430\u0442" in lowered
+
+
+def _wants_add_button_above_form(text: str) -> bool:
+    lowered = str(text or "").lower()
+    mentions_button = "button" in lowered or "\u043a\u043d\u043e\u043f" in lowered
+    mentions_add = "add" in lowered or "\u0434\u043e\u0431\u0430\u0432" in lowered
+    mentions_top = "above" in lowered or "top" in lowered or "\u043d\u0430\u0434" in lowered or "\u0432\u0435\u0440\u0445" in lowered
+    mentions_form = "form" in lowered or "\u0444\u043e\u0440\u043c" in lowered
+    return mentions_button and mentions_add and mentions_top and mentions_form
+
+
+def _wants_done_checkbox_first(text: str) -> bool:
+    lowered = str(text or "").lower()
+    mentions_done = "done" in lowered or "purchased" in lowered or "\u043a\u0443\u043f\u043b\u0435\u043d" in lowered
+    mentions_checkbox = "checkbox" in lowered or "check box" in lowered or "\u0447\u0435\u043a\u0431\u043e\u043a\u0441" in lowered
+    mentions_first_column = (
+        ("first" in lowered or "\u043f\u0435\u0440\u0432" in lowered)
+        and ("column" in lowered or "\u043a\u043e\u043b\u043e\u043d" in lowered)
+    )
+    return mentions_done and (mentions_checkbox or mentions_first_column)
+
+
+def _wants_date_values(text: str) -> bool:
+    lowered = str(text or "").lower()
+    return _mentions_date(lowered) and any(
+        token in lowered for token in ("data", "value", "values", "fill", "\u0434\u0430\u043d\u043d", "\u0437\u043d\u0430\u0447\u0435\u043d", "\u0437\u0430\u043f\u043e\u043b\u043d")
+    )
 
 
 def _workbench_service():
@@ -962,6 +1114,33 @@ def update_current_scenario(
         session["fields"] = fields
         patch["operation"] = "remove_field"
         patch["diff"] = {"field_id": fid, "removed": before != len(fields), "warning": "existing records may still contain this field"}
+    elif _wants_add_button_above_form(text):
+        session["form_action_position"] = "top"
+        patch["operation"] = "move_form_action"
+        patch["diff"] = {"form_id": "prototype-form", "action_id": "add_item", "submitPlacement": "top"}
+    elif _wants_done_checkbox_first(text):
+        fields, field, added = _ensure_field(fields, label="\u041a\u0443\u043f\u043b\u0435\u043d\u043e", field_id="done", field_type="boolean")
+        fields = _move_field_first(fields, "done")
+        session["fields"] = fields
+        patch["operation"] = "set_checkbox_column"
+        patch["diff"] = {
+            "field": field,
+            "added": added,
+            "field_order": [str(item.get("id") or "") for item in fields],
+            "table_column": {"key": "done", "kind": "boolean", "position": 0},
+        }
+    elif _mentions_date(text) and ("field" in lowered or "column" in lowered or "\u043f\u043e\u043b\u0435" in lowered or "\u043a\u043e\u043b\u043e\u043d" in lowered or _wants_date_values(text)):
+        fields, field, added = _ensure_field(fields, label="\u0414\u0430\u0442\u0430", field_id="date", field_type="date")
+        session["fields"] = fields
+        rows = _date_mock_rows(fields, session.get("mock_rows"))
+        session["mock_rows"] = rows
+        patch["operation"] = "add_field" if added else "update_mock_data"
+        patch["diff"] = {
+            "field": field,
+            "added": added,
+            "datasource_id": session.get("datasource_id") or "items",
+            "rows": rows,
+        }
     elif _wants_sample_data(text):
         rows = _food_mock_rows(fields)
         session["mock_rows"] = rows
@@ -972,7 +1151,7 @@ def update_current_scenario(
         if label:
             fid = _field_id(label)
             if not any(str(item.get("id")) == fid for item in fields):
-                field = {"id": fid, "type": "number" if fid == "price" else "string", "label": label, "required": False}
+                field = {"id": fid, "type": _field_type_for_id(fid, label), "label": _default_label_for_field(fid, label), "required": False}
                 fields.append(field)
                 session["fields"] = fields
                 patch["operation"] = "add_field"

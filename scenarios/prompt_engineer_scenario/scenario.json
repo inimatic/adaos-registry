@@ -373,6 +373,34 @@
               ]
             },
             {
+              "id": "builder-chat",
+              "type": "ui.chat",
+              "area": "right",
+              "title": "Builder",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "voice_chat.messages",
+                "scope": "shared",
+                "transport": "hub",
+                "params": {
+                  "dialog_channel_id": "builder"
+                }
+              },
+              "inputs": {
+                "placeholder": "Builder request...",
+                "hint": "Describe a UI change for the active draft.",
+                "sendCommand": "voice.chat.user",
+                "receiver": "voice_chat.messages",
+                "scope": "shared",
+                "meta": {
+                  "route_id": "voice_chat",
+                  "dialog_channel_id": "builder",
+                  "active_agent_id": "agent:builder_skill:builder",
+                  "active_agent_label": "Строитель"
+                }
+              }
+            },
+            {
               "id": "status-toolbar",
               "type": "input.commandBar",
               "area": "bottom",
@@ -386,10 +414,32 @@
               },
               "actions": [
                 {
-                  "on": "click",
+                  "on": "click:current-object",
                   "type": "openModal",
                   "params": {
-                    "modalId": "$event.action.openModal"
+                    "modalId": "project_meta_modal"
+                  }
+                },
+                {
+                  "on": "click:llm-status",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "llm_status_modal"
+                  }
+                },
+                {
+                  "on": "click:llm-profile",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "llm_profile_modal"
+                  }
+                },
+                {
+                  "on": "click:dev-webspace",
+                  "type": "openWorkspace",
+                  "params": {
+                    "ensureBuilderWorkbench": true,
+                    "newWindow": true
                   }
                 }
               ]
