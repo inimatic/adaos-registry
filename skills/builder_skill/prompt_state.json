@@ -1,0 +1,17 @@
+{
+  "object_type": "skill",
+  "object_id": "builder_skill",
+  "base_tz": "",
+  "tz_addenda": [],
+  "prepare": {
+    "general_prompt": "",
+    "iterations": []
+  },
+  "generate": {
+    "general_prompt": "",
+    "iterations": []
+  },
+  "llm_profile_id": null,
+  "target_node_id": null,
+  "workflow_state": "tz"
+}
