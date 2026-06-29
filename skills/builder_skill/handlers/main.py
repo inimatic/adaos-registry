@@ -39,6 +39,28 @@ def _webspace_id(value: str | None = None, _meta: Mapping[str, Any] | None = Non
     return "default"
 
 
+def _source_webspace_id(value: str | None = None, _meta: Mapping[str, Any] | None = None) -> str:
+    if isinstance(_meta, Mapping):
+        for key in ("source_webspace_id", "builder_source_webspace_id"):
+            raw = _meta.get(key)
+            if isinstance(raw, str) and raw.strip():
+                return raw.strip()
+    token = _webspace_id(value, _meta)
+    if token.endswith("-dev") and len(token) > 4:
+        return token[:-4]
+    return token
+
+
+def _paired_dev_webspace_id(source_webspace_id: str) -> str | None:
+    try:
+        from adaos.services.builder.workbench import dev_webspace_id_for_source
+
+        return dev_webspace_id_for_source(source_webspace_id)
+    except Exception:
+        source = str(source_webspace_id or "").strip()
+        return f"{source}-dev" if source else None
+
+
 def _scoped_key(base: str, webspace_id: str) -> str:
     return f"{base}.{webspace_id or 'default'}"
 
@@ -141,11 +163,13 @@ def _dialog_state(webspace_id: str) -> dict[str, Any]:
 
 def _chat_meta(_meta: Mapping[str, Any] | None, *, webspace_id: str) -> dict[str, Any]:
     meta = dict(_meta or {})
-    meta.setdefault("webspace_id", webspace_id)
+    meta.pop("webspace_ids", None)
+    meta["webspace_id"] = webspace_id
+    meta.setdefault("source_webspace_id", _source_webspace_id(webspace_id, _meta))
     meta.setdefault("route_id", "voice_chat")
     meta.setdefault("dialog_channel_id", DIALOG_CHANNEL_ID)
-    meta.setdefault("conversation_id", _conversation_id(webspace_id))
-    meta.setdefault("conversation_owner", f"skill:{SKILL_ID}")
+    meta["conversation_id"] = _conversation_id(webspace_id)
+    meta["conversation_owner"] = f"skill:{SKILL_ID}"
     meta.setdefault("active_agent_id", AGENT_ID)
     meta.setdefault("active_agent_label", AGENT_LABEL)
     meta.setdefault("active_agent_gender", "male")
@@ -272,7 +296,13 @@ def _safe_emit_chat(text: str, *, webspace_id: str, _meta: Mapping[str, Any] | N
     try:
         from adaos.sdk.io.out import chat_append
 
-        chat_append(text, from_="hub", _meta=_chat_meta(_meta, webspace_id=webspace_id))
+        source_ws = _source_webspace_id(webspace_id, _meta)
+        targets = [source_ws]
+        dev_ws = _paired_dev_webspace_id(source_ws)
+        if dev_ws and dev_ws not in targets:
+            targets.append(dev_ws)
+        for target in targets:
+            chat_append(text, from_="hub", _meta=_chat_meta(_meta, webspace_id=target))
     except Exception:
         return
 
@@ -309,6 +339,8 @@ def _preview_state(*, session: Mapping[str, Any]) -> dict[str, Any]:
     fields = [dict(item) for item in session.get("fields", []) if isinstance(item, Mapping)]
     datasource_id = str(session.get("datasource_id") or "items")
     table_columns = [{"field": item["id"], "label": item.get("label") or item["id"]} for item in fields]
+    stored_mock_rows = session.get("mock_rows")
+    mock_rows = [dict(item) for item in stored_mock_rows if isinstance(item, Mapping)] if isinstance(stored_mock_rows, list) else _mock_rows(fields)
     ui = {
         "schema": "adaos.declarative_ui.v1",
         "id": str(session.get("scenario_id") or "prototype"),
@@ -357,7 +389,7 @@ def _preview_state(*, session: Mapping[str, Any]) -> dict[str, Any]:
                 "operations": ["create", "read", "update", "delete"],
             }
         ],
-        "mock_data": {datasource_id: _mock_rows(fields)},
+        "mock_data": {datasource_id: mock_rows},
         "pending_patches": [item for item in session.get("patches", []) if item.get("status") == "proposed"],
         "version": str(session.get("version") or "v1"),
     }
@@ -376,6 +408,32 @@ def _mock_rows(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 row[field_id] = index == 1
             else:
                 row[field_id] = f"{field.get('label') or field_id} {index}"
+        rows.append(row)
+    return rows
+
+
+def _food_mock_rows(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    products = [
+        {"item": "\u041c\u043e\u043b\u043e\u043a\u043e", "quantity": 2, "category": "\u041c\u043e\u043b\u043e\u0447\u043d\u044b\u0435", "done": False, "price": 89.9},
+        {"item": "\u0425\u043b\u0435\u0431", "quantity": 1, "category": "\u0411\u0430\u043a\u0430\u043b\u0435\u044f", "done": True, "price": 54.0},
+        {"item": "\u042f\u0431\u043b\u043e\u043a\u0438", "quantity": 6, "category": "\u0424\u0440\u0443\u043a\u0442\u044b", "done": False, "price": 129.5},
+    ]
+    rows: list[dict[str, Any]] = []
+    for index, product in enumerate(products, start=1):
+        row: dict[str, Any] = {}
+        for field in fields:
+            field_id = str(field.get("id") or "")
+            field_type = str(field.get("type") or "string")
+            if field_id in product:
+                row[field_id] = product[field_id]
+            elif field_id in {"title", "name", "product"}:
+                row[field_id] = product["item"]
+            elif field_type == "number":
+                row[field_id] = index
+            elif field_type == "boolean":
+                row[field_id] = index == 2
+            else:
+                row[field_id] = str(field.get("label") or field_id or "value")
         rows.append(row)
     return rows
 
@@ -611,6 +669,84 @@ def _runtime_scenario_id(session: Mapping[str, Any] | None) -> str | None:
     return str(session.get("scenario_id") or "").strip() or None
 
 
+def _workbench_binding(webspace_id: str) -> dict[str, Any]:
+    try:
+        binding = _workbench_service().get_workspace_binding(webspace_id)
+        return dict(binding) if isinstance(binding, Mapping) else {}
+    except Exception:
+        return {}
+
+
+def _session_matches_binding(session: Mapping[str, Any], binding: Mapping[str, Any]) -> bool:
+    draft_id = str(binding.get("active_draft_id") or "").strip()
+    scenario_id = str(binding.get("runtime_scenario_id") or "").strip()
+    if draft_id and str(session.get("draft_id") or session.get("id") or "").strip() == draft_id:
+        return True
+    if scenario_id and str(session.get("scenario_id") or "").strip() == scenario_id:
+        return True
+    return not draft_id and not scenario_id
+
+
+def _target_session(webspace_id: str) -> tuple[dict[str, Any] | None, dict[str, Any]]:
+    binding = _workbench_binding(webspace_id)
+    draft_id = str(binding.get("active_draft_id") or "").strip()
+    scenario_id = str(binding.get("runtime_scenario_id") or "").strip()
+    sessions = _sessions(webspace_id)
+    if draft_id or scenario_id:
+        for session in sessions.values():
+            if draft_id and str(session.get("draft_id") or session.get("id") or "").strip() == draft_id:
+                return copy.deepcopy(session), binding
+            if scenario_id and str(session.get("scenario_id") or "").strip() == scenario_id:
+                return copy.deepcopy(session), binding
+        return None, binding
+    session = _load_session(webspace_id)
+    if session and _session_matches_binding(session, binding):
+        return session, binding
+    return None, binding
+
+
+def _target_required_message(binding: Mapping[str, Any] | None = None) -> str:
+    scenario_id = str((binding or {}).get("runtime_scenario_id") or "").strip()
+    if scenario_id:
+        return (
+            f"{AGENT_LABEL}: \u0432 Prompt IDE \u0432\u044b\u0431\u0440\u0430\u043d \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 {scenario_id}, "
+            "\u043d\u043e \u044f \u043d\u0435 \u0432\u0438\u0436\u0443 \u0434\u043b\u044f \u043d\u0435\u0433\u043e Builder-\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a. "
+            "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 Builder-\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a \u0438\u043b\u0438 \u0441\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043d\u043e\u0432\u044b\u0439: "
+            "\u00ab\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c, \u0441\u043e\u0437\u0434\u0430\u0439 ...\u00bb."
+        )
+    return (
+        f"{AGENT_LABEL}: \u0432\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043e\u0431\u044a\u0435\u043a\u0442 \u0434\u043b\u044f \u0434\u043e\u0440\u0430\u0431\u043e\u0442\u043a\u0438 "
+        "\u0432 Prompt IDE (\u043d\u0430\u0432\u044b\u043a \u0438\u043b\u0438 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439). "
+        "\u0415\u0441\u043b\u0438 \u043d\u0443\u0436\u0435\u043d \u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f, \u043d\u0430\u043f\u0438\u0448\u0438\u0442\u0435: "
+        "\u00ab\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c, \u0441\u043e\u0437\u0434\u0430\u0439 ...\u00bb."
+    )
+
+
+def _is_create_request(text: str) -> bool:
+    lowered = str(text or "").lower()
+    return any(
+        token in lowered
+        for token in (
+            "create",
+            "new app",
+            "new scenario",
+            "app",
+            "scenario",
+            "skill",
+            "\u0441\u043e\u0437\u0434",
+            "\u043d\u043e\u0432\u044b\u0439",
+            "\u043f\u0440\u0438\u043b\u043e\u0436",
+            "\u0441\u0446\u0435\u043d\u0430\u0440",
+            "\u043d\u0430\u0432\u044b\u043a",
+        )
+    )
+
+
+def _wants_sample_data(text: str) -> bool:
+    lowered = str(text or "").lower()
+    return any(token in lowered for token in ("sample", "mock", "example", "\u043f\u0440\u0438\u043c\u0435\u0440", "\u0434\u0430\u043d\u043d", "\u043f\u0440\u043e\u0434\u0443\u043a\u0442", "\u043f\u0438\u0442\u0430\u043d", "\u0435\u0434\u0430"))
+
+
 def _ensure_workbench(
     webspace_id: str,
     *,
@@ -676,17 +812,27 @@ def chat(
     auto_apply: bool = True,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     utterance = str(text or "").strip()
-    session = _load_session(ws)
-    lowered = utterance.lower()
-    if not session or any(token in lowered for token in ("создад", "create", "прилож", "app", "сценар")):
+    session, binding = _target_session(ws)
+    if _is_create_request(utterance):
         result = create_scenario_draft(idea=utterance or "prototype app", webspace_id=ws, _meta=_meta)
         if result.get("ok"):
             message = str(result.get("message") or "")
             _safe_emit_chat(message, webspace_id=ws, _meta=_meta)
             return {**result, "dialog": _dialog_state(ws)}
         return {**result, "dialog": _dialog_state(ws)}
+    if not session:
+        message = _target_required_message(binding)
+        _safe_emit_chat(message, webspace_id=ws, _meta=_meta)
+        return {
+            "ok": True,
+            "status": "target_required",
+            "needs_selection": True,
+            "message": message,
+            "binding": binding,
+            "dialog": _dialog_state(ws),
+        }
     result = update_current_scenario(instruction=utterance, webspace_id=ws, auto_apply=auto_apply, _meta=_meta)
     if result.get("ok"):
         _safe_emit_chat(str(result.get("message") or ""), webspace_id=ws, _meta=_meta)
@@ -700,7 +846,7 @@ def create_scenario_draft(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     source_idea = str(idea or "").strip() or "prototype app"
     sid = re.sub(r"[^a-z0-9_.-]+", "_", str(scenario_id or "").strip().lower()).strip("._-") or _scenario_id_from_idea(source_idea)
     fields = _build_fields(source_idea)
@@ -780,10 +926,17 @@ def update_current_scenario(
     auto_apply: bool = True,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
-    session = _load_session(ws)
+    ws = _source_webspace_id(webspace_id, _meta)
+    session, binding = _target_session(ws)
     if not session:
-        return create_scenario_draft(idea=instruction, webspace_id=ws, _meta=_meta)
+        return {
+            "ok": True,
+            "status": "target_required",
+            "needs_selection": True,
+            "message": _target_required_message(binding),
+            "binding": binding,
+            "dialog": _dialog_state(ws),
+        }
     text = str(instruction or "").strip()
     lowered = text.lower()
     patch = {
@@ -809,6 +962,11 @@ def update_current_scenario(
         session["fields"] = fields
         patch["operation"] = "remove_field"
         patch["diff"] = {"field_id": fid, "removed": before != len(fields), "warning": "existing records may still contain this field"}
+    elif _wants_sample_data(text):
+        rows = _food_mock_rows(fields)
+        session["mock_rows"] = rows
+        patch["operation"] = "update_mock_data"
+        patch["diff"] = {"datasource_id": session.get("datasource_id") or "items", "rows": rows}
     else:
         label = _extract_field_label(text) or ("\u0426\u0435\u043d\u0430" if "\u0446\u0435\u043d" in lowered or "price" in lowered else None)
         if label:
@@ -819,6 +977,28 @@ def update_current_scenario(
                 session["fields"] = fields
                 patch["operation"] = "add_field"
                 patch["diff"] = {"field": field}
+    if patch["operation"] == "noop":
+        preview = session.get("preview_state") if isinstance(session.get("preview_state"), dict) else _preview_state(session=session)
+        workbench = _ensure_workbench(ws, session=session, preview_state=preview)
+        message = (
+            f"{AGENT_LABEL}: \u044f \u043d\u0435 \u043d\u0430\u0448\u0435\u043b \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u0430\u043d\u043d\u043e\u0433\u043e "
+            f"\u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u0434\u043b\u044f {session.get('scenario_id')}. "
+            "\u0423\u0442\u043e\u0447\u043d\u0438\u0442\u0435, \u043a\u0430\u043a \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u044c UI: "
+            "\u0434\u043e\u0431\u0430\u0432\u044c \u043f\u043e\u043b\u0435, \u0443\u0431\u0435\u0440\u0438 \u043f\u043e\u043b\u0435, "
+            "\u043f\u043e\u043a\u0430\u0436\u0438 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0430\u043c\u0438 \u0438\u043b\u0438 \u0441\u0434\u0435\u043b\u0430\u0439 \u043f\u0440\u0438\u043c\u0435\u0440 \u0434\u0430\u043d\u043d\u044b\u0445."
+        )
+        return {
+            "ok": True,
+            "status": "noop",
+            "session_id": session.get("id"),
+            "scenario_id": session.get("scenario_id"),
+            "patch": patch,
+            "preview_state": preview,
+            "workbench": workbench,
+            "pending_action": None,
+            "message": message,
+            "dialog": _dialog_state(ws),
+        }
     session.setdefault("patches", []).append(patch)
     session["version"] = f"v{len(session.get('patches') or []) + 1}"
     preview = _preview_state(session=session)
@@ -863,7 +1043,7 @@ def get_session(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     session = _load_session(ws, session_id)
     workbench = _ensure_workbench(ws, session=session, preview_state=(session or {}).get("preview_state") if isinstance(session, dict) else None)
     return {"ok": bool(session), "session": session, "workbench": workbench, "dialog": _dialog_state(ws)}
@@ -875,7 +1055,7 @@ def get_preview_state(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     session = _load_session(ws, session_id)
     if not session:
         return {"ok": False, "error": "session_not_found", "preview_state": None, "dialog": _dialog_state(ws)}
@@ -890,7 +1070,7 @@ def ensure_dev_webspace(
     active_draft_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     session = _load_session(ws)
     explicit_draft_id = str(active_draft_id or "").strip() or None
     if active_draft_id:
@@ -907,7 +1087,7 @@ def get_workspace_binding(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     binding = _workbench_service().get_workspace_binding(ws)
     return {"ok": True, "binding": binding, "dialog": _dialog_state(ws)}
 
@@ -918,8 +1098,8 @@ def open_dev_webspace(
     base_url: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
-    session = _load_session(ws)
+    ws = _source_webspace_id(webspace_id, _meta)
+    session, binding = _target_session(ws)
     workbench = _ensure_workbench(ws, session=session)
     if not workbench.get("ok"):
         return {**workbench, "dialog": _dialog_state(ws)}
@@ -932,7 +1112,7 @@ def attach_dialog_widget(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     widget = _workbench_service().dialog_widget_config(ws)
     return {"ok": True, "widget": widget, "dialog": _dialog_state(ws)}
 
@@ -943,7 +1123,7 @@ def set_active_draft(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     session = _load_session(ws)
     if draft_id and (not session or str(session.get("draft_id") or "") != str(draft_id).strip()):
         sessions = _sessions(ws)
@@ -967,7 +1147,7 @@ def list_development_skills(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     return {**_workbench_service().list_development_skills(ws), "dialog": _dialog_state(ws)}
 
 
@@ -977,7 +1157,7 @@ def delete_development_skill(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    ws = _webspace_id(webspace_id, _meta)
+    ws = _source_webspace_id(webspace_id, _meta)
     result = _workbench_service().delete_development_skill(draft_id, ws)
     if result.get("ok"):
         _delete_sessions_for_draft(ws, draft_id)
