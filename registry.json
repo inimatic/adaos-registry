@@ -70,7 +70,7 @@
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "updated_at": "2026-06-29T10:42:11+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",

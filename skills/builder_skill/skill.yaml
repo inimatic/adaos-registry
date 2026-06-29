@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.2.1
+version: 0.2.2
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -11,6 +11,7 @@ events:
   subscribe: []
   publish:
   - io.out.chat.append
+  - builder.workbench.ensure_requested
 exports:
   tools:
   - start

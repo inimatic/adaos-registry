@@ -5,7 +5,6 @@ import hashlib
 import json
 import re
 import time
-import asyncio
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -19,6 +18,7 @@ AGENT_LABEL = "\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c"
 SESSIONS_KEY = "builder_skill.sessions"
 CURRENT_KEY = "builder_skill.current_session"
 MAX_SESSIONS = 50
+WORKBENCH_REFRESH_TOPIC = "builder.workbench.ensure_requested"
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
 
@@ -579,18 +579,20 @@ def _field_id(label: str) -> str:
     return ascii_id or f"field_{_hash_suffix(label)}"
 
 
-def _run_async(coro: Any) -> Any:
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    raise RuntimeError("builder_skill sync tool cannot wait for async workbench call inside a running event loop")
-
-
 def _workbench_service():
     from adaos.services.builder.workbench import BuilderWorkbenchService
 
     return BuilderWorkbenchService.from_context()
+
+
+def _request_workbench_refresh(payload: Mapping[str, Any]) -> dict[str, Any]:
+    try:
+        from adaos.sdk.data import events
+
+        events.publish(WORKBENCH_REFRESH_TOPIC, payload, source=SKILL_ID)
+        return {"ok": True, "topic": WORKBENCH_REFRESH_TOPIC}
+    except Exception as exc:
+        return {"ok": False, "topic": WORKBENCH_REFRESH_TOPIC, "error": f"{type(exc).__name__}: {exc}"}
 
 
 def _active_draft_id(session: Mapping[str, Any] | None) -> str | None:
@@ -614,20 +616,31 @@ def _ensure_workbench(
     *,
     session: Mapping[str, Any] | None = None,
     preview_state: Mapping[str, Any] | None = None,
+    active_draft_id: str | None = None,
+    runtime_scenario_id: str | None = None,
 ) -> dict[str, Any]:
     svc = _workbench_service()
+    draft_id = str(active_draft_id or _active_draft_id(session) or "").strip() or None
+    scenario_id = str(runtime_scenario_id or _runtime_scenario_id(session) or "").strip() or None
     try:
-        binding = _run_async(
-            svc.ensure_dev_webspace(
-                webspace_id,
-                active_draft_id=_active_draft_id(session),
-                runtime_scenario_id=_runtime_scenario_id(session),
-            )
+        binding = svc.set_active_draft(
+            source_webspace_id=webspace_id,
+            active_draft_id=draft_id,
+            runtime_scenario_id=scenario_id,
+            persist_projection=False,
         )
-        projection = svc.publish_projection_sync(webspace_id, preview_state=preview_state)
+        snapshot = svc.snapshot(webspace_id, preview_state=preview_state)
+        event = _request_workbench_refresh(
+            {
+                "source_webspace_id": webspace_id,
+                "active_draft_id": draft_id,
+                "runtime_scenario_id": scenario_id,
+                "preview_state": dict(preview_state or {}),
+            }
+        )
     except Exception as exc:
         return {"ok": False, "error": "workbench_unavailable", "detail": f"{type(exc).__name__}: {exc}"}
-    return {"ok": True, "binding": binding, "projection": projection}
+    return {"ok": True, "binding": binding, "projection": {"ok": True, "snapshot": snapshot, "deferred": True, "event": event}}
 
 
 def _delete_sessions_for_draft(webspace_id: str, draft_id: str) -> None:
@@ -883,17 +896,10 @@ def ensure_dev_webspace(
     if active_draft_id:
         session = dict(session or {})
         session["draft_id"] = explicit_draft_id
-    try:
-        binding = _run_async(
-            _workbench_service().ensure_dev_webspace(
-                ws,
-                active_draft_id=explicit_draft_id or _active_draft_id(session),
-                runtime_scenario_id=_runtime_scenario_id(session),
-            )
-        )
-    except Exception as exc:
-        return {"ok": False, "error": "workbench_unavailable", "detail": f"{type(exc).__name__}: {exc}", "dialog": _dialog_state(ws)}
-    return {"ok": True, "binding": binding, "dialog": _dialog_state(ws)}
+    workbench = _ensure_workbench(ws, session=session, active_draft_id=explicit_draft_id or None)
+    if not workbench.get("ok"):
+        return {**workbench, "dialog": _dialog_state(ws)}
+    return {"ok": True, "binding": workbench["binding"], "workbench": workbench, "dialog": _dialog_state(ws)}
 
 
 @tool(summary="Return Builder workbench binding.", side_effects="none")
@@ -914,18 +920,11 @@ def open_dev_webspace(
 ) -> dict[str, Any]:
     ws = _webspace_id(webspace_id, _meta)
     session = _load_session(ws)
-    try:
-        result = _run_async(
-            _workbench_service().open_dev_webspace_ready(
-                ws,
-                base_url=base_url,
-                active_draft_id=_active_draft_id(session),
-                runtime_scenario_id=_runtime_scenario_id(session),
-            )
-        )
-    except Exception as exc:
-        return {"ok": False, "error": "workbench_unavailable", "detail": f"{type(exc).__name__}: {exc}", "dialog": _dialog_state(ws)}
-    return {**result, "dialog": _dialog_state(ws)}
+    workbench = _ensure_workbench(ws, session=session)
+    if not workbench.get("ok"):
+        return {**workbench, "dialog": _dialog_state(ws)}
+    result = _workbench_service().open_dev_webspace(ws, base_url=base_url)
+    return {**result, "binding": workbench["binding"], "workbench": workbench, "dialog": _dialog_state(ws)}
 
 
 @tool(summary="Return embedded Voice Chat widget config for Builder workbench.", side_effects="none")
@@ -952,14 +951,15 @@ def set_active_draft(
             if str(item.get("draft_id") or item.get("id") or "").strip() == str(draft_id).strip():
                 session = item
                 break
-    binding = _run_async(
-        _workbench_service().ensure_dev_webspace(
-            ws,
-            active_draft_id=draft_id,
-            runtime_scenario_id=_runtime_scenario_id(session),
-        )
+    workbench = _ensure_workbench(
+        ws,
+        session=session,
+        active_draft_id=str(draft_id or "").strip() or None,
+        runtime_scenario_id=_runtime_scenario_id(session),
     )
-    return {"ok": True, "binding": binding, "dialog": _dialog_state(ws)}
+    if not workbench.get("ok"):
+        return {**workbench, "dialog": _dialog_state(ws)}
+    return {"ok": True, "binding": workbench["binding"], "workbench": workbench, "dialog": _dialog_state(ws)}
 
 
 @tool(summary="List Builder skills/scenarios in development.", side_effects="none")
