@@ -240,6 +240,36 @@ tools:
     type: array
     items:
       type: object
+- name: prompt_select_project
+  description: Mark a Prompt IDE project as selected and sync Builder preview runtime
+  entry: handlers.main:prompt_select_project
+  input_schema:
+    type: object
+    required:
+    - object_type
+    - object_id
+    properties:
+      object_type:
+        type: string
+        enum:
+        - skill
+        - scenario
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      object_type:
+        type: string
+      object_id:
+        type: string
+      builder_topic_id:
+        type: string
 - name: prompt_list_project_files
   description: List source files for a prompt project
   entry: handlers.main:prompt_list_project_files

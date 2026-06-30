@@ -52,6 +52,19 @@
         "pageSchema": {
           "id": "prompt_ide",
           "title": "Prompt IDE",
+          "initialStateSource": {
+            "kind": "y",
+            "path": "data/prompt/workflow",
+            "map": {
+              "currentProjectType": "object_type",
+              "currentProjectId": "object_id",
+              "currentObjectType": "object_type",
+              "currentObjectId": "object_id",
+              "currentStage": "state",
+              "builderTopicId": "topic_id",
+              "builderConversationId": "conversation_id"
+            }
+          },
           "layout": {
             "type": "split",
             "pattern": "split",
@@ -383,7 +396,9 @@
                 "scope": "shared",
                 "transport": "hub",
                 "params": {
-                  "dialog_channel_id": "builder"
+                  "dialog_channel_id": "builder",
+                  "conversation_id": "$state.builderConversationId",
+                  "conversation_topic_id": "$state.builderTopicId"
                 }
               },
               "inputs": {
@@ -395,6 +410,9 @@
                 "meta": {
                   "route_id": "voice_chat",
                   "dialog_channel_id": "builder",
+                  "conversation_id": "$state.builderConversationId",
+                  "conversation_topic_id": "$state.builderTopicId",
+                  "thread_id": "$state.builderTopicId",
                   "active_agent_id": "agent:builder_skill:builder",
                   "active_agent_label": "Строитель"
                 }
@@ -490,13 +508,31 @@
                 },
                 {
                   "on": "select",
+                  "type": "callSkill",
+                  "target": "prompt_engineer_skill.prompt_select_project",
+                  "params": {
+                    "object_type": "$event.object_type",
+                    "object_id": "$event.object_id"
+                  }
+                },
+                {
+                  "on": "select",
                   "type": "updateState",
                   "params": {
                     "currentProjectType": "$event.object_type",
                     "currentProjectId": "$event.object_id",
                     "currentObjectType": "$event.object_type",
                     "currentObjectId": "$event.object_id",
-                    "currentStage": "$event.workflow_state"
+                    "currentStage": "$event.workflow_state",
+                    "builderTopicId": "prompt-project:$event.object_type:$event.object_id",
+                    "builderConversationId": "conv.skill.builder_skill.default.$client.webspaceId"
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "closeModal",
+                  "params": {
+                    "role": "select"
                   }
                 }
               ]
@@ -590,13 +626,33 @@
                   },
                   {
                     "on": "click:create",
+                    "type": "callHost",
+                    "target": "scenario.workflow.set_state",
+                    "params": {
+                      "scenario_id": "prompt_engineer_scenario",
+                      "state": "tz",
+                      "object_type": "$state.createObjectType",
+                      "object_id": "$state.createObjectName"
+                    }
+                  },
+                  {
+                    "on": "click:create",
                     "type": "updateState",
                     "params": {
                       "currentProjectType": "$state.createObjectType",
                       "currentProjectId": "$state.createObjectName",
                       "currentObjectType": "$state.createObjectType",
                       "currentObjectId": "$state.createObjectName",
-                      "currentStage": "tz"
+                      "currentStage": "tz",
+                      "builderTopicId": "prompt-project:$state.createObjectType:$state.createObjectName",
+                      "builderConversationId": "conv.skill.builder_skill.default.$client.webspaceId"
+                    }
+                  },
+                  {
+                    "on": "click:create",
+                    "type": "closeModal",
+                    "params": {
+                      "role": "create"
                     }
                   }
                 ]
@@ -796,7 +852,15 @@
                   "mode": "markdown",
                   "bindField": "description"
                 },
-                "actions": []
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "editProjectDescription": "$event.value"
+                    }
+                  }
+                ]
               },
               {
                 "id": "project-meta-type",

@@ -124,8 +124,63 @@ def _conversation_id(webspace_id: str) -> str:
     return f"conv.skill.{SKILL_ID}.default.{webspace_id or 'default'}"
 
 
-def _dialog_state(webspace_id: str) -> dict[str, Any]:
-    return {
+def _builder_topic_ref(
+    webspace_id: str,
+    *,
+    session: Mapping[str, Any] | None = None,
+    binding: Mapping[str, Any] | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    meta = dict(_meta or {})
+    existing_topic = meta.get("builder_topic") if isinstance(meta.get("builder_topic"), Mapping) else {}
+    thread_id = str(meta.get("thread_id") or meta.get("conversation_thread_id") or meta.get("conversation_topic_id") or "").strip()
+    topic_id = str(meta.get("topic_id") or "").strip()
+    if thread_id:
+        topic = {k: v for k, v in dict(existing_topic or {}).items() if v is not None}
+        topic.setdefault("schema", "adaos.conversation.topic_ref.v1")
+        topic.setdefault("thread_id", thread_id)
+        topic.setdefault("topic_id", topic_id or thread_id)
+        topic.setdefault("topic_kind", "builder_runtime")
+        topic.setdefault("webspace_id", webspace_id)
+        topic.setdefault("source_webspace_id", webspace_id)
+        topic.setdefault("conversation_id", _conversation_id(webspace_id))
+        topic.setdefault("channel_id", DIALOG_CHANNEL_ID)
+        topic.setdefault("owner", f"skill:{SKILL_ID}")
+        return topic
+    session = session if isinstance(session, Mapping) else {}
+    binding = binding if isinstance(binding, Mapping) else {}
+    try:
+        from adaos.services.conversation_links import ensure_builder_topic
+
+        return ensure_builder_topic(
+            webspace_id,
+            active_draft_id=str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None,
+            scenario_id=str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None,
+            dev_webspace_id=str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None,
+        )
+    except Exception:
+        token = str(session.get("draft_id") or session.get("scenario_id") or binding.get("runtime_scenario_id") or "default").strip()
+        token = re.sub(r"[^A-Za-z0-9_.:-]+", ".", token).strip(".") or "default"
+        return {
+            "schema": "adaos.conversation.topic_ref.v1",
+            "topic_id": f"builder:{webspace_id}:{token}",
+            "thread_id": f"thread.builder.{webspace_id}.{token}",
+            "topic_kind": "builder_runtime",
+            "webspace_id": webspace_id,
+            "source_webspace_id": webspace_id,
+            "active_draft_id": str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None,
+            "scenario_id": str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None,
+            "dev_webspace_id": str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None,
+            "conversation_id": _conversation_id(webspace_id),
+            "channel_id": DIALOG_CHANNEL_ID,
+            "owner": f"skill:{SKILL_ID}",
+            "stored": False,
+        }
+
+
+def _dialog_state(webspace_id: str, *, topic_ref: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    topic = dict(topic_ref or {}) if isinstance(topic_ref, Mapping) else {}
+    state = {
         "state": "active",
         "dialog_channel_id": DIALOG_CHANNEL_ID,
         "conversation_id": _conversation_id(webspace_id),
@@ -159,9 +214,21 @@ def _dialog_state(webspace_id: str) -> dict[str, Any]:
             "active_agent_id": AGENT_ID,
         },
     }
+    if topic:
+        state["thread_id"] = str(topic.get("thread_id") or "").strip() or None
+        state["topic_id"] = str(topic.get("topic_id") or "").strip() or None
+        state["topic"] = {k: v for k, v in topic.items() if k != "stored"}
+    return state
 
 
-def _chat_meta(_meta: Mapping[str, Any] | None, *, webspace_id: str) -> dict[str, Any]:
+def _chat_meta(
+    _meta: Mapping[str, Any] | None,
+    *,
+    webspace_id: str,
+    session: Mapping[str, Any] | None = None,
+    binding: Mapping[str, Any] | None = None,
+    topic_ref: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     meta = dict(_meta or {})
     meta.pop("webspace_ids", None)
     meta["webspace_id"] = webspace_id
@@ -175,6 +242,22 @@ def _chat_meta(_meta: Mapping[str, Any] | None, *, webspace_id: str) -> dict[str
     meta.setdefault("active_agent_gender", "male")
     meta.setdefault("active_agent_voice", "ru-male")
     meta.setdefault("active_agent_icon", "construct-outline")
+    topic = dict(topic_ref or {}) if isinstance(topic_ref, Mapping) else _builder_topic_ref(
+        webspace_id,
+        session=session,
+        binding=binding,
+        _meta=meta,
+    )
+    thread_id = str(topic.get("thread_id") or "").strip()
+    topic_id = str(topic.get("topic_id") or "").strip()
+    if thread_id:
+        meta.setdefault("thread_id", thread_id)
+        meta.setdefault("conversation_thread_id", thread_id)
+        meta.setdefault("conversation_topic_id", thread_id)
+    if topic_id:
+        meta.setdefault("topic_id", topic_id)
+    if topic:
+        meta.setdefault("builder_topic", {k: v for k, v in topic.items() if k != "stored"})
     return meta
 
 
@@ -185,7 +268,7 @@ def _source_refs(
     _meta: Mapping[str, Any] | None = None,
     patch: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    meta = _chat_meta(_meta, webspace_id=webspace_id)
+    meta = _chat_meta(_meta, webspace_id=webspace_id, session=session)
     refs: dict[str, Any] = {
         "conversation_id": meta.get("conversation_id") or _conversation_id(webspace_id),
         "dialog_channel_id": DIALOG_CHANNEL_ID,
@@ -193,7 +276,7 @@ def _source_refs(
         "session_id": session.get("id"),
         "scenario_id": session.get("scenario_id"),
     }
-    for key in ("thread_id", "turn_trace_id", "request_id", "message_id", "input_event_kind"):
+    for key in ("thread_id", "topic_id", "turn_trace_id", "request_id", "message_id", "input_event_kind"):
         value = str(meta.get(key) or "").strip()
         if value:
             refs[key] = value
@@ -292,7 +375,15 @@ def _publish_review_pending_action(
         }
 
 
-def _safe_emit_chat(text: str, *, webspace_id: str, _meta: Mapping[str, Any] | None = None) -> None:
+def _safe_emit_chat(
+    text: str,
+    *,
+    webspace_id: str,
+    _meta: Mapping[str, Any] | None = None,
+    session: Mapping[str, Any] | None = None,
+    binding: Mapping[str, Any] | None = None,
+    topic_ref: Mapping[str, Any] | None = None,
+) -> None:
     try:
         from adaos.sdk.io.out import chat_append
 
@@ -302,7 +393,11 @@ def _safe_emit_chat(text: str, *, webspace_id: str, _meta: Mapping[str, Any] | N
         if dev_ws and dev_ws not in targets:
             targets.append(dev_ws)
         for target in targets:
-            chat_append(text, from_="hub", _meta=_chat_meta(_meta, webspace_id=target))
+            chat_append(
+                text,
+                from_="hub",
+                _meta=_chat_meta(_meta, webspace_id=target, session=session, binding=binding, topic_ref=topic_ref),
+            )
     except Exception:
         return
 
@@ -488,6 +583,27 @@ def _write_webui(artifact_root: str | None, preview_state: Mapping[str, Any]) ->
     _write_scenario_page_schema(root, preview_state)
 
 
+def _write_scenario_manifest(root: Path, scenario: Mapping[str, Any], preview_state: Mapping[str, Any]) -> None:
+    scenario_id = str(scenario.get("id") or preview_state.get("scenario_id") or preview_state.get("id") or root.name).strip() or root.name
+    title = str(preview_state.get("title") or scenario.get("title") or scenario.get("name") or scenario_id).strip() or scenario_id
+    lines = [
+        f"id: {json.dumps(scenario_id, ensure_ascii=False)}",
+        f"name: {json.dumps(str(scenario.get('name') or scenario_id), ensure_ascii=False)}",
+        f"type: {json.dumps(str(scenario.get('type') or 'desktop'), ensure_ascii=False)}",
+        f"title: {json.dumps(title, ensure_ascii=False)}",
+        f"description: {json.dumps(str(scenario.get('description') or 'Builder rapid prototype scenario.'), ensure_ascii=False)}",
+        f"version: {json.dumps(str(scenario.get('version') or '0.1.0'), ensure_ascii=False)}",
+        "depends:",
+        "  - builder_skill",
+        "runtime:",
+        "  skills:",
+        "    required:",
+        "      - builder_skill",
+        "",
+    ]
+    (root / "scenario.yaml").write_text("\n".join(lines), encoding="utf-8")
+
+
 def _form_field_type(field: Mapping[str, Any]) -> str:
     field_type = str(field.get("type") or "string")
     if field_type == "boolean":
@@ -615,14 +731,31 @@ def _write_scenario_page_schema(root: Path, preview_state: Mapping[str, Any]) ->
         return
     if not isinstance(scenario, dict):
         return
+    scenario.setdefault("id", root.name)
+    scenario.setdefault("name", root.name)
     scenario.setdefault("type", "desktop")
     scenario.setdefault("title", preview_state.get("title") or scenario.get("name") or scenario.get("id") or "Prototype")
+    depends = scenario.get("depends")
+    depends_list = [str(item) for item in depends if isinstance(item, str)] if isinstance(depends, list) else []
+    if SKILL_ID not in depends_list:
+        depends_list.append(SKILL_ID)
+    scenario["depends"] = depends_list
+    runtime = scenario.get("runtime") if isinstance(scenario.get("runtime"), dict) else {}
+    skills = runtime.get("skills") if isinstance(runtime.get("skills"), dict) else {}
+    required = skills.get("required") if isinstance(skills.get("required"), list) else []
+    required_list = [str(item) for item in required if isinstance(item, str)]
+    if SKILL_ID not in required_list:
+        required_list.append(SKILL_ID)
+    skills["required"] = required_list
+    runtime["skills"] = skills
+    scenario["runtime"] = runtime
     scenario.setdefault("ui", {})
     scenario["ui"].setdefault("application", {})
     scenario["ui"]["application"].setdefault("version", "0.1")
     scenario["ui"]["application"].setdefault("desktop", {})
     scenario["ui"]["application"]["desktop"]["pageSchema"] = _page_schema_from_preview(preview_state)
     manifest.write_text(json.dumps(scenario, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _write_scenario_manifest(root, scenario, preview_state)
 
 
 def _save_session(webspace_id: str, session: dict[str, Any]) -> dict[str, Any]:
@@ -967,28 +1100,37 @@ def chat(
     ws = _source_webspace_id(webspace_id, _meta)
     utterance = str(text or "").strip()
     session, binding = _target_session(ws)
+    topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     if _is_create_request(utterance):
         result = create_scenario_draft(idea=utterance or "prototype app", webspace_id=ws, _meta=_meta)
         if result.get("ok"):
             message = str(result.get("message") or "")
-            _safe_emit_chat(message, webspace_id=ws, _meta=_meta)
-            return {**result, "dialog": _dialog_state(ws)}
-        return {**result, "dialog": _dialog_state(ws)}
+            _safe_emit_chat(message, webspace_id=ws, _meta=_meta, topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else None)
+            return {**result, "dialog": _dialog_state(ws, topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic)}
+        return {**result, "dialog": _dialog_state(ws, topic_ref=topic)}
     if not session:
         message = _target_required_message(binding)
-        _safe_emit_chat(message, webspace_id=ws, _meta=_meta)
+        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, binding=binding, topic_ref=topic)
         return {
             "ok": True,
             "status": "target_required",
             "needs_selection": True,
             "message": message,
             "binding": binding,
-            "dialog": _dialog_state(ws),
+            "topic": topic,
+            "dialog": _dialog_state(ws, topic_ref=topic),
         }
     result = update_current_scenario(instruction=utterance, webspace_id=ws, auto_apply=auto_apply, _meta=_meta)
     if result.get("ok"):
-        _safe_emit_chat(str(result.get("message") or ""), webspace_id=ws, _meta=_meta)
-    return {**result, "dialog": _dialog_state(ws)}
+        _safe_emit_chat(
+            str(result.get("message") or ""),
+            webspace_id=ws,
+            _meta=_meta,
+            session=session,
+            binding=binding,
+            topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic,
+        )
+    return {**result, "dialog": _dialog_state(ws, topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic)}
 
 
 @tool(summary="Create scenario prototype draft.", side_effects="local_write")
@@ -1043,6 +1185,12 @@ def create_scenario_draft(
     session["preview_state"] = preview
     _save_session(ws, session)
     workbench = _ensure_workbench(ws, session=session, preview_state=preview)
+    binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
+    topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
+    session["thread_id"] = str(topic.get("thread_id") or "").strip() or None
+    session["topic_id"] = str(topic.get("topic_id") or "").strip() or None
+    session["topic_ref"] = {k: v for k, v in topic.items() if k != "stored"}
+    _save_session(ws, session)
     message = _message_created(session)
     if session.get("draft_error"):
         message += f" \u041f\u0440\u0435\u0434\u0443\u043f\u0440\u0435\u0436\u0434\u0435\u043d\u0438\u0435: dev draft \u043d\u0435 \u0441\u043e\u0437\u0434\u0430\u043d ({session['draft_error']})."
@@ -1065,9 +1213,10 @@ def create_scenario_draft(
         "artifact_root": session.get("artifact_root"),
         "preview_state": preview,
         "workbench": workbench,
+        "topic": {k: v for k, v in topic.items() if k != "stored"},
         "pending_action": pending_action,
         "message": message,
-        "dialog": _dialog_state(ws),
+        "dialog": _dialog_state(ws, topic_ref=topic),
     }
 
 
@@ -1080,6 +1229,7 @@ def update_current_scenario(
 ) -> dict[str, Any]:
     ws = _source_webspace_id(webspace_id, _meta)
     session, binding = _target_session(ws)
+    topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     if not session:
         return {
             "ok": True,
@@ -1087,7 +1237,8 @@ def update_current_scenario(
             "needs_selection": True,
             "message": _target_required_message(binding),
             "binding": binding,
-            "dialog": _dialog_state(ws),
+            "topic": topic,
+            "dialog": _dialog_state(ws, topic_ref=topic),
         }
     text = str(instruction or "").strip()
     lowered = text.lower()
@@ -1159,6 +1310,8 @@ def update_current_scenario(
     if patch["operation"] == "noop":
         preview = session.get("preview_state") if isinstance(session.get("preview_state"), dict) else _preview_state(session=session)
         workbench = _ensure_workbench(ws, session=session, preview_state=preview)
+        binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else binding
+        topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
         message = (
             f"{AGENT_LABEL}: \u044f \u043d\u0435 \u043d\u0430\u0448\u0435\u043b \u043f\u043e\u0434\u0434\u0435\u0440\u0436\u0430\u043d\u043d\u043e\u0433\u043e "
             f"\u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u0434\u043b\u044f {session.get('scenario_id')}. "
@@ -1174,17 +1327,23 @@ def update_current_scenario(
             "patch": patch,
             "preview_state": preview,
             "workbench": workbench,
+            "topic": {k: v for k, v in topic.items() if k != "stored"},
             "pending_action": None,
             "message": message,
-            "dialog": _dialog_state(ws),
+            "dialog": _dialog_state(ws, topic_ref=topic),
         }
     session.setdefault("patches", []).append(patch)
     session["version"] = f"v{len(session.get('patches') or []) + 1}"
     preview = _preview_state(session=session)
     _write_webui(str(session.get("artifact_root") or ""), preview)
     session["preview_state"] = preview
-    _save_session(ws, session)
     workbench = _ensure_workbench(ws, session=session, preview_state=preview)
+    binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else binding
+    topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
+    session["thread_id"] = str(topic.get("thread_id") or "").strip() or None
+    session["topic_id"] = str(topic.get("topic_id") or "").strip() or None
+    session["topic_ref"] = {k: v for k, v in topic.items() if k != "stored"}
+    _save_session(ws, session)
     pending_action = _publish_review_pending_action(
         webspace_id=ws,
         session=session,
@@ -1210,9 +1369,10 @@ def update_current_scenario(
         "patch": patch,
         "preview_state": preview,
         "workbench": workbench,
+        "topic": {k: v for k, v in topic.items() if k != "stored"},
         "pending_action": pending_action,
         "message": message,
-        "dialog": _dialog_state(ws),
+        "dialog": _dialog_state(ws, topic_ref=topic),
     }
 
 
@@ -1292,8 +1452,10 @@ def attach_dialog_widget(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     ws = _source_webspace_id(webspace_id, _meta)
-    widget = _workbench_service().dialog_widget_config(ws)
-    return {"ok": True, "widget": widget, "dialog": _dialog_state(ws)}
+    binding = _workbench_service().get_workspace_binding(ws)
+    widget = binding.get("dialog") if isinstance(binding.get("dialog"), Mapping) else _workbench_service().dialog_widget_config(ws)
+    topic = widget.get("topic") if isinstance(widget.get("topic"), Mapping) else None
+    return {"ok": True, "widget": widget, "binding": binding, "dialog": _dialog_state(ws, topic_ref=topic)}
 
 
 @tool(summary="Switch active Builder development draft.", side_effects="local_write")
