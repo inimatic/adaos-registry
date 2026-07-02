@@ -193,6 +193,10 @@
           "interface": {
             "schema": "adaos.ui.modal.interface.v1",
             "defaultRoute": "notes.list",
+            "history": {
+              "url": true,
+              "mode": "push"
+            },
             "domain": {
               "schema": "adaos.ui.modal_domain.v1",
               "defaultState": "notes.list",

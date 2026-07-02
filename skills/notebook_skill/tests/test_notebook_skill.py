@@ -205,6 +205,7 @@ def test_notebook_ui_reads_editor_and_widget_from_stream():
     assert ui["views"]["notebook.note.edit"]["params"]["note_id"]["required"] is True
     assert "notebook.note.edit" in modal["implements"]
     assert modal_interface["defaultRoute"] == "notes.list"
+    assert modal_interface["history"] == {"url": True, "mode": "push"}
     assert modal_interface["routes"]["note.edit"]["state"] == {
         "notebookViewMode": "edit",
         "notebookSelectedNoteId": "$params.note_id",
