@@ -74,6 +74,7 @@
 								"stopLabel": "⏹️ Стоп",
 								"sendCommand": "voice.chat.user",
 								"scope": "shared",
+								"voiceDiagnostics": false,
 								"nonBlocking": true,
 								"meta": { "route_id": "voice_chat", "voice_chat_scope": "shared" },
 								"ttsProfiles": {

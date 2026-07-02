@@ -366,3 +366,14 @@ def test_voice_chat_skill_yaml_exports_get_snapshot():
     assert stream_route["budget"]["max_payload_bytes"] == 16384
     assert stream_route["budget"]["max_fanout"] == 3
     assert stream_route["budget"]["max_items"] == 8
+
+
+def test_voice_chat_webui_keeps_voice_header_compact():
+    webui_path = Path(__file__).resolve().parents[1] / "webui.json"
+    payload = json.loads(webui_path.read_text(encoding="utf-8"))
+
+    schema = payload["registry"]["modals"]["voice_chat_modal"]["schema"]
+    voice_input = next(item for item in schema["widgets"] if item.get("id") == "voice-input")
+    inputs = voice_input["inputs"]
+
+    assert inputs["voiceDiagnostics"] is False
