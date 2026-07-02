@@ -43,20 +43,42 @@ _projection_fingerprints: dict[str, str] = {}
 _stream_fingerprints: dict[str, str] = {}
 
 
-DEFAULT_MODEL = {
+TRIAL_MOBILENET_MODEL = {
+    "id": "tfjs_mobilenet_v2_100_embedding",
+    "title": "MobileNetV2 browser embedding",
+    "runtime": "tfjs-mobilenet",
+    "task": "embed",
+    "version": 2,
+    "alpha": 1.0,
+    "inputSize": 224,
+    "inputRange": [0, 1],
+    "modelUrl": "https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v2_1.0_224/model.json",
+    "model_signature": "tfjs-mobilenet-v2-1.0-224@google-storage",
+    "status": "trial",
+    "description": "Trial TensorFlow.js MobileNetV2 feature-vector model loaded from Google Storage in the browser.",
+}
+
+BROWSER_FRAME_MODEL = {
     "id": "browser_embedding_placeholder",
     "title": "Browser embedding placeholder",
     "runtime": "client-cv",
     "task": "embed",
-    "status": "pending_client_runtime",
-    "description": "Placeholder model descriptor until the AdaOS client CV runtime is installed.",
+    "model_signature": "browser-frame-embedding@v1",
+    "status": "fallback",
+    "description": "Deterministic downsampled-frame embedding fallback for browser runtime diagnostics.",
 }
+
+DEFAULT_MODEL = TRIAL_MOBILENET_MODEL
 
 DEFAULT_MODEL_OPTIONS = [
     {
-        **DEFAULT_MODEL,
+        **TRIAL_MOBILENET_MODEL,
+        "label": "MobileNetV2 browser embedding",
+    },
+    {
+        **BROWSER_FRAME_MODEL,
         "label": "Browser embedding placeholder",
-    }
+    },
 ]
 
 _DATA_PROJECTION_ENTRIES = [
@@ -141,7 +163,7 @@ def _default_state() -> dict[str, Any]:
         "status": "init",
         "mode": "setup",
         "model": model,
-        "model_options": DEFAULT_MODEL_OPTIONS,
+        "model_options": _merged_model_options(DEFAULT_MODEL_OPTIONS),
         "matching": {
             "metric": "cosine",
             "threshold": 0.82,
@@ -164,6 +186,24 @@ def _default_state() -> dict[str, Any]:
     }
 
 
+def _merged_model_options(options: Any = None) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    extra_options = options if isinstance(options, list) else []
+    for option in list(DEFAULT_MODEL_OPTIONS) + list(extra_options):
+        if not isinstance(option, Mapping):
+            continue
+        item = dict(option)
+        token = str(item.get("id") or "").strip()
+        if not token or token in seen:
+            continue
+        item.setdefault("model_signature", _model_signature(item))
+        item.setdefault("label", item.get("title") or token)
+        seen.add(token)
+        out.append(item)
+    return out
+
+
 def _read_state() -> dict[str, Any]:
     path = _state_path()
     if not path.exists():
@@ -178,8 +218,15 @@ def _read_state() -> dict[str, Any]:
     state = _default_state()
     state.update(data)
     model = state.get("model") if isinstance(state.get("model"), dict) else dict(DEFAULT_MODEL)
+    if (
+        str(model.get("id") or "").strip() == "browser_embedding_placeholder"
+        and str(model.get("status") or "").strip() == "pending_client_runtime"
+        and not state.get("descriptors")
+    ):
+        model = dict(DEFAULT_MODEL)
     model.setdefault("model_signature", _model_signature(model))
     state["model"] = model
+    state["model_options"] = _merged_model_options(state.get("model_options"))
     if not isinstance(state.get("descriptors"), list):
         state["descriptors"] = []
     if not isinstance(state.get("runtime"), dict):

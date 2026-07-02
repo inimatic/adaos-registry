@@ -33,18 +33,37 @@
       "status": "init",
       "mode": "setup",
       "model": {
-        "id": "browser_embedding_placeholder",
-        "title": "Browser embedding placeholder",
-        "runtime": "client-cv",
+        "id": "tfjs_mobilenet_v2_100_embedding",
+        "title": "MobileNetV2 browser embedding",
+        "runtime": "tfjs-mobilenet",
         "task": "embed",
-        "status": "pending_client_runtime"
+        "version": 2,
+        "alpha": 1.0,
+        "inputSize": 224,
+        "inputRange": [0, 1],
+        "modelUrl": "https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v2_1.0_224/model.json",
+        "model_signature": "tfjs-mobilenet-v2-1.0-224@google-storage",
+        "status": "trial"
       },
       "model_options": [
+        {
+          "id": "tfjs_mobilenet_v2_100_embedding",
+          "label": "MobileNetV2 browser embedding",
+          "runtime": "tfjs-mobilenet",
+          "task": "embed",
+          "version": 2,
+          "alpha": 1.0,
+          "inputSize": 224,
+          "inputRange": [0, 1],
+          "modelUrl": "https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v2_1.0_224/model.json",
+          "model_signature": "tfjs-mobilenet-v2-1.0-224@google-storage"
+        },
         {
           "id": "browser_embedding_placeholder",
           "label": "Browser embedding placeholder",
           "runtime": "client-cv",
-          "task": "embed"
+          "task": "embed",
+          "model_signature": "browser-frame-embedding@v1"
         }
       ],
       "activity": {
@@ -141,6 +160,10 @@
                 "optionValuePath": "id",
                 "options": [
                   {
+                    "id": "tfjs_mobilenet_v2_100_embedding",
+                    "label": "MobileNetV2 browser embedding"
+                  },
+                  {
                     "id": "browser_embedding_placeholder",
                     "label": "Browser embedding placeholder"
                   }
@@ -229,6 +252,7 @@
                 "sessionPath": "sessions.setup",
                 "commandPath": "desired",
                 "allowSelect": true,
+                "showContractCopy": true,
                 "showPreview": true,
                 "aspectRatio": "16 / 9"
               }
@@ -346,6 +370,7 @@
                 "sessionPath": "sessions.work",
                 "commandPath": "desired",
                 "allowSelect": false,
+                "showContractCopy": true,
                 "showPreview": true,
                 "aspectRatio": "16 / 9"
               }

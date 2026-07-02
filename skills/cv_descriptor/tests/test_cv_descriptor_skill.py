@@ -32,9 +32,26 @@ def test_status_projects_public_empty_state(tmp_path: Path, monkeypatch) -> None
 
     assert result["ok"] is True
     assert result["current"]["status"] == "init"
+    assert result["current"]["model"]["id"] == "tfjs_mobilenet_v2_100_embedding"
+    assert result["current"]["model"]["runtime"] == "tfjs-mobilenet"
+    assert result["current"]["model"]["modelUrl"].startswith("https://storage.googleapis.com/")
+    assert any(item["id"] == "browser_embedding_placeholder" for item in result["current"]["model_options"])
     assert result["current"]["stats"]["descriptor_count"] == 0
     assert result["descriptors"]["items"] == []
     assert result["runtime"]["client_runtime_required"] is True
+
+
+def test_old_empty_placeholder_state_migrates_to_trial_model(tmp_path: Path, monkeypatch) -> None:
+    state_path = tmp_path / "state.json"
+    state_path.write_text(
+        '{"model":{"id":"browser_embedding_placeholder","status":"pending_client_runtime"}, "descriptors":[]}',
+        encoding="utf-8",
+    )
+    mod = _load_module(tmp_path, monkeypatch)
+
+    result = mod.cv_descriptor_status()
+
+    assert result["current"]["model"]["id"] == "tfjs_mobilenet_v2_100_embedding"
 
 
 def test_save_descriptor_keeps_vectors_out_of_public_projection(tmp_path: Path, monkeypatch) -> None:

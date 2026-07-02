@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-02T11:01:43+00:00",
+  "updated_at": "2026-07-02T11:14:13+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -114,8 +114,8 @@
       "kind": "skill",
       "id": "cv_descriptor",
       "name": "cv_descriptor",
-      "version": "0.1.1",
-      "updated_at": "2026-07-02T08:51:31+00:00",
+      "version": "0.1.2",
+      "updated_at": "2026-07-02T11:14:13+00:00",
       "path": "skills/cv_descriptor",
       "manifest": "skills/cv_descriptor/skill.yaml",
       "source": {

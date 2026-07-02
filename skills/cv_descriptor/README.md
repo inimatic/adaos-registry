@@ -17,7 +17,7 @@ Session flow:
 
 1. Setup mode starts `cv_descriptor.setup`.
 2. The browser loads the selected CV model and captures an embedding when the user selects an object.
-3. The browser calls `cv_descriptor_save_descriptor` with vector, thumbnail, title/description draft, and model signature.
+3. The browser opens a descriptor edit modal with the captured thumbnail, then calls `cv_descriptor_save_descriptor` with vector, thumbnail, title/description, and model signature.
 4. Work mode starts `cv_descriptor.work`.
 5. The browser calls `cv_descriptor_get_targets`, compares embeddings locally, and emits `cv_descriptor.match` events on enter/update/exit.
 6. The skill records current match and diagnostics through `cv_descriptor_record_runtime_event`.
@@ -32,8 +32,17 @@ Model rules:
 
 - `skill.yaml` declares tools, data projections, event subscriptions, and stream budgets.
 - `handlers/main.py` provides durable JSON state, descriptor CRUD tools, target export, runtime command state, Yjs projection, and bounded stream events.
-- The AdaOS client contains the first `CvRuntimeService` edition with camera lifecycle, browser-frame embedding adapter, browser-side target matching, visible `media.cvCamera`, and headless `host.cvRuntime`.
+- The AdaOS client contains the first `CvRuntimeService` edition with camera lifecycle, TensorFlow.js MobileNetV2 trial adapter using an explicit Google Storage model URL, browser-frame fallback adapter, browser-side target matching, visible `media.cvCamera`, and headless `host.cvRuntime`.
 - `webui.json` uses `media.cvCamera` in setup/work modals and keeps generic status/list/debug widgets around it.
+
+## Phone Smoke Check 2026-07-02
+
+- Camera start: verified on phone.
+- Permission/HTTPS: no blocking issue observed.
+- Preview: visible.
+- Work overlay: visible; runtime shows `running`, about 10 fps.
+- Select/descriptors: not observed in the previous build.
+- Model state in the previous build: browser-frame embedding placeholder only; no real model load yet.
 
 ## Roadmap Checklist
 
@@ -49,6 +58,8 @@ Model rules:
 - [x] Add browser-side cosine/L2 matcher with debounce and hysteresis.
 - [x] Wire browser events to `cv_descriptor.runtime.event`, `cv_descriptor.match`, and `cv_descriptor.runtime.diagnostics`.
 - [x] Replace setup placeholder controls with actual camera preview and Select button.
-- [x] Add setup fields for descriptor title/description during capture.
+- [x] Add post-Select descriptor edit modal with thumbnail, title, and description.
+- [x] Add runtime contract copy action for phone debugging.
+- [x] Add TensorFlow.js MobileNetV2 trial model adapter.
 - [ ] Add list-item edit UI for existing descriptor title/description.
 - [ ] Add end-to-end browser test with synthetic camera/model adapter.
