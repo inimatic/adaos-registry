@@ -193,6 +193,72 @@
           "interface": {
             "schema": "adaos.ui.modal.interface.v1",
             "defaultRoute": "notes.list",
+            "domain": {
+              "schema": "adaos.ui.modal_domain.v1",
+              "defaultState": "notes.list",
+              "stateKey": "notebookRoute",
+              "states": {
+                "notes.list": {
+                  "kind": "collection",
+                  "route": "notes.list",
+                  "view": "notebook.notes.list",
+                  "state": {
+                    "notebookViewMode": "list"
+                  }
+                },
+                "note.edit": {
+                  "kind": "entity",
+                  "route": "note.edit",
+                  "view": "notebook.note.edit",
+                  "entity": {
+                    "type": "note",
+                    "idParam": "note_id",
+                    "idStateKey": "notebookSelectedNoteId"
+                  },
+                  "state": {
+                    "notebookViewMode": "edit"
+                  }
+                },
+                "note.new": {
+                  "kind": "draft",
+                  "route": "note.new",
+                  "view": "notebook.note.new",
+                  "entity": {
+                    "type": "note",
+                    "draft": true
+                  },
+                  "state": {
+                    "notebookViewMode": "edit"
+                  }
+                }
+              }
+            },
+            "ownership": {
+              "schema": "adaos.ui.state_ownership.v1",
+              "domainState": {
+                "owner": "skill:notebook_skill",
+                "store": "skill_memory",
+                "projection": "webio:notebook_skill.notes"
+              },
+              "routeState": {
+                "owner": "browser",
+                "scope": "modal",
+                "keys": [
+                  "notebookViewMode",
+                  "notebookSelectedNoteId",
+                  "notebookEditorContent"
+                ]
+              },
+              "viewState": {
+                "owner": "browser",
+                "scope": "modal"
+              },
+              "persistence": {
+                "owner": "skill:notebook_skill",
+                "ack": "tool:notebook_skill.save_note",
+                "durability": "skill_local_memory"
+              }
+            },
             "routes": {
               "notes.list": {
                 "view": "notebook.notes.list",

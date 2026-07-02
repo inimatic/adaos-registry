@@ -5,6 +5,8 @@ import json
 import sys
 from pathlib import Path
 
+from adaos.services.skill.validation import validate_webui_file_contract
+
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(SKILL_ROOT) not in sys.path:
@@ -193,6 +195,7 @@ def test_notebook_ui_reads_editor_and_widget_from_stream():
     desktop_widget = next(item for item in webui["widgets"] if item["id"] == "notebook_skill_last_note")
     modal = webui["registry"]["modals"]["notebook_modal"]
     modal_schema = modal["schema"]
+    modal_interface = modal_schema["interface"]
     modal_widgets = modal_schema["widgets"]
     editor = next(item for item in modal_widgets if item["id"] == "notebook-editor")
     attachments = next(item for item in modal_widgets if item["id"] == "notebook-attachments")
@@ -201,11 +204,36 @@ def test_notebook_ui_reads_editor_and_widget_from_stream():
     assert "notebook.latest" in ui["views"]
     assert ui["views"]["notebook.note.edit"]["params"]["note_id"]["required"] is True
     assert "notebook.note.edit" in modal["implements"]
-    assert modal_schema["interface"]["defaultRoute"] == "notes.list"
-    assert modal_schema["interface"]["routes"]["note.edit"]["state"] == {
+    assert modal_interface["defaultRoute"] == "notes.list"
+    assert modal_interface["routes"]["note.edit"]["state"] == {
         "notebookViewMode": "edit",
         "notebookSelectedNoteId": "$params.note_id",
     }
+    assert modal_interface["domain"]["defaultState"] == "notes.list"
+    assert modal_interface["domain"]["states"]["note.edit"] == {
+        "kind": "entity",
+        "route": "note.edit",
+        "view": "notebook.note.edit",
+        "entity": {
+            "type": "note",
+            "idParam": "note_id",
+            "idStateKey": "notebookSelectedNoteId",
+        },
+        "state": {
+            "notebookViewMode": "edit",
+        },
+    }
+    assert modal_interface["ownership"]["domainState"] == {
+        "owner": "skill:notebook_skill",
+        "store": "skill_memory",
+        "projection": "webio:notebook_skill.notes",
+    }
+    assert modal_interface["ownership"]["routeState"]["keys"] == [
+        "notebookViewMode",
+        "notebookSelectedNoteId",
+        "notebookEditorContent",
+    ]
+    assert modal_interface["ownership"]["persistence"]["ack"] == "tool:notebook_skill.save_note"
     assert desktop_widget["dataSource"] == {
         "kind": "stream",
         "receiver": "notebook_skill.notes",
@@ -234,6 +262,10 @@ def test_notebook_ui_reads_editor_and_widget_from_stream():
         "path": "editor",
     }
     assert attachments["inputs"]["collectionKey"] == "attachments"
+
+
+def test_notebook_webui_contract_is_valid():
+    assert validate_webui_file_contract(SKILL_ROOT, skill_name="notebook_skill") == []
 
 
 def test_send_note_to_telegram_uses_root_outbox_contract(monkeypatch):

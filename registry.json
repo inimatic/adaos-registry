@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-02T11:14:13+00:00",
+  "updated_at": "2026-07-02T11:22:58+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -414,8 +414,8 @@
       "kind": "skill",
       "id": "notebook_skill",
       "name": "notebook_skill",
-      "version": "0.1.27",
-      "updated_at": "2026-07-02T09:21:52+00:00",
+      "version": "0.1.28",
+      "updated_at": "2026-07-02T11:22:58+00:00",
       "path": "skills/notebook_skill",
       "manifest": "skills/notebook_skill/skill.yaml",
       "source": {
