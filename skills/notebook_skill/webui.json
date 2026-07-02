@@ -151,30 +151,30 @@
         "cardShell": true,
         "itemAccordion": false,
         "emptyText": "No note yet"
-      },
-      "actions": [
-        {
-          "on": "select",
-          "type": "callSkill",
-          "target": "notebook_skill.select_note",
-          "params": {
-            "note_id": "$event.id",
-            "edit": true
-          }
         },
-        {
-          "on": "select",
-          "type": "navigate",
-          "params": {
-            "to": "notebook.note.edit",
+        "actions": [
+          {
+            "on": "select",
+            "type": "navigate",
+            "params": {
+              "to": "notebook.note.edit",
             "surface": "modal",
             "params": {
-              "note_id": "$event.id"
+                "note_id": "$event.id"
+              }
+            }
+          },
+          {
+            "on": "select",
+            "type": "callSkill",
+            "target": "notebook_skill.select_note",
+            "params": {
+              "note_id": "$event.id",
+              "edit": true
             }
           }
-        }
-      ]
-    }
+        ]
+      }
   ],
   "registry": {
     "modals": {

@@ -214,10 +214,10 @@ def test_notebook_ui_reads_editor_and_widget_from_stream():
     assert desktop_widget["inputs"]["detailsPresentation"] == "body"
     assert desktop_widget["inputs"]["cardShell"] is True
     assert "hideTitle" not in desktop_widget["inputs"]
-    assert desktop_widget["actions"][0]["type"] == "callSkill"
-    assert desktop_widget["actions"][1]["type"] == "navigate"
-    assert desktop_widget["actions"][1]["params"]["to"] == "notebook.note.edit"
-    assert desktop_widget["actions"][1]["params"]["params"]["note_id"] == "$event.id"
+    assert desktop_widget["actions"][0]["type"] == "navigate"
+    assert desktop_widget["actions"][0]["params"]["to"] == "notebook.note.edit"
+    assert desktop_widget["actions"][0]["params"]["params"]["note_id"] == "$event.id"
+    assert desktop_widget["actions"][1]["type"] == "callSkill"
     assert modal_list["actions"][0]["type"] == "navigateModal"
     assert modal_list["actions"][0]["params"] == {
         "route": "note.edit",
