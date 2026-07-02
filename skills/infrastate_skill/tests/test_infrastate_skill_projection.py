@@ -191,6 +191,41 @@ def test_infrastate_compact_snapshot_excludes_yjs_controls():
     assert "yjs_webspaces" not in compact
 
 
+def test_infrastate_compact_snapshot_projects_yjs_balancer():
+    mod = _load_infrastate_module()
+
+    balancer = {
+        "schema": "adaos.yjs_balancer.v1",
+        "webspace_id": "desktop",
+        "state": "watch",
+        "reason": "active_connection_limit_near",
+        "health": {"available": True, "server_ready": True},
+        "usage": {
+            "active_connections": 5,
+            "active_connection_limit": 6,
+            "active_client_sessions": [{"dev_id": "dev-1", "session_count": 2}],
+        },
+        "limits": {"max_active_per_webspace": 6},
+        "guard": {"recent_attempts_10s": 1},
+        "observed": {
+            "hot_clients": [{"device_id": "dev-1", "attempt_15s": 1}],
+            "active_by_webspace": [{"webspace_id": "desktop", "active_connections": 5}],
+            "server": {"ready": True, "room_total": 1},
+        },
+        "raw_diag": {"should_not": "leak"},
+    }
+
+    compact = mod._compact_snapshot_for_yjs({"yjs_balancer": balancer})
+    sections = mod._projection_sections_from_snapshot({"yjs_balancer": balancer})
+
+    assert mod._PROJECTION_SLOT_PATHS["infrastate.yjs_balancer"] == "data/infrastate/yjs_balancer"
+    assert mod._PROJECTION_SECTION_TO_SLOT["yjs_balancer"] == "infrastate.yjs_balancer"
+    assert compact["yjs_balancer"]["state"] == "watch"
+    assert compact["yjs_balancer"]["usage"]["active_connections"] == 5
+    assert "raw_diag" not in compact["yjs_balancer"]
+    assert sections["infrastate.yjs_balancer"]["guard"]["recent_attempts_10s"] == 1
+
+
 def test_infrastate_update_actions_use_member_label():
     mod = _load_infrastate_module()
 
@@ -3133,6 +3168,22 @@ def test_infrastate_marketplace_action_opens_modal_without_host_roundtrip():
 
     assert any(action.get("on") == "click:marketplace" and action.get("type") == "openModal" for action in actions)
     assert not any(action.get("on") == "click" and action.get("target") == "infrastate.action" for action in actions)
+
+
+def test_infrastate_yjs_balancer_tab_uses_y_projection():
+    webui = json.loads((Path(__file__).resolve().parents[1] / "webui.json").read_text(encoding="utf-8"))
+    widgets = webui["registry"]["modals"]["infrastate_modal"]["schema"]["widgets"]
+    by_id = {widget.get("id"): widget for widget in widgets}
+    tabs = by_id["infrastate-tabs"]["inputs"]["buttons"]
+    tab_ids = [tab.get("id") for tab in tabs]
+
+    assert tab_ids.index("yjs_balancer") > tab_ids.index("diagnostics")
+    assert by_id["infrastate-yjs-balancer"]["type"] == "ui.jsonViewer"
+    assert by_id["infrastate-yjs-balancer"]["visibleIf"] == "$state.infrastateTab === 'yjs_balancer'"
+    assert by_id["infrastate-yjs-balancer"]["dataSource"] == {
+        "kind": "y",
+        "path": "data/infrastate/yjs_balancer",
+    }
 
 
 def test_infrastate_inventory_and_marketplace_use_stream_data_sources():

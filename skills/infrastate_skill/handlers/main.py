@@ -108,6 +108,7 @@ _PROJECTION_SLOT_PATHS: dict[str, str] = {
     "infrastate.fallback": "data/infrastate/fallback",
     "infrastate.errors": "data/infrastate/errors",
     "infrastate.projection_diag": "data/infrastate/projection_diag",
+    "infrastate.yjs_balancer": "data/infrastate/yjs_balancer",
 }
 _DATA_PROJECTION_ENTRIES = [
     {
@@ -134,6 +135,7 @@ _PROJECTION_SECTION_TO_SLOT = {
     "fallback": "infrastate.fallback",
     "errors": "infrastate.errors",
     "projection_diag": "infrastate.projection_diag",
+    "yjs_balancer": "infrastate.yjs_balancer",
 }
 _PROJECTION_RUNTIME = ProjectionRuntime(
     "infrastate_skill",
@@ -528,6 +530,38 @@ def _sanitize_snapshot_for_fingerprint(value: Any) -> Any:
     return value
 
 
+def _compact_yjs_balancer_for_yjs(value: Any) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        return {}
+    out: dict[str, Any] = {}
+    for key in ("schema", "webspace_id", "state", "reason", "updated_at"):
+        if key in value:
+            out[key] = _cache_copy(value.get(key))
+    for key in ("health", "usage", "limits", "guard"):
+        if isinstance(value.get(key), dict):
+            out[key] = _compact_mapping(value.get(key), max_keys=32)
+    observed = value.get("observed") if isinstance(value.get("observed"), dict) else {}
+    if observed:
+        compact_observed: dict[str, Any] = {}
+        for key in (
+            "global_recent_open_10s",
+            "global_recent_open_60s",
+            "global_recent_attempts_10s",
+            "global_recent_attempts_60s",
+        ):
+            if key in observed:
+                compact_observed[key] = _cache_copy(observed.get(key))
+        for key, limit in (("hot_clients", 8), ("active_by_webspace", 16)):
+            items = observed.get(key)
+            if isinstance(items, list):
+                compact_observed[key] = [_cache_copy(item) for item in items[:limit]]
+        if isinstance(observed.get("server"), dict):
+            compact_observed["server"] = _compact_mapping(observed.get("server"), max_keys=12)
+        if compact_observed:
+            out["observed"] = compact_observed
+    return out
+
+
 def _compact_snapshot_for_yjs(snapshot: dict[str, Any]) -> dict[str, Any]:
     snapshot = snapshot or {}
     # Primary YJS is a bootstrap/control channel, not the diagnostics transport.
@@ -547,6 +581,8 @@ def _compact_snapshot_for_yjs(snapshot: dict[str, Any]) -> dict[str, Any]:
         compact["node_editor"] = _compact_mapping(snapshot.get("node_editor"), max_keys=8)
     if isinstance(snapshot.get("ui_state"), dict):
         compact["ui_state"] = _compact_ui_state_for_yjs(snapshot.get("ui_state"))
+    if isinstance(snapshot.get("yjs_balancer"), dict):
+        compact["yjs_balancer"] = _compact_yjs_balancer_for_yjs(snapshot.get("yjs_balancer"))
     operations = snapshot.get("operations")
     if isinstance(operations, dict):
         compact["operations"] = {
@@ -930,6 +966,39 @@ def _direct_yjs_load_mark_rows(webspace_id: str | None) -> list[dict[str, Any]]:
     if rows:
         return rows
     return _yjs_load_mark_history_rows(webspace_id)
+
+
+def _yjs_balancer_snapshot(webspace_id: str | None) -> dict[str, Any]:
+    selected_ws = str(webspace_id or "").strip() or default_webspace_id()
+    try:
+        from adaos.services.yjs.gateway import yjs_balancer_snapshot
+
+        snapshot = yjs_balancer_snapshot(webspace_id=selected_ws)
+        if isinstance(snapshot, dict):
+            return snapshot
+    except Exception as exc:
+        return {
+            "schema": "adaos.yjs_balancer.v1",
+            "webspace_id": selected_ws,
+            "state": "unavailable",
+            "reason": f"{type(exc).__name__}: {exc}",
+            "health": {"available": False},
+            "limits": {},
+            "usage": {},
+            "guard": {},
+            "observed": {},
+        }
+    return {
+        "schema": "adaos.yjs_balancer.v1",
+        "webspace_id": selected_ws,
+        "state": "unavailable",
+        "reason": "invalid_snapshot",
+        "health": {"available": False},
+        "limits": {},
+        "usage": {},
+        "guard": {},
+        "observed": {},
+    }
 
 
 def _stream_payload_for_receiver(snapshot: dict[str, Any], receiver: str) -> Any:
@@ -6956,6 +7025,7 @@ def _lightweight_projection_sections(
         ),
         "infrastate.ui_state": _compact_ui_state_for_yjs(ctx["ui_state"]),
         "infrastate.projection_diag": _projection_diag_snapshot(),
+        "infrastate.yjs_balancer": _compact_yjs_balancer_for_yjs(_yjs_balancer_snapshot(webspace_id)),
     }
 
 
@@ -7844,6 +7914,11 @@ def _snapshot(webspace_id: str | None = None, selected_node_id: str | None = Non
     display_build = selected_projection["build"] if isinstance(selected_projection.get("build"), dict) else build
     selected_member = selected_projection["selected_member"] if isinstance(selected_projection.get("selected_member"), dict) else {}
     transport_diag = _safe_snapshot_step("transport_diag_snapshot", _transport_diag_snapshot, {}) or {}
+    yjs_balancer = _safe_snapshot_step(
+        "yjs_balancer_snapshot",
+        lambda: _yjs_balancer_snapshot(webspace_id),
+        {},
+    ) or {}
     report = _safe_snapshot_step(
         "core_update_report",
         lambda: _read_json(_base_dir() / "state" / "core_update" / "status.json") or {},
@@ -7955,6 +8030,7 @@ def _snapshot(webspace_id: str | None = None, selected_node_id: str | None = Non
         "lifecycle": display_lifecycle,
         "reliability": reliability,
         "transport_diag": transport_diag,
+        "yjs_balancer": yjs_balancer,
         "projection_diag": _projection_diag_snapshot(),
         "build_meta": display_build,
         "ui_state": ui_state,
@@ -7982,6 +8058,7 @@ def _fallback_snapshot(exc: Exception, *, webspace_id: str | None = None) -> dic
     yjs_runtime.setdefault("available", bool(sync_runtime))
     yjs_runtime.setdefault("selected_webspace_id", selected_ws)
     yjs_runtime.setdefault("assessment", {"state": "degraded", "reason": "fallback_snapshot"})
+    yjs_balancer = _yjs_balancer_snapshot(selected_ws)
     return {
         "summary": {
             "label": "Infra State",
@@ -8032,6 +8109,7 @@ def _fallback_snapshot(exc: Exception, *, webspace_id: str | None = None) -> dic
         "lifecycle": lifecycle if isinstance(lifecycle, dict) else {},
         "reliability": reliability,
         "yjs_runtime": yjs_runtime,
+        "yjs_balancer": yjs_balancer,
         "projection_diag": _projection_diag_snapshot(),
         "last_refresh_ts": time.time(),
         "fallback": True,
@@ -8716,6 +8794,7 @@ def get_snapshot(
         },
         "ui_state": _cache_copy(sections.get("infrastate.ui_state") or {}),
         "projection_diag": _projection_diag_snapshot(),
+        "yjs_balancer": _cache_copy(sections.get("infrastate.yjs_balancer") or {}),
         "last_refresh_ts": time.time(),
         "details": {
             "delivery": "streams",

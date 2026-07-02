@@ -344,7 +344,8 @@
                   { "id": "overview", "label": "Overview" },
                   { "id": "update", "label": "Update" },
                   { "id": "inventory", "label": "Inventory" },
-                  { "id": "diagnostics", "label": "Diagnostics" }
+                  { "id": "diagnostics", "label": "Diagnostics" },
+                  { "id": "yjs_balancer", "label": "YJS Balancer" }
                 ]
               },
               "actions": [
@@ -886,6 +887,20 @@
 									{ "key": "recent_writes", "label": "Writes", "mono": true, "width": "90px" },
 									{ "key": "current_size_bytes", "label": "Size", "mono": true, "width": "110px" }
 								]
+							}
+						},
+						{
+							"id": "infrastate-yjs-balancer",
+							"type": "ui.jsonViewer",
+							"area": "main",
+							"title": "YJS Balancer",
+              "visibleIf": "$state.infrastateTab === 'yjs_balancer'",
+							"dataSource": {
+								"kind": "y",
+								"path": "data/infrastate/yjs_balancer"
+							},
+							"inputs": {
+								"emptyText": "No YJS balancer snapshot yet"
 							}
 						}
 					]
