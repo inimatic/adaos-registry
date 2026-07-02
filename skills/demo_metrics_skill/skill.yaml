@@ -1,7 +1,7 @@
 name: demo_metrics_skill
-version: 0.11.2
+version: 0.12.0
 description: Neutral demo skill for semantic Web UI migration with a metrics table,
-  chart payload, and live event stream.
+  chart payload, Taiga tree, and live event stream.
 runtime:
   python: '3.11'
 webui_owner: shared
@@ -16,6 +16,11 @@ data_projections:
   targets:
   - backend: yjs
     path: data/demo_metrics/table
+- scope: webspace
+  slot: demo.metrics.tree
+  targets:
+  - backend: yjs
+    path: data/demo_metrics/tree
 - scope: webspace
   slot: demo.metrics.chart
   targets:
@@ -91,5 +96,5 @@ tools:
     required:
     - ok
     - event
-updated_at: '2026-05-26T11:07:06+00:00'
+updated_at: '2026-07-02T00:00:00+00:00'
 

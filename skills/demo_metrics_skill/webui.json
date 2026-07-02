@@ -63,6 +63,53 @@
         }
       ]
     },
+    "data/demo_metrics/tree": {
+      "root": {
+        "id": "demo-metrics-root",
+        "title": "Demo metrics",
+        "subtitle": "Taiga UI Tree hierarchy",
+        "children": [
+          {
+            "id": "compute",
+            "title": "Compute",
+            "subtitle": "2 metrics",
+            "children": [
+              {
+                "id": "cpu",
+                "title": "CPU Load",
+                "subtitle": "Updated 10:00",
+                "status": "healthy",
+                "value": 42,
+                "unit": "%"
+              },
+              {
+                "id": "memory",
+                "title": "Memory Pressure",
+                "subtitle": "Updated 10:00",
+                "status": "warning",
+                "value": 76,
+                "unit": "%"
+              }
+            ]
+          },
+          {
+            "id": "runtime",
+            "title": "Runtime",
+            "subtitle": "1 metric",
+            "children": [
+              {
+                "id": "queue",
+                "title": "Queue Depth",
+                "subtitle": "Updated 10:00",
+                "status": "healthy",
+                "value": 7,
+                "unit": "jobs"
+              }
+            ]
+          }
+        ]
+      }
+    },
     "data/demo_metrics/chart": {
       "metric_id": "cpu",
       "title": "CPU Load",
@@ -274,6 +321,33 @@
               }
             },
             {
+              "id": "demo-metrics-tree",
+              "type": "visual.taigaTree",
+              "area": "right",
+              "title": "Metric tree",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/demo_metrics/tree"
+              },
+              "inputs": {
+                "rootLabel": "Demo metrics",
+                "stateKey": "demo_metrics.selection",
+                "selectionMode": "leaf",
+                "emptyText": "No metric tree yet"
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "demo_metrics.selection": {
+                      "metric_id": "$event.id"
+                    }
+                  }
+                }
+              ]
+            },
+            {
               "id": "demo-metrics-events",
               "type": "ui.list",
               "area": "bottom",
@@ -407,6 +481,42 @@
                   "yKey": "value",
                   "seriesLabelKey": "title"
                 }
+              },
+              {
+                "id": "metrics_tree",
+                "kind": "collection_tree",
+                "area": "right",
+                "title": "Metric tree",
+                "when": {
+                  "requiredCapabilities": ["listable"],
+                  "surfaceClasses": ["workspace"],
+                  "lifecycleStages": ["active"]
+                },
+                "source": {
+                  "kind": "y",
+                  "ref": "y:data/demo_metrics/tree",
+                  "scope": "shared"
+                },
+                "selection": {
+                  "kind": "view",
+                  "ref": "view:demo_metrics.selection",
+                  "scope": "local"
+                },
+                "config": {
+                  "rootLabel": "Demo metrics",
+                  "selectionMode": "leaf",
+                  "emptyText": "No metric tree yet"
+                },
+                "actions": [
+                  {
+                    "ref": "action:view.demo_metrics.select_metric_from_tree",
+                    "kind": "set_view_state",
+                    "trigger": "select",
+                    "payload": {
+                      "metric_id": "$event.id"
+                    }
+                  }
+                ]
               },
               {
                 "id": "metrics_events",

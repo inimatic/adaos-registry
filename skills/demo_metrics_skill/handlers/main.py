@@ -73,6 +73,53 @@ def _snapshot() -> dict[str, Any]:
             "group": "runtime",
         },
     ]
+    tree = {
+        "root": {
+            "id": "demo-metrics-root",
+            "title": "Demo metrics",
+            "subtitle": "Taiga UI Tree hierarchy",
+            "children": [
+                {
+                    "id": "compute",
+                    "title": "Compute",
+                    "subtitle": "2 metrics",
+                    "children": [
+                        {
+                            "id": "cpu",
+                            "title": "CPU Load",
+                            "subtitle": "Updated 10:00",
+                            "status": "healthy",
+                            "value": 42,
+                            "unit": "%",
+                        },
+                        {
+                            "id": "memory",
+                            "title": "Memory Pressure",
+                            "subtitle": "Updated 10:00",
+                            "status": "warning",
+                            "value": 76,
+                            "unit": "%",
+                        },
+                    ],
+                },
+                {
+                    "id": "runtime",
+                    "title": "Runtime",
+                    "subtitle": "1 metric",
+                    "children": [
+                        {
+                            "id": "queue",
+                            "title": "Queue Depth",
+                            "subtitle": "Updated 10:00",
+                            "status": "healthy",
+                            "value": 7,
+                            "unit": "jobs",
+                        }
+                    ],
+                },
+            ],
+        }
+    }
     series = {
         "metric_id": "cpu",
         "title": "CPU Load",
@@ -159,6 +206,7 @@ def _snapshot() -> dict[str, Any]:
             ],
         },
         "table": {"items": rows},
+        "tree": tree,
         "chart": series,
         "selection": {
             "metric_id": "cpu",
