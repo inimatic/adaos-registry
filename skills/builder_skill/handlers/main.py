@@ -116,6 +116,53 @@ def _hash_suffix(text: str) -> str:
     return hashlib.sha256(str(text or "").encode("utf-8", errors="ignore")).hexdigest()[:8]
 
 
+def _compact_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def _builder_llm_timeout_s() -> float:
+    raw = os.getenv("ADAOS_BUILDER_LLM_TIMEOUT_S")
+    try:
+        value = float(raw) if raw else 150.0
+    except (TypeError, ValueError):
+        value = 150.0
+    return max(30.0, min(value, 300.0))
+
+
+def _builder_llm_max_tokens() -> int:
+    raw = os.getenv("ADAOS_BUILDER_LLM_MAX_TOKENS")
+    try:
+        value = int(raw) if raw else 5000
+    except (TypeError, ValueError):
+        value = 5000
+    return max(1000, min(value, 12000))
+
+
+def _builder_llm_request_id(
+    *,
+    session: Mapping[str, Any],
+    instruction: str,
+    current_payload: Mapping[str, Any],
+    attempt: int,
+) -> str:
+    seed = {
+        "schema": "adaos.builder.llm_request_id.v1",
+        "scenario_id": session.get("scenario_id"),
+        "session_id": session.get("id"),
+        "revision": session.get("ui_revision") or session.get("version"),
+        "instruction": instruction,
+        "current_webui_json": current_payload,
+        "attempt": attempt,
+    }
+    digest = hashlib.sha256(_compact_json(seed).encode("utf-8", errors="ignore")).hexdigest()
+    return f"builder-ui-{digest[:32]}"
+
+
+def _looks_like_timeout(text: str) -> bool:
+    lowered = str(text or "").lower()
+    return any(token in lowered for token in ("timed out", "timeout", "read operation timed out", "504"))
+
+
 def _scenario_id_from_idea(idea: str) -> str:
     lowered = _repair_mojibake_text(idea).lower()
     if "shopping" in lowered or "shop" in lowered or "\u043f\u043e\u043a\u0443\u043f" in lowered:
@@ -2246,51 +2293,66 @@ def _apply_llm_webui_transform(
             "unable_reason": "short optional diagnostic if request cannot be implemented",
         },
     }
-    user_prompt = json.dumps(
-        base_request,
-        ensure_ascii=False,
-        indent=2,
-    )
+    user_prompt = _compact_json(base_request)
     attempts: list[dict[str, Any]] = []
     last_response = ""
     last_error: dict[str, Any] | None = None
     try:
         from adaos.sdk.llm.llm_client import send_response
 
-        timeout_s = float(os.getenv("ADAOS_BUILDER_LLM_TIMEOUT_S") or 75)
+        timeout_s = _builder_llm_timeout_s()
+        max_tokens = _builder_llm_max_tokens()
         for attempt in range(1, 3):
+            request_id = _builder_llm_request_id(
+                session=session,
+                instruction=instruction,
+                current_payload=current_payload,
+                attempt=attempt,
+            )
             if attempt == 1:
                 messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
             else:
-                repair_prompt = json.dumps(
+                repair_prompt = _compact_json(
                     {
                         "task": "Repair the previous Builder JSON response. Return only corrected JSON.",
                         "validation_error": last_error or {},
                         "previous_response": last_response[:20000],
                         "original_request": base_request,
-                    },
-                    ensure_ascii=False,
-                    indent=2,
+                    }
                 )
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": repair_prompt},
                 ]
-            response = send_response(
-                messages,
-                temperature=0,
-                max_tokens=7000,
-                timeout=timeout_s,
-            )
+            try:
+                response = send_response(
+                    messages,
+                    temperature=0,
+                    max_tokens=max_tokens,
+                    request_id=request_id,
+                    timeout=timeout_s,
+                )
+            except Exception as exc:
+                detail = f"{type(exc).__name__}: {exc}"
+                last_error = {
+                    "ok": False,
+                    "error": "llm_timeout" if _looks_like_timeout(detail) else "llm_request_failed",
+                    "detail": detail,
+                    "request_id": request_id,
+                    "timeout_s": timeout_s,
+                }
+                attempts.append({"attempt": attempt, **last_error})
+                break
             output_text = str(response.get("output_text") or "")
             last_response = output_text
             try:
                 parsed = _extract_json_object(output_text)
                 payload, preview = _normalise_llm_webui_payload(parsed, previous_preview=preview_state)
                 validation = _validate_builder_webui_payload(payload, preview)
-                attempts.append({"attempt": attempt, "ok": bool(validation.get("ok")), "validation": validation})
+                attempts.append({"attempt": attempt, "ok": bool(validation.get("ok")), "request_id": request_id, "validation": validation})
                 if not validation.get("ok"):
                     last_error = dict(validation)
+                    last_error["request_id"] = request_id
                     continue
                 return {
                     "ok": True,
@@ -2303,7 +2365,12 @@ def _apply_llm_webui_transform(
                     "raw_response": output_text,
                 }
             except Exception as exc:
-                last_error = {"ok": False, "error": "llm_response_parse_failed", "detail": f"{type(exc).__name__}: {exc}"}
+                last_error = {
+                    "ok": False,
+                    "error": "llm_response_parse_failed",
+                    "detail": f"{type(exc).__name__}: {exc}",
+                    "request_id": request_id,
+                }
                 attempts.append({"attempt": attempt, **last_error})
         return {
             "ok": False,
@@ -2315,12 +2382,15 @@ def _apply_llm_webui_transform(
             "comment": "\u041d\u0435 \u0441\u043c\u043e\u0433 \u0441\u043e\u0431\u0440\u0430\u0442\u044c \u0432\u0430\u043b\u0438\u0434\u043d\u044b\u0439 UI JSON.",
         }
     except Exception as exc:
+        detail = f"{type(exc).__name__}: {exc}"
+        timeout = _looks_like_timeout(detail)
         return {
             "ok": False,
-            "error": "llm_webui_transform_failed",
-            "detail": f"{type(exc).__name__}: {exc}",
+            "error": "llm_timeout" if timeout else "llm_webui_transform_failed",
+            "detail": detail,
             "attempts": attempts,
             "last_response": last_response,
+            "comment": "\u041d\u0435 \u0434\u043e\u0436\u0434\u0430\u043b\u0441\u044f \u043e\u0442\u0432\u0435\u0442\u0430 LLM." if timeout else "",
         }
 
 
@@ -3707,9 +3777,38 @@ def _llm_failure_summary(llm_result: Mapping[str, Any] | None) -> str:
         return ""
     detail = str(llm_result.get("detail") or llm_result.get("error") or "").strip()
     comment = str(llm_result.get("comment") or "").strip()
+    request_id = str(llm_result.get("request_id") or "").strip()
+    if not request_id:
+        attempts = llm_result.get("attempts")
+        if isinstance(attempts, list):
+            for item in attempts:
+                if isinstance(item, Mapping) and item.get("request_id"):
+                    request_id = str(item.get("request_id") or "").strip()
+                    break
+    if _looks_like_timeout(detail) or str(llm_result.get("error") or "") in {"llm_timeout", "llm_webui_transform_timeout"}:
+        suffix = f" request_id={request_id}" if request_id else ""
+        return f"LLM timeout: {detail}{suffix}".strip()
     if comment and detail:
         return f"{comment} ({detail})"
     return comment or detail
+
+
+def _llm_failure_is_timeout(llm_result: Mapping[str, Any] | None) -> bool:
+    if not isinstance(llm_result, Mapping):
+        return False
+    if str(llm_result.get("error") or "") in {"llm_timeout", "llm_webui_transform_timeout"}:
+        return True
+    if _looks_like_timeout(str(llm_result.get("detail") or "")):
+        return True
+    attempts = llm_result.get("attempts")
+    return any(
+        isinstance(item, Mapping)
+        and (
+            str(item.get("error") or "") in {"llm_timeout", "llm_webui_transform_timeout"}
+            or _looks_like_timeout(str(item.get("detail") or ""))
+        )
+        for item in (attempts if isinstance(attempts, list) else [])
+    )
 
 
 def _builder_update_message_clean(
@@ -4128,14 +4227,22 @@ def update_current_scenario(
         workbench = _ensure_workbench(ws, session=session, preview_state=preview)
         binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else binding
         topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
-        diagnostic = _llm_failure_summary(llm_result if isinstance(llm_result, Mapping) else patch.get("diff", {}).get("llm_fallback") if isinstance(patch.get("diff"), Mapping) else None)
+        llm_failure = llm_result if isinstance(llm_result, Mapping) else patch.get("diff", {}).get("llm_fallback") if isinstance(patch.get("diff"), Mapping) else None
+        diagnostic = _llm_failure_summary(llm_failure if isinstance(llm_failure, Mapping) else None)
         diagnostic_text = f" LLM: {diagnostic}" if diagnostic else ""
-        message = (
-            f"{AGENT_LABEL}: \u043d\u0435 \u0441\u043c\u043e\u0433 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e "
-            f"\u043f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0435 \u0434\u043b\u044f {session.get('scenario_id')}. "
-            f"\u0421\u0432\u043e\u0431\u043e\u0434\u043d\u0430\u044f \u0442\u0440\u0430\u043d\u0441\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f UI "
-            f"\u043d\u0435 \u043f\u0440\u043e\u0448\u043b\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443 \u0438\u043b\u0438 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430.{diagnostic_text}"
-        )
+        if _llm_failure_is_timeout(llm_failure if isinstance(llm_failure, Mapping) else None):
+            message = (
+                f"{AGENT_LABEL}: \u043d\u0435 \u0434\u043e\u0436\u0434\u0430\u043b\u0441\u044f \u043e\u0442\u0432\u0435\u0442\u0430 LLM "
+                f"\u0434\u043b\u044f {session.get('scenario_id')}. UI \u043d\u0435 \u0438\u0437\u043c\u0435\u043d\u0435\u043d. "
+                f"\u041f\u043e\u0432\u0442\u043e\u0440\u0438\u0442\u0435 \u0437\u0430\u043f\u0440\u043e\u0441 \u0438\u043b\u0438 \u0443\u0442\u043e\u0447\u043d\u0438\u0442\u0435 \u0435\u0433\u043e \u043a\u043e\u0440\u043e\u0447\u0435.{diagnostic_text}"
+            )
+        else:
+            message = (
+                f"{AGENT_LABEL}: \u043d\u0435 \u0441\u043c\u043e\u0433 \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u043e "
+                f"\u043f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0435 \u0434\u043b\u044f {session.get('scenario_id')}. "
+                f"\u0421\u0432\u043e\u0431\u043e\u0434\u043d\u0430\u044f \u0442\u0440\u0430\u043d\u0441\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u044f UI "
+                f"\u043d\u0435 \u043f\u0440\u043e\u0448\u043b\u0430 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443 \u0438\u043b\u0438 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430.{diagnostic_text}"
+            )
         return {
             "ok": True,
             "status": "noop",
