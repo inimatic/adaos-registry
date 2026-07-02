@@ -3239,6 +3239,7 @@ def _ensure_workbench(
     preview_state: Mapping[str, Any] | None = None,
     active_draft_id: str | None = None,
     runtime_scenario_id: str | None = None,
+    refresh_runtime: bool = True,
 ) -> dict[str, Any]:
     svc = _workbench_service()
     draft_id = str(active_draft_id or _active_draft_id(session) or "").strip() or None
@@ -3251,23 +3252,27 @@ def _ensure_workbench(
             persist_projection=False,
         )
         snapshot = svc.snapshot(webspace_id, preview_state=preview_state)
-        direct = _ensure_workbench_runtime_direct(
-            svc,
-            webspace_id=webspace_id,
-            active_draft_id=draft_id,
-            runtime_scenario_id=scenario_id,
-            preview_state=preview_state,
-        )
-        if isinstance(direct.get("binding"), Mapping):
-            binding = dict(direct["binding"])
-        event = {"ok": True, "skipped": "direct_workbench_ensure"} if direct.get("ok") else _request_workbench_refresh(
-            {
-                "source_webspace_id": webspace_id,
-                "active_draft_id": draft_id,
-                "runtime_scenario_id": scenario_id,
-                "preview_state": dict(preview_state or {}),
-            }
-        )
+        if refresh_runtime:
+            direct = _ensure_workbench_runtime_direct(
+                svc,
+                webspace_id=webspace_id,
+                active_draft_id=draft_id,
+                runtime_scenario_id=scenario_id,
+                preview_state=preview_state,
+            )
+            if isinstance(direct.get("binding"), Mapping):
+                binding = dict(direct["binding"])
+            event = {"ok": True, "skipped": "direct_workbench_ensure"} if direct.get("ok") else _request_workbench_refresh(
+                {
+                    "source_webspace_id": webspace_id,
+                    "active_draft_id": draft_id,
+                    "runtime_scenario_id": scenario_id,
+                    "preview_state": dict(preview_state or {}),
+                }
+            )
+        else:
+            direct = {"ok": False, "skipped": "runtime_refresh_deferred_to_dev_reload"}
+            event = {"ok": True, "skipped": "runtime_refresh_deferred_to_dev_reload"}
     except Exception as exc:
         return {"ok": False, "error": "workbench_unavailable", "detail": f"{type(exc).__name__}: {exc}"}
     return {
@@ -3626,8 +3631,14 @@ def create_scenario_draft(
         revision=initial_revision,
     )
     _save_session(ws, session)
-    workbench = _ensure_workbench(ws, session=session, preview_state=preview)
+    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
+    dev_runtime_refresh = _schedule_dev_runtime_reload_after_revision(
+        ws,
+        session=session,
+        binding=binding,
+        revision=str(session.get("ui_revision") or initial_revision),
+    )
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     session["thread_id"] = str(topic.get("thread_id") or "").strip() or None
     session["topic_id"] = str(topic.get("topic_id") or "").strip() or None
@@ -3661,6 +3672,7 @@ def create_scenario_draft(
         "artifact_root": session.get("artifact_root"),
         "preview_state": preview,
         "workbench": workbench,
+        "dev_runtime_refresh": dev_runtime_refresh,
         "prompt_selection": prompt_selection,
         "topic": {k: v for k, v in topic.items() if k != "stored"},
         "pending_action": pending_action,
@@ -3782,7 +3794,7 @@ def _finalize_scenario_update(
         patch["revision"] = revision_info.get("revision")
         patch["revision_path"] = revision_info.get("path")
         session["patches"][-1] = patch
-    workbench = _ensure_workbench(ws, session=session, preview_state=preview)
+    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
     resolved_binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else binding
     dev_runtime_refresh = _schedule_dev_runtime_reload_after_revision(
         ws,
@@ -4140,7 +4152,7 @@ def get_session(
     ws = _source_webspace_id(webspace_id, _meta)
     session = _load_session(ws, session_id)
     preview = (session or {}).get("preview_state") if isinstance(session, dict) else None
-    workbench = _ensure_workbench(ws, session=session, preview_state=preview)
+    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     return {
@@ -4233,8 +4245,14 @@ def set_ui_revision_current(
     session["ui_revision"] = str(revision_payload.get("revision") or revision)
     _merge_session_from_preview(session, preview)
     _write_webui_payload(str(session.get("artifact_root") or ""), after_webui)
-    workbench = _ensure_workbench(ws, session=session, preview_state=preview)
+    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
+    dev_runtime_refresh = _schedule_dev_runtime_reload_after_revision(
+        ws,
+        session=session,
+        binding=binding,
+        revision=str(session.get("ui_revision") or revision),
+    )
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     session["thread_id"] = str(topic.get("thread_id") or "").strip() or None
     session["topic_id"] = str(topic.get("topic_id") or "").strip() or None
@@ -4254,6 +4272,7 @@ def set_ui_revision_current(
         "revision": session.get("ui_revision"),
         "preview_state": preview,
         "workbench": workbench,
+        "dev_runtime_refresh": dev_runtime_refresh,
         "message": message,
         "message_actions": actions,
         "dialog": _dialog_state(ws, topic_ref=topic),
