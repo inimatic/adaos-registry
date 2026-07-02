@@ -1775,6 +1775,31 @@ def _wants_english_ui(text: str) -> bool:
     return _text_contains_any(text, ("english", "in english", "\u0430\u043d\u0433\u043b\u0438\u0439\u0441\u043a", "\u043d\u0430 \u0430\u043d\u0433\u043b"))
 
 
+def _wants_llm_owned_content_change(text: str) -> bool:
+    return _text_contains_any(
+        text,
+        (
+            "data",
+            "mock",
+            "sample",
+            "example",
+            "record",
+            "records",
+            "row",
+            "rows",
+            "text",
+            "copy",
+            "content",
+            "\u0434\u0430\u043d\u043d",
+            "\u0437\u0430\u043f\u0438\u0441",
+            "\u0441\u0442\u0440\u043e\u043a",
+            "\u0442\u0435\u043a\u0441\u0442",
+            "\u0441\u043e\u0434\u0435\u0440\u0436",
+            "\u043f\u0440\u0438\u043c\u0435\u0440",
+        ),
+    )
+
+
 def _has_deterministic_builder_update(text: str) -> bool:
     lowered = _repair_mojibake_text(text).lower()
     if any(
@@ -2232,7 +2257,7 @@ def _apply_llm_webui_transform(
     try:
         from adaos.sdk.llm.llm_client import send_response
 
-        timeout_s = float(os.getenv("ADAOS_BUILDER_LLM_TIMEOUT_S") or 30)
+        timeout_s = float(os.getenv("ADAOS_BUILDER_LLM_TIMEOUT_S") or 75)
         for attempt in range(1, 3):
             if attempt == 1:
                 messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
@@ -3745,6 +3770,7 @@ def update_current_scenario(
     base_preview = session.get("preview_state") if isinstance(session.get("preview_state"), dict) else _preview_state(session=session)
     before_webui = _current_webui_payload(session, base_preview)
     llm_result: dict[str, Any] | None = None
+    llm_owned_content_change = _wants_llm_owned_content_change(text)
     if text and _builder_llm_primary_enabled(_meta):
         llm_result = _apply_llm_webui_transform(session=session, instruction=text, preview_state=base_preview, _meta=_meta)
         if llm_result.get("ok"):
@@ -3773,6 +3799,11 @@ def update_current_scenario(
                 auto_apply=auto_apply,
                 _meta=_meta,
             )
+    if llm_owned_content_change and patch["operation"] == "noop":
+        patch["diff"] = {
+            "llm_required": True,
+            "llm_fallback": llm_result or {"ok": False, "error": "llm_disabled"},
+        }
     if _wants_swap_input_and_cards(text):
         session["card_view"] = True
         session["hide_table"] = True
@@ -3816,7 +3847,7 @@ def update_current_scenario(
         patch["operation"] = "add_field" if added else "ensure_field"
         patch["diff"] = {"field": field, "added": added, "component": "checkbox"}
         lowered = ""
-    elif _wants_english_ui(text):
+    elif _wants_english_ui(text) and not llm_owned_content_change:
         _translate_session_to_english(session, fields)
         patch["operation"] = "translate_ui"
         patch["diff"] = {"locale": "en", "fields": [dict(item) for item in session.get("fields", []) if isinstance(item, Mapping)]}
@@ -3938,7 +3969,9 @@ def update_current_scenario(
                 session["webui_payload"] = copy.deepcopy(dict(payload_from_llm))
             _merge_session_from_preview(session, preview_from_llm)
         else:
-            patch["diff"] = {"llm_fallback": llm_patch or {"ok": False, "error": "llm_disabled"}}
+            existing_diff = dict(patch.get("diff") or {}) if isinstance(patch.get("diff"), Mapping) else {}
+            existing_diff["llm_fallback"] = llm_patch or existing_diff.get("llm_fallback") or {"ok": False, "error": "llm_disabled"}
+            patch["diff"] = existing_diff
     if patch["operation"] == "noop":
         if not isinstance(session.get("user_summary"), Mapping):
             session["user_summary"] = _draft_user_summary(session)
