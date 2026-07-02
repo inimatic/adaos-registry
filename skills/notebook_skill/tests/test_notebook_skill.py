@@ -192,6 +192,19 @@ def test_notebook_state_rehydrates_from_freshest_webspace_alias(monkeypatch):
         assert memory[mod._memory_key(ws)]["notes"]["note-1"]["content"] == "Fresh alias\nFresh body"
 
 
+def test_lifecycle_persist_rehydrates_before_writing_memory(monkeypatch):
+    memory = {}
+    mod, _projected, _streams = load_module(monkeypatch, memory=memory)
+    mod.save_note({"note_id": "note-1", "content": "Durable title\nDurable body", "webspace_id": "desktop"})
+
+    mod, _projected, _streams = load_module(monkeypatch, memory=memory)
+    result = mod.notebook_persist_state({"webspace_id": "desktop"})
+
+    assert result["ok"] is True
+    for ws in ["desktop-dev", "desktop", "default"]:
+        assert memory[mod._memory_key(ws)]["notes"]["note-1"]["content"] == "Durable title\nDurable body"
+
+
 def test_yjs_reload_completion_reprojects_notebook_snapshot(monkeypatch):
     memory = {}
     mod, projected, _streams = load_module(monkeypatch, memory=memory)

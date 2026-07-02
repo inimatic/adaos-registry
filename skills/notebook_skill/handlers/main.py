@@ -1023,7 +1023,7 @@ def notebook_persist_state(payload: Mapping[str, Any] | None = None, **kwargs: A
     body = dict(payload or {})
     body.update({k: v for k, v in kwargs.items() if v is not None})
     ws = _webspace_id(body)
-    _ensure_default_note()
+    _prepare_state(ws, force=True)
     _persist_state(ws)
     return {"ok": True, "webspace_id": ws, "state": _state_payload()}
 
