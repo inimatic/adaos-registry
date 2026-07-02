@@ -1964,6 +1964,52 @@ def _builder_llm_primary_enabled(_meta: Mapping[str, Any] | None = None) -> bool
     return True
 
 
+def _env_enabled(name: str, default: bool) -> bool:
+    raw = str(os.getenv(name) or "").strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def _builder_llm_async_enabled(_meta: Mapping[str, Any] | None = None) -> bool:
+    if isinstance(_meta, Mapping) and _meta.get("builder_llm_async") is False:
+        return False
+    if isinstance(_meta, Mapping) and _meta.get("builder_llm_async") is True:
+        return True
+    if os.getenv("PYTEST_CURRENT_TEST") and not _env_enabled("ADAOS_BUILDER_LLM_ASYNC_IN_TESTS", False):
+        return False
+    return _env_enabled("ADAOS_BUILDER_LLM_ASYNC", True)
+
+
+def _builder_llm_job_submit_timeout_s() -> float:
+    raw = os.getenv("ADAOS_BUILDER_LLM_JOB_SUBMIT_TIMEOUT_S")
+    try:
+        value = float(raw) if raw else 15.0
+    except (TypeError, ValueError):
+        value = 15.0
+    return max(3.0, min(value, 60.0))
+
+
+def _builder_llm_job_timeout_s() -> float:
+    raw = os.getenv("ADAOS_BUILDER_LLM_JOB_TIMEOUT_S")
+    try:
+        value = float(raw) if raw else _builder_llm_timeout_s()
+    except (TypeError, ValueError):
+        value = _builder_llm_timeout_s()
+    return max(30.0, min(value, 600.0))
+
+
+def _builder_llm_job_poll_interval_s() -> float:
+    raw = os.getenv("ADAOS_BUILDER_LLM_JOB_POLL_INTERVAL_S")
+    try:
+        value = float(raw) if raw else 2.0
+    except (TypeError, ValueError):
+        value = 2.0
+    return max(0.5, min(value, 15.0))
+
+
 def _project_memory(session: Mapping[str, Any]) -> dict[str, Any]:
     artifact_root = str(session.get("artifact_root") or "").strip()
     memory_text = ""
@@ -2007,6 +2053,70 @@ def _current_webui_payload(session: Mapping[str, Any], preview_state: Mapping[st
     payload.setdefault("generated_by", SKILL_ID)
     payload["preview_state"] = copy.deepcopy(dict(preview_state))
     return payload
+
+
+def _builder_llm_webui_transform_request(
+    *,
+    session: Mapping[str, Any],
+    instruction: str,
+    preview_state: Mapping[str, Any],
+) -> dict[str, Any]:
+    current_payload = _current_webui_payload(session, preview_state)
+    schema = _load_webui_schema()
+    history = [
+        {
+            "operation": str(item.get("operation") or ""),
+            "summary": str(item.get("summary") or ""),
+            "status": str(item.get("status") or ""),
+            "revision": str(item.get("revision") or ""),
+        }
+        for item in (session.get("patches") if isinstance(session.get("patches"), list) else [])[-8:]
+        if isinstance(item, Mapping)
+    ]
+    system_prompt = (
+        "You are AdaOS Builder, a deterministic UI prototyping programmer. "
+        "Transform the current prototype UI according to the user's instruction. "
+        "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
+        "The root object must keep schema='adaos.webui.prototype.v1', generated_by='builder_skill', and preview_state. "
+        "preview_state.current_ui is the compact Builder preview contract. "
+        "preview_state.page_schema is optional and may contain a full AdaOS pageSchema with layout/widgets; use it when the user asks to move, remove, or redesign widgets. "
+        "Use the supplied adaos.webui.v1 schema as the webui.json compatibility contract. "
+        "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
+        "When the user asks for sample data, realistic examples, a different domain, or translation, update preview_state.mock_data directly for the active datasource instead of leaving old rows in place. "
+        "Do not rely on hidden application code to generate domain examples after your response; your JSON must be complete. "
+        "For checkbox/toggle semantics use boolean fields and boolean UI/table kinds; do not represent booleans as literal strings like 'true'/'false' unless the user asks for text. "
+        "If you cannot safely satisfy the request, keep the previous UI valid and set unable_reason plus a short comment."
+    )
+    base_request = {
+        "instruction": instruction,
+        "scenario_id": session.get("scenario_id"),
+        "title": session.get("title"),
+        "current_webui_json": current_payload,
+        "project_memory": _project_memory(session),
+        "recent_patch_history": history,
+        "webui_v1_schema": schema,
+        "required_output_shape": {
+            "schema": "adaos.webui.prototype.v1",
+            "generated_by": SKILL_ID,
+            "preview_state": {
+                "title": "string",
+                "current_ui": "object",
+                "datasources": "array",
+                "mock_data": "object",
+                "filters": "array optional",
+                "form_action_position": "top|bottom optional",
+                "page_schema": "optional AdaOS pageSchema object with layout/widgets",
+            },
+            "comment": "short user-facing text about what changed or why it could not be changed",
+            "unable_reason": "short optional diagnostic if request cannot be implemented",
+        },
+    }
+    return {
+        "current_payload": current_payload,
+        "system_prompt": system_prompt,
+        "user_prompt": _compact_json(base_request),
+        "base_request": base_request,
+    }
 
 
 def _balanced_json_object(text: str) -> str | None:
@@ -2243,57 +2353,15 @@ def _apply_llm_webui_transform(
     preview_state: Mapping[str, Any],
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    current_payload = _current_webui_payload(session, preview_state)
-    schema = _load_webui_schema()
-    history = [
-        {
-            "operation": str(item.get("operation") or ""),
-            "summary": str(item.get("summary") or ""),
-            "status": str(item.get("status") or ""),
-            "revision": str(item.get("revision") or ""),
-        }
-        for item in (session.get("patches") if isinstance(session.get("patches"), list) else [])[-8:]
-        if isinstance(item, Mapping)
-    ]
-    system_prompt = (
-        "You are AdaOS Builder, a deterministic UI prototyping programmer. "
-        "Transform the current prototype UI according to the user's instruction. "
-        "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
-        "The root object must keep schema='adaos.webui.prototype.v1', generated_by='builder_skill', and preview_state. "
-        "preview_state.current_ui is the compact Builder preview contract. "
-        "preview_state.page_schema is optional and may contain a full AdaOS pageSchema with layout/widgets; use it when the user asks to move, remove, or redesign widgets. "
-        "Use the supplied adaos.webui.v1 schema as the webui.json compatibility contract. "
-        "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
-        "When the user asks for sample data, realistic examples, a different domain, or translation, update preview_state.mock_data directly for the active datasource instead of leaving old rows in place. "
-        "Do not rely on hidden application code to generate domain examples after your response; your JSON must be complete. "
-        "For checkbox/toggle semantics use boolean fields and boolean UI/table kinds; do not represent booleans as literal strings like 'true'/'false' unless the user asks for text. "
-        "If you cannot safely satisfy the request, keep the previous UI valid and set unable_reason plus a short comment."
+    request = _builder_llm_webui_transform_request(
+        session=session,
+        instruction=instruction,
+        preview_state=preview_state,
     )
-    base_request = {
-        "instruction": instruction,
-        "scenario_id": session.get("scenario_id"),
-        "title": session.get("title"),
-        "current_webui_json": current_payload,
-        "project_memory": _project_memory(session),
-        "recent_patch_history": history,
-        "webui_v1_schema": schema,
-        "required_output_shape": {
-            "schema": "adaos.webui.prototype.v1",
-            "generated_by": SKILL_ID,
-            "preview_state": {
-                "title": "string",
-                "current_ui": "object",
-                "datasources": "array",
-                "mock_data": "object",
-                "filters": "array optional",
-                "form_action_position": "top|bottom optional",
-                "page_schema": "optional AdaOS pageSchema object with layout/widgets",
-            },
-            "comment": "short user-facing text about what changed or why it could not be changed",
-            "unable_reason": "short optional diagnostic if request cannot be implemented",
-        },
-    }
-    user_prompt = _compact_json(base_request)
+    current_payload = request["current_payload"]
+    system_prompt = str(request["system_prompt"])
+    user_prompt = str(request["user_prompt"])
+    base_request = request["base_request"]
     attempts: list[dict[str, Any]] = []
     last_response = ""
     last_error: dict[str, Any] | None = None
@@ -2392,6 +2460,54 @@ def _apply_llm_webui_transform(
             "last_response": last_response,
             "comment": "\u041d\u0435 \u0434\u043e\u0436\u0434\u0430\u043b\u0441\u044f \u043e\u0442\u0432\u0435\u0442\u0430 LLM." if timeout else "",
         }
+
+
+def _parse_llm_webui_transform_output(
+    *,
+    output_text: str,
+    previous_preview: Mapping[str, Any],
+    request_id: str = "",
+    job_id: str = "",
+) -> dict[str, Any]:
+    parsed = _extract_json_object(output_text)
+    payload, preview = _normalise_llm_webui_payload(parsed, previous_preview=previous_preview)
+    validation = _validate_builder_webui_payload(payload, preview)
+    if not validation.get("ok"):
+        return {
+            "ok": False,
+            "error": "llm_webui_transform_invalid",
+            "detail": "LLM response did not pass Builder validation",
+            "validation": validation,
+            "attempts": [
+                {
+                    "attempt": 1,
+                    "ok": False,
+                    "request_id": request_id,
+                    "job_id": job_id,
+                    "validation": validation,
+                }
+            ],
+            "last_response": output_text,
+            "comment": "\u041d\u0435 \u0441\u043c\u043e\u0433 \u0441\u043e\u0431\u0440\u0430\u0442\u044c \u0432\u0430\u043b\u0438\u0434\u043d\u044b\u0439 UI JSON.",
+        }
+    return {
+        "ok": True,
+        "payload": payload,
+        "preview_state": preview,
+        "comment": str(parsed.get("comment") or parsed.get("summary") or "").strip(),
+        "unable_reason": str(parsed.get("unable_reason") or "").strip(),
+        "validation": validation,
+        "attempts": [
+            {
+                "attempt": 1,
+                "ok": True,
+                "request_id": request_id,
+                "job_id": job_id,
+                "validation": validation,
+            }
+        ],
+        "raw_response": output_text,
+    }
 
 
 def _workbench_service():
@@ -3981,6 +4097,319 @@ def _finalize_scenario_update(
     }
 
 
+def _finalize_llm_webui_transform_result(
+    *,
+    ws: str,
+    session: dict[str, Any],
+    binding: Mapping[str, Any],
+    patch: dict[str, Any],
+    request_text: str,
+    before_webui: Mapping[str, Any] | None,
+    llm_result: Mapping[str, Any],
+    auto_apply: bool,
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    preview_from_llm = llm_result.get("preview_state") if isinstance(llm_result.get("preview_state"), Mapping) else {}
+    if not preview_from_llm:
+        preview_from_llm = session.get("preview_state") if isinstance(session.get("preview_state"), Mapping) else _preview_state(session=session)
+    payload_from_llm = llm_result.get("payload") if isinstance(llm_result.get("payload"), Mapping) else None
+    patch["operation"] = "llm_webui_transform"
+    patch["diff"] = {
+        "schema_valid": True,
+        "comment": str(llm_result.get("comment") or ""),
+        "unable_reason": str(llm_result.get("unable_reason") or ""),
+        "validation": dict(llm_result.get("validation") or {}) if isinstance(llm_result.get("validation"), Mapping) else {},
+        "attempts": list(llm_result.get("attempts") or []) if isinstance(llm_result.get("attempts"), list) else [],
+    }
+    session["preview_state"] = copy.deepcopy(dict(preview_from_llm))
+    if payload_from_llm is not None:
+        session["webui_payload"] = copy.deepcopy(dict(payload_from_llm))
+    _merge_session_from_preview(session, preview_from_llm)
+    return _finalize_scenario_update(
+        ws=ws,
+        session=session,
+        binding=binding,
+        patch=patch,
+        request_text=request_text,
+        before_webui=before_webui,
+        llm_result=llm_result,
+        auto_apply=auto_apply,
+        _meta=_meta,
+    )
+
+
+def _submit_llm_webui_transform_job(
+    *,
+    session: Mapping[str, Any],
+    instruction: str,
+    preview_state: Mapping[str, Any],
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    request = _builder_llm_webui_transform_request(
+        session=session,
+        instruction=instruction,
+        preview_state=preview_state,
+    )
+    current_payload = request["current_payload"]
+    request_id = _builder_llm_request_id(
+        session=session,
+        instruction=instruction,
+        current_payload=current_payload,
+        attempt=1,
+    )
+    messages = [
+        {"role": "system", "content": str(request["system_prompt"])},
+        {"role": "user", "content": str(request["user_prompt"])},
+    ]
+    try:
+        from adaos.sdk.llm.llm_client import submit_response_job
+
+        response = submit_response_job(
+            messages,
+            temperature=0,
+            max_tokens=_builder_llm_max_tokens(),
+            request_id=request_id,
+            timeout=_builder_llm_job_submit_timeout_s(),
+        )
+    except Exception as exc:
+        detail = f"{type(exc).__name__}: {exc}"
+        return {
+            "ok": False,
+            "error": "llm_job_submit_timeout" if _looks_like_timeout(detail) else "llm_job_submit_failed",
+            "detail": detail,
+            "request_id": request_id,
+            "comment": "\u041d\u0435 \u0441\u043c\u043e\u0433 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c LLM job.",
+        }
+    status = str(response.get("status") or "").strip().lower()
+    job_id = str(response.get("job_id") or "").strip()
+    client = response.get("_client") if isinstance(response.get("_client"), Mapping) else {}
+    base_url = str(client.get("base_url") or "").strip()
+    if status == "succeeded":
+        output_text = str(response.get("output_text") or "")
+        try:
+            parsed = _parse_llm_webui_transform_output(
+                output_text=output_text,
+                previous_preview=preview_state,
+                request_id=request_id,
+                job_id=job_id,
+            )
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"
+            return {
+                "ok": False,
+                "error": "llm_response_parse_failed",
+                "detail": detail,
+                "request_id": request_id,
+                "job_id": job_id,
+                "last_response": output_text,
+            }
+        parsed["job"] = response
+        return parsed
+    if status in {"queued", "running"} and job_id:
+        return {
+            "ok": True,
+            "pending": True,
+            "status": status,
+            "job_id": job_id,
+            "request_id": request_id,
+            "base_url": base_url,
+            "job": response,
+            "message": (
+                f"{AGENT_LABEL}: \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u043b LLM-\u0437\u0430\u0434\u0430\u0447\u0443 "
+                f"\u0434\u043b\u044f {session.get('scenario_id')}. Job: {job_id}."
+            ),
+        }
+    return {
+        "ok": False,
+        "error": "llm_job_failed",
+        "detail": str(response.get("error") or response),
+        "request_id": request_id,
+        "job_id": job_id,
+        "job": response,
+    }
+
+
+def _mark_llm_job_failed(
+    *,
+    ws: str,
+    session: dict[str, Any],
+    job_id: str,
+    detail: str,
+    binding: Mapping[str, Any] | None = None,
+    topic_ref: Mapping[str, Any] | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> None:
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
+    if job_id and isinstance(pending, dict) and isinstance(pending.get(job_id), Mapping):
+        updated = dict(pending)
+        item = dict(updated.get(job_id) or {})
+        item["status"] = "failed"
+        item["finished_at"] = _now()
+        item["detail"] = detail
+        updated[job_id] = item
+        session["pending_llm_jobs"] = updated
+    _save_session(ws, session)
+    topic = topic_ref if isinstance(topic_ref, Mapping) else _builder_topic_ref(ws, session=session, binding=binding or {}, _meta=_meta)
+    message = (
+        f"{AGENT_LABEL}: LLM-\u0437\u0430\u0434\u0430\u0447\u0430 {job_id or ''} "
+        f"\u0434\u043b\u044f {session.get('scenario_id')} \u043d\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043b\u0430\u0441\u044c. {detail}"
+    ).strip()
+    _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding or {}, topic_ref=topic)
+
+
+def _complete_llm_webui_job(
+    *,
+    ws: str,
+    session_id: str,
+    binding: Mapping[str, Any],
+    patch: Mapping[str, Any],
+    request_text: str,
+    before_webui: Mapping[str, Any] | None,
+    job_id: str,
+    base_url: str,
+    request_id: str,
+    auto_apply: bool,
+    _meta: Mapping[str, Any] | None,
+) -> None:
+    session = _load_session(ws, session_id)
+    if not session:
+        return
+    topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
+    try:
+        from adaos.sdk.llm.llm_client import wait_response_job
+
+        job = wait_response_job(
+            job_id,
+            base_url=base_url or None,
+            timeout_s=_builder_llm_job_timeout_s(),
+            poll_interval_s=_builder_llm_job_poll_interval_s(),
+        )
+    except Exception as exc:
+        _mark_llm_job_failed(
+            ws=ws,
+            session=session,
+            job_id=job_id,
+            detail=f"{type(exc).__name__}: {exc}",
+            binding=binding,
+            topic_ref=topic,
+            _meta=_meta,
+        )
+        return
+    status = str(job.get("status") or "").strip().lower()
+    if status != "succeeded":
+        _mark_llm_job_failed(
+            ws=ws,
+            session=session,
+            job_id=job_id,
+            detail=str(job.get("error") or job),
+            binding=binding,
+            topic_ref=topic,
+            _meta=_meta,
+        )
+        return
+    output_text = str(job.get("output_text") or "")
+    previous_preview = (
+        before_webui.get("preview_state")
+        if isinstance(before_webui, Mapping) and isinstance(before_webui.get("preview_state"), Mapping)
+        else session.get("preview_state")
+        if isinstance(session.get("preview_state"), Mapping)
+        else {}
+    )
+    try:
+        llm_result = _parse_llm_webui_transform_output(
+            output_text=output_text,
+            previous_preview=previous_preview,
+            request_id=request_id,
+            job_id=job_id,
+        )
+    except Exception as exc:
+        _mark_llm_job_failed(
+            ws=ws,
+            session=session,
+            job_id=job_id,
+            detail=f"{type(exc).__name__}: {exc}",
+            binding=binding,
+            topic_ref=topic,
+            _meta=_meta,
+        )
+        return
+    if not llm_result.get("ok"):
+        _mark_llm_job_failed(
+            ws=ws,
+            session=session,
+            job_id=job_id,
+            detail=str(llm_result.get("detail") or llm_result.get("error") or "invalid_llm_response"),
+            binding=binding,
+            topic_ref=topic,
+            _meta=_meta,
+        )
+        return
+    llm_result["job"] = job
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
+    if isinstance(pending, dict) and job_id in pending:
+        updated = dict(pending)
+        item = dict(updated.get(job_id) or {})
+        item["status"] = "succeeded"
+        item["finished_at"] = _now()
+        updated[job_id] = item
+        session["pending_llm_jobs"] = updated
+    result = _finalize_llm_webui_transform_result(
+        ws=ws,
+        session=session,
+        binding=binding,
+        patch=dict(patch),
+        request_text=request_text,
+        before_webui=before_webui,
+        llm_result=llm_result,
+        auto_apply=auto_apply,
+        _meta=_meta,
+    )
+    _safe_emit_chat(
+        str(result.get("message") or ""),
+        webspace_id=ws,
+        _meta=_meta,
+        session=result.get("session") if isinstance(result.get("session"), Mapping) else session,
+        binding=binding,
+        topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic,
+        actions=result.get("message_actions") if isinstance(result.get("message_actions"), list) else None,
+    )
+
+
+def _start_llm_webui_job_worker(
+    *,
+    ws: str,
+    session: Mapping[str, Any],
+    binding: Mapping[str, Any],
+    patch: Mapping[str, Any],
+    request_text: str,
+    before_webui: Mapping[str, Any] | None,
+    job_id: str,
+    base_url: str,
+    request_id: str,
+    auto_apply: bool,
+    _meta: Mapping[str, Any] | None,
+) -> None:
+    thread = threading.Thread(
+        target=_complete_llm_webui_job,
+        kwargs={
+            "ws": ws,
+            "session_id": str(session.get("id") or ""),
+            "binding": dict(binding),
+            "patch": dict(patch),
+            "request_text": request_text,
+            "before_webui": copy.deepcopy(dict(before_webui or {})),
+            "job_id": job_id,
+            "base_url": base_url,
+            "request_id": request_id,
+            "auto_apply": auto_apply,
+            "_meta": dict(_meta or {}),
+        },
+        name=f"builder-llm-job:{job_id}",
+        daemon=True,
+    )
+    thread.start()
+
+
 @tool(summary="Update current scenario prototype.", side_effects="local_write")
 def update_current_scenario(
     instruction: str,
@@ -4020,23 +4449,68 @@ def update_current_scenario(
     llm_result: dict[str, Any] | None = None
     llm_owned_content_change = _wants_llm_owned_content_change(text)
     if text and _builder_llm_primary_enabled(_meta):
-        llm_result = _apply_llm_webui_transform(session=session, instruction=text, preview_state=base_preview, _meta=_meta)
+        if _builder_llm_async_enabled(_meta):
+            llm_result = _submit_llm_webui_transform_job(
+                session=session,
+                instruction=text,
+                preview_state=base_preview,
+                _meta=_meta,
+            )
+            if llm_result.get("pending"):
+                job_id = str(llm_result.get("job_id") or "").strip()
+                request_id = str(llm_result.get("request_id") or "").strip()
+                base_url = str(llm_result.get("base_url") or "").strip()
+                pending_jobs = dict(session.get("pending_llm_jobs") or {}) if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
+                pending_jobs[job_id] = {
+                    "schema": "adaos.builder.llm_job.v1",
+                    "job_id": job_id,
+                    "request_id": request_id,
+                    "base_url": base_url,
+                    "status": str(llm_result.get("status") or "queued"),
+                    "request_text": text,
+                    "patch_id": patch.get("id"),
+                    "created_at": _now(),
+                }
+                session["pending_llm_jobs"] = pending_jobs
+                _save_session(ws, session)
+                _start_llm_webui_job_worker(
+                    ws=ws,
+                    session=session,
+                    binding=binding,
+                    patch=patch,
+                    request_text=text,
+                    before_webui=before_webui,
+                    job_id=job_id,
+                    base_url=base_url,
+                    request_id=request_id,
+                    auto_apply=auto_apply,
+                    _meta=_meta,
+                )
+                return {
+                    "ok": True,
+                    "status": "llm_pending",
+                    "session_id": session.get("id"),
+                    "scenario_id": session.get("scenario_id"),
+                    "patch": patch,
+                    "preview_state": base_preview,
+                    "topic": {k: v for k, v in topic.items() if k != "stored"},
+                    "pending_action": None,
+                    "llm_job": {
+                        "job_id": job_id,
+                        "request_id": request_id,
+                        "base_url": base_url or None,
+                        "status": str(llm_result.get("status") or "queued"),
+                    },
+                    "message": str(llm_result.get("message") or (
+                        f"{AGENT_LABEL}: \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u043b LLM-\u0437\u0430\u0434\u0430\u0447\u0443 "
+                        f"\u0434\u043b\u044f {session.get('scenario_id')}."
+                    )),
+                    "dialog": _dialog_state(ws, topic_ref=topic),
+                }
+        else:
+            llm_result = _apply_llm_webui_transform(session=session, instruction=text, preview_state=base_preview, _meta=_meta)
         if llm_result.get("ok"):
-            preview_from_llm = llm_result.get("preview_state") if isinstance(llm_result.get("preview_state"), Mapping) else base_preview
-            payload_from_llm = llm_result.get("payload") if isinstance(llm_result.get("payload"), Mapping) else None
-            patch["operation"] = "llm_webui_transform"
-            patch["diff"] = {
-                "schema_valid": True,
-                "comment": str(llm_result.get("comment") or ""),
-                "unable_reason": str(llm_result.get("unable_reason") or ""),
-                "validation": dict(llm_result.get("validation") or {}) if isinstance(llm_result.get("validation"), Mapping) else {},
-                "attempts": list(llm_result.get("attempts") or []) if isinstance(llm_result.get("attempts"), list) else [],
-            }
-            session["preview_state"] = copy.deepcopy(dict(preview_from_llm))
-            if payload_from_llm is not None:
-                session["webui_payload"] = copy.deepcopy(dict(payload_from_llm))
-            _merge_session_from_preview(session, preview_from_llm)
-            return _finalize_scenario_update(
+            return _finalize_llm_webui_transform_result(
                 ws=ws,
                 session=session,
                 binding=binding,
@@ -4199,9 +4673,15 @@ def update_current_scenario(
                 patch["diff"] = {"field": field}
     if patch["operation"] == "noop":
         llm_patch = llm_result
-        if llm_patch is None and text and _builder_llm_primary_enabled(_meta):
+        if (
+            llm_patch is None
+            and text
+            and _builder_llm_primary_enabled(_meta)
+            and not _builder_llm_async_enabled(_meta)
+        ):
             llm_patch = _apply_llm_webui_transform(session=session, instruction=text, preview_state=base_preview, _meta=_meta)
         if isinstance(llm_patch, Mapping) and llm_patch.get("ok"):
+            llm_result = dict(llm_patch)
             preview_from_llm = llm_patch.get("preview_state") if isinstance(llm_patch.get("preview_state"), Mapping) else base_preview
             payload_from_llm = llm_patch.get("payload") if isinstance(llm_patch.get("payload"), Mapping) else None
             patch["operation"] = "llm_webui_transform"
