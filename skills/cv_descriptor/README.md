@@ -1,0 +1,54 @@
+# CV Descriptor
+
+`cv_descriptor` is the pilot skill for the browser-side AdaOS CV runtime. The skill stores visual-object descriptors: a browser model signature, embedding vector, thumbnail, title, and description. The client CV runtime is expected to capture vectors in setup mode and match a small descriptor list in work mode.
+
+## Target Architecture
+
+The browser client owns camera access, model loading, inference, overlays, and low-latency matching. The skill owns durable descriptor metadata and exposes the webui/control contract.
+
+Core runtime components:
+
+- `CvRuntimeService` in the AdaOS client: starts/stops camera sessions, loads model adapters, runs inference, emits diagnostics, and compares embeddings against a small target list.
+- `media.cvCamera` widget: visible camera preview, match overlay, setup capture controls, and diagnostics.
+- `host.cvRuntime` widget: headless session host for pages where another surface is shown instead of camera preview.
+- `cv_descriptor` skill: persists descriptors and projects compact Yjs state; raw vectors are returned through `cv_descriptor_get_targets` instead of public descriptor lists.
+
+Session flow:
+
+1. Setup mode starts `cv_descriptor.setup`.
+2. The browser loads the selected CV model and captures an embedding when the user selects an object.
+3. The browser calls `cv_descriptor_save_descriptor` with vector, thumbnail, title/description draft, and model signature.
+4. Work mode starts `cv_descriptor.work`.
+5. The browser calls `cv_descriptor_get_targets`, compares embeddings locally, and emits `cv_descriptor.match` events on enter/update/exit.
+6. The skill records current match and diagnostics through `cv_descriptor_record_runtime_event`.
+
+Model rules:
+
+- Every stored vector is tied to `model_signature`.
+- Work mode only returns targets compatible with the active model signature.
+- Changing the model reconfigures the browser session and makes incompatible descriptors inactive for matching until recaptured or migrated.
+
+## Current Implementation
+
+- `skill.yaml` declares tools, data projections, event subscriptions, and stream budgets.
+- `handlers/main.py` provides durable JSON state, descriptor CRUD tools, target export, runtime command state, Yjs projection, and bounded stream events.
+- The AdaOS client contains the first `CvRuntimeService` edition with camera lifecycle, browser-frame embedding adapter, browser-side target matching, visible `media.cvCamera`, and headless `host.cvRuntime`.
+- `webui.json` uses `media.cvCamera` in setup/work modals and keeps generic status/list/debug widgets around it.
+
+## Roadmap Checklist
+
+- [x] Create AdaOS skill skeleton in `.adaos/workspace/skills/cv_descriptor`.
+- [x] Persist descriptor records with vector, thumbnail, title, description, model id, and model signature.
+- [x] Expose `cv_descriptor_get_targets` for browser-side small-list matching.
+- [x] Project compact public state to `data/cv_descriptor/current`, `data/cv_descriptor/descriptors`, and `data/cv_descriptor/runtime`.
+- [x] Add setup/work webui surfaces using existing widgets.
+- [x] Add client `CvRuntimeService`.
+- [x] Add model adapter registry with stable model signatures and reinitialization on model change.
+- [x] Add `media.cvCamera` visible widget.
+- [x] Add `host.cvRuntime` headless widget.
+- [x] Add browser-side cosine/L2 matcher with debounce and hysteresis.
+- [x] Wire browser events to `cv_descriptor.runtime.event`, `cv_descriptor.match`, and `cv_descriptor.runtime.diagnostics`.
+- [x] Replace setup placeholder controls with actual camera preview and Select button.
+- [x] Add setup fields for descriptor title/description during capture.
+- [ ] Add list-item edit UI for existing descriptor title/description.
+- [ ] Add end-to-end browser test with synthetic camera/model adapter.

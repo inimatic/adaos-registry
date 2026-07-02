@@ -1,0 +1,269 @@
+name: cv_descriptor
+version: 0.1.1
+description: Browser-side CV descriptor pilot. Stores visual-object embeddings, model
+  signatures, thumbnails, and text descriptions while the AdaOS client CV runtime
+  is being built.
+runtime:
+  python: '3.11'
+webui_owner: shared
+tools:
+- name: cv_descriptor_status
+  description: Return current CV Descriptor state, public descriptor list, and browser
+    runtime command state.
+  entry: handlers.main:cv_descriptor_status
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+      include_vectors:
+        type: boolean
+- name: cv_descriptor_configure_model
+  description: Select or set the browser CV model descriptor used for new embeddings
+    and target matching.
+  entry: handlers.main:cv_descriptor_configure_model
+  input_schema:
+    type: object
+    properties:
+      model_id:
+        type: string
+      model:
+        type: object
+      threshold:
+        type: number
+      webspace_id:
+        type: string
+- name: cv_descriptor_save_descriptor
+  description: Persist one browser-captured embedding with thumbnail, title, description,
+    and model signature.
+  entry: handlers.main:cv_descriptor_save_descriptor
+  input_schema:
+    type: object
+    properties:
+      vector:
+        type: array
+        items:
+          type: number
+      embedding:
+        type: array
+        items:
+          type: number
+      descriptor:
+        type: object
+      title:
+        type: string
+      name:
+        type: string
+      description:
+        type: string
+      thumbnail:
+        type: string
+      threshold:
+        type: number
+      model_signature:
+        type: string
+      metadata:
+        type: object
+      webspace_id:
+        type: string
+- name: cv_descriptor_update_descriptor
+  description: Update descriptor title, description, threshold, enabled flag, or thumbnail.
+  entry: handlers.main:cv_descriptor_update_descriptor
+  input_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      descriptor_id:
+        type: string
+      title:
+        type: string
+      name:
+        type: string
+      description:
+        type: string
+      thumbnail:
+        type: string
+      enabled:
+        type: boolean
+      threshold:
+        type: number
+      webspace_id:
+        type: string
+- name: cv_descriptor_delete_descriptor
+  description: Delete one descriptor by id.
+  entry: handlers.main:cv_descriptor_delete_descriptor
+  input_schema:
+    type: object
+    properties:
+      id:
+        type: string
+      descriptor_id:
+        type: string
+      webspace_id:
+        type: string
+- name: cv_descriptor_clear
+  description: Remove all saved descriptors.
+  entry: handlers.main:cv_descriptor_clear
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+- name: cv_descriptor_get_targets
+  description: Return enabled descriptor vectors for browser-side small-list identification.
+  entry: handlers.main:cv_descriptor_get_targets
+  input_schema:
+    type: object
+    properties:
+      include_disabled:
+        type: boolean
+      webspace_id:
+        type: string
+- name: cv_descriptor_runtime_command
+  description: Write a desired browser CV runtime command into projected state.
+  entry: handlers.main:cv_descriptor_runtime_command
+  input_schema:
+    type: object
+    properties:
+      action:
+        type: string
+      mode:
+        type: string
+      session_id:
+        type: string
+      webspace_id:
+        type: string
+- name: cv_descriptor_record_runtime_event
+  description: Record browser CV runtime events, matches, and diagnostics.
+  entry: handlers.main:cv_descriptor_record_runtime_event
+  input_schema:
+    type: object
+    properties:
+      kind:
+        type: string
+      event:
+        type: object
+      match:
+        type: object
+      diagnostics:
+        type: object
+      webspace_id:
+        type: string
+events:
+  subscribe:
+  - cv_descriptor.runtime.event
+  - cv_descriptor.match
+  - cv_descriptor.runtime.diagnostics
+  - webio.stream.snapshot.requested
+  - webio.stream.subscription.changed
+  - sys.ready
+  publish:
+  - cv_descriptor.updated
+  - cv_descriptor.command
+  - io.out.stream.publish
+data_routes:
+- surface: skill:cv_descriptor.current
+  route: yjs
+  owner: skill:cv_descriptor
+  projection_slot: cv_descriptor.current
+  path: data/cv_descriptor/current
+  first_paint: compact status, selected model, matching options, and current match
+    summary
+  recovery: status tool can rebuild the compact state from skill-local JSON storage
+  update_source:
+  - cv_descriptor_status
+  - cv_descriptor_configure_model
+  - cv_descriptor_*_descriptor
+  - cv_descriptor_runtime_command
+  budget:
+    max_payload_bytes: 12288
+    max_publish_hz: 2
+    coalesce_ms: 250
+    snapshot_policy: none
+  guard_visibility:
+    degraded_state: Descriptor storage remains available even if browser CV runtime
+      is missing.
+    log: service.cv_descriptor.runtime.log
+    quarantine: true
+    metric: yjs_owner_guard.cv_descriptor.current
+- surface: skill:cv_descriptor.descriptors
+  route: yjs
+  owner: skill:cv_descriptor
+  projection_slot: cv_descriptor.descriptors
+  path: data/cv_descriptor/descriptors
+  first_paint: public descriptor cards without raw vectors
+  recovery: status tool reprojects descriptor public metadata
+  update_source:
+  - cv_descriptor_save_descriptor
+  - cv_descriptor_update_descriptor
+  - cv_descriptor_delete_descriptor
+  - cv_descriptor_clear
+  budget:
+    max_payload_bytes: 32768
+    max_publish_hz: 2
+    coalesce_ms: 250
+    snapshot_policy: none
+  guard_visibility:
+    degraded_state: Raw vectors are not projected; browser requests them through cv_descriptor_get_targets.
+    log: service.cv_descriptor.runtime.log
+    quarantine: true
+    metric: yjs_owner_guard.cv_descriptor.descriptors
+- surface: skill:cv_descriptor.runtime
+  route: yjs
+  owner: skill:cv_descriptor
+  projection_slot: cv_descriptor.runtime
+  path: data/cv_descriptor/runtime
+  first_paint: desired browser CV command/session state and last diagnostics
+  recovery: status tool reprojects latest desired runtime command
+  update_source:
+  - cv_descriptor_runtime_command
+  - cv_descriptor_record_runtime_event
+  budget:
+    max_payload_bytes: 32768
+    max_publish_hz: 4
+    coalesce_ms: 250
+    snapshot_policy: none
+  guard_visibility:
+    degraded_state: CV runtime may be absent; setup/work UI remains inspectable.
+    log: service.cv_descriptor.runtime.log
+    quarantine: false
+    metric: yjs_owner_guard.cv_descriptor.runtime
+- surface: skill:cv_descriptor.events
+  route: stream
+  owner: skill:cv_descriptor
+  receiver: cv_descriptor.events
+  first_paint: empty bounded event log
+  recovery: stream snapshot publishes current compact state
+  update_source:
+  - cv_descriptor_* tools
+  - cv_descriptor browser runtime events
+  budget:
+    max_payload_bytes: 8192
+    max_publish_hz: 10
+    coalesce_ms: 100
+    max_items: 100
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: Event log can drop old entries independently of descriptor storage.
+    log: service.cv_descriptor.runtime.log
+    quarantine: false
+    metric: webio_stream_guard.cv_descriptor.events
+data_projections:
+- scope: subnet
+  slot: cv_descriptor.current
+  targets:
+  - backend: yjs
+    path: data/cv_descriptor/current
+- scope: subnet
+  slot: cv_descriptor.descriptors
+  targets:
+  - backend: yjs
+    path: data/cv_descriptor/descriptors
+- scope: subnet
+  slot: cv_descriptor.runtime
+  targets:
+  - backend: yjs
+    path: data/cv_descriptor/runtime
+updated_at: '2026-07-02T08:51:31+00:00'
+

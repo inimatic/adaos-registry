@@ -1,0 +1,458 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "webio": {
+    "receivers": {
+      "cv_descriptor.events": {
+        "mode": "append",
+        "collectionKey": "items",
+        "dedupeBy": "id",
+        "maxItems": 100,
+        "snapshotPolicy": "on_subscribe",
+        "budget": {
+          "maxPayloadBytes": 8192,
+          "maxPublishHz": 10,
+          "coalesceMs": 100,
+          "maxItems": 100
+        },
+        "initialState": {
+          "items": [
+            {
+              "id": "cv-descriptor-waiting",
+              "title": "Waiting for CV runtime",
+              "description": "The browser CV component is not connected yet."
+            }
+          ]
+        }
+      }
+    }
+  },
+  "ydoc_defaults": {
+    "data/cv_descriptor/current": {
+      "schema": "adaos.cv_descriptor.current.v1",
+      "ok": true,
+      "status": "init",
+      "mode": "setup",
+      "model": {
+        "id": "browser_embedding_placeholder",
+        "title": "Browser embedding placeholder",
+        "runtime": "client-cv",
+        "task": "embed",
+        "status": "pending_client_runtime"
+      },
+      "model_options": [
+        {
+          "id": "browser_embedding_placeholder",
+          "label": "Browser embedding placeholder",
+          "runtime": "client-cv",
+          "task": "embed"
+        }
+      ],
+      "activity": {
+        "label": "init",
+        "description": "Waiting for browser CV runtime",
+        "color": "warning"
+      },
+      "stats": {
+        "descriptor_count": 0,
+        "enabled_count": 0,
+        "target_count": 0
+      },
+      "current_match": null
+    },
+    "data/cv_descriptor/descriptors": {
+      "schema": "adaos.cv_descriptor.descriptors.v1",
+      "items": []
+    },
+    "data/cv_descriptor/runtime": {
+      "desired": null,
+      "diagnostics": null,
+      "last_event": null,
+      "current_match": null,
+      "client_runtime_required": true,
+      "sessions": {}
+    }
+  },
+  "apps": [
+    {
+      "id": "cv_descriptor_app",
+      "title": "CV Descriptor",
+      "subtitle": "Text labels for visual objects",
+      "icon": "scan-outline",
+      "launchModal": "cv_descriptor_setup_modal"
+    }
+  ],
+  "widgets": [
+    {
+      "id": "cv_descriptor_summary",
+      "title": "CV Descriptor",
+      "type": "visual.metricTile",
+      "dataSource": {
+        "kind": "y",
+        "path": "data/cv_descriptor/current/stats"
+      },
+      "inputs": {
+        "valuePath": "descriptor_count",
+        "descriptionPath": "target_count",
+        "emptyText": "0"
+      },
+      "actions": [
+        {
+          "on": "click",
+          "type": "openModal",
+          "params": {
+            "modalId": "cv_descriptor_setup_modal"
+          }
+        }
+      ]
+    }
+  ],
+  "registry": {
+    "modals": {
+      "cv_descriptor_setup_modal": {
+        "title": "CV Descriptor Setup",
+        "presentation": {
+          "kind": "fullscreen"
+        },
+        "schema": {
+          "id": "cv_descriptor_setup_modal",
+          "surfaceClass": "operations",
+          "layout": {
+            "type": "split",
+            "pattern": "split",
+            "areas": [
+              { "id": "main", "role": "main" },
+              { "id": "right", "role": "aux" },
+              { "id": "bottom", "role": "footer" }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "cv-setup-model",
+              "type": "input.selector",
+              "area": "main",
+              "title": "CV model",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/cv_descriptor/current/model"
+              },
+              "inputs": {
+                "bindField": "id",
+                "optionLabelPath": "label",
+                "optionValuePath": "id",
+                "options": [
+                  {
+                    "id": "browser_embedding_placeholder",
+                    "label": "Browser embedding placeholder"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "cv_descriptor.cv_descriptor_configure_model",
+                  "params": {
+                    "model_id": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "cv-setup-controls",
+              "type": "input.commandBar",
+              "area": "main",
+              "title": "Setup controls",
+              "inputs": {
+                "variant": "stack",
+                "size": "small",
+                "buttons": [
+                  { "id": "start", "label": "Start setup" },
+                  { "id": "stop", "label": "Stop" },
+                  { "id": "diagnostics", "label": "Diagnostics" },
+                  { "id": "work", "label": "Work mode" },
+                  { "id": "clear", "label": "Clear", "kind": "danger" }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:start",
+                  "type": "callSkill",
+                  "target": "cv_descriptor.cv_descriptor_runtime_command",
+                  "params": {
+                    "action": "start",
+                    "mode": "setup"
+                  }
+                },
+                {
+                  "on": "click:stop",
+                  "type": "callSkill",
+                  "target": "cv_descriptor.cv_descriptor_runtime_command",
+                  "params": {
+                    "action": "stop",
+                    "mode": "setup"
+                  }
+                },
+                {
+                  "on": "click:diagnostics",
+                  "type": "callSkill",
+                  "target": "cv_descriptor.cv_descriptor_runtime_command",
+                  "params": {
+                    "action": "diagnostics",
+                    "mode": "setup"
+                  }
+                },
+                {
+                  "on": "click:work",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "cv_descriptor_work_modal"
+                  }
+                },
+                {
+                  "on": "click:clear",
+                  "type": "callSkill",
+                  "target": "cv_descriptor.cv_descriptor_clear"
+                }
+              ]
+            },
+            {
+              "id": "cv-setup-camera",
+              "type": "media.cvCamera",
+              "area": "main",
+              "title": "Camera",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/cv_descriptor/runtime"
+              },
+              "inputs": {
+                "mode": "setup",
+                "sessionPath": "sessions.setup",
+                "commandPath": "desired",
+                "allowSelect": true,
+                "showPreview": true,
+                "aspectRatio": "16 / 9"
+              }
+            },
+            {
+              "id": "cv-descriptor-cards",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Descriptors",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/cv_descriptor/descriptors"
+              },
+              "inputs": {
+                "variant": "cards",
+                "collectionKey": "items",
+                "titleKey": "title",
+                "subtitleKey": "model_id",
+                "previewKey": "description",
+                "imageKey": "thumbnail",
+                "badgeKey": "vector_dim",
+                "search": true,
+                "emptyText": "No descriptors captured yet"
+              }
+            },
+            {
+              "id": "cv-status",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "Status",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/cv_descriptor/current/activity"
+              },
+              "inputs": {
+                "valuePath": "label",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "init"
+              }
+            },
+            {
+              "id": "cv-descriptor-count",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "Descriptors",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/cv_descriptor/current/stats"
+              },
+              "inputs": {
+                "valuePath": "descriptor_count",
+                "descriptionPath": "target_count",
+                "emptyText": "0"
+              }
+            },
+            {
+              "id": "cv-runtime-json",
+              "type": "ui.jsonViewer",
+              "area": "right",
+              "title": "Runtime contract",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/cv_descriptor/runtime"
+              }
+            },
+            {
+              "id": "cv-events",
+              "type": "ui.list",
+              "area": "bottom",
+              "title": "Runtime events",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "cv_descriptor.events"
+              },
+              "inputs": {
+                "collectionKey": "items",
+                "titleKey": "title",
+                "subtitleKey": "description",
+                "emptyText": "No runtime events"
+              }
+            }
+          ]
+        }
+      },
+      "cv_descriptor_work_modal": {
+        "title": "CV Descriptor Work",
+        "presentation": {
+          "kind": "fullscreen"
+        },
+        "schema": {
+          "id": "cv_descriptor_work_modal",
+          "surfaceClass": "operations",
+          "layout": {
+            "type": "split",
+            "pattern": "split",
+            "areas": [
+              { "id": "main", "role": "main" },
+              { "id": "right", "role": "aux" },
+              { "id": "bottom", "role": "footer" }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "cv-work-camera",
+              "type": "media.cvCamera",
+              "area": "main",
+              "title": "Camera",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/cv_descriptor/runtime"
+              },
+              "inputs": {
+                "mode": "work",
+                "sessionPath": "sessions.work",
+                "commandPath": "desired",
+                "allowSelect": false,
+                "showPreview": true,
+                "aspectRatio": "16 / 9"
+              }
+            },
+            {
+              "id": "cv-work-controls",
+              "type": "input.commandBar",
+              "area": "main",
+              "title": "Work controls",
+              "inputs": {
+                "variant": "stack",
+                "size": "small",
+                "buttons": [
+                  { "id": "start", "label": "Start work" },
+                  { "id": "stop", "label": "Stop" },
+                  { "id": "setup", "label": "Setup" }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:start",
+                  "type": "callSkill",
+                  "target": "cv_descriptor.cv_descriptor_runtime_command",
+                  "params": {
+                    "action": "start",
+                    "mode": "work"
+                  }
+                },
+                {
+                  "on": "click:stop",
+                  "type": "callSkill",
+                  "target": "cv_descriptor.cv_descriptor_runtime_command",
+                  "params": {
+                    "action": "stop",
+                    "mode": "work"
+                  }
+                },
+                {
+                  "on": "click:setup",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "cv_descriptor_setup_modal"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "cv-current-match",
+              "type": "item.details",
+              "area": "main",
+              "title": "Current match",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/cv_descriptor/current/current_match"
+              }
+            },
+            {
+              "id": "cv-work-descriptors",
+              "type": "ui.list",
+              "area": "right",
+              "title": "Known objects",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/cv_descriptor/descriptors"
+              },
+              "inputs": {
+                "collectionKey": "items",
+                "titleKey": "title",
+                "subtitleKey": "description",
+                "iconKey": "icon",
+                "emptyText": "No descriptors"
+              }
+            },
+            {
+              "id": "cv-work-events",
+              "type": "ui.list",
+              "area": "bottom",
+              "title": "Match events",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "cv_descriptor.events"
+              },
+              "inputs": {
+                "collectionKey": "items",
+                "titleKey": "title",
+                "subtitleKey": "description",
+                "emptyText": "No match events"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "widgets": {}
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "cv_descriptor_app",
+      "autoInstall": true
+    },
+    {
+      "extensionPoint": "desktop.widgets",
+      "type": "widget",
+      "id": "cv_descriptor_summary",
+      "autoInstall": false
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-06-30T12:40:48+00:00",
+  "updated_at": "2026-07-02T08:51:31+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -112,6 +112,27 @@
     },
     {
       "kind": "skill",
+      "id": "cv_descriptor",
+      "name": "cv_descriptor",
+      "version": "0.1.1",
+      "updated_at": "2026-07-02T08:51:31+00:00",
+      "path": "skills/cv_descriptor",
+      "manifest": "skills/cv_descriptor/skill.yaml",
+      "source": {
+        "path": "skills/cv_descriptor",
+        "manifest": "skills/cv_descriptor/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "cv_descriptor",
+        "id": "cv_descriptor"
+      },
+      "description": "Browser-side CV descriptor pilot. Stores visual-object embeddings, model signatures, thumbnails, and text descriptions while the AdaOS client CV runtime is being built.",
+      "runtime_python": "3.11",
+      "tools_count": 9
+    },
+    {
+      "kind": "skill",
       "id": "demo_metrics_skill",
       "name": "demo_metrics_skill",
       "version": "0.11.2",
@@ -130,6 +151,39 @@
       "description": "Neutral demo skill for semantic Web UI migration with a metrics table, chart payload, and live event stream.",
       "runtime_python": "3.11",
       "tools_count": 3
+    },
+    {
+      "kind": "skill",
+      "id": "diagnostics_skill",
+      "name": "diagnostics_skill",
+      "version": "0.1.0",
+      "updated_at": "2026-07-01T00:00:00+00:00",
+      "path": "skills/diagnostics_skill",
+      "manifest": "skills/diagnostics_skill/skill.yaml",
+      "source": {
+        "path": "skills/diagnostics_skill",
+        "manifest": "skills/diagnostics_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "diagnostics_skill",
+        "id": "diagnostics_skill"
+      },
+      "description": "Read-only diagnostics dashboard for AdaOS runtime, Root MCP, Skill Factory, workspace registry, and local logs.",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "web_desktop"
+          ],
+          "client_presence": true,
+          "webspace_scope": "active"
+        },
+        "startup_allowed": true,
+        "background_refresh": false
+      },
+      "tools_count": 2
     },
     {
       "kind": "skill",
@@ -799,8 +853,8 @@
       "kind": "scenario",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.9",
-      "updated_at": "2026-06-24T05:18:59+00:00",
+      "version": "0.3.10",
+      "updated_at": "2026-07-01T00:00:00+00:00",
       "path": "scenarios/web_desktop",
       "manifest": "scenarios/web_desktop/scenario.yaml",
       "source": {
@@ -818,7 +872,8 @@
           "web_desktop_skill",
           "greet_on_boot_skill",
           "pair_new_device_skill",
-          "voice_chat_skill"
+          "voice_chat_skill",
+          "diagnostics_skill"
         ]
       }
     }
