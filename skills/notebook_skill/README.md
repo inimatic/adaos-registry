@@ -2,9 +2,12 @@
 
 Shared plain-text notebook for AdaOS Web UI.
 
-The first version keeps note records in process memory and projects the selected
-note into Yjs at `data/notebook/editor`. The note list is published through the
+Notebook keeps note records in skill-local memory and projects the selected note
+into Yjs at `data/desktop/notebook/editor`. The note list is published through the
 `notebook_skill.notes` stream. Only one note is selected for editing at a time.
+
+Editor changes are auto-saved through the `save_note` skill action and then
+republished to Yjs; there is no manual Save button.
 
 Telegram export uses the root `/io/tg/send` outbox contract. Configure a paired
 hub or set `TG_CHAT_ID` / `TELEGRAM_CHAT_ID`.

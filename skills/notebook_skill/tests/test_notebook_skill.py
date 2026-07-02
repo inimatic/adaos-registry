@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 from pathlib import Path
 
@@ -10,13 +11,20 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 
-def load_module(monkeypatch):
+def load_module(monkeypatch, memory=None):
     mod = importlib.import_module("handlers.main")
     mod = importlib.reload(mod)
     projected = []
     streams = []
-    monkeypatch.setattr(mod.ctx_subnet, "set", lambda slot, value, webspace_id=None: projected.append((slot, value, webspace_id)))
+    memory = {} if memory is None else memory
+    monkeypatch.setattr(
+        mod,
+        "_project_notebook_snapshot",
+        lambda value, webspace_id=None: projected.append(("notebook.snapshot", value, webspace_id)),
+    )
     monkeypatch.setattr(mod, "stream_publish", lambda receiver, data=None, _meta=None: streams.append((receiver, data, _meta)))
+    monkeypatch.setattr(mod, "skill_memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(mod, "skill_memory_set", lambda key, value: memory.__setitem__(key, value))
     return mod, projected, streams
 
 
@@ -54,14 +62,39 @@ def test_delete_selected_note_falls_back_to_remaining_note(monkeypatch):
 
 def test_snapshot_request_republishes_note_list(monkeypatch):
     mod, _projected, streams = load_module(monkeypatch)
+    mod.save_note({"note_id": "note-1", "content": "Stream title\nStream body", "source": "editor_change"})
 
     mod.on_webio_stream_snapshot_requested({"receiver": "notebook_skill.notes", "webspace_id": "desktop"})
 
     assert streams
     receiver, payload, meta = streams[-1]
     assert receiver == "notebook_skill.notes"
+    assert payload["_stream_require_revision"] is True
+    assert isinstance(payload["_stream_rev"], int)
     assert payload["items"][0]["id"] == "note-1"
+    assert payload["editor"]["content"] == "Stream title\nStream body"
+    assert payload["widget"]["items"][0]["title"] == "Stream title"
+    assert payload["widget"]["items"][0]["text"] == "Stream body"
     assert meta["webspace_id"] == "desktop"
+
+
+def test_snapshot_request_reloads_durable_state_before_publish(monkeypatch):
+    memory = {}
+    mod, _projected, streams = load_module(monkeypatch, memory=memory)
+    mod.save_note({"note_id": "note-1", "content": "Old title\nOld body", "source": "editor_change", "webspace_id": "desktop"})
+    stored = json.loads(json.dumps(memory[mod._memory_key("desktop")]))
+    stored["notes"]["note-1"]["content"] = "Fresh title\nFresh body"
+    stored["notes"]["note-1"]["updated_at"] += 10
+    stored["notes"]["note-1"]["version"] += 1
+    memory[mod._memory_key("desktop")] = stored
+    mod._STATE["notes"]["note-1"]["content"] = "Old title\nOld body"
+    mod._LOADED_WEBSPACES.add("desktop")
+
+    mod.on_webio_stream_snapshot_requested({"receiver": "notebook_skill.notes", "webspace_id": "desktop"})
+
+    assert streams[-1][1]["editor"]["content"] == "Fresh title\nFresh body"
+    assert streams[-1][1]["widget"]["items"][0]["title"] == "Fresh title"
+    assert streams[-1][1]["widget"]["items"][0]["text"] == "Fresh body"
 
 
 def test_actions_default_to_desktop_webspace(monkeypatch):
@@ -85,6 +118,122 @@ def test_save_note_ignores_unresolved_content_placeholders(monkeypatch):
     assert result["ok"] is False
     assert result["error"] == "content_required"
     assert mod.get_notebook_snapshot()["snapshot"]["editor"]["content"] == "Keep me"
+
+
+def test_save_note_rejects_stale_empty_state_but_allows_editor_clear(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+
+    mod.save_note({"note_id": "note-1", "content": "Keep me"})
+
+    stale = mod.save_note({"note_id": "note-1", "content": ""})
+
+    assert stale["ok"] is False
+    assert stale["error"] == "stale_empty_content"
+    assert mod.get_notebook_snapshot()["snapshot"]["editor"]["content"] == "Keep me"
+
+    cleared = mod.save_note({"note_id": "note-1", "content": "", "source": "editor_change"})
+
+    assert cleared["ok"] is True
+    assert cleared["note"]["content"] == ""
+
+
+def test_notebook_state_rehydrates_from_skill_memory(monkeypatch):
+    memory = {}
+    mod, _projected, _streams = load_module(monkeypatch, memory=memory)
+
+    mod.save_note({"note_id": "note-1", "content": "Persisted title\nPersisted body", "webspace_id": "desktop"})
+
+    mod, projected, streams = load_module(monkeypatch, memory=memory)
+    snapshot = mod.get_notebook_snapshot({"webspace_id": "desktop"})["snapshot"]
+
+    assert snapshot["editor"]["content"] == "Persisted title\nPersisted body"
+    assert snapshot["notes"]["items"][0]["title"] == "Persisted title"
+    assert snapshot["notes"]["items"][0]["preview"] == "Persisted body"
+    assert snapshot["widget"]["items"][0]["text"] == "Persisted body"
+    assert projected[-1][1]["editor"]["content"] == "Persisted title\nPersisted body"
+    assert streams[-1][1]["items"][0]["preview"] == "Persisted body"
+
+
+def test_notebook_state_persists_to_projected_webspaces(monkeypatch):
+    memory = {}
+    mod, _projected, _streams = load_module(monkeypatch, memory=memory)
+
+    mod.save_note({"note_id": "note-1", "content": "Shared title\nShared body", "webspace_id": "desktop-dev"})
+
+    for ws in ["desktop-dev", "desktop", "default"]:
+        stored = memory[mod._memory_key(ws)]
+        assert stored["notes"]["note-1"]["content"] == "Shared title\nShared body"
+
+
+def test_yjs_reload_completion_reprojects_notebook_snapshot(monkeypatch):
+    memory = {}
+    mod, projected, _streams = load_module(monkeypatch, memory=memory)
+    monkeypatch.setattr(mod, "_RELOAD_REPUBLISH_DELAYS", ())
+    mod.save_note({"note_id": "note-1", "content": "Reloaded title\nReloaded body", "webspace_id": "desktop-dev"})
+    projected.clear()
+
+    mod.on_yjs_control_completed({"action": "reload", "webspace_id": "desktop", "ok": True, "accepted": True})
+
+    assert projected[-1][2] == "desktop"
+    assert projected[-1][1]["widget"]["items"][0]["title"] == "Reloaded title"
+    assert projected[-1][1]["widget"]["items"][0]["text"] == "Reloaded body"
+
+
+def test_notebook_back_action_does_not_save_empty_state():
+    webui = json.loads((SKILL_ROOT / "webui.json").read_text(encoding="utf-8"))
+    widgets = webui["registry"]["modals"]["notebook_modal"]["schema"]["widgets"]
+    back = next(item for item in widgets if item["id"] == "notebook-back")
+
+    assert all(action.get("target") != "notebook_skill.save_note" for action in back["actions"])
+
+
+def test_notebook_ui_reads_editor_and_widget_from_stream():
+    webui = json.loads((SKILL_ROOT / "webui.json").read_text(encoding="utf-8"))
+    ui = webui["interface"]
+    desktop_widget = next(item for item in webui["widgets"] if item["id"] == "notebook_skill_last_note")
+    modal = webui["registry"]["modals"]["notebook_modal"]
+    modal_schema = modal["schema"]
+    modal_widgets = modal_schema["widgets"]
+    editor = next(item for item in modal_widgets if item["id"] == "notebook-editor")
+    attachments = next(item for item in modal_widgets if item["id"] == "notebook-attachments")
+    modal_list = next(item for item in modal_widgets if item["id"] == "notebook-notes")
+
+    assert "notebook.latest" in ui["views"]
+    assert ui["views"]["notebook.note.edit"]["params"]["note_id"]["required"] is True
+    assert "notebook.note.edit" in modal["implements"]
+    assert modal_schema["interface"]["defaultRoute"] == "notes.list"
+    assert modal_schema["interface"]["routes"]["note.edit"]["state"] == {
+        "notebookViewMode": "edit",
+        "notebookSelectedNoteId": "$params.note_id",
+    }
+    assert desktop_widget["dataSource"] == {
+        "kind": "stream",
+        "receiver": "notebook_skill.notes",
+        "path": "widget",
+    }
+    assert desktop_widget["inputs"]["detailsPresentation"] == "body"
+    assert desktop_widget["inputs"]["cardShell"] is True
+    assert "hideTitle" not in desktop_widget["inputs"]
+    assert desktop_widget["actions"][0]["type"] == "callSkill"
+    assert desktop_widget["actions"][1]["type"] == "navigate"
+    assert desktop_widget["actions"][1]["params"]["to"] == "notebook.note.edit"
+    assert desktop_widget["actions"][1]["params"]["params"]["note_id"] == "$event.id"
+    assert modal_list["actions"][0]["type"] == "navigateModal"
+    assert modal_list["actions"][0]["params"] == {
+        "route": "note.edit",
+        "params": {"note_id": "$event.id"},
+    }
+    assert editor["dataSource"] == {
+        "kind": "stream",
+        "receiver": "notebook_skill.notes",
+        "path": "editor",
+    }
+    assert attachments["dataSource"] == {
+        "kind": "stream",
+        "receiver": "notebook_skill.notes",
+        "path": "editor",
+    }
+    assert attachments["inputs"]["collectionKey"] == "attachments"
 
 
 def test_send_note_to_telegram_uses_root_outbox_contract(monkeypatch):
@@ -134,6 +283,32 @@ def test_attach_note_file_updates_editor_and_widget(monkeypatch):
     assert projected[-1][1]["editor"]["attachments"][0]["name"] == "photo.jpg"
 
 
+def test_attach_note_upload_accepts_sanitized_upload_payload(monkeypatch):
+    mod, projected, _streams = load_module(monkeypatch)
+    created = mod.create_note({"content": "with upload", "webspace_id": "desktop"})
+    note_id = created["note"]["id"]
+
+    result = mod.attach_note_upload({
+        "note_id": note_id,
+        "kind": "photo",
+        "upload": {
+            "name": "photo.gif",
+            "size_bytes": 123,
+            "mime": "image/gif",
+            "sha256": "a" * 64,
+            "purpose": "photos",
+        },
+        "webspace_id": "desktop",
+        "side_effect_class": "local_write",
+    })
+
+    assert result["ok"] is True
+    assert result["attachment"]["kind"] == "photo"
+    assert result["attachment"]["name"] == "photo.gif"
+    assert result["attachment"]["artifact_ref"]["artifact_id"] == "skill_file:notebook_skill:photos:aaaaaaaaaaaaaaaa"
+    assert projected[-1][1]["editor"]["attachments"][0]["mime"] == "image/gif"
+
+
 def test_note_cards_use_first_line_title_and_remaining_preview(monkeypatch):
     mod, _projected, _streams = load_module(monkeypatch)
 
@@ -141,7 +316,10 @@ def test_note_cards_use_first_line_title_and_remaining_preview(monkeypatch):
     item = created["snapshot"]["notes"]["items"][0]
 
     assert item["title"] == "Heading"
+    assert item["content"] == "Heading\nBody line one\nBody line two"
+    assert item["text"] == "Body line one\nBody line two"
     assert item["preview"] == "Body line one\nBody line two"
+    assert item["description"] == "Body line one\nBody line two"
 
 
 def test_widget_snapshot_uses_latest_changed_note(monkeypatch):
@@ -155,3 +333,5 @@ def test_widget_snapshot_uses_latest_changed_note(monkeypatch):
     assert snapshot["editor"]["id"] == second["note"]["id"]
     assert snapshot["widget"]["items"][0]["id"] == first["note"]["id"]
     assert snapshot["widget"]["items"][0]["title"] == "First note"
+    assert snapshot["widget"]["items"][0]["text"] == "updated"
+    assert snapshot["widget"]["items"][0]["content"] == "First note\nupdated"

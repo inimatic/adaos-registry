@@ -42,6 +42,81 @@
       }
     }
   },
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "defaultView": "notebook.notes.list",
+    "views": {
+      "notebook.latest": {
+        "title": "Latest note",
+        "surfaces": ["widget"],
+        "params": {},
+        "data": {
+          "note": {
+            "source": "notebook_skill.notes",
+            "path": "widget.items.0"
+          }
+        }
+      },
+      "notebook.notes.list": {
+        "title": "Notes",
+        "surfaces": ["modal"],
+        "params": {},
+        "data": {
+          "notes": {
+            "source": "notebook_skill.notes",
+            "path": "items"
+          }
+        }
+      },
+      "notebook.note.edit": {
+        "title": "Edit note",
+        "surfaces": ["modal"],
+        "params": {
+          "note_id": {
+            "type": "string",
+            "required": true
+          }
+        },
+        "data": {
+          "note": {
+            "source": "notebook_skill.notes",
+            "path": "editor"
+          }
+        }
+      },
+      "notebook.note.new": {
+        "title": "New note",
+        "surfaces": ["modal"],
+        "params": {}
+      }
+    },
+    "transitions": [
+      {
+        "from": "notebook.latest",
+        "on": "select",
+        "to": "notebook.note.edit",
+        "surface": "modal",
+        "params": {
+          "note_id": "$event.id"
+        }
+      },
+      {
+        "from": "notebook.notes.list",
+        "on": "select",
+        "to": "notebook.note.edit",
+        "surface": "modal",
+        "params": {
+          "note_id": "$event.id"
+        }
+      },
+      {
+        "from": "notebook.note.edit",
+        "on": "back",
+        "to": "notebook.notes.list",
+        "surface": "modal"
+      }
+    ]
+  },
   "apps": [
     {
       "id": "notebook_skill_app",
@@ -62,25 +137,40 @@
       "type": "ui.list",
       "icon": "document-text-outline",
       "dataSource": {
-        "kind": "y",
-        "path": "data/notebook/widget",
-        "observeRoot": true
+        "kind": "stream",
+        "receiver": "notebook_skill.notes",
+        "path": "widget"
       },
       "inputs": {
         "collectionKey": "items",
         "titleKey": "title",
         "subtitleKey": "updated_at",
-        "detailsPath": "content",
+        "detailsPath": "text",
         "showDetails": true,
+        "detailsPresentation": "body",
+        "cardShell": true,
         "itemAccordion": false,
         "emptyText": "No note yet"
       },
       "actions": [
         {
           "on": "select",
-          "type": "openModal",
+          "type": "callSkill",
+          "target": "notebook_skill.select_note",
           "params": {
-            "modalId": "notebook_modal"
+            "note_id": "$event.id",
+            "edit": true
+          }
+        },
+        {
+          "on": "select",
+          "type": "navigate",
+          "params": {
+            "to": "notebook.note.edit",
+            "surface": "modal",
+            "params": {
+              "note_id": "$event.id"
+            }
           }
         }
       ]
@@ -90,11 +180,52 @@
     "modals": {
       "notebook_modal": {
         "title": "Notebook",
+        "implements": [
+          "notebook.notes.list",
+          "notebook.note.edit",
+          "notebook.note.new"
+        ],
         "presentation": {
           "kind": "fullscreen"
         },
         "schema": {
           "id": "notebook_modal",
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "defaultRoute": "notes.list",
+            "routes": {
+              "notes.list": {
+                "view": "notebook.notes.list",
+                "params": {},
+                "state": {
+                  "notebookViewMode": "list",
+                  "notebookSelectedNoteId": ""
+                }
+              },
+              "note.edit": {
+                "view": "notebook.note.edit",
+                "params": {
+                  "note_id": {
+                    "type": "string",
+                    "required": true
+                  }
+                },
+                "state": {
+                  "notebookViewMode": "edit",
+                  "notebookSelectedNoteId": "$params.note_id"
+                }
+              },
+              "note.new": {
+                "view": "notebook.note.new",
+                "params": {},
+                "state": {
+                  "notebookViewMode": "edit",
+                  "notebookSelectedNoteId": "",
+                  "notebookEditorContent": ""
+                }
+              }
+            }
+          },
           "initialState": {
             "notebookViewMode": "list",
             "notebookSelectedNoteId": ""
@@ -145,10 +276,12 @@
               "actions": [
                 {
                   "on": "select",
-                  "type": "updateState",
+                  "type": "navigateModal",
                   "params": {
-                    "notebookViewMode": "edit",
-                    "notebookSelectedNoteId": "$event.id"
+                    "route": "note.edit",
+                    "params": {
+                      "note_id": "$event.id"
+                    }
                   }
                 },
                 {
@@ -170,11 +303,9 @@
                 },
                 {
                   "on": "add",
-                  "type": "updateState",
+                  "type": "navigateModal",
                   "params": {
-                    "notebookViewMode": "edit",
-                    "notebookSelectedNoteId": "",
-                    "notebookEditorContent": ""
+                    "route": "note.new"
                   }
                 }
               ]
@@ -194,18 +325,9 @@
               "actions": [
                 {
                   "on": "click:back",
-                  "type": "callSkill",
-                  "target": "notebook_skill.save_note",
+                  "type": "navigateModal",
                   "params": {
-                    "note_id": "$state.notebookSelectedNoteId",
-                    "content": "$state.notebookEditorContent"
-                  }
-                },
-                {
-                  "on": "click:back",
-                  "type": "updateState",
-                  "params": {
-                    "notebookViewMode": "list"
+                    "route": "notes.list"
                   }
                 }
               ]
@@ -217,9 +339,9 @@
               "title": "Editor",
               "visibleIf": "$state.notebookViewMode === 'edit'",
               "dataSource": {
-                "kind": "y",
-                "path": "data/notebook/editor",
-                "observeRoot": true
+                "kind": "stream",
+                "receiver": "notebook_skill.notes",
+                "path": "editor"
               },
               "inputs": {
                 "bindField": "content",
@@ -237,7 +359,9 @@
                   "target": "notebook_skill.save_note",
                   "params": {
                     "note_id": "$state.notebookSelectedNoteId",
-                    "content": "$event.content"
+                    "content": "$event.content",
+                    "source": "editor_change",
+                    "side_effect_class": "local_write"
                   }
                 }
               ]
@@ -249,11 +373,12 @@
               "title": "Attachments",
               "visibleIf": "$state.notebookViewMode === 'edit'",
               "dataSource": {
-                "kind": "y",
-                "path": "data/notebook/editor/attachments",
-                "observeRoot": true
+                "kind": "stream",
+                "receiver": "notebook_skill.notes",
+                "path": "editor"
               },
               "inputs": {
+                "collectionKey": "attachments",
                 "titleKey": "name",
                 "subtitleKey": "mime",
                 "detailsPath": "path",
@@ -277,13 +402,18 @@
                 {
                   "on": "uploaded",
                   "type": "callSkill",
-                  "target": "notebook_skill.attach_note_file",
+                  "target": "notebook_skill.attach_note_upload",
                   "params": {
                     "note_id": "$state.notebookSelectedNoteId",
                     "kind": "photo",
-                    "artifact_ref": "$event.artifact_ref",
-                    "file": "$event.file",
-                    "path": "$event.path"
+                    "side_effect_class": "local_write",
+                    "upload": {
+                      "name": "$event.file.name",
+                      "mime": "$event.file.mime",
+                      "size_bytes": "$event.file.size_bytes",
+                      "sha256": "$event.artifact_ref.sha256",
+                      "purpose": "photos"
+                    }
                   }
                 }
               ]
@@ -305,13 +435,18 @@
                 {
                   "on": "uploaded",
                   "type": "callSkill",
-                  "target": "notebook_skill.attach_note_file",
+                  "target": "notebook_skill.attach_note_upload",
                   "params": {
                     "note_id": "$state.notebookSelectedNoteId",
-                    "kind": "file",
-                    "artifact_ref": "$event.artifact_ref",
-                    "file": "$event.file",
-                    "path": "$event.path"
+                    "kind": "attachment",
+                    "side_effect_class": "local_write",
+                    "upload": {
+                      "name": "$event.file.name",
+                      "mime": "$event.file.mime",
+                      "size_bytes": "$event.file.size_bytes",
+                      "sha256": "$event.artifact_ref.sha256",
+                      "purpose": "attachments"
+                    }
                   }
                 }
               ]
@@ -343,25 +478,15 @@
                 },
                 {
                   "on": "click:new",
-                  "type": "updateState",
+                  "type": "navigateModal",
                   "params": {
-                    "notebookSelectedNoteId": "",
-                    "notebookEditorContent": ""
+                    "route": "note.new"
                   }
                 },
                 {
                   "on": "click:refresh",
                   "type": "callSkill",
                   "target": "notebook_skill.get_notebook_snapshot"
-                },
-                {
-                  "on": "click:telegram",
-                  "type": "callSkill",
-                  "target": "notebook_skill.save_note",
-                  "params": {
-                    "note_id": "$state.notebookSelectedNoteId",
-                    "content": "$state.notebookEditorContent"
-                  }
                 },
                 {
                   "on": "click:telegram",
@@ -381,9 +506,9 @@
                 },
                 {
                   "on": "click:delete",
-                  "type": "updateState",
+                  "type": "navigateModal",
                   "params": {
-                    "notebookViewMode": "list"
+                    "route": "notes.list"
                   }
                 }
               ]
@@ -394,7 +519,7 @@
     }
   },
   "ydoc_defaults": {
-    "data/notebook": {
+    "data/desktop/notebook": {
       "selected_note_id": "note-1",
       "display_note_id": "note-1",
       "editing_note_id": "",
@@ -420,6 +545,9 @@
             "title": "New note",
             "subtitle": "",
             "content": "",
+            "text": "",
+            "preview": "",
+            "description": "",
             "attachments": [],
             "updated_at": null
           }

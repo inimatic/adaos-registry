@@ -1,9 +1,10 @@
 name: notebook_skill
-version: 0.1.7
+version: 0.1.26
 description: Shared plain-text notebook with one active editable note, a live note
   list stream, and Telegram export.
 runtime:
   python: '3.11'
+webui_owner: shared
 events:
   subscribe:
   - webio.stream.snapshot.requested
@@ -13,14 +14,15 @@ data_projections:
   slot: notebook.snapshot
   targets:
   - backend: yjs
-    path: data/notebook
+    webspace_id: desktop
+    path: data/desktop/notebook
 data_routes:
 - surface: modal:notebook_modal
-  route: yjs
-  projection_slot: notebook.snapshot
-  path: data/notebook/editor
-  first_paint: default selected note from webui defaults
-  recovery: latest active note content is restored from Yjs projection
+  route: stream
+  receiver: notebook_skill.notes
+  path: editor
+  first_paint: selected note from stream snapshot
+  recovery: skill republishes durable state on stream subscribe
   update_source:
   - notebook_skill.action
   budget:
@@ -28,7 +30,7 @@ data_routes:
     max_publish_hz: 2
     snapshot_policy: on_subscribe
   guard_visibility:
-    degraded_state: editor keeps the last projected note
+    degraded_state: editor keeps the last stream snapshot
     log: skill:notebook_skill.runtime
     quarantine: false
 - surface: modal:notebook_modal
@@ -48,13 +50,34 @@ data_routes:
     degraded_state: note list keeps the last stream snapshot
     log: skill:notebook_skill.runtime
     quarantine: false
+- surface: desktop.widget:notebook_skill_last_note
+  route: stream
+  receiver: notebook_skill.notes
+  path: widget
+  first_paint: last note from stream snapshot
+  recovery: skill republishes durable state on stream subscribe
+  update_source:
+  - notebook_skill.action
+  - webio.stream.snapshot.requested
+  budget:
+    max_payload_bytes: 32768
+    max_publish_hz: 2
+    max_items: 1
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: last note widget keeps the last stream snapshot
+    log: skill:notebook_skill.runtime
+    quarantine: false
 memory_budget:
   expected_rss_mb: 64
   caches:
   - name: notebook.notes
-    storage: skill_memory_process
+    storage: skill_memory
     max_items: 64
     cleanup_hook: reset_notebook
+lifecycle:
+  persist_before_switch: notebook_persist_state
+  rehydrate: notebook_rehydrate
 tools:
 - name: get_notebook_snapshot
   entry: handlers.main:get_notebook_snapshot
@@ -121,6 +144,7 @@ tools:
 - name: save_note
   entry: handlers.main:save_note
   description: Save the active note content and publish updated Yjs/stream state.
+  side_effect_class: local_write
   input_schema:
     type: object
     properties:
@@ -128,7 +152,11 @@ tools:
         type: string
       content:
         type: string
+      source:
+        type: string
       webspace_id:
+        type: string
+      side_effect_class:
         type: string
   output_schema:
     type: object
@@ -168,9 +196,36 @@ tools:
         type: object
       note:
         type: object
+- name: attach_note_upload
+  entry: handlers.main:attach_note_upload
+  description: Attach uploaded media metadata to the selected note.
+  input_schema:
+    type: object
+    properties:
+      note_id:
+        type: string
+      kind:
+        type: string
+      upload:
+        type: object
+      webspace_id:
+        type: string
+      side_effect_class:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      attachment:
+        type: object
+      note:
+        type: object
 - name: delete_note
   entry: handlers.main:delete_note
-  description: Delete a note from the in-memory notebook.
+  description: Delete a note from the notebook.
   input_schema:
     type: object
     properties:
@@ -212,7 +267,7 @@ tools:
         type: object
 - name: reset_notebook
   entry: handlers.main:reset_notebook
-  description: Reset the process-local notebook state to the default note.
+  description: Reset the notebook state to the default note.
   input_schema:
     type: object
     properties:
@@ -225,7 +280,37 @@ tools:
     properties:
       ok:
         type: boolean
-updated_at: '2026-06-24T19:18:41+00:00'
+- name: notebook_persist_state
+  entry: handlers.main:notebook_persist_state
+  description: Persist the current notebook state for runtime handoff.
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+- name: notebook_rehydrate
+  entry: handlers.main:notebook_rehydrate
+  description: Restore notebook state from durable skill memory and republish it.
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+updated_at: '2026-06-30T19:45:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3182.28313b56

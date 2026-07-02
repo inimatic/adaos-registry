@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-02T08:51:31+00:00",
+  "updated_at": "2026-06-30T19:45:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -414,8 +414,8 @@
       "kind": "skill",
       "id": "notebook_skill",
       "name": "notebook_skill",
-      "version": "0.1.7",
-      "updated_at": "2026-06-24T19:18:41+00:00",
+      "version": "0.1.26",
+      "updated_at": "2026-06-30T19:45:00+00:00",
       "path": "skills/notebook_skill",
       "manifest": "skills/notebook_skill/skill.yaml",
       "source": {
@@ -429,7 +429,7 @@
       },
       "description": "Shared plain-text notebook with one active editable note, a live note list stream, and Telegram export.",
       "runtime_python": "3.11",
-      "tools_count": 8
+      "tools_count": 11
     },
     {
       "kind": "skill",
