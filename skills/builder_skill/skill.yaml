@@ -45,6 +45,7 @@ tools:
   - name: chat
     description: "Handle a Builder dialog turn and create or patch a scenario prototype."
     entry: "handlers.main:chat"
+    timeout_seconds: 120
     input_schema:
       type: object
       properties:
@@ -82,6 +83,7 @@ tools:
   - name: update_current_scenario
     description: "Apply a safe declarative UI patch to the current Builder scenario session."
     entry: "handlers.main:update_current_scenario"
+    timeout_seconds: 120
     input_schema:
       type: object
       required: [instruction]
