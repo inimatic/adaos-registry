@@ -27,6 +27,9 @@ PROMPT_IDE_SCENARIO_ID = "prompt_engineer_scenario"
 CHAT_APPEND_TIMEOUT_S = 0.75
 PENDING_ACTION_TIMEOUT_S = 1.5
 PROMPT_SELECTION_ASYNC_TOPICS = ("prompt.project.changed", "builder.preview.selected")
+BUILDER_MEMORY_FILE = "builder_memory.md"
+BUILDER_SYSTEM_PROMPT_FILE = "builder_system_prompt.md"
+PROMPT_TZ_BASE_FILE = Path("tz") / "base_tz.md"
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
 
@@ -118,6 +121,45 @@ def _hash_suffix(text: str) -> str:
 
 def _compact_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def _read_text_file(path: Path, *, limit: int | None = None) -> str:
+    try:
+        text = path.read_text(encoding="utf-8-sig")
+    except Exception:
+        return ""
+    if limit is not None and limit >= 0:
+        return text[:limit]
+    return text
+
+
+def _write_text_file(path: Path, value: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(value or ""), encoding="utf-8")
+
+
+def _load_json_file(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8-sig") or "{}")
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _project_artifact_root(session: Mapping[str, Any]) -> Path | None:
+    token = str(session.get("artifact_root") or "").strip()
+    if not token:
+        return None
+    try:
+        path = Path(token)
+    except Exception:
+        return None
+    try:
+        if path.exists() and path.is_dir():
+            return path
+    except Exception:
+        return None
+    return None
 
 
 def _builder_llm_timeout_s() -> float:
@@ -680,7 +722,11 @@ def _preferred_card_preview_key(fields: Sequence[Mapping[str, Any]], *, prefer_t
 def _card_key_from_template(value: Any) -> str:
     text = str(value or "").strip()
     match = re.fullmatch(r"\{\{\s*([A-Za-z_][\w.-]*)\s*\}\}", text)
-    return match.group(1) if match else text
+    if match:
+        return match.group(1)
+    if re.fullmatch(r"[A-Za-z_][\w.-]*", text):
+        return text
+    return ""
 
 
 def _preview_state(*, session: Mapping[str, Any]) -> dict[str, Any]:
@@ -775,6 +821,127 @@ def _mock_rows(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return rows
 
 
+def _default_builder_memory_text(preview_state: Mapping[str, Any]) -> str:
+    title = str(preview_state.get("title") or "Builder prototype").strip() or "Builder prototype"
+    summary = preview_state.get("user_summary") if isinstance(preview_state.get("user_summary"), Mapping) else {}
+    lines = [
+        f"# {title}",
+        "",
+        "This file is the editable project memory for AdaOS Builder.",
+        "Keep stable product decisions, domain vocabulary, UX preferences, and constraints here.",
+        "Builder includes this file in every LLM UI transform request.",
+    ]
+    for heading, key in (
+        ("Assumptions", "assumptions"),
+        ("Expected behavior", "expected_behavior"),
+        ("Preview notes", "preview"),
+        ("Risks", "risks"),
+    ):
+        values = summary.get(key) if isinstance(summary, Mapping) else None
+        if not isinstance(values, list) or not values:
+            continue
+        lines.extend(["", f"## {heading}"])
+        lines.extend(f"- {str(item)}" for item in values[:12])
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _default_builder_system_prompt_text() -> str:
+    return (
+        "# Builder project system prompt\n\n"
+        "Add project-specific instructions for AdaOS Builder here.\n"
+        "Prefer durable rules that should affect every future UI transform for this prototype.\n"
+        "Leave this file empty when no project-specific behavior is needed.\n"
+    )
+
+
+def _ensure_builder_project_files(root: Path, preview_state: Mapping[str, Any]) -> None:
+    memory_path = root / BUILDER_MEMORY_FILE
+    if not memory_path.exists():
+        _write_text_file(memory_path, _default_builder_memory_text(preview_state))
+    system_prompt_path = root / BUILDER_SYSTEM_PROMPT_FILE
+    if not system_prompt_path.exists():
+        _write_text_file(system_prompt_path, _default_builder_system_prompt_text())
+    tz_path = root / PROMPT_TZ_BASE_FILE
+    if not tz_path.exists():
+        _write_text_file(tz_path, _read_text_file(memory_path))
+    state_path = root / "prompt_state.json"
+    if state_path.exists():
+        state = _load_json_file(state_path)
+        if state and not str(state.get("base_tz") or "").strip():
+            state["base_tz"] = _read_text_file(tz_path)
+            state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _current_scenario_manifest(root: Path | None) -> dict[str, Any]:
+    if root is None:
+        return {}
+    scenario_json = root / "scenario.json"
+    if scenario_json.exists():
+        data = _load_json_file(scenario_json)
+        if data:
+            data["__path"] = str(scenario_json)
+            return _repair_text_tree(data)
+    scenario_yaml = root / "scenario.yaml"
+    if scenario_yaml.exists():
+        try:
+            import yaml
+
+            data = yaml.safe_load(scenario_yaml.read_text(encoding="utf-8")) or {}
+        except Exception:
+            data = {}
+        if isinstance(data, dict):
+            data["__path"] = str(scenario_yaml)
+            return _repair_text_tree(data)
+    return {}
+
+
+def _current_runtime_page_schema(root: Path | None) -> dict[str, Any]:
+    scenario = _current_scenario_manifest(root)
+    ui = scenario.get("ui") if isinstance(scenario.get("ui"), Mapping) else {}
+    app = ui.get("application") if isinstance(ui.get("application"), Mapping) else {}
+    desktop = app.get("desktop") if isinstance(app.get("desktop"), Mapping) else {}
+    page_schema = desktop.get("pageSchema") if isinstance(desktop.get("pageSchema"), Mapping) else {}
+    return _repair_text_tree(copy.deepcopy(dict(page_schema))) if page_schema else {}
+
+
+def _builder_runtime_component_contracts() -> dict[str, Any]:
+    return {
+        "ui.form": {
+            "purpose": "Editable input area for a draft record.",
+            "inputs": {
+                "fields": "Array of field descriptors: id, type, label. Supported field types: text, number, date, toggle.",
+                "submitLabel": "Button label.",
+                "submitPlacement": "Optional: top or bottom.",
+            },
+        },
+        "ui.table": {
+            "purpose": "Static table preview.",
+            "inputs": {
+                "columns": "Array of {key,label}. Boolean columns may include kind='boolean'.",
+                "filters": "Optional filters by row key/stateKey.",
+            },
+        },
+        "ui.list": {
+            "purpose": "List or card preview. For cards set inputs.variant='cards'.",
+            "inputs": {
+                "titleKey": "Single object path used as the card title.",
+                "subtitleKey": "Single object path used as the card subtitle.",
+                "previewKey": "Single object path used as the small preview text; this is not a template engine.",
+                "emptyText": "Empty-state text.",
+            },
+            "notes": [
+                "Do not put '{{a}} - {{b}}' into titleKey/subtitleKey/previewKey.",
+                "When a card needs combined text, add a derived string field to datasource fields and each mock_data row, then point previewKey to that field.",
+            ],
+        },
+        "layout": {
+            "areas": "The current rapid prototype normally uses split layout areas 'main' and 'right'.",
+            "move_widgets": "To move visible sections, update pageSchema.widgets[*].area and keep layout.areas consistent.",
+        },
+    }
+
+
 def _write_webui(artifact_root: str | None, preview_state: Mapping[str, Any]) -> None:
     if not artifact_root:
         return
@@ -782,6 +949,7 @@ def _write_webui(artifact_root: str | None, preview_state: Mapping[str, Any]) ->
     if not root.exists():
         return
     preview_state = _repair_text_tree(dict(preview_state))
+    _ensure_builder_project_files(root, preview_state)
     payload = {
         "schema": "adaos.webui.prototype.v1",
         "generated_by": SKILL_ID,
@@ -818,6 +986,8 @@ def _write_webui_payload(artifact_root: str | None, payload: Mapping[str, Any]) 
         return
     data = _repair_text_tree(dict(payload))
     preview_state = data.get("preview_state") if isinstance(data.get("preview_state"), Mapping) else {}
+    if isinstance(preview_state, Mapping):
+        _ensure_builder_project_files(root, preview_state)
     data.setdefault("schema", "adaos.webui.prototype.v1")
     data.setdefault("generated_by", SKILL_ID)
     (root / "webui.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -865,6 +1035,8 @@ def _compact_llm_result(result: Mapping[str, Any] | None) -> dict[str, Any] | No
     for key in ("ok", "error", "detail", "comment", "unable_reason", "attempts"):
         if key in result:
             compact[key] = copy.deepcopy(result.get(key))
+    if isinstance(result.get("timing"), Mapping):
+        compact["timing"] = copy.deepcopy(dict(result["timing"]))
     if isinstance(result.get("validation"), Mapping):
         compact["validation"] = copy.deepcopy(dict(result["validation"]))
     raw = str(result.get("last_response") or result.get("raw_response") or "").strip()
@@ -1061,6 +1233,19 @@ def _normalise_page_schema_candidate(value: Any, *, title: str, page_id: str) ->
         if not item_type:
             continue
         item["type"] = item_type
+        if item_type == "ui.list":
+            inputs = item.get("inputs") if isinstance(item.get("inputs"), Mapping) else {}
+            if inputs:
+                clean_inputs = copy.deepcopy(dict(inputs))
+                for key in ("titleKey", "subtitleKey", "previewKey"):
+                    if key not in clean_inputs:
+                        continue
+                    clean_key = _card_key_from_template(clean_inputs.get(key))
+                    if clean_key:
+                        clean_inputs[key] = clean_key
+                    else:
+                        clean_inputs.pop(key, None)
+                item["inputs"] = clean_inputs
         clean_widgets.append(item)
     if not clean_widgets:
         return None
@@ -1665,7 +1850,14 @@ def _repair_mojibake_text(value: Any) -> str:
         bad_pairs = sum(candidate.count(token) for token in ("Р", "С", "Ð", "Ñ", "\ufffd"))
         bad_question_runs = len(re.findall(r"\?{2,}", candidate))
         cyrillic = sum(1 for ch in candidate if "\u0400" <= ch <= "\u04ff")
-        return (bad_pairs + bad_question_runs * 4, -cyrillic, len(candidate))
+        mojibake_cyrillic_pairs = len(re.findall(r"[\u0420\u0421][\u0400-\u04ff]", candidate))
+        mojibake_latin_pairs = len(re.findall(r"[\u00d0\u00d1][\x80-\xff]", candidate))
+        rare_cyrillic = sum(candidate.count(token) for token in ("\u0403", "\u040a", "\u040c", "\u040b", "\u040f", "\u0453", "\u045a", "\u045c", "\u045f", "\u0491", "\u0490"))
+        return (
+            bad_pairs * 8 + mojibake_cyrillic_pairs * 3 + mojibake_latin_pairs * 3 + rare_cyrillic * 2 + bad_question_runs * 4,
+            -cyrillic,
+            len(candidate),
+        )
 
     repaired = min(candidates, key=score)
     return "".join(
@@ -2011,19 +2203,31 @@ def _builder_llm_job_poll_interval_s() -> float:
 
 
 def _project_memory(session: Mapping[str, Any]) -> dict[str, Any]:
-    artifact_root = str(session.get("artifact_root") or "").strip()
+    artifact_root = _project_artifact_root(session)
     memory_text = ""
-    if artifact_root:
-        path = Path(artifact_root) / "builder_memory.md"
+    technical_spec_text = ""
+    system_prompt_text = ""
+    if artifact_root is not None:
+        path = artifact_root / BUILDER_MEMORY_FILE
         if path.exists():
-            try:
-                memory_text = path.read_text(encoding="utf-8-sig")[:12000]
-            except Exception:
-                memory_text = ""
+            memory_text = _read_text_file(path, limit=12000)
+        tz_path = artifact_root / PROMPT_TZ_BASE_FILE
+        if tz_path.exists():
+            technical_spec_text = _read_text_file(tz_path, limit=12000)
+        system_prompt_path = artifact_root / BUILDER_SYSTEM_PROMPT_FILE
+        if system_prompt_path.exists():
+            system_prompt_text = _read_text_file(system_prompt_path, limit=8000)
     return {
         "source_idea": str(session.get("source_idea") or ""),
         "user_summary": copy.deepcopy(dict(session.get("user_summary") or {})) if isinstance(session.get("user_summary"), Mapping) else {},
         "memory_text": memory_text,
+        "technical_spec_text": technical_spec_text,
+        "project_system_prompt_text": system_prompt_text,
+        "editable_files": {
+            "project_memory": BUILDER_MEMORY_FILE,
+            "technical_specification": str(PROMPT_TZ_BASE_FILE).replace("\\", "/"),
+            "project_system_prompt": BUILDER_SYSTEM_PROMPT_FILE,
+        },
         "current_revision": str(session.get("ui_revision") or ""),
         "recent_revisions": [
             {
@@ -2038,20 +2242,40 @@ def _project_memory(session: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _current_webui_payload(session: Mapping[str, Any], preview_state: Mapping[str, Any]) -> dict[str, Any]:
-    artifact_root = str(session.get("artifact_root") or "").strip()
+    artifact_root = _project_artifact_root(session)
     payload: dict[str, Any] = {}
-    if artifact_root:
-        path = Path(artifact_root) / "webui.json"
+    runtime_page_schema: dict[str, Any] = {}
+    scenario_manifest: dict[str, Any] = {}
+    if artifact_root is not None:
+        _ensure_builder_project_files(artifact_root, preview_state)
+        path = artifact_root / "webui.json"
         if path.exists():
-            try:
-                raw = json.loads(path.read_text(encoding="utf-8-sig") or "{}")
-                if isinstance(raw, dict):
-                    payload = raw
-            except Exception:
-                payload = {}
+            raw = _load_json_file(path)
+            if raw:
+                payload = raw
+        scenario_manifest = _current_scenario_manifest(artifact_root)
+        runtime_page_schema = _current_runtime_page_schema(artifact_root)
     payload.setdefault("schema", "adaos.webui.prototype.v1")
     payload.setdefault("generated_by", SKILL_ID)
-    payload["preview_state"] = copy.deepcopy(dict(preview_state))
+    preview = copy.deepcopy(dict(preview_state))
+    if runtime_page_schema and not isinstance(preview.get("page_schema"), Mapping):
+        preview["page_schema"] = copy.deepcopy(runtime_page_schema)
+    payload["preview_state"] = preview
+    payload["runtime_context"] = {
+        "scenario_manifest_path": str(scenario_manifest.get("__path") or "") if scenario_manifest else "",
+        "scenario_manifest_summary": {
+            "id": scenario_manifest.get("id"),
+            "name": scenario_manifest.get("name"),
+            "title": scenario_manifest.get("title"),
+            "type": scenario_manifest.get("type"),
+            "depends": scenario_manifest.get("depends") if isinstance(scenario_manifest.get("depends"), list) else [],
+            "runtime": scenario_manifest.get("runtime") if isinstance(scenario_manifest.get("runtime"), Mapping) else {},
+        }
+        if scenario_manifest
+        else {},
+        "current_page_schema": runtime_page_schema,
+        "component_contracts": _builder_runtime_component_contracts(),
+    }
     return payload
 
 
@@ -2063,6 +2287,8 @@ def _builder_llm_webui_transform_request(
 ) -> dict[str, Any]:
     current_payload = _current_webui_payload(session, preview_state)
     schema = _load_webui_schema()
+    project_memory = _project_memory(session)
+    project_system_prompt = str(project_memory.get("project_system_prompt_text") or "").strip()
     history = [
         {
             "operation": str(item.get("operation") or ""),
@@ -2079,7 +2305,10 @@ def _builder_llm_webui_transform_request(
         "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
         "The root object must keep schema='adaos.webui.prototype.v1', generated_by='builder_skill', and preview_state. "
         "preview_state.current_ui is the compact Builder preview contract. "
-        "preview_state.page_schema is optional and may contain a full AdaOS pageSchema with layout/widgets; use it when the user asks to move, remove, or redesign widgets. "
+        "preview_state.page_schema is the renderable AdaOS runtime pageSchema when present. "
+        "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update preview_state.page_schema.widgets and layout too; do not only reorder compact current_ui.children. "
+        "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
+        "If cards need combined text like status plus date, add a derived string field to datasources and mock_data rows, then point previewKey to that field. "
         "Use the supplied adaos.webui.v1 schema as the webui.json compatibility contract. "
         "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
         "When the user asks for sample data, realistic examples, a different domain, or translation, update preview_state.mock_data directly for the active datasource instead of leaving old rows in place. "
@@ -2087,12 +2316,15 @@ def _builder_llm_webui_transform_request(
         "For checkbox/toggle semantics use boolean fields and boolean UI/table kinds; do not represent booleans as literal strings like 'true'/'false' unless the user asks for text. "
         "If you cannot safely satisfy the request, keep the previous UI valid and set unable_reason plus a short comment."
     )
+    if project_system_prompt and project_system_prompt != _default_builder_system_prompt_text().strip():
+        system_prompt += "\n\nProject-specific Builder system prompt:\n" + project_system_prompt[:8000]
     base_request = {
         "instruction": instruction,
         "scenario_id": session.get("scenario_id"),
         "title": session.get("title"),
         "current_webui_json": current_payload,
-        "project_memory": _project_memory(session),
+        "project_memory": project_memory,
+        "runtime_component_contracts": _builder_runtime_component_contracts(),
         "recent_patch_history": history,
         "webui_v1_schema": schema,
         "required_output_shape": {
@@ -2105,7 +2337,7 @@ def _builder_llm_webui_transform_request(
                 "mock_data": "object",
                 "filters": "array optional",
                 "form_action_position": "top|bottom optional",
-                "page_schema": "optional AdaOS pageSchema object with layout/widgets",
+                "page_schema": "AdaOS pageSchema object with layout/widgets; include it when changing visible runtime layout/widgets",
             },
             "comment": "short user-facing text about what changed or why it could not be changed",
             "unable_reason": "short optional diagnostic if request cannot be implemented",
@@ -2262,6 +2494,15 @@ def _normalise_llm_webui_payload(
     for key in ("session_id", "title", "version"):
         if not preview_data.get(key) and previous_preview.get(key):
             preview_data[key] = copy.deepcopy(previous_preview.get(key))
+    previous_page_schema = previous_preview.get("page_schema") if isinstance(previous_preview.get("page_schema"), Mapping) else None
+    current_page_schema = preview_data.get("page_schema") if isinstance(preview_data.get("page_schema"), Mapping) else None
+    if previous_page_schema is not None and current_page_schema is not None:
+        previous_compact = copy.deepcopy(dict(previous_preview))
+        current_compact = copy.deepcopy(dict(preview_data))
+        previous_compact.pop("page_schema", None)
+        current_compact.pop("page_schema", None)
+        if _compact_json(previous_page_schema) == _compact_json(current_page_schema) and _compact_json(previous_compact) != _compact_json(current_compact):
+            preview_data.pop("page_schema", None)
     data.setdefault("schema", "adaos.webui.prototype.v1")
     data.setdefault("generated_by", SKILL_ID)
     data["preview_state"] = preview_data
@@ -2339,7 +2580,7 @@ def _merge_session_from_preview(session: dict[str, Any], preview_state: Mapping[
             if str(cards_widget.get("area") or "") == "main" and str(form_widget.get("area") or "") == "right":
                 layout_order = "cards_first"
             inputs = cards_widget.get("inputs") if isinstance(cards_widget.get("inputs"), Mapping) else {}
-            schema_preview_key = str(inputs.get("previewKey") or "").strip()
+            schema_preview_key = _card_key_from_template(inputs.get("previewKey"))
             if schema_preview_key:
                 session["card_preview_key"] = schema_preview_key
     if layout_order:
@@ -2415,7 +2656,12 @@ def _apply_llm_webui_transform(
             last_response = output_text
             try:
                 parsed = _extract_json_object(output_text)
-                payload, preview = _normalise_llm_webui_payload(parsed, previous_preview=preview_state)
+                payload, preview = _normalise_llm_webui_payload(
+                    parsed,
+                    previous_preview=current_payload.get("preview_state")
+                    if isinstance(current_payload.get("preview_state"), Mapping)
+                    else preview_state,
+                )
                 validation = _validate_builder_webui_payload(payload, preview)
                 attempts.append({"attempt": attempt, "ok": bool(validation.get("ok")), "request_id": request_id, "validation": validation})
                 if not validation.get("ok"):
@@ -4145,11 +4391,13 @@ def _submit_llm_webui_transform_job(
     preview_state: Mapping[str, Any],
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    started_at = _now()
     request = _builder_llm_webui_transform_request(
         session=session,
         instruction=instruction,
         preview_state=preview_state,
     )
+    context_ready_at = _now()
     current_payload = request["current_payload"]
     request_id = _builder_llm_request_id(
         session=session,
@@ -4171,15 +4419,27 @@ def _submit_llm_webui_transform_job(
             request_id=request_id,
             timeout=_builder_llm_job_submit_timeout_s(),
         )
+        submit_done_at = _now()
     except Exception as exc:
+        failed_at = _now()
         detail = f"{type(exc).__name__}: {exc}"
         return {
             "ok": False,
             "error": "llm_job_submit_timeout" if _looks_like_timeout(detail) else "llm_job_submit_failed",
             "detail": detail,
             "request_id": request_id,
+            "timing": {
+                "context_build_ms": int((context_ready_at - started_at) * 1000),
+                "submit_ms": int((failed_at - context_ready_at) * 1000),
+                "total_ms": int((failed_at - started_at) * 1000),
+            },
             "comment": "\u041d\u0435 \u0441\u043c\u043e\u0433 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c LLM job.",
         }
+    timing = {
+        "context_build_ms": int((context_ready_at - started_at) * 1000),
+        "submit_ms": int((submit_done_at - context_ready_at) * 1000),
+        "total_ms": int((submit_done_at - started_at) * 1000),
+    }
     status = str(response.get("status") or "").strip().lower()
     job_id = str(response.get("job_id") or "").strip()
     client = response.get("_client") if isinstance(response.get("_client"), Mapping) else {}
@@ -4189,7 +4449,9 @@ def _submit_llm_webui_transform_job(
         try:
             parsed = _parse_llm_webui_transform_output(
                 output_text=output_text,
-                previous_preview=preview_state,
+                previous_preview=current_payload.get("preview_state")
+                if isinstance(current_payload.get("preview_state"), Mapping)
+                else preview_state,
                 request_id=request_id,
                 job_id=job_id,
             )
@@ -4204,6 +4466,7 @@ def _submit_llm_webui_transform_job(
                 "last_response": output_text,
             }
         parsed["job"] = response
+        parsed["timing"] = timing
         return parsed
     if status in {"queued", "running"} and job_id:
         return {
@@ -4214,6 +4477,7 @@ def _submit_llm_webui_transform_job(
             "request_id": request_id,
             "base_url": base_url,
             "job": response,
+            "timing": timing,
             "message": (
                 f"{AGENT_LABEL}: \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u043b LLM-\u0437\u0430\u0434\u0430\u0447\u0443 "
                 f"\u0434\u043b\u044f {session.get('scenario_id')}. Job: {job_id}."
@@ -4226,6 +4490,7 @@ def _submit_llm_webui_transform_job(
         "request_id": request_id,
         "job_id": job_id,
         "job": response,
+        "timing": timing,
     }
 
 
@@ -4470,6 +4735,7 @@ def update_current_scenario(
                     "request_text": text,
                     "patch_id": patch.get("id"),
                     "created_at": _now(),
+                    "timing": dict(llm_result.get("timing") or {}) if isinstance(llm_result.get("timing"), Mapping) else {},
                 }
                 session["pending_llm_jobs"] = pending_jobs
                 _save_session(ws, session)
@@ -4500,6 +4766,7 @@ def update_current_scenario(
                         "request_id": request_id,
                         "base_url": base_url or None,
                         "status": str(llm_result.get("status") or "queued"),
+                        "timing": dict(llm_result.get("timing") or {}) if isinstance(llm_result.get("timing"), Mapping) else {},
                     },
                     "message": str(llm_result.get("message") or (
                         f"{AGENT_LABEL}: \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u043b LLM-\u0437\u0430\u0434\u0430\u0447\u0443 "
