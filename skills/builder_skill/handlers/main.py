@@ -3338,6 +3338,117 @@ def _ensure_workbench_runtime_direct(
     return {"ok": True, "result": value}
 
 
+def _schedule_dev_runtime_reload_after_revision(
+    webspace_id: str,
+    *,
+    session: Mapping[str, Any],
+    binding: Mapping[str, Any] | None,
+    revision: str | None,
+) -> dict[str, Any]:
+    scenario_id = str(session.get("scenario_id") or "").strip()
+    if not scenario_id:
+        return {"ok": False, "skipped": "scenario_id_missing"}
+    binding = binding if isinstance(binding, Mapping) else {}
+    dev_webspace_id = str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip()
+    if not dev_webspace_id:
+        return {"ok": False, "skipped": "dev_webspace_id_missing", "scenario_id": scenario_id}
+    if (
+        os.getenv("PYTEST_CURRENT_TEST")
+        and str(os.getenv("ADAOS_BUILDER_DEV_RUNTIME_REFRESH_IN_TESTS") or "").strip().lower()
+        not in {"1", "true", "yes", "on"}
+    ):
+        return {
+            "ok": False,
+            "skipped": "actual_dev_runtime_refresh_disabled_in_tests",
+            "webspace_id": dev_webspace_id,
+            "scenario_id": scenario_id,
+        }
+
+    rev = str(revision or session.get("ui_revision") or session.get("version") or "").strip() or "current"
+    cmd_fp = _hash_suffix(f"{webspace_id}:{dev_webspace_id}:{scenario_id}:{rev}:{_now()}")
+    event_payload = {
+        "source": SKILL_ID,
+        "reason": "builder_ui_revision_written",
+        "source_webspace_id": webspace_id,
+        "webspace_id": dev_webspace_id,
+        "scenario_id": scenario_id,
+        "draft_id": str(session.get("draft_id") or "").strip() or None,
+        "ui_revision": rev,
+        "_meta": {
+            "cmd_id": f"builder.ui.{scenario_id}.{rev}",
+            "gateway_client": SKILL_ID,
+            "gateway_command_fingerprint": f"builder-ui-{cmd_fp}",
+            "trace_id": f"builder-ui-refresh-{cmd_fp}",
+        },
+    }
+
+    try:
+        from adaos.services.scenario.webspace_runtime import reload_webspace_from_scenario
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": "reload_webspace_import_failed",
+            "detail": f"{type(exc).__name__}: {exc}",
+            "webspace_id": dev_webspace_id,
+            "scenario_id": scenario_id,
+        }
+
+    async def _reload() -> dict[str, Any]:
+        return await reload_webspace_from_scenario(
+            dev_webspace_id,
+            scenario_id=scenario_id,
+            action="reload",
+            event_payload=event_payload,
+        )
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        def _runner() -> None:
+            try:
+                asyncio.run(_reload())
+            except Exception:
+                return
+
+        thread = threading.Thread(target=_runner, name=f"builder-dev-runtime-reload:{dev_webspace_id}", daemon=True)
+        thread.start()
+        return {
+            "ok": True,
+            "scheduled": True,
+            "mode": "thread",
+            "webspace_id": dev_webspace_id,
+            "scenario_id": scenario_id,
+            "event_payload": event_payload,
+        }
+
+    try:
+        task = loop.create_task(_reload(), name=f"builder-dev-runtime-reload:{dev_webspace_id}:{scenario_id}:{rev}")
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": "reload_schedule_failed",
+            "detail": f"{type(exc).__name__}: {exc}",
+            "webspace_id": dev_webspace_id,
+            "scenario_id": scenario_id,
+        }
+
+    def _consume_result(done: asyncio.Task[Any]) -> None:
+        try:
+            done.result()
+        except Exception:
+            return
+
+    task.add_done_callback(_consume_result)
+    return {
+        "ok": True,
+        "scheduled": True,
+        "mode": "event_loop_task",
+        "webspace_id": dev_webspace_id,
+        "scenario_id": scenario_id,
+        "event_payload": event_payload,
+    }
+
+
 def _delete_sessions_for_draft(webspace_id: str, draft_id: str) -> None:
     token = str(draft_id or "").strip()
     if not token:
@@ -3673,6 +3784,12 @@ def _finalize_scenario_update(
         session["patches"][-1] = patch
     workbench = _ensure_workbench(ws, session=session, preview_state=preview)
     resolved_binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else binding
+    dev_runtime_refresh = _schedule_dev_runtime_reload_after_revision(
+        ws,
+        session=session,
+        binding=resolved_binding,
+        revision=str(revision_info.get("revision") if revision_info else ""),
+    )
     topic = _builder_topic_ref(ws, session=session, binding=resolved_binding, _meta=_meta)
     session["thread_id"] = str(topic.get("thread_id") or "").strip() or None
     session["topic_id"] = str(topic.get("topic_id") or "").strip() or None
@@ -3721,6 +3838,7 @@ def _finalize_scenario_update(
         "patch": patch,
         "preview_state": preview,
         "workbench": workbench,
+        "dev_runtime_refresh": dev_runtime_refresh,
         "project_files_refresh": project_files_refresh,
         "prompt_selection": prompt_selection,
         "topic": {k: v for k, v in topic.items() if k != "stored"},
