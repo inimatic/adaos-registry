@@ -1,316 +1,293 @@
 name: builder_skill
-version: 0.2.2
-description: Rapid prototyping Builder skill for creating and editing scenario UI
-  drafts from voice or text dialog.
-entry: handlers/main.py
+version: "0.2.2"
+description: "Rapid prototyping Builder skill for creating and editing scenario UI drafts from voice or text dialog."
+entry: "handlers/main.py"
 runtime:
-  python: '3.11'
-default_tool: chat
+  python: "3.11"
+default_tool: "chat"
 dependencies: []
 events:
   subscribe: []
   publish:
-  - io.out.chat.append
-  - builder.workbench.ensure_requested
+    - io.out.chat.append
+    - builder.workbench.ensure_requested
 exports:
   tools:
-  - start
-  - chat
-  - create_scenario_draft
-  - update_current_scenario
-  - get_session
-  - get_preview_state
-  - ensure_dev_webspace
-  - get_workspace_binding
-  - open_dev_webspace
-  - attach_dialog_widget
-  - set_active_draft
-  - list_development_skills
-  - delete_development_skill
+    - start
+    - chat
+    - create_scenario_draft
+    - update_current_scenario
+    - get_session
+    - get_preview_state
+    - set_ui_revision_current
+    - ensure_dev_webspace
+    - get_workspace_binding
+    - open_dev_webspace
+    - attach_dialog_widget
+    - set_active_draft
+    - list_development_skills
+    - delete_development_skill
 tools:
-- name: start
-  description: Start or resume the Builder rapid prototyping dialog.
-  entry: handlers.main:start
-  input_schema:
-    type: object
-    properties:
-      text:
-        type: string
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - message
-    - dialog
-- name: chat
-  description: Handle a Builder dialog turn and create or patch a scenario prototype.
-  entry: handlers.main:chat
-  input_schema:
-    type: object
-    properties:
-      text:
-        type: string
-      webspace_id:
-        type: string
-      auto_apply:
-        type: boolean
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - message
-    - dialog
-- name: create_scenario_draft
-  description: Create a new dev-space scenario draft with a declarative web UI prototype.
-  entry: handlers.main:create_scenario_draft
-  input_schema:
-    type: object
-    required:
-    - idea
-    properties:
-      idea:
-        type: string
-      scenario_id:
-        type: string
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - session_id
-    - scenario_id
-    properties:
-      pending_action:
-        type: object
-        description: Builder review Pending Action linked to conversation/thread/source
-          refs.
-- name: update_current_scenario
-  description: Apply a safe declarative UI patch to the current Builder scenario session.
-  entry: handlers.main:update_current_scenario
-  input_schema:
-    type: object
-    required:
-    - instruction
-    properties:
-      instruction:
-        type: string
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - message
-    properties:
-      pending_action:
-        type: object
-        description: Builder patch review Pending Action linked to conversation/thread/source
-          refs.
-- name: get_session
-  description: Return the current Builder rapid prototyping session.
-  entry: handlers.main:get_session
-  input_schema:
-    type: object
-    properties:
-      session_id:
-        type: string
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-- name: get_preview_state
-  description: Return the render-ready declarative preview state for the current Builder
-    session.
-  entry: handlers.main:get_preview_state
-  input_schema:
-    type: object
-    properties:
-      session_id:
-        type: string
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - preview_state
-- name: ensure_dev_webspace
-  description: Create or reuse the paired Prompt IDE dev webspace for the current
-    source webspace.
-  entry: handlers.main:ensure_dev_webspace
-  input_schema:
-    type: object
-    properties:
-      webspace_id:
-        type: string
-      active_draft_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-- name: get_workspace_binding
-  description: Return the Builder source/dev webspace binding and active draft.
-  entry: handlers.main:get_workspace_binding
-  input_schema:
-    type: object
-    properties:
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - binding
-- name: open_dev_webspace
-  description: Return the browser URL for the paired Prompt IDE dev webspace.
-  entry: handlers.main:open_dev_webspace
-  input_schema:
-    type: object
-    properties:
-      webspace_id:
-        type: string
-      base_url:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - url
-    - webspace_id
-- name: attach_dialog_widget
-  description: Return embedded Voice Chat widget config for Builder Prompt IDE.
-  entry: handlers.main:attach_dialog_widget
-  input_schema:
-    type: object
-    properties:
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - widget
-- name: set_active_draft
-  description: Switch the active Builder development draft in the paired Prompt IDE
-    dev webspace.
-  entry: handlers.main:set_active_draft
-  input_schema:
-    type: object
-    properties:
-      draft_id:
-        type: string
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - binding
-- name: list_development_skills
-  description: List Builder drafts and skills/scenarios currently in development.
-  entry: handlers.main:list_development_skills
-  input_schema:
-    type: object
-    properties:
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
-    - items
-- name: delete_development_skill
-  description: Delete a Builder development draft and clear it from the active workbench
-    if selected.
-  entry: handlers.main:delete_development_skill
-  input_schema:
-    type: object
-    required:
-    - draft_id
-    properties:
-      draft_id:
-        type: string
-      webspace_id:
-        type: string
-    additionalProperties: true
-  output_schema:
-    type: object
-    required:
-    - ok
+  - name: start
+    description: "Start or resume the Builder rapid prototyping dialog."
+    entry: "handlers.main:start"
+    input_schema:
+      type: object
+      properties:
+        text:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, message, dialog]
+  - name: chat
+    description: "Handle a Builder dialog turn and create or patch a scenario prototype."
+    entry: "handlers.main:chat"
+    input_schema:
+      type: object
+      properties:
+        text:
+          type: string
+        webspace_id:
+          type: string
+        auto_apply:
+          type: boolean
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, message, dialog]
+  - name: create_scenario_draft
+    description: "Create a new dev-space scenario draft with a declarative web UI prototype."
+    entry: "handlers.main:create_scenario_draft"
+    input_schema:
+      type: object
+      required: [idea]
+      properties:
+        idea:
+          type: string
+        scenario_id:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, session_id, scenario_id]
+      properties:
+        pending_action:
+          type: object
+          description: "Builder review Pending Action linked to conversation/thread/source refs."
+  - name: update_current_scenario
+    description: "Apply a safe declarative UI patch to the current Builder scenario session."
+    entry: "handlers.main:update_current_scenario"
+    input_schema:
+      type: object
+      required: [instruction]
+      properties:
+        instruction:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, message]
+      properties:
+        pending_action:
+          type: object
+          description: "Builder patch review Pending Action linked to conversation/thread/source refs."
+  - name: get_session
+    description: "Return the current Builder rapid prototyping session."
+    entry: "handlers.main:get_session"
+    input_schema:
+      type: object
+      properties:
+        session_id:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok]
+  - name: get_preview_state
+    description: "Return the render-ready declarative preview state for the current Builder session."
+    entry: "handlers.main:get_preview_state"
+    input_schema:
+      type: object
+      properties:
+        session_id:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, preview_state]
+  - name: set_ui_revision_current
+    description: "Restore a stored Builder UI revision as the current scenario web UI."
+    entry: "handlers.main:set_ui_revision_current"
+    input_schema:
+      type: object
+      required: [revision]
+      properties:
+        revision:
+          type: string
+        session_id:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, message]
+  - name: ensure_dev_webspace
+    description: "Create or reuse the paired Prompt IDE dev webspace for the current source webspace."
+    entry: "handlers.main:ensure_dev_webspace"
+    input_schema:
+      type: object
+      properties:
+        webspace_id:
+          type: string
+        active_draft_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok]
+  - name: get_workspace_binding
+    description: "Return the Builder source/dev webspace binding and active draft."
+    entry: "handlers.main:get_workspace_binding"
+    input_schema:
+      type: object
+      properties:
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, binding]
+  - name: open_dev_webspace
+    description: "Return the browser URL for the paired Prompt IDE dev webspace."
+    entry: "handlers.main:open_dev_webspace"
+    input_schema:
+      type: object
+      properties:
+        webspace_id:
+          type: string
+        base_url:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, url, webspace_id]
+  - name: attach_dialog_widget
+    description: "Return embedded Voice Chat widget config for Builder Prompt IDE."
+    entry: "handlers.main:attach_dialog_widget"
+    input_schema:
+      type: object
+      properties:
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, widget]
+  - name: set_active_draft
+    description: "Switch the active Builder development draft in the paired Prompt IDE dev webspace."
+    entry: "handlers.main:set_active_draft"
+    input_schema:
+      type: object
+      properties:
+        draft_id:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, binding]
+  - name: list_development_skills
+    description: "List Builder drafts and skills/scenarios currently in development."
+    entry: "handlers.main:list_development_skills"
+    input_schema:
+      type: object
+      properties:
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok, items]
+  - name: delete_development_skill
+    description: "Delete a Builder development draft and clear it from the active workbench if selected."
+    entry: "handlers.main:delete_development_skill"
+    input_schema:
+      type: object
+      required: [draft_id]
+      properties:
+        draft_id:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      type: object
+      required: [ok]
 data_routes:
-- surface: builder rapid prototype preview
-  route: skill-local
-  path: skill_memory:builder_skill.sessions
-  owner: skill:builder_skill
-  first_paint: empty Builder session with a prompt to describe the application
-  recovery: get_preview_state rebuilds preview from skill-local session and dev scenario
-    files
-  guard_visibility: Builder reports degraded preview state in tool response
-- surface: builder workbench state
-  route: yjs
-  path: data.builder
-  owner: skill:builder_skill
-  first_paint: empty workbench binding with embedded Voice Chat widget config
-  recovery: get_workspace_binding and get_preview_state republish data.builder from
-    state/builder/workbench
-  guard_visibility: Builder reports projection publication status in tool response
+  - surface: "builder rapid prototype preview"
+    route: "skill-local"
+    path: "skill_memory:builder_skill.sessions"
+    owner: "skill:builder_skill"
+    first_paint: "empty Builder session with a prompt to describe the application"
+    recovery: "get_preview_state rebuilds preview from skill-local session and dev scenario files"
+    guard_visibility: "Builder reports degraded preview state in tool response"
+  - surface: "builder workbench state"
+    route: "yjs"
+    path: "data.builder"
+    owner: "skill:builder_skill"
+    first_paint: "empty workbench binding with embedded Voice Chat widget config"
+    recovery: "get_workspace_binding and get_preview_state republish data.builder from state/builder/workbench"
+    guard_visibility: "Builder reports projection publication status in tool response"
 llm_hints:
-  description: Builder rapid prototyping agent. Use when the user asks Builder/Строитель
-    to create or change an application, scenario, form, list, table, card view, or
-    web UI prototype.
+  description: "Builder rapid prototyping agent. Use when the user asks Builder/Строитель to create or change an application, scenario, form, list, table, card view, or web UI prototype."
   aliases:
-  - Builder
-  - builder
-  - buikder
-  - Строитель
-  - строитель
-  - билдер
-  side_effect_class: local_write
+    - "Builder"
+    - "builder"
+    - "buikder"
+    - "Строитель"
+    - "строитель"
+    - "билдер"
+  side_effect_class: "local_write"
   primary_actions:
-  - id: builder.start
-    intent: builder.start
-    tool: start
-    side_effect_class: local_write
-    examples:
-    - Строитель, создадим приложение список покупок
-    - Builder, create a shopping list app
-  - id: builder.chat
-    intent: builder.chat
-    tool: chat
-    side_effect_class: local_write
-    examples:
-    - добавь поле цена
-    - покажи список карточками
+    - id: builder.start
+      intent: builder.start
+      tool: start
+      side_effect_class: local_write
+      examples:
+        - "Строитель, создадим приложение список покупок"
+        - "Builder, create a shopping list app"
+    - id: builder.chat
+      intent: builder.chat
+      tool: chat
+      side_effect_class: local_write
+      examples:
+        - "добавь поле цена"
+        - "покажи список карточками"
 nlu_hints:
   aliases:
-  - Строитель
-  - Builder
-  - билдер
+    - "Строитель"
+    - "Builder"
+    - "билдер"
   examples:
-  - text: Строитель, создадим приложение список покупок
-    locale: ru
-    intent: builder.start
-  - text: Builder, create a shopping list app
-    locale: en
-    intent: builder.start
+    - text: "Строитель, создадим приложение список покупок"
+      locale: "ru"
+      intent: builder.start
+    - text: "Builder, create a shopping list app"
+      locale: "en"
+      intent: builder.start
 conversation:
   dialog_channel:
     id: builder
@@ -318,22 +295,20 @@ conversation:
     owner: skill:builder_skill
     default_tool: builder_skill.chat
   agents:
-  - id: agent:builder_skill:builder
-    label: Строитель
-    owner: skill:builder_skill
-    kind: skill_agent
-    channel_id: builder
-    skill: builder_skill
-    talk_tool: chat
-    gender: male
-    voice: ru-male
-    icon: construct-outline
-    aliases:
-    - Строитель
-    - строитель
-    - Builder
-    - builder
-    - buikder
-    - билдер
-prototype: BuilderSkill
-updated_at: '2026-06-29T10:42:11+00:00'
+    - id: agent:builder_skill:builder
+      label: "Строитель"
+      owner: skill:builder_skill
+      kind: skill_agent
+      channel_id: builder
+      skill: builder_skill
+      talk_tool: chat
+      gender: male
+      voice: ru-male
+      icon: construct-outline
+      aliases:
+        - "Строитель"
+        - "строитель"
+        - "Builder"
+        - "builder"
+        - "buikder"
+        - "билдер"
