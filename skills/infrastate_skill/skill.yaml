@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.50
+version: 0.75.51
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -516,6 +516,11 @@ data_projections:
   targets:
   - backend: yjs
     path: data/infrastate/projection_diag
+- scope: subnet
+  slot: infrastate.yjs_balancer
+  targets:
+  - backend: yjs
+    path: data/infrastate/yjs_balancer
 lifecycle:
   drain: infrastate_runtime_drain
   dispose: infrastate_runtime_dispose
@@ -640,11 +645,11 @@ tools:
   output_schema:
     type: object
     properties: {}
-updated_at: '2026-07-02T10:36:37+00:00'
+updated_at: '2026-07-02T11:01:43+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3423.e973342b
-    recorded_at: '2026-07-02T10:36:37+00:00'
+    recorded_at: '2026-07-02T11:01:43+00:00'
     source: skill_push
     min_commit: e973342beea51293a7114bf2323eadbc70d92466
     min_short_commit: e973342b

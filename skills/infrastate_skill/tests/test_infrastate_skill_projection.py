@@ -3186,6 +3186,20 @@ def test_infrastate_yjs_balancer_tab_uses_y_projection():
     }
 
 
+def test_infrastate_manifest_includes_handler_projection_slots():
+    mod = _load_infrastate_module()
+    manifest = mod.yaml.safe_load((Path(__file__).resolve().parents[1] / "skill.yaml").read_text(encoding="utf-8"))
+    entries = manifest.get("data_projections") if isinstance(manifest, dict) else []
+    manifest_paths = {
+        str(entry.get("slot") or ""): str(((entry.get("targets") or [{}])[0] or {}).get("path") or "")
+        for entry in list(entries or [])
+        if isinstance(entry, dict)
+    }
+
+    for slot, path in mod._PROJECTION_SLOT_PATHS.items():
+        assert manifest_paths.get(slot) == path
+
+
 def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     webui = json.loads((Path(__file__).resolve().parents[1] / "webui.json").read_text(encoding="utf-8"))
     infrastate_widgets = webui["registry"]["modals"]["infrastate_modal"]["schema"]["widgets"]
