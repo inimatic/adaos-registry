@@ -3388,26 +3388,26 @@ def _schedule_dev_runtime_reload_after_revision(
     }
 
     try:
-        from adaos.sdk.data import events
-
-        reload_event = dict(event_payload)
-        reload_event["_event_type"] = "desktop.webspace.reload"
-        reload_event["recreate_room"] = False
-        events.publish("desktop.webspace.reload", reload_event, source=SKILL_ID)
-        return {
-            "ok": True,
-            "scheduled": True,
-            "mode": "event_bus",
-            "webspace_id": dev_webspace_id,
-            "scenario_id": scenario_id,
-            "event_payload": event_payload,
-        }
-    except Exception as bus_exc:
-        bus_error = f"{type(bus_exc).__name__}: {bus_exc}"
-
-    try:
         from adaos.services.scenario.webspace_runtime import reload_webspace_from_scenario
     except Exception as exc:
+        try:
+            from adaos.sdk.data import events
+
+            reload_event = dict(event_payload)
+            reload_event["_event_type"] = "desktop.webspace.reload"
+            reload_event["recreate_room"] = False
+            events.publish("desktop.webspace.reload", reload_event, source=SKILL_ID)
+            return {
+                "ok": True,
+                "scheduled": True,
+                "mode": "event_bus_fallback",
+                "webspace_id": dev_webspace_id,
+                "scenario_id": scenario_id,
+                "event_payload": event_payload,
+                "direct_error": f"{type(exc).__name__}: {exc}",
+            }
+        except Exception as bus_exc:
+            bus_error = f"{type(bus_exc).__name__}: {bus_exc}"
         return {
             "ok": False,
             "error": "reload_webspace_import_failed",
@@ -3443,7 +3443,6 @@ def _schedule_dev_runtime_reload_after_revision(
             "webspace_id": dev_webspace_id,
             "scenario_id": scenario_id,
             "event_payload": event_payload,
-            "bus_error": bus_error,
         }
 
     try:
@@ -3453,7 +3452,6 @@ def _schedule_dev_runtime_reload_after_revision(
             "ok": False,
             "error": "reload_schedule_failed",
             "detail": f"{type(exc).__name__}: {exc}",
-            "bus_error": bus_error,
             "webspace_id": dev_webspace_id,
             "scenario_id": scenario_id,
         }
@@ -3472,7 +3470,6 @@ def _schedule_dev_runtime_reload_after_revision(
         "webspace_id": dev_webspace_id,
         "scenario_id": scenario_id,
         "event_payload": event_payload,
-        "bus_error": bus_error,
     }
 
 
