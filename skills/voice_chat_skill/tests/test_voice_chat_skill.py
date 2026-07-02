@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import importlib.util
+import json
 import sys
 import types
 from pathlib import Path
@@ -47,6 +48,7 @@ def test_voice_chat_get_snapshot_uses_projected_state_without_yjs(monkeypatch):
     mod = _load_voice_chat_module()
     assert not hasattr(mod, "get_ydoc")
 
+    monkeypatch.setattr(mod.sdk_conversation, "get", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("no ledger")))
     projected: list[tuple[str, str | None, object]] = []
     streamed: list[tuple[str, object, dict[str, object]]] = []
     monkeypatch.setattr(
@@ -66,33 +68,147 @@ def test_voice_chat_get_snapshot_uses_projected_state_without_yjs(monkeypatch):
     ]
     state["last_refresh_ts"] = 123.0
 
-    snapshot = mod.get_snapshot(webspace_id="desktop", target_node_id="member-01")
+    ack = mod.get_snapshot(webspace_id="desktop", target_node_id="member-01")
 
-    assert snapshot["voice_chat"]["messages"][0]["text"] == "weather in Berlin"
-    assert snapshot["messages"][0]["text"] == "weather in Berlin"
-    assert snapshot["last_refresh_ts"] == 123.0
+    assert ack["ok"] is True
+    assert ack["status"] == "snapshot_published"
+    assert ack["receiver"] == "voice_chat.messages"
+    assert "messages" not in ack
     assert projected and projected[0][0] == "voice_chat.state"
+    assert projected[0][2]["last_message"]["text"] == "weather in Berlin"
     assert streamed and streamed[0][0] == "voice_chat.messages"
+    assert streamed[0][1]["messages"][0]["text"] == "weather in Berlin"
     assert streamed[0][2]["webspace_id"] == "desktop"
     assert streamed[0][2]["force"] is True
+
+
+def test_voice_chat_get_snapshot_prefers_conversation_ledger(monkeypatch):
+    mod = _load_voice_chat_module()
+
+    projected: list[tuple[str, str | None, object]] = []
+    streamed: list[tuple[str, object, dict[str, object]]] = []
+    monkeypatch.setattr(
+        mod.ctx_subnet,
+        "set",
+        lambda slot, value, *, webspace_id=None: projected.append((slot, webspace_id, value)),
+    )
+    monkeypatch.setattr(
+        mod._STREAM_RUNTIME,
+        "publish_snapshot",
+        lambda receiver, data, **kwargs: streamed.append((receiver, data, kwargs)),
+    )
+    monkeypatch.setattr(
+        mod.sdk_conversation,
+        "get",
+        lambda conversation_id, **kwargs: {
+            "messages": [
+                {
+                    "id": "ledger.1",
+                    "from": "user",
+                    "text": "ledger user",
+                    "ts": 1,
+                    "conversation_id": conversation_id,
+                    "dialog_channel_id": "general",
+                },
+                {
+                    "id": "ledger.2",
+                    "from": "hub",
+                    "text": "ledger reply",
+                    "ts": 2,
+                    "conversation_id": conversation_id,
+                    "dialog_channel_id": "general",
+                },
+            ],
+            "before_cursor": "0",
+            "has_more_before": False,
+            "total_message_count": 2,
+        },
+    )
+
+    state = mod._state_for("desktop", None)
+    state["messages"] = [{"id": "stale", "from": "user", "text": "stale cache"}]
+
+    ack = mod.get_snapshot(_payload={"_meta": {"conversation_id": "conv.core.general.desktop"}}, webspace_id="desktop")
+
+    assert ack["ok"] is True
+    assert ack["history_mode"] == "conversation_ledger"
+    assert ack["conversation_id"] == "conv.core.general.desktop"
+    assert streamed[-1][1]["messages"][-1]["text"] == "ledger reply"
+    assert projected[-1][2]["last_message"]["text"] == "ledger reply"
 
 
 def test_voice_chat_messages_survive_new_tool_invocation(monkeypatch):
     mod = _load_voice_chat_module()
     memory: dict[str, object] = {}
 
+    monkeypatch.setattr(mod.sdk_conversation, "get", lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("no ledger")))
     monkeypatch.setattr(mod, "memory_get", lambda key, default=None: memory.get(key, default))
     monkeypatch.setattr(mod, "memory_set", lambda key, value: memory.__setitem__(key, value))
     monkeypatch.setattr(mod, "_project_state", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(mod, "_publish_tail_stream", lambda *_args, **_kwargs: None)
+    streamed: list[tuple[str, str | None]] = []
+    monkeypatch.setattr(
+        mod._STREAM_RUNTIME,
+        "publish_snapshot",
+        lambda _receiver, data, **_kwargs: streamed.extend((item["from"], item["text"]) for item in data["messages"]),
+    )
 
-    mod._append_projected_message("desktop", None, from_="user", text="weather in Berlin")
+    mod._append_projected_message("desktop", None, from_="user", text="weather in Berlin", publish=False)
     mod._STATE_BY_KEY.clear()
 
-    snapshot = mod.get_snapshot(webspace_id="desktop")
+    ack = mod.get_snapshot(webspace_id="desktop")
 
-    assert snapshot["messages"][0]["from"] == "user"
-    assert snapshot["messages"][0]["text"] == "weather in Berlin"
+    assert ack["ok"] is True
+    assert streamed == [("user", "weather in Berlin")]
+
+
+def test_voice_chat_stream_snapshot_stays_under_declared_budget():
+    mod = _load_voice_chat_module()
+    state = mod._state_for("desktop", None)
+    state["messages"] = [
+        {"id": f"m-{index}", "from": "user", "text": "x" * 5000, "ts": index}
+        for index in range(20)
+    ]
+
+    payload = mod._tail_stream_payload(state)
+
+    assert len(payload["messages"]) == 8
+    assert payload["message_count"] == 20
+    assert payload["retained_message_count"] == 8
+    assert payload["truncated"] is True
+    assert all(len(item["text"]) <= 643 for item in payload["messages"])
+    assert len(json.dumps(payload, ensure_ascii=False).encode("utf-8")) < 16384
+
+
+def test_voice_chat_append_reply_materializes_via_conversation_sdk(monkeypatch):
+    mod = _load_voice_chat_module()
+    opened: list[dict[str, object]] = []
+    sent: list[dict[str, object]] = []
+
+    monkeypatch.setattr(mod.sdk_conversation, "open", lambda **kwargs: opened.append(dict(kwargs)) or {"ok": True})
+    monkeypatch.setattr(mod.sdk_chat, "send", lambda text, **kwargs: sent.append({"text": text, **kwargs}) or {"ok": True})
+    monkeypatch.setattr(mod, "_project_state", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "_persist_state", lambda *_args, **_kwargs: None)
+
+    result = mod._append_reply(
+        "done",
+        webspace_id="desktop",
+        target_node_id="member-1",
+        meta={
+            "route_id": "voice_chat",
+            "conversation_id": "conv.core.general.desktop",
+            "turn_trace_id": "trace.1",
+            "request_id": "req.1",
+        },
+    )
+
+    assert result["ok"] is True
+    assert opened[0]["conversation_id"] == "conv.core.general.desktop"
+    assert opened[0]["channel_id"] == "general"
+    assert sent[0]["text"] == "done"
+    assert sent[0]["conversation_id"] == "conv.core.general.desktop"
+    assert sent[0]["route_id"] == "voice_chat"
+    assert sent[0]["render_targets"] == ("text_tail",)
+    assert sent[0]["meta"]["idempotency_key"].startswith("voice_chat_skill.reply.trace.1.")
 
 
 def test_voice_chat_local_time_command_replies(monkeypatch):
@@ -150,6 +266,38 @@ def test_voice_chat_timer_command_schedules_completion(monkeypatch):
     assert "\u0437\u0430\u043f\u0443\u0449\u0435\u043d" in replies[0]
 
 
+def test_voice_chat_runtime_dispose_cancels_active_timers(monkeypatch):
+    mod = _load_voice_chat_module()
+    canceled: list[bool] = []
+
+    class _Timer:
+        daemon = False
+
+        def __init__(self, _seconds, _callback):
+            return None
+
+        def start(self):
+            return None
+
+        def cancel(self):
+            canceled.append(True)
+
+    monkeypatch.setattr(mod, "_append_reply", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "_speak_reply", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod.threading, "Timer", _Timer)
+
+    result = mod._start_timer("10 minutes", webspace_id="desktop", target_node_id=None, meta={})
+    assert result["ok"] is True
+    assert mod.voice_chat_healthcheck()["active_timer_total"] == 1
+
+    cleanup = mod.voice_chat_runtime_dispose(reason="test")
+
+    assert cleanup["ok"] is True
+    assert cleanup["canceled_timer_total"] == 1
+    assert canceled == [True]
+    assert mod.voice_chat_healthcheck()["active_timer_total"] == 0
+
+
 def test_voice_chat_marketplace_command_opens_modal_once(monkeypatch):
     mod = _load_voice_chat_module()
     replies: list[str] = []
@@ -184,7 +332,7 @@ def test_voice_chat_modal_open_event_acknowledges_voice_marketplace(monkeypatch)
     monkeypatch.setattr(
         mod,
         "_append_reply",
-        lambda text, *, webspace_id, target_node_id: replies.append((text, webspace_id, target_node_id)),
+        lambda text, *, webspace_id, target_node_id, **_kwargs: replies.append((text, webspace_id, target_node_id)),
     )
     monkeypatch.setattr(mod, "_speak_reply", lambda *_args, **_kwargs: None)
 
@@ -208,3 +356,13 @@ def test_voice_chat_skill_yaml_exports_get_snapshot():
 
     tools = payload.get("tools") or []
     assert any((item or {}).get("name") == "get_snapshot" for item in tools)
+    assert any((item or {}).get("name") == "on_quarantine" for item in tools)
+    assert payload["lifecycle"]["dispose"] == "voice_chat_runtime_dispose"
+    assert payload["lifecycle"]["drain"] == "voice_chat_runtime_drain"
+    assert payload["memory_budget"]["background_workers"][0]["max_threads"] == 8
+    assert payload["conversation"]["dialog_channel"]["id"] == "general"
+    assert payload["conversation"]["dialog_channel"]["history"]["store"] == "node"
+    stream_route = next(item for item in payload["data_routes"] if item.get("receiver") == "voice_chat.messages")
+    assert stream_route["budget"]["max_payload_bytes"] == 16384
+    assert stream_route["budget"]["max_fanout"] == 3
+    assert stream_route["budget"]["max_items"] == 8

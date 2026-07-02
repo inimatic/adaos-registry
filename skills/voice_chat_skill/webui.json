@@ -9,10 +9,11 @@
 				"sequenceField": "last_refresh_ts",
 				"updatedAtField": "last_refresh_ts",
 				"budget": {
-					"maxPayloadBytes": 32768,
+					"maxPayloadBytes": 16384,
+					"maxFanout": 3,
 					"maxPublishHz": 8,
 					"maxSnapshotHz": 1,
-					"maxItems": 32
+					"maxItems": 8
 				},
 				"guardVisibility": {
 					"degradedState": "Keep last local chat tail; YJS only carries compact voice status.",

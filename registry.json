@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-02T13:46:16+00:00",
+  "updated_at": "2026-07-02T13:46:32+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -660,8 +660,8 @@
       "kind": "skill",
       "id": "voice_chat_skill",
       "name": "voice_chat_skill",
-      "version": "0.6.13",
-      "updated_at": "2026-06-27T21:01:25+00:00",
+      "version": "0.6.15",
+      "updated_at": "2026-07-02T13:46:32+00:00",
       "path": "skills/voice_chat_skill",
       "manifest": "skills/voice_chat_skill/skill.yaml",
       "source": {
@@ -673,9 +673,9 @@
         "name": "voice_chat_skill",
         "id": "voice_chat_skill"
       },
-      "description": "Voice chat bridge for web_desktop (text in -> publish chat + TTS via io.out.*; shared chat history goes through YJS, with stream receiver kept as a recovery/compatibility path).",
+      "description": "Voice chat bridge for web_desktop (text in -> materialize replies through the node conversation ledger; shared chat history is exposed as a bounded compatibility stream, with YJS kept as a compact status projection).",
       "runtime_python": "3.11",
-      "tools_count": 2
+      "tools_count": 7
     },
     {
       "kind": "skill",

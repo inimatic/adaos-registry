@@ -1,8 +1,8 @@
 name: voice_chat_skill
-version: 0.6.14
-description: Voice chat bridge for web_desktop (text in -> publish chat + TTS via
-  io.out.*; shared chat history goes through YJS, with stream receiver kept as a recovery/compatibility
-  path).
+version: 0.6.15
+description: Voice chat bridge for web_desktop (text in -> materialize replies through
+  the node conversation ledger; shared chat history is exposed as a bounded compatibility
+  stream, with YJS kept as a compact status projection).
 runtime:
   python: '3.11'
 events:
@@ -23,9 +23,9 @@ data_routes:
   owner: skill:voice_chat_skill
   projection_slot: voice_chat.state
   path: data/voice_chat
-  first_paint: shared voice chat history from the last YJS projection
-  recovery: YJS replay restores the bounded chat tail; stream receiver remains a compatibility
-    snapshot path.
+  first_paint: compact voice chat status from the last YJS projection
+  recovery: YJS replay restores only status/count/last-message metadata; stream receiver
+    owns the visible chat tail.
   update_source:
   - voice_chat_skill.handle_text
   budget:
@@ -43,16 +43,17 @@ data_routes:
   owner: skill:voice_chat_skill
   receiver: voice_chat.messages
   first_paint: empty chat list until a stream snapshot is requested
-  recovery: Stream snapshot request republishes the bounded in-memory tail or migrates
-    the old YJS tail.
+  recovery: Stream snapshot request republishes a small bounded ledger tail, with
+    skill-local memory used only as a compatibility fallback.
   update_source:
   - webio.stream.snapshot.requested
   - voice_chat_skill.handle_text
   budget:
-    max_payload_bytes: 32768
+    max_payload_bytes: 16384
+    max_fanout: 3
     max_publish_hz: 8
     coalesce_ms: 100
-    max_items: 80
+    max_items: 8
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: Chat list keeps the last local stream state; YJS only shows compact
@@ -66,11 +67,68 @@ data_projections:
   targets:
   - backend: yjs
     path: data/voice_chat
+memory_budget:
+  expected_rss_mb: 64
+  caches:
+  - name: voice_chat.state_by_key
+    route: skill-local
+    max_items: 32
+    ttl_seconds: 3600
+    cleanup_hook: voice_chat_runtime_dispose
+  - name: voice_chat.projection_fingerprints
+    route: process-memory
+    max_items: 32
+    cleanup_hook: voice_chat_runtime_dispose
+  - name: voice_chat.quarantine_incidents
+    route: skill-local
+    max_items: 16
+    cleanup_hook: voice_chat_runtime_dispose
+  background_workers:
+  - name: voice_chat.timer
+    max_threads: 8
+    cleanup_hook: voice_chat_runtime_dispose
+lifecycle:
+  drain: voice_chat_runtime_drain
+  dispose: voice_chat_runtime_dispose
+  before_deactivate: voice_chat_runtime_before_deactivate
+conversation:
+  dialog_channel:
+    id: general
+    label: General
+    owner: core:general_assistant
+    default_tool: voice_chat_skill.handle_text
+    route_id: voice_chat
+    history:
+      store: node
+      visible_tail_messages: 8
+    retrieval:
+      max_messages: 12
+      max_segments: 2
+      max_memory_items: 4
+      max_tokens: 1200
+    response:
+      default_targets:
+      - text_tail
+      - speech_text
+      renderer: dialog.visible_tail
+  history:
+    store: node
+    owner: core:general_assistant
+    retention_class: normal
+  retrieval:
+    strategy: recent_plus_segments_plus_memory
+    cross_owner_memory: deny_by_default
+  response:
+    default_targets:
+    - text_tail
+    - speech_text
+    structured_envelope: true
 default_tool: handle_text
 tools:
 - name: handle_text
   description: Convert voice text into supported desktop/time/timer/weather actions
-    and publish chat + tts outputs (no direct Yjs writes).
+    and materialize chat through the conversation ledger plus TTS outputs (no direct
+    Yjs writes).
   entry: handlers.main:handle_text
   input_schema:
     type: object
@@ -81,20 +139,61 @@ tools:
       _meta:
         type: object
 - name: get_snapshot
-  description: Return the current voice chat history snapshot for the selected node/webspace.
+  description: Publish the bounded voice chat stream snapshot for the selected node/webspace
+    and return a compact acknowledgement.
   entry: handlers.main:get_snapshot
   input_schema:
     type: object
     additionalProperties: true
   output_schema:
     type: object
-updated_at: '2026-06-27T21:01:25+00:00'
+- name: voice_chat_healthcheck
+  description: Return compact Voice runtime counters without publishing state.
+  entry: handlers.main:voice_chat_healthcheck
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: voice_chat_runtime_drain
+  description: Stop Voice background timers before runtime drain.
+  entry: handlers.main:voice_chat_runtime_drain
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: voice_chat_runtime_dispose
+  description: Release Voice timers and bounded in-memory caches.
+  entry: handlers.main:voice_chat_runtime_dispose
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: voice_chat_runtime_before_deactivate
+  description: Release Voice timers and bounded in-memory caches before deactivation.
+  entry: handlers.main:voice_chat_runtime_before_deactivate
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: on_quarantine
+  description: Record compact Voice quarantine evidence and stop background timers.
+  entry: handlers.main:on_quarantine
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+updated_at: '2026-07-02T13:46:32+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3286.fb22e6d6
-    recorded_at: '2026-06-27T21:01:25+00:00'
+    min_version: 0.1.0+3431.2883ba30
+    recorded_at: '2026-07-02T13:46:32+00:00'
     source: skill_push
-    min_commit: fb22e6d696b1300fb9bff9f0784fa90971c75f3b
-    min_short_commit: fb22e6d6
-    build_date: '2026-06-28T00:00:58+03:00'
+    min_commit: 2883ba30c3a44cf28d2b1948fdfecca263fd578c
+    min_short_commit: 2883ba30
+    build_date: '2026-07-02T16:46:21+03:00'
 
