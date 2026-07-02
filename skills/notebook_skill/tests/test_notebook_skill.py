@@ -160,25 +160,56 @@ def test_notebook_state_persists_to_projected_webspaces(monkeypatch):
     memory = {}
     mod, _projected, _streams = load_module(monkeypatch, memory=memory)
 
-    mod.save_note({"note_id": "note-1", "content": "Shared title\nShared body", "webspace_id": "desktop-dev"})
+    mod.save_note({"note_id": "note-1", "content": "Shared title\nShared body", "webspace_id": "desktop"})
 
     for ws in ["desktop-dev", "desktop", "default"]:
         stored = memory[mod._memory_key(ws)]
         assert stored["notes"]["note-1"]["content"] == "Shared title\nShared body"
 
 
+def test_notebook_state_rehydrates_from_freshest_webspace_alias(monkeypatch):
+    memory = {}
+    mod, _projected, _streams = load_module(monkeypatch, memory=memory)
+    mod.save_note({"note_id": "note-1", "content": "Old alias\nOld body", "webspace_id": "desktop-dev"})
+    old_state = json.loads(json.dumps(memory[mod._memory_key("desktop-dev")]))
+    fresh_state = json.loads(json.dumps(old_state))
+    fresh_state["notes"]["note-1"]["content"] = "Fresh alias\nFresh body"
+    fresh_state["notes"]["note-1"]["updated_at"] += 100
+    fresh_state["notes"]["note-1"]["version"] += 1
+    fresh_state["updated_at"] += 100
+    memory[mod._memory_key("desktop-dev")] = old_state
+    memory[mod._memory_key("default")] = old_state
+    memory[mod._memory_key("desktop")] = fresh_state
+
+    mod, projected, streams = load_module(monkeypatch, memory=memory)
+    snapshot = mod.get_notebook_snapshot({"webspace_id": "desktop-dev"})["snapshot"]
+
+    assert snapshot["editor"]["content"] == "Fresh alias\nFresh body"
+    assert snapshot["widget"]["items"][0]["title"] == "Fresh alias"
+    assert projected[-1][2] == "desktop-dev"
+    assert streams[-1][2]["webspace_id"] == "desktop-dev"
+    for ws in ["desktop-dev", "desktop", "default"]:
+        assert memory[mod._memory_key(ws)]["notes"]["note-1"]["content"] == "Fresh alias\nFresh body"
+
+
 def test_yjs_reload_completion_reprojects_notebook_snapshot(monkeypatch):
     memory = {}
     mod, projected, _streams = load_module(monkeypatch, memory=memory)
     monkeypatch.setattr(mod, "_RELOAD_REPUBLISH_DELAYS", ())
-    mod.save_note({"note_id": "note-1", "content": "Reloaded title\nReloaded body", "webspace_id": "desktop-dev"})
+    mod.save_note({"note_id": "note-1", "content": "Reloaded title\nReloaded body", "webspace_id": "desktop"})
     projected.clear()
 
-    mod.on_yjs_control_completed({"action": "reload", "webspace_id": "desktop", "ok": True, "accepted": True})
+    mod.on_yjs_control_completed({"action": "reload", "webspace_id": "desktop-dev", "ok": True, "accepted": True})
 
-    assert projected[-1][2] == "desktop"
+    assert projected[-1][2] == "desktop-dev"
     assert projected[-1][1]["widget"]["items"][0]["title"] == "Reloaded title"
     assert projected[-1][1]["widget"]["items"][0]["text"] == "Reloaded body"
+
+
+def test_notebook_manifest_subscribes_to_yjs_reload_events():
+    text = (SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8")
+
+    assert "node.yjs.control.completed" in text
 
 
 def test_notebook_back_action_does_not_save_empty_state():

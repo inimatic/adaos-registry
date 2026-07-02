@@ -1,5 +1,5 @@
 name: notebook_skill
-version: 0.1.29
+version: 0.1.30
 description: Shared plain-text notebook with one active editable note, a live note
   list stream, and Telegram export.
 runtime:
@@ -9,6 +9,7 @@ events:
   subscribe:
   - webio.stream.snapshot.requested
   - webio.stream.subscription.changed
+  - node.yjs.control.completed
 data_projections:
 - scope: subnet
   slot: notebook.snapshot
@@ -310,15 +311,15 @@ tools:
     properties:
       ok:
         type: boolean
-updated_at: '2026-07-02T13:46:16+00:00'
+updated_at: '2026-07-02T18:27:04+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3430.b48ab7fc
-    recorded_at: '2026-07-02T13:46:17+00:00'
+    min_version: 0.1.0+3450.506cdda3
+    recorded_at: '2026-07-02T18:27:04+00:00'
     source: skill_push
-    min_commit: b48ab7fc16c723b525ae875cbc06b3edaf41ef94
-    min_short_commit: b48ab7fc
-    build_date: '2026-07-02T14:32:39+03:00'
+    min_commit: 506cdda3b913d458a52792dfac061b6a94feb9d3
+    min_short_commit: 506cdda3
+    build_date: '2026-07-02T21:19:23+03:00'
 nlu:
   intents:
     notebook.create_note:

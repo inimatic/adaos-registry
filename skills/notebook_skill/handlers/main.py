@@ -31,6 +31,7 @@ _MAX_NOTES = 64
 _MAX_CONTENT_CHARS = 32000
 _NOTE_PREFIX = "note-"
 _DEFAULT_WEBSPACE_ID = "desktop"
+_SHARED_WEBSPACE_IDS = ("desktop", "desktop-dev", "default")
 _STATE_MEMORY_PREFIX = "notebook_state.v1"
 _LOG = logging.getLogger(_SKILL_NAME)
 _PROJECTION_TIMEOUT_S = 8.0
@@ -70,6 +71,16 @@ _RELOAD_REPUBLISH_DELAYS: tuple[float, ...] = (1.0, 3.0, 8.0, 15.0)
 
 def _memory_key(webspace_id: str) -> str:
     return f"{_STATE_MEMORY_PREFIX}.{coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)}"
+
+
+def _state_webspace_ids(webspace_id: str) -> list[str]:
+    primary = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
+    result: list[str] = []
+    for candidate in (primary, *_SHARED_WEBSPACE_IDS):
+        token = str(candidate or "").strip()
+        if token and token not in result:
+            result.append(token)
+    return result
 
 
 def _mem_get(key: str, default: Any = None) -> Any:
@@ -157,6 +168,39 @@ def _apply_stored_state(value: Any) -> bool:
     return True
 
 
+def _state_freshness(value: Any) -> tuple[int, float, int]:
+    if not isinstance(value, Mapping):
+        return (0, 0.0, 0)
+    raw_notes = value.get("notes")
+    if not isinstance(raw_notes, Mapping):
+        return (0, 0.0, 0)
+    meaningful = 0
+    best_updated = 0.0
+    version_total = 0
+    for note in raw_notes.values():
+        if not isinstance(note, Mapping):
+            continue
+        content = str(note.get("content") or "").strip()
+        attachments = note.get("attachments")
+        has_attachments = isinstance(attachments, list) and bool(attachments)
+        try:
+            version = max(0, int(note.get("version") or 0))
+        except Exception:
+            version = 0
+        version_total += version
+        if content or has_attachments or version > 0:
+            meaningful = 1
+        try:
+            best_updated = max(best_updated, float(note.get("updated_at") or 0.0))
+        except Exception:
+            pass
+    try:
+        best_updated = max(best_updated, float(value.get("updated_at") or 0.0))
+    except Exception:
+        pass
+    return (meaningful, best_updated, version_total)
+
+
 def _state_payload() -> dict[str, Any]:
     return {
         "schema": "notebook_skill.state.v1",
@@ -173,14 +217,30 @@ def _load_state(webspace_id: str, *, force: bool = False) -> bool:
     ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
     if not force and ws in _LOADED_WEBSPACES:
         return True
-    loaded = _apply_stored_state(_mem_get(_memory_key(ws), None))
-    _LOADED_WEBSPACES.add(ws)
+    best_value: Any = None
+    best_key = ""
+    best_rank = (0, 0.0, 0)
+    for candidate in _state_webspace_ids(ws):
+        key = _memory_key(candidate)
+        value = _mem_get(key, None)
+        rank = _state_freshness(value)
+        if rank > best_rank:
+            best_value = value
+            best_key = key
+            best_rank = rank
+    loaded = _apply_stored_state(best_value)
+    for candidate in _state_webspace_ids(ws):
+        _LOADED_WEBSPACES.add(candidate)
+    if loaded:
+        _persist_state(ws)
+        if best_key and best_key != _memory_key(ws):
+            _LOG.info("notebook state rehydrated from alias key=%s webspace=%s", best_key, ws)
     return loaded
 
 
 def _persist_state(webspace_id: str) -> None:
     payload = _state_payload()
-    for ws in _projection_webspace_ids(webspace_id):
+    for ws in _state_webspace_ids(webspace_id):
         _mem_set(_memory_key(ws), payload)
 
 
@@ -538,14 +598,7 @@ def _write_notebook_snapshot_to_doc(ydoc: Any, txn: Any, snapshot: Mapping[str, 
 
 
 def _projection_webspace_ids(webspace_id: str) -> list[str]:
-    primary = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
-    candidates = [primary, _DEFAULT_WEBSPACE_ID, "default"]
-    result: list[str] = []
-    for candidate in candidates:
-        token = str(candidate or "").strip()
-        if token and token not in result:
-            result.append(token)
-    return result
+    return _state_webspace_ids(webspace_id)
 
 
 async def _project_notebook_snapshot_webspace_async(snapshot: Mapping[str, Any], webspace_id: str) -> None:
