@@ -116,8 +116,8 @@
               ]
             },
             {
-              "id": "project-tree",
-              "type": "collection.tree",
+              "id": "project-objects",
+              "type": "collection.grid",
               "area": "sidebar",
               "title": "Project",
               "dataSource": {
@@ -131,7 +131,8 @@
               "inputs": {
                 "labelField": "label",
                 "columns": 1,
-                "selectedStateKey": "currentFilePath"
+                "selectedStateKey": "currentObjectSelectionId",
+                "disableImplicitScenarioSelect": true
               },
               "actions": [
                 {
@@ -151,8 +152,10 @@
                   "params": {
                     "currentObjectType": "$event.object_type",
                     "currentObjectId": "$event.object_id",
+                    "currentObjectSelectionId": "$event.id",
                     "currentStage": "file",
-                    "currentFilePath": "$event.path"
+                    "currentFilePath": "tz/base_tz.md",
+                    "currentFileEditable": true
                   }
                 }
               ]
@@ -185,12 +188,12 @@
             },
             {
               "id": "project-files",
-              "type": "collection.grid",
+              "type": "collection.tree",
               "area": "sidebar",
               "title": "Files",
               "dataSource": {
                 "kind": "skill",
-                "name": "prompt_engineer_skill.prompt_list_project_files",
+                "name": "prompt_engineer_skill.prompt_list_project_file_tree",
                 "params": {
                   "object_type": "$state.currentObjectType",
                   "object_id": "$state.currentObjectId",
@@ -198,9 +201,10 @@
                 }
               },
               "inputs": {
-                "labelField": "label",
-                "columns": 1,
-                "selectedStateKey": "currentFilePath"
+                "rootLabel": "Files",
+                "expandedByDefault": false,
+                "selectionMode": "leaf",
+                "stateKey": "currentFilePath"
               },
               "actions": [
                 {
@@ -210,7 +214,8 @@
                     "currentObjectType": "$event.object_type",
                     "currentObjectId": "$event.object_id",
                     "currentStage": "file",
-                    "currentFilePath": "$event.path"
+                    "currentFilePath": "$event.path",
+                    "currentFileEditable": "$event.editable"
                   }
                 }
               ]
@@ -309,6 +314,40 @@
               "visibleIf": "$state.currentStage === 'tz' || $state.currentStage === 'tz_add'"
             },
             {
+              "id": "file-editor",
+              "type": "item.textEditor",
+              "area": "main",
+              "title": "Project file",
+              "dataSource": {
+                "kind": "skill",
+                "name": "prompt_engineer_skill.prompt_read_project_file",
+                "params": {
+                  "object_type": "$state.currentObjectType",
+                  "object_id": "$state.currentObjectId",
+                  "path": "$state.currentFilePath"
+                }
+              },
+              "inputs": {
+                "mode": "text",
+                "bindField": "content",
+                "stateKey": "promptProjectFileDraft"
+              },
+              "actions": [
+                {
+                  "on": "save",
+                  "type": "callSkill",
+                  "target": "prompt_engineer_skill.prompt_save_project_file",
+                  "params": {
+                    "object_type": "$state.currentObjectType",
+                    "object_id": "$state.currentObjectId",
+                    "path": "$state.currentFilePath",
+                    "text": "$event.content"
+                  }
+                }
+              ],
+              "visibleIf": "$state.currentStage === 'file' && $state.currentFileEditable === true"
+            },
+            {
               "id": "code-viewer",
               "type": "item.codeViewer",
               "area": "main",
@@ -326,7 +365,7 @@
                 "bindField": "content",
                 "languageField": "language"
               },
-              "visibleIf": "$state.currentStage === 'file'"
+              "visibleIf": "$state.currentStage === 'file' && $state.currentFileEditable !== true"
             },
             {
               "id": "llm-artifacts",
@@ -524,7 +563,10 @@
                     "currentProjectId": "$event.object_id",
                     "currentObjectType": "$event.object_type",
                     "currentObjectId": "$event.object_id",
-                    "currentStage": "$event.workflow_state",
+                    "currentObjectSelectionId": "$event.id",
+                    "currentStage": "file",
+                    "currentFilePath": "tz/base_tz.md",
+                    "currentFileEditable": true,
                     "builderTopicId": "prompt-project:$event.object_type:$event.object_id",
                     "builderConversationId": "conv.skill.builder_skill.default.$client.webspaceId"
                   }
@@ -644,7 +686,10 @@
                       "currentProjectId": "$state.createObjectName",
                       "currentObjectType": "$state.createObjectType",
                       "currentObjectId": "$state.createObjectName",
-                      "currentStage": "tz",
+                      "currentObjectSelectionId": "$state.createObjectType:$state.createObjectName",
+                      "currentStage": "file",
+                      "currentFilePath": "tz/base_tz.md",
+                      "currentFileEditable": true,
                       "builderTopicId": "prompt-project:$state.createObjectType:$state.createObjectName",
                       "builderConversationId": "conv.skill.builder_skill.default.$client.webspaceId"
                     }

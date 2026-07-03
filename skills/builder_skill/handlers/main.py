@@ -30,6 +30,13 @@ PROMPT_SELECTION_ASYNC_TOPICS = ("prompt.project.changed", "builder.preview.sele
 BUILDER_MEMORY_FILE = "builder_memory.md"
 BUILDER_SYSTEM_PROMPT_FILE = "builder_system_prompt.md"
 PROMPT_TZ_BASE_FILE = Path("tz") / "base_tz.md"
+PROMPT_REVISION_FILES = (
+    PROMPT_TZ_BASE_FILE,
+    Path(BUILDER_MEMORY_FILE),
+    Path(BUILDER_SYSTEM_PROMPT_FILE),
+    Path("prepare") / "general_prompt.md",
+    Path("generate") / "general_prompt.md",
+)
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
 
@@ -873,6 +880,84 @@ def _ensure_builder_project_files(root: Path, preview_state: Mapping[str, Any]) 
             state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def _snapshot_prompt_files(artifact_root: str | None) -> dict[str, dict[str, Any]]:
+    root = _project_artifact_root({"artifact_root": artifact_root or ""})
+    if root is None:
+        return {}
+    snapshots: dict[str, dict[str, Any]] = {}
+    for rel_path in PROMPT_REVISION_FILES:
+        path = root / rel_path
+        rel = rel_path.as_posix()
+        if not path.exists() or not path.is_file():
+            snapshots[rel] = {"exists": False, "content": ""}
+            continue
+        snapshots[rel] = {
+            "exists": True,
+            "content": _read_text_file(path),
+        }
+    return snapshots
+
+
+def _sync_prompt_state_from_files(root: Path) -> None:
+    state_path = root / "prompt_state.json"
+    state = _load_json_file(state_path) if state_path.exists() else {}
+    if not state:
+        return
+    base_tz = root / PROMPT_TZ_BASE_FILE
+    if base_tz.exists():
+        state["base_tz"] = _read_text_file(base_tz)
+    prepare_prompt = root / "prepare" / "general_prompt.md"
+    if prepare_prompt.exists():
+        prepare = state.setdefault("prepare", {})
+        if not isinstance(prepare, dict):
+            prepare = {}
+            state["prepare"] = prepare
+        prepare["general_prompt"] = _read_text_file(prepare_prompt)
+    generate_prompt = root / "generate" / "general_prompt.md"
+    if generate_prompt.exists():
+        generate = state.setdefault("generate", {})
+        if not isinstance(generate, dict):
+            generate = {}
+            state["generate"] = generate
+        generate["general_prompt"] = _read_text_file(generate_prompt)
+    state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _restore_prompt_files_from_revision(session: Mapping[str, Any], revision_payload: Mapping[str, Any]) -> dict[str, Any]:
+    root = _project_artifact_root(session)
+    if root is None:
+        return {"ok": False, "error": "artifact_root_missing"}
+    prompt_files = revision_payload.get("prompt_files")
+    if not isinstance(prompt_files, Mapping):
+        return {"ok": True, "restored": [], "skipped": "prompt_files_missing"}
+    allowed = {path.as_posix(): path for path in PROMPT_REVISION_FILES}
+    restored: list[str] = []
+    for rel, payload in prompt_files.items():
+        rel_token = str(rel or "").strip().replace("\\", "/")
+        rel_path = allowed.get(rel_token)
+        if rel_path is None or not isinstance(payload, Mapping):
+            continue
+        target = (root / rel_path).resolve()
+        try:
+            target.relative_to(root)
+        except ValueError:
+            continue
+        exists = payload.get("exists") is not False
+        if not exists:
+            if target.exists():
+                try:
+                    target.unlink()
+                    restored.append(rel_token)
+                except Exception:
+                    pass
+            continue
+        _write_text_file(target, str(payload.get("content") or ""))
+        restored.append(rel_token)
+    if restored:
+        _sync_prompt_state_from_files(root)
+    return {"ok": True, "restored": restored}
+
+
 def _current_scenario_manifest(root: Path | None) -> dict[str, Any]:
     if root is None:
         return {}
@@ -1084,6 +1169,7 @@ def _write_ui_revision(
         "before_webui": before_for_revision,
         "after_webui": after_for_revision,
         "preview_state": preview_for_revision,
+        "prompt_files": _snapshot_prompt_files(str(session.get("artifact_root") or "")),
     }
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (revision_dir / "current.txt").write_text(revision + "\n", encoding="utf-8")
@@ -5118,6 +5204,7 @@ def set_ui_revision_current(
     session["ui_revision"] = str(revision_payload.get("revision") or revision)
     _merge_session_from_preview(session, preview)
     _write_webui_payload(str(session.get("artifact_root") or ""), after_webui)
+    prompt_files_restore = _restore_prompt_files_from_revision(session, revision_payload)
     workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
     dev_runtime_refresh = _schedule_dev_runtime_reload_after_revision(
@@ -5144,6 +5231,7 @@ def set_ui_revision_current(
         "scenario_id": session.get("scenario_id"),
         "revision": session.get("ui_revision"),
         "preview_state": preview,
+        "prompt_files_restore": prompt_files_restore,
         "workbench": workbench,
         "dev_runtime_refresh": dev_runtime_refresh,
         "message": message,

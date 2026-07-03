@@ -1,5 +1,5 @@
 name: prompt_engineer_skill
-version: 0.6.3
+version: 0.6.4
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -291,6 +291,32 @@ tools:
     type: array
     items:
       type: object
+- name: prompt_list_project_file_tree
+  description: List project files as a nested tree for Prompt IDE
+  entry: handlers.main:prompt_list_project_file_tree
+  input_schema:
+    type: object
+    required:
+    - object_type
+    - object_id
+    properties:
+      object_type:
+        type: string
+        enum:
+        - skill
+        - scenario
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+      root:
+        type: object
+      count:
+        type: integer
 - name: prompt_read_project_file
   description: Read a single project file for code viewer
   entry: handlers.main:prompt_read_project_file
@@ -326,6 +352,39 @@ tools:
       language:
         type: string
       content:
+        type: string
+- name: prompt_save_project_file
+  description: Save an editable project text file selected in Prompt IDE
+  entry: handlers.main:prompt_save_project_file
+  input_schema:
+    type: object
+    required:
+    - object_type
+    - object_id
+    - path
+    - text
+    properties:
+      object_type:
+        type: string
+        enum:
+        - skill
+        - scenario
+      object_id:
+        type: string
+        minLength: 1
+      path:
+        type: string
+        minLength: 1
+      text:
+        type: string
+  output_schema:
+    type: object
+    properties:
+      ok:
+        type: boolean
+      error:
+        type: string
+      path:
         type: string
 - name: prompt_list_templates
   description: List available templates for skills or scenarios

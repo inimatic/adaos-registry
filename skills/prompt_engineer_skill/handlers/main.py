@@ -33,6 +33,26 @@ _PROJECT_FILE_EXTS = {
     ".toml",
     ".txt",
 }
+_EDITABLE_PROJECT_FILE_EXTS = {
+    ".json",
+    ".yml",
+    ".yaml",
+    ".md",
+    ".markdown",
+    ".toml",
+    ".txt",
+}
+_READONLY_PROJECT_FILES = {
+    "prompt_state.json",
+}
+_READONLY_PROJECT_FILE_DIR_PREFIXES = (
+    "artifacts/",
+    "tz/addenda/",
+    "ui_revisions/",
+)
+_CREATABLE_PROJECT_FILES = {
+    "tz/base_tz.md",
+}
 _SKIP_FILE_DIRS = {
     ".git",
     ".hg",
@@ -228,6 +248,121 @@ def _read_text(path: Path) -> str:
 def _write_text(path: Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(value, encoding="utf-8")
+
+
+def _resolve_project_file(root: Path, path: Any) -> tuple[Path, Path]:
+    raw = str(path or "").strip()
+    if not raw:
+        raise ValueError("path is required")
+    rel_path = Path(raw)
+    full = (root / rel_path).resolve()
+    try:
+        full.relative_to(root)
+    except ValueError as exc:  # pragma: no cover - defensive
+        raise ValueError("path is outside project root") from exc
+    return rel_path, full
+
+
+def _project_file_editable(rel_path: Path, full: Optional[Path] = None) -> tuple[bool, str]:
+    rel = rel_path.as_posix()
+    if rel_path.name in _READONLY_PROJECT_FILES:
+        return False, "managed_state_file"
+    if any(rel.startswith(prefix) for prefix in _READONLY_PROJECT_FILE_DIR_PREFIXES):
+        return False, "managed_or_append_only_file"
+    if rel_path.suffix.lower() not in _EDITABLE_PROJECT_FILE_EXTS:
+        return False, "unsupported_file_type"
+    if full is not None and full.exists():
+        try:
+            if full.stat().st_size > _MAX_FILE_BYTES:
+                return False, "file_too_large"
+        except OSError:
+            return False, "file_stat_failed"
+    return True, ""
+
+
+def _sync_prompt_state_after_project_file_save(
+    object_type: str,
+    object_id: str,
+    root: Path,
+    rel_path: Path,
+    content: str,
+) -> Optional[Dict[str, Any]]:
+    rel = rel_path.as_posix()
+    state: Optional[Dict[str, Any]] = None
+    if rel == "tz/base_tz.md":
+        state = _load_state(object_type, object_id)
+        state["base_tz"] = content
+    elif rel == "prepare/general_prompt.md":
+        state = _load_state(object_type, object_id)
+        prepare = state.setdefault("prepare", {})
+        if not isinstance(prepare, dict):
+            prepare = {}
+            state["prepare"] = prepare
+        prepare["general_prompt"] = content
+    elif rel == "generate/general_prompt.md":
+        state = _load_state(object_type, object_id)
+        generate = state.setdefault("generate", {})
+        if not isinstance(generate, dict):
+            generate = {}
+            state["generate"] = generate
+        generate["general_prompt"] = content
+
+    if state is not None:
+        _write_state(root, state)
+    return state
+
+
+def _current_proto_revision(root: Path) -> str:
+    revision_dir = root / "ui_revisions"
+    current_path = revision_dir / "current.txt"
+    try:
+        current = current_path.read_text(encoding="utf-8").strip()
+    except Exception:
+        current = ""
+    if current:
+        return current
+    try:
+        revisions = sorted(
+            path.stem
+            for path in revision_dir.glob("*.json")
+            if path.stem.isdigit()
+        )
+    except Exception:
+        revisions = []
+    return revisions[-1] if revisions else ""
+
+
+def _project_file_meta(object_type: str, object_id: str, root: Path, rel_path: Path, full: Path) -> Dict[str, Any]:
+    editable, readonly_reason = _project_file_editable(rel_path, full)
+    exists = full.exists()
+    size_bytes = 0
+    updated_at: Optional[str] = None
+    if exists:
+        try:
+            stat = full.stat()
+            size_bytes = stat.st_size
+            updated_at = datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc).isoformat()
+        except Exception:
+            size_bytes = 0
+            updated_at = None
+    rel = rel_path.as_posix()
+    return {
+        "id": f"{object_type}:{object_id}:{rel}",
+        "label": rel,
+        "title": rel_path.name or rel,
+        "subtitle": str(rel_path.parent.as_posix()) if str(rel_path.parent.as_posix()) != "." else "",
+        "path": rel,
+        "object_type": object_type,
+        "object_id": object_id,
+        "kind": "project_file",
+        "type": "file",
+        "language": _detect_language_from_suffix(rel_path),
+        "editable": editable,
+        "readonly_reason": readonly_reason,
+        "exists": exists,
+        "size_bytes": size_bytes,
+        "updated_at": updated_at,
+    }
 
 
 def _default_state(object_type: str, object_id: str) -> Dict[str, Any]:
@@ -753,6 +888,7 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
     def _scenario_meta(name: str) -> Dict[str, Any]:
         project_root = (dev_scenarios_root / name).resolve()
         path, data = _project_manifest("scenario", project_root)
+        proto_revision = _current_proto_revision(project_root)
         # Per-project workflow state (if any) from PromptProjectState.
         wf_state = "tz"
         try:
@@ -766,6 +902,7 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
             "title": data.get("title") or data.get("name") or name,
             "description": data.get("description") or "",
             "version": data.get("version") or "",
+            "proto_revision": proto_revision,
             "updated_at": datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat() if path and path.exists() else None,
             "workflow_state": wf_state,
         }
@@ -813,6 +950,9 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
                 "title": meta["title"],
                 "description": meta["description"],
                 "version": meta["version"],
+                "proto_revision": meta.get("proto_revision") or "",
+                "subtitle": f"proto {meta['proto_revision']}" if meta.get("proto_revision") else meta["description"],
+                "kindLabel": f"proto {meta['proto_revision']}" if meta.get("proto_revision") else "scenario",
                 "updated_at": meta["updated_at"],
                 "workflow_state": meta["workflow_state"],
                 "builder_topic_id": _builder_topic_id("scenario", name),
@@ -834,6 +974,9 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
                 "title": meta["title"],
                 "description": meta["description"],
                 "version": meta["version"],
+                "proto_revision": "",
+                "subtitle": meta["description"],
+                "kindLabel": "skill",
                 "updated_at": meta["updated_at"],
                 "workflow_state": meta["workflow_state"],
                 "builder_topic_id": _builder_topic_id("skill", name),
@@ -868,7 +1011,9 @@ def prompt_list_project_objects(payload: Optional[Dict[str, Any]] = None, **kwar
         meta: Dict[str, Any]
         if kind == "scenario":
             root = ctx.paths.dev_scenarios_dir()
-            path, raw = _project_manifest("scenario", (root / name).resolve())
+            project_root = (root / name).resolve()
+            path, raw = _project_manifest("scenario", project_root)
+            proto_revision = _current_proto_revision(project_root)
             updated_at = None
             if path and path.exists():
                 try:
@@ -881,6 +1026,7 @@ def prompt_list_project_objects(payload: Optional[Dict[str, Any]] = None, **kwar
                 "title": raw.get("title") or raw.get("name") or name,
                 "description": raw.get("description") or "",
                 "version": raw.get("version") or "",
+                "proto_revision": proto_revision,
                 "updated_at": updated_at,
             }
         else:
@@ -899,6 +1045,7 @@ def prompt_list_project_objects(payload: Optional[Dict[str, Any]] = None, **kwar
                 "title": raw.get("title") or raw.get("name") or name,
                 "description": raw.get("description") or "",
                 "version": raw.get("version") or "",
+                "proto_revision": "",
                 "updated_at": updated_at,
             }
 
@@ -920,6 +1067,17 @@ def prompt_list_project_objects(payload: Optional[Dict[str, Any]] = None, **kwar
             "title": meta["title"],
             "description": meta["description"],
             "version": meta["version"],
+            "proto_revision": meta.get("proto_revision") or "",
+            "subtitle": (
+                f"proto {meta.get('proto_revision')}"
+                if meta.get("proto_revision")
+                else meta["description"]
+            ),
+            "kindLabel": (
+                f"proto {meta.get('proto_revision')}"
+                if meta.get("proto_revision")
+                else label_prefix.lower()
+            ),
             "updated_at": meta["updated_at"],
             "workflow_state": wf_state,
         }
@@ -993,6 +1151,15 @@ def prompt_list_project_files(payload: Optional[Dict[str, Any]] = None, **kwargs
     if not root.exists():
         return items
 
+    seen_paths: set[str] = set()
+
+    def _append_file(rel_path: Path, full: Path) -> None:
+        rel = rel_path.as_posix()
+        if rel in seen_paths:
+            return
+        seen_paths.add(rel)
+        items.append(_project_file_meta(str(object_type), str(object_id), root, rel_path, full))
+
     for current, dirs, files in os.walk(root):
         dirs[:] = sorted(
             name
@@ -1008,20 +1175,79 @@ def prompt_list_project_files(payload: Optional[Dict[str, Any]] = None, **kwargs
                 rel = path.relative_to(root).as_posix()
             except ValueError:
                 continue
-            items.append(
-                {
-                    "id": rel,
-                    "label": rel,
-                    "path": rel,
-                    "object_type": object_type,
-                    "object_id": object_id,
-                    "language": _detect_language_from_suffix(path),
-                    "size_bytes": path.stat().st_size,
-                }
-            )
+            _append_file(Path(rel), path)
+            if len(items) >= limit:
+                return items
+    for rel in sorted(_CREATABLE_PROJECT_FILES):
+        rel_path = Path(rel)
+        full = (root / rel_path).resolve()
+        if not full.exists():
+            _append_file(rel_path, full)
             if len(items) >= limit:
                 return items
     return items
+
+
+@tool("prompt_list_project_file_tree")
+def prompt_list_project_file_tree(payload: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+    """
+    Return project files as a nested tree for Prompt IDE navigation.
+    """
+    payload = _payload_with_kwargs(payload, **kwargs)
+    files = prompt_list_project_files(payload)
+    root_node: Dict[str, Any] = {
+        "id": "files",
+        "title": "Files",
+        "kind": "directory",
+        "type": "directory",
+        "children": [],
+    }
+    directories: Dict[str, Dict[str, Any]] = {"": root_node}
+
+    def _directory(path: str) -> Dict[str, Any]:
+        token = path.strip("/")
+        if token in directories:
+            return directories[token]
+        parent_token = "/".join(token.split("/")[:-1])
+        parent = _directory(parent_token)
+        title = token.split("/")[-1] if token else "Files"
+        node = {
+            "id": f"dir:{token}" if token else "files",
+            "title": title,
+            "label": title,
+            "path": token,
+            "kind": "directory",
+            "type": "directory",
+            "children": [],
+        }
+        parent.setdefault("children", []).append(node)
+        directories[token] = node
+        return node
+
+    for item in files:
+        rel = str(item.get("path") or "").strip()
+        if not rel:
+            continue
+        parent_token = "/".join(rel.split("/")[:-1])
+        parent = _directory(parent_token)
+        parent.setdefault("children", []).append({**item, "children": []})
+
+    def _sort(node: Dict[str, Any]) -> None:
+        children = node.get("children")
+        if not isinstance(children, list):
+            return
+        children.sort(key=lambda item: (0 if item.get("type") == "directory" else 1, str(item.get("title") or item.get("label") or "")))
+        for child in children:
+            if isinstance(child, dict):
+                _sort(child)
+
+    _sort(root_node)
+    return {
+        "ok": True,
+        "root": root_node,
+        "items": files,
+        "count": len(files),
+    }
 
 
 @tool("prompt_read_project_file")
@@ -1041,30 +1267,98 @@ def prompt_read_project_file(payload: Optional[Dict[str, Any]] = None, **kwargs:
         raise ValueError("object_type, object_id and path are required")
 
     root = _project_root(object_type, object_id)
-    rel_path = Path(path)
-    full = (root / rel_path).resolve()
-
-    # Basic safety: ensure we do not escape the project root.
-    try:
-        full.relative_to(root)
-    except ValueError as exc:  # pragma: no cover - defensive
-        raise ValueError("path is outside project root") from exc
+    rel_path, full = _resolve_project_file(root, path)
+    editable, readonly_reason = _project_file_editable(rel_path, full)
 
     language = _detect_language_from_suffix(full)
     max_bytes = _limit_from_payload(payload, "max_bytes", default=_MAX_FILE_BYTES, maximum=_MAX_FILE_BYTES)
-    raw = full.read_bytes()
+    raw = full.read_bytes() if full.exists() else b""
     truncated = len(raw) > max_bytes
     content = raw[:max_bytes].decode("utf-8", errors="replace")
     return {
         "ok": True,
+        "id": f"{object_type}:{object_id}:{rel_path.as_posix()}",
         "object_type": object_type,
         "object_id": object_id,
         "path": rel_path.as_posix(),
         "language": language,
         "content": content,
+        "editable": editable,
+        "readonly_reason": readonly_reason,
+        "exists": full.exists(),
         "truncated": truncated,
         "size_bytes": len(raw),
         "max_bytes": max_bytes,
+    }
+
+
+@tool("prompt_save_project_file")
+def prompt_save_project_file(payload: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+    """
+    Save an editable project text file selected in Prompt IDE.
+    """
+    payload = _payload_with_kwargs(payload, **kwargs)
+    object_type = str(payload.get("object_type") or "").strip().lower()
+    object_id = str(payload.get("object_id") or "").strip()
+    path = payload.get("path")
+    text = str(payload.get("text") if payload.get("text") is not None else payload.get("content") or "")
+    if not object_type or not object_id or not path:
+        raise ValueError("object_type, object_id and path are required")
+
+    root = _project_root(object_type, object_id)
+    rel_path, full = _resolve_project_file(root, path)
+    editable, readonly_reason = _project_file_editable(rel_path, full)
+    if not editable:
+        return {
+            "ok": False,
+            "error": "file_not_editable",
+            "reason": readonly_reason,
+            "object_type": object_type,
+            "object_id": object_id,
+            "path": rel_path.as_posix(),
+        }
+    if not full.exists() and rel_path.as_posix() not in _CREATABLE_PROJECT_FILES:
+        return {
+            "ok": False,
+            "error": "file_not_found",
+            "object_type": object_type,
+            "object_id": object_id,
+            "path": rel_path.as_posix(),
+        }
+    raw = text.encode("utf-8")
+    if len(raw) > _MAX_FILE_BYTES:
+        return {
+            "ok": False,
+            "error": "file_too_large",
+            "max_bytes": _MAX_FILE_BYTES,
+            "size_bytes": len(raw),
+        }
+    if rel_path.suffix.lower() == ".json":
+        try:
+            json.loads(text)
+        except Exception as exc:
+            return {
+                "ok": False,
+                "error": "invalid_json",
+                "detail": str(exc),
+                "object_type": object_type,
+                "object_id": object_id,
+                "path": rel_path.as_posix(),
+            }
+
+    _write_text(full, text)
+    state = _sync_prompt_state_after_project_file_save(object_type, object_id, root, rel_path, text)
+    _emit_project_changed(object_type, object_id, reason="project_file_saved")
+    return {
+        "ok": True,
+        "object_type": object_type,
+        "object_id": object_id,
+        "path": rel_path.as_posix(),
+        "language": _detect_language_from_suffix(rel_path),
+        "content": text,
+        "editable": True,
+        "size_bytes": len(raw),
+        "state": state,
     }
 
 
