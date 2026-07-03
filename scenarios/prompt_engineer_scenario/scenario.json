@@ -230,7 +230,8 @@
               },
               "inputs": {
                 "mode": "markdown",
-                "bindField": "base_tz"
+                "bindField": "base_tz",
+                "stateKey": "promptTechnicalSpecificationDraft"
               },
               "actions": [
                 {
