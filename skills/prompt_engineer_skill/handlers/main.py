@@ -227,13 +227,6 @@ def _emit_builder_preview_selected(object_type: str, object_id: str) -> None:
         _log.debug("failed to emit builder.preview.selected for scenario:%s", scenario_id, exc_info=True)
 
 
-def _ts_artifact_path(root: Path) -> Path:
-    """
-    Location for the TS draft artifact used by Prompt IDE (LLM Artifacts panel).
-    """
-    return root / "artifacts" / "llm_artifacts" / "ts_draft.md"
-
-
 def _state_path(root: Path) -> Path:
     return root / "prompt_state.json"
 
@@ -720,8 +713,6 @@ def tz_execute(payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     It reads current PromptProjectState (base_tz + tz_addenda), builds a combined
     Technical Specification and sends it through request_ts_draft.
 
-    The resulting artifact path is returned so that the IDE can show it under
-    LLM Artifacts (draft).
     """
     payload = payload or {}
     object_type = (payload.get("object_type") or "").strip().lower()
@@ -739,18 +730,15 @@ def tz_execute(payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             "error": "technical_spec_missing",
         }
 
-    # Send request via Root LLM proxy and persist TS draft artifact for this project.
+    # Send request via Root LLM proxy and return the generated brief to the caller.
     from adaos.sdk.llm.llm_client import request_ts_draft
 
-    root = _project_root(object_type, object_id)
-    artifact_path = _ts_artifact_path(root)
-    result = request_ts_draft(ts_text, output_path=artifact_path)
+    result = request_ts_draft(ts_text)
     return {
         "ok": True,
         "object_type": object_type,
         "object_id": object_id,
         "output_text": str(result.get("output_text") or ""),
-        "output_path": str(result.get("output_path") or artifact_path),
         "request_prompt": result.get("request_prompt"),
         "raw_response": result.get("response"),
     }
@@ -1497,30 +1485,6 @@ def prompt_create_dev_project(payload: Optional[Dict[str, Any]] = None, **kwargs
         "path": str(result.path),
         "template": template or "default",
     }
-
-
-@tool("prompt_snapshot_project")
-def prompt_snapshot_project(payload: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """
-    Persist the current PromptProjectState for a dev project to disk.
-
-    For v0.1 this is effectively a no-op snapshot: we reload the state
-    (which already merges file-backed TZ/addenda/general prompts) and
-    re-write ``prompt_state.json`` under the project root. This gives
-    us an explicit, debuggable checkpoint that the web IDE can trigger
-    from the Files section.
-    """
-    payload = payload or {}
-    object_type = (payload.get("object_type") or "").strip().lower()
-    object_id = (payload.get("object_id") or "").strip()
-    if not object_type or not object_id:
-        raise ValueError("object_type and object_id are required")
-
-    root = _project_root(object_type, object_id)
-    state = _load_state(object_type, object_id)
-    _write_state(root, state)
-    _emit_project_changed(object_type, object_id, reason="project_snapshotted")
-    return {"ok": True, "object_type": object_type, "object_id": object_id}
 
 
 @tool("prompt_set_workflow_state")

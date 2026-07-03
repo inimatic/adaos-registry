@@ -458,32 +458,6 @@ tools:
     type: array
     items:
       type: object
-- name: prompt_snapshot_project
-  description: Persist PromptProjectState snapshot for a dev project
-  entry: handlers.main:prompt_snapshot_project
-  input_schema:
-    type: object
-    required:
-    - object_type
-    - object_id
-    properties:
-      object_type:
-        type: string
-        enum:
-        - skill
-        - scenario
-      object_id:
-        type: string
-        minLength: 1
-  output_schema:
-    type: object
-    properties:
-      ok:
-        type: boolean
-      object_type:
-        type: string
-      object_id:
-        type: string
 - name: prompt_get_project_meta
   description: Return metadata for a dev scenario or skill
   entry: handlers.main:prompt_get_project_meta
@@ -621,7 +595,7 @@ tools:
         type: string
       object_id:
         type: string
-      output_path:
+      output_text:
         type: string
 - name: prompt_llm_list_models
   description: List available LLM models from the Root LLM proxy

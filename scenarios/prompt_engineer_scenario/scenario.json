@@ -119,7 +119,6 @@
               "id": "project-objects",
               "type": "collection.grid",
               "area": "sidebar",
-              "title": "Project",
               "dataSource": {
                 "kind": "skill",
                 "name": "prompt_engineer_skill.prompt_list_project_objects",
@@ -161,32 +160,6 @@
               ]
             },
             {
-              "id": "project-files-tools",
-              "type": "input.commandBar",
-              "area": "sidebar",
-              "title": "Files tools",
-              "inputs": {
-                "size": "small",
-                "buttons": [
-                  {
-                    "id": "snapshot",
-                    "label": "Snapshot"
-                  }
-                ]
-              },
-              "actions": [
-                {
-                  "on": "click:snapshot",
-                  "type": "callSkill",
-                  "target": "prompt_engineer_skill.prompt_snapshot_project",
-                  "params": {
-                    "object_type": "$state.currentObjectType",
-                    "object_id": "$state.currentObjectId"
-                  }
-                }
-              ]
-            },
-            {
               "id": "project-files",
               "type": "collection.tree",
               "area": "sidebar",
@@ -202,6 +175,7 @@
               },
               "inputs": {
                 "rootLabel": "Files",
+                "hideRoot": true,
                 "expandedByDefault": false,
                 "selectionMode": "leaf",
                 "stateKey": "currentFilePath"
@@ -366,20 +340,6 @@
                 "languageField": "language"
               },
               "visibleIf": "$state.currentStage === 'file' && $state.currentFileEditable !== true"
-            },
-            {
-              "id": "llm-artifacts",
-              "type": "item.details",
-              "area": "right",
-              "title": "LLM Artifacts (draft)",
-              "inputs": {
-                "collapsible": true,
-                "collapsedByDefault": true
-              },
-              "dataSource": {
-                "kind": "y",
-                "path": "data/prompt/llm_artifacts"
-              }
             },
             {
               "id": "workflow-actions",
