@@ -13,6 +13,13 @@ Core runtime components:
 - `host.cvRuntime` widget: headless session host for pages where another surface is shown instead of camera preview.
 - `cv_descriptor` skill: persists descriptors and projects compact Yjs state; raw vectors are returned through `cv_descriptor_get_targets` instead of public descriptor lists.
 
+Skill-owned use cases:
+
+- The skill defines `session.useCase`: `id`, `kind`, `profile`, `camera`, `pipeline`, `matching`, `targets`, `sinks`, and optional `ui` hints.
+- The client treats `useCase` as the scenario contract. Runtime profiles only provide defaults; explicit skill session fields win.
+- Supported profile defaults are `low_power`, `balanced`, and `quality`. `cv_descriptor` uses `low_power` for phone testing.
+- `cv_descriptor` currently requests `320x240`, camera `frameRate` max `5`, and runtime `targetFps` `4` to reduce heat while preserving object identification.
+
 Session flow:
 
 1. Setup mode starts `cv_descriptor.setup`.
@@ -34,6 +41,7 @@ Model rules:
 - `handlers/main.py` provides durable JSON state, descriptor CRUD tools, target export, runtime command state, Yjs projection, and bounded stream events.
 - The AdaOS client contains the first `CvRuntimeService` edition with camera lifecycle, TensorFlow.js MobileNetV2 trial adapter using an explicit Google Storage model URL, browser-frame fallback adapter, browser-side target matching, visible `media.cvCamera`, and headless `host.cvRuntime`.
 - `webui.json` uses `media.cvCamera` in setup/work modals and keeps generic status/list/debug widgets around it.
+- CV session diagnostics include the active use-case summary and actual browser camera track settings when available.
 
 ## Phone Smoke Check 2026-07-02
 
@@ -61,5 +69,7 @@ Model rules:
 - [x] Add post-Select descriptor edit modal with thumbnail, title, and description.
 - [x] Add runtime contract copy action for phone debugging.
 - [x] Add TensorFlow.js MobileNetV2 trial model adapter.
+- [x] Add skill-owned `useCase` contract with runtime load profiles.
+- [x] Move `cv_descriptor` phone profile to low-power camera/FPS defaults.
 - [ ] Add list-item edit UI for existing descriptor title/description.
 - [ ] Add end-to-end browser test with synthetic camera/model adapter.

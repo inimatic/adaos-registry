@@ -81,6 +81,16 @@ DEFAULT_MODEL_OPTIONS = [
     },
 ]
 
+LOW_POWER_CAMERA = {
+    "facingMode": "environment",
+    "width": {"ideal": 320, "max": 320},
+    "height": {"ideal": 240, "max": 240},
+    "frameRate": {"ideal": 5, "max": 5},
+    "resizeMode": "crop-and-scale",
+}
+
+LOW_POWER_TARGET_FPS = 4
+
 _DATA_PROJECTION_ENTRIES = [
     {
         "scope": "subnet",
@@ -335,22 +345,38 @@ def _targets(state: Mapping[str, Any], *, include_disabled: bool = False) -> lis
 def _session_config(state: Mapping[str, Any], mode: str) -> dict[str, Any]:
     normalized_mode = "setup" if str(mode or "").strip().lower() == "setup" else "work"
     tasks = ["embed"] if normalized_mode == "setup" else ["embed", "identify"]
+    camera = json.loads(json.dumps(LOW_POWER_CAMERA))
+    pipeline = {
+        "tasks": tasks,
+        "targetFps": LOW_POWER_TARGET_FPS,
+        "emitVectors": normalized_mode == "setup",
+        "showOverlay": True,
+    }
+    use_case = {
+        "id": f"cv_descriptor.{normalized_mode}",
+        "kind": "descriptor_capture" if normalized_mode == "setup" else "descriptor_identification",
+        "profile": "low_power",
+        "camera": camera,
+        "pipeline": dict(pipeline),
+        "matching": {
+            "mode": "small_list_browser_vectors",
+            "metric": (state.get("matching") or {}).get("metric") or "cosine",
+        },
+        "ui": {
+            "preview": True,
+            "select": normalized_mode == "setup",
+            "overlay": normalized_mode == "work",
+        },
+    }
     return {
         "schema": "adaos.cv.session.v1",
         "sessionId": f"cv_descriptor.{normalized_mode}",
         "mode": normalized_mode,
         "model": dict(state.get("model") or {}),
-        "camera": {
-            "facingMode": "environment",
-            "width": {"ideal": 1280},
-            "height": {"ideal": 720},
-        },
-        "pipeline": {
-            "tasks": tasks,
-            "targetFps": 12,
-            "emitVectors": normalized_mode == "setup",
-            "showOverlay": True,
-        },
+        "profile": "low_power",
+        "useCase": use_case,
+        "camera": camera,
+        "pipeline": pipeline,
         "matching": dict(state.get("matching") or {}),
         "targets": {
             "tool": f"{SKILL_NAME}.cv_descriptor_get_targets",

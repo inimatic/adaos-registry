@@ -41,6 +41,23 @@ def test_status_projects_public_empty_state(tmp_path: Path, monkeypatch) -> None
     assert result["runtime"]["client_runtime_required"] is True
 
 
+def test_sessions_define_low_power_skill_use_cases(tmp_path: Path, monkeypatch) -> None:
+    mod = _load_module(tmp_path, monkeypatch)
+
+    result = mod.cv_descriptor_status()
+    setup = result["runtime"]["sessions"]["setup"]
+    work = result["runtime"]["sessions"]["work"]
+
+    assert setup["useCase"]["kind"] == "descriptor_capture"
+    assert work["useCase"]["kind"] == "descriptor_identification"
+    assert work["useCase"]["profile"] == "low_power"
+    assert work["camera"]["width"] == {"ideal": 320, "max": 320}
+    assert work["camera"]["height"] == {"ideal": 240, "max": 240}
+    assert work["camera"]["frameRate"] == {"ideal": 5, "max": 5}
+    assert work["pipeline"]["targetFps"] == 4
+    assert work["pipeline"]["tasks"] == ["embed", "identify"]
+
+
 def test_old_empty_placeholder_state_migrates_to_trial_model(tmp_path: Path, monkeypatch) -> None:
     state_path = tmp_path / "state.json"
     state_path.write_text(
