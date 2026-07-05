@@ -1,5 +1,5 @@
 name: weather_skill
-version: 2.6.10
+version: 2.6.11
 description: Weather skill with Open-Meteo current conditions, forecast, browser location
   support and declarative UI actions.
 runtime:
@@ -120,11 +120,11 @@ nlu:
     enabled: true
     source: teacher
     candidate_id: cand.1768330399036
-updated_at: '2026-07-05T04:56:11+00:00'
+updated_at: '2026-07-05T04:56:48+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3499.72fbb554
-    recorded_at: '2026-07-05T04:56:12+00:00'
+    min_version: 0.1.465+3499.72fbb554
+    recorded_at: '2026-07-05T04:56:48+00:00'
     source: skill_push
     min_commit: 72fbb55442ff1991220c39cba2a81aa51efd353f
     min_short_commit: 72fbb554
