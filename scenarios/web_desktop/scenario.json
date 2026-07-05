@@ -2,6 +2,72 @@
   "ui": {
     "application": {
       "version": "0.2",
+      "resources": [
+        {
+          "id": "web_desktop.i18n.en",
+          "kind": "data",
+          "role": "i18n",
+          "locale": "en",
+          "owner": "scenario:web_desktop",
+          "dictionary": {
+            "web_desktop.title": "Web Desktop",
+            "web_desktop.description": "Desktop shell scenario that defines the main UI layout, registry and base catalog.",
+            "web_desktop.widget.infrastructure_status": "Infrastructure status",
+            "web_desktop.page.desktop": "Desktop",
+            "web_desktop.widget.icons": "Icons",
+            "web_desktop.widget.widgets": "Widgets",
+            "web_desktop.modal.nlu_teacher": "NLU Teacher",
+            "web_desktop.nlu.user_requests": "User requests",
+            "web_desktop.nlu.candidates": "Candidates",
+            "web_desktop.nlu.signals": "Signals",
+            "web_desktop.nlu.check": "Check",
+            "web_desktop.nlu.check_phrase": "Check phrase",
+            "web_desktop.nlu.probe_result": "Probe result",
+            "web_desktop.nlu.phrase": "Phrase",
+            "web_desktop.nlu.check_placeholder": "Show subnet environment variables",
+            "web_desktop.nlu.no_phrase_checked": "No phrase checked yet",
+            "web_desktop.nlu.no_user_requests": "No user requests yet",
+            "web_desktop.nlu.no_candidates": "No candidates yet",
+            "web_desktop.nlu.no_teacher_signals": "No teacher signals yet",
+            "web_desktop.nlu.details": "Details",
+            "web_desktop.nlu.apply": "Apply",
+            "web_desktop.nlu.test": "Test",
+            "web_desktop.nlu.rollback": "Rollback"
+          }
+        },
+        {
+          "id": "web_desktop.i18n.ru",
+          "kind": "data",
+          "role": "i18n",
+          "locale": "ru",
+          "owner": "scenario:web_desktop",
+          "dictionary": {
+            "web_desktop.title": "Web Desktop",
+            "web_desktop.description": "Desktop shell scenario, который задает основной UI layout, registry и base catalog.",
+            "web_desktop.widget.infrastructure_status": "Состояние инфраструктуры",
+            "web_desktop.page.desktop": "Рабочий стол",
+            "web_desktop.widget.icons": "Иконки",
+            "web_desktop.widget.widgets": "Виджеты",
+            "web_desktop.modal.nlu_teacher": "NLU Teacher",
+            "web_desktop.nlu.user_requests": "Запросы пользователя",
+            "web_desktop.nlu.candidates": "Кандидаты",
+            "web_desktop.nlu.signals": "Сигналы",
+            "web_desktop.nlu.check": "Проверка",
+            "web_desktop.nlu.check_phrase": "Проверяемая фраза",
+            "web_desktop.nlu.probe_result": "Результат проверки",
+            "web_desktop.nlu.phrase": "Фраза",
+            "web_desktop.nlu.check_placeholder": "Покажи переменные окружения подсети",
+            "web_desktop.nlu.no_phrase_checked": "Фраза еще не проверялась",
+            "web_desktop.nlu.no_user_requests": "Запросов пользователя пока нет",
+            "web_desktop.nlu.no_candidates": "Кандидатов пока нет",
+            "web_desktop.nlu.no_teacher_signals": "Сигналов NLU Teacher пока нет",
+            "web_desktop.nlu.details": "Детали",
+            "web_desktop.nlu.apply": "Применить",
+            "web_desktop.nlu.test": "Тест",
+            "web_desktop.nlu.rollback": "Откатить"
+          }
+        }
+      ],
       "desktop": {
         "topbar": [],
         "iconTemplate": {
@@ -18,7 +84,10 @@
             "type": "visual.metricTile",
             "title": "Infrastructure status",
             "source": "data/infra/status",
-            "dev": false
+            "dev": false,
+            "title_i18n": {
+              "key": "web_desktop.widget.infrastructure_status"
+            }
           }
         ],
         "pageSchema": {
@@ -55,7 +124,10 @@
                     "modalId": "$event.action.openModal"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "web_desktop.widget.icons"
+              }
             },
             {
               "id": "desktop-widgets",
@@ -65,9 +137,15 @@
               "dataSource": {
                 "kind": "y",
                 "transform": "desktop.widgets"
+              },
+              "title_i18n": {
+                "key": "web_desktop.widget.widgets"
               }
             }
-          ]
+          ],
+          "title_i18n": {
+            "key": "web_desktop.page.desktop"
+          }
         }
       },
       "modals": {
@@ -97,19 +175,31 @@
                   "buttons": [
                     {
                       "id": "requests",
-                      "label": "User requests"
+                      "label": "User requests",
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.user_requests"
+                      }
                     },
                     {
                       "id": "candidates",
-                      "label": "Candidates"
+                      "label": "Candidates",
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.candidates"
+                      }
                     },
                     {
                       "id": "signals",
-                      "label": "Signals"
+                      "label": "Signals",
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.signals"
+                      }
                     },
                     {
                       "id": "check",
-                      "label": "Check"
+                      "label": "Check",
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.check"
+                      }
                     }
                   ]
                 },
@@ -156,9 +246,18 @@
                       "id": "phrase",
                       "type": "text",
                       "label": "Phrase",
-                      "placeholder": "\u041f\u043e\u043a\u0430\u0436\u0438 \u043f\u0435\u0440\u0435\u043c\u0435\u043d\u043d\u044b\u0435 \u043e\u043a\u0440\u0443\u0436\u0435\u043d\u0438\u044f \u043f\u043e\u0434\u0441\u0435\u0442\u0438"
+                      "placeholder": "Покажи переменные окружения подсети",
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.phrase"
+                      },
+                      "placeholder_i18n": {
+                        "key": "web_desktop.nlu.check_placeholder"
+                      }
                     }
-                  ]
+                  ],
+                  "submitLabel_i18n": {
+                    "key": "web_desktop.nlu.check"
+                  }
                 },
                 "visibleIf": "$state.nluTeacherTab === 'check'",
                 "actions": [
@@ -173,7 +272,10 @@
                       "emit_trace": true
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "web_desktop.nlu.check_phrase"
+                }
               },
               {
                 "id": "nlu-check-result",
@@ -182,10 +284,16 @@
                 "title": "Probe result",
                 "inputs": {
                   "stateKey": "nluTeacherProbeResult",
-                  "emptyText": "No phrase checked yet"
+                  "emptyText": "No phrase checked yet",
+                  "emptyText_i18n": {
+                    "key": "web_desktop.nlu.no_phrase_checked"
+                  }
                 },
                 "visibleIf": "$state.nluTeacherTab === 'check'",
-                "actions": []
+                "actions": [],
+                "title_i18n": {
+                  "key": "web_desktop.nlu.probe_result"
+                }
               },
               {
                 "id": "nlu-requests",
@@ -212,15 +320,24 @@
                       "label": "Details",
                       "icon": "information-circle-outline",
                       "whenKey": "has_error_details",
-                      "whenEquals": true
+                      "whenEquals": true,
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.details"
+                      }
                     },
                     {
                       "id": "apply",
                       "label": "Apply",
                       "icon": "checkmark-circle-outline",
-                      "whenKey": "candidate_id"
+                      "whenKey": "candidate_id",
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.apply"
+                      }
                     }
-                  ]
+                  ],
+                  "emptyText_i18n": {
+                    "key": "web_desktop.nlu.no_user_requests"
+                  }
                 },
                 "visibleIf": "$state.nluTeacherTab === 'requests'",
                 "actions": [
@@ -232,7 +349,10 @@
                       "candidate_id": "$event.candidate_id"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "web_desktop.nlu.user_requests"
+                }
               },
               {
                 "id": "nlu-candidates",
@@ -262,23 +382,35 @@
                       "label": "Test",
                       "icon": "play-outline",
                       "whenKey": "candidate_status",
-                      "whenEquals": "pending"
+                      "whenEquals": "pending",
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.test"
+                      }
                     },
                     {
                       "id": "apply",
                       "label": "Apply",
                       "icon": "checkmark-circle-outline",
                       "whenKey": "candidate_status",
-                      "whenEquals": "pending"
+                      "whenEquals": "pending",
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.apply"
+                      }
                     },
                     {
                       "id": "rollback",
                       "label": "Rollback",
                       "icon": "refresh-outline",
                       "whenKey": "candidate_status",
-                      "whenEquals": "applied"
+                      "whenEquals": "applied",
+                      "label_i18n": {
+                        "key": "web_desktop.nlu.rollback"
+                      }
                     }
-                  ]
+                  ],
+                  "emptyText_i18n": {
+                    "key": "web_desktop.nlu.no_candidates"
+                  }
                 },
                 "visibleIf": "$state.nluTeacherTab === 'candidates'",
                 "actions": [
@@ -309,7 +441,10 @@
                       "target": "$event.candidate_target"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "web_desktop.nlu.candidates"
+                }
               },
               {
                 "id": "nlu-signals",
@@ -329,12 +464,21 @@
                   "itemAccordion": true,
                   "detailsPath": "details",
                   "detailsModal": false,
-                  "detailsModalTitleKey": "title"
+                  "detailsModalTitleKey": "title",
+                  "emptyText_i18n": {
+                    "key": "web_desktop.nlu.no_teacher_signals"
+                  }
                 },
                 "visibleIf": "$state.nluTeacherTab === 'signals'",
-                "actions": []
+                "actions": [],
+                "title_i18n": {
+                  "key": "web_desktop.nlu.signals"
+                }
               }
             ]
+          },
+          "title_i18n": {
+            "key": "web_desktop.modal.nlu_teacher"
           }
         }
       }
@@ -359,7 +503,10 @@
         "icon": "apps-outline",
         "launchModal": "nlu_teacher_modal",
         "dev": false,
-        "origin": "system:nlu.teacher"
+        "origin": "system:nlu.teacher",
+        "title_i18n": {
+          "key": "web_desktop.modal.nlu_teacher"
+        }
       }
     ],
     "widgets": []
@@ -372,9 +519,9 @@
         "description": "Show weather for a city (voice/chat).",
         "scope": "scenario",
         "examples": [
-          "\u043f\u043e\u0433\u043e\u0434\u0430",
-          "\u043a\u0430\u043a\u0430\u044f \u043f\u043e\u0433\u043e\u0434\u0430",
-          "\u043f\u043e\u0433\u043e\u0434\u0430 \u0432 \u041c\u043e\u0441\u043a\u0432\u0435",
+          "погода",
+          "какая погода",
+          "погода в Москве",
           "weather",
           "weather in Paris"
         ],
@@ -403,8 +550,8 @@
           }
         ],
         "examples": [
-          "\u0437\u0430\u043f\u0443\u0441\u0442\u0438 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 weather_app",
-          "\u043e\u0442\u043a\u0440\u043e\u0439 \u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435 voice_chat_app",
+          "запусти приложение weather_app",
+          "открой приложение voice_chat_app",
           "open app weather_app",
           "launch app voice_chat_app"
         ]
@@ -423,8 +570,8 @@
           }
         ],
         "examples": [
-          "\u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 web_desktop",
-          "\u043e\u0442\u043a\u0440\u043e\u0439 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439 prompt_engineer_scenario",
+          "переключи сценарий web_desktop",
+          "открой сценарий prompt_engineer_scenario",
           "switch scenario web_desktop",
           "open scenario prompt_engineer_scenario"
         ]
@@ -443,9 +590,9 @@
           }
         ],
         "examples": [
-          "\u043e\u0442\u043a\u0440\u043e\u0439 \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441",
-          "\u043e\u0442\u043a\u0440\u043e\u0439 \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0430\u0441\u0435",
-          "\u043f\u043e\u043a\u0430\u0436\u0438 \u043c\u0430\u0440\u043a\u0435\u0442\u043f\u043b\u0435\u0439\u0441",
+          "открой маркетплейс",
+          "открой маркетпласе",
+          "покажи маркетплейс",
           "open marketplace",
           "show marketplace"
         ]
@@ -463,8 +610,8 @@
           }
         ],
         "examples": [
-          "\u0441\u043a\u043e\u043b\u044c\u043a\u043e \u0432\u0440\u0435\u043c\u0435\u043d\u0438",
-          "\u043a\u043e\u0442\u043e\u0440\u044b\u0439 \u0447\u0430\u0441",
+          "сколько времени",
+          "который час",
           "what time is it"
         ]
       },
@@ -482,8 +629,8 @@
           }
         ],
         "examples": [
-          "\u043f\u043e\u0441\u0442\u0430\u0432\u044c \u0442\u0430\u0439\u043c\u0435\u0440 \u043d\u0430 [10 \u043c\u0438\u043d\u0443\u0442](duration)",
-          "\u0437\u0430\u043f\u0443\u0441\u0442\u0438 \u0442\u0430\u0439\u043c\u0435\u0440 \u043d\u0430 [30 \u0441\u0435\u043a\u0443\u043d\u0434](duration)",
+          "поставь таймер на [10 минут](duration)",
+          "запусти таймер на [30 секунд](duration)",
           "set timer for [10 minutes](duration)"
         ]
       }
@@ -491,7 +638,7 @@
     "regex_rules": [
       {
         "id": "builtin.desktop.open_marketplace",
-        "created_at": 1779821400.0,
+        "created_at": 1779821400,
         "intent": "desktop.open_marketplace",
         "pattern": "\\b(?:\\u043e\\u0442\\u043a\\u0440\\u043e\\u0439|\\u043f\\u043e\\u043a\\u0430\\u0436\\u0438|\\u0437\\u0430\\u043f\\u0443\\u0441\\u0442\\u0438|open|show)\\s+(?:\\u043c\\u0430\\u0440\\u043a\\u0435\\u0442\\u043f\\u043b(?:\\u0435\\u0439\\u0441|\\u0430\\u0441\\u0435)|marketplace)\\b",
         "enabled": true,
@@ -499,7 +646,7 @@
       },
       {
         "id": "builtin.voice.time_now",
-        "created_at": 1779821400.0,
+        "created_at": 1779821400,
         "intent": "voice.time.now",
         "pattern": "\\b(?:\\u0441\\u043a\\u043e\\u043b\\u044c\\u043a\\u043e\\s+\\u0432\\u0440\\u0435\\u043c\\u0435\\u043d\\u0438|\\u043a\\u043e\\u0442\\u043e\\u0440\\u044b\\u0439\\s+\\u0447\\u0430\\u0441|what\\s+time\\s+is\\s+it)\\b",
         "enabled": true,
@@ -507,7 +654,7 @@
       },
       {
         "id": "builtin.voice.timer_start.ru",
-        "created_at": 1779821400.0,
+        "created_at": 1779821400,
         "intent": "voice.timer.start",
         "pattern": "\\b(?:\\u043f\\u043e\\u0441\\u0442\\u0430\\u0432\\u044c|\\u0443\\u0441\\u0442\\u0430\\u043d\\u043e\\u0432\\u0438|\\u0437\\u0430\\u043f\\u0443\\u0441\\u0442\\u0438)\\s+\\u0442\\u0430\\u0439\\u043c\\u0435\\u0440(?:\\s+\\u043d\\u0430)?\\s+(?P<duration>\\d+\\s*(?:\\u0441\\u0435\\u043a\\u0443\\u043d\\u0434(?:\\u0443|\\u044b)?|\\u0441\\u0435\\u043a|\\u043c\\u0438\\u043d\\u0443\\u0442(?:\\u0443|\\u044b)?|\\u043c\\u0438\\u043d|\\u0447\\u0430\\u0441(?:\\u0430|\\u043e\\u0432)?))\\b",
         "enabled": true,
@@ -515,7 +662,7 @@
       },
       {
         "id": "builtin.voice.timer_start.en",
-        "created_at": 1779821400.0,
+        "created_at": 1779821400,
         "intent": "voice.timer.start",
         "pattern": "\\b(?:set|start)\\s+(?:a\\s+)?timer\\s+(?:for\\s+)?(?P<duration>\\d+\\s*(?:seconds?|secs?|minutes?|mins?|hours?))\\b",
         "enabled": true,
@@ -525,7 +672,7 @@
         "id": "rx.1768301351746",
         "created_at": 1768301351.7463748,
         "intent": "desktop.open_weather",
-        "pattern": "\\b\u043f\u043e\u043a\u0430\u0436\u0438\\s+\u0442\u0435\u043c\u043f\u0435\u0440\u0430\u0442\u0443\u0440\u0443\\s+\u0432\\s+(?P<city>[^?.!,;:]+)\\b",
+        "pattern": "\\bпокажи\\s+температуру\\s+в\\s+(?P<city>[^?.!,;:]+)\\b",
         "enabled": true,
         "source": "teacher",
         "candidate_id": "cand.1768301216687"
@@ -534,7 +681,7 @@
         "id": "rx.a22c88f2-1c30-4985-9e19-96e3ce4752bb",
         "created_at": 1780405682.894294,
         "intent": "desktop.open_modal",
-        "pattern": "\\b(?:\u043f\u043e\u043a\u0430\u0436\u0438|\u043e\u0442\u043a\u0440\u043e\u0439|show)\\s+(?P<modal_id>\u0431\u0440\u0430\u0443\u0437\u0435\u0440\u044b)\\b",
+        "pattern": "\\b(?:покажи|открой|show)\\s+(?P<modal_id>браузеры)\\b",
         "enabled": true,
         "source": "teacher",
         "candidate_id": "cand.1780405659965"
@@ -543,7 +690,7 @@
         "id": "rx.dd23aefb-0d34-48a0-8616-37f1e4c4b161",
         "created_at": 1780406447.325565,
         "intent": "desktop.open_modal",
-        "pattern": "\\b(?:\u043f\u043e\u043a\u0430\u0436\u0438|\u043e\u0442\u043a\u0440\u043e\u0439|show)\\s+(?P<modal_id>Infra\\s*State)\\b",
+        "pattern": "\\b(?:покажи|открой|show)\\s+(?P<modal_id>Infra\\s*State)\\b",
         "enabled": true,
         "source": "teacher",
         "candidate_id": "cand.1780406326235"
@@ -552,7 +699,7 @@
         "id": "rx.7410b779-45f9-457d-bb25-4d5279768890",
         "created_at": 1780518095.600756,
         "intent": "desktop.open_modal",
-        "pattern": "\\b(?:\u043f\u043e\u043a\u0430\u0436\u0438|\u043e\u0442\u043a\u0440\u043e\u0439|show)\\s+(?P<modal_id>\u043f\u0435\u0440\u0435\u043c\u0435\u043d\u043d\u044b\u0435\\s+\u043e\u043a\u0440\u0443\u0436\u0435\u043d\u0438\u044f\\s+\u043f\u043e\u0434\u0441\u0435\u0442\u0438)\\b",
+        "pattern": "\\b(?:покажи|открой|show)\\s+(?P<modal_id>переменные\\s+окружения\\s+подсети)\\b",
         "enabled": true,
         "source": "teacher",
         "candidate_id": "cand.1780499242016"
@@ -561,7 +708,7 @@
         "id": "rx.da6e8bb7-fb9c-4380-92c4-4e1e3d8ed6d2",
         "created_at": 1780609153.0542421,
         "intent": "desktop.open_modal",
-        "pattern": "\\b(?:\u043f\u043e\u043a\u0430\u0436\u0438|\u043e\u0442\u043a\u0440\u043e\u0439|\u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c|\u043e\u0442\u043a\u0440\u044b\u0442\u044c|show|open|launch)\\s+(?P<modal_id>\u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0435\\s+\u0438\u043d\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043a\u0442\u0443\u0440\u044b|infrastate_app|Infra\\s+State|infrastate|\u0438\u043d\u0444\u0440\u0430\u0441\u0442\u0435\u0439\u0442|\u0438\u043d\u0444\u0440\u0430\\s+\u0441\u0442\u0435\u0439\u0442|\u0438\u043d\u0444\u0440\u0430\u0441\u0442\u0440\u0443\u043a\u0442\u0443\u0440\u0430)\\b",
+        "pattern": "\\b(?:покажи|открой|показать|открыть|show|open|launch)\\s+(?P<modal_id>состояние\\s+инфраструктуры|infrastate_app|Infra\\s+State|infrastate|инфрастейт|инфра\\s+стейт|инфраструктура)\\b",
         "enabled": true,
         "source": "teacher",
         "candidate_id": "cand.1780607378059",
@@ -602,7 +749,7 @@
         "id": "rx.7cc800da-90a3-4d63-9205-cf5864074921",
         "created_at": 1780803865.1306977,
         "intent": "desktop.open_modal",
-        "pattern": "\\b(?:\u043f\u043e\u043a\u0430\u0436\u0438|\u043e\u0442\u043a\u0440\u043e\u0439|\u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c|\u043e\u0442\u043a\u0440\u044b\u0442\u044c|show|open|launch)\\s+(?P<modal_id>\u041d\u041b\u041e\\s+teacher|nlu\\s+teacher|nlo\\s+teacher|\u043d\u043b\u0443\\s+teacher|nlu_teacher_app|nlu_teacher_modal|nlu\\s+teacher\\s+app|nlo\\s+teacher\\s+app|\u043d\u043b\u0443\\s+teacher\\s+app|\u043d\u043b\u043e\\s+teacher\\s+app)\\b",
+        "pattern": "\\b(?:покажи|открой|показать|открыть|show|open|launch)\\s+(?P<modal_id>НЛО\\s+teacher|nlu\\s+teacher|nlo\\s+teacher|нлу\\s+teacher|nlu_teacher_app|nlu_teacher_modal|nlu\\s+teacher\\s+app|nlo\\s+teacher\\s+app|нлу\\s+teacher\\s+app|нло\\s+teacher\\s+app)\\b",
         "enabled": true,
         "source": "teacher",
         "candidate_id": "cand.1780803832396",
