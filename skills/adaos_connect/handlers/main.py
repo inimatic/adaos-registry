@@ -33,7 +33,7 @@ _TELEGRAM_PAIR_TTL_S = 600
 _NODE_JOIN_CODE_TTL_S = 15 * 60
 _prepare_request_counter = count(1)
 _prepare_latest_request: dict[str, str] = {}
-_prepare_tasks: dict[str, asyncio.Task[None]] = {}
+_prepare_tasks: dict[str, asyncio.Task[Dict[str, Any]]] = {}
 _prepare_cache: dict[tuple[str, str], dict[str, Any]] = {}
 _projections_loaded = False
 
@@ -46,6 +46,27 @@ def _payload(evt: Any) -> Dict[str, Any]:
     if isinstance(evt, dict):
         return evt
     return {}
+
+
+def _event_type(evt: Any) -> str:
+    if isinstance(evt, dict):
+        for key in ("type", "kind", "topic", "event_type"):
+            token = str(evt.get(key) or "").strip()
+            if token:
+                return token
+        meta = evt.get("_meta")
+        if isinstance(meta, dict):
+            for key in ("type", "kind", "topic", "event_type"):
+                token = str(meta.get(key) or "").strip()
+                if token:
+                    return token
+        return ""
+    for attr in ("type", "kind", "topic", "event_type"):
+        if hasattr(evt, attr):
+            token = str(getattr(evt, attr) or "").strip()
+            if token:
+                return token
+    return ""
 
 
 def _webspace_id(payload: Dict[str, Any]) -> str:
@@ -665,7 +686,7 @@ def _is_current_request(webspace_id: str, request_id: str) -> bool:
     return _prepare_latest_request.get(webspace_id) == request_id
 
 
-async def _finish_prepare(mode: str, webspace_id: str, request_id: str, context: Dict[str, Any]) -> None:
+async def _finish_prepare(mode: str, webspace_id: str, request_id: str, context: Dict[str, Any]) -> Dict[str, Any]:
     try:
         current = await asyncio.to_thread(_prepare_current, mode, context, request_id=request_id)
     except Exception as exc:
@@ -676,35 +697,39 @@ async def _finish_prepare(mode: str, webspace_id: str, request_id: str, context:
         if current.get("status") == "ready":
             _cache_current(webspace_id, mode, context, current)
     if not _is_current_request(webspace_id, request_id):
-        return
+        return current
     await _write_current(webspace_id, current)
+    return current
 
 
 @subscribe("adaos_connect.prepare")
 async def on_prepare(evt: Any) -> None:
+    event_type = _event_type(evt)
+    if event_type and event_type != "adaos_connect.prepare":
+        return
     payload = _payload(evt)
-    await _prepare_from_payload(payload)
+    await _prepare_from_payload(payload, wait=True)
 
 
 @subscribe("adaos_connect.prepare.browser")
 async def on_prepare_browser(evt: Any) -> None:
     payload = _payload(evt)
     payload["mode"] = "browser"
-    await _prepare_from_payload(payload)
+    await _prepare_from_payload(payload, wait=True)
 
 
 @subscribe("adaos_connect.prepare.telegram")
 async def on_prepare_telegram(evt: Any) -> None:
     payload = _payload(evt)
     payload["mode"] = "telegram"
-    await _prepare_from_payload(payload)
+    await _prepare_from_payload(payload, wait=True)
 
 
 @subscribe("adaos_connect.prepare.node")
 async def on_prepare_node(evt: Any) -> None:
     payload = _payload(evt)
     payload["mode"] = "node"
-    await _prepare_from_payload(payload)
+    await _prepare_from_payload(payload, wait=True)
 
 
 @tool("prepare")
@@ -737,18 +762,17 @@ async def _prepare_from_payload(payload: Dict[str, Any], *, wait: bool = False) 
         if cached is not None:
             await _write_current(webspace_id, cached)
             return {"ok": True, "cached": True, "current": cached}
-    await _write_current(webspace_id, _pending_current(mode, context, request_id=request_id))
     if wait:
-        await _finish_prepare(mode, webspace_id, request_id, context)
-        current = _cached_current(webspace_id, mode, context, request_id=request_id)
+        current = await _finish_prepare(mode, webspace_id, request_id, context)
         return {"ok": bool(current and current.get("status") == "ready"), "cached": False, "current": current or {}}
+    await _write_current(webspace_id, _pending_current(mode, context, request_id=request_id))
     task = asyncio.create_task(
         _finish_prepare(mode, webspace_id, request_id, context),
         name=f"adaos-connect-prepare:{webspace_id}:{mode}",
     )
     _prepare_tasks[webspace_id] = task
 
-    def _cleanup(done: asyncio.Task[None], *, ws: str) -> None:
+    def _cleanup(done: asyncio.Task[Dict[str, Any]], *, ws: str) -> None:
         if _prepare_tasks.get(ws) is done:
             _prepare_tasks.pop(ws, None)
 

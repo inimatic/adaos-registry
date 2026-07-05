@@ -1,13 +1,13 @@
 {
   "version": 1,
-  "updated_at": "2026-07-02T20:51:44+00:00",
+  "updated_at": "2026-07-05T04:50:38+00:00",
   "skills": [
     {
       "kind": "skill",
       "id": "adaos_connect",
       "name": "adaos_connect",
-      "version": "0.16.1",
-      "updated_at": "2026-05-12T03:48:51+00:00",
+      "version": "0.16.2",
+      "updated_at": "2026-07-05T04:50:38+00:00",
       "path": "skills/adaos_connect",
       "manifest": "skills/adaos_connect/skill.yaml",
       "source": {
@@ -151,39 +151,6 @@
       "description": "Neutral demo skill for semantic Web UI migration with a metrics table, chart payload, Taiga tree, and live event stream.",
       "runtime_python": "3.11",
       "tools_count": 3
-    },
-    {
-      "kind": "skill",
-      "id": "diagnostics_skill",
-      "name": "diagnostics_skill",
-      "version": "0.1.0",
-      "updated_at": "2026-07-01T00:00:00+00:00",
-      "path": "skills/diagnostics_skill",
-      "manifest": "skills/diagnostics_skill/skill.yaml",
-      "source": {
-        "path": "skills/diagnostics_skill",
-        "manifest": "skills/diagnostics_skill/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "diagnostics_skill",
-        "id": "diagnostics_skill"
-      },
-      "description": "Read-only diagnostics dashboard for AdaOS runtime, Root MCP, Skill Factory, workspace registry, and local logs.",
-      "runtime_python": "3.11",
-      "activation": {
-        "mode": "lazy",
-        "when": {
-          "scenarios_active": [
-            "web_desktop"
-          ],
-          "client_presence": true,
-          "webspace_scope": "active"
-        },
-        "startup_allowed": true,
-        "background_refresh": false
-      },
-      "tools_count": 2
     },
     {
       "kind": "skill",
@@ -408,6 +375,18 @@
       "description": "Анализ дефектов камней на видео с помощью нейросети (сегментация DeepLabV3)",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
+      "activation": {
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "new_face_vision_scenario"
+          ],
+          "client_presence": true,
+          "webspace_scope": "active"
+        },
+        "startup_allowed": false,
+        "background_refresh": false
+      },
       "tools_count": 22
     },
     {
@@ -473,7 +452,7 @@
       "description": "Prompt IDE backend skill that manages dev scenarios/skills, technical specs and git operations.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 23
+      "tools_count": 24
     },
     {
       "kind": "skill",
@@ -536,7 +515,7 @@
       "description": "Service skill for ReDevice endpoint settings, assignment, status, and policy-bound device actions.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 7
+      "tools_count": 8
     },
     {
       "kind": "skill",
@@ -587,7 +566,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-05-16T12:43:53+00:00",
+      "updated_at": "2026-07-02T21:27:18+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
@@ -853,8 +832,8 @@
       "kind": "scenario",
       "id": "web_desktop",
       "name": "web_desktop",
-      "version": "0.3.10",
-      "updated_at": "2026-07-01T00:00:00+00:00",
+      "version": "0.3.9",
+      "updated_at": "2026-06-24T05:18:59+00:00",
       "path": "scenarios/web_desktop",
       "manifest": "scenarios/web_desktop/scenario.yaml",
       "source": {
@@ -872,8 +851,7 @@
           "web_desktop_skill",
           "greet_on_boot_skill",
           "pair_new_device_skill",
-          "voice_chat_skill",
-          "diagnostics_skill"
+          "voice_chat_skill"
         ]
       }
     }
