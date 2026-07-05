@@ -13,7 +13,10 @@
             {
               "id": "selected:none",
               "title": "No endpoint selected",
-              "subtitle": "Refresh endpoints, then add one or more admitted ReDevice endpoints."
+              "subtitle": "Refresh endpoints, then add one or more admitted ReDevice endpoints.",
+              "title_i18n": {
+                "key": "slideshow.empty.no_endpoint"
+              }
             }
           ],
           "items": [],
@@ -253,13 +256,19 @@
       "icon": "image",
       "aliases": [
         "slideshow",
-        "слайдшоу",
-        "слайд шоу",
-        "показ слайдов"
+        "\u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
+        "\u0441\u043b\u0430\u0439\u0434 \u0448\u043e\u0443",
+        "\u043f\u043e\u043a\u0430\u0437 \u0441\u043b\u0430\u0439\u0434\u043e\u0432"
       ],
       "launchModal": "slideshow_modal",
       "action": {
         "openModal": "slideshow_modal"
+      },
+      "title_i18n": {
+        "key": "slideshow.title"
+      },
+      "subtitle_i18n": {
+        "key": "slideshow.subtitle"
       }
     }
   ],
@@ -284,34 +293,52 @@
           {
             "id": "play",
             "label": "Play",
-            "icon": "play-outline"
+            "icon": "play-outline",
+            "label_i18n": {
+              "key": "slideshow.play"
+            }
           },
           {
             "id": "stop",
             "label": "Stop",
-            "icon": "stop-outline"
+            "icon": "stop-outline",
+            "label_i18n": {
+              "key": "slideshow.stop"
+            }
           },
           {
             "id": "prev",
             "label": "Previous",
-            "icon": "chevron-back-outline"
+            "icon": "chevron-back-outline",
+            "label_i18n": {
+              "key": "slideshow.previous"
+            }
           },
           {
             "id": "next",
             "label": "Next",
-            "icon": "chevron-forward-outline"
+            "icon": "chevron-forward-outline",
+            "label_i18n": {
+              "key": "slideshow.next"
+            }
           },
           {
             "id": "fav",
             "label": "Favorite",
             "icon": "star-outline",
             "labelField": "favorite_label",
-            "iconField": "favorite_icon"
+            "iconField": "favorite_icon",
+            "label_i18n": {
+              "key": "slideshow.favorite"
+            }
           },
           {
             "id": "send_telegram",
             "label": "Send to Telegram",
-            "icon": "send-outline"
+            "icon": "send-outline",
+            "label_i18n": {
+              "key": "slideshow.send_telegram"
+            }
           }
         ],
         "fullscreenActions": [
@@ -319,29 +346,44 @@
             "id": "close",
             "label": "Close",
             "icon": "close-outline",
-            "local": "closeFullscreen"
+            "local": "closeFullscreen",
+            "label_i18n": {
+              "key": "slideshow.close"
+            }
           },
           {
             "id": "prev",
             "label": "Previous",
-            "icon": "chevron-back-outline"
+            "icon": "chevron-back-outline",
+            "label_i18n": {
+              "key": "slideshow.previous"
+            }
           },
           {
             "id": "next",
             "label": "Next",
-            "icon": "chevron-forward-outline"
+            "icon": "chevron-forward-outline",
+            "label_i18n": {
+              "key": "slideshow.next"
+            }
           },
           {
             "id": "fav",
             "label": "Favorite",
             "icon": "star-outline",
             "labelField": "favorite_label",
-            "iconField": "favorite_icon"
+            "iconField": "favorite_icon",
+            "label_i18n": {
+              "key": "slideshow.favorite"
+            }
           },
           {
             "id": "send_telegram",
             "label": "Telegram",
-            "icon": "send-outline"
+            "icon": "send-outline",
+            "label_i18n": {
+              "key": "slideshow.telegram"
+            }
           }
         ],
         "keyboardActions": {
@@ -359,21 +401,36 @@
         "metrics": [
           {
             "label": "Endpoint",
-            "path": "label"
+            "path": "label",
+            "label_i18n": {
+              "key": "slideshow.endpoint"
+            }
           },
           {
             "label": "Mode",
-            "path": "mode"
+            "path": "mode",
+            "label_i18n": {
+              "key": "slideshow.mode"
+            }
           },
           {
             "label": "Scope",
-            "path": "scope"
+            "path": "scope",
+            "label_i18n": {
+              "key": "slideshow.scope"
+            }
           },
           {
             "label": "Frame",
-            "path": "frame.label"
+            "path": "frame.label",
+            "label_i18n": {
+              "key": "slideshow.frame"
+            }
           }
-        ]
+        ],
+        "emptyText_i18n": {
+          "key": "slideshow.empty.start"
+        }
       },
       "actions": [
         {
@@ -448,7 +505,10 @@
             "action": "send_telegram"
           }
         }
-      ]
+      ],
+      "title_i18n": {
+        "key": "slideshow.redevice_slideshow"
+      }
     }
   ],
   "registry": {
@@ -505,7 +565,13 @@
                 "placeholder": "C:\\Users\\Zver\\Pictures",
                 "commitMode": "manual",
                 "saveLabel": "Apply source",
-                "helper": "Stored in skill memory. Refresh index runs in background and preserves favorites."
+                "helper": "Stored in skill memory. Refresh index runs in background and preserves favorites.",
+                "saveLabel_i18n": {
+                  "key": "slideshow.apply_source"
+                },
+                "helper_i18n": {
+                  "key": "slideshow.source_helper"
+                }
               },
               "actions": [
                 {
@@ -527,6 +593,9 @@
               "dataSource": {
                 "kind": "stream",
                 "receiver": "slideshow_skill.session"
+              },
+              "title_i18n": {
+                "key": "slideshow.source_folder"
               }
             },
             {
@@ -539,45 +608,75 @@
                 "buttons": [
                   {
                     "id": "refresh",
-                    "label": "Refresh endpoints"
+                    "label": "Refresh endpoints",
+                    "label_i18n": {
+                      "key": "slideshow.refresh_endpoints"
+                    }
                   },
                   {
                     "id": "index",
-                    "label": "Refresh index"
+                    "label": "Refresh index",
+                    "label_i18n": {
+                      "key": "slideshow.refresh_index"
+                    }
                   },
                   {
                     "id": "cancelIndex",
                     "label": "Cancel index",
-                    "kind": "danger"
+                    "kind": "danger",
+                    "label_i18n": {
+                      "key": "slideshow.cancel_index"
+                    }
                   },
                   {
                     "id": "folders",
-                    "label": "Folders"
+                    "label": "Folders",
+                    "label_i18n": {
+                      "key": "slideshow.folders"
+                    }
                   },
                   {
                     "id": "preview",
-                    "label": "Preview photos"
+                    "label": "Preview photos",
+                    "label_i18n": {
+                      "key": "slideshow.preview_photos"
+                    }
                   },
                   {
                     "id": "play",
-                    "label": "Play"
+                    "label": "Play",
+                    "label_i18n": {
+                      "key": "slideshow.play"
+                    }
                   },
                   {
                     "id": "stop",
                     "label": "Stop",
-                    "kind": "danger"
+                    "kind": "danger",
+                    "label_i18n": {
+                      "key": "slideshow.stop"
+                    }
                   },
                   {
                     "id": "prev",
-                    "label": "Prev"
+                    "label": "Prev",
+                    "label_i18n": {
+                      "key": "slideshow.prev"
+                    }
                   },
                   {
                     "id": "next",
-                    "label": "Next"
+                    "label": "Next",
+                    "label_i18n": {
+                      "key": "slideshow.next"
+                    }
                   },
                   {
                     "id": "fav",
-                    "label": "Fav"
+                    "label": "Fav",
+                    "label_i18n": {
+                      "key": "slideshow.fav"
+                    }
                   }
                 ]
               },
@@ -674,7 +773,10 @@
                     "action": "fav"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.actions"
+              }
             },
             {
               "id": "slideshow-endpoint-table",
@@ -695,23 +797,35 @@
                   },
                   {
                     "key": "title",
-                    "label": "Device"
+                    "label": "Device",
+                    "label_i18n": {
+                      "key": "slideshow.device"
+                    }
                   },
                   {
                     "key": "online_state",
                     "label": "Online",
-                    "width": "90px"
+                    "width": "90px",
+                    "label_i18n": {
+                      "key": "slideshow.online"
+                    }
                   },
                   {
                     "key": "last_seen",
                     "label": "Last seen",
-                    "width": "100px"
+                    "width": "100px",
+                    "label_i18n": {
+                      "key": "slideshow.last_seen"
+                    }
                   },
                   {
                     "key": "code",
                     "label": "Code",
                     "mono": true,
-                    "width": "110px"
+                    "width": "110px",
+                    "label_i18n": {
+                      "key": "slideshow.code"
+                    }
                   },
                   {
                     "key": "_actions",
@@ -723,23 +837,38 @@
                         "id": "toggle",
                         "label": "Add/remove",
                         "disabledKey": "selectable",
-                        "disabledWhenEquals": false
+                        "disabledWhenEquals": false,
+                        "label_i18n": {
+                          "key": "slideshow.add_remove"
+                        }
                       },
                       {
                         "id": "only",
                         "label": "Only",
                         "disabledKey": "selectable",
-                        "disabledWhenEquals": false
+                        "disabledWhenEquals": false,
+                        "label_i18n": {
+                          "key": "slideshow.only"
+                        }
                       },
                       {
                         "id": "rename",
                         "label": "Rename",
                         "disabledKey": "selectable",
-                        "disabledWhenEquals": false
+                        "disabledWhenEquals": false,
+                        "label_i18n": {
+                          "key": "slideshow.rename"
+                        }
                       }
-                    ]
+                    ],
+                    "label_i18n": {
+                      "key": "slideshow.actions"
+                    }
                   }
-                ]
+                ],
+                "emptyText_i18n": {
+                  "key": "slideshow.empty.endpoints"
+                }
               },
               "actions": [
                 {
@@ -782,7 +911,10 @@
                     "aliases": "$state.slideshowAliases"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.endpoints"
+              }
             },
             {
               "id": "slideshow-index-status",
@@ -807,7 +939,10 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.get_slideshow_index_status"
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.photo_index"
+              }
             },
             {
               "id": "slideshow-run-selector",
@@ -825,11 +960,17 @@
                 "options": [
                   {
                     "id": "start",
-                    "label": "Running"
+                    "label": "Running",
+                    "label_i18n": {
+                      "key": "slideshow.running"
+                    }
                   },
                   {
                     "id": "stop",
-                    "label": "Stopped"
+                    "label": "Stopped",
+                    "label_i18n": {
+                      "key": "slideshow.stopped"
+                    }
                   }
                 ]
               },
@@ -849,7 +990,10 @@
                     "action": "$event.value"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.run"
+              }
             },
             {
               "id": "slideshow-order-selector",
@@ -867,11 +1011,17 @@
                 "options": [
                   {
                     "id": "sequential",
-                    "label": "Sequential"
+                    "label": "Sequential",
+                    "label_i18n": {
+                      "key": "slideshow.sequential"
+                    }
                   },
                   {
                     "id": "random",
-                    "label": "Random"
+                    "label": "Random",
+                    "label_i18n": {
+                      "key": "slideshow.random"
+                    }
                   }
                 ]
               },
@@ -884,7 +1034,10 @@
                     "action": "$event.value"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.order"
+              }
             },
             {
               "id": "slideshow-scope-selector",
@@ -902,11 +1055,17 @@
                 "options": [
                   {
                     "id": "all",
-                    "label": "All photos"
+                    "label": "All photos",
+                    "label_i18n": {
+                      "key": "slideshow.all_photos"
+                    }
                   },
                   {
                     "id": "favorites",
-                    "label": "Favorites"
+                    "label": "Favorites",
+                    "label_i18n": {
+                      "key": "slideshow.favorites"
+                    }
                   }
                 ]
               },
@@ -919,7 +1078,10 @@
                     "action": "$event.value"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.scope"
+              }
             },
             {
               "id": "slideshow-sync-selector",
@@ -937,11 +1099,17 @@
                 "options": [
                   {
                     "id": "sync_on",
-                    "label": "Synchronous"
+                    "label": "Synchronous",
+                    "label_i18n": {
+                      "key": "slideshow.synchronous"
+                    }
                   },
                   {
                     "id": "sync_off",
-                    "label": "Independent"
+                    "label": "Independent",
+                    "label_i18n": {
+                      "key": "slideshow.independent"
+                    }
                   }
                 ]
               },
@@ -954,7 +1122,10 @@
                     "action": "$event.value"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.endpoint_sync"
+              }
             },
             {
               "id": "slideshow-display-selector",
@@ -972,11 +1143,17 @@
                 "options": [
                   {
                     "id": "fit",
-                    "label": "Fit"
+                    "label": "Fit",
+                    "label_i18n": {
+                      "key": "slideshow.fit"
+                    }
                   },
                   {
                     "id": "crop",
-                    "label": "Crop"
+                    "label": "Crop",
+                    "label_i18n": {
+                      "key": "slideshow.crop"
+                    }
                   }
                 ]
               },
@@ -989,7 +1166,10 @@
                     "action": "$event.value"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.display"
+              }
             },
             {
               "id": "slideshow-fullscreen-selector",
@@ -1007,11 +1187,17 @@
                 "options": [
                   {
                     "id": "fullscreen_on",
-                    "label": "Fullscreen"
+                    "label": "Fullscreen",
+                    "label_i18n": {
+                      "key": "slideshow.fullscreen"
+                    }
                   },
                   {
                     "id": "fullscreen_off",
-                    "label": "Panel"
+                    "label": "Panel",
+                    "label_i18n": {
+                      "key": "slideshow.panel"
+                    }
                   }
                 ]
               },
@@ -1024,7 +1210,10 @@
                     "action": "$event.value"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.surface"
+              }
             },
             {
               "id": "slideshow-current-frame",
@@ -1043,21 +1232,39 @@
                 "metrics": [
                   {
                     "label": "Endpoint",
-                    "path": "label"
+                    "path": "label",
+                    "label_i18n": {
+                      "key": "slideshow.endpoint"
+                    }
                   },
                   {
                     "label": "Mode",
-                    "path": "mode"
+                    "path": "mode",
+                    "label_i18n": {
+                      "key": "slideshow.mode"
+                    }
                   },
                   {
                     "label": "Scope",
-                    "path": "scope"
+                    "path": "scope",
+                    "label_i18n": {
+                      "key": "slideshow.scope"
+                    }
                   },
                   {
                     "label": "Frame",
-                    "path": "frame.label"
+                    "path": "frame.label",
+                    "label_i18n": {
+                      "key": "slideshow.frame"
+                    }
                   }
-                ]
+                ],
+                "emptyText_i18n": {
+                  "key": "slideshow.empty.start"
+                }
+              },
+              "title_i18n": {
+                "key": "slideshow.current_photo"
               }
             },
             {
@@ -1073,7 +1280,13 @@
                 "collectionKey": "selected_items",
                 "titleKey": "title",
                 "subtitleKey": "subtitle",
-                "emptyText": "No endpoint selected"
+                "emptyText": "No endpoint selected",
+                "emptyText_i18n": {
+                  "key": "slideshow.empty.no_endpoint"
+                }
+              },
+              "title_i18n": {
+                "key": "slideshow.selected_endpoints"
               }
             },
             {
@@ -1086,7 +1299,16 @@
                 "placeholder": "Tablet",
                 "commitMode": "manual",
                 "saveLabel": "Use name",
-                "helper": "Fill this value, then press Rename in the endpoint row."
+                "helper": "Fill this value, then press Rename in the endpoint row.",
+                "placeholder_i18n": {
+                  "key": "slideshow.tablet"
+                },
+                "saveLabel_i18n": {
+                  "key": "slideshow.use_name"
+                },
+                "helper_i18n": {
+                  "key": "slideshow.rename_helper"
+                }
               },
               "actions": [
                 {
@@ -1096,7 +1318,10 @@
                     "slideshowDisplayName": "$event.value"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.display_name_for_rename"
+              }
             },
             {
               "id": "slideshow-aliases",
@@ -1108,7 +1333,16 @@
                 "placeholder": "Kitchen tablet, TF201",
                 "commitMode": "manual",
                 "saveLabel": "Use aliases",
-                "helper": "Comma-separated names for voice and UI matching."
+                "helper": "Comma-separated names for voice and UI matching.",
+                "placeholder_i18n": {
+                  "key": "slideshow.aliases_placeholder"
+                },
+                "saveLabel_i18n": {
+                  "key": "slideshow.use_aliases"
+                },
+                "helper_i18n": {
+                  "key": "slideshow.aliases_helper"
+                }
               },
               "actions": [
                 {
@@ -1118,7 +1352,10 @@
                     "slideshowAliases": "$event.value"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.aliases_for_rename"
+              }
             },
             {
               "id": "slideshow-preview-table",
@@ -1134,24 +1371,42 @@
                 "columns": [
                   {
                     "key": "title",
-                    "label": "File"
+                    "label": "File",
+                    "label_i18n": {
+                      "key": "slideshow.file"
+                    }
                   },
                   {
                     "key": "favorite",
                     "label": "Fav",
-                    "width": "70px"
+                    "width": "70px",
+                    "label_i18n": {
+                      "key": "slideshow.fav"
+                    }
                   },
                   {
                     "key": "size_label",
                     "label": "Size",
-                    "width": "90px"
+                    "width": "90px",
+                    "label_i18n": {
+                      "key": "slideshow.size"
+                    }
                   },
                   {
                     "key": "modified",
                     "label": "Modified",
-                    "width": "170px"
+                    "width": "170px",
+                    "label_i18n": {
+                      "key": "slideshow.modified"
+                    }
                   }
-                ]
+                ],
+                "emptyText_i18n": {
+                  "key": "slideshow.empty.preview"
+                }
+              },
+              "title_i18n": {
+                "key": "slideshow.preview_photos"
               }
             },
             {
@@ -1169,10 +1424,19 @@
                 "subtitleKey": "subtitle",
                 "detailsPath": "content",
                 "showDetails": true,
-                "emptyText": "No slideshow command yet"
+                "emptyText": "No slideshow command yet",
+                "emptyText_i18n": {
+                  "key": "slideshow.empty.command"
+                }
+              },
+              "title_i18n": {
+                "key": "slideshow.last_command"
               }
             }
           ]
+        },
+        "title_i18n": {
+          "key": "slideshow.redevice_slideshow"
         }
       },
       "slideshow_folders_modal": {
@@ -1216,7 +1480,10 @@
                   "type": "callSkill",
                   "target": "slideshow_skill.get_slideshow_index_status"
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.photo_index"
+              }
             },
             {
               "id": "slideshow-folder-table",
@@ -1237,11 +1504,17 @@
                   },
                   {
                     "key": "title",
-                    "label": "Folder"
+                    "label": "Folder",
+                    "label_i18n": {
+                      "key": "slideshow.folder"
+                    }
                   },
                   {
                     "key": "subtitle",
-                    "label": "Photos"
+                    "label": "Photos",
+                    "label_i18n": {
+                      "key": "slideshow.photos"
+                    }
                   },
                   {
                     "key": "_actions",
@@ -1253,11 +1526,20 @@
                         "id": "use",
                         "label": "Use",
                         "disabledKey": "selectable",
-                        "disabledWhenEquals": false
+                        "disabledWhenEquals": false,
+                        "label_i18n": {
+                          "key": "slideshow.use"
+                        }
                       }
-                    ]
+                    ],
+                    "label_i18n": {
+                      "key": "slideshow.actions"
+                    }
                   }
-                ]
+                ],
+                "emptyText_i18n": {
+                  "key": "slideshow.empty.folders"
+                }
               },
               "actions": [
                 {
@@ -1275,9 +1557,15 @@
                     "folder": "$event.id"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "slideshow.folders"
+              }
             }
           ]
+        },
+        "title_i18n": {
+          "key": "slideshow.folders_modal"
         }
       }
     }
@@ -1294,13 +1582,13 @@
           "play slideshow"
         ],
         "ru": [
-          "показывай слайдшоу",
-          "покажи слайдшоу",
-          "запусти слайдшоу"
+          "\u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0439 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
+          "\u043f\u043e\u043a\u0430\u0436\u0438 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
+          "\u0437\u0430\u043f\u0443\u0441\u0442\u0438 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443"
         ]
       },
       "examples": [
-        "Планшет, показывай слайдшоу",
+        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0439 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
         "Kitchen tablet start slideshow"
       ],
       "result_modes": [
@@ -1320,6 +1608,9 @@
       "verify": {
         "skill": "slideshow_skill",
         "tool": "voice_control_redevice_slideshow"
+      },
+      "title_i18n": {
+        "key": "slideshow.voice.start"
       }
     },
     {
@@ -1332,13 +1623,13 @@
           "pause slideshow"
         ],
         "ru": [
-          "останови слайдшоу",
-          "стоп слайдшоу",
-          "пауза слайдшоу"
+          "\u043e\u0441\u0442\u0430\u043d\u043e\u0432\u0438 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
+          "\u0441\u0442\u043e\u043f \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
+          "\u043f\u0430\u0443\u0437\u0430 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443"
         ]
       },
       "examples": [
-        "Планшет, стоп",
+        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u0441\u0442\u043e\u043f",
         "Kitchen tablet stop slideshow"
       ],
       "result_modes": [
@@ -1358,6 +1649,9 @@
       "verify": {
         "skill": "slideshow_skill",
         "tool": "voice_control_redevice_slideshow"
+      },
+      "title_i18n": {
+        "key": "slideshow.voice.stop"
       }
     },
     {
@@ -1371,13 +1665,13 @@
           "slideshow next"
         ],
         "ru": [
-          "следующая",
-          "следующий слайд",
-          "следующее фото"
+          "\u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f",
+          "\u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439 \u0441\u043b\u0430\u0439\u0434",
+          "\u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0435 \u0444\u043e\u0442\u043e"
         ]
       },
       "examples": [
-        "Планшет, следующая",
+        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f",
         "Kitchen tablet next photo"
       ],
       "result_modes": [
@@ -1397,6 +1691,9 @@
       "verify": {
         "skill": "slideshow_skill",
         "tool": "voice_control_redevice_slideshow"
+      },
+      "title_i18n": {
+        "key": "slideshow.voice.next"
       }
     },
     {
@@ -1410,13 +1707,13 @@
           "slideshow back"
         ],
         "ru": [
-          "предыдущая",
-          "предыдущий слайд",
-          "назад"
+          "\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0430\u044f",
+          "\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0439 \u0441\u043b\u0430\u0439\u0434",
+          "\u043d\u0430\u0437\u0430\u0434"
         ]
       },
       "examples": [
-        "Планшет, предыдущая",
+        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0430\u044f",
         "Kitchen tablet previous photo"
       ],
       "result_modes": [
@@ -1436,6 +1733,9 @@
       "verify": {
         "skill": "slideshow_skill",
         "tool": "voice_control_redevice_slideshow"
+      },
+      "title_i18n": {
+        "key": "slideshow.voice.previous"
       }
     },
     {
@@ -1448,13 +1748,13 @@
           "mark favorite"
         ],
         "ru": [
-          "в избранное",
-          "фаворит",
-          "отметь фаворит"
+          "\u0432 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435",
+          "\u0444\u0430\u0432\u043e\u0440\u0438\u0442",
+          "\u043e\u0442\u043c\u0435\u0442\u044c \u0444\u0430\u0432\u043e\u0440\u0438\u0442"
         ]
       },
       "examples": [
-        "Планшет, в избранное",
+        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u0432 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435",
         "Kitchen tablet favorite"
       ],
       "result_modes": [
@@ -1474,6 +1774,9 @@
       "verify": {
         "skill": "slideshow_skill",
         "tool": "voice_control_redevice_slideshow"
+      },
+      "title_i18n": {
+        "key": "slideshow.voice.favorite"
       }
     },
     {
@@ -1486,13 +1789,13 @@
           "telegram current photo"
         ],
         "ru": [
-          "отправь в телеграм",
-          "фото в телеграм",
-          "перешли в телеграм"
+          "\u043e\u0442\u043f\u0440\u0430\u0432\u044c \u0432 \u0442\u0435\u043b\u0435\u0433\u0440\u0430\u043c",
+          "\u0444\u043e\u0442\u043e \u0432 \u0442\u0435\u043b\u0435\u0433\u0440\u0430\u043c",
+          "\u043f\u0435\u0440\u0435\u0448\u043b\u0438 \u0432 \u0442\u0435\u043b\u0435\u0433\u0440\u0430\u043c"
         ]
       },
       "examples": [
-        "Планшет, отправь в телеграм",
+        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u043e\u0442\u043f\u0440\u0430\u0432\u044c \u0432 \u0442\u0435\u043b\u0435\u0433\u0440\u0430\u043c",
         "Kitchen tablet send to telegram"
       ],
       "result_modes": [
@@ -1512,6 +1815,9 @@
       "verify": {
         "skill": "slideshow_skill",
         "tool": "voice_control_redevice_slideshow"
+      },
+      "title_i18n": {
+        "key": "slideshow.voice.telegram"
       }
     }
   ],
@@ -1525,15 +1831,21 @@
       "icon": "image",
       "aliases": [
         "slideshow",
-        "слайдшоу",
-        "слайд шоу",
-        "показ слайдов"
+        "\u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
+        "\u0441\u043b\u0430\u0439\u0434 \u0448\u043e\u0443",
+        "\u043f\u043e\u043a\u0430\u0437 \u0441\u043b\u0430\u0439\u0434\u043e\u0432"
       ],
       "launchModal": "slideshow_modal",
       "action": {
         "openModal": "slideshow_modal"
       },
-      "autoInstall": true
+      "autoInstall": true,
+      "title_i18n": {
+        "key": "slideshow.title"
+      },
+      "subtitle_i18n": {
+        "key": "slideshow.subtitle"
+      }
     },
     {
       "extensionPoint": "desktop.widgets",
@@ -1541,5 +1853,189 @@
       "id": "slideshow_skill_widget_frame",
       "autoInstall": true
     }
-  ]
+  ],
+  "resources": {
+    "slideshow.i18n.en": {
+      "id": "slideshow.i18n.en",
+      "kind": "data",
+      "role": "i18n",
+      "locale": "en",
+      "owner": "skill:slideshow_skill",
+      "dictionary": {
+        "slideshow.title": "Slideshow",
+        "slideshow.subtitle": "Project photos to ReDevice endpoints",
+        "slideshow.redevice_slideshow": "ReDevice slideshow",
+        "slideshow.empty.start": "Start slideshow to show the current photo.",
+        "slideshow.play": "Play",
+        "slideshow.stop": "Stop",
+        "slideshow.previous": "Previous",
+        "slideshow.next": "Next",
+        "slideshow.favorite": "Favorite",
+        "slideshow.send_telegram": "Send to Telegram",
+        "slideshow.close": "Close",
+        "slideshow.telegram": "Telegram",
+        "slideshow.endpoint": "Endpoint",
+        "slideshow.mode": "Mode",
+        "slideshow.scope": "Scope",
+        "slideshow.frame": "Frame",
+        "slideshow.source_folder": "Photo source folder",
+        "slideshow.apply_source": "Apply source",
+        "slideshow.source_helper": "Stored in skill memory. Refresh index runs in background and preserves favorites.",
+        "slideshow.actions": "Actions",
+        "slideshow.refresh_endpoints": "Refresh endpoints",
+        "slideshow.refresh_index": "Refresh index",
+        "slideshow.cancel_index": "Cancel index",
+        "slideshow.folders": "Folders",
+        "slideshow.preview_photos": "Preview photos",
+        "slideshow.prev": "Prev",
+        "slideshow.fav": "Fav",
+        "slideshow.endpoints": "ReDevice endpoints",
+        "slideshow.empty.endpoints": "Refresh endpoints to load ReDevice endpoints",
+        "slideshow.device": "Device",
+        "slideshow.online": "Online",
+        "slideshow.last_seen": "Last seen",
+        "slideshow.code": "Code",
+        "slideshow.add_remove": "Add/remove",
+        "slideshow.only": "Only",
+        "slideshow.rename": "Rename",
+        "slideshow.photo_index": "Photo index",
+        "slideshow.run": "Run",
+        "slideshow.running": "Running",
+        "slideshow.stopped": "Stopped",
+        "slideshow.order": "Order",
+        "slideshow.sequential": "Sequential",
+        "slideshow.random": "Random",
+        "slideshow.all_photos": "All photos",
+        "slideshow.favorites": "Favorites",
+        "slideshow.endpoint_sync": "Endpoint sync",
+        "slideshow.synchronous": "Synchronous",
+        "slideshow.independent": "Independent",
+        "slideshow.display": "Display",
+        "slideshow.fit": "Fit",
+        "slideshow.crop": "Crop",
+        "slideshow.surface": "Surface",
+        "slideshow.fullscreen": "Fullscreen",
+        "slideshow.panel": "Panel",
+        "slideshow.current_photo": "Current photo",
+        "slideshow.selected_endpoints": "Selected endpoints",
+        "slideshow.empty.no_endpoint": "No endpoint selected",
+        "slideshow.display_name_for_rename": "Display name for Rename",
+        "slideshow.tablet": "Tablet",
+        "slideshow.use_name": "Use name",
+        "slideshow.rename_helper": "Fill this value, then press Rename in the endpoint row.",
+        "slideshow.aliases_for_rename": "Aliases for Rename",
+        "slideshow.aliases_placeholder": "Kitchen tablet, TF201",
+        "slideshow.use_aliases": "Use aliases",
+        "slideshow.aliases_helper": "Comma-separated names for voice and UI matching.",
+        "slideshow.empty.preview": "Press Preview photos to show indexed files. Refresh index runs in background.",
+        "slideshow.file": "File",
+        "slideshow.size": "Size",
+        "slideshow.modified": "Modified",
+        "slideshow.last_command": "Last command",
+        "slideshow.empty.command": "No slideshow command yet",
+        "slideshow.folder": "Folder",
+        "slideshow.photos": "Photos",
+        "slideshow.use": "Use",
+        "slideshow.empty.folders": "Refresh index to load top-level folders. Large folder sets are capped in this view.",
+        "slideshow.folders_modal": "Slideshow folders",
+        "slideshow.voice.start": "Start ReDevice slideshow",
+        "slideshow.voice.stop": "Stop ReDevice slideshow",
+        "slideshow.voice.next": "Next ReDevice slideshow photo",
+        "slideshow.voice.previous": "Previous ReDevice slideshow photo",
+        "slideshow.voice.favorite": "Toggle ReDevice slideshow favorite",
+        "slideshow.voice.telegram": "Send ReDevice slideshow photo to Telegram"
+      }
+    },
+    "slideshow.i18n.ru": {
+      "id": "slideshow.i18n.ru",
+      "kind": "data",
+      "role": "i18n",
+      "locale": "ru",
+      "owner": "skill:slideshow_skill",
+      "dictionary": {
+        "slideshow.title": "\u0421\u043b\u0430\u0439\u0434-\u0448\u043e\u0443",
+        "slideshow.subtitle": "\u041f\u043e\u043a\u0430\u0437 \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0438\u0439 \u043d\u0430 ReDevice-\u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u0430\u0445",
+        "slideshow.redevice_slideshow": "\u0421\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
+        "slideshow.empty.start": "\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u0435 \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443, \u0447\u0442\u043e\u0431\u044b \u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u0441\u043d\u0438\u043c\u043e\u043a.",
+        "slideshow.play": "\u041f\u0443\u0441\u043a",
+        "slideshow.stop": "\u0421\u0442\u043e\u043f",
+        "slideshow.previous": "\u041d\u0430\u0437\u0430\u0434",
+        "slideshow.next": "\u0412\u043f\u0435\u0440\u0435\u0434",
+        "slideshow.favorite": "\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435",
+        "slideshow.send_telegram": "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0432 Telegram",
+        "slideshow.close": "\u0417\u0430\u043a\u0440\u044b\u0442\u044c",
+        "slideshow.telegram": "Telegram",
+        "slideshow.endpoint": "Endpoint",
+        "slideshow.mode": "\u0420\u0435\u0436\u0438\u043c",
+        "slideshow.scope": "\u041e\u0431\u043b\u0430\u0441\u0442\u044c",
+        "slideshow.frame": "\u041a\u0430\u0434\u0440",
+        "slideshow.source_folder": "\u041f\u0430\u043f\u043a\u0430 \u0441 \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0438\u044f\u043c\u0438",
+        "slideshow.apply_source": "\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a",
+        "slideshow.source_helper": "\u0425\u0440\u0430\u043d\u0438\u0442\u0441\u044f \u0432 \u043f\u0430\u043c\u044f\u0442\u0438 \u043d\u0430\u0432\u044b\u043a\u0430. \u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u0438\u043d\u0434\u0435\u043a\u0441\u0430 \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f \u0432 \u0444\u043e\u043d\u0435 \u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u0442 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435.",
+        "slideshow.actions": "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044f",
+        "slideshow.refresh_endpoints": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c endpoints",
+        "slideshow.refresh_index": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c \u0438\u043d\u0434\u0435\u043a\u0441",
+        "slideshow.cancel_index": "\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c \u0438\u043d\u0434\u0435\u043a\u0441",
+        "slideshow.folders": "\u041f\u0430\u043f\u043a\u0438",
+        "slideshow.preview_photos": "\u041f\u0440\u0435\u0434\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440 \u0444\u043e\u0442\u043e",
+        "slideshow.prev": "\u041d\u0430\u0437\u0430\u0434",
+        "slideshow.fav": "\u0418\u0437\u0431\u0440.",
+        "slideshow.endpoints": "ReDevice-endpoints",
+        "slideshow.empty.endpoints": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u0435 endpoints, \u0447\u0442\u043e\u0431\u044b \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c ReDevice-endpoints",
+        "slideshow.device": "\u0423\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u043e",
+        "slideshow.online": "\u041e\u043d\u043b\u0430\u0439\u043d",
+        "slideshow.last_seen": "\u0411\u044b\u043b \u0432 \u0441\u0435\u0442\u0438",
+        "slideshow.code": "\u041a\u043e\u0434",
+        "slideshow.add_remove": "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c/\u0443\u0431\u0440\u0430\u0442\u044c",
+        "slideshow.only": "\u0422\u043e\u043b\u044c\u043a\u043e",
+        "slideshow.rename": "\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c",
+        "slideshow.photo_index": "\u0418\u043d\u0434\u0435\u043a\u0441 \u0444\u043e\u0442\u043e",
+        "slideshow.run": "\u0417\u0430\u043f\u0443\u0441\u043a",
+        "slideshow.running": "\u0412\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f",
+        "slideshow.stopped": "\u041e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u043e",
+        "slideshow.order": "\u041f\u043e\u0440\u044f\u0434\u043e\u043a",
+        "slideshow.sequential": "\u041f\u043e\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u043d\u043e",
+        "slideshow.random": "\u0421\u043b\u0443\u0447\u0430\u0439\u043d\u043e",
+        "slideshow.all_photos": "\u0412\u0441\u0435 \u0444\u043e\u0442\u043e",
+        "slideshow.favorites": "\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435",
+        "slideshow.endpoint_sync": "\u0421\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f endpoints",
+        "slideshow.synchronous": "\u0421\u0438\u043d\u0445\u0440\u043e\u043d\u043d\u043e",
+        "slideshow.independent": "\u041d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e",
+        "slideshow.display": "\u041e\u0442\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435",
+        "slideshow.fit": "\u0412\u043f\u0438\u0441\u0430\u0442\u044c",
+        "slideshow.crop": "\u041e\u0431\u0440\u0435\u0437\u0430\u0442\u044c",
+        "slideshow.surface": "\u041f\u043e\u0432\u0435\u0440\u0445\u043d\u043e\u0441\u0442\u044c",
+        "slideshow.fullscreen": "\u041f\u043e\u043b\u043d\u044b\u0439 \u044d\u043a\u0440\u0430\u043d",
+        "slideshow.panel": "\u041f\u0430\u043d\u0435\u043b\u044c",
+        "slideshow.current_photo": "\u0422\u0435\u043a\u0443\u0449\u0435\u0435 \u0444\u043e\u0442\u043e",
+        "slideshow.selected_endpoints": "\u0412\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0435 endpoints",
+        "slideshow.empty.no_endpoint": "Endpoint \u043d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d",
+        "slideshow.display_name_for_rename": "\u0418\u043c\u044f \u0434\u043b\u044f \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u044f",
+        "slideshow.tablet": "\u041f\u043b\u0430\u043d\u0448\u0435\u0442",
+        "slideshow.use_name": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u0438\u043c\u044f",
+        "slideshow.rename_helper": "\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0435, \u0437\u0430\u0442\u0435\u043c \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c \u0432 \u0441\u0442\u0440\u043e\u043a\u0435 endpoint.",
+        "slideshow.aliases_for_rename": "\u041f\u0441\u0435\u0432\u0434\u043e\u043d\u0438\u043c\u044b \u0434\u043b\u044f \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u044f",
+        "slideshow.aliases_placeholder": "\u041a\u0443\u0445\u043e\u043d\u043d\u044b\u0439 \u043f\u043b\u0430\u043d\u0448\u0435\u0442, TF201",
+        "slideshow.use_aliases": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u043f\u0441\u0435\u0432\u0434\u043e\u043d\u0438\u043c\u044b",
+        "slideshow.aliases_helper": "\u0418\u043c\u0435\u043d\u0430 \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043f\u044f\u0442\u0443\u044e \u0434\u043b\u044f \u0433\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0433\u043e \u0438 UI-\u0441\u043e\u043f\u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u0438\u044f.",
+        "slideshow.empty.preview": "\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u043f\u0440\u0435\u0434\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440 \u0444\u043e\u0442\u043e, \u0447\u0442\u043e\u0431\u044b \u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u043f\u0440\u043e\u0438\u043d\u0434\u0435\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0435 \u0444\u0430\u0439\u043b\u044b. \u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u0438\u043d\u0434\u0435\u043a\u0441\u0430 \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f \u0432 \u0444\u043e\u043d\u0435.",
+        "slideshow.file": "\u0424\u0430\u0439\u043b",
+        "slideshow.size": "\u0420\u0430\u0437\u043c\u0435\u0440",
+        "slideshow.modified": "\u0418\u0437\u043c\u0435\u043d\u0435\u043d",
+        "slideshow.last_command": "\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u044f\u044f \u043a\u043e\u043c\u0430\u043d\u0434\u0430",
+        "slideshow.empty.command": "\u041a\u043e\u043c\u0430\u043d\u0434 \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442",
+        "slideshow.folder": "\u041f\u0430\u043f\u043a\u0430",
+        "slideshow.photos": "\u0424\u043e\u0442\u043e",
+        "slideshow.use": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c",
+        "slideshow.empty.folders": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u0435 \u0438\u043d\u0434\u0435\u043a\u0441, \u0447\u0442\u043e\u0431\u044b \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u043f\u0430\u043f\u043a\u0438 \u0432\u0435\u0440\u0445\u043d\u0435\u0433\u043e \u0443\u0440\u043e\u0432\u043d\u044f. \u0411\u043e\u043b\u044c\u0448\u0438\u0435 \u043d\u0430\u0431\u043e\u0440\u044b \u043f\u0430\u043f\u043e\u043a \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u044b \u0432 \u044d\u0442\u043e\u043c \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u0438\u0438.",
+        "slideshow.folders_modal": "\u041f\u0430\u043f\u043a\u0438 \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443",
+        "slideshow.voice.start": "\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
+        "slideshow.voice.stop": "\u041e\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
+        "slideshow.voice.next": "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0435 \u0444\u043e\u0442\u043e \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
+        "slideshow.voice.previous": "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0435\u0435 \u0444\u043e\u0442\u043e \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
+        "slideshow.voice.favorite": "\u041f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435 \u0444\u043e\u0442\u043e ReDevice",
+        "slideshow.voice.telegram": "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0444\u043e\u0442\u043e \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice \u0432 Telegram"
+      }
+    }
+  }
 }
