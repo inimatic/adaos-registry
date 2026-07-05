@@ -1061,10 +1061,6 @@ def _default_builder_memory_text(preview_state: Mapping[str, Any]) -> str:
     summary = preview_state.get("user_summary") if isinstance(preview_state.get("user_summary"), Mapping) else {}
     lines = [
         f"# {title}",
-        "",
-        "This file is the editable project memory for AdaOS Builder.",
-        "Keep stable product decisions, domain vocabulary, UX preferences, and constraints here.",
-        "Builder includes this file in every LLM UI transform request.",
     ]
     for heading, key in (
         ("Assumptions", "assumptions"),
@@ -1081,7 +1077,7 @@ def _default_builder_memory_text(preview_state: Mapping[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _default_builder_system_prompt_text() -> str:
+def _legacy_default_builder_system_prompt_text() -> str:
     return (
         "# Builder project system prompt\n\n"
         "Add project-specific instructions for AdaOS Builder here.\n"
@@ -1090,12 +1086,18 @@ def _default_builder_system_prompt_text() -> str:
     )
 
 
+def _default_builder_system_prompt_text() -> str:
+    return ""
+
+
 def _ensure_builder_project_files(root: Path, preview_state: Mapping[str, Any]) -> None:
     memory_path = root / BUILDER_MEMORY_FILE
     if not memory_path.exists():
         _write_text_file(memory_path, _default_builder_memory_text(preview_state))
     system_prompt_path = root / BUILDER_SYSTEM_PROMPT_FILE
     if not system_prompt_path.exists():
+        _write_text_file(system_prompt_path, _default_builder_system_prompt_text())
+    elif _read_text_file(system_prompt_path).strip() == _legacy_default_builder_system_prompt_text().strip():
         _write_text_file(system_prompt_path, _default_builder_system_prompt_text())
     tz_path = root / PROMPT_TZ_BASE_FILE
     if not tz_path.exists():
