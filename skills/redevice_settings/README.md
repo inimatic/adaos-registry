@@ -32,3 +32,19 @@ Current command delivery still bridges to the legacy ReDevice root API. The
 stable skill-facing API is already endpoint-oriented so the transport can move
 behind `EndpointRouter` later.
 
+## Data Route
+
+`redevice_settings.state` is a compact replace stream. It is limited to table
+rows, selected endpoint summary, small status sections, LAN admission rows, and
+a bounded `last_command` acknowledgement. Full manifest, policy, diagnostics,
+and large command responses must stay out of the stream and be requested through
+explicit inspect/detail tools.
+
+Subscription churn must not republish the full state. The stream uses
+`webio.stream.snapshot.requested` for first paint; `subscription.changed` is only
+an observation signal.
+
+The main endpoint table intentionally includes both `endpoint_id` and pair code
+so multiple identical Android devices can be distinguished before the operator
+renames them.
+

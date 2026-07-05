@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-05T04:58:01+00:00",
+  "updated_at": "2026-07-05T16:57:13+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -499,8 +499,8 @@
       "kind": "skill",
       "id": "redevice_settings",
       "name": "redevice_settings",
-      "version": "0.1.16",
-      "updated_at": "2026-06-19T11:08:40+00:00",
+      "version": "0.1.17",
+      "updated_at": "2026-07-05T16:57:13+00:00",
       "path": "skills/redevice_settings",
       "manifest": "skills/redevice_settings/skill.yaml",
       "source": {

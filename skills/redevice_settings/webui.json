@@ -18,6 +18,11 @@
           "sections": {},
           "assignment_presets": [],
           "last_command": {},
+          "lan_admission": {
+            "status": {},
+            "requests": [],
+            "pending_count": 0
+          },
           "scenario": {
             "id": "redevice_user_face",
             "required_skills": [
@@ -92,6 +97,8 @@
                 "size": "small",
                 "buttons": [
                   { "id": "refresh", "label": "Refresh" },
+                  { "id": "lan_on", "label": "LAN discovery" },
+                  { "id": "lan_off", "label": "Stop LAN" },
                   { "id": "wifi", "label": "Wi-Fi" },
                   { "id": "bluetooth", "label": "Bluetooth" },
                   { "id": "speaker", "label": "Speaker" },
@@ -101,6 +108,8 @@
               },
               "actions": [
                 { "on": "click:refresh", "type": "callSkill", "target": "redevice_settings.refresh_redevice_settings_state", "params": {} },
+                { "on": "click:lan_on", "type": "callSkill", "target": "redevice_settings.enable_redevice_lan_discovery", "params": { "ttl_s": 600 } },
+                { "on": "click:lan_off", "type": "callSkill", "target": "redevice_settings.disable_redevice_lan_discovery", "params": {} },
                 { "on": "click:wifi", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "open_wifi" } },
                 { "on": "click:bluetooth", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "open_bluetooth" } },
                 { "on": "click:speaker", "type": "callSkill", "target": "redevice_settings.send_redevice_settings_command", "params": { "device_ref": "$state.redeviceSettingsRef", "action": "speaker_test" } },
@@ -139,6 +148,50 @@
               }
             },
             {
+              "id": "settings-lan-tile",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "LAN admission",
+              "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "lan_admission.status.discovery" },
+              "inputs": {
+                "valuePath": "state",
+                "labelPath": "hub_base_url",
+                "subtitlePath": "expires_at_iso",
+                "descriptionPath": "control_base_url",
+                "emptyText": "disabled"
+              }
+            },
+            {
+              "id": "settings-lan-requests",
+              "type": "ui.table",
+              "area": "main",
+              "title": "LAN admission requests",
+              "dataSource": { "kind": "stream", "receiver": "redevice_settings.state", "path": "lan_admission.requests" },
+              "inputs": {
+                "emptyText": "No pending LAN requests",
+                "columns": [
+                  { "key": "device_label", "label": "Device" },
+                  { "key": "endpoint_id", "label": "Endpoint" },
+                  { "key": "client_host", "label": "Host", "width": "120px" },
+                  { "key": "state", "label": "State", "width": "100px" },
+                  {
+                    "key": "_actions",
+                    "label": "Actions",
+                    "kind": "buttons",
+                    "width": "160px",
+                    "buttons": [
+                      { "id": "approve", "label": "Approve" },
+                      { "id": "deny", "label": "Deny" }
+                    ]
+                  }
+                ]
+              },
+              "actions": [
+                { "on": "click:approve", "type": "callSkill", "target": "redevice_settings.approve_redevice_lan_request", "params": { "request_id": "$event.request_id", "display_name": "$event.device_label" } },
+                { "on": "click:deny", "type": "callSkill", "target": "redevice_settings.deny_redevice_lan_request", "params": { "request_id": "$event.request_id", "reason": "operator_denied" } }
+              ]
+            },
+            {
               "id": "settings-devices",
               "type": "ui.table",
               "area": "main",
@@ -149,6 +202,8 @@
                 "columns": [
                   { "key": "selected_label", "label": "Selected", "width": "82px" },
                   { "key": "title", "label": "Device" },
+                  { "key": "endpoint_id", "label": "Endpoint ID", "width": "210px" },
+                  { "key": "code", "label": "Code", "width": "92px" },
                   { "key": "online_state", "label": "State", "width": "90px" },
                   { "key": "last_seen", "label": "Seen", "width": "72px" },
                   { "key": "assignment", "label": "Role", "width": "116px" },

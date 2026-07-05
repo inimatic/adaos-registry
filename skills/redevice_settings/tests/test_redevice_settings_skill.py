@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from uuid import uuid4
@@ -167,57 +168,44 @@ def test_first_selected_skips_revoked_endpoint_when_online_available(monkeypatch
     assert selected["desktop"] == "redevice:new-endpoint"
 
 
-def test_load_devices_uses_redevice_sdk_when_endpoint_inventory_missing(monkeypatch) -> None:
+def test_load_devices_returns_empty_without_core_inventory(monkeypatch) -> None:
     mod = _load_redevice_settings_module()
 
-    class LegacyDeviceAccess:
-        pass
+    monkeypatch.setattr(mod, "core_device_inventory", None)
 
-    class EmptyDevices:
+    items = mod._load_devices()
+
+    assert items == []
+
+
+def test_load_devices_prefers_core_device_inventory(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+
+    class CoreInventory:
         @staticmethod
         def list_devices(kind: str | None = None):
-            return []
-
-    class ReDeviceSdk:
-        @staticmethod
-        def list_endpoints(sync_registry: bool = True):
-            assert sync_registry is True
+            assert kind == "redevice"
             return [
                 {
-                    "code": "SNX68P2A",
-                    "endpoint_id": "redevice-1",
-                    "state": "consumed",
-                    "last_seen_at": mod.time.time(),
-                    "device_label": "Kitchen tablet",
-                    "hub_id": "sn_92ffc943",
-                    "owner_id": "sn_92ffc943",
-                    "endpoint_policy": {"hub_id": "sn_92ffc943", "trust_level": "limited"},
+                    "ref": "redevice:endpoint-1",
+                    "identity": {"endpoint_id": "endpoint-1", "pair_code": "FMRS7WTB"},
+                    "policy": {"effective_name": "Kitchen tablet"},
+                    "observation": {"online": True, "connection_state": "online", "last_seen_at": 1},
                 }
             ]
 
+    class FailingDeviceAccess:
         @staticmethod
-        def compact_endpoint(endpoint):
-            return {
-                "code": endpoint["code"],
-                "endpoint_id": endpoint["endpoint_id"],
-                "state": endpoint["state"],
-                "online": True,
-                "online_state": "online",
-                "last_seen": "0s",
-                "display_name": endpoint["device_label"],
-                "raw": dict(endpoint),
-            }
+        def list_endpoint_devices(*_args, **_kwargs):
+            raise AssertionError("SDK fallback should not run when core inventory is available")
 
-    monkeypatch.setattr(mod, "sdk_device_access", LegacyDeviceAccess())
-    monkeypatch.setattr(mod, "sdk_devices", EmptyDevices())
-    monkeypatch.setattr(mod, "sdk_redevice", ReDeviceSdk())
+    monkeypatch.setattr(mod, "core_device_inventory", CoreInventory())
+    monkeypatch.setattr(mod, "sdk_device_access", FailingDeviceAccess())
 
     items = mod._load_devices()
 
     assert len(items) == 1
-    assert items[0]["ref"] == "redevice:redevice-1"
-    assert items[0]["code"] == "SNX68P2A"
-    assert items[0]["online"] is True
+    assert items[0]["endpoint_id"] == "endpoint-1"
 
 
 def test_settings_command_uses_redevice_bridge_when_endpoint_command_missing(monkeypatch) -> None:
@@ -394,6 +382,73 @@ def test_build_snapshot_keeps_table_rows_lightweight(monkeypatch) -> None:
     assert snapshot["items_truncated"] == 0
 
 
+def test_load_devices_uses_core_inventory_read_model(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    calls: list[dict] = []
+
+    class CoreInventory:
+        @staticmethod
+        def list_devices(kind: str | None = None):
+            calls.append({"kind": kind})
+            return [
+                {
+                    "ref": "redevice:endpoint-1",
+                    "identity": {"endpoint_id": "endpoint-1", "pair_code": "FMRS7WTB"},
+                    "policy": {"effective_name": "Kitchen tablet"},
+                    "observation": {"online": True, "connection_state": "online", "last_seen_at": 1},
+                }
+            ]
+
+    monkeypatch.setattr(mod, "core_device_inventory", CoreInventory())
+
+    items = mod._load_devices()
+
+    assert items
+    assert calls == [{"kind": "redevice"}]
+
+
+def test_build_snapshot_compacts_large_last_command(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    full_item = {
+        "ref": "redevice:endpoint-1",
+        "code": "FMRS7WTB",
+        "endpoint_id": "endpoint-1",
+        "title": "Kitchen tablet",
+        "selected": True,
+        "online": True,
+        "online_state": "online",
+        "last_seen": "0s",
+        "commandable": True,
+    }
+    large_result = {
+        "ok": False,
+        "error": "http_404",
+        "detail": "x" * 20000,
+        "items": [{"payload": "y" * 2000} for _ in range(10)],
+    }
+
+    def memory_dict(key):
+        if key == mod._LAST_COMMAND_KEY:
+            return {
+                "action": "open_wifi",
+                "command": {"command_id": "cmd-1", "type": "settings.open_wifi", "payload": {"body": "z" * 12000}},
+                "result": large_result,
+                "updated_at": "2026-06-18T10:00:00+00:00",
+            }
+        return {}
+
+    monkeypatch.setattr(mod, "_load_devices", lambda selected_ref=None: [dict(full_item)])
+    monkeypatch.setattr(mod, "_first_selected", lambda items, webspace_id=None: "redevice:endpoint-1")
+    monkeypatch.setattr(mod, "_memory_dict", memory_dict)
+
+    snapshot = mod._build_snapshot("desktop")
+
+    assert len(json.dumps(snapshot["last_command"], ensure_ascii=False).encode("utf-8")) <= mod._MAX_LAST_COMMAND_BYTES
+    assert snapshot["last_command"]["command"] == {"command_id": "cmd-1", "type": "settings.open_wifi"}
+    assert snapshot["last_command"]["result"]["error"] == "http_404"
+    assert "detail" not in snapshot["last_command"]["result"]
+
+
 def test_inspect_endpoint_returns_full_contracts_without_streaming(monkeypatch) -> None:
     mod = _load_redevice_settings_module()
     full_item = {
@@ -502,3 +557,26 @@ def test_stream_subscription_publishes_cached_snapshot_without_refresh(monkeypat
     )
 
     assert published == [cached["desktop"]]
+
+
+def test_stream_subscription_changed_does_not_republish_cached_snapshot(monkeypatch) -> None:
+    mod = _load_redevice_settings_module()
+    published: list[dict] = []
+    monkeypatch.setattr(mod, "stream_publish", lambda receiver, snapshot, _meta=None: published.append(dict(snapshot)))
+
+    mod.on_webio_stream_subscription_changed(
+        {"receiver": "redevice_settings.state", "webspace_id": "desktop"}
+    )
+
+    assert published == []
+
+
+def test_webui_redevice_table_exposes_endpoint_id() -> None:
+    webui_path = Path(__file__).resolve().parents[1] / "webui.json"
+    webui = json.loads(webui_path.read_text(encoding="utf-8"))
+    widgets = webui["registry"]["modals"]["redevice_settings_modal"]["schema"]["widgets"]
+    table = next(widget for widget in widgets if widget["id"] == "settings-devices")
+    columns = [column["key"] for column in table["inputs"]["columns"]]
+
+    assert "endpoint_id" in columns
+    assert "code" in columns

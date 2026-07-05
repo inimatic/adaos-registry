@@ -8,10 +8,15 @@ from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import device_access as sdk_device_access
-from adaos.sdk.data import devices as sdk_devices
 from adaos.sdk.data import skill_memory_get, skill_memory_set
 from adaos.sdk.io import stream_publish
 from adaos.services.redevice_versions import endpoint_version_info
+from adaos.services import redevice_lan_admission
+
+try:
+    from adaos.services import device_inventory as core_device_inventory
+except Exception:  # pragma: no cover - older core without Endpoint Registry read model
+    core_device_inventory = None
 
 try:
     from adaos.sdk import redevice as sdk_redevice
@@ -31,6 +36,8 @@ _LAST_COMMAND_KEY = "last_command"
 _LAST_SNAPSHOT_KEY = "last_stream_snapshot_by_webspace"
 _ASSIGNMENT_PRESETS = ["assistant", "slideshow", "voice_endpoint", "media_center", "webcam", "idle"]
 _MAX_TABLE_ITEMS = 32
+_MAX_LAN_REQUESTS = 16
+_MAX_LAST_COMMAND_BYTES = 2048
 _MIN_PUBLISH_INTERVAL_S = 1.0
 _LAST_PUBLISH_AT: dict[str, float] = {}
 _LAST_PUBLISH_FINGERPRINT: dict[str, str] = {}
@@ -90,6 +97,66 @@ def _compact_result(value: Any) -> dict[str, Any]:
     if not compact:
         compact = _compact_value(result, max_fields=8, max_text=120)
     return compact if isinstance(compact, dict) else {"value": compact}
+
+
+def _json_bytes(value: Any) -> int:
+    try:
+        return len(json.dumps(value, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":")).encode("utf-8"))
+    except Exception:
+        return 0
+
+
+def _compact_last_command(value: Any) -> dict[str, Any]:
+    payload = _mapping(value)
+    if not payload:
+        return {}
+    command = _mapping(payload.get("command"))
+    compact: dict[str, Any] = {
+        "action": _text(payload.get("action")),
+        "updated_at": _text(payload.get("updated_at")),
+    }
+    if payload.get("reason") is not None:
+        compact["reason"] = _text(payload.get("reason"))
+    if command:
+        compact["command"] = {
+            "command_id": _text(command.get("command_id")),
+            "type": _text(command.get("type")),
+        }
+    if payload.get("result") is not None:
+        compact["result"] = _compact_result(payload.get("result"))
+    if _json_bytes(compact) <= _MAX_LAST_COMMAND_BYTES:
+        return compact
+    if isinstance(compact.get("result"), dict):
+        result = dict(compact["result"])
+        for key in list(result.keys()):
+            if key not in {"ok", "error", "state", "status", "code", "device_ref", "endpoint_id", "command_id"}:
+                result.pop(key, None)
+        compact["result"] = result
+    if _json_bytes(compact) <= _MAX_LAST_COMMAND_BYTES:
+        return compact
+    compact.pop("result", None)
+    compact["result"] = {"error": "last_command_compacted", "truncated": True}
+    return compact
+
+
+def _store_last_command(value: Mapping[str, Any]) -> None:
+    _set_memory_dict(_LAST_COMMAND_KEY, _compact_last_command(value))
+
+
+def _compact_lan_request(value: Any) -> dict[str, Any]:
+    payload = _mapping(value)
+    allowed = {
+        "request_id",
+        "endpoint_id",
+        "device_label",
+        "client_host",
+        "state",
+        "created_at",
+        "updated_at",
+        "expires_at",
+        "expires_at_iso",
+    }
+    return {key: _compact_value(payload.get(key), max_fields=6, max_text=96) for key in allowed if key in payload}
 
 
 def _diagnostics_summary(diagnostics: Mapping[str, Any]) -> dict[str, Any]:
@@ -425,25 +492,9 @@ def _selected_stream_item(item: Mapping[str, Any] | None) -> dict[str, Any]:
 
 def _load_devices(selected_ref: str | None = None) -> list[dict[str, Any]]:
     raw_items: list[Mapping[str, Any]] = []
-    list_endpoint_devices = getattr(sdk_device_access, "list_endpoint_devices", None)
-    if callable(list_endpoint_devices):
+    if core_device_inventory is not None:
         try:
-            raw_items = [item for item in list_endpoint_devices("redevice", sync_registry=True) if isinstance(item, Mapping)]
-        except Exception:
-            raw_items = []
-    if not raw_items and sdk_redevice is not None:
-        try:
-            compact = getattr(sdk_redevice, "compact_endpoint", None)
-            endpoints = [item for item in sdk_redevice.list_endpoints(sync_registry=True) if isinstance(item, Mapping)]
-            if callable(compact):
-                raw_items = [compact(item) for item in endpoints]
-            else:
-                raw_items = endpoints
-        except Exception:
-            raw_items = []
-    if not raw_items:
-        try:
-            raw_items = [item for item in sdk_devices.list_devices(kind="redevice") if isinstance(item, Mapping)]
+            raw_items = [item for item in core_device_inventory.list_devices(kind="redevice") if isinstance(item, Mapping)]
         except Exception:
             raw_items = []
     normalized = [_normalize_device(item, selected_ref=selected_ref) for item in raw_items if isinstance(item, Mapping)]
@@ -749,7 +800,16 @@ def _build_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
     items = _load_devices(selected_ref)
     selected = next((item for item in items if item.get("selected")), None)
     table_items = [_table_item(item) for item in items[:_MAX_TABLE_ITEMS]]
-    last_command = _memory_dict(_LAST_COMMAND_KEY)
+    raw_last_command = _memory_dict(_LAST_COMMAND_KEY)
+    last_command = _compact_last_command(raw_last_command)
+    if raw_last_command and _json_bytes(raw_last_command) > _MAX_LAST_COMMAND_BYTES:
+        _set_memory_dict(_LAST_COMMAND_KEY, last_command)
+    try:
+        lan_status = redevice_lan_admission.discovery_status()
+        lan_requests = redevice_lan_admission.list_requests(include_terminal=False)
+    except Exception as exc:
+        lan_status = {"ok": False, "error": "lan_admission_unavailable", "detail": str(exc)}
+        lan_requests = {"ok": False, "requests": []}
     return {
         "ok": True,
         "selected_ref": selected_ref,
@@ -763,6 +823,11 @@ def _build_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
         "sections": _section_rows(selected),
         "assignment_presets": [{"id": item, "label": item.replace("_", " ").title()} for item in _ASSIGNMENT_PRESETS],
         "last_command": last_command,
+        "lan_admission": {
+            "status": lan_status,
+            "requests": [_compact_lan_request(item) for item in list(lan_requests.get("requests") or [])[:_MAX_LAN_REQUESTS]],
+            "pending_count": int(lan_status.get("pending_count") or len(list(lan_requests.get("requests") or []))),
+        },
         "scenario": {
             "id": "redevice_user_face",
             "required_skills": ["redevice_settings", "slideshow_skill", "redevice_voice"],
@@ -807,6 +872,10 @@ def _publish(webspace_id: str | None = None, *, force: bool = False) -> dict[str
 
 
 def _empty_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
+    raw_last_command = _memory_dict(_LAST_COMMAND_KEY)
+    last_command = _compact_last_command(raw_last_command)
+    if raw_last_command and _json_bytes(raw_last_command) > _MAX_LAST_COMMAND_BYTES:
+        _set_memory_dict(_LAST_COMMAND_KEY, last_command)
     return {
         "ok": True,
         "selected_ref": _selected_by_ws().get(_webspace_id(webspace_id), ""),
@@ -819,7 +888,7 @@ def _empty_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
         "inspection": [],
         "sections": {},
         "assignment_presets": [{"id": item, "label": item.replace("_", " ").title()} for item in _ASSIGNMENT_PRESETS],
-        "last_command": _memory_dict(_LAST_COMMAND_KEY),
+        "last_command": last_command,
         "scenario": {
             "id": "redevice_user_face",
             "required_skills": ["redevice_settings", "slideshow_skill", "redevice_voice"],
@@ -875,6 +944,42 @@ def _matches_receiver(payload: Mapping[str, Any]) -> bool:
 @tool
 def refresh_redevice_settings_state(webspace_id: str | None = None) -> dict[str, Any]:
     return _ack(_publish(webspace_id), status="refreshed")
+
+
+@tool
+def enable_redevice_lan_discovery(
+    ttl_s: float | None = None,
+    hub_base_url: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    result = redevice_lan_admission.enable_discovery(ttl_s=ttl_s, hub_base_url=hub_base_url)
+    return _ack(_publish(webspace_id, force=True), status="lan_discovery_enabled", ok=bool(result.get("ok")), result=result)
+
+
+@tool
+def disable_redevice_lan_discovery(webspace_id: str | None = None) -> dict[str, Any]:
+    result = redevice_lan_admission.disable_discovery()
+    return _ack(_publish(webspace_id, force=True), status="lan_discovery_disabled", ok=bool(result.get("ok")), result=result)
+
+
+@tool
+def approve_redevice_lan_request(
+    request_id: str,
+    display_name: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    result = redevice_lan_admission.approve_request(request_id, display_name=display_name)
+    return _ack(_publish(webspace_id, force=True), status="lan_request_approved", ok=bool(result.get("ok")), result=result)
+
+
+@tool
+def deny_redevice_lan_request(
+    request_id: str,
+    reason: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    result = redevice_lan_admission.deny_request(request_id, reason=reason)
+    return _ack(_publish(webspace_id, force=True), status="lan_request_denied", ok=bool(result.get("ok")), result=result)
 
 
 @tool
@@ -1042,7 +1147,7 @@ def send_redevice_settings_command(
             "action": token,
             "message": "Select a ReDevice endpoint before sending settings commands.",
         }
-        _set_memory_dict(_LAST_COMMAND_KEY, {"action": token, "result": result, "updated_at": _now_iso()})
+        _store_last_command({"action": token, "result": result, "updated_at": _now_iso()})
         snapshot = _publish(webspace_id)
         return _ack(snapshot, status="command_rejected", ok=False, result=result, action=token)
     if selected and not bool(selected.get("online")):
@@ -1053,7 +1158,7 @@ def send_redevice_settings_command(
             "code": pair_code,
             "online_state": _text(selected.get("online_state")) or "offline",
         }
-        _set_memory_dict(_LAST_COMMAND_KEY, {"action": token, "result": result, "updated_at": _now_iso()})
+        _store_last_command({"action": token, "result": result, "updated_at": _now_iso()})
         snapshot = _publish(webspace_id)
         return _ack(snapshot, status="command_rejected", ok=False, result=result, action=token)
     command = {
@@ -1073,7 +1178,7 @@ def send_redevice_settings_command(
         },
     }
     result = _send_endpoint_command(device_ref=ref, code=pair_code, command=command)
-    _set_memory_dict(_LAST_COMMAND_KEY, {"action": token, "command": command, "result": result, "updated_at": _now_iso()})
+    _store_last_command({"action": token, "command": command, "result": result, "updated_at": _now_iso()})
     snapshot = _publish(webspace_id)
     return _ack(snapshot, status="command_sent", ok=bool(result.get("ok")), result=result, action=token)
 
@@ -1095,7 +1200,7 @@ def retire_redevice_settings_endpoint(device_ref: str | None = None, code: str |
 
 
 def dispose(reason: str | None = None, **_: Any) -> dict[str, Any]:
-    _set_memory_dict(_LAST_COMMAND_KEY, {"action": "dispose", "reason": _text(reason) or "dispose", "updated_at": _now_iso()})
+    _store_last_command({"action": "dispose", "reason": _text(reason) or "dispose", "updated_at": _now_iso()})
     return {"ok": True, "reason": _text(reason) or "dispose", "updated_at": _now_iso()}
 
 
@@ -1114,7 +1219,7 @@ def on_quarantine(
         "metrics": _compact_value(dict(metrics or {}), max_fields=12, max_text=120),
         "updated_at": _now_iso(),
     }
-    _set_memory_dict(_LAST_COMMAND_KEY, {"action": "quarantine", "result": incident, "updated_at": _now_iso()})
+    _store_last_command({"action": "quarantine", "result": incident, "updated_at": _now_iso()})
     return {"ok": True, "incident": incident}
 
 
@@ -1130,4 +1235,7 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
 def on_webio_stream_subscription_changed(evt: Any) -> None:
     payload = _event_payload(evt)
     if _matches_receiver(payload):
-        _publish_cached(_text(payload.get("webspace_id") or payload.get("workspace_id")) or None)
+        # Snapshot delivery is handled by webio.stream.snapshot.requested.
+        # Subscription churn can be frequent across mirrored browsers; publishing
+        # here turns a cached state into stream pressure without improving first paint.
+        return
