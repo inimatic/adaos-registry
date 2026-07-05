@@ -1,58 +1,101 @@
 {
-	"$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
-	"apps": [
-		{
-			"id": "scenario:prompt_engineer_scenario",
-			"title": "Prompt IDE",
-			"icon": "desktop",
-			"scenario_id": "prompt_engineer_scenario",
-			"dev": true
-		}
-	],
-	"widgets": [],
-	"registry": {
-		"modals": {
-			"prompt_ide_modal": {
-				"title": "Prompt IDE",
-				"schema": {
-					"id": "prompt_ide_workspace",
-					"layout": {
-						"type": "single",
-						"pattern": "stack",
-						"areas": [
-							{
-								"id": "main",
-								"role": "main"
-							}
-						]
-					},
-					"widgets": [
-						{
-							"id": "prompt-ide-status",
-							"type": "visual.metricTile",
-							"area": "main",
-							"title": "Prompt IDE (TZ backend ready)",
-							"dataSource": {
-								"kind": "static",
-								"value": {
-									"value": "Prompt IDE v0.1",
-									"label": "Base TZ + addenda API"
-								}
-							}
-						}
-					]
-				}
-			}
-		},
-		"widgets": {}
-	},
-	"ydoc_defaults": {},
-	"contributions": [
-		{
-			"extensionPoint": "desktop.apps",
-			"type": "app",
-			"id": "scenario:prompt_engineer_scenario",
-			"autoInstall": true
-		}
-	]
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "apps": [
+    {
+      "id": "scenario:prompt_engineer_scenario",
+      "title": "Prompt IDE",
+      "icon": "desktop",
+      "scenario_id": "prompt_engineer_scenario",
+      "dev": true,
+      "title_i18n": {
+        "key": "prompt_ide_skill.title"
+      }
+    }
+  ],
+  "widgets": [],
+  "registry": {
+    "modals": {
+      "prompt_ide_modal": {
+        "title": "Prompt IDE",
+        "schema": {
+          "id": "prompt_ide_workspace",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "prompt-ide-status",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Prompt IDE (TZ backend ready)",
+              "dataSource": {
+                "kind": "static",
+                "value": {
+                  "value": "Prompt IDE v0.1",
+                  "label": "Base TZ + addenda API",
+                  "value_i18n": {
+                    "key": "prompt_ide_skill.version"
+                  },
+                  "label_i18n": {
+                    "key": "prompt_ide_skill.status_label"
+                  }
+                }
+              },
+              "title_i18n": {
+                "key": "prompt_ide_skill.status_title"
+              }
+            }
+          ]
+        },
+        "title_i18n": {
+          "key": "prompt_ide_skill.title"
+        }
+      }
+    },
+    "widgets": {}
+  },
+  "ydoc_defaults": {},
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "scenario:prompt_engineer_scenario",
+      "autoInstall": true
+    }
+  ],
+  "resources": {
+    "prompt_ide_skill.i18n.en": {
+      "id": "prompt_ide_skill.i18n.en",
+      "kind": "data",
+      "role": "i18n",
+      "locale": "en",
+      "owner": "skill:prompt_engineer_skill",
+      "dictionary": {
+        "prompt_ide_skill.title": "Prompt IDE",
+        "prompt_ide_skill.status_title": "Prompt IDE (TZ backend ready)",
+        "prompt_ide_skill.version": "Prompt IDE v0.1",
+        "prompt_ide_skill.status_label": "Base TZ + addenda API"
+      }
+    },
+    "prompt_ide_skill.i18n.ru": {
+      "id": "prompt_ide_skill.i18n.ru",
+      "kind": "data",
+      "role": "i18n",
+      "locale": "ru",
+      "owner": "skill:prompt_engineer_skill",
+      "dictionary": {
+        "prompt_ide_skill.title": "Prompt IDE",
+        "prompt_ide_skill.status_title": "Prompt IDE (\u0431\u044d\u043a\u0435\u043d\u0434 \u0422\u0417 \u0433\u043e\u0442\u043e\u0432)",
+        "prompt_ide_skill.version": "Prompt IDE v0.1",
+        "prompt_ide_skill.status_label": "\u0411\u0430\u0437\u043e\u0432\u043e\u0435 \u0422\u0417 + API \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0439"
+      }
+    }
+  }
 }

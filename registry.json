@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-05T04:54:27+00:00",
+  "updated_at": "2026-07-05T04:54:29+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -436,8 +436,8 @@
       "kind": "skill",
       "id": "prompt_engineer_skill",
       "name": "prompt_engineer_skill",
-      "version": "0.6.5",
-      "updated_at": "2026-07-05T04:54:27+00:00",
+      "version": "0.6.6",
+      "updated_at": "2026-07-05T04:54:29+00:00",
       "path": "skills/prompt_engineer_skill",
       "manifest": "skills/prompt_engineer_skill/skill.yaml",
       "source": {
