@@ -1028,11 +1028,15 @@ def _weather_projection_payload(
 
 
 async def _project_weather_snapshot_async(snapshot: Dict[str, Any], *, webspace_id: Optional[str]) -> None:
+    pushed = False
     try:
-        set_current_skill("weather_skill")
+        pushed = set_current_skill("weather_skill")
         await ctx_subnet.set_async("weather.snapshot", snapshot, webspace_id=webspace_id)
     except Exception:
         _log.warning("failed to project weather.snapshot via ctx_subnet", exc_info=True)
+    finally:
+        if pushed:
+            clear_current_skill()
 
 
 async def _project_weather_current_async(data: Dict[str, Any], *, webspace_id: Optional[str], status: str = "") -> None:
@@ -1043,11 +1047,15 @@ def _project_weather_current(data: Dict[str, Any], *, webspace_id: Optional[str]
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
+        pushed = False
         try:
-            set_current_skill("weather_skill")
+            pushed = set_current_skill("weather_skill")
             ctx_subnet.set("weather.snapshot", _weather_projection_payload(data, status=status), webspace_id=webspace_id)
         except Exception:
             _log.warning("failed to project weather.snapshot via ctx_subnet", exc_info=True)
+        finally:
+            if pushed:
+                clear_current_skill()
         return
     loop.create_task(_project_weather_current_async(data, webspace_id=webspace_id, status=status))
 
@@ -1119,54 +1127,57 @@ async def _refresh_weather_live_snapshot(
 
 
 async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
-    set_current_skill("weather_skill")
+    pushed = set_current_skill("weather_skill")
     try:
         ctx = get_ctx()
         _load_skill_data_projections(ctx)
     except Exception:
         pass
+    try:
+        payload = _event_payload(evt)
+        if not payload:
+            return
+        allowed, target_node_id, webspace_id = _target_context(payload)
+        if not allowed:
+            _log.info("weather request ignored: target_node_mismatch target_node_id=%s", target_node_id)
+            return
 
-    payload = _event_payload(evt)
-    if not payload:
-        return
-    allowed, target_node_id, webspace_id = _target_context(payload)
-    if not allowed:
-        _log.info("weather request ignored: target_node_mismatch target_node_id=%s", target_node_id)
-        return
+        city = _extract_city_from_payload(payload)
+        location = _extract_location_from_payload(payload)
+        request_id = _extract_request_id(payload)
+        api_entry_point, default_city = _load_config()
+        if not city and not location:
+            city = _resolve_city(None) or default_city
+        if not city and not location:
+            _log.info("weather request ignored: missing city/location payload_keys=%s", sorted(payload.keys()))
+            return
 
-    city = _extract_city_from_payload(payload)
-    location = _extract_location_from_payload(payload)
-    request_id = _extract_request_id(payload)
-    api_entry_point, default_city = _load_config()
-    if not city and not location:
-        city = _resolve_city(None) or default_city
-    if not city and not location:
-        _log.info("weather request ignored: missing city/location payload_keys=%s", sorted(payload.keys()))
-        return
-
-    pending = _weather_pending_payload(city or "", request_id=request_id, location=location)
-    _log.info(
-        "%s accepted webspace=%s city=%s source=pending",
-        event_name,
-        webspace_id or "default",
-        pending.get("city"),
-    )
-    await _project_weather_current_async(pending, webspace_id=webspace_id, status="refreshing")
-
-    task_key = f"{str(webspace_id or 'default').strip() or 'default'}::{target_node_id or 'local'}"
-    previous = _WEATHER_UPDATE_TASKS.get(task_key)
-    if previous and not previous.done():
-        previous.cancel()
-    _WEATHER_UPDATE_TASKS[task_key] = asyncio.create_task(
-        _refresh_weather_live_snapshot(
-            task_key=task_key,
-            api_entry_point=api_entry_point,
-            city=city,
-            location=location,
-            webspace_id=webspace_id,
-            request_id=request_id,
+        pending = _weather_pending_payload(city or "", request_id=request_id, location=location)
+        _log.info(
+            "%s accepted webspace=%s city=%s source=pending",
+            event_name,
+            webspace_id or "default",
+            pending.get("city"),
         )
-    )
+        await _project_weather_current_async(pending, webspace_id=webspace_id, status="refreshing")
+
+        task_key = f"{str(webspace_id or 'default').strip() or 'default'}::{target_node_id or 'local'}"
+        previous = _WEATHER_UPDATE_TASKS.get(task_key)
+        if previous and not previous.done():
+            previous.cancel()
+        _WEATHER_UPDATE_TASKS[task_key] = asyncio.create_task(
+            _refresh_weather_live_snapshot(
+                task_key=task_key,
+                api_entry_point=api_entry_point,
+                city=city,
+                location=location,
+                webspace_id=webspace_id,
+                request_id=request_id,
+            )
+        )
+    finally:
+        if pushed:
+            clear_current_skill()
 
 
 @subscribe("weather.location.requested")
