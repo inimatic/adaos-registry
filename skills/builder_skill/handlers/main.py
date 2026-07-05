@@ -5,10 +5,12 @@ import copy
 import hashlib
 import inspect
 import json
+import logging
 import os
 import re
 import threading
 import time
+from collections.abc import Iterable as IterableABC
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -39,6 +41,7 @@ PROMPT_REVISION_FILES = (
 )
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
+_LOG = logging.getLogger("adaos.skills.builder_skill")
 
 
 def _now() -> float:
@@ -101,15 +104,32 @@ def _mem_set(key: str, value: Any) -> None:
         _FALLBACK_MEMORY[key] = copy.deepcopy(value)
 
 
+def _mem_set_many(values: Mapping[str, Any]) -> None:
+    payload = {str(key): copy.deepcopy(value) for key, value in values.items()}
+    if not payload:
+        return
+    try:
+        from adaos.sdk.data import skill_env
+
+        env = skill_env.read_env()
+        env.update(payload)
+        skill_env.write_env(env)
+    except Exception:
+        _FALLBACK_MEMORY.update(payload)
+
+
 def _sessions(webspace_id: str) -> dict[str, dict[str, Any]]:
     raw = _mem_get(_scoped_key(SESSIONS_KEY, webspace_id), {})
     return copy.deepcopy(raw) if isinstance(raw, dict) else {}
 
 
-def _save_sessions(webspace_id: str, sessions: Mapping[str, Mapping[str, Any]]) -> None:
+def _trim_sessions(sessions: Mapping[str, Mapping[str, Any]]) -> dict[str, dict[str, Any]]:
     items = sorted((dict(v) for v in sessions.values()), key=lambda item: float(item.get("updated_at") or 0), reverse=True)
-    trimmed = {str(item["id"]): item for item in items[:MAX_SESSIONS] if item.get("id")}
-    _mem_set(_scoped_key(SESSIONS_KEY, webspace_id), trimmed)
+    return {str(item["id"]): item for item in items[:MAX_SESSIONS] if item.get("id")}
+
+
+def _save_sessions(webspace_id: str, sessions: Mapping[str, Mapping[str, Any]]) -> None:
+    _mem_set(_scoped_key(SESSIONS_KEY, webspace_id), _trim_sessions(sessions))
 
 
 def _current_session_id(webspace_id: str) -> str | None:
@@ -128,6 +148,83 @@ def _hash_suffix(text: str) -> str:
 
 def _compact_json(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def _elapsed_ms(started_at: float) -> float:
+    return round(max(0.0, (time.perf_counter() - started_at) * 1000.0), 3)
+
+
+def _builder_revision_materialization_enabled() -> bool:
+    raw = os.getenv("ADAOS_BUILDER_REVISION_MATERIALIZATION_FAST_PATH")
+    if raw is None:
+        return True
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _builder_revision_materialization_delay_s() -> float:
+    raw = os.getenv("ADAOS_BUILDER_REVISION_MATERIALIZATION_DELAY_S")
+    if raw is None:
+        return 0.0
+    try:
+        value = float(str(raw or "").strip())
+    except Exception:
+        return 0.0
+    return max(0.0, min(value, 10.0))
+
+
+def _builder_revision_chat_emit_delay_s() -> float:
+    raw = os.getenv("ADAOS_BUILDER_REVISION_CHAT_EMIT_DELAY_S")
+    if raw is None:
+        return 0.5
+    try:
+        value = float(str(raw or "").strip())
+    except Exception:
+        return 0.5
+    return max(0.0, min(value, 10.0))
+
+
+def _webui_source_fingerprint(payload: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(payload, Mapping):
+        return None
+    try:
+        return hashlib.sha1(_compact_json(_repair_text_tree(dict(payload))).encode("utf-8")).hexdigest()
+    except Exception:
+        return None
+
+
+def _meta_user_id(_meta: Mapping[str, Any] | None) -> str:
+    if isinstance(_meta, Mapping):
+        for key in ("user_id", "current_user_id", "profile_id", "actor_user_id"):
+            token = str(_meta.get(key) or "").strip()
+            if token:
+                return token
+    return "guest"
+
+
+def _meta_roles(_meta: Mapping[str, Any] | None) -> list[str]:
+    raw: Any = None
+    if isinstance(_meta, Mapping):
+        raw = _meta.get("roles")
+        if raw is None:
+            raw = _meta.get("user_roles")
+        if raw is None:
+            raw = _meta.get("role")
+    if isinstance(raw, str):
+        items = raw.split(",")
+    elif isinstance(raw, IterableABC) and not isinstance(raw, (bytes, bytearray, str, Mapping)):
+        items = raw
+    else:
+        items = []
+    roles: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        token = str(item or "").strip().lower()
+        if not token or token in seen:
+            continue
+        seen.add(token)
+        roles.append(token)
+    roles.sort()
+    return roles
 
 
 def _read_text_file(path: Path, *, limit: int | None = None) -> str:
@@ -248,6 +345,8 @@ def _builder_topic_ref(
     existing_topic = meta.get("builder_topic") if isinstance(meta.get("builder_topic"), Mapping) else {}
     thread_id = str(meta.get("thread_id") or meta.get("conversation_thread_id") or meta.get("conversation_topic_id") or "").strip()
     topic_id = str(meta.get("topic_id") or "").strip()
+    session = session if isinstance(session, Mapping) else {}
+    binding = binding if isinstance(binding, Mapping) else {}
     if thread_id:
         topic = {k: v for k, v in dict(existing_topic or {}).items() if v is not None}
         topic.setdefault("schema", "adaos.conversation.topic_ref.v1")
@@ -260,8 +359,23 @@ def _builder_topic_ref(
         topic.setdefault("channel_id", DIALOG_CHANNEL_ID)
         topic.setdefault("owner", f"skill:{SKILL_ID}")
         return topic
-    session = session if isinstance(session, Mapping) else {}
-    binding = binding if isinstance(binding, Mapping) else {}
+    session_topic = session.get("topic_ref") if isinstance(session.get("topic_ref"), Mapping) else {}
+    if session_topic and str(session_topic.get("thread_id") or session_topic.get("topic_id") or "").strip():
+        topic = {k: v for k, v in dict(session_topic).items() if v is not None}
+        topic.setdefault("schema", "adaos.conversation.topic_ref.v1")
+        topic.setdefault("topic_id", str(session_topic.get("topic_id") or session_topic.get("thread_id") or "").strip())
+        topic.setdefault("thread_id", str(session_topic.get("thread_id") or session_topic.get("topic_id") or "").strip())
+        topic.setdefault("topic_kind", "builder_runtime")
+        topic.setdefault("webspace_id", webspace_id)
+        topic.setdefault("source_webspace_id", webspace_id)
+        topic.setdefault("active_draft_id", str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None)
+        topic.setdefault("scenario_id", str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None)
+        topic.setdefault("dev_webspace_id", str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None)
+        topic.setdefault("conversation_id", _conversation_id(webspace_id))
+        topic.setdefault("channel_id", DIALOG_CHANNEL_ID)
+        topic.setdefault("owner", f"skill:{SKILL_ID}")
+        topic.setdefault("stored", bool(session_topic.get("stored")))
+        return topic
     try:
         from adaos.services.conversation_links import ensure_builder_topic
 
@@ -559,6 +673,48 @@ def _safe_emit_chat(
         return
 
 
+def _schedule_safe_emit_chat(
+    text: str,
+    *,
+    webspace_id: str,
+    _meta: Mapping[str, Any] | None = None,
+    session: Mapping[str, Any] | None = None,
+    binding: Mapping[str, Any] | None = None,
+    topic_ref: Mapping[str, Any] | None = None,
+    actions: Sequence[Mapping[str, Any]] | None = None,
+    delay_s: float | None = None,
+) -> dict[str, Any]:
+    effective_delay = _builder_revision_chat_emit_delay_s() if delay_s is None else max(0.0, min(float(delay_s), 10.0))
+    if effective_delay <= 0:
+        _safe_emit_chat(
+            text,
+            webspace_id=webspace_id,
+            _meta=_meta,
+            session=session,
+            binding=binding,
+            topic_ref=topic_ref,
+            actions=actions,
+        )
+        return {"scheduled": False, "mode": "inline", "delay_s": 0.0}
+
+    def _runner() -> None:
+        _safe_emit_chat(
+            text,
+            webspace_id=webspace_id,
+            _meta=_meta,
+            session=session,
+            binding=binding,
+            topic_ref=topic_ref,
+            actions=actions,
+        )
+
+    timer = threading.Timer(effective_delay, _runner)
+    timer.name = f"builder-chat-emit:{webspace_id}"
+    timer.daemon = True
+    timer.start()
+    return {"scheduled": True, "mode": "timer_thread", "delay_s": effective_delay}
+
+
 def _event_payload(evt: Any) -> dict[str, Any]:
     payload = getattr(evt, "payload", None)
     if isinstance(payload, Mapping):
@@ -734,6 +890,78 @@ def _card_key_from_template(value: Any) -> str:
     if re.fullmatch(r"[A-Za-z_][\w.-]*", text):
         return text
     return ""
+
+
+_CARD_TEMPLATE_FIELD_RE = re.compile(r"\{\{\s*([A-Za-z_][\w.-]*)\s*\}\}")
+
+
+def _card_template_fields(value: Any) -> list[str]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    return [match.group(1) for match in _CARD_TEMPLATE_FIELD_RE.finditer(text)]
+
+
+def _row_path_value(row: Mapping[str, Any], path: str) -> Any:
+    current: Any = row
+    for part in str(path or "").split("."):
+        if not part:
+            continue
+        if isinstance(current, Mapping):
+            current = current.get(part)
+        else:
+            return ""
+    return current
+
+
+def _render_card_template(value: Any, row: Mapping[str, Any]) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+
+    def _replace(match: re.Match[str]) -> str:
+        raw = _row_path_value(row, match.group(1))
+        if raw is None:
+            return ""
+        if isinstance(raw, (dict, list)):
+            return json.dumps(raw, ensure_ascii=False, separators=(",", ":"))
+        return str(raw)
+
+    return _CARD_TEMPLATE_FIELD_RE.sub(_replace, text).strip()
+
+
+def _card_preview_derived_key(fields: Sequence[Mapping[str, Any]], rows: Sequence[Mapping[str, Any]]) -> str:
+    used = set(_field_ids(fields))
+    for row in rows:
+        if isinstance(row, Mapping):
+            used.update(str(key) for key in row.keys())
+    base = "card_preview"
+    if base not in used:
+        return base
+    index = 2
+    while f"{base}_{index}" in used:
+        index += 1
+    return f"{base}_{index}"
+
+
+def _derive_card_preview_rows(
+    template: Any,
+    *,
+    fields: Sequence[Mapping[str, Any]],
+    rows: Sequence[Mapping[str, Any]],
+) -> tuple[str, list[dict[str, Any]]] | None:
+    text = str(template or "").strip()
+    if not text or _card_key_from_template(text):
+        return None
+    if not _card_template_fields(text):
+        return None
+    key = _card_preview_derived_key(fields, rows)
+    derived_rows: list[dict[str, Any]] = []
+    for row in rows:
+        item = dict(row) if isinstance(row, Mapping) else {}
+        item[key] = _render_card_template(text, item)
+        derived_rows.append(item)
+    return key, derived_rows
 
 
 def _preview_state(*, session: Mapping[str, Any]) -> dict[str, Any]:
@@ -1261,6 +1489,12 @@ def _write_scenario_manifest(root: Path, scenario: Mapping[str, Any], preview_st
     ]
     runtime = scenario.get("runtime") if isinstance(scenario.get("runtime"), Mapping) else {}
     skills = runtime.get("skills") if isinstance(runtime.get("skills"), Mapping) else {}
+    raw_supported_locales = scenario.get("supported_locales") if isinstance(scenario.get("supported_locales"), list) else []
+    supported_locales = [
+        str(item).strip().lower()
+        for item in raw_supported_locales
+        if isinstance(item, str) and str(item).strip()
+    ] or ["en", "ru"]
     required = [
         str(item).strip()
         for item in (skills.get("required") if isinstance(skills.get("required"), list) else [])
@@ -1274,6 +1508,8 @@ def _write_scenario_manifest(root: Path, scenario: Mapping[str, Any], preview_st
         f"description: {json.dumps(str(scenario.get('description') or 'Builder rapid prototype scenario.'), ensure_ascii=False)}",
         f"version: {json.dumps(str(scenario.get('version') or '0.1.0'), ensure_ascii=False)}",
     ]
+    lines.append("supported_locales:")
+    lines.extend(f"  - {json.dumps(item, ensure_ascii=False)}" for item in supported_locales)
     if depends:
         lines.append("depends:")
         lines.extend(f"  - {json.dumps(item, ensure_ascii=False)}" for item in depends)
@@ -1362,7 +1598,8 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
     fields = [dict(item) for item in datasource.get("fields", []) if isinstance(item, Mapping)]
     datasource_id = str(datasource.get("id") or "items").strip() or "items"
     mock_data = preview_state.get("mock_data") if isinstance(preview_state.get("mock_data"), Mapping) else {}
-    rows = mock_data.get(datasource_id) if isinstance(mock_data.get(datasource_id), list) else []
+    raw_rows = mock_data.get(datasource_id) if isinstance(mock_data.get(datasource_id), list) else []
+    rows = [dict(item) for item in raw_rows if isinstance(item, Mapping)]
     filters = [dict(item) for item in preview_state.get("filters", []) if isinstance(item, Mapping)]
     layout_order = str(preview_state.get("layout_order") or ui.get("layout_order") or "").strip().lower()
     cards_first = layout_order in {"cards_first", "cards-first", "cards_left", "cards-left", "cards_main", "cards-main"}
@@ -1483,9 +1720,16 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
             ),
             {},
         )
-        preview_key = str(preview_state.get("card_preview_key") or "").strip()
-        if not preview_key and isinstance(card_child, Mapping):
-            preview_key = _card_key_from_template(card_child.get("preview"))
+        preview_key = ""
+        if isinstance(card_child, Mapping):
+            preview_template = card_child.get("preview")
+            preview_key = _card_key_from_template(preview_template)
+            if not preview_key:
+                derived_preview = _derive_card_preview_rows(preview_template, fields=fields, rows=rows)
+                if derived_preview is not None:
+                    preview_key, rows = derived_preview
+        if not preview_key:
+            preview_key = str(preview_state.get("card_preview_key") or "").strip()
         if not preview_key:
             preview_key = _preferred_card_preview_key(fields)
         subtitle_key = second
@@ -1548,6 +1792,7 @@ def _write_scenario_page_schema(root: Path, preview_state: Mapping[str, Any]) ->
     scenario.setdefault("name", root.name)
     scenario.setdefault("type", "desktop")
     scenario.setdefault("title", preview_state.get("title") or scenario.get("name") or scenario.get("id") or "Prototype")
+    scenario.setdefault("supported_locales", ["en", "ru"])
     depends = scenario.get("depends")
     depends_list = [str(item) for item in depends if isinstance(item, str)] if isinstance(depends, list) else []
     depends_list = [item for item in depends_list if item != SKILL_ID]
@@ -1573,8 +1818,12 @@ def _save_session(webspace_id: str, session: dict[str, Any]) -> dict[str, Any]:
     session["updated_at"] = _now()
     sessions = _sessions(webspace_id)
     sessions[str(session["id"])] = copy.deepcopy(session)
-    _save_sessions(webspace_id, sessions)
-    _set_current_session_id(webspace_id, str(session["id"]))
+    _mem_set_many(
+        {
+            _scoped_key(SESSIONS_KEY, webspace_id): _trim_sessions(sessions),
+            _scoped_key(CURRENT_KEY, webspace_id): str(session["id"]),
+        }
+    )
     return session
 
 
@@ -3758,6 +4007,7 @@ def _ensure_workbench(
     active_draft_id: str | None = None,
     runtime_scenario_id: str | None = None,
     refresh_runtime: bool = True,
+    snapshot_projection: bool = True,
 ) -> dict[str, Any]:
     svc = _workbench_service()
     draft_id = str(active_draft_id or _active_draft_id(session) or "").strip() or None
@@ -3769,7 +4019,14 @@ def _ensure_workbench(
             runtime_scenario_id=scenario_id,
             persist_projection=False,
         )
-        snapshot = svc.snapshot(webspace_id, preview_state=preview_state)
+        if snapshot_projection:
+            snapshot = svc.snapshot(webspace_id, preview_state=preview_state)
+        else:
+            snapshot = {
+                "source_webspace_id": webspace_id,
+                "preview_state": dict(preview_state or {}),
+                "skipped": "snapshot_projection_deferred",
+            }
         if refresh_runtime:
             direct = _ensure_workbench_runtime_direct(
                 svc,
@@ -3802,6 +4059,7 @@ def _ensure_workbench(
             "deferred": True,
             "event": event,
             "direct": direct,
+            "snapshot_deferred": not snapshot_projection,
         },
     }
 
@@ -3867,6 +4125,10 @@ def _schedule_dev_runtime_reload_after_revision(
     session: Mapping[str, Any],
     binding: Mapping[str, Any] | None,
     revision: str | None,
+    source_fingerprint: str | None = None,
+    user_id: str | None = None,
+    roles: Sequence[str] | None = None,
+    policy_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     scenario_id = str(session.get("scenario_id") or "").strip()
     if not scenario_id:
@@ -3905,6 +4167,112 @@ def _schedule_dev_runtime_reload_after_revision(
         },
     }
 
+    if _builder_revision_materialization_enabled():
+        try:
+            from adaos.services.scenario.webspace_runtime import apply_builder_revision_materialization
+        except Exception as exc:
+            materialization_import_error = f"{type(exc).__name__}: {exc}"
+        else:
+            async def _apply_materialization() -> dict[str, Any]:
+                return await apply_builder_revision_materialization(
+                    dev_webspace_id,
+                    scenario_id=scenario_id,
+                    revision=rev,
+                    source_fingerprint=source_fingerprint,
+                    user_id=user_id or "guest",
+                    roles=list(roles or []),
+                    policy_fingerprint=policy_fingerprint,
+                    event_payload=event_payload,
+                )
+
+            delay_s = _builder_revision_materialization_delay_s()
+
+            async def _delayed_apply_materialization() -> dict[str, Any]:
+                if delay_s > 0:
+                    await asyncio.sleep(delay_s)
+                return await _apply_materialization()
+
+            def _consume_materialization_result(done: asyncio.Task[Any]) -> None:
+                try:
+                    done.result()
+                except Exception:
+                    _LOG.warning(
+                        "builder dev materialization task failed webspace=%s scenario=%s revision=%s",
+                        dev_webspace_id,
+                        scenario_id,
+                        rev,
+                        exc_info=True,
+                    )
+
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                try:
+                    from adaos.sdk.data import events
+
+                    materialize_event = dict(event_payload)
+                    materialize_event["_event_type"] = "builder.ui_revision.materialize"
+                    materialize_event["revision"] = rev
+                    materialize_event["source_fingerprint"] = source_fingerprint
+                    materialize_event["user_id"] = user_id or "guest"
+                    materialize_event["roles"] = list(roles or [])
+                    materialize_event["policy_fingerprint"] = policy_fingerprint
+                    materialize_event["delay_s"] = delay_s
+                    events.publish("builder.ui_revision.materialize", materialize_event, source=SKILL_ID)
+                    return {
+                        "ok": True,
+                        "scheduled": True,
+                        "mode": "materialization_event_bus",
+                        "webspace_id": dev_webspace_id,
+                        "scenario_id": scenario_id,
+                        "revision": rev,
+                        "source_fingerprint": source_fingerprint,
+                        "user_id": user_id or "guest",
+                        "roles": list(roles or []),
+                        "delay_s": delay_s,
+                        "event_payload": materialize_event,
+                    }
+                except Exception as exc:
+                    return {
+                        "ok": False,
+                        "error": "materialization_event_publish_failed",
+                        "detail": f"{type(exc).__name__}: {exc}",
+                        "webspace_id": dev_webspace_id,
+                        "scenario_id": scenario_id,
+                        "revision": rev,
+                    }
+            else:
+                try:
+                    task = loop.create_task(
+                        _delayed_apply_materialization(),
+                        name=f"builder-dev-materialization:{dev_webspace_id}:{scenario_id}:{rev}",
+                    )
+                    task.add_done_callback(_consume_materialization_result)
+                except Exception as exc:
+                    return {
+                        "ok": False,
+                        "error": "materialization_schedule_failed",
+                        "detail": f"{type(exc).__name__}: {exc}",
+                        "webspace_id": dev_webspace_id,
+                        "scenario_id": scenario_id,
+                        "revision": rev,
+                    }
+                return {
+                    "ok": True,
+                    "scheduled": True,
+                    "mode": "materialization_event_loop_task",
+                    "webspace_id": dev_webspace_id,
+                    "scenario_id": scenario_id,
+                    "revision": rev,
+                    "source_fingerprint": source_fingerprint,
+                    "user_id": user_id or "guest",
+                    "roles": list(roles or []),
+                    "delay_s": delay_s,
+                    "event_payload": event_payload,
+                }
+    else:
+        materialization_import_error = "fast_path_disabled"
+
     try:
         from adaos.services.scenario.webspace_runtime import reload_webspace_from_scenario
     except Exception as exc:
@@ -3923,6 +4291,7 @@ def _schedule_dev_runtime_reload_after_revision(
                 "scenario_id": scenario_id,
                 "event_payload": event_payload,
                 "direct_error": f"{type(exc).__name__}: {exc}",
+                "materialization_error": materialization_import_error,
             }
         except Exception as bus_exc:
             bus_error = f"{type(bus_exc).__name__}: {bus_exc}"
@@ -3931,6 +4300,7 @@ def _schedule_dev_runtime_reload_after_revision(
             "error": "reload_webspace_import_failed",
             "detail": f"{type(exc).__name__}: {exc}",
             "bus_error": bus_error,
+            "materialization_error": materialization_import_error,
             "webspace_id": dev_webspace_id,
             "scenario_id": scenario_id,
         }
@@ -4168,13 +4538,18 @@ def create_scenario_draft(
         revision=initial_revision,
     )
     _save_session(ws, session)
-    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
+    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False, snapshot_projection=False)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
     dev_runtime_refresh = _schedule_dev_runtime_reload_after_revision(
         ws,
         session=session,
         binding=binding,
         revision=str(session.get("ui_revision") or initial_revision),
+        source_fingerprint=_webui_source_fingerprint(
+            session.get("webui_payload") if isinstance(session.get("webui_payload"), Mapping) else None
+        ),
+        user_id=_meta_user_id(_meta),
+        roles=_meta_roles(_meta),
     )
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     session["thread_id"] = str(topic.get("thread_id") or "").strip() or None
@@ -4360,13 +4735,16 @@ def _finalize_scenario_update(
         patch["revision"] = revision_info.get("revision")
         patch["revision_path"] = revision_info.get("path")
         session["patches"][-1] = patch
-    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
+    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False, snapshot_projection=False)
     resolved_binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else binding
     dev_runtime_refresh = _schedule_dev_runtime_reload_after_revision(
         ws,
         session=session,
         binding=resolved_binding,
         revision=str(revision_info.get("revision") if revision_info else ""),
+        source_fingerprint=_webui_source_fingerprint(after_webui),
+        user_id=_meta_user_id(_meta),
+        roles=_meta_roles(_meta),
     )
     topic = _builder_topic_ref(ws, session=session, binding=resolved_binding, _meta=_meta)
     session["thread_id"] = str(topic.get("thread_id") or "").strip() or None
@@ -5168,17 +5546,29 @@ def set_ui_revision_current(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    started_at = time.perf_counter()
+    timings_ms: dict[str, float] = {}
     ws = _source_webspace_id(webspace_id, _meta)
+    stage_started = time.perf_counter()
     session = _load_session(ws, session_id)
+    timings_ms["load_session"] = _elapsed_ms(stage_started)
     if not session:
         message = _builder_revision_message("session_not_found")
+        stage_started = time.perf_counter()
         _safe_emit_chat(message, webspace_id=ws, _meta=_meta)
-        return {"ok": False, "error": "session_not_found", "message": message, "dialog": _dialog_state(ws)}
+        timings_ms["emit_chat"] = _elapsed_ms(stage_started)
+        timings_ms["total"] = _elapsed_ms(started_at)
+        return {"ok": False, "error": "session_not_found", "message": message, "dialog": _dialog_state(ws), "timings_ms": timings_ms}
+    stage_started = time.perf_counter()
     revision_payload = _read_ui_revision(session, revision)
+    timings_ms["read_revision"] = _elapsed_ms(stage_started)
     if not revision_payload:
         message = _builder_revision_message("revision_not_found", revision=revision, scenario_id=session.get("scenario_id"))
+        stage_started = time.perf_counter()
         _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session)
-        return {"ok": False, "error": "revision_not_found", "message": message, "dialog": _dialog_state(ws)}
+        timings_ms["emit_chat"] = _elapsed_ms(stage_started)
+        timings_ms["total"] = _elapsed_ms(started_at)
+        return {"ok": False, "error": "revision_not_found", "message": message, "dialog": _dialog_state(ws), "timings_ms": timings_ms}
     after_webui = revision_payload.get("after_webui") if isinstance(revision_payload.get("after_webui"), Mapping) else {}
     preview = after_webui.get("preview_state") if isinstance(after_webui.get("preview_state"), Mapping) else revision_payload.get("preview_state")
     if not isinstance(after_webui, Mapping) or not isinstance(preview, Mapping):
@@ -5187,9 +5577,14 @@ def set_ui_revision_current(
             revision=str(revision_payload.get("revision") or revision),
             scenario_id=session.get("scenario_id"),
         )
+        stage_started = time.perf_counter()
         _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session)
-        return {"ok": False, "error": "revision_invalid", "message": message, "dialog": _dialog_state(ws)}
+        timings_ms["emit_chat"] = _elapsed_ms(stage_started)
+        timings_ms["total"] = _elapsed_ms(started_at)
+        return {"ok": False, "error": "revision_invalid", "message": message, "dialog": _dialog_state(ws), "timings_ms": timings_ms}
+    stage_started = time.perf_counter()
     validation = _validate_builder_webui_payload(after_webui, preview)
+    timings_ms["validate_webui"] = _elapsed_ms(stage_started)
     if not validation.get("ok"):
         message = _builder_revision_message(
             "revision_validation_failed",
@@ -5197,34 +5592,64 @@ def set_ui_revision_current(
             scenario_id=session.get("scenario_id"),
             detail=validation.get("detail") or validation.get("error"),
         )
+        stage_started = time.perf_counter()
         _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session)
-        return {"ok": False, "error": "revision_validation_failed", "validation": validation, "message": message, "dialog": _dialog_state(ws)}
+        timings_ms["emit_chat"] = _elapsed_ms(stage_started)
+        timings_ms["total"] = _elapsed_ms(started_at)
+        return {"ok": False, "error": "revision_validation_failed", "validation": validation, "message": message, "dialog": _dialog_state(ws), "timings_ms": timings_ms}
+    stage_started = time.perf_counter()
     session["preview_state"] = copy.deepcopy(dict(preview))
     session["webui_payload"] = copy.deepcopy(dict(after_webui))
     session["ui_revision"] = str(revision_payload.get("revision") or revision)
     _merge_session_from_preview(session, preview)
+    timings_ms["update_session"] = _elapsed_ms(stage_started)
+    stage_started = time.perf_counter()
     _write_webui_payload(str(session.get("artifact_root") or ""), after_webui)
+    timings_ms["write_webui_payload"] = _elapsed_ms(stage_started)
+    stage_started = time.perf_counter()
     prompt_files_restore = _restore_prompt_files_from_revision(session, revision_payload)
-    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
+    timings_ms["restore_prompt_files"] = _elapsed_ms(stage_started)
+    stage_started = time.perf_counter()
+    workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False, snapshot_projection=False)
+    timings_ms["ensure_workbench"] = _elapsed_ms(stage_started)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
+    stage_started = time.perf_counter()
     dev_runtime_refresh = _schedule_dev_runtime_reload_after_revision(
         ws,
         session=session,
         binding=binding,
         revision=str(session.get("ui_revision") or revision),
+        source_fingerprint=_webui_source_fingerprint(after_webui),
+        user_id=_meta_user_id(_meta),
+        roles=_meta_roles(_meta),
     )
+    timings_ms["schedule_dev_runtime_refresh"] = _elapsed_ms(stage_started)
+    stage_started = time.perf_counter()
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
+    timings_ms["topic_ref"] = _elapsed_ms(stage_started)
+    stage_started = time.perf_counter()
     session["thread_id"] = str(topic.get("thread_id") or "").strip() or None
     session["topic_id"] = str(topic.get("topic_id") or "").strip() or None
     session["topic_ref"] = {k: v for k, v in topic.items() if k != "stored"}
     _save_session(ws, session)
+    timings_ms["save_session"] = _elapsed_ms(stage_started)
     message = _builder_revision_message(
         "revision_restored",
         revision=str(session.get("ui_revision") or revision),
         scenario_id=session.get("scenario_id"),
     )
+    stage_started = time.perf_counter()
     actions = _revision_chat_actions(session, str(session.get("ui_revision") or ""))
-    _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding, topic_ref=topic, actions=actions)
+    timings_ms["message_actions"] = _elapsed_ms(stage_started)
+    chat_emit = {
+        "scheduled": False,
+        "mode": "receipt_only",
+        "persisted": False,
+        "reason": "revision_current_success_not_persistent",
+    }
+    timings_ms["emit_chat"] = 0.0
+    timings_ms["emit_chat_deferred"] = 0.0
+    timings_ms["total"] = _elapsed_ms(started_at)
     return {
         "ok": True,
         "session_id": session.get("id"),
@@ -5234,9 +5659,11 @@ def set_ui_revision_current(
         "prompt_files_restore": prompt_files_restore,
         "workbench": workbench,
         "dev_runtime_refresh": dev_runtime_refresh,
+        "chat_emit": chat_emit,
         "message": message,
         "message_actions": actions,
         "dialog": _dialog_state(ws, topic_ref=topic),
+        "timings_ms": timings_ms,
     }
 
 
