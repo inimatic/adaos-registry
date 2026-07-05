@@ -35,6 +35,10 @@ _SHARED_WEBSPACE_IDS = ("desktop", "desktop-dev", "default")
 _STATE_MEMORY_PREFIX = "notebook_state.v1"
 _LOG = logging.getLogger(_SKILL_NAME)
 _PROJECTION_TIMEOUT_S = 8.0
+_PROJECTION_DEBOUNCE_S = 0.2
+_PROJECTION_LOCK = threading.Lock()
+_PROJECTION_PENDING: dict[str, dict[str, Any]] = {}
+_PROJECTION_WORKER: threading.Thread | None = None
 
 
 def _now() -> float:
@@ -232,8 +236,8 @@ def _load_state(webspace_id: str, *, force: bool = False) -> bool:
     for candidate in _state_webspace_ids(ws):
         _LOADED_WEBSPACES.add(candidate)
     if loaded:
-        _persist_state(ws)
         if best_key and best_key != _memory_key(ws):
+            _persist_state(ws)
             _LOG.info("notebook state rehydrated from alias key=%s webspace=%s", best_key, ws)
     return loaded
 
@@ -658,7 +662,7 @@ async def _project_notebook_snapshot_async(snapshot: Mapping[str, Any], webspace
         await _project_notebook_snapshot_webspace_async(snapshot, ws)
 
 
-def _project_notebook_snapshot(snapshot: Mapping[str, Any], webspace_id: str) -> None:
+def _project_notebook_snapshot_now(snapshot: Mapping[str, Any], webspace_id: str) -> None:
     snap = deepcopy(dict(snapshot))
     ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
     try:
@@ -666,27 +670,46 @@ def _project_notebook_snapshot(snapshot: Mapping[str, Any], webspace_id: str) ->
     except Exception:
         _LOG.warning("failed to project notebook snapshot via ctx_subnet webspace=%s", ws, exc_info=True)
 
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        asyncio.run(_project_notebook_snapshot_async(snap, ws))
-        return
+    asyncio.run(_project_notebook_snapshot_async(snap, ws))
 
-    errors: list[BaseException] = []
 
-    def _runner() -> None:
-        try:
-            asyncio.run(_project_notebook_snapshot_async(snap, ws))
-        except BaseException as exc:
-            errors.append(exc)
+def _projection_worker() -> None:
+    global _PROJECTION_WORKER
+    while True:
+        time.sleep(_PROJECTION_DEBOUNCE_S)
+        with _PROJECTION_LOCK:
+            pending = dict(_PROJECTION_PENDING)
+            _PROJECTION_PENDING.clear()
+            if not pending:
+                _PROJECTION_WORKER = None
+                return
 
-    thread = threading.Thread(target=_runner, name=f"{_SKILL_NAME}-projection", daemon=True)
-    thread.start()
-    thread.join(_PROJECTION_TIMEOUT_S)
-    if thread.is_alive():
-        raise TimeoutError(f"notebook snapshot projection timed out after {_PROJECTION_TIMEOUT_S:.1f}s")
-    if errors:
-        raise errors[0]
+        for ws, snap in pending.items():
+            started = time.monotonic()
+            try:
+                _project_notebook_snapshot_now(snap, ws)
+            except Exception:
+                _LOG.warning("failed to project notebook snapshot in background webspace=%s", ws, exc_info=True)
+                continue
+            elapsed = time.monotonic() - started
+            if elapsed > _PROJECTION_TIMEOUT_S:
+                _LOG.warning("slow notebook snapshot projection webspace=%s duration=%.3fs", ws, elapsed)
+
+
+def _project_notebook_snapshot(snapshot: Mapping[str, Any], webspace_id: str) -> None:
+    global _PROJECTION_WORKER
+    snap = deepcopy(dict(snapshot))
+    ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
+    with _PROJECTION_LOCK:
+        _PROJECTION_PENDING[ws] = snap
+        if _PROJECTION_WORKER is not None and _PROJECTION_WORKER.is_alive():
+            return
+        _PROJECTION_WORKER = threading.Thread(
+            target=_projection_worker,
+            name=f"{_SKILL_NAME}-projection",
+            daemon=True,
+        )
+        _PROJECTION_WORKER.start()
 
 
 def _publish(snapshot: Mapping[str, Any] | None = None, *, webspace_id: str | None = None) -> dict[str, Any]:
