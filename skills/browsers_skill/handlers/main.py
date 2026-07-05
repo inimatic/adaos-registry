@@ -3,7 +3,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 from datetime import datetime, timezone
 from typing import Any, Dict, Mapping
 
@@ -36,6 +38,9 @@ _SELECTED_BROWSER_BY_WS: dict[str, str] = {}
 _PROJECTION_EXECUTOR: ThreadPoolExecutor | None = None
 _PROJECTION_EXECUTOR_LOCK = threading.Lock()
 _PENDING_REFRESH_BY_WS: dict[str, Any] = {}
+_SNAPSHOT_CACHE_TTL_S = 2.0
+_SNAPSHOT_CACHE_LOCK = threading.RLock()
+_SNAPSHOT_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
 REQUIRES_DATA_PROJECTIONS = [
     "browsers.summary",
     "browsers.devices",
@@ -132,6 +137,19 @@ def _receiver_from_payload(payload: Any) -> str:
     if not isinstance(payload, Mapping):
         return ""
     return str(payload.get("receiver") or "").strip()
+
+
+def _snapshot_cache_key(webspace_id: str | None = None) -> str:
+    return str(webspace_id or default_webspace_id()).strip() or default_webspace_id()
+
+
+def _clear_snapshot_cache(webspace_id: str | None = None) -> int:
+    with _SNAPSHOT_CACHE_LOCK:
+        if webspace_id is None:
+            total = len(_SNAPSHOT_CACHE)
+            _SNAPSHOT_CACHE.clear()
+            return total
+        return 1 if _SNAPSHOT_CACHE.pop(_snapshot_cache_key(webspace_id), None) is not None else 0
 
 
 def _iso(value: Any) -> str | None:
@@ -267,6 +285,7 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle", wait: bool = False) -> 
             pass
     _STREAM_RUNTIME.reset()
     _PROJECTION_RUNTIME.reset()
+    cache_total = _clear_snapshot_cache()
     selected_total = len(_SELECTED_BROWSER_BY_WS)
     _SELECTED_BROWSER_BY_WS.clear()
     with _PROJECTION_EXECUTOR_LOCK:
@@ -275,10 +294,11 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle", wait: bool = False) -> 
     if executor is not None:
         executor.shutdown(wait=wait, cancel_futures=True)
     _LOG.info(
-        "browsers lifecycle cleanup reason=%s pending=%s cancelled=%s selected_total=%s executor=%s",
+        "browsers lifecycle cleanup reason=%s pending=%s cancelled=%s cache_total=%s selected_total=%s executor=%s",
         reason,
         len(pending),
         cancelled,
+        cache_total,
         selected_total,
         bool(executor),
     )
@@ -287,6 +307,7 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle", wait: bool = False) -> 
         "reason": reason,
         "pending_total": len(pending),
         "cancelled_total": cancelled,
+        "cache_total": cache_total,
         "selected_total": selected_total,
         "executor_shutdown": bool(executor),
     }
@@ -461,6 +482,13 @@ def _resolve_current_browser_id(entries: list[Mapping[str, Any]], webspace_id: s
 
 
 def _build_snapshot(target_ws: str | None = None) -> tuple[dict[str, Any], str]:
+    effective_ws = _snapshot_cache_key(target_ws)
+    now = time.monotonic()
+    with _SNAPSHOT_CACHE_LOCK:
+        cached = _SNAPSHOT_CACHE.get(effective_ws)
+        if cached is not None and cached[0] > now:
+            return deepcopy(cached[1]), effective_ws
+
     all_entries = sdk_access_links.list_browser_links()
     devices = sorted(
         [entry for entry in all_entries if str(entry.get("access_class") or "device").strip() != "client"],
@@ -476,16 +504,18 @@ def _build_snapshot(target_ws: str | None = None) -> tuple[dict[str, Any], str]:
         "subtitle": f"{len(devices)} devices | {len(clients)} clients",
         "details": f"{sum(1 for entry in all_entries if bool(entry.get('online')))} online",
     }
-    effective_ws = str(target_ws or default_webspace_id()).strip() or default_webspace_id()
     current_device_id = _resolve_current_browser_id(devices + clients, effective_ws)
     current_summary, current_name = _current_browser_payload(current_device_id)
-    return ({
+    payload = {
         "summary": summary,
         "devices": _browser_tiles(devices),
         "clients": _browser_tiles(clients),
         "current_summary": current_summary,
         "current_name": current_name,
-    }, effective_ws)
+    }
+    with _SNAPSHOT_CACHE_LOCK:
+        _SNAPSHOT_CACHE[effective_ws] = (time.monotonic() + _SNAPSHOT_CACHE_TTL_S, deepcopy(payload))
+    return payload, effective_ws
 
 
 async def _publish_snapshot(target_ws: str | None = None, *, fanout: bool = False, force: bool = False) -> dict[str, Any]:
@@ -541,6 +571,7 @@ def _publish_stream_snapshot(receiver: str, webspace_id: str | None = None) -> N
 
 
 def _refresh_snapshot_sync(target_ws: str | None = None, *, fanout: bool = False, force: bool = False) -> dict[str, Any]:
+    _clear_snapshot_cache(None if fanout else target_ws)
     if _has_running_loop():
         payload, _ = _build_snapshot(target_ws)
         _schedule_publish_snapshot(target_ws, fanout=fanout, force=force)
@@ -587,7 +618,7 @@ def refresh_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
 
 @subscribe("webio.stream.snapshot.requested")
 def on_webio_stream_snapshot_requested(evt: Any) -> None:
-    _STREAM_RUNTIME.handle_snapshot_requested(evt, receiver_prefix="browsers.")
+    _STREAM_RUNTIME.handle_snapshot_requested(evt, receiver_prefix="browsers.", force=False)
 
 
 @subscribe("webio.stream.subscription.changed")

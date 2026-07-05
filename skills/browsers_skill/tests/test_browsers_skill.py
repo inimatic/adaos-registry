@@ -281,6 +281,40 @@ def test_browsers_skill_projection_refresh_does_not_eager_publish_streams(monkey
     assert streams[0][2]["webspace_id"] == "desktop"
 
 
+def test_browsers_skill_snapshot_request_uses_fingerprint_guard(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    mod._SELECTED_BROWSER_BY_WS.clear()
+
+    browser_entry = {
+        "id": "browser-1",
+        "display_name": "Main browser",
+        "hostname": "main-browser",
+        "access_class": "device",
+        "lifetime_mode": "permanent",
+        "last_webspace_id": "desktop",
+        "last_seen_at": 1715000000.0,
+        "online": True,
+    }
+    streams: list[tuple[str, object, dict[str, object] | None]] = []
+
+    monkeypatch.setattr(mod, "stream_publish", lambda receiver, data, _meta=None: streams.append((receiver, data, _meta)))
+    monkeypatch.setattr(mod.sdk_access_links, "list_browser_links", lambda: [dict(browser_entry)])
+    monkeypatch.setattr(
+        mod.sdk_access_links,
+        "get_browser_link",
+        lambda device_id: dict(browser_entry) if str(device_id or "").strip() == "browser-1" else None,
+    )
+    monkeypatch.setattr(mod.sdk_access_links, "lifetime_label", lambda _entry: "Permanent")
+
+    event = {"receiver": "browsers.summary", "webspace_id": "desktop"}
+
+    mod.on_webio_stream_snapshot_requested(event)
+    mod.on_webio_stream_snapshot_requested(event)
+
+    assert [item[0] for item in streams] == ["browsers.summary"]
+    assert streams[0][2]["webspace_id"] == "desktop"
+
+
 def test_browsers_skill_yjs_projection_requires_active_demand(monkeypatch) -> None:
     mod = _load_browsers_skill_module()
     mod._SELECTED_BROWSER_BY_WS.clear()
