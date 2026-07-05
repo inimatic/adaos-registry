@@ -14,7 +14,9 @@
       "tz": {
         "label": "Stage: TZ",
         "context": {
-          "edit": ["base_tz"],
+          "edit": [
+            "base_tz"
+          ],
           "readonly": []
         },
         "actions": [
@@ -23,15 +25,25 @@
             "label": "Execute",
             "trigger": "button",
             "tool": "prompt_engineer_skill.tz_execute",
-            "next_state": "tz_add"
+            "next_state": "tz_add",
+            "label_i18n": {
+              "key": "prompt_ide.execute"
+            }
           }
-        ]
+        ],
+        "label_i18n": {
+          "key": "prompt_ide.stage.tz"
+        }
       },
       "tz_add": {
         "label": "Stage: TZ addenda",
         "context": {
-          "edit": ["tz_addenda"],
-          "readonly": ["base_tz"]
+          "edit": [
+            "tz_addenda"
+          ],
+          "readonly": [
+            "base_tz"
+          ]
         },
         "actions": [
           {
@@ -39,9 +51,15 @@
             "label": "Reset",
             "trigger": "button",
             "tool": "prompt_engineer_skill.tz_add_reset",
-            "next_state": "tz"
+            "next_state": "tz",
+            "label_i18n": {
+              "key": "prompt_ide.reset"
+            }
           }
-        ]
+        ],
+        "label_i18n": {
+          "key": "prompt_ide.stage.tz_addenda"
+        }
       }
     }
   },
@@ -101,7 +119,10 @@
                   {
                     "id": "select-project",
                     "label": "Select project",
-                    "icon": "folder-open-outline"
+                    "icon": "folder-open-outline",
+                    "label_i18n": {
+                      "key": "prompt_ide.select_project"
+                    }
                   }
                 ]
               },
@@ -113,7 +134,10 @@
                     "modalId": "project_selector"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "prompt_ide.project"
+              }
             },
             {
               "id": "project-objects",
@@ -192,7 +216,10 @@
                     "currentFileEditable": "$event.editable"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "prompt_ide.files"
+              }
             },
             {
               "id": "tz-editor",
@@ -224,7 +251,10 @@
                   }
                 }
               ],
-              "visibleIf": "$state.currentStage === 'tz'"
+              "visibleIf": "$state.currentStage === 'tz'",
+              "title_i18n": {
+                "key": "prompt_ide.technical_specification"
+              }
             },
             {
               "id": "tz-addenda",
@@ -243,7 +273,10 @@
               "inputs": {
                 "bindField": "tz_addenda"
               },
-              "visibleIf": "$state.currentStage === 'tz' || $state.currentStage === 'tz_add'"
+              "visibleIf": "$state.currentStage === 'tz' || $state.currentStage === 'tz_add'",
+              "title_i18n": {
+                "key": "prompt_ide.tz_addenda"
+              }
             },
             {
               "id": "tz-view-readonly",
@@ -261,7 +294,10 @@
               "inputs": {
                 "bindField": "base_tz"
               },
-              "visibleIf": "$state.currentStage === 'tz_add'"
+              "visibleIf": "$state.currentStage === 'tz_add'",
+              "title_i18n": {
+                "key": "prompt_ide.technical_specification"
+              }
             },
             {
               "id": "tz-addenda-controls",
@@ -272,7 +308,10 @@
                 "buttons": [
                   {
                     "id": "add-addendum",
-                    "label": "Add addendum"
+                    "label": "Add addendum",
+                    "label_i18n": {
+                      "key": "prompt_ide.add_addendum"
+                    }
                   }
                 ]
               },
@@ -285,7 +324,10 @@
                   }
                 }
               ],
-              "visibleIf": "$state.currentStage === 'tz' || $state.currentStage === 'tz_add'"
+              "visibleIf": "$state.currentStage === 'tz' || $state.currentStage === 'tz_add'",
+              "title_i18n": {
+                "key": "prompt_ide.tz_tools"
+              }
             },
             {
               "id": "file-editor",
@@ -319,7 +361,10 @@
                   }
                 }
               ],
-              "visibleIf": "$state.currentStage === 'file' && $state.currentFileEditable === true"
+              "visibleIf": "$state.currentStage === 'file' && $state.currentFileEditable === true",
+              "title_i18n": {
+                "key": "prompt_ide.project_file"
+              }
             },
             {
               "id": "code-viewer",
@@ -339,7 +384,10 @@
                 "bindField": "content",
                 "languageField": "language"
               },
-              "visibleIf": "$state.currentStage === 'file' && $state.currentFileEditable !== true"
+              "visibleIf": "$state.currentStage === 'file' && $state.currentFileEditable !== true",
+              "title_i18n": {
+                "key": "prompt_ide.source_file"
+              }
             },
             {
               "id": "workflow-actions",
@@ -383,7 +431,10 @@
                     "currentStage": "$event.next_state"
                   }
                 }
-              ]
+              ],
+              "title_i18n": {
+                "key": "prompt_ide.workflow"
+              }
             },
             {
               "id": "builder-chat",
@@ -414,8 +465,17 @@
                   "conversation_topic_id": "$state.builderTopicId",
                   "thread_id": "$state.builderTopicId",
                   "active_agent_id": "agent:builder_skill:builder",
-                  "active_agent_label": "Строитель"
+                  "active_agent_label": "\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c"
+                },
+                "placeholder_i18n": {
+                  "key": "prompt_ide.builder_placeholder"
+                },
+                "hint_i18n": {
+                  "key": "prompt_ide.builder_hint"
                 }
+              },
+              "title_i18n": {
+                "key": "prompt_ide.builder"
               }
             },
             {
@@ -462,7 +522,10 @@
                 }
               ]
             }
-          ]
+          ],
+          "title_i18n": {
+            "key": "prompt_ide.title"
+          }
         }
       },
       "modals": {
@@ -470,10 +533,10 @@
           "title": "Select project",
           "schema": {
             "id": "project_selector",
-              "layout": {
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
+            "layout": {
+              "type": "single",
+              "pattern": "stack",
+              "areas": [
                 {
                   "id": "main",
                   "role": "main"
@@ -494,51 +557,54 @@
                   "kind": "skill",
                   "name": "prompt_engineer_skill.prompt_list_dev_objects"
                 },
-              "actions": [
-                {
-                  "on": "select",
-                  "type": "callHost",
-                  "target": "scenario.workflow.set_state",
-                  "params": {
-                    "scenario_id": "prompt_engineer_scenario",
-                    "state": "$event.workflow_state",
-                    "object_type": "$event.object_type",
-                    "object_id": "$event.object_id"
+                "actions": [
+                  {
+                    "on": "select",
+                    "type": "callHost",
+                    "target": "scenario.workflow.set_state",
+                    "params": {
+                      "scenario_id": "prompt_engineer_scenario",
+                      "state": "$event.workflow_state",
+                      "object_type": "$event.object_type",
+                      "object_id": "$event.object_id"
+                    }
+                  },
+                  {
+                    "on": "select",
+                    "type": "callSkill",
+                    "target": "prompt_engineer_skill.prompt_select_project",
+                    "params": {
+                      "object_type": "$event.object_type",
+                      "object_id": "$event.object_id"
+                    }
+                  },
+                  {
+                    "on": "select",
+                    "type": "updateState",
+                    "params": {
+                      "currentProjectType": "$event.object_type",
+                      "currentProjectId": "$event.object_id",
+                      "currentObjectType": "$event.object_type",
+                      "currentObjectId": "$event.object_id",
+                      "currentObjectSelectionId": "$event.id",
+                      "currentStage": "file",
+                      "currentFilePath": "tz/base_tz.md",
+                      "currentFileEditable": true,
+                      "builderTopicId": "prompt-project:$event.object_type:$event.object_id",
+                      "builderConversationId": "conv.skill.builder_skill.default.$client.webspaceId"
+                    }
+                  },
+                  {
+                    "on": "select",
+                    "type": "closeModal",
+                    "params": {
+                      "role": "select"
+                    }
                   }
-                },
-                {
-                  "on": "select",
-                  "type": "callSkill",
-                  "target": "prompt_engineer_skill.prompt_select_project",
-                  "params": {
-                    "object_type": "$event.object_type",
-                    "object_id": "$event.object_id"
-                  }
-                },
-                {
-                  "on": "select",
-                  "type": "updateState",
-                  "params": {
-                    "currentProjectType": "$event.object_type",
-                    "currentProjectId": "$event.object_id",
-                    "currentObjectType": "$event.object_type",
-                    "currentObjectId": "$event.object_id",
-                    "currentObjectSelectionId": "$event.id",
-                    "currentStage": "file",
-                    "currentFilePath": "tz/base_tz.md",
-                    "currentFileEditable": true,
-                    "builderTopicId": "prompt-project:$event.object_type:$event.object_id",
-                    "builderConversationId": "conv.skill.builder_skill.default.$client.webspaceId"
-                  }
-                },
-                {
-                  "on": "select",
-                  "type": "closeModal",
-                  "params": {
-                    "role": "select"
-                  }
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.dev_projects"
                 }
-              ]
               },
               {
                 "id": "project-create-kind",
@@ -559,7 +625,10 @@
                       "createObjectType": "$event.value"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.create_type"
+                }
               },
               {
                 "id": "project-create-name",
@@ -567,7 +636,10 @@
                 "area": "main",
                 "title": "Create: name",
                 "inputs": {
-                  "placeholder": "my_new_project"
+                  "placeholder": "my_new_project",
+                  "placeholder_i18n": {
+                    "key": "prompt_ide.new_project_placeholder"
+                  }
                 },
                 "actions": [
                   {
@@ -577,7 +649,10 @@
                       "createObjectName": "$event.value"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.create_name"
+                }
               },
               {
                 "id": "project-create-template",
@@ -592,7 +667,10 @@
                   }
                 },
                 "inputs": {
-                  "label": "Template"
+                  "label": "Template",
+                  "label_i18n": {
+                    "key": "prompt_ide.template"
+                  }
                 },
                 "actions": [
                   {
@@ -602,7 +680,10 @@
                       "createTemplateName": "$event.value"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.create_template"
+                }
               },
               {
                 "id": "project-create-actions",
@@ -612,7 +693,10 @@
                   "buttons": [
                     {
                       "id": "create",
-                      "label": "Create"
+                      "label": "Create",
+                      "label_i18n": {
+                        "key": "prompt_ide.create"
+                      }
                     }
                   ]
                 },
@@ -664,16 +748,19 @@
                 ]
               }
             ]
+          },
+          "title_i18n": {
+            "key": "prompt_ide.select_project"
           }
         },
         "project_git_modal": {
           "title": "Project git",
           "schema": {
             "id": "project_git_modal",
-              "layout": {
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
+            "layout": {
+              "type": "single",
+              "pattern": "stack",
+              "areas": [
                 {
                   "id": "main",
                   "role": "main"
@@ -693,6 +780,9 @@
                     "object_type": "$state.currentObjectType",
                     "object_id": "$state.currentObjectId"
                   }
+                },
+                "title_i18n": {
+                  "key": "prompt_ide.current_object"
                 }
               },
               {
@@ -704,20 +794,32 @@
                   "buttons": [
                     {
                       "id": "push",
-                      "label": "Push"
+                      "label": "Push",
+                      "label_i18n": {
+                        "key": "prompt_ide.push"
+                      }
                     },
                     {
                       "id": "update",
-                      "label": "Update"
+                      "label": "Update",
+                      "label_i18n": {
+                        "key": "prompt_ide.update"
+                      }
                     },
                     {
                       "id": "publish",
-                      "label": "Publish"
+                      "label": "Publish",
+                      "label_i18n": {
+                        "key": "prompt_ide.publish"
+                      }
                     },
                     {
                       "id": "delete",
                       "label": "Delete",
-                      "kind": "danger"
+                      "kind": "danger",
+                      "label_i18n": {
+                        "key": "prompt_ide.delete"
+                      }
                     }
                   ]
                 },
@@ -765,7 +867,10 @@
                       "gitLogRefresh": "$event.ts"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.git"
+                }
               },
               {
                 "id": "project-git-log",
@@ -780,19 +885,25 @@
                     "object_id": "$state.currentObjectId",
                     "refresh_token": "$state.gitLogRefresh"
                   }
+                },
+                "title_i18n": {
+                  "key": "prompt_ide.git_log"
                 }
               }
             ]
+          },
+          "title_i18n": {
+            "key": "prompt_ide.project_git"
           }
         },
         "project_meta_modal": {
           "title": "Project details",
           "schema": {
             "id": "project_meta_modal",
-              "layout": {
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
+            "layout": {
+              "type": "single",
+              "pattern": "stack",
+              "areas": [
                 {
                   "id": "main",
                   "role": "main"
@@ -812,6 +923,9 @@
                     "object_type": "$state.currentProjectType",
                     "object_id": "$state.currentProjectId"
                   }
+                },
+                "title_i18n": {
+                  "key": "prompt_ide.current_metadata"
                 }
               },
               {
@@ -829,7 +943,10 @@
                 },
                 "inputs": {
                   "placeholder": "Title",
-                  "bindField": "title"
+                  "bindField": "title",
+                  "placeholder_i18n": {
+                    "key": "prompt_ide.project_title"
+                  }
                 },
                 "actions": [
                   {
@@ -839,7 +956,10 @@
                       "editProjectTitle": "$event.value"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.project_title"
+                }
               },
               {
                 "id": "project-meta-description",
@@ -866,7 +986,10 @@
                       "editProjectDescription": "$event.value"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.project_description"
+                }
               },
               {
                 "id": "project-meta-type",
@@ -888,7 +1011,10 @@
                       "editProjectType": "$event.value"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.type"
+                }
               },
               {
                 "id": "project-meta-actions",
@@ -898,7 +1024,10 @@
                   "buttons": [
                     {
                       "id": "save",
-                      "label": "Save"
+                      "label": "Save",
+                      "label_i18n": {
+                        "key": "prompt_ide.save"
+                      }
                     }
                   ]
                 },
@@ -918,16 +1047,19 @@
                 ]
               }
             ]
+          },
+          "title_i18n": {
+            "key": "prompt_ide.project_details"
           }
         },
         "tz_addendum_modal": {
           "title": "Add TZ addendum",
           "schema": {
             "id": "tz_addendum_modal",
-              "layout": {
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
+            "layout": {
+              "type": "single",
+              "pattern": "stack",
+              "areas": [
                 {
                   "id": "main",
                   "role": "main"
@@ -968,19 +1100,25 @@
                       "tzAddendaRefresh": "$event.ts"
                     }
                   }
-                ]
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.add_tz_addendum"
+                }
               }
             ]
+          },
+          "title_i18n": {
+            "key": "prompt_ide.add_tz_addendum"
           }
         },
         "llm_profile_modal": {
           "title": "LLM profile",
           "schema": {
             "id": "llm_profile_modal",
-              "layout": {
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
+            "layout": {
+              "type": "single",
+              "pattern": "stack",
+              "areas": [
                 {
                   "id": "main",
                   "role": "main"
@@ -996,19 +1134,25 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "prompt_engineer_skill.prompt_llm_list_models"
+                },
+                "title_i18n": {
+                  "key": "prompt_ide.available_llm_models"
                 }
               }
             ]
+          },
+          "title_i18n": {
+            "key": "prompt_ide.llm_profile"
           }
         },
         "llm_status_modal": {
           "title": "LLM status",
           "schema": {
             "id": "llm_status_modal",
-              "layout": {
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
+            "layout": {
+              "type": "single",
+              "pattern": "stack",
+              "areas": [
                 {
                   "id": "main",
                   "role": "main"
@@ -1024,9 +1168,127 @@
                 "dataSource": {
                   "kind": "y",
                   "path": "data/prompt/llm_status"
+                },
+                "title_i18n": {
+                  "key": "prompt_ide.llm_status"
                 }
               }
             ]
+          },
+          "title_i18n": {
+            "key": "prompt_ide.llm_status"
+          }
+        }
+      },
+      "resources": {
+        "prompt_ide.i18n.en": {
+          "id": "prompt_ide.i18n.en",
+          "kind": "data",
+          "role": "i18n",
+          "locale": "en",
+          "owner": "scenario:prompt_engineer_scenario",
+          "dictionary": {
+            "prompt_ide.workspace": "Prompt IDE Workspace",
+            "prompt_ide.title": "Prompt IDE",
+            "prompt_ide.description": "Prompt engineering IDE workspace for dev skills and scenarios.",
+            "prompt_ide.stage.tz": "Stage: TZ",
+            "prompt_ide.stage.tz_addenda": "Stage: TZ addenda",
+            "prompt_ide.execute": "Execute",
+            "prompt_ide.reset": "Reset",
+            "prompt_ide.project": "Project",
+            "prompt_ide.select_project": "Select project",
+            "prompt_ide.files": "Files",
+            "prompt_ide.technical_specification": "Technical Specification",
+            "prompt_ide.tz_addenda": "TZ Addenda",
+            "prompt_ide.tz_tools": "TZ tools",
+            "prompt_ide.add_addendum": "Add addendum",
+            "prompt_ide.project_file": "Project file",
+            "prompt_ide.source_file": "Source file",
+            "prompt_ide.workflow": "Workflow",
+            "prompt_ide.builder": "Builder",
+            "prompt_ide.builder_placeholder": "Builder request...",
+            "prompt_ide.builder_hint": "Describe a UI change for the active draft.",
+            "prompt_ide.dev_projects": "Dev projects",
+            "prompt_ide.create_type": "Create: type",
+            "prompt_ide.create_name": "Create: name",
+            "prompt_ide.new_project_placeholder": "my_new_project",
+            "prompt_ide.create_template": "Create: template",
+            "prompt_ide.template": "Template",
+            "prompt_ide.create": "Create",
+            "prompt_ide.project_git": "Project git",
+            "prompt_ide.current_object": "Current object",
+            "prompt_ide.git": "Git",
+            "prompt_ide.push": "Push",
+            "prompt_ide.update": "Update",
+            "prompt_ide.publish": "Publish",
+            "prompt_ide.delete": "Delete",
+            "prompt_ide.git_log": "Git log",
+            "prompt_ide.project_details": "Project details",
+            "prompt_ide.current_metadata": "Current metadata",
+            "prompt_ide.project_title": "Title",
+            "prompt_ide.project_description": "Description",
+            "prompt_ide.type": "Type",
+            "prompt_ide.save": "Save",
+            "prompt_ide.add_tz_addendum": "Add TZ addendum",
+            "prompt_ide.llm_profile": "LLM profile",
+            "prompt_ide.available_llm_models": "Available LLM models",
+            "prompt_ide.llm_status": "LLM status",
+            "prompt_ide.description_draft": "Prompt engineering IDE workspace (draft layout)."
+          }
+        },
+        "prompt_ide.i18n.ru": {
+          "id": "prompt_ide.i18n.ru",
+          "kind": "data",
+          "role": "i18n",
+          "locale": "ru",
+          "owner": "scenario:prompt_engineer_scenario",
+          "dictionary": {
+            "prompt_ide.workspace": "\u0420\u0430\u0431\u043e\u0447\u0430\u044f \u043e\u0431\u043b\u0430\u0441\u0442\u044c Prompt IDE",
+            "prompt_ide.title": "Prompt IDE",
+            "prompt_ide.description": "\u0420\u0430\u0431\u043e\u0447\u0430\u044f \u043e\u0431\u043b\u0430\u0441\u0442\u044c Prompt IDE \u0434\u043b\u044f \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0438 \u043d\u0430\u0432\u044b\u043a\u043e\u0432 \u0438 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0435\u0432.",
+            "prompt_ide.stage.tz": "\u042d\u0442\u0430\u043f: \u0422\u0417",
+            "prompt_ide.stage.tz_addenda": "\u042d\u0442\u0430\u043f: \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f \u043a \u0422\u0417",
+            "prompt_ide.execute": "\u0412\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c",
+            "prompt_ide.reset": "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c",
+            "prompt_ide.project": "\u041f\u0440\u043e\u0435\u043a\u0442",
+            "prompt_ide.select_project": "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0440\u043e\u0435\u043a\u0442",
+            "prompt_ide.files": "\u0424\u0430\u0439\u043b\u044b",
+            "prompt_ide.technical_specification": "\u0422\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u0437\u0430\u0434\u0430\u043d\u0438\u0435",
+            "prompt_ide.tz_addenda": "\u0414\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f \u043a \u0422\u0417",
+            "prompt_ide.tz_tools": "\u0418\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u044b \u0422\u0417",
+            "prompt_ide.add_addendum": "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435",
+            "prompt_ide.project_file": "\u0424\u0430\u0439\u043b \u043f\u0440\u043e\u0435\u043a\u0442\u0430",
+            "prompt_ide.source_file": "\u0418\u0441\u0445\u043e\u0434\u043d\u044b\u0439 \u0444\u0430\u0439\u043b",
+            "prompt_ide.workflow": "\u041f\u0440\u043e\u0446\u0435\u0441\u0441",
+            "prompt_ide.builder": "Builder",
+            "prompt_ide.builder_placeholder": "\u0417\u0430\u043f\u0440\u043e\u0441 \u0432 Builder...",
+            "prompt_ide.builder_hint": "\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0435 UI \u0434\u043b\u044f \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0433\u043e \u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a\u0430.",
+            "prompt_ide.dev_projects": "Dev-\u043f\u0440\u043e\u0435\u043a\u0442\u044b",
+            "prompt_ide.create_type": "\u0421\u043e\u0437\u0434\u0430\u0442\u044c: \u0442\u0438\u043f",
+            "prompt_ide.create_name": "\u0421\u043e\u0437\u0434\u0430\u0442\u044c: \u0438\u043c\u044f",
+            "prompt_ide.new_project_placeholder": "my_new_project",
+            "prompt_ide.create_template": "\u0421\u043e\u0437\u0434\u0430\u0442\u044c: \u0448\u0430\u0431\u043b\u043e\u043d",
+            "prompt_ide.template": "\u0428\u0430\u0431\u043b\u043e\u043d",
+            "prompt_ide.create": "\u0421\u043e\u0437\u0434\u0430\u0442\u044c",
+            "prompt_ide.project_git": "Git \u043f\u0440\u043e\u0435\u043a\u0442\u0430",
+            "prompt_ide.current_object": "\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u043e\u0431\u044a\u0435\u043a\u0442",
+            "prompt_ide.git": "Git",
+            "prompt_ide.push": "Push",
+            "prompt_ide.update": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c",
+            "prompt_ide.publish": "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u0442\u044c",
+            "prompt_ide.delete": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c",
+            "prompt_ide.git_log": "Git log",
+            "prompt_ide.project_details": "\u0414\u0435\u0442\u0430\u043b\u0438 \u043f\u0440\u043e\u0435\u043a\u0442\u0430",
+            "prompt_ide.current_metadata": "\u0422\u0435\u043a\u0443\u0449\u0438\u0435 \u043c\u0435\u0442\u0430\u0434\u0430\u043d\u043d\u044b\u0435",
+            "prompt_ide.project_title": "\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435",
+            "prompt_ide.project_description": "\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435",
+            "prompt_ide.type": "\u0422\u0438\u043f",
+            "prompt_ide.save": "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c",
+            "prompt_ide.add_tz_addendum": "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043a \u0422\u0417",
+            "prompt_ide.llm_profile": "\u041f\u0440\u043e\u0444\u0438\u043b\u044c LLM",
+            "prompt_ide.available_llm_models": "\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0435 \u043c\u043e\u0434\u0435\u043b\u0438 LLM",
+            "prompt_ide.llm_status": "\u0421\u0442\u0430\u0442\u0443\u0441 LLM",
+            "prompt_ide.description_draft": "\u0420\u0430\u0431\u043e\u0447\u0430\u044f \u043e\u0431\u043b\u0430\u0441\u0442\u044c Prompt IDE (\u0447\u0435\u0440\u043d\u043e\u0432\u043e\u0439 layout)."
           }
         }
       }
@@ -1040,5 +1302,14 @@
     "apps": [],
     "widgets": []
   },
-  "data": {}
+  "data": {},
+  "name_i18n": {
+    "key": "prompt_ide.workspace"
+  },
+  "title_i18n": {
+    "key": "prompt_ide.title"
+  },
+  "description_i18n": {
+    "key": "prompt_ide.description_draft"
+  }
 }
