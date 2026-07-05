@@ -53,6 +53,13 @@ _READONLY_PROJECT_FILE_DIR_PREFIXES = (
 _CREATABLE_PROJECT_FILES = {
     "tz/base_tz.md",
 }
+_BUILDER_SYSTEM_PROMPT_FILE = "builder_system_prompt.md"
+_LEGACY_BUILDER_SYSTEM_PROMPT_TEXT = (
+    "# Builder project system prompt\n\n"
+    "Add project-specific instructions for AdaOS Builder here.\n"
+    "Prefer durable rules that should affect every future UI transform for this prototype.\n"
+    "Leave this file empty when no project-specific behavior is needed.\n"
+)
 _SKIP_FILE_DIRS = {
     ".git",
     ".hg",
@@ -241,6 +248,15 @@ def _read_text(path: Path) -> str:
 def _write_text(path: Path, value: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(value, encoding="utf-8")
+
+
+def _normalize_project_file_content(rel_path: Path, full: Path, content: str) -> str:
+    if rel_path.as_posix() != _BUILDER_SYSTEM_PROMPT_FILE:
+        return content
+    if content.strip() != _LEGACY_BUILDER_SYSTEM_PROMPT_TEXT.strip():
+        return content
+    _write_text(full, "")
+    return ""
 
 
 def _resolve_project_file(root: Path, path: Any) -> tuple[Path, Path]:
@@ -1263,6 +1279,10 @@ def prompt_read_project_file(payload: Optional[Dict[str, Any]] = None, **kwargs:
     raw = full.read_bytes() if full.exists() else b""
     truncated = len(raw) > max_bytes
     content = raw[:max_bytes].decode("utf-8", errors="replace")
+    if not truncated:
+        content = _normalize_project_file_content(rel_path, full, content)
+        if content == "":
+            raw = b""
     return {
         "ok": True,
         "id": f"{object_type}:{object_id}:{rel_path.as_posix()}",
