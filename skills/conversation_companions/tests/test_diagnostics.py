@@ -178,3 +178,38 @@ def test_webio_snapshot_subscription_publishes_matching_receiver(monkeypatch) ->
     main.on_webio_stream_snapshot_requested({"receiver": "other.receiver", "webspace_id": "ignored"})
 
     assert calls == [("operator-desktop", {"webspace_id": "operator-desktop"})]
+
+
+def test_webio_snapshot_skips_unchanged_diagnostics_publish(monkeypatch) -> None:
+    from handlers import main
+    import adaos.sdk.io as sdk_io
+
+    _use_isolated_memory(monkeypatch, main)
+    main._DIAGNOSTICS_CACHE.clear()
+    main._DIAGNOSTICS_STREAM_FINGERPRINTS.clear()
+
+    calls: list[tuple[str, object, object]] = []
+    monkeypatch.setattr(
+        sdk_io,
+        "stream_publish",
+        lambda receiver, data, _meta=None: calls.append((receiver, data, _meta)) or {"ok": True},
+    )
+
+    event = {
+        "receiver": "conversation_companions.diagnostics",
+        "webspace_id": "operator-desktop",
+        "_meta": {"webspace_id": "operator-desktop"},
+    }
+
+    main.on_webio_stream_subscription_changed(event)
+    main.on_webio_stream_snapshot_requested(event)
+    main.on_webio_stream_snapshot_requested(event)
+
+    assert [item[0] for item in calls] == ["conversation_companions.diagnostics"]
+
+    main.publish_diagnostics(webspace_id="operator-desktop")
+
+    assert [item[0] for item in calls] == [
+        "conversation_companions.diagnostics",
+        "conversation_companions.diagnostics",
+    ]

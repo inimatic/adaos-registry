@@ -4,6 +4,7 @@ import copy
 import json
 import logging
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any, Mapping
@@ -48,6 +49,10 @@ VOICE_PROFILES = {
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
 _LOG = logging.getLogger("adaos.skill.conversation_companions")
+_DIAGNOSTICS_CACHE_TTL_S = 2.0
+_DIAGNOSTICS_CACHE_LOCK = threading.RLock()
+_DIAGNOSTICS_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
+_DIAGNOSTICS_STREAM_FINGERPRINTS: dict[str, str] = {}
 
 
 def _load_default_profiles() -> dict[str, dict[str, Any]]:
@@ -78,6 +83,23 @@ def _scoped_key(base: str, webspace_id: str) -> str:
     return f"{base}.{webspace_id or 'default'}"
 
 
+def _diagnostics_cache_key(webspace_id: str | None = None) -> str:
+    return str(webspace_id or "default").strip() or "default"
+
+
+def _clear_diagnostics_cache(webspace_id: str | None = None) -> int:
+    with _DIAGNOSTICS_CACHE_LOCK:
+        if webspace_id is None:
+            total = len(_DIAGNOSTICS_CACHE)
+            _DIAGNOSTICS_CACHE.clear()
+            return total
+        return 1 if _DIAGNOSTICS_CACHE.pop(_diagnostics_cache_key(webspace_id), None) is not None else 0
+
+
+def _diagnostics_fingerprint(payload: Mapping[str, Any]) -> str:
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True, default=str)
+
+
 def _mem_get(key: str, default: Any = None) -> Any:
     try:
         from adaos.sdk.data import skill_memory
@@ -94,6 +116,7 @@ def _mem_set(key: str, value: Any) -> None:
         skill_memory.set(key, value)
     except Exception:
         _FALLBACK_MEMORY[key] = copy.deepcopy(value)
+    _clear_diagnostics_cache()
 
 
 def _profiles(webspace_id: str) -> dict[str, dict[str, Any]]:
@@ -692,16 +715,42 @@ def _build_diagnostics(webspace_id: str) -> dict[str, Any]:
     }
 
 
-def _publish_diagnostics_snapshot(webspace_id: str, _meta: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    payload = _build_diagnostics(webspace_id)
+def _diagnostics_snapshot(webspace_id: str, *, force: bool = False) -> dict[str, Any]:
+    key = _diagnostics_cache_key(webspace_id)
+    now = time.monotonic()
+    if not force:
+        with _DIAGNOSTICS_CACHE_LOCK:
+            cached = _DIAGNOSTICS_CACHE.get(key)
+            if cached is not None and cached[0] > now:
+                return copy.deepcopy(cached[1])
+    payload = _build_diagnostics(key)
+    with _DIAGNOSTICS_CACHE_LOCK:
+        _DIAGNOSTICS_CACHE[key] = (time.monotonic() + _DIAGNOSTICS_CACHE_TTL_S, copy.deepcopy(payload))
+    return payload
+
+
+def _publish_diagnostics_snapshot(
+    webspace_id: str,
+    _meta: Mapping[str, Any] | None = None,
+    *,
+    force: bool = False,
+) -> dict[str, Any]:
+    key = _diagnostics_cache_key(webspace_id)
+    payload = _diagnostics_snapshot(key, force=force)
+    fingerprint = _diagnostics_fingerprint(payload)
+    with _DIAGNOSTICS_CACHE_LOCK:
+        if not force and _DIAGNOSTICS_STREAM_FINGERPRINTS.get(key) == fingerprint:
+            return payload
     try:
         from adaos.sdk.io import stream_publish
 
         meta = dict(_meta or {})
-        meta.setdefault("webspace_id", webspace_id)
+        meta.setdefault("webspace_id", key)
         stream_publish(DIAGNOSTICS_RECEIVER, payload, _meta=meta)
     except Exception:
         return payload
+    with _DIAGNOSTICS_CACHE_LOCK:
+        _DIAGNOSTICS_STREAM_FINGERPRINTS[key] = fingerprint
     return payload
 
 
@@ -992,7 +1041,7 @@ def publish_diagnostics(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return _publish_diagnostics_snapshot(_webspace_id(webspace_id, _meta), _meta)
+    return _publish_diagnostics_snapshot(_webspace_id(webspace_id, _meta), _meta, force=True)
 
 
 @subscribe("webio.stream.snapshot.requested")
@@ -1007,7 +1056,11 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
 def on_webio_stream_subscription_changed(evt: Any) -> None:
     payload = _event_payload(evt)
     if _matches_diagnostics_receiver(payload):
-        on_webio_stream_snapshot_requested(evt)
+        _publish_diagnostics_snapshot(
+            _webspace_from_event_payload(payload),
+            payload.get("_meta") if isinstance(payload.get("_meta"), Mapping) else None,
+            force=True,
+        )
 
 
 def handle(topic: str, payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
