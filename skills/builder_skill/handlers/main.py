@@ -1220,12 +1220,49 @@ def _current_runtime_page_schema(root: Path | None) -> dict[str, Any]:
     return _repair_text_tree(copy.deepcopy(dict(page_schema))) if page_schema else {}
 
 
+def _extract_webui_page_schema(payload: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {}
+    ui = payload.get("ui") if isinstance(payload.get("ui"), Mapping) else {}
+    app = ui.get("application") if isinstance(ui.get("application"), Mapping) else {}
+    desktop = app.get("desktop") if isinstance(app.get("desktop"), Mapping) else {}
+    page_schema = desktop.get("pageSchema") if isinstance(desktop.get("pageSchema"), Mapping) else {}
+    if page_schema:
+        return _repair_text_tree(copy.deepcopy(dict(page_schema)))
+    preview = payload.get("preview_state") if isinstance(payload.get("preview_state"), Mapping) else {}
+    page_schema = preview.get("page_schema") if isinstance(preview.get("page_schema"), Mapping) else {}
+    if page_schema:
+        return _repair_text_tree(copy.deepcopy(dict(page_schema)))
+    page_schema = payload.get("page_schema") if isinstance(payload.get("page_schema"), Mapping) else {}
+    return _repair_text_tree(copy.deepcopy(dict(page_schema))) if page_schema else {}
+
+
+def _set_webui_page_schema(payload: dict[str, Any], page_schema: Mapping[str, Any]) -> dict[str, Any]:
+    payload["schema"] = "adaos.webui.v1"
+    ui = payload.get("ui") if isinstance(payload.get("ui"), dict) else {}
+    app = ui.get("application") if isinstance(ui.get("application"), dict) else {}
+    desktop = app.get("desktop") if isinstance(app.get("desktop"), dict) else {}
+    desktop["pageSchema"] = _repair_text_tree(copy.deepcopy(dict(page_schema)))
+    app["desktop"] = desktop
+    ui["application"] = app
+    payload["ui"] = ui
+    return payload
+
+
+def _canonical_webui_payload(payload: Mapping[str, Any] | None, page_schema: Mapping[str, Any]) -> dict[str, Any]:
+    data = copy.deepcopy(dict(payload or {}))
+    for key in ("preview_state", "current_ui", "page_schema", "runtime_context"):
+        data.pop(key, None)
+    data.setdefault("generated_by", SKILL_ID)
+    return _set_webui_page_schema(data, page_schema)
+
+
 def _builder_runtime_component_contracts() -> dict[str, Any]:
     return {
         "ui.form": {
             "purpose": "Editable input area for a draft record.",
             "inputs": {
-                "fields": "Array of field descriptors: id, type, label. Supported field types: text, number, date, toggle.",
+                "fields": "Array of field descriptors: id, type, label. Supported field types: text, number, date, toggle, select. Select fields must include non-empty options.",
                 "submitLabel": "Button label.",
                 "submitPlacement": "Optional: top or bottom.",
             },
@@ -1247,7 +1284,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             },
             "notes": [
                 "Do not put '{{a}} - {{b}}' into titleKey/subtitleKey/previewKey.",
-                "When a card needs combined text, add a derived string field to datasource fields and each mock_data row, then point previewKey to that field.",
+                "When a card needs combined text, add a derived string property to each static dataSource.value row, then point previewKey to that property.",
             ],
         },
         "layout": {
@@ -1265,10 +1302,11 @@ def _write_webui(artifact_root: str | None, preview_state: Mapping[str, Any]) ->
         return
     preview_state = _repair_text_tree(dict(preview_state))
     _ensure_builder_project_files(root, preview_state)
+    page_schema = _page_schema_from_preview(preview_state)
     payload = {
-        "schema": "adaos.webui.prototype.v1",
+        "schema": "adaos.webui.v1",
         "generated_by": SKILL_ID,
-        "preview_state": preview_state,
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
         "nlu": {
             "llm_hints": {
                 "aliases": [str(preview_state.get("title") or "prototype")],
@@ -1290,7 +1328,7 @@ def _write_webui(artifact_root: str | None, preview_state: Mapping[str, Any]) ->
         },
     }
     (root / "webui.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    _write_scenario_page_schema(root, preview_state)
+    _write_scenario_page_schema_value(root, page_schema, preview_state)
 
 
 def _write_webui_payload(artifact_root: str | None, payload: Mapping[str, Any]) -> None:
@@ -1301,12 +1339,19 @@ def _write_webui_payload(artifact_root: str | None, payload: Mapping[str, Any]) 
         return
     data = _repair_text_tree(dict(payload))
     preview_state = data.get("preview_state") if isinstance(data.get("preview_state"), Mapping) else {}
+    page_schema = _extract_webui_page_schema(data)
+    if not page_schema and isinstance(preview_state, Mapping):
+        page_schema = _page_schema_from_preview(preview_state)
+    if page_schema:
+        data = _canonical_webui_payload(data, page_schema)
     if isinstance(preview_state, Mapping):
         _ensure_builder_project_files(root, preview_state)
-    data.setdefault("schema", "adaos.webui.prototype.v1")
+    data.setdefault("schema", "adaos.webui.v1")
     data.setdefault("generated_by", SKILL_ID)
     (root / "webui.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    if isinstance(preview_state, Mapping):
+    if page_schema:
+        _write_scenario_page_schema_value(root, page_schema, preview_state if isinstance(preview_state, Mapping) else {})
+    elif isinstance(preview_state, Mapping):
         _write_scenario_page_schema(root, preview_state)
 
 
@@ -1972,10 +2017,11 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
     }
 
 
-def _write_scenario_page_schema(root: Path, preview_state: Mapping[str, Any]) -> None:
+def _write_scenario_page_schema_value(root: Path, page_schema: Mapping[str, Any], preview_state: Mapping[str, Any]) -> None:
     preview_state = _repair_text_tree(dict(preview_state))
+    page_schema = _repair_text_tree(copy.deepcopy(dict(page_schema)))
     manifest = root / "scenario.json"
-    if not manifest.exists():
+    if not manifest.exists() or not page_schema:
         return
     try:
         scenario = json.loads(manifest.read_text(encoding="utf-8-sig") or "{}")
@@ -2005,9 +2051,13 @@ def _write_scenario_page_schema(root: Path, preview_state: Mapping[str, Any]) ->
     scenario["ui"].setdefault("application", {})
     scenario["ui"]["application"].setdefault("version", "0.1")
     scenario["ui"]["application"].setdefault("desktop", {})
-    scenario["ui"]["application"]["desktop"]["pageSchema"] = _page_schema_from_preview(preview_state)
+    scenario["ui"]["application"]["desktop"]["pageSchema"] = page_schema
     manifest.write_text(json.dumps(scenario, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     _write_scenario_manifest(root, scenario, preview_state)
+
+
+def _write_scenario_page_schema(root: Path, preview_state: Mapping[str, Any]) -> None:
+    _write_scenario_page_schema_value(root, _page_schema_from_preview(preview_state), preview_state)
 
 
 def _save_session(webspace_id: str, session: dict[str, Any]) -> dict[str, Any]:
@@ -2776,7 +2826,6 @@ def _current_webui_payload(session: Mapping[str, Any], preview_state: Mapping[st
     artifact_root = _project_artifact_root(session)
     payload: dict[str, Any] = {}
     runtime_page_schema: dict[str, Any] = {}
-    scenario_manifest: dict[str, Any] = {}
     if artifact_root is not None:
         _ensure_builder_project_files(artifact_root, preview_state)
         path = artifact_root / "webui.json"
@@ -2784,15 +2833,19 @@ def _current_webui_payload(session: Mapping[str, Any], preview_state: Mapping[st
             raw = _load_json_file(path)
             if raw:
                 payload = raw
-        scenario_manifest = _current_scenario_manifest(artifact_root)
         runtime_page_schema = _current_runtime_page_schema(artifact_root)
-    payload.setdefault("schema", "adaos.webui.prototype.v1")
-    payload.setdefault("generated_by", SKILL_ID)
-    preview = copy.deepcopy(dict(preview_state))
-    if runtime_page_schema and not isinstance(preview.get("page_schema"), Mapping):
-        preview["page_schema"] = copy.deepcopy(runtime_page_schema)
-    payload["preview_state"] = preview
-    payload["runtime_context"] = {
+    page_schema = _extract_webui_page_schema(payload) or runtime_page_schema
+    if not page_schema and isinstance(preview_state.get("page_schema"), Mapping):
+        page_schema = _repair_text_tree(copy.deepcopy(dict(preview_state["page_schema"])))
+    if not page_schema:
+        page_schema = _page_schema_from_preview(preview_state)
+    return _canonical_webui_payload(payload, page_schema)
+
+
+def _builder_runtime_context(session: Mapping[str, Any], current_payload: Mapping[str, Any]) -> dict[str, Any]:
+    artifact_root = _project_artifact_root(session)
+    scenario_manifest = _current_scenario_manifest(artifact_root) if artifact_root is not None else {}
+    return {
         "scenario_manifest_path": str(scenario_manifest.get("__path") or "") if scenario_manifest else "",
         "scenario_manifest_summary": {
             "id": scenario_manifest.get("id"),
@@ -2804,10 +2857,9 @@ def _current_webui_payload(session: Mapping[str, Any], preview_state: Mapping[st
         }
         if scenario_manifest
         else {},
-        "current_page_schema": runtime_page_schema,
+        "current_page_schema": _extract_webui_page_schema(current_payload),
         "component_contracts": _builder_runtime_component_contracts(),
     }
-    return payload
 
 
 def _builder_llm_webui_transform_request(
@@ -2834,15 +2886,15 @@ def _builder_llm_webui_transform_request(
         "You are AdaOS Builder, a deterministic UI prototyping programmer. "
         "Transform the current prototype UI according to the user's instruction. "
         "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
-        "The root object must keep schema='adaos.webui.prototype.v1', generated_by='builder_skill', and preview_state. "
-        "preview_state.current_ui is the compact Builder preview contract. "
-        "preview_state.page_schema is the renderable AdaOS runtime pageSchema when present. "
-        "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update preview_state.page_schema.widgets and layout too; do not only reorder compact current_ui.children. "
+        "The root object must be an adaos.webui.v1 manifest with schema='adaos.webui.v1'. "
+        "The renderable source of truth is ui.application.desktop.pageSchema. "
+        "Return the complete updated pageSchema under ui.application.desktop.pageSchema; do not return preview_state, current_ui, or a root-level page_schema. "
+        "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
         "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
-        "If cards need combined text like status plus date, add a derived string field to datasources and mock_data rows, then point previewKey to that field. "
+        "If cards need combined text like status plus date, add a derived string property to the relevant static dataSource.value rows, then point previewKey to that property. "
         "Use the supplied adaos.webui.v1 schema as the webui.json compatibility contract. "
         "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
-        "When the user asks for sample data, realistic examples, a different domain, or translation, update preview_state.mock_data directly for the active datasource instead of leaving old rows in place. "
+        "When the user asks for sample data, realistic examples, a different domain, or translation, update the relevant widget dataSource/static values inside ui.application.desktop.pageSchema instead of leaving old rows in place. "
         "Do not rely on hidden application code to generate domain examples after your response; your JSON must be complete. "
         "For checkbox/toggle semantics use boolean fields and boolean UI/table kinds; do not represent booleans as literal strings like 'true'/'false' unless the user asks for text. "
         "If you cannot safely satisfy the request, keep the previous UI valid and set unable_reason plus a short comment."
@@ -2854,21 +2906,19 @@ def _builder_llm_webui_transform_request(
         "scenario_id": session.get("scenario_id"),
         "title": session.get("title"),
         "current_webui_json": current_payload,
+        "runtime_context": _builder_runtime_context(session, current_payload),
         "project_memory": project_memory,
         "runtime_component_contracts": _builder_runtime_component_contracts(),
         "recent_patch_history": history,
         "webui_v1_schema": schema,
         "required_output_shape": {
-            "schema": "adaos.webui.prototype.v1",
-            "generated_by": SKILL_ID,
-            "preview_state": {
-                "title": "string",
-                "current_ui": "object",
-                "datasources": "array",
-                "mock_data": "object",
-                "filters": "array optional",
-                "form_action_position": "top|bottom optional",
-                "page_schema": "AdaOS pageSchema object with layout/widgets; include it when changing visible runtime layout/widgets",
+            "schema": "adaos.webui.v1",
+            "ui": {
+                "application": {
+                    "desktop": {
+                        "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
+                    }
+                }
             },
             "comment": "short user-facing text about what changed or why it could not be changed",
             "unable_reason": "short optional diagnostic if request cannot be implemented",
@@ -2948,8 +2998,8 @@ def _validate_webui_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _validate_preview_state_payload(preview_state: Mapping[str, Any]) -> dict[str, Any]:
-    if not isinstance(preview_state.get("current_ui"), Mapping):
-        return {"ok": False, "error": "preview_state_invalid", "detail": "preview_state.current_ui must be an object"}
+    if preview_state.get("current_ui") is not None and not isinstance(preview_state.get("current_ui"), Mapping):
+        return {"ok": False, "error": "preview_state_invalid", "detail": "preview_state.current_ui must be an object when present"}
     datasources = preview_state.get("datasources")
     if datasources is not None and not isinstance(datasources, list):
         return {"ok": False, "error": "preview_state_invalid", "detail": "preview_state.datasources must be an array"}
@@ -2974,10 +3024,56 @@ def _validate_preview_state_payload(preview_state: Mapping[str, Any]) -> dict[st
     return {"ok": True}
 
 
+def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) -> dict[str, Any]:
+    if not isinstance(page_schema, Mapping):
+        return {"ok": False, "error": "page_schema_invalid", "detail": "ui.application.desktop.pageSchema must be an object"}
+    widgets = page_schema.get("widgets")
+    if not isinstance(widgets, list) or not widgets:
+        return {"ok": False, "error": "page_schema_invalid", "detail": "ui.application.desktop.pageSchema.widgets must be a non-empty array"}
+    for widget_index, widget in enumerate(widgets):
+        if not isinstance(widget, Mapping):
+            return {"ok": False, "error": "page_schema_invalid", "detail": f"widgets[{widget_index}] must be an object"}
+        if not str(widget.get("id") or "").strip():
+            return {"ok": False, "error": "page_schema_invalid", "detail": f"widgets[{widget_index}].id is required"}
+        widget_type = str(widget.get("type") or "").strip()
+        if not widget_type:
+            return {"ok": False, "error": "page_schema_invalid", "detail": f"widgets[{widget_index}].type is required"}
+        if widget_type != "ui.form":
+            continue
+        inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
+        fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
+        for field_index, field in enumerate(fields):
+            if not isinstance(field, Mapping):
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": f"widgets[{widget_index}].inputs.fields[{field_index}] must be an object",
+                }
+            field_type = str(field.get("type") or "").strip().lower()
+            if field_type in {"select", "dropdown", "choice", "enum"} and not _normalize_field_options(field.get("options")):
+                field_id = str(field.get("id") or field_index)
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": f"ui.form field '{field_id}' is {field_type} but options are missing or empty",
+                }
+    return {"ok": True}
+
+
 def _validate_builder_webui_payload(payload: Mapping[str, Any], preview_state: Mapping[str, Any]) -> dict[str, Any]:
     webui_validation = _validate_webui_payload(payload)
     if not webui_validation.get("ok"):
         return webui_validation
+    page_schema = _extract_webui_page_schema(payload)
+    if not page_schema:
+        return {
+            "ok": False,
+            "error": "page_schema_missing",
+            "detail": "LLM response must contain ui.application.desktop.pageSchema",
+        }
+    component_validation = _validate_page_schema_component_contracts(page_schema)
+    if not component_validation.get("ok"):
+        return component_validation
     preview_validation = _validate_preview_state_payload(preview_state)
     if not preview_validation.get("ok"):
         return preview_validation
@@ -2993,31 +3089,27 @@ def _normalise_llm_webui_payload(
     *,
     previous_preview: Mapping[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
-    data = dict(payload)
-    preview = data.get("preview_state") if isinstance(data.get("preview_state"), Mapping) else None
-    if preview is None and isinstance(data.get("current_ui"), Mapping):
-        preview = data
-        data = {"schema": "adaos.webui.prototype.v1", "generated_by": SKILL_ID, "preview_state": preview}
-    if preview is None and isinstance(data.get("page_schema"), Mapping):
-        preview = {"page_schema": data.get("page_schema")}
-        data = {"schema": "adaos.webui.prototype.v1", "generated_by": SKILL_ID, "preview_state": preview}
-    if not isinstance(preview, Mapping):
-        raise ValueError("LLM payload must contain preview_state")
-    preview_data = copy.deepcopy(dict(preview))
-    if isinstance(data.get("page_schema"), Mapping) and not isinstance(preview_data.get("page_schema"), Mapping):
-        preview_data["page_schema"] = copy.deepcopy(data["page_schema"])
+    data = copy.deepcopy(dict(payload))
+    legacy_preview = data.get("preview_state") if isinstance(data.get("preview_state"), Mapping) else {}
+    page_schema = _extract_webui_page_schema(data)
+    if not page_schema:
+        raise ValueError("LLM payload must contain ui.application.desktop.pageSchema")
+    preview_data = {
+        key: copy.deepcopy(value)
+        for key, value in dict(previous_preview).items()
+        if key != "current_ui"
+    }
+    if isinstance(legacy_preview, Mapping):
+        for key in ("datasources", "mock_data", "filters", "form_action_position", "layout_order", "card_preview_key"):
+            if key in legacy_preview:
+                preview_data[key] = copy.deepcopy(legacy_preview[key])
+        if legacy_preview.get("title"):
+            preview_data["title"] = copy.deepcopy(legacy_preview.get("title"))
+    preview_data["page_schema"] = page_schema
+    if isinstance(page_schema.get("title"), str) and page_schema.get("title").strip():
+        preview_data["title"] = str(page_schema.get("title")).strip()
     if not preview_data.get("title") and previous_preview.get("title"):
         preview_data["title"] = copy.deepcopy(previous_preview.get("title"))
-    if not isinstance(preview_data.get("current_ui"), Mapping):
-        title = str(preview_data.get("title") or previous_preview.get("title") or "Prototype")
-        previous_ui = previous_preview.get("current_ui") if isinstance(previous_preview.get("current_ui"), Mapping) else {}
-        preview_data["current_ui"] = {
-            "schema": "adaos.declarative_ui.v1",
-            "id": str(previous_ui.get("id") or previous_preview.get("session_id") or "builder_prototype"),
-            "type": "page",
-            "title": title,
-            "children": [],
-        }
     if not isinstance(preview_data.get("datasources"), list):
         preview_data["datasources"] = copy.deepcopy(previous_preview.get("datasources") or [])
     if not isinstance(preview_data.get("mock_data"), Mapping):
@@ -3025,19 +3117,7 @@ def _normalise_llm_webui_payload(
     for key in ("session_id", "title", "version"):
         if not preview_data.get(key) and previous_preview.get(key):
             preview_data[key] = copy.deepcopy(previous_preview.get(key))
-    previous_page_schema = previous_preview.get("page_schema") if isinstance(previous_preview.get("page_schema"), Mapping) else None
-    current_page_schema = preview_data.get("page_schema") if isinstance(preview_data.get("page_schema"), Mapping) else None
-    if previous_page_schema is not None and current_page_schema is not None:
-        previous_compact = copy.deepcopy(dict(previous_preview))
-        current_compact = copy.deepcopy(dict(preview_data))
-        previous_compact.pop("page_schema", None)
-        current_compact.pop("page_schema", None)
-        if _compact_json(previous_page_schema) == _compact_json(current_page_schema) and _compact_json(previous_compact) != _compact_json(current_compact):
-            preview_data.pop("page_schema", None)
-    preview_data["page_schema"] = _page_schema_from_preview(preview_data)
-    data.setdefault("schema", "adaos.webui.prototype.v1")
-    data.setdefault("generated_by", SKILL_ID)
-    data["preview_state"] = preview_data
+    data = _canonical_webui_payload(data, page_schema)
     return data, preview_data
 
 
@@ -4911,7 +4991,6 @@ def _finalize_scenario_update(
     preview = _repair_text_tree(dict(preview))
     if patch.get("operation") == "llm_webui_transform" and isinstance(session.get("webui_payload"), Mapping):
         payload = copy.deepcopy(dict(session["webui_payload"]))
-        payload["preview_state"] = copy.deepcopy(dict(preview))
         session["webui_payload"] = payload
         _write_webui_payload(str(session.get("artifact_root") or ""), payload)
     else:
