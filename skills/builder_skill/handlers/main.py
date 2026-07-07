@@ -1527,18 +1527,210 @@ def _write_scenario_manifest(root: Path, scenario: Mapping[str, Any], preview_st
     (root / "scenario.yaml").write_text("\n".join(lines), encoding="utf-8")
 
 
+def _normalize_field_options(value: Any) -> list[Any]:
+    if not isinstance(value, list):
+        return []
+    options: list[Any] = []
+    for item in value:
+        if isinstance(item, Mapping):
+            option = copy.deepcopy(dict(item))
+            label = str(
+                option.get("label")
+                or option.get("title")
+                or option.get("name")
+                or option.get("value")
+                or option.get("id")
+                or ""
+            ).strip()
+            if not label:
+                continue
+            option.setdefault("label", label)
+            option.setdefault("value", option.get("id", label))
+            options.append(option)
+            continue
+        if isinstance(item, (str, int, float, bool)) and str(item).strip():
+            options.append(item)
+    return options
+
+
 def _form_field_type(field: Mapping[str, Any]) -> str:
-    field_type = str(field.get("type") or "string")
-    if field_type == "boolean":
+    field_type = str(field.get("type") or "string").strip().lower()
+    if field_type in {"select", "dropdown", "choice", "enum"} or _normalize_field_options(field.get("options")):
+        return "select"
+    if field_type in {"boolean", "bool", "toggle", "checkbox"}:
         return "toggle"
-    if field_type == "number":
+    if field_type in {"number", "integer", "float", "decimal"}:
         return "number"
-    if field_type == "date":
+    if field_type in {"date", "datetime"}:
         return "date"
+    if field_type in {"textarea", "text_area", "multiline"}:
+        return "textarea"
     return "text"
 
 
-def _normalise_page_schema_candidate(value: Any, *, title: str, page_id: str) -> dict[str, Any] | None:
+def _current_ui_field_id(node: Mapping[str, Any]) -> str:
+    binding = str(node.get("binding") or node.get("stateKey") or node.get("state_key") or "").strip()
+    if binding.startswith("draft."):
+        return binding.split(".", 1)[1].strip()
+    raw = str(node.get("field_id") or node.get("field") or node.get("key") or node.get("id") or "").strip()
+    for prefix in ("input_", "field_"):
+        if raw.startswith(prefix) and len(raw) > len(prefix):
+            return raw[len(prefix) :]
+    return raw
+
+
+def _current_ui_form_field_map(ui: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    supported = {
+        "text_input",
+        "input",
+        "textarea",
+        "text_area",
+        "number_input",
+        "date_input",
+        "checkbox",
+        "toggle",
+        "select",
+        "dropdown",
+        "choice",
+        "enum",
+    }
+    found: dict[str, dict[str, Any]] = {}
+
+    def _walk(nodes: Any) -> None:
+        if not isinstance(nodes, list):
+            return
+        for child in nodes:
+            if not isinstance(child, Mapping):
+                continue
+            node_type = str(child.get("type") or "").strip().lower()
+            options = _normalize_field_options(child.get("options"))
+            if node_type in supported or options or child.get("binding"):
+                field_id = _current_ui_field_id(child)
+                if field_id:
+                    field = {
+                        "id": field_id,
+                        "type": _form_field_type(child),
+                        "label": child.get("label") or child.get("title") or field_id,
+                    }
+                    if options:
+                        field["options"] = options
+                    found[field_id] = field
+            _walk(child.get("children"))
+
+    _walk(ui.get("children"))
+    return found
+
+
+def _merge_current_ui_fields(
+    fields: Sequence[Mapping[str, Any]],
+    ui_fields: Mapping[str, Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    merged = [copy.deepcopy(dict(item)) for item in fields if isinstance(item, Mapping)]
+    seen: set[str] = set()
+    for item in merged:
+        field_id = str(item.get("id") or "").strip()
+        if not field_id:
+            continue
+        seen.add(field_id)
+        source = ui_fields.get(field_id)
+        if not isinstance(source, Mapping):
+            continue
+        source_type = str(source.get("type") or "").strip()
+        if source_type:
+            item["type"] = source_type
+        if not str(item.get("label") or "").strip() and source.get("label"):
+            item["label"] = source.get("label")
+        options = _normalize_field_options(item.get("options")) or _normalize_field_options(source.get("options"))
+        if options:
+            item["options"] = options
+    for field_id, source in ui_fields.items():
+        if field_id in seen or not isinstance(source, Mapping):
+            continue
+        field = {
+            "id": field_id,
+            "type": str(source.get("type") or "string").strip() or "string",
+            "label": source.get("label") or field_id,
+            "required": False,
+        }
+        options = _normalize_field_options(source.get("options"))
+        if options:
+            field["options"] = options
+        merged.append(field)
+    return merged
+
+
+def _page_form_field(field: Mapping[str, Any], index: int, ui_fields: Mapping[str, Mapping[str, Any]]) -> dict[str, Any]:
+    field_id = str(field.get("id") or f"field_{index}").strip() or f"field_{index}"
+    source = ui_fields.get(field_id) if isinstance(ui_fields.get(field_id), Mapping) else {}
+    form_type = str(source.get("type") or "").strip() or _form_field_type(field)
+    options = _normalize_field_options(field.get("options")) or _normalize_field_options(source.get("options"))
+    if options:
+        form_type = "select"
+    item = {
+        "id": field_id,
+        "type": form_type,
+        "label": field.get("label") or source.get("label") or field.get("id") or f"Field {index + 1}",
+    }
+    if options:
+        item["options"] = options
+    return item
+
+
+def _enrich_page_schema_form_fields(data: dict[str, Any], ui_fields: Mapping[str, Mapping[str, Any]]) -> None:
+    if not ui_fields:
+        return
+    widgets = data.get("widgets")
+    if not isinstance(widgets, list):
+        return
+    for widget in widgets:
+        if not isinstance(widget, Mapping) or str(widget.get("type") or "") != "ui.form":
+            continue
+        inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
+        fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
+        enriched: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for index, raw_field in enumerate(fields):
+            if not isinstance(raw_field, Mapping):
+                continue
+            field = copy.deepcopy(dict(raw_field))
+            field_id = str(field.get("id") or "").strip()
+            if not field_id:
+                enriched.append(field)
+                continue
+            seen.add(field_id)
+            source = ui_fields.get(field_id)
+            if isinstance(source, Mapping):
+                source_type = str(source.get("type") or "").strip()
+                if source_type:
+                    field["type"] = source_type
+                if not str(field.get("label") or "").strip() and source.get("label"):
+                    field["label"] = source.get("label")
+                options = _normalize_field_options(field.get("options")) or _normalize_field_options(source.get("options"))
+                if options:
+                    field["type"] = "select"
+                    field["options"] = options
+            else:
+                options = _normalize_field_options(field.get("options"))
+                if options:
+                    field["type"] = "select"
+                    field["options"] = options
+            enriched.append(field)
+        for field_id, source in ui_fields.items():
+            if field_id in seen or not isinstance(source, Mapping):
+                continue
+            enriched.append(_page_form_field(source, len(enriched), ui_fields))
+        next_inputs = copy.deepcopy(dict(inputs))
+        next_inputs["fields"] = enriched
+        widget["inputs"] = next_inputs
+
+
+def _normalise_page_schema_candidate(
+    value: Any,
+    *,
+    title: str,
+    page_id: str,
+    ui_fields: Mapping[str, Mapping[str, Any]] | None = None,
+) -> dict[str, Any] | None:
     if not isinstance(value, Mapping):
         return None
     data = copy.deepcopy(dict(value))
@@ -1574,6 +1766,7 @@ def _normalise_page_schema_candidate(value: Any, *, title: str, page_id: str) ->
     if not clean_widgets:
         return None
     data["widgets"] = clean_widgets
+    _enrich_page_schema_form_fields(data, ui_fields or {})
     data.setdefault("id", page_id or "builder_prototype")
     data.setdefault("title", title or "Prototype")
     if not isinstance(data.get("layout"), Mapping):
@@ -1588,16 +1781,21 @@ def _normalise_page_schema_candidate(value: Any, *, title: str, page_id: str) ->
 def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any]:
     ui = preview_state.get("current_ui") if isinstance(preview_state.get("current_ui"), Mapping) else {}
     title = str(preview_state.get("title") or ui.get("title") or "Prototype").strip() or "Prototype"
+    ui_fields = _current_ui_form_field_map(ui)
     direct_page_schema = _normalise_page_schema_candidate(
         preview_state.get("page_schema"),
         title=title,
         page_id=str(ui.get("id") or preview_state.get("session_id") or "builder_prototype"),
+        ui_fields=ui_fields,
     )
     if direct_page_schema is not None:
         return direct_page_schema
     datasources = preview_state.get("datasources") if isinstance(preview_state.get("datasources"), list) else []
     datasource = datasources[0] if datasources and isinstance(datasources[0], Mapping) else {}
-    fields = [dict(item) for item in datasource.get("fields", []) if isinstance(item, Mapping)]
+    fields = _merge_current_ui_fields(
+        [dict(item) for item in datasource.get("fields", []) if isinstance(item, Mapping)],
+        ui_fields,
+    )
     datasource_id = str(datasource.get("id") or "items").strip() or "items"
     mock_data = preview_state.get("mock_data") if isinstance(preview_state.get("mock_data"), Mapping) else {}
     raw_rows = mock_data.get(datasource_id) if isinstance(mock_data.get(datasource_id), list) else []
@@ -1629,11 +1827,7 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
     cards_area = "main" if cards_first and has_card_view else "right"
     form_inputs = {
         "fields": [
-            {
-                "id": str(field.get("id") or f"field_{index}"),
-                "type": _form_field_type(field),
-                "label": field.get("label") or field.get("id") or f"Field {index + 1}",
-            }
+            _page_form_field(field, index, ui_fields)
             for index, field in enumerate(fields)
         ],
         "submitLabel": "Add",
@@ -2840,6 +3034,7 @@ def _normalise_llm_webui_payload(
         current_compact.pop("page_schema", None)
         if _compact_json(previous_page_schema) == _compact_json(current_page_schema) and _compact_json(previous_compact) != _compact_json(current_compact):
             preview_data.pop("page_schema", None)
+    preview_data["page_schema"] = _page_schema_from_preview(preview_data)
     data.setdefault("schema", "adaos.webui.prototype.v1")
     data.setdefault("generated_by", SKILL_ID)
     data["preview_state"] = preview_data
