@@ -6131,16 +6131,37 @@ def _complete_llm_webui_job(
     if not session:
         return
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
+    started_at = _now()
+    timeout_s = _builder_llm_job_timeout_s()
+    poll_interval_s = _builder_llm_job_poll_interval_s()
+    _LOG.debug(
+        "builder LLM job wait start scenario=%s job_id=%s request_id=%s base_url=%s timeout_s=%.1f poll_interval_s=%.1f",
+        str(session.get("scenario_id") or ""),
+        job_id,
+        request_id,
+        base_url,
+        timeout_s,
+        poll_interval_s,
+    )
     try:
         from adaos.sdk.llm.llm_client import wait_response_job
 
         job = wait_response_job(
             job_id,
             base_url=base_url or None,
-            timeout_s=_builder_llm_job_timeout_s(),
-            poll_interval_s=_builder_llm_job_poll_interval_s(),
+            timeout_s=timeout_s,
+            poll_interval_s=poll_interval_s,
         )
     except Exception as exc:
+        _LOG.warning(
+            "builder LLM job wait failed scenario=%s job_id=%s request_id=%s base_url=%s elapsed_ms=%d detail=%s",
+            str(session.get("scenario_id") or ""),
+            job_id,
+            request_id,
+            base_url,
+            int((_now() - started_at) * 1000),
+            f"{type(exc).__name__}: {exc}",
+        )
         _mark_llm_job_failed(
             ws=ws,
             session=session,
@@ -6152,7 +6173,24 @@ def _complete_llm_webui_job(
         )
         return
     status = str(job.get("status") or "").strip().lower()
+    _LOG.debug(
+        "builder LLM job wait completed scenario=%s job_id=%s request_id=%s base_url=%s status=%s elapsed_ms=%d",
+        str(session.get("scenario_id") or ""),
+        job_id,
+        request_id,
+        base_url,
+        status,
+        int((_now() - started_at) * 1000),
+    )
     if status != "succeeded":
+        _LOG.warning(
+            "builder LLM job returned non-success scenario=%s job_id=%s request_id=%s status=%s error=%s",
+            str(session.get("scenario_id") or ""),
+            job_id,
+            request_id,
+            status,
+            str(job.get("error") or ""),
+        )
         _mark_llm_job_failed(
             ws=ws,
             session=session,
@@ -6233,6 +6271,14 @@ def _complete_llm_webui_job(
         llm_result=llm_result,
         auto_apply=auto_apply,
         _meta=_meta,
+    )
+    _LOG.debug(
+        "builder LLM job applied scenario=%s job_id=%s request_id=%s elapsed_ms=%d ok=%s",
+        str(session.get("scenario_id") or ""),
+        job_id,
+        request_id,
+        int((_now() - started_at) * 1000),
+        bool(result.get("ok", True)) if isinstance(result, Mapping) else True,
     )
     _safe_emit_chat(
         str(result.get("message") or ""),
