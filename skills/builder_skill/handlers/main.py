@@ -20,7 +20,7 @@ from adaos.sdk.core.decorators import subscribe, tool
 SKILL_ID = "builder_skill"
 DIALOG_CHANNEL_ID = "builder"
 AGENT_ID = "agent:builder_skill:builder"
-AGENT_LABEL = "\u0421\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c"
+AGENT_LABEL = "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440"
 SESSIONS_KEY = "builder_skill.sessions"
 CURRENT_KEY = "builder_skill.current_session"
 MAX_SESSIONS = 50
@@ -398,12 +398,24 @@ def _builder_topic_ref(
     try:
         from adaos.services.conversation_links import ensure_builder_topic
 
-        return ensure_builder_topic(
+        topic = ensure_builder_topic(
             webspace_id,
             active_draft_id=str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None,
             scenario_id=str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None,
             dev_webspace_id=str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None,
         )
+        if prompt_topic_id and isinstance(topic, Mapping):
+            normalized = {k: v for k, v in dict(topic).items() if v is not None}
+            normalized["thread_id"] = prompt_topic_id
+            normalized["topic_id"] = prompt_topic_id
+            normalized.setdefault("topic_kind", "builder_runtime")
+            normalized.setdefault("webspace_id", webspace_id)
+            normalized.setdefault("source_webspace_id", webspace_id)
+            normalized.setdefault("conversation_id", _conversation_id(webspace_id))
+            normalized.setdefault("channel_id", DIALOG_CHANNEL_ID)
+            normalized.setdefault("owner", f"skill:{SKILL_ID}")
+            return normalized
+        return topic
     except Exception:
         token = str(session.get("draft_id") or session.get("scenario_id") or binding.get("runtime_scenario_id") or "default").strip()
         token = re.sub(r"[^A-Za-z0-9_.:-]+", ".", token).strip(".") or "default"
@@ -692,7 +704,6 @@ def _safe_emit_chat(
     topic_ref: Mapping[str, Any] | None = None,
     actions: Sequence[Mapping[str, Any]] | None = None,
 ) -> None:
-    emit_started = time.perf_counter()
     try:
         from adaos.sdk.io.out import chat_append
         from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
@@ -712,39 +723,18 @@ def _safe_emit_chat(
                     return chat_append(text, from_="hub", _meta=meta)
 
             pool = ThreadPoolExecutor(max_workers=1)
-            target_started = time.perf_counter()
             try:
                 future = pool.submit(_append_chat)
                 try:
                     future.result(timeout=CHAT_APPEND_TIMEOUT_S)
                 except FuturesTimeoutError:
-                    _LOG.warning(
-                        "builder chat emit target timeout source_webspace=%s target_webspace=%s timeout_s=%.2f elapsed_ms=%.1f",
-                        source_ws,
-                        target,
-                        CHAT_APPEND_TIMEOUT_S,
-                        (time.perf_counter() - target_started) * 1000.0,
-                    )
                     future.cancel()
                     pool.shutdown(wait=False, cancel_futures=True)
                     pool = None
             finally:
                 if pool is not None:
                     pool.shutdown(wait=True)
-            _LOG.debug(
-                "builder chat emit target completed source_webspace=%s target_webspace=%s elapsed_ms=%.1f total_ms=%.1f",
-                source_ws,
-                target,
-                (time.perf_counter() - target_started) * 1000.0,
-                (time.perf_counter() - emit_started) * 1000.0,
-            )
     except Exception:
-        _LOG.warning(
-            "builder chat emit failed source_webspace=%s elapsed_ms=%.1f",
-            str(webspace_id or ""),
-            (time.perf_counter() - emit_started) * 1000.0,
-            exc_info=True,
-        )
         return
 
 
@@ -1114,7 +1104,7 @@ def _mock_rows(fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
             field_type = str(field.get("type") or "string")
             if field_type == "number":
                 row[field_id] = index
-            elif field_type == "boolean":
+            elif _is_boolean_field_type(field_type):
                 row[field_id] = index == 1
             elif field_type == "date":
                 row[field_id] = f"2026-07-0{index}"
@@ -1279,13 +1269,112 @@ def _current_scenario_manifest(root: Path | None) -> dict[str, Any]:
     return {}
 
 
+def _current_scenario_yaml_manifest(root: Path | None) -> dict[str, Any]:
+    if root is None:
+        return {}
+    for name in ("scenario.yaml", "scenario.yml"):
+        path = root / name
+        if not path.exists():
+            continue
+        try:
+            import yaml
+
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except Exception:
+            data = {}
+        if isinstance(data, dict):
+            data["__path"] = str(path)
+            return _repair_text_tree(data)
+    return {}
+
+
+def _clean_i18n_spec(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {}
+    data = _repair_text_tree(copy.deepcopy(dict(value)))
+    return {str(key): item for key, item in data.items() if item is not None}
+
+
+def _scenario_title_i18n(
+    *,
+    scenario_id: str,
+    title: str,
+    scenario: Mapping[str, Any] | None = None,
+    page_schema: Mapping[str, Any] | None = None,
+    preview_state: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    for source in (preview_state, scenario, page_schema):
+        spec = _clean_i18n_spec(source.get("title_i18n") if isinstance(source, Mapping) else None)
+        if spec:
+            return spec
+    key = f"scenario.{scenario_id}.title" if scenario_id else "scenario.prototype.title"
+    return {"key": key, "fallback": title}
+
+
+def _canonical_scenario_title(
+    root: Path | None,
+    *,
+    scenario: Mapping[str, Any] | None = None,
+    preview_state: Mapping[str, Any] | None = None,
+    page_schema: Mapping[str, Any] | None = None,
+    prefer_preview: bool = False,
+) -> tuple[str, dict[str, Any]]:
+    yaml_manifest = _current_scenario_yaml_manifest(root)
+    sources = [preview_state, yaml_manifest, scenario, page_schema] if prefer_preview else [yaml_manifest, scenario, preview_state, page_schema]
+    scenario_id = str(
+        (yaml_manifest.get("id") if isinstance(yaml_manifest, Mapping) else "")
+        or (scenario.get("id") if isinstance(scenario, Mapping) else "")
+        or (preview_state.get("scenario_id") if isinstance(preview_state, Mapping) else "")
+        or (page_schema.get("id") if isinstance(page_schema, Mapping) else "")
+        or (root.name if root is not None else "")
+        or "prototype"
+    ).strip()
+    title = ""
+    for source in sources:
+        if not isinstance(source, Mapping):
+            continue
+        value = str(source.get("title") or source.get("name") or "").strip()
+        if value:
+            title = value
+            break
+    if not title:
+        title = scenario_id.replace("_", " ").title() if scenario_id else "Prototype"
+    title_i18n = _scenario_title_i18n(
+        scenario_id=scenario_id,
+        title=title,
+        scenario=yaml_manifest or scenario,
+        page_schema=page_schema,
+        preview_state=preview_state,
+    )
+    return title, title_i18n
+
+
+def _apply_scenario_title_to_page_schema(
+    page_schema: Mapping[str, Any],
+    *,
+    title: str,
+    title_i18n: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    data = _repair_text_tree(copy.deepcopy(dict(page_schema)))
+    if title:
+        data["title"] = title
+    spec = _clean_i18n_spec(title_i18n)
+    if spec:
+        data["title_i18n"] = spec
+    return data
+
+
 def _current_runtime_page_schema(root: Path | None) -> dict[str, Any]:
     scenario = _current_scenario_manifest(root)
     ui = scenario.get("ui") if isinstance(scenario.get("ui"), Mapping) else {}
     app = ui.get("application") if isinstance(ui.get("application"), Mapping) else {}
     desktop = app.get("desktop") if isinstance(app.get("desktop"), Mapping) else {}
     page_schema = desktop.get("pageSchema") if isinstance(desktop.get("pageSchema"), Mapping) else {}
-    return _repair_text_tree(copy.deepcopy(dict(page_schema))) if page_schema else {}
+    if not page_schema:
+        return {}
+    page_schema = _repair_text_tree(copy.deepcopy(dict(page_schema)))
+    title, title_i18n = _canonical_scenario_title(root, scenario=scenario, page_schema=page_schema)
+    return _apply_scenario_title_to_page_schema(page_schema, title=title, title_i18n=title_i18n)
 
 
 def _extract_webui_page_schema(payload: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -1631,6 +1720,10 @@ def _write_webui(artifact_root: str | None, preview_state: Mapping[str, Any]) ->
     preview_state = _repair_text_tree(dict(preview_state))
     _ensure_builder_project_files(root, preview_state)
     page_schema = _with_builder_page_schema_meta(_page_schema_from_preview(preview_state), preview_state)
+    title, title_i18n = _canonical_scenario_title(root, preview_state=preview_state, page_schema=page_schema, prefer_preview=True)
+    preview_state["title"] = title
+    preview_state["title_i18n"] = title_i18n
+    page_schema = _apply_scenario_title_to_page_schema(page_schema, title=title, title_i18n=title_i18n)
     payload = {
         "schema": "adaos.webui.v1",
         "generated_by": SKILL_ID,
@@ -1672,6 +1765,23 @@ def _write_webui_payload(artifact_root: str | None, payload: Mapping[str, Any]) 
         page_schema = _page_schema_from_preview(preview_state)
     if page_schema:
         page_schema = _with_builder_page_schema_meta(page_schema, preview_state if isinstance(preview_state, Mapping) else {})
+        if isinstance(preview_state, dict) and not str(preview_state.get("title") or "").strip():
+            page_title = str(page_schema.get("title") or "").strip()
+            if page_title:
+                preview_state["title"] = page_title
+                page_title_i18n = _clean_i18n_spec(page_schema.get("title_i18n"))
+                if page_title_i18n:
+                    preview_state["title_i18n"] = page_title_i18n
+        title, title_i18n = _canonical_scenario_title(
+            root,
+            preview_state=preview_state if isinstance(preview_state, Mapping) else {},
+            page_schema=page_schema,
+            prefer_preview=True,
+        )
+        if isinstance(preview_state, dict):
+            preview_state["title"] = title
+            preview_state["title_i18n"] = title_i18n
+        page_schema = _apply_scenario_title_to_page_schema(page_schema, title=title, title_i18n=title_i18n)
         data = _canonical_webui_payload(data, page_schema)
     if isinstance(preview_state, Mapping):
         _ensure_builder_project_files(root, preview_state)
@@ -1857,7 +1967,13 @@ def _revision_chat_actions(session: Mapping[str, Any], revision: str | None) -> 
 
 def _write_scenario_manifest(root: Path, scenario: Mapping[str, Any], preview_state: Mapping[str, Any]) -> None:
     scenario_id = str(scenario.get("id") or preview_state.get("scenario_id") or preview_state.get("id") or root.name).strip() or root.name
-    title = str(preview_state.get("title") or scenario.get("title") or scenario.get("name") or scenario_id).strip() or scenario_id
+    title, title_i18n = _canonical_scenario_title(
+        root,
+        scenario=scenario,
+        preview_state=preview_state,
+        prefer_preview=True,
+    )
+    title = title or scenario_id
     depends = [
         str(item).strip()
         for item in (scenario.get("depends") if isinstance(scenario.get("depends"), list) else [])
@@ -1884,6 +2000,10 @@ def _write_scenario_manifest(root: Path, scenario: Mapping[str, Any], preview_st
         f"description: {json.dumps(str(scenario.get('description') or 'Builder rapid prototype scenario.'), ensure_ascii=False)}",
         f"version: {json.dumps(str(scenario.get('version') or '0.1.0'), ensure_ascii=False)}",
     ]
+    if title_i18n:
+        lines.append("title_i18n:")
+        for key, value in title_i18n.items():
+            lines.append(f"  {key}: {json.dumps(value, ensure_ascii=False)}")
     lines.append("supported_locales:")
     lines.extend(f"  - {json.dumps(item, ensure_ascii=False)}" for item in supported_locales)
     if depends:
@@ -1940,6 +2060,10 @@ def _form_field_type(field: Mapping[str, Any]) -> str:
     if field_type in {"textarea", "text_area", "multiline"}:
         return "textarea"
     return "text"
+
+
+def _is_boolean_field_type(value: Any) -> bool:
+    return str(value or "").strip().lower() in {"boolean", "bool", "toggle", "checkbox", "switch"}
 
 
 def _current_ui_field_id(node: Mapping[str, Any]) -> str:
@@ -2098,6 +2222,55 @@ def _enrich_page_schema_form_fields(data: dict[str, Any], ui_fields: Mapping[str
         widget["inputs"] = next_inputs
 
 
+def _enrich_page_schema_table_columns(data: dict[str, Any], ui_fields: Mapping[str, Mapping[str, Any]]) -> None:
+    if not ui_fields:
+        return
+    widgets = data.get("widgets")
+    if not isinstance(widgets, list):
+        return
+    for widget in widgets:
+        if not isinstance(widget, Mapping) or str(widget.get("type") or "") != "ui.table":
+            continue
+        inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
+        columns = inputs.get("columns") if isinstance(inputs.get("columns"), list) else []
+        enriched: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for index, raw_column in enumerate(columns):
+            if not isinstance(raw_column, Mapping):
+                continue
+            column = copy.deepcopy(dict(raw_column))
+            field_id = str(column.get("key") or column.get("field") or column.get("id") or "").strip()
+            if not field_id:
+                field_id = f"field_{index}"
+                column["key"] = field_id
+            if "key" not in column:
+                column["key"] = field_id
+            column.pop("field", None)
+            seen.add(field_id)
+            source = ui_fields.get(field_id)
+            if isinstance(source, Mapping):
+                if not str(column.get("label") or "").strip():
+                    column["label"] = source.get("label") or field_id
+                if _is_boolean_field_type(source.get("type")):
+                    column["kind"] = "boolean"
+                    column.setdefault("width", "72px")
+            enriched.append(column)
+        for field_id, source in ui_fields.items():
+            if field_id in seen or not isinstance(source, Mapping):
+                continue
+            column = {
+                "key": field_id,
+                "label": source.get("label") or field_id,
+            }
+            if _is_boolean_field_type(source.get("type")):
+                column["kind"] = "boolean"
+                column["width"] = "72px"
+            enriched.append(column)
+        next_inputs = copy.deepcopy(dict(inputs))
+        next_inputs["columns"] = enriched
+        widget["inputs"] = next_inputs
+
+
 def _normalise_page_schema_candidate(
     value: Any,
     *,
@@ -2141,6 +2314,7 @@ def _normalise_page_schema_candidate(
         return None
     data["widgets"] = clean_widgets
     _enrich_page_schema_form_fields(data, ui_fields or {})
+    _enrich_page_schema_table_columns(data, ui_fields or {})
     data.setdefault("id", page_id or "builder_prototype")
     data.setdefault("title", title or "Prototype")
     if not isinstance(data.get("layout"), Mapping):
@@ -2156,20 +2330,21 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
     ui = preview_state.get("current_ui") if isinstance(preview_state.get("current_ui"), Mapping) else {}
     title = str(preview_state.get("title") or ui.get("title") or "Prototype").strip() or "Prototype"
     ui_fields = _current_ui_form_field_map(ui)
-    direct_page_schema = _normalise_page_schema_candidate(
-        preview_state.get("page_schema"),
-        title=title,
-        page_id=str(ui.get("id") or preview_state.get("session_id") or "builder_prototype"),
-        ui_fields=ui_fields,
-    )
-    if direct_page_schema is not None:
-        return direct_page_schema
     datasources = preview_state.get("datasources") if isinstance(preview_state.get("datasources"), list) else []
     datasource = datasources[0] if datasources and isinstance(datasources[0], Mapping) else {}
     fields = _merge_current_ui_fields(
         [dict(item) for item in datasource.get("fields", []) if isinstance(item, Mapping)],
         ui_fields,
     )
+    schema_fields = {str(item.get("id") or ""): item for item in fields if str(item.get("id") or "").strip()}
+    direct_page_schema = _normalise_page_schema_candidate(
+        preview_state.get("page_schema"),
+        title=title,
+        page_id=str(ui.get("id") or preview_state.get("session_id") or "builder_prototype"),
+        ui_fields=schema_fields or ui_fields,
+    )
+    if direct_page_schema is not None:
+        return direct_page_schema
     datasource_id = str(datasource.get("id") or "items").strip() or "items"
     mock_data = preview_state.get("mock_data") if isinstance(preview_state.get("mock_data"), Mapping) else {}
     raw_rows = mock_data.get(datasource_id) if isinstance(mock_data.get(datasource_id), list) else []
@@ -2262,7 +2437,7 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
                         {
                             "key": str(field.get("id") or f"field_{index}"),
                             "label": field.get("label") or field.get("id") or f"Field {index + 1}",
-                            **({"kind": "boolean", "width": "72px"} if str(field.get("type") or "") == "boolean" else {}),
+                            **({"kind": "boolean", "width": "72px"} if _is_boolean_field_type(field.get("type")) else {}),
                         }
                         for index, field in enumerate(fields)
                     ],
@@ -2359,10 +2534,22 @@ def _write_scenario_page_schema_value(root: Path, page_schema: Mapping[str, Any]
     if not isinstance(scenario, dict):
         return
     scenario = _repair_text_tree(scenario)
+    title, title_i18n = _canonical_scenario_title(
+        root,
+        scenario=scenario,
+        preview_state=preview_state,
+        page_schema=page_schema,
+        prefer_preview=True,
+    )
+    preview_state["title"] = title
+    preview_state["title_i18n"] = title_i18n
+    page_schema = _apply_scenario_title_to_page_schema(page_schema, title=title, title_i18n=title_i18n)
     scenario.setdefault("id", root.name)
     scenario.setdefault("name", root.name)
     scenario.setdefault("type", "desktop")
-    scenario.setdefault("title", preview_state.get("title") or scenario.get("name") or scenario.get("id") or "Prototype")
+    scenario["title"] = title or scenario.get("name") or scenario.get("id") or "Prototype"
+    if title_i18n:
+        scenario["title_i18n"] = title_i18n
     scenario.setdefault("supported_locales", ["en", "ru"])
     depends = scenario.get("depends")
     depends_list = [str(item) for item in depends if isinstance(item, str)] if isinstance(depends, list) else []
@@ -3177,12 +3364,21 @@ def _current_webui_payload(session: Mapping[str, Any], preview_state: Mapping[st
         page_schema = _repair_text_tree(copy.deepcopy(dict(preview_state["page_schema"])))
     if not page_schema:
         page_schema = _page_schema_from_preview(preview_state)
+    if artifact_root is not None and page_schema:
+        title, title_i18n = _canonical_scenario_title(
+            artifact_root,
+            preview_state=preview_state,
+            page_schema=page_schema,
+            prefer_preview=False,
+        )
+        page_schema = _apply_scenario_title_to_page_schema(page_schema, title=title, title_i18n=title_i18n)
     return _canonical_webui_payload(payload, page_schema)
 
 
 def _builder_runtime_context(session: Mapping[str, Any], current_payload: Mapping[str, Any]) -> dict[str, Any]:
     artifact_root = _project_artifact_root(session)
-    scenario_manifest = _current_scenario_manifest(artifact_root) if artifact_root is not None else {}
+    scenario_manifest = _current_scenario_yaml_manifest(artifact_root) or (_current_scenario_manifest(artifact_root) if artifact_root is not None else {})
+    current_page_schema = _extract_webui_page_schema(current_payload)
     return {
         "scenario_manifest_path": str(scenario_manifest.get("__path") or "") if scenario_manifest else "",
         "scenario_manifest_summary": {
@@ -3195,6 +3391,7 @@ def _builder_runtime_context(session: Mapping[str, Any], current_payload: Mappin
         }
         if scenario_manifest
         else {},
+        "current_page_schema": current_page_schema,
     }
 
 
@@ -3245,6 +3442,7 @@ def _builder_llm_webui_transform_request(
         "project_memory": project_memory,
         "recent_patch_history": history,
         "webui_v1_abi": _builder_webui_abi_summary(),
+        "runtime_component_contracts": _builder_runtime_component_contracts(),
         "webui_v1_schema": "see webui_v1_abi.schema_contract; validated by src/adaos/abi/webui.v1.schema.json",
         "required_output_shape": {
             "schema": "adaos.webui.v1",
@@ -4295,24 +4493,30 @@ def _project_words() -> tuple[str, ...]:
 
 def _is_explicit_create_request(text: str) -> bool:
     lowered = _normalise_command_text(text)
-    return _has_any(
+    explicit_object_create = _has_any(
         lowered,
         (
-            "create",
-            "build",
-            "make new",
+            "create app",
+            "create project",
+            "create scenario",
+            "create prototype",
+            "create skill",
+            "build app",
+            "build project",
+            "build scenario",
+            "build prototype",
             "new app",
             "new scenario",
             "new prototype",
             "new skill",
-            "lets build",
-            "let's build",
-            "build it",
-            "\u0441\u043e\u0437\u0434",
-            "\u0441\u0434\u0435\u043b\u0430\u0435\u043c",
-            "\u0434\u0430\u0432\u0430\u0439 \u0441\u0434\u0435\u043b",
-            "\u0441\u043e\u0431\u0435\u0440",
-            "\u043f\u043e\u0441\u0442\u0440\u043e\u0438",
+            "\u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u0438\u043b\u043e\u0436",
+            "\u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
+            "\u0441\u043e\u0437\u0434\u0430\u0439 \u0441\u0446\u0435\u043d\u0430\u0440",
+            "\u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f",
+            "\u0441\u043e\u0437\u0434\u0430\u0439 \u043d\u0430\u0432\u044b\u043a",
+            "\u0441\u0434\u0435\u043b\u0430\u0439 \u043f\u0440\u0438\u043b\u043e\u0436",
+            "\u0441\u0434\u0435\u043b\u0430\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
+            "\u0441\u0434\u0435\u043b\u0430\u0439 \u0441\u0446\u0435\u043d\u0430\u0440",
             "\u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
             "\u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f",
             "\u043d\u043e\u0432\u043e\u0435 \u043f\u0440\u0438\u043b\u043e\u0436",
@@ -4320,6 +4524,58 @@ def _is_explicit_create_request(text: str) -> bool:
             "\u043d\u043e\u0432\u044b\u0439 \u043d\u0430\u0432\u044b\u043a",
         ),
     )
+    if explicit_object_create:
+        return True
+    return _has_any(
+        lowered,
+        (
+            "lets build",
+            "let's build",
+            "build it",
+            "\u0441\u0434\u0435\u043b\u0430\u0435\u043c",
+            "\u0434\u0430\u0432\u0430\u0439 \u0441\u0434\u0435\u043b",
+            "\u0441\u043e\u0431\u0435\u0440",
+            "\u043f\u043e\u0441\u0442\u0440\u043e\u0438",
+        ),
+    )
+
+
+def _is_edit_like_request(text: str) -> bool:
+    lowered = _normalise_command_text(text)
+    if not lowered:
+        return False
+    mutation_words = (
+        "add",
+        "change",
+        "update",
+        "remove",
+        "delete",
+        "group",
+        "sample data",
+        "mock data",
+        "\u0434\u043e\u0431\u0430\u0432",
+        "\u0438\u0437\u043c\u0435\u043d",
+        "\u043e\u0431\u043d\u043e\u0432",
+        "\u0443\u0431\u0435\u0440",
+        "\u0443\u0434\u0430\u043b",
+        "\u0441\u0433\u0440\u0443\u043f",
+        "\u043f\u0440\u0438\u043c\u0435\u0440 \u0434\u0430\u043d\u043d",
+    )
+    target_words = (
+        "field",
+        "column",
+        "card",
+        "cards",
+        "data",
+        "row",
+        "rows",
+        "\u043f\u043e\u043b\u0435",
+        "\u043a\u043e\u043b\u043e\u043d",
+        "\u043a\u0430\u0440\u0442\u043e\u0447",
+        "\u0434\u0430\u043d\u043d",
+        "\u0441\u0442\u0440\u043e\u043a",
+    )
+    return _has_any(lowered, mutation_words) and _has_any(lowered, target_words)
 
 
 def _parse_builder_command(text: str, *, allow_create: bool = True, has_session: bool = False) -> dict[str, Any]:
@@ -4389,7 +4645,8 @@ def _parse_builder_command(text: str, *, allow_create: bool = True, has_session:
             if ref:
                 return {"intent": "project.switch", "project_ref": ref, "confidence": 1.0, "source": "deterministic"}
 
-    if allow_create and (_is_explicit_create_request(raw) or (not has_session and _is_create_request(raw))):
+    edit_like = _is_edit_like_request(raw)
+    if allow_create and not edit_like and (_is_explicit_create_request(raw) or (not has_session and _is_create_request(raw))):
         return {"intent": "project.create", "idea": raw, "confidence": 1.0, "source": "deterministic"}
 
     return {"intent": "none"}
@@ -5137,28 +5394,10 @@ def chat(
     auto_apply: bool = True,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    started_at = time.perf_counter()
-    stage_started = started_at
-
-    def _log_stage(stage: str, **extra: Any) -> None:
-        nonlocal stage_started
-        now = time.perf_counter()
-        suffix = " ".join(f"{key}={value}" for key, value in extra.items())
-        _LOG.debug(
-            "builder chat phase=%s webspace=%s phase_ms=%.1f total_ms=%.1f%s",
-            stage,
-            str(webspace_id or ""),
-            (now - stage_started) * 1000.0,
-            (now - started_at) * 1000.0,
-            f" {suffix}" if suffix else "",
-        )
-        stage_started = now
-
     ws = _source_webspace_id(webspace_id, _meta)
     utterance = str(text or "").strip()
     session, binding = _target_session(ws)
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
-    _log_stage("target_session", resolved_ws=ws, has_session=bool(session), scenario=str((session or {}).get("scenario_id") or ""))
     if _is_guided_clarification_request(utterance):
         clarification = _builder_clarification_payload(text=utterance, webspace_id=ws, topic=topic)
         message = _guided_clarification_message(clarification)
@@ -5176,7 +5415,6 @@ def chat(
     command = _parse_builder_command(utterance, has_session=bool(session))
     command["raw"] = utterance
     intent = str(command.get("intent") or "")
-    _log_stage("command_parsed", intent=intent or "-")
     if intent == "project.list":
         return _handle_project_list_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
     if intent == "project.current":
@@ -5212,7 +5450,6 @@ def chat(
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
     result = update_current_scenario(instruction=utterance, webspace_id=ws, auto_apply=auto_apply, _meta=_meta)
-    _log_stage("update_current_scenario", status=str(result.get("status") or ""), ok=bool(result.get("ok")))
     if result.get("ok"):
         actions = result.get("message_actions") if isinstance(result.get("message_actions"), list) else None
         emit_kwargs = {
@@ -5223,14 +5460,11 @@ def chat(
             "topic_ref": result.get("topic") if isinstance(result.get("topic"), Mapping) else topic,
             "actions": actions,
         }
-        if str(result.get("status") or "") == "llm_pending":
+        if str(result.get("status") or "") in {"llm_pending", "llm_submitting"}:
             _schedule_safe_emit_chat(str(result.get("message") or ""), delay_s=0.0, **emit_kwargs)
         else:
             _safe_emit_chat(str(result.get("message") or ""), **emit_kwargs)
-        _log_stage("emit_chat")
-    final = {**result, "dialog": _dialog_state(ws, topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic)}
-    _log_stage("dialog_state")
-    return final
+    return {**result, "dialog": _dialog_state(ws, topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic)}
 
 
 @tool(summary="Create scenario prototype draft.", side_effects="local_write")
@@ -5929,6 +6163,106 @@ def _start_llm_webui_job_worker(
     thread.start()
 
 
+def _local_llm_job_id(session: Mapping[str, Any], instruction: str) -> str:
+    seed = f"{session.get('id') or ''}:{session.get('scenario_id') or ''}:{instruction}:{_now()}"
+    return f"builder_llm_submit_{_hash_suffix(seed)}"
+
+
+def _start_llm_webui_submit_worker(
+    *,
+    ws: str,
+    session: Mapping[str, Any],
+    binding: Mapping[str, Any],
+    patch: Mapping[str, Any],
+    request_text: str,
+    before_webui: Mapping[str, Any] | None,
+    local_job_id: str,
+    auto_apply: bool,
+    _meta: Mapping[str, Any] | None,
+) -> None:
+    def _runner() -> None:
+        loaded = _load_session(ws, str(session.get("id") or "")) or copy.deepcopy(dict(session))
+        preview_state = loaded.get("preview_state") if isinstance(loaded.get("preview_state"), Mapping) else _preview_state(session=loaded)
+        submit_result = _submit_llm_webui_transform_job(
+            session=loaded,
+            instruction=request_text,
+            preview_state=preview_state,
+            _meta=_meta,
+        )
+        topic = _builder_topic_ref(ws, session=loaded, binding=binding, _meta=_meta)
+        if not submit_result.get("pending"):
+            _mark_llm_job_failed(
+                ws=ws,
+                session=loaded,
+                job_id=local_job_id,
+                detail=str(submit_result.get("detail") or submit_result.get("error") or "llm_job_submit_failed"),
+                binding=binding,
+                topic_ref=topic,
+                _meta=_meta,
+            )
+            return
+        job_id = str(submit_result.get("job_id") or "").strip()
+        request_id = str(submit_result.get("request_id") or "").strip()
+        base_url = str(submit_result.get("base_url") or "").strip()
+        pending_jobs = dict(loaded.get("pending_llm_jobs") or {}) if isinstance(loaded.get("pending_llm_jobs"), Mapping) else {}
+        local_entry = dict(pending_jobs.get(local_job_id) or {})
+        local_entry.update(
+            {
+                "status": "submitted",
+                "root_job_id": job_id,
+                "request_id": request_id,
+                "base_url": base_url or None,
+                "submitted_at": _now(),
+                "timing": dict(submit_result.get("timing") or {}) if isinstance(submit_result.get("timing"), Mapping) else {},
+            }
+        )
+        pending_jobs[local_job_id] = local_entry
+        pending_jobs[job_id] = {
+            "schema": "adaos.builder.llm_job.v1",
+            "job_id": job_id,
+            "local_job_id": local_job_id,
+            "request_id": request_id,
+            "base_url": base_url,
+            "status": str(submit_result.get("status") or "queued"),
+            "request_text": request_text,
+            "patch_id": patch.get("id"),
+            "created_at": _now(),
+            "timing": dict(submit_result.get("timing") or {}) if isinstance(submit_result.get("timing"), Mapping) else {},
+        }
+        loaded["pending_llm_jobs"] = pending_jobs
+        _save_session(ws, loaded)
+        _safe_emit_chat(
+            str(submit_result.get("message") or (
+                f"{AGENT_LABEL}: отправил LLM-задачу для {loaded.get('scenario_id')}. Job: {job_id}."
+            )),
+            webspace_id=ws,
+            _meta=_meta,
+            session=loaded,
+            binding=binding,
+            topic_ref=topic,
+        )
+        _complete_llm_webui_job(
+            ws=ws,
+            session_id=str(loaded.get("id") or session.get("id") or ""),
+            binding=binding,
+            patch=patch,
+            request_text=request_text,
+            before_webui=before_webui,
+            job_id=job_id,
+            base_url=base_url,
+            request_id=request_id,
+            auto_apply=auto_apply,
+            _meta=_meta,
+        )
+
+    thread = threading.Thread(
+        target=_runner,
+        name=f"builder-llm-submit:{local_job_id}",
+        daemon=True,
+    )
+    thread.start()
+
+
 @tool(summary="Update current scenario prototype.", side_effects="local_write")
 def update_current_scenario(
     instruction: str,
@@ -5969,65 +6303,51 @@ def update_current_scenario(
     llm_owned_content_change = _wants_llm_owned_content_change(text)
     if text and _builder_llm_primary_enabled(_meta):
         if _builder_llm_async_enabled(_meta):
-            llm_result = _submit_llm_webui_transform_job(
+            local_job_id = _local_llm_job_id(session, text)
+            pending_jobs = dict(session.get("pending_llm_jobs") or {}) if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
+            pending_jobs[local_job_id] = {
+                "schema": "adaos.builder.llm_job.v1",
+                "job_id": local_job_id,
+                "status": "submitting",
+                "request_text": text,
+                "patch_id": patch.get("id"),
+                "created_at": _now(),
+            }
+            session["pending_llm_jobs"] = pending_jobs
+            _save_session(ws, session)
+            _start_llm_webui_submit_worker(
+                ws=ws,
                 session=session,
-                instruction=text,
-                preview_state=base_preview,
+                binding=binding,
+                patch=patch,
+                request_text=text,
+                before_webui=before_webui,
+                local_job_id=local_job_id,
+                auto_apply=auto_apply,
                 _meta=_meta,
             )
-            if llm_result.get("pending"):
-                job_id = str(llm_result.get("job_id") or "").strip()
-                request_id = str(llm_result.get("request_id") or "").strip()
-                base_url = str(llm_result.get("base_url") or "").strip()
-                pending_jobs = dict(session.get("pending_llm_jobs") or {}) if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
-                pending_jobs[job_id] = {
-                    "schema": "adaos.builder.llm_job.v1",
-                    "job_id": job_id,
-                    "request_id": request_id,
-                    "base_url": base_url,
-                    "status": str(llm_result.get("status") or "queued"),
-                    "request_text": text,
-                    "patch_id": patch.get("id"),
-                    "created_at": _now(),
-                    "timing": dict(llm_result.get("timing") or {}) if isinstance(llm_result.get("timing"), Mapping) else {},
-                }
-                session["pending_llm_jobs"] = pending_jobs
-                _save_session(ws, session)
-                _start_llm_webui_job_worker(
-                    ws=ws,
-                    session=session,
-                    binding=binding,
-                    patch=patch,
-                    request_text=text,
-                    before_webui=before_webui,
-                    job_id=job_id,
-                    base_url=base_url,
-                    request_id=request_id,
-                    auto_apply=auto_apply,
-                    _meta=_meta,
-                )
-                return {
-                    "ok": True,
-                    "status": "llm_pending",
-                    "session_id": session.get("id"),
-                    "scenario_id": session.get("scenario_id"),
-                    "patch": patch,
-                    "preview_state": base_preview,
-                    "topic": {k: v for k, v in topic.items() if k != "stored"},
-                    "pending_action": None,
-                    "llm_job": {
-                        "job_id": job_id,
-                        "request_id": request_id,
-                        "base_url": base_url or None,
-                        "status": str(llm_result.get("status") or "queued"),
-                        "timing": dict(llm_result.get("timing") or {}) if isinstance(llm_result.get("timing"), Mapping) else {},
-                    },
-                    "message": str(llm_result.get("message") or (
-                        f"{AGENT_LABEL}: \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u043b LLM-\u0437\u0430\u0434\u0430\u0447\u0443 "
-                        f"\u0434\u043b\u044f {session.get('scenario_id')}."
-                    )),
-                    "dialog": _dialog_state(ws, topic_ref=topic),
-                }
+            return {
+                "ok": True,
+                "status": "llm_submitting",
+                "session_id": session.get("id"),
+                "scenario_id": session.get("scenario_id"),
+                "patch": patch,
+                "preview_state": base_preview,
+                "topic": {k: v for k, v in topic.items() if k != "stored"},
+                "pending_action": None,
+                "llm_job": {
+                    "job_id": local_job_id,
+                    "status": "submitting",
+                    "request_id": "",
+                    "base_url": None,
+                    "timing": {"submit_deferred": True},
+                },
+                "message": (
+                    f"{AGENT_LABEL}: \u043f\u0440\u0438\u043d\u044f\u043b \u0437\u0430\u043f\u0440\u043e\u0441 \u0434\u043b\u044f {session.get('scenario_id')} "
+                    f"\u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u044e LLM-\u0437\u0430\u0434\u0430\u0447\u0443. Job: {local_job_id}."
+                ),
+                "dialog": _dialog_state(ws, topic_ref=topic),
+            }
         else:
             llm_result = _apply_llm_webui_transform(session=session, instruction=text, preview_state=base_preview, _meta=_meta)
         if llm_result.get("ok"):
@@ -6257,6 +6577,10 @@ def update_current_scenario(
             "message": message,
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
+    if patch["operation"] != "llm_webui_transform" and isinstance(session.get("preview_state"), dict):
+        preview_for_rebuild = copy.deepcopy(dict(session["preview_state"]))
+        preview_for_rebuild.pop("page_schema", None)
+        session["preview_state"] = preview_for_rebuild
     return _finalize_scenario_update(
         ws=ws,
         session=session,
