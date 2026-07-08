@@ -3660,6 +3660,12 @@ def _normalise_llm_webui_payload(
     previous_preview: Mapping[str, Any],
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     data = copy.deepcopy(dict(payload))
+    if len(data) == 1:
+        for wrapper_key in ("adaos.webui.v1", "webui", "manifest"):
+            wrapped = data.get(wrapper_key)
+            if isinstance(wrapped, Mapping):
+                data = copy.deepcopy(dict(wrapped))
+                break
     legacy_preview = data.get("preview_state") if isinstance(data.get("preview_state"), Mapping) else {}
     page_schema = _extract_webui_page_schema(data)
     if not page_schema:
