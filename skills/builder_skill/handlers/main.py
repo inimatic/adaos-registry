@@ -512,6 +512,25 @@ def _chat_meta(
         binding=binding,
         _meta=meta,
     )
+    if prompt_topic_id:
+        scenario_id = str((session or {}).get("scenario_id") or (binding or {}).get("runtime_scenario_id") or "").strip()
+        active_draft_id = str((session or {}).get("draft_id") or (binding or {}).get("active_draft_id") or "").strip()
+        source_ws = str(meta.get("source_webspace_id") or _source_webspace_id(webspace_id, _meta)).strip() or webspace_id
+        dev_ws = str((binding or {}).get("dev_webspace_id") or _paired_dev_webspace_id(source_ws) or "").strip()
+        topic = {k: v for k, v in dict(topic or {}).items() if v is not None}
+        topic["schema"] = "adaos.conversation.topic_ref.v1"
+        topic["thread_id"] = prompt_topic_id
+        topic["topic_id"] = prompt_topic_id
+        topic["topic_kind"] = "builder_scenario"
+        topic["webspace_id"] = webspace_id
+        topic["source_webspace_id"] = source_ws
+        topic["active_draft_id"] = active_draft_id or None
+        topic["scenario_id"] = scenario_id or None
+        topic["dev_webspace_id"] = dev_ws or None
+        topic["project_id"] = scenario_id or active_draft_id or None
+        topic["conversation_id"] = _conversation_id(webspace_id)
+        topic["channel_id"] = DIALOG_CHANNEL_ID
+        topic["owner"] = f"skill:{SKILL_ID}"
     thread_id = str(topic.get("thread_id") or "").strip()
     topic_id = str(topic.get("topic_id") or "").strip()
     if thread_id:
