@@ -3312,10 +3312,10 @@ def _builder_llm_async_enabled(_meta: Mapping[str, Any] | None = None) -> bool:
 def _builder_llm_job_submit_timeout_s() -> float:
     raw = os.getenv("ADAOS_BUILDER_LLM_JOB_SUBMIT_TIMEOUT_S")
     try:
-        value = float(raw) if raw else 3.0
+        value = float(raw) if raw else 15.0
     except (TypeError, ValueError):
-        value = 3.0
-    return max(0.75, min(value, 60.0))
+        value = 15.0
+    return max(3.0, min(value, 60.0))
 
 
 def _builder_llm_job_submit_warn_ms() -> float:
