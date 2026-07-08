@@ -6101,15 +6101,7 @@ def _mark_llm_job_failed(
     topic_ref: Mapping[str, Any] | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> None:
-    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
-    if job_id and isinstance(pending, dict) and isinstance(pending.get(job_id), Mapping):
-        updated = dict(pending)
-        item = dict(updated.get(job_id) or {})
-        item["status"] = "failed"
-        item["finished_at"] = _now()
-        item["detail"] = detail
-        updated[job_id] = item
-        session["pending_llm_jobs"] = updated
+    _update_llm_job_status(session, job_id, "failed", detail=detail)
     _save_session(ws, session)
     topic = topic_ref if isinstance(topic_ref, Mapping) else _builder_topic_ref(ws, session=session, binding=binding or {}, _meta=_meta)
     message = (
@@ -6117,6 +6109,90 @@ def _mark_llm_job_failed(
         f"\u0434\u043b\u044f {session.get('scenario_id')} \u043d\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043b\u0430\u0441\u044c. {detail}"
     ).strip()
     _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding or {}, topic_ref=topic)
+
+
+_ACTIVE_LLM_JOB_STATUSES = frozenset({"submitting", "submitted", "queued", "running"})
+
+
+def _update_llm_job_status(
+    session: dict[str, Any],
+    job_id: str,
+    status: str,
+    *,
+    detail: str | None = None,
+) -> None:
+    token = str(job_id or "").strip()
+    if not token:
+        return
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
+    if not isinstance(pending, dict):
+        return
+    updated = dict(pending)
+    related_ids: set[str] = {token}
+    current = updated.get(token)
+    if isinstance(current, Mapping):
+        for key in ("local_job_id", "root_job_id"):
+            value = str(current.get(key) or "").strip()
+            if value:
+                related_ids.add(value)
+    for key, value in list(updated.items()):
+        if not isinstance(value, Mapping):
+            continue
+        value_job_id = str(value.get("job_id") or key or "").strip()
+        local_job_id = str(value.get("local_job_id") or "").strip()
+        root_job_id = str(value.get("root_job_id") or "").strip()
+        if token in {value_job_id, local_job_id, root_job_id}:
+            related_ids.add(str(key))
+            if value_job_id:
+                related_ids.add(value_job_id)
+            if local_job_id:
+                related_ids.add(local_job_id)
+            if root_job_id:
+                related_ids.add(root_job_id)
+    now = _now()
+    for related_id in related_ids:
+        if not related_id or not isinstance(updated.get(related_id), Mapping):
+            continue
+        item = dict(updated.get(related_id) or {})
+        item["status"] = status
+        item["finished_at"] = now
+        if detail:
+            item["detail"] = detail
+        updated[related_id] = item
+    session["pending_llm_jobs"] = updated
+
+
+def _active_llm_job(session: Mapping[str, Any]) -> dict[str, Any] | None:
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
+    if not isinstance(pending, Mapping):
+        return None
+    try:
+        stale_after_s = max(float(_builder_llm_job_timeout_s()) + 60.0, 300.0)
+    except Exception:
+        stale_after_s = 300.0
+    now = _now()
+    candidates: list[dict[str, Any]] = []
+    for key, value in pending.items():
+        if not isinstance(value, Mapping):
+            continue
+        status = str(value.get("status") or "").strip().lower()
+        if status not in _ACTIVE_LLM_JOB_STATUSES:
+            continue
+        ts = value.get("submitted_at") or value.get("created_at") or value.get("started_at")
+        try:
+            age_s = max(0.0, now - float(ts))
+        except Exception:
+            age_s = 0.0
+        if age_s > stale_after_s:
+            continue
+        item = dict(value)
+        item.setdefault("job_id", str(key))
+        item["age_s"] = age_s
+        candidates.append(item)
+    if not candidates:
+        return None
+    candidates.sort(key=lambda item: float(item.get("created_at") or item.get("submitted_at") or 0.0))
+    return candidates[0]
 
 
 def _complete_llm_webui_job(
@@ -6259,14 +6335,7 @@ def _complete_llm_webui_job(
             )
             return
     llm_result["job"] = job
-    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
-    if isinstance(pending, dict) and job_id in pending:
-        updated = dict(pending)
-        item = dict(updated.get(job_id) or {})
-        item["status"] = "succeeded"
-        item["finished_at"] = _now()
-        updated[job_id] = item
-        session["pending_llm_jobs"] = updated
+    _update_llm_job_status(session, job_id, "succeeded")
     result = _finalize_llm_webui_transform_result(
         ws=ws,
         session=session,
@@ -6479,6 +6548,33 @@ def update_current_scenario(
     llm_owned_content_change = _wants_llm_owned_content_change(text)
     if text and _builder_llm_primary_enabled(_meta):
         if _builder_llm_async_enabled(_meta):
+            active_job = _active_llm_job(session)
+            if active_job:
+                active_job_id = (
+                    str(active_job.get("root_job_id") or "").strip()
+                    or str(active_job.get("job_id") or "").strip()
+                    or str(active_job.get("local_job_id") or "").strip()
+                )
+                status = str(active_job.get("status") or "").strip() or "running"
+                message = (
+                    f"{AGENT_LABEL}: LLM-задача для {session.get('scenario_id')} еще выполняется"
+                    f"{f' ({active_job_id})' if active_job_id else ''}. "
+                    "Дождитесь результата и повторите запрос."
+                )
+                return {
+                    "ok": True,
+                    "status": "llm_busy",
+                    "session_id": session.get("id"),
+                    "scenario_id": session.get("scenario_id"),
+                    "active_llm_job": {
+                        "job_id": active_job_id,
+                        "status": status,
+                        "age_s": active_job.get("age_s"),
+                    },
+                    "message": message,
+                    "topic": {k: v for k, v in topic.items() if k != "stored"},
+                    "dialog": _dialog_state(ws, topic_ref=topic),
+                }
             local_job_id = _local_llm_job_id(session, text)
             pending_jobs = dict(session.get("pending_llm_jobs") or {}) if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
             pending_jobs[local_job_id] = {
