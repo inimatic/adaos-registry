@@ -26,7 +26,6 @@ from adaos.sdk.io.media import (
     publish_media_file as sdk_publish_media_file,
 )
 from adaos.sdk.redevice import (
-    ReDeviceBridge,
     choose_endpoint as sdk_choose_endpoint,
     compact_endpoint,
     list_endpoints as sdk_list_endpoints,
@@ -1711,6 +1710,62 @@ def _offline_result(pair_code: str, endpoint: Mapping[str, Any] | None) -> dict[
     }
 
 
+def _endpoint_device_ref(endpoint: Mapping[str, Any] | None, pair_code: str | None = None) -> str:
+    data = _mapping(endpoint)
+    endpoint_id = _text(data.get("endpoint_id") or data.get("id"))
+    if endpoint_id:
+        return f"redevice:{endpoint_id}"
+    code = _text(pair_code or data.get("code") or data.get("pair_code"))
+    return f"redevice:{code}" if code else ""
+
+
+def _endpoint_media_session(
+    endpoint: Mapping[str, Any] | None,
+    pair_code: str,
+    *,
+    item_count: int,
+    direct_candidate_count: int,
+) -> dict[str, Any]:
+    try:
+        from adaos.services import endpoint_router
+
+        return endpoint_router.build_media_session(
+            endpoint=endpoint or {},
+            code=pair_code,
+            owner=_owner(),
+            intent="display.slideshow",
+            item_count=item_count,
+            primary_transport="endpoint_media_pull",
+            fallback_transport="root_relay_inline",
+            inline_fallback=direct_candidate_count <= 0,
+        )
+    except Exception:
+        return {
+            "schema_version": "endpoint-media-session.v1",
+            "intent": "display.slideshow",
+            "primary_transport": "endpoint_media_pull",
+            "fallback_transport": "root_relay_inline",
+            "inline_fallback": direct_candidate_count <= 0,
+            "item_count": int(item_count or 0),
+        }
+
+
+def _send_endpoint_command(
+    pair_code: str,
+    command: Mapping[str, Any],
+    *,
+    endpoint: Mapping[str, Any] | None = None,
+    constraints: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    return device_access.send_endpoint_command(
+        device_ref=_endpoint_device_ref(endpoint, pair_code) or None,
+        code=pair_code,
+        command=command,
+        requested_by=_owner(),
+        constraints=constraints,
+    )
+
+
 def _endpoint_payload(devices: list[dict[str, Any]], state: Mapping[str, Any]) -> dict[str, Any]:
     selected_codes = set(_healed_pair_codes(devices, _unique_texts(state.get("selected_codes"))))
     items = [_slideshow_endpoint_item(item, selected_codes) for item in devices]
@@ -1874,6 +1929,7 @@ def _build_command(
     *,
     autoplay: bool,
     transport: Mapping[str, Any] | None = None,
+    media_session: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     command_id = "cmd:slideshow:" + hashlib.sha256(f"{pair_code}:{_now()}".encode("utf-8")).hexdigest()[:16]
     owner = _owner()
@@ -1926,6 +1982,7 @@ def _build_command(
             "selected_folder": _text(state.get("selected_folder")),
             "current_index": _current_index(state, code=pair_code),
             "transport": transport_payload,
+            "media_session": dict(media_session or {}),
             "cache_policy": {
                 "schema": "redevice.slideshow.cache_policy.v1",
                 "max_current_items": _MAX_ENDPOINT_CURRENT,
@@ -1997,8 +2054,8 @@ def _send_to_selected(
         if skipped:
             state["last_surface_skipped_codes"] = skipped
         _save_state(state)
-    bridge = ReDeviceBridge()
     transports: dict[str, Any] = {}
+    media_sessions: dict[str, Any] = {}
     items_by_code: dict[str, list[dict[str, Any]]] = {}
     first_items: list[dict[str, Any]] = []
     first_content_bytes = 0
@@ -2042,11 +2099,18 @@ def _send_to_selected(
             allow_root_relay=True,
         )
         transports[pair_code] = transport
+        media_session = _endpoint_media_session(
+            endpoint_for_transport,
+            pair_code,
+            item_count=len(items),
+            direct_candidate_count=direct_candidate_count,
+        )
+        media_sessions[pair_code] = media_session
         # The skill owns slideshow sequencing. Endpoint-side autoplay is kept off
         # so legacy devices do not loop over a small local cache window.
-        command = _build_command(pair_code, items, state, autoplay=False, transport=transport)
+        command = _build_command(pair_code, items, state, autoplay=False, transport=transport, media_session=media_session)
         first_command_id = first_command_id or _text(command.get("command_id"))
-        res = bridge.send_command(pair_code, command)
+        res = _send_endpoint_command(pair_code, command, endpoint=devices_by_code.get(pair_code))
         queued = _mapping(res.get("command"))
         results.append(
             {
@@ -2085,6 +2149,8 @@ def _send_to_selected(
         },
         "transport": next(iter(transports.values()), {}),
         "transports": transports,
+        "media_session": next(iter(media_sessions.values()), {}),
+        "media_sessions": media_sessions,
         "results": results,
         "updated_at": _now(),
     }
@@ -2165,7 +2231,6 @@ def _stop_selected(
     if not selected_codes:
         device = _select_device(devices)
         selected_codes = [_text(device.get("code"))] if device else []
-    bridge = ReDeviceBridge()
     devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
     results: list[dict[str, Any]] = []
     first_command_id = ""
@@ -2192,7 +2257,7 @@ def _stop_selected(
                 "items": [],
             },
         }
-        res = bridge.send_command(pair_code, command)
+        res = _send_endpoint_command(pair_code, command, endpoint=endpoint)
         queued = _mapping(res.get("command"))
         results.append(
             {
@@ -2794,6 +2859,8 @@ def voice_control_redevice_slideshow(
     query = _text(device_name) or _device_query_from_text(text, resolved_action)
     resolved = device_access.resolve_endpoint_device(query=query, assignment="slideshow") if query else {}
     if not resolved.get("ok") and query:
+        resolved = device_access.resolve_endpoint_device(query=query, active_app="slideshow_skill")
+    if not resolved.get("ok") and query:
         resolved = device_access.resolve_endpoint_device(query=query)
     state = _load_state()
     code = _text(resolved.get("code")) if resolved.get("ok") else ""
@@ -2803,6 +2870,8 @@ def voice_control_redevice_slideshow(
         device_access.assign_endpoint(code=code, assignment="slideshow")
     elif not _unique_texts(state.get("selected_codes")):
         fallback = device_access.resolve_endpoint_device(assignment="slideshow")
+        if not fallback.get("ok"):
+            fallback = device_access.resolve_endpoint_device(active_app="slideshow_skill")
         if fallback.get("ok"):
             code = _text(fallback.get("code"))
             state["selected_codes"] = _unique_texts([code])
@@ -2832,7 +2901,7 @@ def rename_redevice_endpoint(
     webspace_id: str | None = None,
 ) -> dict[str, Any]:
     alias_list = _unique_texts(aliases)
-    result = ReDeviceBridge().update_profile(code, display_name=display_name, aliases=alias_list)
+    result = device_access.update_endpoint_profile(code=code, display_name=display_name, aliases=alias_list)
     devices = _load_devices()
     state = _load_state()
     payload = _endpoint_payload(devices, state)

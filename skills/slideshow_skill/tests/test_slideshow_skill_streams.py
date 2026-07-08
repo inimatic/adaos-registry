@@ -1024,6 +1024,34 @@ def test_select_endpoint_resends_running_surface(monkeypatch, tmp_path):
     assert sent == [["B"]]
 
 
+def test_voice_control_uses_active_app_resolution_when_assignment_missing(monkeypatch):
+    mod = _load_slideshow_module()
+    calls: list[dict] = []
+
+    def fake_resolve_endpoint_device(**kwargs):
+        calls.append(dict(kwargs))
+        if kwargs.get("active_app") == "slideshow_skill":
+            return {"ok": True, "device_ref": "redevice:endpoint-1", "code": "ABC123"}
+        return {"ok": False, "error": "endpoint_not_found"}
+
+    monkeypatch.setattr(mod.device_access, "resolve_endpoint_device", fake_resolve_endpoint_device)
+    monkeypatch.setattr(mod.device_access, "assign_endpoint", lambda **_kwargs: {"ok": True})
+    monkeypatch.setattr(mod, "_load_state", lambda: {"selected_codes": []})
+    monkeypatch.setattr(mod, "_save_state", lambda state: dict(state))
+    monkeypatch.setattr(
+        mod,
+        "control_redevice_slideshow",
+        lambda action, code=None, webspace_id=None: {"ok": True, "action": action, "code": code},
+    )
+
+    result = mod.voice_control_redevice_slideshow(action="next", device_name="Kitchen tablet")
+
+    assert result["ok"] is True
+    assert result["code"] == "ABC123"
+    assert any(call.get("assignment") == "slideshow" for call in calls)
+    assert any(call.get("active_app") == "slideshow_skill" for call in calls)
+
+
 def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):
     mod = _load_slideshow_module()
 
@@ -1042,6 +1070,12 @@ def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):
             "scope": "all",
         },
         autoplay=True,
+        media_session={
+            "schema_version": "endpoint-media-session.v1",
+            "primary_transport": "endpoint_media_pull",
+            "fallback_transport": "root_relay_inline",
+            "inline_fallback": False,
+        },
     )
     raw = json.dumps({"command": command}, separators=(",", ":")).encode("utf-8")
 
@@ -1050,6 +1084,9 @@ def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):
     assert command["expires_at"] >= int(time.time())
     assert command["payload"]["cache_policy"]["command_ttl_sec"] == mod._REDEVICE_COMMAND_TTL_S
     assert command["payload"]["cache_policy"]["receiver_disk_cache"] is True
+    assert command["payload"]["media_session"]["schema_version"] == "endpoint-media-session.v1"
+    assert command["payload"]["media_session"]["primary_transport"] == "endpoint_media_pull"
+    assert command["payload"]["media_session"]["inline_fallback"] is False
     assert item["cache_key"].startswith("slideshow:v1:")
     assert item["content_hash"]
     assert item["thumbnail_bytes"] < 48_000
@@ -1074,11 +1111,7 @@ def test_send_to_selected_skips_offline_endpoint_without_building_payload(monkey
         "_content_items_for_window",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("offline endpoint must not build command media")),
     )
-    monkeypatch.setattr(
-        mod,
-        "ReDeviceBridge",
-        lambda: type("Bridge", (), {"send_command": lambda self, *_args, **_kwargs: sent.append(_args)})(),
-    )
+    monkeypatch.setattr(mod.device_access, "send_endpoint_command", lambda *args, **kwargs: sent.append((args, kwargs)))
     monkeypatch.setattr(mod, "_session_payload", lambda *_args, **_kwargs: {"ok": True})
     monkeypatch.setattr(mod, "_publish", lambda *_args, **_kwargs: {"ok": True})
 
