@@ -41,6 +41,14 @@ except Exception:  # pragma: no cover
         return "default"
 
 
+def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
+    try:
+        value = int(str(os.environ.get(name) or "").strip() or default)
+    except Exception:
+        value = default
+    return max(minimum, min(maximum, value))
+
+
 _ENDPOINTS_RECEIVER = "slideshow_skill.endpoints"
 _PREVIEW_RECEIVER = "slideshow_skill.preview"
 _FOLDERS_RECEIVER = "slideshow_skill.folders"
@@ -71,6 +79,8 @@ _LAST_MEDIA_KEY = "slideshow_skill.last_media"
 _POLL_INTERVAL_S = 2.5
 _SNAPSHOT_DEBOUNCE_S = 1.0
 _SURFACE_REASSERT_INTERVAL_S = 20.0
+_REDEVICE_COMMAND_TTL_S = _env_int("SLIDESHOW_REDEVICE_COMMAND_TTL_S", 120, 15, 600)
+_REDEVICE_CACHE_MIN_FREE_FRACTION = 0.20
 _VOLATILE_STREAM_KEYS = {"updated_at"}
 _log = logging.getLogger("skills.slideshow_skill")
 _poll_lock = threading.Lock()
@@ -1313,6 +1323,7 @@ def _deferred_session_image(content_ref: str, *, reason: str) -> dict[str, Any]:
 def _content_item(path: Path) -> dict[str, Any]:
     thumb, cached = _thumbnail(path, _ENDPOINT_SIZE, "endpoint-cache-v6")
     ref = _content_ref(path)
+    content_hash = ref.rsplit(":", 1)[-1]
     media = _publish_media_file(thumb, ref, variant="endpoint")
     # Endpoint commands may be consumed by old native agents that cannot resolve
     # browser-relative hub paths. Only send concrete endpoint-reachable direct
@@ -1321,6 +1332,8 @@ def _content_item(path: Path) -> dict[str, Any]:
     content_url = candidates[0] if candidates else ""
     return {
         "content_ref": ref,
+        "content_hash": content_hash,
+        "cache_key": f"slideshow:v1:{content_hash}",
         "source_path": str(path),
         "source_name": path.name,
         "title": path.stem,
@@ -1328,6 +1341,7 @@ def _content_item(path: Path) -> dict[str, Any]:
         "cached": cached,
         "thumbnail_path": str(thumb),
         "thumbnail_bytes": thumb.stat().st_size,
+        "content_size_bytes": thumb.stat().st_size,
         "content_url": content_url,
         "content_url_candidates": candidates,
         "browser_content_path": _text(media.get("browser_path")),
@@ -1672,6 +1686,31 @@ def _slideshow_endpoint_item(endpoint: Mapping[str, Any], selected_codes: set[st
     }
 
 
+def _endpoint_online_state(endpoint: Mapping[str, Any] | None) -> str:
+    if not endpoint:
+        return "unknown"
+    return _text(compact_endpoint(endpoint).get("online_state")) or "unknown"
+
+
+def _endpoint_accepts_commands(endpoint: Mapping[str, Any] | None) -> bool:
+    return _endpoint_online_state(endpoint) == "online"
+
+
+def _offline_result(pair_code: str, endpoint: Mapping[str, Any] | None) -> dict[str, Any]:
+    return {
+        "code": pair_code,
+        "ok": False,
+        "error": "device_offline",
+        "command_id": "",
+        "state": "skipped",
+        "item_count": 0,
+        "content_bytes": 0,
+        "cache_budget_limited": False,
+        "online_state": _endpoint_online_state(endpoint),
+        "transport": {},
+    }
+
+
 def _endpoint_payload(devices: list[dict[str, Any]], state: Mapping[str, Any]) -> dict[str, Any]:
     selected_codes = set(_healed_pair_codes(devices, _unique_texts(state.get("selected_codes"))))
     items = [_slideshow_endpoint_item(item, selected_codes) for item in devices]
@@ -1759,6 +1798,7 @@ def _compact_result(item: Mapping[str, Any]) -> dict[str, Any]:
         "error": item.get("error"),
         "command_id": _text(item.get("command_id")),
         "state": _text(item.get("state")),
+        "online_state": _text(item.get("online_state")),
         "item_count": int(item.get("item_count") or 0),
         "content_bytes": int(item.get("content_bytes") or 0),
         "cache_budget_limited": bool(item.get("cache_budget_limited")),
@@ -1777,6 +1817,7 @@ def _compact_command_payload(payload: Mapping[str, Any] | None, *, include_items
         "source_dir": _text(data.get("source_dir")),
         "selected_codes": _unique_texts(data.get("selected_codes")),
         "target_codes": _unique_texts(data.get("target_codes")),
+        "sent_codes": _unique_texts(data.get("sent_codes")),
         "item_count": int(data.get("item_count") or 0),
         "cache_target": int(data.get("cache_target") or 0),
         "cache_budget_limited": bool(data.get("cache_budget_limited")),
@@ -1837,9 +1878,12 @@ def _build_command(
     command_id = "cmd:slideshow:" + hashlib.sha256(f"{pair_code}:{_now()}".encode("utf-8")).hexdigest()[:16]
     owner = _owner()
     transport_payload = dict(transport or {})
+    expires_at = int(time.time()) + _REDEVICE_COMMAND_TTL_S
     return {
         "command_id": command_id,
         "type": "display.render_surface",
+        "ttl_sec": _REDEVICE_COMMAND_TTL_S,
+        "expires_at": expires_at,
         "owner": owner,
         "transport": transport_payload,
         "active_app": {
@@ -1883,11 +1927,21 @@ def _build_command(
             "current_index": _current_index(state, code=pair_code),
             "transport": transport_payload,
             "cache_policy": {
+                "schema": "redevice.slideshow.cache_policy.v1",
                 "max_current_items": _MAX_ENDPOINT_CURRENT,
                 "max_favorite_items": 0,
                 "receiver_cache_items": _MAX_ENDPOINT_CURRENT,
                 "target_current_items": _MAX_ENDPOINT_CURRENT,
                 "inline_content_budget_bytes": _INLINE_CONTENT_BUDGET_BYTES,
+                "command_ttl_sec": _REDEVICE_COMMAND_TTL_S,
+                "receiver_disk_cache": True,
+                "receiver_cache_min_free_fraction": _REDEVICE_CACHE_MIN_FREE_FRACTION,
+            },
+            "cache": {
+                "schema": "redevice.image_cache.v1",
+                "namespace": "slideshow_skill",
+                "mode": "pull_or_inline",
+                "min_free_fraction": _REDEVICE_CACHE_MIN_FREE_FRACTION,
             },
             "items": items,
             "controls": {
@@ -1923,16 +1977,27 @@ def _send_to_selected(
             state["selected_codes"] = healed_configured
             configured_codes = healed_configured
             _save_state(state)
-    if not _endpoint_window(files, state, code=target_codes[0] if target_codes else None):
+    devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
+    requested_target_codes = list(target_codes)
+    results: list[dict[str, Any]] = []
+    target_codes = []
+    for pair_code in requested_target_codes:
+        endpoint = devices_by_code.get(pair_code)
+        if not _endpoint_accepts_commands(endpoint):
+            results.append(_offline_result(pair_code, endpoint))
+            continue
+        target_codes.append(pair_code)
+    if target_codes and not _endpoint_window(files, state, code=target_codes[0]):
         return {"ok": False, "error": "no_supported_photos", "source_dir": state.get("source_dir")}
     if isinstance(state, dict):
         now = time.time()
         state["last_surface_sync_at"] = now
         state["last_surface_target_codes"] = target_codes
+        skipped = [item["code"] for item in results if item.get("state") == "skipped"]
+        if skipped:
+            state["last_surface_skipped_codes"] = skipped
         _save_state(state)
     bridge = ReDeviceBridge()
-    devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
-    results: list[dict[str, Any]] = []
     transports: dict[str, Any] = {}
     items_by_code: dict[str, list[dict[str, Any]]] = {}
     first_items: list[dict[str, Any]] = []
@@ -1990,6 +2055,7 @@ def _send_to_selected(
                 "error": res.get("error"),
                 "command_id": queued.get("command_id") or command.get("command_id"),
                 "state": queued.get("state"),
+                "online_state": _endpoint_online_state(devices_by_code.get(pair_code)),
                 "item_count": len(items),
                 "content_bytes": content_bytes,
                 "cache_budget_limited": budget_limited,
@@ -2000,8 +2066,9 @@ def _send_to_selected(
         "ok": any(bool(item.get("ok")) for item in results),
         "command_id": first_command_id,
         "source_dir": state.get("source_dir"),
-        "selected_codes": configured_codes or target_codes,
-        "target_codes": target_codes,
+        "selected_codes": configured_codes or requested_target_codes,
+        "target_codes": requested_target_codes,
+        "sent_codes": target_codes,
         "item_count": len(first_items),
         "cache_target": _MAX_ENDPOINT_CURRENT,
         "cache_budget_limited": any_budget_limited,
@@ -2099,20 +2166,29 @@ def _stop_selected(
         device = _select_device(devices)
         selected_codes = [_text(device.get("code"))] if device else []
     bridge = ReDeviceBridge()
+    devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
     results: list[dict[str, Any]] = []
     first_command_id = ""
     for pair_code in selected_codes:
+        endpoint = devices_by_code.get(pair_code)
+        if not _endpoint_accepts_commands(endpoint):
+            results.append(_offline_result(pair_code, endpoint))
+            continue
         command_id = "cmd:slideshow-stop:" + hashlib.sha256(f"{pair_code}:{_now()}".encode("utf-8")).hexdigest()[:16]
         first_command_id = first_command_id or command_id
+        expires_at = int(time.time()) + _REDEVICE_COMMAND_TTL_S
         command = {
             "command_id": command_id,
             "type": "display.clear_surface",
+            "ttl_sec": _REDEVICE_COMMAND_TTL_S,
+            "expires_at": expires_at,
             "owner": _owner(),
             "payload": {
                 "surface_ref": "slideshow.viewer",
                 "surface_id": f"surface:slideshow:{command_id.split(':')[-1]}",
                 "active_app": None,
                 "fullscreen": False,
+                "cache_policy": {"command_ttl_sec": _REDEVICE_COMMAND_TTL_S},
                 "items": [],
             },
         }

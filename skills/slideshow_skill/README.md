@@ -41,8 +41,10 @@ Runtime state:
 - sync mode broadcasts skill-selected state to all selected endpoints;
 - when running in sync mode, the skill-selected frame is broadcast to all selected endpoints;
 - endpoint payload targets 4 current items, but root inline fallback is budget guarded;
+- endpoint commands carry a short TTL and are skipped for endpoints that are not currently online;
+- slideshow items carry stable `cache_key`/`content_hash` values so ReDevice can reuse endpoint-side disk cache entries;
 - when inline transport is selected, the endpoint receives as many compact cached frames as fit the command budget;
-- a future `content_url` pull route should provide the guaranteed 10-frame cache without inflating root commands.
+- ReDevice keeps the slideshow image cache best-effort and prunes oldest entries to preserve at least 20% free storage.
 
 Service behavior:
 

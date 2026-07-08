@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+import time
 from pathlib import Path
 from uuid import uuid4
 
@@ -1045,5 +1046,56 @@ def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):
     raw = json.dumps({"command": command}, separators=(",", ":")).encode("utf-8")
 
     assert len(command["payload"]["items"]) == 1
+    assert command["ttl_sec"] == mod._REDEVICE_COMMAND_TTL_S
+    assert command["expires_at"] >= int(time.time())
+    assert command["payload"]["cache_policy"]["command_ttl_sec"] == mod._REDEVICE_COMMAND_TTL_S
+    assert command["payload"]["cache_policy"]["receiver_disk_cache"] is True
+    assert item["cache_key"].startswith("slideshow:v1:")
+    assert item["content_hash"]
     assert item["thumbnail_bytes"] < 48_000
     assert len(raw) < 80_000
+
+
+def test_send_to_selected_skips_offline_endpoint_without_building_payload(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photo = tmp_path / "source.jpg"
+    photo.write_bytes(b"jpeg")
+
+    sent: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        mod,
+        "_load_devices",
+        lambda: [{"code": "OFFLINE1", "state": "approved", "display_name": "Tablet", "last_seen_at": 1}],
+    )
+    monkeypatch.setattr(mod, "_save_state", lambda state: state)
+    monkeypatch.setattr(
+        mod,
+        "_content_items_for_window",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("offline endpoint must not build command media")),
+    )
+    monkeypatch.setattr(
+        mod,
+        "ReDeviceBridge",
+        lambda: type("Bridge", (), {"send_command": lambda self, *_args, **_kwargs: sent.append(_args)})(),
+    )
+    monkeypatch.setattr(mod, "_session_payload", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(mod, "_publish", lambda *_args, **_kwargs: {"ok": True})
+
+    result = mod._send_to_selected(
+        {
+            "source_dir": str(tmp_path),
+            "selected_codes": ["OFFLINE1"],
+            "sync": True,
+            "running": True,
+            "current_index": 0,
+            "mode": "sequential",
+            "scope": "all",
+        },
+        [photo],
+    )
+
+    assert result["ok"] is False
+    assert result["results"][0]["error"] == "device_offline"
+    assert result["results"][0]["state"] == "skipped"
+    assert sent == []
