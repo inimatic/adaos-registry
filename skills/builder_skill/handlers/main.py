@@ -3341,9 +3341,9 @@ def _builder_llm_job_timeout_s() -> float:
 def _builder_llm_job_poll_interval_s() -> float:
     raw = os.getenv("ADAOS_BUILDER_LLM_JOB_POLL_INTERVAL_S")
     try:
-        value = float(raw) if raw else 2.0
+        value = float(raw) if raw else 1.0
     except (TypeError, ValueError):
-        value = 2.0
+        value = 1.0
     return max(0.5, min(value, 15.0))
 
 
