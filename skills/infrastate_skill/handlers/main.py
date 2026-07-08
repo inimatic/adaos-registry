@@ -66,6 +66,7 @@ _SUMMARY_RENDER_STATE_KEY = "infrastate.summary_render_state"
 _UI_STATE_FALLBACK: dict[str, Any] = {}
 _SUMMARY_RENDER_STATE_FALLBACK: dict[str, Any] = {}
 _BACKGROUND_REFRESH_DEBOUNCE_S = 0.35
+_BACKGROUND_REFRESH_TIMEOUT_S = max(2.0, float(os.getenv("ADAOS_INFRASTATE_BACKGROUND_REFRESH_TIMEOUT_S") or "60"))
 _REMOTE_VERSION_PROBE_ENABLED = str(os.getenv("ADAOS_INFRASTATE_REMOTE_VERSION_PROBE") or "1").strip().lower() in {"1", "true", "yes", "on"}
 _MARKETPLACE_CACHE_TTL_S = max(0.0, float(os.getenv("ADAOS_INFRASTATE_MARKETPLACE_CACHE_TTL_S") or "30"))
 _MARKETPLACE_REMOTE_FETCH_ENABLED = str(os.getenv("ADAOS_INFRASTATE_MARKETPLACE_REMOTE_FETCH") or "").strip().lower() in {"1", "true", "yes", "on"}
@@ -384,6 +385,7 @@ def _action_invalidates_marketplace(action_id: str) -> bool:
         "adaos_update",
         "marketplace",
         "marketplace_install",
+        "inventory_activate",
         "scenario_hard_pull",
         "scenario_uninstall",
         "skill_activate",
@@ -414,12 +416,18 @@ def _action_inventory_receivers(action_id: str) -> tuple[str, ...]:
         "adaos_update",
         "marketplace",
         "marketplace_install",
+        "inventory_activate",
     }:
         return (
             _skills_receiver(),
             _scenarios_receiver(),
             _marketplace_skills_receiver(),
             _marketplace_scenarios_receiver(),
+        )
+    if token in {"inventory_validate", "inventory_test"}:
+        return (
+            _skills_receiver(),
+            _scenarios_receiver(),
         )
     return ()
 
@@ -3304,6 +3312,268 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
     return out
 
 
+def _make_skill_manager(ctx) -> SkillManager:
+    return SkillManager(
+        repo=ctx.skills_repo,
+        registry=SqliteSkillRegistry(ctx.sql),
+        git=ctx.git,
+        paths=ctx.paths,
+        bus=getattr(ctx, "bus", None),
+        caps=ctx.caps,
+        settings=getattr(ctx, "settings", None),
+    )
+
+
+def _make_scenario_manager(ctx) -> ScenarioManager:
+    return ScenarioManager(
+        repo=ctx.scenarios_repo,
+        registry=SqliteScenarioRegistry(ctx.sql),
+        git=ctx.git,
+        paths=ctx.paths,
+        bus=getattr(ctx, "bus", None),
+        caps=ctx.caps,
+    )
+
+
+def _result_error(exc: BaseException) -> str:
+    return f"{type(exc).__name__}: {exc}"
+
+
+def _tail_text(value: Any, *, limit: int = 2400) -> str:
+    text = str(value or "")
+    if len(text) <= limit:
+        return text
+    return text[-limit:]
+
+
+def _serialize_validation_issues(issues: Any) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for issue in list(issues or []):
+        out.append(
+            {
+                "level": str(getattr(issue, "level", "") or ""),
+                "code": str(getattr(issue, "code", "") or ""),
+                "message": str(getattr(issue, "message", "") or issue or ""),
+                "where": getattr(issue, "where", None),
+            }
+        )
+    return out
+
+
+def _serialize_skill_tests(tests: Any) -> dict[str, dict[str, Any]]:
+    serialized: dict[str, dict[str, Any]] = {}
+    for test_name, test_result in dict(tests or {}).items():
+        serialized[str(test_name)] = {
+            "status": str(getattr(test_result, "status", "") or ""),
+            "detail": getattr(test_result, "detail", None),
+        }
+    return serialized
+
+
+def _skill_tests_ok(tests: Any) -> bool:
+    for test_result in dict(tests or {}).values():
+        status = str(getattr(test_result, "status", "") or "").strip().lower()
+        if status in {"failed", "failure", "error", "errored", "fail"}:
+            return False
+    return True
+
+
+def _inventory_activate_local(*, webspace_id: str | None = None) -> dict[str, Any]:
+    ctx = get_ctx()
+    target_webspace = str(webspace_id or default_webspace_id()).strip() or default_webspace_id()
+    skill_mgr = _make_skill_manager(ctx)
+    scenario_mgr = _make_scenario_manager(ctx)
+    result: dict[str, Any] = {
+        "ok": True,
+        "action": "inventory_activate",
+        "webspace_id": target_webspace,
+        "skills": [],
+        "scenarios": [],
+    }
+
+    skill_rows = [row for row in _skills_items(include_all=True) if row.get("can_activate")]
+    for row in skill_rows:
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        item: dict[str, Any] = {"name": name, "ok": False}
+        try:
+            prep = skill_mgr.prepare_runtime(name, run_tests=False, allow_deactivated=True)
+            slot = skill_mgr.activate_for_space(
+                name,
+                version=getattr(prep, "version", None),
+                slot=getattr(prep, "slot", None),
+                space="default",
+                webspace_id=target_webspace,
+            )
+            item.update(
+                {
+                    "ok": True,
+                    "version": getattr(prep, "version", None),
+                    "prepared": getattr(prep, "slot", None),
+                    "slot": slot,
+                }
+            )
+        except Exception as exc:
+            item["error"] = _result_error(exc)
+            result["ok"] = False
+        result["skills"].append(item)
+
+    for row in _scenario_items(include_all=True):
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        item = {"name": name, "ok": False}
+        try:
+            dep_result = scenario_mgr.bootstrap_dependencies(name, webspace_id=target_webspace)
+            required = [str(dep) for dep in list(dep_result.get("required") or []) if str(dep or "").strip()]
+            item.update(
+                {
+                    "ok": bool(dep_result.get("ok", True)),
+                    "required": required,
+                    "succeeded": list(dep_result.get("succeeded") or []),
+                    "failed": list(dep_result.get("failed") or []),
+                    "skipped": not required,
+                }
+            )
+            if not item["ok"]:
+                result["ok"] = False
+        except Exception as exc:
+            item["error"] = _result_error(exc)
+            result["ok"] = False
+        result["scenarios"].append(item)
+
+    result["activated_skills"] = [item["name"] for item in result["skills"] if item.get("ok")]
+    result["scenario_dependencies_checked"] = [item["name"] for item in result["scenarios"]]
+    return result
+
+
+def _inventory_validate_local(*, webspace_id: str | None = None) -> dict[str, Any]:
+    ctx = get_ctx()
+    skill_mgr = _make_skill_manager(ctx)
+    result: dict[str, Any] = {
+        "ok": True,
+        "action": "inventory_validate",
+        "webspace_id": str(webspace_id or default_webspace_id()).strip() or default_webspace_id(),
+        "skills": [],
+        "scenarios": [],
+    }
+
+    for row in _skills_items(include_all=True):
+        if not row.get("can_validate"):
+            continue
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        item: dict[str, Any] = {"name": name, "ok": False}
+        try:
+            report = skill_mgr.validate_skill(name, strict=False, probe_tools=False)
+            item.update(
+                {
+                    "ok": bool(getattr(report, "ok", False)),
+                    "issues": _serialize_validation_issues(getattr(report, "issues", []) or []),
+                }
+            )
+            if not item["ok"]:
+                result["ok"] = False
+        except Exception as exc:
+            item["error"] = _result_error(exc)
+            result["ok"] = False
+        result["skills"].append(item)
+
+    try:
+        from adaos.sdk.scenarios.runtime import ScenarioRuntime, load_scenario
+
+        runtime = ScenarioRuntime()
+        scenarios_root = Path(ctx.paths.scenarios_workspace_dir())
+        for row in _scenario_items(include_all=True):
+            if not row.get("can_validate"):
+                continue
+            name = str(row.get("name") or "").strip()
+            if not name:
+                continue
+            item: dict[str, Any] = {"name": name, "ok": False}
+            try:
+                model = load_scenario(scenarios_root / name)
+                errors = list(runtime.validate(model) or [])
+                item.update({"ok": not bool(errors), "errors": [str(err) for err in errors]})
+                if errors:
+                    result["ok"] = False
+            except Exception as exc:
+                item["error"] = _result_error(exc)
+                result["ok"] = False
+            result["scenarios"].append(item)
+    except Exception as exc:
+        result["ok"] = False
+        result["scenario_runtime_error"] = _result_error(exc)
+
+    return result
+
+
+def _inventory_test_local(*, webspace_id: str | None = None) -> dict[str, Any]:
+    ctx = get_ctx()
+    skill_mgr = _make_skill_manager(ctx)
+    result: dict[str, Any] = {
+        "ok": True,
+        "action": "inventory_test",
+        "webspace_id": str(webspace_id or default_webspace_id()).strip() or default_webspace_id(),
+        "skills": [],
+        "scenarios": [],
+    }
+
+    for row in _skills_items(include_all=True):
+        if not row.get("can_test"):
+            continue
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        item: dict[str, Any] = {"name": name, "ok": False}
+        try:
+            tests = skill_mgr.run_skill_tests(name)
+            item.update({"ok": _skill_tests_ok(tests), "tests": _serialize_skill_tests(tests)})
+            if not item["ok"]:
+                result["ok"] = False
+        except Exception as exc:
+            item["error"] = _result_error(exc)
+            result["ok"] = False
+        result["skills"].append(item)
+
+    scenarios_root = Path(ctx.paths.scenarios_workspace_dir())
+    for row in _scenario_items(include_all=True):
+        if not row.get("can_test"):
+            continue
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        tests_dir = scenarios_root / name / "tests"
+        item: dict[str, Any] = {"name": name, "ok": True, "skipped": True}
+        if tests_dir.is_dir() and any(tests_dir.glob("test_*.py")):
+            try:
+                proc = subprocess.run(
+                    ["pytest", "-q", str(tests_dir)],
+                    text=True,
+                    capture_output=True,
+                    timeout=300,
+                )
+                item.update(
+                    {
+                        "ok": proc.returncode == 0,
+                        "skipped": False,
+                        "returncode": proc.returncode,
+                        "stdout": _tail_text(proc.stdout),
+                        "stderr": _tail_text(proc.stderr),
+                    }
+                )
+                if proc.returncode != 0:
+                    result["ok"] = False
+            except Exception as exc:
+                item.update({"ok": False, "skipped": False, "error": _result_error(exc)})
+                result["ok"] = False
+        result["scenarios"].append(item)
+
+    return result
+
+
 def _skill_usage_by_scenarios() -> dict[str, list[str]]:
     try:
         ctx = get_ctx()
@@ -3477,25 +3747,57 @@ def _update_actions(conf, ui_state: dict[str, Any], reliability: dict[str, Any])
         return [
             {
                 "id": "adaos_update",
+                "label": "Update",
                 "title": title,
                 "status": "warn",
                 "description": "Remote update is available only from hub",
             }
         ]
-    return [
+    items = [
         {
             "id": "adaos_update",
+            "label": "Update",
             "title": title,
             "status": "ok",
             "description": description,
-        },
+        }
+    ]
+    if target_kind == "local":
+        items.extend(
+            [
+                {
+                    "id": "inventory_activate",
+                    "label": "Activate",
+                    "title": "Activate skills",
+                    "status": "ok",
+                    "description": "Activate prepared skill runtimes and refresh scenario dependencies.",
+                },
+                {
+                    "id": "inventory_validate",
+                    "label": "Validate",
+                    "title": "Validate skills & scenarios",
+                    "status": "ok",
+                    "description": "Validate installed workspace skills and scenarios.",
+                },
+                {
+                    "id": "inventory_test",
+                    "label": "Test",
+                    "title": "Test skills & scenarios",
+                    "status": "ok",
+                    "description": "Run available skill and scenario tests.",
+                },
+            ]
+        )
+    items.append(
         {
             "id": "marketplace",
+            "label": "Marketplace",
             "title": "Marketplace",
             "status": "ok",
             "description": "Browse registry catalog and install missing skills or scenarios.",
-        },
-    ]
+        }
+    )
+    return items
 
 
 def _adaos_update_local(*, dry_run: bool = False) -> dict[str, Any]:
@@ -3573,6 +3875,7 @@ def _adaos_update_local(*, dry_run: bool = False) -> dict[str, Any]:
                 source_version=source_version,
                 migrate_runtime=True,
                 ensure_installed=True,
+                retry_deactivated=True,
             )
             if bool(result.get("runtime_updated")) or bool(result.get("runtime_migrated")):
                 runtime_updated.append(name)
@@ -4700,7 +5003,10 @@ async def _background_refresh_worker() -> None:
                 background_refresh_error="",
             )
             try:
-                await _refresh_snapshot_async(webspace_id=webspace_id, allow_cache=True)
+                await asyncio.wait_for(
+                    _refresh_snapshot_async(webspace_id=webspace_id, allow_cache=True),
+                    timeout=_BACKGROUND_REFRESH_TIMEOUT_S,
+                )
             except (asyncio.CancelledError, RuntimeError) as exc:
                 if isinstance(exc, RuntimeError) and "Executor shutdown has been called" not in str(exc):
                     raise
@@ -7231,6 +7537,9 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
             "rollback",
             "drain",
             "restart_sidecar",
+            "inventory_activate",
+            "inventory_validate",
+            "inventory_test",
             "skill_activate",
             "skill_validate",
             "skill_test",
@@ -7262,6 +7571,22 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
             last_error="",
         )
         return result
+    if action_id in {"inventory_activate", "inventory_validate", "inventory_test"}:
+        webspace_id = str(_extract_param(payload, "webspace_id") or default_webspace_id()).strip() or default_webspace_id()
+        if action_id == "inventory_activate":
+            result = _inventory_activate_local(webspace_id=webspace_id)
+        elif action_id == "inventory_validate":
+            result = _inventory_validate_local(webspace_id=webspace_id)
+        else:
+            result = _inventory_test_local(webspace_id=webspace_id)
+        _write_ui_state(
+            last_action=action_id,
+            last_action_ts=time.time(),
+            last_refresh_ts=time.time(),
+            last_result=result,
+            last_error="" if bool(result.get("ok", False)) else str(result.get("error") or "inventory_action_failed"),
+        )
+        return result
     if action_id in {
         "skill_activate",
         "skill_validate",
@@ -7287,7 +7612,7 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
             settings=ctx.settings,
         )
         if action_id == "skill_activate":
-            prep = mgr.prepare_runtime(name, run_tests=False)
+            prep = mgr.prepare_runtime(name, run_tests=False, allow_deactivated=True)
             slot = mgr.activate_for_space(
                 name,
                 version=getattr(prep, "version", None),
@@ -7421,6 +7746,7 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
                 migrate_runtime=True,
                 ensure_installed=False,
                 require_active_version=bool(source_version),
+                retry_deactivated=True,
             )
             result = {
                 "ok": True,
@@ -7740,7 +8066,7 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
         if str(getattr(conf, "role", "") or "").strip().lower() != "hub":
             raise ValueError("remote member control can only be requested from hub")
         current_rev = str(status.get("target_rev") or os.getenv("ADAOS_REV") or "").strip()
-        current_version = str(status.get("target_version") or BUILD_INFO.version or "").strip()
+        current_version = str(_extract_param(payload, "target_version") or "").strip()
         request_action = {
             "member_start_update": "update",
             "member_cancel_update": "cancel",
@@ -7788,7 +8114,7 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
         return result
     if action_id == "start_update":
         current_rev = str(status.get("target_rev") or os.getenv("ADAOS_REV") or "").strip()
-        current_version = str(status.get("target_version") or BUILD_INFO.version or "").strip()
+        current_version = str(_extract_param(payload, "target_version") or "").strip()
         result = _post_local_admin(
             conf,
             "/api/admin/update/start",

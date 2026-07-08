@@ -252,6 +252,47 @@ def test_infrastate_update_actions_use_member_label():
     assert items[0]["title"] == "Update skills & scenarios (Edge One)"
 
 
+def test_infrastate_inventory_update_actions_include_bulk_controls():
+    mod = _load_infrastate_module()
+
+    class _Conf:
+        role = "hub"
+        node_id = "hub-1"
+
+    items = mod._update_actions(_Conf(), {"selected_node_id": "hub-1"}, {})
+
+    assert [item["id"] for item in items] == [
+        "adaos_update",
+        "inventory_activate",
+        "inventory_validate",
+        "inventory_test",
+        "marketplace",
+    ]
+    assert [item["label"] for item in items] == ["Update", "Activate", "Validate", "Test", "Marketplace"]
+
+
+def test_infrastate_inventory_bulk_action_dispatch_does_not_require_row_name(monkeypatch):
+    mod = _load_infrastate_module()
+
+    class _Conf:
+        role = "hub"
+        node_id = "hub-1"
+
+    ui_updates: list[dict[str, object]] = []
+    monkeypatch.setattr(mod, "_ui_state", lambda: {"selected_node_id": "hub-1"})
+    monkeypatch.setattr(mod, "_write_ui_state", lambda **kwargs: ui_updates.append(dict(kwargs)))
+    monkeypatch.setattr(
+        mod,
+        "_inventory_activate_local",
+        lambda *, webspace_id=None: {"ok": True, "action": "inventory_activate", "webspace_id": webspace_id},
+    )
+
+    result = mod._perform_action("inventory_activate", _Conf(), {"webspace_id": "desktop"})
+
+    assert result == {"ok": True, "action": "inventory_activate", "webspace_id": "desktop"}
+    assert ui_updates[-1]["last_action"] == "inventory_activate"
+
+
 def test_infrastate_set_node_names_prefers_selected_member_over_injected_local_node(monkeypatch):
     mod = _load_infrastate_module()
 
@@ -3168,6 +3209,28 @@ def test_infrastate_marketplace_action_opens_modal_without_host_roundtrip():
 
     assert any(action.get("on") == "click:marketplace" and action.get("type") == "openModal" for action in actions)
     assert not any(action.get("on") == "click" and action.get("target") == "infrastate.action" for action in actions)
+
+
+def test_infrastate_inventory_toolbar_wires_bulk_action_buttons():
+    webui = json.loads((Path(__file__).resolve().parents[1] / "webui.json").read_text(encoding="utf-8"))
+    widgets = webui["registry"]["modals"]["infrastate_modal"]["schema"]["widgets"]
+    update_actions = next(widget for widget in widgets if widget.get("id") == "infrastate-update-actions")
+    action_by_on = {action.get("on"): action for action in update_actions["actions"]}
+    defaults = webui["ydoc_defaults"]["data/infrastate"]["update_actions"]
+
+    assert [item["id"] for item in defaults] == [
+        "adaos_update",
+        "inventory_activate",
+        "inventory_validate",
+        "inventory_test",
+        "marketplace",
+    ]
+    for action_id in ["adaos_update", "inventory_activate", "inventory_validate", "inventory_test"]:
+        action = action_by_on[f"click:{action_id}"]
+        assert action.get("type") == "callHost"
+        assert action.get("target") == "infrastate.action"
+        assert (action.get("params") or {}).get("id") == "$event.id"
+    assert action_by_on["click:marketplace"].get("type") == "openModal"
 
 
 def test_infrastate_yjs_balancer_tab_uses_y_projection():

@@ -536,6 +536,42 @@
           "target": "infrastate.action",
           "params": {
             "id": "$event.id"
+          },
+          "feedback": {
+            "pending": { "disable": true, "label": "Updating" }
+          }
+        },
+        {
+          "on": "click:inventory_activate",
+          "type": "callHost",
+          "target": "infrastate.action",
+          "params": {
+            "id": "$event.id"
+          },
+          "feedback": {
+            "pending": { "disable": true, "label": "Activating" }
+          }
+        },
+        {
+          "on": "click:inventory_validate",
+          "type": "callHost",
+          "target": "infrastate.action",
+          "params": {
+            "id": "$event.id"
+          },
+          "feedback": {
+            "pending": { "disable": true, "label": "Validating" }
+          }
+        },
+        {
+          "on": "click:inventory_test",
+          "type": "callHost",
+          "target": "infrastate.action",
+          "params": {
+            "id": "$event.id"
+          },
+          "feedback": {
+            "pending": { "disable": true, "label": "Testing" }
           }
         },
         {
@@ -1108,12 +1144,35 @@
       "update_actions": [
         {
           "id": "adaos_update",
+          "label": "Update",
           "title": "Update skills & scenarios",
           "status": "ok",
           "description": "Run workspace sync on the selected node"
         },
         {
+          "id": "inventory_activate",
+          "label": "Activate",
+          "title": "Activate skills",
+          "status": "ok",
+          "description": "Activate prepared skill runtimes and refresh scenario dependencies"
+        },
+        {
+          "id": "inventory_validate",
+          "label": "Validate",
+          "title": "Validate skills & scenarios",
+          "status": "ok",
+          "description": "Validate installed workspace skills and scenarios"
+        },
+        {
+          "id": "inventory_test",
+          "label": "Test",
+          "title": "Test skills & scenarios",
+          "status": "ok",
+          "description": "Run available skill and scenario tests"
+        },
+        {
           "id": "marketplace",
+          "label": "Marketplace",
           "title": "Marketplace",
           "status": "ok",
           "description": "Browse registry catalog and install missing skills or scenarios"
