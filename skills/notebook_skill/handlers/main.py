@@ -37,6 +37,8 @@ _STATE_MEMORY_PREFIX = "notebook_state.v1"
 _LOG = logging.getLogger(_SKILL_NAME)
 _PROJECTION_TIMEOUT_S = 8.0
 _PROJECTION_DEBOUNCE_S = 0.2
+_LIST_PREVIEW_CHARS = 420
+_WIDGET_PREVIEW_CHARS = 1200
 _PROJECTION_LOCK = threading.Lock()
 _PROJECTION_PENDING: dict[str, dict[str, Any]] = {}
 _PROJECTION_WORKER: threading.Thread | None = None
@@ -337,6 +339,13 @@ def _preview(content: str, *, limit: int = 120) -> str:
     return text[: max(0, limit - 1)].rstrip() + "..."
 
 
+def _bounded_text(value: Any, *, limit: int) -> str:
+    text = str(value or "")
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "..."
+
+
 def _content_lines(content: Any) -> list[str]:
     text = str(content or "").replace("\r\n", "\n").replace("\r", "\n").strip()
     return text.split("\n") if text else []
@@ -355,9 +364,7 @@ def _note_card_preview(note: Mapping[str, Any], *, limit: int = 420) -> str:
     if len(lines) <= 1:
         return ""
     text = "\n".join(line.strip() for line in lines[1:]).strip()
-    if len(text) <= limit:
-        return text
-    return text[: max(0, limit - 1)].rstrip() + "..."
+    return _bounded_text(text, limit=limit)
 
 
 def _promote_note(note_id: str) -> None:
@@ -419,22 +426,29 @@ def _note_list_items() -> list[dict[str, Any]]:
         if not isinstance(note, Mapping):
             continue
         updated = float(note.get("updated_at") or 0)
-        content = str(note.get("content") or "")
-        preview = _note_card_preview(note)
+        preview = _note_card_preview(note, limit=_LIST_PREVIEW_CHARS)
         attachments = [_project_attachment(item) for item in list(note.get("attachments") or []) if isinstance(item, Mapping)]
+        image = next(
+            (
+                str(item.get("url") or "")
+                for item in attachments
+                if isinstance(item, Mapping) and item.get("kind") == "photo" and item.get("url")
+            ),
+            "",
+        )
         items.append(
             {
                 "id": note_id,
                 "title": _note_heading(note),
                 "subtitle": _now_iso(updated) if updated else "",
-                "content": content,
+                "content": preview,
                 "text": preview,
                 "preview": preview,
                 "description": preview,
                 "selected": "selected" if note_id == display_id else "",
                 "editing": "editing" if note_id == editing_id else "",
                 "attachment_count": len(attachments),
-                "image": next((item for item in attachments if isinstance(item, Mapping) and item.get("kind") == "photo"), None),
+                "image": image or None,
                 "updated_at": updated or None,
                 "version": int(note.get("version") or 0),
             }
@@ -445,9 +459,12 @@ def _note_list_items() -> list[dict[str, Any]]:
 def _snapshot() -> dict[str, Any]:
     display_note = _display_note()
     latest_note = _latest_note()
-    latest_preview = _note_card_preview(latest_note)
+    display_preview = _note_card_preview(display_note, limit=_WIDGET_PREVIEW_CHARS)
+    latest_preview = _note_card_preview(latest_note, limit=_WIDGET_PREVIEW_CHARS)
     editing_note = _editing_note()
     editor_note = editing_note or display_note
+    display_attachments = [_project_attachment(item) for item in list(display_note.get("attachments") or []) if isinstance(item, Mapping)]
+    latest_attachments = [_project_attachment(item) for item in list(latest_note.get("attachments") or []) if isinstance(item, Mapping)]
     editor = {
         "id": editor_note["id"],
         "content": editor_note["content"],
@@ -465,8 +482,12 @@ def _snapshot() -> dict[str, Any]:
         "editing_note_id": str(_STATE.get("editing_note_id") or ""),
         "display": {
             "id": display_note["id"],
-            "content": display_note["content"],
-            "attachments": [_project_attachment(item) for item in list(display_note.get("attachments") or []) if isinstance(item, Mapping)],
+            "title": _note_heading(display_note),
+            "content": display_preview,
+            "text": display_preview,
+            "preview": display_preview,
+            "description": display_preview,
+            "attachment_count": len(display_attachments),
             "updated_at": display_note.get("updated_at"),
             "updated_label": _now_iso(float(display_note.get("updated_at") or _now())),
             "version": int(display_note.get("version") or 0),
@@ -476,11 +497,11 @@ def _snapshot() -> dict[str, Any]:
         "latest": {
             "id": latest_note["id"],
             "title": _note_heading(latest_note),
-            "content": latest_note["content"],
+            "content": latest_preview,
             "text": latest_preview,
             "preview": latest_preview,
             "description": latest_preview,
-            "attachments": [_project_attachment(item) for item in list(latest_note.get("attachments") or []) if isinstance(item, Mapping)],
+            "attachment_count": len(latest_attachments),
             "updated_at": latest_note.get("updated_at"),
             "updated_label": _now_iso(float(latest_note.get("updated_at") or _now())),
             "version": int(latest_note.get("version") or 0),
@@ -491,11 +512,11 @@ def _snapshot() -> dict[str, Any]:
                     "id": latest_note["id"],
                     "title": _note_heading(latest_note),
                     "subtitle": _now_iso(float(latest_note.get("updated_at") or _now())),
-                    "content": latest_note["content"],
+                    "content": latest_preview,
                     "text": latest_preview,
                     "preview": latest_preview,
                     "description": latest_preview,
-                    "attachments": [_project_attachment(item) for item in list(latest_note.get("attachments") or []) if isinstance(item, Mapping)],
+                    "attachment_count": len(latest_attachments),
                     "updated_at": latest_note.get("updated_at"),
                 }
             ]
@@ -511,6 +532,8 @@ def _notes_stream_payload(snapshot: Mapping[str, Any] | None = None) -> dict[str
     editor = snap.get("editor") if isinstance(snap.get("editor"), Mapping) else {}
     latest = snap.get("latest") if isinstance(snap.get("latest"), Mapping) else {}
     widget = snap.get("widget") if isinstance(snap.get("widget"), Mapping) else {}
+    items = [_stream_list_item(item) for item in list(notes.get("items") or []) if isinstance(item, Mapping)]
+    widget_items = widget.get("items") if isinstance(widget.get("items"), list) else []
     return {
         "ok": True,
         "_stream_rev": _stream_revision(snap),
@@ -518,13 +541,80 @@ def _notes_stream_payload(snapshot: Mapping[str, Any] | None = None) -> dict[str
         "selected_note_id": str(snap.get("selected_note_id") or ""),
         "display_note_id": str(snap.get("display_note_id") or ""),
         "editing_note_id": str(snap.get("editing_note_id") or ""),
-        "display": deepcopy(dict(display)),
-        "editor": deepcopy(dict(editor)),
-        "latest": deepcopy(dict(latest)),
-        "widget": deepcopy(dict(widget)),
-        "items": list(notes.get("items") or []),
+        "display": _stream_note_summary(display),
+        "editor": _stream_editor(editor),
+        "latest": _stream_note_summary(latest),
+        "widget": {"items": [_stream_widget_item(item) for item in widget_items if isinstance(item, Mapping)]},
+        "items": items,
         "updated_at": snap.get("updated_at"),
     }
+
+
+def _without_empty(value: Mapping[str, Any]) -> dict[str, Any]:
+    return {key: item for key, item in value.items() if item is not None and item != ""}
+
+
+def _stream_list_item(item: Mapping[str, Any]) -> dict[str, Any]:
+    preview = _bounded_text(item.get("preview") or item.get("text") or item.get("description") or item.get("content"), limit=_LIST_PREVIEW_CHARS)
+    return _without_empty(
+        {
+            "id": str(item.get("id") or ""),
+            "title": str(item.get("title") or ""),
+            "subtitle": str(item.get("subtitle") or ""),
+            "preview": preview,
+            "selected": item.get("selected"),
+            "editing": item.get("editing"),
+            "attachment_count": item.get("attachment_count"),
+            "image": item.get("image"),
+            "updated_at": item.get("updated_at"),
+            "version": item.get("version"),
+        }
+    )
+
+
+def _stream_note_summary(item: Mapping[str, Any]) -> dict[str, Any]:
+    preview = _bounded_text(item.get("preview") or item.get("text") or item.get("description") or item.get("content"), limit=_WIDGET_PREVIEW_CHARS)
+    return _without_empty(
+        {
+            "id": str(item.get("id") or ""),
+            "title": str(item.get("title") or ""),
+            "text": preview,
+            "preview": preview,
+            "attachment_count": item.get("attachment_count"),
+            "updated_at": item.get("updated_at"),
+            "updated_label": item.get("updated_label"),
+            "version": item.get("version"),
+        }
+    )
+
+
+def _stream_widget_item(item: Mapping[str, Any]) -> dict[str, Any]:
+    text = _bounded_text(item.get("text") or item.get("preview") or item.get("description") or item.get("content"), limit=_WIDGET_PREVIEW_CHARS)
+    return _without_empty(
+        {
+            "id": str(item.get("id") or ""),
+            "title": str(item.get("title") or ""),
+            "subtitle": str(item.get("subtitle") or ""),
+            "text": text,
+            "attachment_count": item.get("attachment_count"),
+            "updated_at": item.get("updated_at"),
+        }
+    )
+
+
+def _stream_editor(editor: Mapping[str, Any]) -> dict[str, Any]:
+    attachments = editor.get("attachments") if isinstance(editor.get("attachments"), list) else []
+    return _without_empty(
+        {
+            "id": str(editor.get("id") or ""),
+            "content": str(editor.get("content") or ""),
+            "attachments": [_project_attachment(item) for item in attachments if isinstance(item, Mapping)],
+            "updated_at": editor.get("updated_at"),
+            "updated_label": editor.get("updated_label"),
+            "version": editor.get("version"),
+            "editing": editor.get("editing"),
+        }
+    )
 
 
 def _stream_revision(snapshot: Mapping[str, Any]) -> int:
@@ -904,35 +994,77 @@ def _attachment_icon(kind: str, mime: Any) -> str:
     return "document-attach-outline"
 
 
+def _compact_artifact_ref(
+    artifact: Mapping[str, Any],
+    *,
+    purpose: str,
+    name: str,
+    relative_path: str,
+    mime: str | None,
+    size_bytes: Any,
+) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    artifact_id = str(artifact.get("artifact_id") or artifact.get("id") or "").strip()
+    sha256 = str(artifact.get("sha256") or "").strip()
+    if not artifact_id and sha256:
+        artifact_id = f"skill_file:{_SKILL_NAME}:{purpose}:{sha256[:16]}"
+    if artifact_id:
+        out["artifact_id"] = artifact_id
+        out["id"] = artifact_id
+    if sha256:
+        out["sha256"] = sha256
+    if purpose:
+        out["purpose"] = purpose
+    if name:
+        out["name"] = name
+    if relative_path:
+        out["relative_path"] = relative_path
+    if mime:
+        out["mime"] = mime
+    if size_bytes:
+        out["size_bytes"] = size_bytes
+    return out
+
+
 def _project_attachment(value: Mapping[str, Any]) -> dict[str, Any]:
-    out = dict(value or {})
-    artifact = out.get("artifact_ref") if isinstance(out.get("artifact_ref"), Mapping) else {}
-    kind = "photo" if str(out.get("kind") or "").strip() == "photo" else "file"
-    name = str(out.get("name") or artifact.get("name") or artifact.get("filename") or "attachment").strip()
-    mime = str(out.get("mime") or artifact.get("mime") or "").strip() or None
-    size_bytes = out.get("size_bytes") or artifact.get("size_bytes")
+    raw = dict(value or {})
+    artifact = raw.get("artifact_ref") if isinstance(raw.get("artifact_ref"), Mapping) else {}
+    kind = "photo" if str(raw.get("kind") or "").strip() == "photo" else "file"
+    name = str(raw.get("name") or artifact.get("name") or artifact.get("filename") or "attachment").strip()
+    mime = str(raw.get("mime") or artifact.get("mime") or "").strip() or None
+    size_bytes = raw.get("size_bytes") or artifact.get("size_bytes")
     purpose = str(artifact.get("purpose") or _default_attachment_purpose(kind)).strip()
-    relative_path = _clean_upload_relative_path(out.get("relative_path") or artifact.get("relative_path"))
+    relative_path = _clean_upload_relative_path(raw.get("relative_path") or artifact.get("relative_path"))
     if not relative_path:
         relative_path = _fallback_upload_relative_path(purpose=purpose, name=name)
-    url = str(out.get("url") or "").strip() or _skill_file_url(relative_path)
-    download_url = str(out.get("download_url") or "").strip() or _skill_file_url(relative_path, download=True)
-    out.update(
-        {
-            "kind": kind,
-            "name": name,
-            "mime": mime,
-            "size_bytes": size_bytes,
-            "summary": str(out.get("summary") or "").strip() or _attachment_summary(mime, size_bytes),
-            "icon": str(out.get("icon") or "").strip() or _attachment_icon(kind, mime),
-            "relative_path": relative_path or None,
-            "url": url or None,
-            "download_url": download_url or None,
-        }
-    )
+    url = str(raw.get("url") or "").strip() or _skill_file_url(relative_path)
+    download_url = str(raw.get("download_url") or "").strip() or _skill_file_url(relative_path, download=True)
+    attachment_id = str(raw.get("id") or artifact.get("artifact_id") or artifact.get("id") or "").strip()
+    out: dict[str, Any] = {
+        "id": attachment_id or None,
+        "kind": kind,
+        "name": name,
+        "mime": mime,
+        "size_bytes": size_bytes,
+        "summary": str(raw.get("summary") or "").strip() or _attachment_summary(mime, size_bytes),
+        "icon": str(raw.get("icon") or "").strip() or _attachment_icon(kind, mime),
+        "relative_path": relative_path or None,
+        "url": url or None,
+        "download_url": download_url or None,
+    }
     if url:
         out["path"] = url
-    return out
+    compact_ref = _compact_artifact_ref(
+        artifact,
+        purpose=purpose,
+        name=name,
+        relative_path=relative_path,
+        mime=mime,
+        size_bytes=size_bytes,
+    )
+    if compact_ref:
+        out["artifact_ref"] = compact_ref
+    return {key: item for key, item in out.items() if item is not None and item != ""}
 
 
 def _safe_upload_ref(
@@ -1003,7 +1135,7 @@ def _attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) -
         "relative_path": relative_path or None,
         "url": url or None,
         "download_url": download_url or None,
-        "path": url or body.get("path") or artifact.get("path") or artifact.get("local_path") or artifact.get("stored_path"),
+        "path": url or None,
     }
     note.setdefault("attachments", []).append(attachment)
     note["updated_at"] = _now()

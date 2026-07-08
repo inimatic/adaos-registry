@@ -412,10 +412,58 @@ def test_note_cards_use_first_line_title_and_remaining_preview(monkeypatch):
     item = created["snapshot"]["notes"]["items"][0]
 
     assert item["title"] == "Heading"
-    assert item["content"] == "Heading\nBody line one\nBody line two"
+    assert item["content"] == "Body line one\nBody line two"
     assert item["text"] == "Body line one\nBody line two"
     assert item["preview"] == "Body line one\nBody line two"
     assert item["description"] == "Body line one\nBody line two"
+
+
+def test_stream_payload_uses_compact_cards_and_safe_attachment_links(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+    body = " ".join(f"word-{idx}" for idx in range(360))
+    selected_id = ""
+
+    for idx in range(8):
+        created = mod.create_note({"content": f"Title {idx}\n{body}", "webspace_id": "desktop"})
+        selected_id = created["note"]["id"]
+
+    note = mod._STATE["notes"][selected_id]
+    note["attachments"] = [
+        {
+            "id": "att-local",
+            "kind": "photo",
+            "name": "local.gif",
+            "mime": "image/gif",
+            "size_bytes": 57051,
+            "artifact_ref": {
+                "artifact_id": "skill_file:notebook_skill:photos:abcdef0123456789",
+                "purpose": "photos",
+                "name": "local.gif",
+                "relative_path": "uploads/photos/local.gif",
+                "path": r"D:\git\inimatic\adaos\.adaos\workspace\skills\.runtime\notebook_skill\v0.1\data\files\uploads\photos\local.gif",
+                "local_path": r"D:\git\inimatic\adaos\.adaos\workspace\skills\.runtime\notebook_skill\v0.1\data\files\uploads\photos\local.gif",
+                "stored_path": r"D:\git\inimatic\adaos\.adaos\workspace\skills\.runtime\notebook_skill\v0.1\data\files\uploads\photos\local.gif",
+                "uri": "file:///D:/git/inimatic/adaos/.adaos/workspace/skills/.runtime/notebook_skill/v0.1/data/files/uploads/photos/local.gif",
+            },
+            "path": r"D:\git\inimatic\adaos\.adaos\workspace\skills\.runtime\notebook_skill\v0.1\data\files\uploads\photos\local.gif",
+        }
+    ]
+    mod._STATE["display_note_id"] = selected_id
+    mod._STATE["editing_note_id"] = selected_id
+
+    payload = mod._notes_stream_payload(mod._snapshot())
+    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
+
+    assert len(encoded.encode("utf-8")) * 3 < 65536
+    assert "content" not in payload["items"][0]
+    assert "text" not in payload["items"][0]
+    assert payload["items"][0]["preview"].endswith("...")
+    assert payload["editor"]["content"].startswith("Title 7\n")
+    assert payload["editor"]["attachments"][0]["url"] == "/api/skills/notebook_skill/files/content/uploads/photos/local.gif"
+    assert "local_path" not in encoded
+    assert "stored_path" not in encoded
+    assert "file:///" not in encoded
+    assert r"D:\\git" not in encoded
 
 
 def test_widget_snapshot_uses_latest_changed_note(monkeypatch):
@@ -430,4 +478,4 @@ def test_widget_snapshot_uses_latest_changed_note(monkeypatch):
     assert snapshot["widget"]["items"][0]["id"] == first["note"]["id"]
     assert snapshot["widget"]["items"][0]["title"] == "First note"
     assert snapshot["widget"]["items"][0]["text"] == "updated"
-    assert snapshot["widget"]["items"][0]["content"] == "First note\nupdated"
+    assert snapshot["widget"]["items"][0]["content"] == "updated"
