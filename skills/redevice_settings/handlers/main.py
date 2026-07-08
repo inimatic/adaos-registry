@@ -332,6 +332,7 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
             }
     ref = _device_ref_from_item(item)
     endpoint_id = _text(identity.get("endpoint_id") or identity.get("link_id") or item.get("endpoint_id"))
+    endpoint_short = endpoint_id[:8] if endpoint_id else ""
     pair_code = _text(identity.get("pair_code") or item.get("code"))
     effective_name = _text(policy.get("effective_name") or policy.get("display_name") or item.get("display_name") or item.get("title")) or endpoint_id or pair_code or "ReDevice"
     last_seen_at = observation.get("last_seen_at")
@@ -395,6 +396,7 @@ def _normalize_device(item: Mapping[str, Any], *, selected_ref: str | None = Non
         "ref": ref,
         "code": pair_code,
         "endpoint_id": endpoint_id,
+        "endpoint_short": endpoint_short,
         "lifecycle_state": lifecycle_state,
         "title": effective_name,
         "selected": selected,
@@ -441,6 +443,7 @@ def _table_item(item: Mapping[str, Any]) -> dict[str, Any]:
         "ref",
         "code",
         "endpoint_id",
+        "endpoint_short",
         "lifecycle_state",
         "title",
         "selected",
@@ -470,6 +473,7 @@ def _selected_stream_item(item: Mapping[str, Any] | None) -> dict[str, Any]:
         "ref",
         "code",
         "endpoint_id",
+        "endpoint_short",
         "lifecycle_state",
         "title",
         "selected",
@@ -641,6 +645,7 @@ def _summary(selected: Mapping[str, Any] | None, items: list[dict[str, Any]]) ->
     assignment = _text(selected_map.get("assignment")) or "idle"
     last_seen = _text(selected_map.get("last_seen")) or "-"
     code = _text(selected_map.get("code")) or "-"
+    endpoint_short = _text(selected_map.get("endpoint_short")) or "-"
     trust_level = _text(selected_map.get("trust_level")) or "-"
     version = _text(selected_map.get("software_version")) or "-"
     served_version = _text(selected_map.get("served_version")) or "unknown"
@@ -655,7 +660,7 @@ def _summary(selected: Mapping[str, Any] | None, items: list[dict[str, Any]]) ->
         "selected": {
             "value": _text(selected_map.get("title")) or "No endpoint selected",
             "label": _text(selected_map.get("online_state")) or "not selected",
-            "subtitle": f"seen {last_seen} | code {code}",
+            "subtitle": f"id {endpoint_short} | seen {last_seen} | code {code}",
             "description": f"{assignment} | trust {trust_level} | agent {version}/{served_version}",
             "color": "success" if selected_map.get("online") else "warning" if selected_map else "danger",
         },
@@ -739,6 +744,7 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
         "overview": [
             {"id": "name", "title": "Name", "description": _text(item.get("title")) or "-"},
             {"id": "ref", "title": "Device ref", "description": _text(item.get("ref")) or "-", "subtitle": _text(item.get("endpoint_id")) or "-"},
+            {"id": "endpoint_id", "title": "Endpoint ID", "description": _text(item.get("endpoint_id")) or "-", "subtitle": f"short {_text(item.get('endpoint_short')) or '-'}"},
             {"id": "subnet", "title": "Subnet", "description": _text(subnet.get("assistant_name")) or _text(subnet.get("zone_id")) or "-", "subtitle": f"node {_text(subnet.get('node_name') or subnet.get('hub_id')) or '-'}"},
             {"id": "assignment", "title": "Current assignment", "description": _text(item.get("assignment")) or "idle"},
             {"id": "active", "title": "Active app", "description": _text(item.get("active_app")) or "-", "subtitle": _text(item.get("active_surface")) or "-"},
@@ -786,6 +792,7 @@ def _section_rows(selected: Mapping[str, Any] | None) -> dict[str, list[dict[str
         "right_summary": [
             {"id": "name", "title": "Name", "description": _text(item.get("title")) or "-"},
             {"id": "state", "title": "State", "description": _text(item.get("online_state")) or "-", "subtitle": f"seen {_text(item.get('last_seen')) or '-'}"},
+            {"id": "endpoint", "title": "Endpoint", "description": _text(item.get("endpoint_short")) or "-", "subtitle": _text(item.get("code")) or "-"},
             {"id": "role", "title": "Role", "description": _text(item.get("assignment")) or "idle", "subtitle": _text(item.get("active_app")) or "-"},
             {"id": "version", "title": "Agent", "description": _text(item.get("software_version")) or "-", "subtitle": f"served {_text(item.get('served_version')) or 'unknown'}"},
             {"id": "trust", "title": "Trust", "description": _text(item.get("trust_level")) or "-", "subtitle": f"code {_text(item.get('code')) or '-'}"},

@@ -45,6 +45,8 @@ def test_normalize_device_and_sections_surface_agent_versions() -> None:
     assert item["software_version"] == "0.1.1"
     assert item["served_version"] == "0.1.2"
     assert item["version_status"] == "drift"
+    assert item["endpoint_short"] == "endpoint"
+    assert overview["endpoint_id"]["description"] == "endpoint-1"
     assert overview["agent_version"]["description"] == "0.1.1"
     assert "served 0.1.2" in overview["agent_version"]["subtitle"]
     assert about["version"]["details"]["served_version_code"] == "3"

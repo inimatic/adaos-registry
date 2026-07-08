@@ -202,7 +202,8 @@
                 "columns": [
                   { "key": "selected_label", "label": "Selected", "width": "82px" },
                   { "key": "title", "label": "Device" },
-                  { "key": "endpoint_id", "label": "Endpoint ID", "width": "210px" },
+                  { "key": "endpoint_short", "label": "Endpoint", "width": "96px" },
+                  { "key": "endpoint_id", "label": "Endpoint ID", "width": "190px" },
                   { "key": "code", "label": "Code", "width": "92px" },
                   { "key": "online_state", "label": "State", "width": "90px" },
                   { "key": "last_seen", "label": "Seen", "width": "72px" },
