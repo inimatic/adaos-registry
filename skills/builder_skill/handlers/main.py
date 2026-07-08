@@ -3473,13 +3473,6 @@ def _builder_llm_webui_transform_request(
     if project_system_prompt and project_system_prompt != _default_builder_system_prompt_text().strip():
         system_prompt += "\n\nProject-specific Builder system prompt:\n" + project_system_prompt[:8000]
     base_request = {
-        "instruction": instruction,
-        "scenario_id": session.get("scenario_id"),
-        "title": session.get("title"),
-        "current_webui_json": current_payload,
-        "runtime_context": _builder_runtime_context(session, current_payload),
-        "project_memory": project_memory,
-        "recent_patch_history": history,
         "webui_v1_abi": _builder_webui_abi_summary(),
         "runtime_component_contracts": _builder_runtime_component_contracts(),
         "webui_v1_schema": "see webui_v1_abi.schema_contract; validated by src/adaos/abi/webui.v1.schema.json",
@@ -3495,6 +3488,13 @@ def _builder_llm_webui_transform_request(
             "comment": "short user-facing text about what changed or why it could not be changed",
             "unable_reason": "short optional diagnostic if request cannot be implemented",
         },
+        "scenario_id": session.get("scenario_id"),
+        "title": session.get("title"),
+        "project_memory": project_memory,
+        "runtime_context": _builder_runtime_context(session, current_payload),
+        "recent_patch_history": history,
+        "current_webui_json": current_payload,
+        "instruction": instruction,
     }
     return {
         "current_payload": current_payload,
@@ -4331,6 +4331,71 @@ def _ensure_session_artifact_root(session: dict[str, Any], binding: Mapping[str,
     return False
 
 
+def _session_from_binding(webspace_id: str, binding: Mapping[str, Any]) -> dict[str, Any] | None:
+    scenario_id = str(binding.get("runtime_scenario_id") or "").strip()
+    draft_id = str(binding.get("active_draft_id") or "").strip()
+    if not scenario_id and not draft_id:
+        return None
+    session: dict[str, Any] = {
+        "id": draft_id or f"scenario.{scenario_id}",
+        "draft_id": draft_id or None,
+        "scenario_id": scenario_id or None,
+        "title": scenario_id.replace("_", " ").title() if scenario_id else "Builder Prototype",
+        "fields": [],
+        "patches": [],
+        "ui_revisions": [],
+        "created_at": _now(),
+        "updated_at": _now(),
+    }
+    if not _ensure_session_artifact_root(session, binding):
+        return None
+    root = _project_artifact_root(session)
+    if root is not None:
+        draft_payload = _read_json_file(root / "builder.draft.json")
+        artifact = draft_payload.get("artifact") if isinstance(draft_payload.get("artifact"), Mapping) else {}
+        metadata = draft_payload.get("metadata") if isinstance(draft_payload.get("metadata"), Mapping) else {}
+        if not str(session.get("draft_id") or "").strip():
+            session["draft_id"] = str(draft_payload.get("draft_id") or "").strip() or session.get("draft_id")
+        if not str(session.get("scenario_id") or "").strip():
+            session["scenario_id"] = str(artifact.get("id") or "").strip() or session.get("scenario_id")
+        source = draft_payload.get("source") if isinstance(draft_payload.get("source"), Mapping) else {}
+        session["source_idea"] = str(
+            source.get("utterance")
+            or metadata.get("source_idea")
+            or session.get("source_idea")
+            or ""
+        )
+        current_revision = root / "ui_revisions" / "current.txt"
+        try:
+            revision = current_revision.read_text(encoding="utf-8").strip()
+        except Exception:
+            revision = ""
+        if revision:
+            session["ui_revision"] = revision
+            revision_path = root / "ui_revisions" / f"{revision}.json"
+            if revision_path.exists():
+                session["ui_revisions"] = [{"revision": revision, "path": str(revision_path)}]
+        webui = _read_json_file(root / "webui.json")
+        page_schema = _extract_webui_page_schema(webui)
+        if page_schema:
+            title = str(page_schema.get("title") or session.get("title") or "").strip()
+            if title:
+                session["title"] = title
+            session["preview_state"] = {
+                "session_id": session["id"],
+                "scenario_id": session.get("scenario_id"),
+                "title": session.get("title"),
+                "page_schema": page_schema,
+                "version": str(session.get("ui_revision") or ""),
+            }
+    key = str(session.get("id") or session.get("draft_id") or session.get("scenario_id") or "").strip()
+    if not key:
+        return None
+    session["id"] = key
+    _save_session(webspace_id, session)
+    return session
+
+
 def _session_matches_binding(session: Mapping[str, Any], binding: Mapping[str, Any]) -> bool:
     draft_id = str(binding.get("active_draft_id") or "").strip()
     scenario_id = str(binding.get("runtime_scenario_id") or "").strip()
@@ -4359,7 +4424,7 @@ def _target_session(webspace_id: str) -> tuple[dict[str, Any] | None, dict[str, 
                 return resolved(session), binding
             if scenario_id and str(session.get("scenario_id") or "").strip() == scenario_id:
                 return resolved(session), binding
-        return None, binding
+        return _session_from_binding(webspace_id, binding), binding
     session = _load_session(webspace_id)
     if session and _session_matches_binding(session, binding):
         if _ensure_session_artifact_root(session, binding):
