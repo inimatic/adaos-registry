@@ -6440,9 +6440,13 @@ def update_current_scenario(
     auto_apply: bool = True,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    started_at = time.perf_counter()
     ws = _source_webspace_id(webspace_id, _meta)
+    source_done_at = time.perf_counter()
     session, binding = _target_session(ws)
+    target_done_at = time.perf_counter()
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
+    topic_done_at = time.perf_counter()
     if not session:
         return {
             "ok": True,
@@ -6468,7 +6472,9 @@ def update_current_scenario(
     fields = [dict(item) for item in session.get("fields", []) if isinstance(item, Mapping)]
     filters = [dict(item) for item in session.get("filters", []) if isinstance(item, Mapping)]
     base_preview = session.get("preview_state") if isinstance(session.get("preview_state"), dict) else _preview_state(session=session)
+    preview_done_at = time.perf_counter()
     before_webui = _current_webui_payload(session, base_preview)
+    before_webui_done_at = time.perf_counter()
     llm_result: dict[str, Any] | None = None
     llm_owned_content_change = _wants_llm_owned_content_change(text)
     if text and _builder_llm_primary_enabled(_meta):
@@ -6485,6 +6491,7 @@ def update_current_scenario(
             }
             session["pending_llm_jobs"] = pending_jobs
             _save_session(ws, session)
+            save_done_at = time.perf_counter()
             _start_llm_webui_submit_worker(
                 ws=ws,
                 session=session,
@@ -6496,6 +6503,24 @@ def update_current_scenario(
                 auto_apply=auto_apply,
                 _meta=_meta,
             )
+            worker_done_at = time.perf_counter()
+            dialog = _dialog_state(ws, topic_ref=topic)
+            dialog_done_at = time.perf_counter()
+            total_ms = (dialog_done_at - started_at) * 1000.0
+            if total_ms >= 1000:
+                _LOG.warning(
+                    "builder update async prepare slow scenario=%s total_ms=%.1f source_ms=%.1f target_ms=%.1f topic_ms=%.1f preview_ms=%.1f before_webui_ms=%.1f save_ms=%.1f worker_ms=%.1f dialog_ms=%.1f",
+                    str(session.get("scenario_id") or ""),
+                    total_ms,
+                    (source_done_at - started_at) * 1000.0,
+                    (target_done_at - source_done_at) * 1000.0,
+                    (topic_done_at - target_done_at) * 1000.0,
+                    (preview_done_at - topic_done_at) * 1000.0,
+                    (before_webui_done_at - preview_done_at) * 1000.0,
+                    (save_done_at - before_webui_done_at) * 1000.0,
+                    (worker_done_at - save_done_at) * 1000.0,
+                    (dialog_done_at - worker_done_at) * 1000.0,
+                )
             return {
                 "ok": True,
                 "status": "llm_submitting",
@@ -6516,7 +6541,7 @@ def update_current_scenario(
                     f"{AGENT_LABEL}: \u043f\u0440\u0438\u043d\u044f\u043b \u0437\u0430\u043f\u0440\u043e\u0441 \u0434\u043b\u044f {session.get('scenario_id')} "
                     f"\u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u044e LLM-\u0437\u0430\u0434\u0430\u0447\u0443. Job: {local_job_id}."
                 ),
-                "dialog": _dialog_state(ws, topic_ref=topic),
+                "dialog": dialog,
             }
         else:
             llm_result = _apply_llm_webui_transform(session=session, instruction=text, preview_state=base_preview, _meta=_meta)
