@@ -386,27 +386,28 @@ def _builder_topic_ref(
     binding = binding if isinstance(binding, Mapping) else {}
     prompt_topic_id = _prompt_project_topic_id(session=session, binding=binding)
     if prompt_topic_id and (
-        thread_id.startswith("thread.builder.")
-        or thread_id.startswith("builder:")
-        or topic_id.startswith("builder:")
+        thread_id != prompt_topic_id
+        or (topic_id and topic_id != prompt_topic_id)
     ):
         thread_id = prompt_topic_id
         topic_id = prompt_topic_id
         existing_topic = {}
     if thread_id:
         topic = {k: v for k, v in dict(existing_topic or {}).items() if v is not None}
-        topic.setdefault("schema", "adaos.conversation.topic_ref.v1")
-        topic.setdefault("thread_id", thread_id)
-        topic.setdefault("topic_id", topic_id or thread_id)
-        topic.setdefault("topic_kind", "builder_runtime")
-        topic.setdefault("webspace_id", webspace_id)
-        topic.setdefault("source_webspace_id", webspace_id)
-        topic.setdefault("active_draft_id", str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None)
-        topic.setdefault("scenario_id", str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None)
-        topic.setdefault("dev_webspace_id", str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None)
-        topic.setdefault("conversation_id", _conversation_id(webspace_id))
-        topic.setdefault("channel_id", DIALOG_CHANNEL_ID)
-        topic.setdefault("owner", f"skill:{SKILL_ID}")
+        scenario_id = str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None
+        topic["schema"] = "adaos.conversation.topic_ref.v1"
+        topic["thread_id"] = thread_id
+        topic["topic_id"] = topic_id or thread_id
+        topic["topic_kind"] = "builder_scenario" if prompt_topic_id else "builder_runtime"
+        topic["webspace_id"] = webspace_id
+        topic["source_webspace_id"] = webspace_id
+        topic["active_draft_id"] = str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None
+        topic["scenario_id"] = scenario_id
+        topic["project_id"] = scenario_id or topic.get("active_draft_id")
+        topic["dev_webspace_id"] = str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None
+        topic["conversation_id"] = _conversation_id(webspace_id)
+        topic["channel_id"] = DIALOG_CHANNEL_ID
+        topic["owner"] = f"skill:{SKILL_ID}"
         return topic
     session_topic = session.get("topic_ref") if isinstance(session.get("topic_ref"), Mapping) else {}
     if session_topic and str(session_topic.get("thread_id") or session_topic.get("topic_id") or "").strip():
@@ -415,21 +416,22 @@ def _builder_topic_ref(
         topic.setdefault("topic_id", str(session_topic.get("topic_id") or session_topic.get("thread_id") or "").strip())
         topic.setdefault("thread_id", str(session_topic.get("thread_id") or session_topic.get("topic_id") or "").strip())
         if prompt_topic_id and (
-            str(topic.get("thread_id") or "").startswith("thread.builder.")
-            or str(topic.get("thread_id") or "").startswith("builder:")
-            or str(topic.get("topic_id") or "").startswith("builder:")
+            str(topic.get("thread_id") or "").strip() != prompt_topic_id
+            or str(topic.get("topic_id") or "").strip() != prompt_topic_id
         ):
             topic["thread_id"] = prompt_topic_id
             topic["topic_id"] = prompt_topic_id
-        topic.setdefault("topic_kind", "builder_runtime")
-        topic.setdefault("webspace_id", webspace_id)
-        topic.setdefault("source_webspace_id", webspace_id)
-        topic.setdefault("active_draft_id", str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None)
-        topic.setdefault("scenario_id", str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None)
-        topic.setdefault("dev_webspace_id", str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None)
-        topic.setdefault("conversation_id", _conversation_id(webspace_id))
-        topic.setdefault("channel_id", DIALOG_CHANNEL_ID)
-        topic.setdefault("owner", f"skill:{SKILL_ID}")
+        scenario_id = str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None
+        topic["topic_kind"] = "builder_scenario" if prompt_topic_id else str(topic.get("topic_kind") or "builder_runtime")
+        topic["webspace_id"] = webspace_id
+        topic["source_webspace_id"] = webspace_id
+        topic["active_draft_id"] = str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None
+        topic["scenario_id"] = scenario_id
+        topic["project_id"] = scenario_id or topic.get("active_draft_id")
+        topic["dev_webspace_id"] = str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None
+        topic["conversation_id"] = _conversation_id(webspace_id)
+        topic["channel_id"] = DIALOG_CHANNEL_ID
+        topic["owner"] = f"skill:{SKILL_ID}"
         topic.setdefault("stored", bool(session_topic.get("stored")))
         return topic
     try:
