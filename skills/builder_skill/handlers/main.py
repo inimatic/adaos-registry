@@ -466,7 +466,14 @@ def _chat_meta(
     meta["conversation_owner"] = f"skill:{SKILL_ID}"
     prompt_topic_id = _prompt_project_topic_id(session=session, binding=binding)
     if prompt_topic_id:
-        meta.setdefault("conversation_topic_id", prompt_topic_id)
+        # The client may still carry a topic from the previously selected Prompt IDE
+        # project. The Builder runtime session is the source of truth for project
+        # scoped chat history, so replace stale topic fields before resolving refs.
+        meta["conversation_topic_id"] = prompt_topic_id
+        meta["conversation_thread_id"] = prompt_topic_id
+        meta["thread_id"] = prompt_topic_id
+        meta["topic_id"] = prompt_topic_id
+        meta.pop("builder_topic", None)
     meta.setdefault("active_agent_id", AGENT_ID)
     meta.setdefault("active_agent_label", AGENT_LABEL)
     meta.setdefault("active_agent_gender", "male")
@@ -481,11 +488,11 @@ def _chat_meta(
     thread_id = str(topic.get("thread_id") or "").strip()
     topic_id = str(topic.get("topic_id") or "").strip()
     if thread_id:
-        meta.setdefault("thread_id", thread_id)
-        meta.setdefault("conversation_thread_id", thread_id)
-        meta.setdefault("conversation_topic_id", thread_id)
+        meta["thread_id"] = thread_id
+        meta["conversation_thread_id"] = thread_id
+        meta["conversation_topic_id"] = thread_id
     if topic_id:
-        meta.setdefault("topic_id", topic_id)
+        meta["topic_id"] = topic_id
     if topic:
         meta.setdefault("builder_topic", {k: v for k, v in topic.items() if k != "stored"})
     return meta
