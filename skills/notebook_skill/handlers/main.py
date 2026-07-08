@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -666,116 +665,6 @@ def _stream_revision(snapshot: Mapping[str, Any]) -> int:
     return int(best_updated * 1000) * 1000 + min(version_total, 999)
 
 
-def _plain_json(value: Any) -> Any:
-    to_json = getattr(value, "to_json", None)
-    if callable(to_json):
-        try:
-            raw = to_json()
-            if isinstance(raw, str):
-                try:
-                    return json.loads(raw)
-                except json.JSONDecodeError:
-                    return raw
-            return raw
-        except Exception:
-            return None
-    if isinstance(value, Mapping):
-        return {str(k): _plain_json(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_plain_json(v) for v in value]
-    return value
-
-
-def _is_y_map(value: Any) -> bool:
-    return callable(getattr(value, "get", None)) and callable(getattr(value, "set", None)) and callable(getattr(value, "to_json", None))
-
-
-def _json_equal(left: Any, right: Any) -> bool:
-    return _plain_json(left) == _plain_json(right)
-
-
-def _write_notebook_snapshot_to_doc(ydoc: Any, txn: Any, snapshot: Mapping[str, Any]) -> bool:
-    payload = deepcopy(dict(snapshot))
-    data = ydoc.get_map("data")
-    desktop = data.get("desktop")
-    if _is_y_map(desktop):
-        current = desktop.get("notebook")
-        if _json_equal(current, payload):
-            return False
-        desktop.set(txn, "notebook", payload)
-        return True
-
-    desktop_payload = _plain_json(desktop)
-    if not isinstance(desktop_payload, dict):
-        desktop_payload = {}
-    if _json_equal(desktop_payload.get("notebook"), payload):
-        return False
-    desktop_payload["notebook"] = payload
-    data.set(txn, "desktop", desktop_payload)
-    return True
-
-
-def _projection_webspace_ids(webspace_id: str) -> list[str]:
-    return _state_webspace_ids(webspace_id)
-
-
-async def _project_notebook_snapshot_webspace_async(snapshot: Mapping[str, Any], webspace_id: str) -> None:
-    from adaos.services.yjs.doc import async_get_ydoc, mutate_live_room
-    from adaos.services.yjs.store import get_ystore_for_webspace
-
-    ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
-    source = f"{_SKILL_NAME}.projection"
-    owner = f"skill:{_SKILL_NAME}"
-    channel = "projection.yjs.notebook"
-    persisted_updates: list[dict[str, Any]] = []
-
-    def _on_store_update(meta: dict[str, Any]) -> None:
-        persisted_updates.append(dict(meta or {}))
-
-    def _mutator(doc: Any, txn: Any) -> None:
-        _write_notebook_snapshot_to_doc(doc, txn, snapshot)
-
-    def _mutate_live() -> None:
-        mutate_live_room(
-            ws,
-            _mutator,
-            root_names=["data"],
-            source=source,
-            owner=owner,
-            channel=channel,
-            governed=True,
-        )
-
-    try:
-        _mutate_live()
-    except Exception:
-        _LOG.warning("failed to project notebook snapshot via live room webspace=%s", ws, exc_info=True)
-
-    async with async_get_ydoc(
-        ws,
-        load_mark_roots=["data"],
-        governed=True,
-        publish_live_room=False,
-        write_source=source,
-        write_owner=owner,
-        write_channel=channel,
-        write_update_callback=_on_store_update,
-    ) as ydoc:
-        with ydoc.begin_transaction() as txn:
-            _write_notebook_snapshot_to_doc(ydoc, txn, snapshot)
-    if persisted_updates:
-        await get_ystore_for_webspace(ws).backup_to_disk(compact_runtime=True, backup_kind="notebook_projection")
-    try:
-        _mutate_live()
-    except Exception:
-        _LOG.warning("failed to refresh notebook snapshot in live room webspace=%s", ws, exc_info=True)
-
-
-async def _project_notebook_snapshot_async(snapshot: Mapping[str, Any], webspace_id: str) -> None:
-    for ws in _projection_webspace_ids(webspace_id):
-        await _project_notebook_snapshot_webspace_async(snapshot, ws)
-
-
 def _project_notebook_snapshot_now(snapshot: Mapping[str, Any], webspace_id: str) -> None:
     snap = deepcopy(dict(snapshot))
     ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
@@ -783,8 +672,6 @@ def _project_notebook_snapshot_now(snapshot: Mapping[str, Any], webspace_id: str
         ctx_subnet.set("notebook.snapshot", snap, webspace_id=ws)
     except Exception:
         _LOG.warning("failed to project notebook snapshot via ctx_subnet webspace=%s", ws, exc_info=True)
-
-    asyncio.run(_project_notebook_snapshot_async(snap, ws))
 
 
 def _projection_worker() -> None:

@@ -504,6 +504,21 @@ def test_stream_payload_uses_compact_cards_and_safe_attachment_links(monkeypatch
     assert r"D:\\git" not in encoded
 
 
+def test_snapshot_projection_uses_ctx_subnet_without_custom_yjs_writer(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+    calls = []
+
+    monkeypatch.setattr(
+        mod.ctx_subnet,
+        "set",
+        lambda slot, value, webspace_id=None: calls.append((slot, value, webspace_id)),
+    )
+
+    mod._project_notebook_snapshot_now({"ok": True, "notes": {"items": []}}, "desktop")
+
+    assert calls == [("notebook.snapshot", {"ok": True, "notes": {"items": []}}, "desktop")]
+
+
 def test_widget_snapshot_uses_latest_changed_note(monkeypatch):
     mod, _projected, _streams = load_module(monkeypatch)
 
