@@ -4331,6 +4331,63 @@ def _ensure_session_artifact_root(session: dict[str, Any], binding: Mapping[str,
     return False
 
 
+def _sync_session_from_artifacts(session: dict[str, Any], binding: Mapping[str, Any] | None = None) -> bool:
+    changed = False
+    if binding is not None:
+        changed = _ensure_session_artifact_root(session, binding) or changed
+    root = _project_artifact_root(session)
+    if root is None:
+        return changed
+
+    revision = ""
+    current_revision = root / "ui_revisions" / "current.txt"
+    try:
+        revision = current_revision.read_text(encoding="utf-8").strip()
+    except Exception:
+        revision = ""
+    if revision:
+        if str(session.get("ui_revision") or "").strip() != revision:
+            session["ui_revision"] = revision
+            changed = True
+        if str(session.get("version") or "").strip() != revision:
+            session["version"] = revision
+            changed = True
+        revision_path = root / "ui_revisions" / f"{revision}.json"
+        if revision_path.exists():
+            revisions = [dict(item) for item in session.get("ui_revisions", []) if isinstance(item, Mapping)]
+            if not any(str(item.get("revision") or "").strip() == revision for item in revisions):
+                revisions.append({"revision": revision, "path": str(revision_path)})
+                session["ui_revisions"] = revisions[-20:]
+                changed = True
+
+    webui = _read_json_file(root / "webui.json")
+    if webui:
+        if session.get("webui_payload") != webui:
+            session["webui_payload"] = copy.deepcopy(webui)
+            changed = True
+        page_schema = _extract_webui_page_schema(webui)
+        if page_schema:
+            title = str(page_schema.get("title") or session.get("title") or "").strip()
+            if title and str(session.get("title") or "").strip() != title:
+                session["title"] = title
+                changed = True
+            preview = session.get("preview_state") if isinstance(session.get("preview_state"), Mapping) else {}
+            next_preview = dict(preview)
+            next_preview.update(
+                {
+                    "session_id": session.get("id"),
+                    "scenario_id": session.get("scenario_id"),
+                    "title": session.get("title"),
+                    "page_schema": page_schema,
+                    "version": str(session.get("ui_revision") or session.get("version") or ""),
+                }
+            )
+            if preview != next_preview:
+                session["preview_state"] = next_preview
+                changed = True
+    return changed
+
+
 def _session_from_binding(webspace_id: str, binding: Mapping[str, Any]) -> dict[str, Any] | None:
     scenario_id = str(binding.get("runtime_scenario_id") or "").strip()
     draft_id = str(binding.get("active_draft_id") or "").strip()
@@ -4365,29 +4422,7 @@ def _session_from_binding(webspace_id: str, binding: Mapping[str, Any]) -> dict[
             or session.get("source_idea")
             or ""
         )
-        current_revision = root / "ui_revisions" / "current.txt"
-        try:
-            revision = current_revision.read_text(encoding="utf-8").strip()
-        except Exception:
-            revision = ""
-        if revision:
-            session["ui_revision"] = revision
-            revision_path = root / "ui_revisions" / f"{revision}.json"
-            if revision_path.exists():
-                session["ui_revisions"] = [{"revision": revision, "path": str(revision_path)}]
-        webui = _read_json_file(root / "webui.json")
-        page_schema = _extract_webui_page_schema(webui)
-        if page_schema:
-            title = str(page_schema.get("title") or session.get("title") or "").strip()
-            if title:
-                session["title"] = title
-            session["preview_state"] = {
-                "session_id": session["id"],
-                "scenario_id": session.get("scenario_id"),
-                "title": session.get("title"),
-                "page_schema": page_schema,
-                "version": str(session.get("ui_revision") or ""),
-            }
+        _sync_session_from_artifacts(session)
     key = str(session.get("id") or session.get("draft_id") or session.get("scenario_id") or "").strip()
     if not key:
         return None
@@ -4413,7 +4448,8 @@ def _target_session(webspace_id: str) -> tuple[dict[str, Any] | None, dict[str, 
     sessions = _sessions(webspace_id)
     def resolved(session: Mapping[str, Any]) -> dict[str, Any]:
         item = copy.deepcopy(dict(session))
-        if _ensure_session_artifact_root(item, binding) and item.get("id"):
+        changed = _sync_session_from_artifacts(item, binding)
+        if changed and item.get("id"):
             sessions[str(item["id"])] = item
             _save_sessions(webspace_id, sessions)
         return item
@@ -4427,7 +4463,7 @@ def _target_session(webspace_id: str) -> tuple[dict[str, Any] | None, dict[str, 
         return _session_from_binding(webspace_id, binding), binding
     session = _load_session(webspace_id)
     if session and _session_matches_binding(session, binding):
-        if _ensure_session_artifact_root(session, binding):
+        if _sync_session_from_artifacts(session, binding):
             _save_session(webspace_id, session)
         return session, binding
     return None, binding
@@ -6963,6 +6999,9 @@ def get_session(
     preview = (session or {}).get("preview_state") if isinstance(session, dict) else None
     workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
+    if isinstance(session, dict) and _sync_session_from_artifacts(session, binding):
+        _save_session(ws, session)
+        preview = session.get("preview_state") if isinstance(session.get("preview_state"), Mapping) else preview
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     return {
         "ok": bool(session),
@@ -6993,6 +7032,9 @@ def get_preview_state(
     preview = session.get("preview_state") if isinstance(session.get("preview_state"), dict) else _preview_state(session=session)
     workbench = _ensure_workbench(ws, session=session, preview_state=preview)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
+    if _sync_session_from_artifacts(session, binding):
+        _save_session(ws, session)
+        preview = session.get("preview_state") if isinstance(session.get("preview_state"), dict) else preview
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     return {
         "ok": True,
