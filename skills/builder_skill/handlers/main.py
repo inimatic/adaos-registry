@@ -304,9 +304,46 @@ def _builder_llm_request_id(
     return f"builder-ui-{digest[:32]}"
 
 
+def _builder_llm_job_request_id(
+    *,
+    session: Mapping[str, Any],
+    instruction: str,
+    current_payload: Mapping[str, Any],
+    attempt: int,
+    job_nonce: str | None = None,
+) -> str:
+    base_id = _builder_llm_request_id(
+        session=session,
+        instruction=instruction,
+        current_payload=current_payload,
+        attempt=attempt,
+    )
+    nonce = str(job_nonce or "").strip()
+    if not nonce:
+        return base_id
+    suffix = _hash_suffix(f"{nonce}:{attempt}")
+    return f"{base_id}-job-{suffix}"
+
+
 def _looks_like_timeout(text: str) -> bool:
     lowered = str(text or "").lower()
     return any(token in lowered for token in ("timed out", "timeout", "read operation timed out", "504"))
+
+
+def _looks_like_llm_request_id_conflict(exc: Exception | str) -> bool:
+    code = str(getattr(exc, "error_code", "") or "").strip()
+    if code == "llm_request_id_conflict":
+        return True
+    payload = getattr(exc, "payload", None)
+    if isinstance(payload, Mapping):
+        values: list[Any] = [payload.get("code"), payload.get("error")]
+        detail = payload.get("detail")
+        if isinstance(detail, Mapping):
+            values.extend([detail.get("code"), detail.get("error")])
+        for value in values:
+            if str(value or "").strip() == "llm_request_id_conflict":
+                return True
+    return "llm_request_id_conflict" in str(exc or "")
 
 
 def _scenario_id_from_idea(idea: str) -> str:
@@ -5855,6 +5892,7 @@ def _submit_llm_webui_transform_job(
     session: Mapping[str, Any],
     instruction: str,
     preview_state: Mapping[str, Any],
+    job_nonce: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     started_at = _now()
@@ -5865,11 +5903,12 @@ def _submit_llm_webui_transform_job(
     )
     context_ready_at = _now()
     current_payload = request["current_payload"]
-    request_id = _builder_llm_request_id(
+    request_id = _builder_llm_job_request_id(
         session=session,
         instruction=instruction,
         current_payload=current_payload,
         attempt=1,
+        job_nonce=job_nonce,
     )
     messages = [
         {"role": "system", "content": str(request["system_prompt"])},
@@ -5887,36 +5926,112 @@ def _submit_llm_webui_transform_job(
     )
     try:
         from adaos.sdk.llm.llm_client import submit_response_job
-
-        response = submit_response_job(
-            messages,
-            temperature=0,
-            max_tokens=_builder_llm_max_tokens(),
-            request_id=request_id,
-            timeout=_builder_llm_job_submit_timeout_s(),
-        )
-        submit_done_at = _now()
     except Exception as exc:
         failed_at = _now()
         detail = f"{type(exc).__name__}: {exc}"
         _LOG.warning(
-            "builder LLM job submit failed scenario=%s request_id=%s context_build_ms=%d submit_ms=%d total_ms=%d detail=%s",
+            "builder LLM job submit unavailable scenario=%s request_id=%s context_build_ms=%d total_ms=%d detail=%s",
             str(session.get("scenario_id") or ""),
             request_id,
             int((context_ready_at - started_at) * 1000),
-            int((failed_at - context_ready_at) * 1000),
             int((failed_at - started_at) * 1000),
             detail,
         )
         return {
             "ok": False,
-            "error": "llm_job_submit_timeout" if _looks_like_timeout(detail) else "llm_job_submit_failed",
+            "error": "llm_job_submit_failed",
             "detail": detail,
+            "request_id": request_id,
+            "timing": {
+                "context_build_ms": int((context_ready_at - started_at) * 1000),
+                "submit_ms": 0,
+                "total_ms": int((failed_at - started_at) * 1000),
+            },
+            "comment": "\u041d\u0435 \u0441\u043c\u043e\u0433 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c LLM job.",
+        }
+    response: Mapping[str, Any] | None = None
+    submit_done_at = context_ready_at
+    submit_attempts: list[dict[str, Any]] = []
+    max_submit_attempts = 2 if job_nonce else 1
+    for submit_attempt in range(1, max_submit_attempts + 1):
+        request_id = _builder_llm_job_request_id(
+            session=session,
+            instruction=instruction,
+            current_payload=current_payload,
+            attempt=submit_attempt,
+            job_nonce=job_nonce,
+        )
+        attempt_started = _now()
+        try:
+            response = submit_response_job(
+                messages,
+                temperature=0,
+                max_tokens=_builder_llm_max_tokens(),
+                request_id=request_id,
+                timeout=_builder_llm_job_submit_timeout_s(),
+            )
+            submit_done_at = _now()
+            submit_attempts.append(
+                {
+                    "attempt": submit_attempt,
+                    "request_id": request_id,
+                    "ok": True,
+                    "duration_ms": int((submit_done_at - attempt_started) * 1000),
+                }
+            )
+            break
+        except Exception as exc:
+            failed_at = _now()
+            detail = f"{type(exc).__name__}: {exc}"
+            conflict = _looks_like_llm_request_id_conflict(exc)
+            retry = conflict and submit_attempt < max_submit_attempts
+            submit_attempts.append(
+                {
+                    "attempt": submit_attempt,
+                    "request_id": request_id,
+                    "ok": False,
+                    "duration_ms": int((failed_at - attempt_started) * 1000),
+                    "error": "llm_request_id_conflict" if conflict else type(exc).__name__,
+                }
+            )
+            _LOG.warning(
+                "builder LLM job submit failed scenario=%s request_id=%s attempt=%d retry=%s context_build_ms=%d submit_ms=%d total_ms=%d detail=%s",
+                str(session.get("scenario_id") or ""),
+                request_id,
+                submit_attempt,
+                bool(retry),
+                int((context_ready_at - started_at) * 1000),
+                int((failed_at - context_ready_at) * 1000),
+                int((failed_at - started_at) * 1000),
+                detail,
+            )
+            if retry:
+                continue
+            return {
+                "ok": False,
+                "error": "llm_job_submit_timeout" if _looks_like_timeout(detail) else "llm_job_submit_failed",
+                "detail": detail,
+                "request_id": request_id,
+                "timing": {
+                    "context_build_ms": int((context_ready_at - started_at) * 1000),
+                    "submit_ms": int((failed_at - context_ready_at) * 1000),
+                    "total_ms": int((failed_at - started_at) * 1000),
+                    "submit_attempts": submit_attempts,
+                },
+                "comment": "\u041d\u0435 \u0441\u043c\u043e\u0433 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c LLM job.",
+            }
+    if response is None:
+        failed_at = _now()
+        return {
+            "ok": False,
+            "error": "llm_job_submit_failed",
+            "detail": "submit_response_job returned no response",
             "request_id": request_id,
             "timing": {
                 "context_build_ms": int((context_ready_at - started_at) * 1000),
                 "submit_ms": int((failed_at - context_ready_at) * 1000),
                 "total_ms": int((failed_at - started_at) * 1000),
+                "submit_attempts": submit_attempts,
             },
             "comment": "\u041d\u0435 \u0441\u043c\u043e\u0433 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c LLM job.",
         }
@@ -5931,6 +6046,8 @@ def _submit_llm_webui_transform_job(
     base_url = str(client.get("base_url") or "").strip()
     if client:
         timing["client"] = dict(client)
+    if submit_attempts:
+        timing["submit_attempts"] = submit_attempts
     (_LOG.warning if timing["total_ms"] >= _builder_llm_job_submit_warn_ms() else _LOG.debug)(
         "builder LLM job submit completed scenario=%s request_id=%s job_id=%s base_url=%s status=%s context_build_ms=%d submit_ms=%d total_ms=%d",
         str(session.get("scenario_id") or ""),
@@ -6187,6 +6304,7 @@ def _start_llm_webui_submit_worker(
             session=loaded,
             instruction=request_text,
             preview_state=preview_state,
+            job_nonce=local_job_id,
             _meta=_meta,
         )
         topic = _builder_topic_ref(ws, session=loaded, binding=binding, _meta=_meta)
