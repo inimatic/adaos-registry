@@ -386,6 +386,9 @@ def _browser_tiles(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
         {
             "id": str(entry.get("id") or "").strip(),
             "device_id": str(entry.get("id") or "").strip(),
+            "device_ref": f"browser:{str(entry.get('id') or '').strip()}",
+            "browser_device_id": str(entry.get("id") or "").strip(),
+            "parent_browser_device_id": str(entry.get("parent_browser_device_id") or "").strip() or None,
             "title": _browser_title(entry),
             "subtitle": _browser_subtitle(entry),
             "content": _browser_details(entry),
