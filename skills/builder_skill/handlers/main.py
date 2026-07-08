@@ -347,6 +347,15 @@ def _builder_topic_ref(
     topic_id = str(meta.get("topic_id") or "").strip()
     session = session if isinstance(session, Mapping) else {}
     binding = binding if isinstance(binding, Mapping) else {}
+    prompt_topic_id = _prompt_project_topic_id(session=session, binding=binding)
+    if prompt_topic_id and (
+        thread_id.startswith("thread.builder.")
+        or thread_id.startswith("builder:")
+        or topic_id.startswith("builder:")
+    ):
+        thread_id = prompt_topic_id
+        topic_id = prompt_topic_id
+        existing_topic = {}
     if thread_id:
         topic = {k: v for k, v in dict(existing_topic or {}).items() if v is not None}
         topic.setdefault("schema", "adaos.conversation.topic_ref.v1")
@@ -355,6 +364,9 @@ def _builder_topic_ref(
         topic.setdefault("topic_kind", "builder_runtime")
         topic.setdefault("webspace_id", webspace_id)
         topic.setdefault("source_webspace_id", webspace_id)
+        topic.setdefault("active_draft_id", str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None)
+        topic.setdefault("scenario_id", str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None)
+        topic.setdefault("dev_webspace_id", str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None)
         topic.setdefault("conversation_id", _conversation_id(webspace_id))
         topic.setdefault("channel_id", DIALOG_CHANNEL_ID)
         topic.setdefault("owner", f"skill:{SKILL_ID}")
@@ -365,6 +377,13 @@ def _builder_topic_ref(
         topic.setdefault("schema", "adaos.conversation.topic_ref.v1")
         topic.setdefault("topic_id", str(session_topic.get("topic_id") or session_topic.get("thread_id") or "").strip())
         topic.setdefault("thread_id", str(session_topic.get("thread_id") or session_topic.get("topic_id") or "").strip())
+        if prompt_topic_id and (
+            str(topic.get("thread_id") or "").startswith("thread.builder.")
+            or str(topic.get("thread_id") or "").startswith("builder:")
+            or str(topic.get("topic_id") or "").startswith("builder:")
+        ):
+            topic["thread_id"] = prompt_topic_id
+            topic["topic_id"] = prompt_topic_id
         topic.setdefault("topic_kind", "builder_runtime")
         topic.setdefault("webspace_id", webspace_id)
         topic.setdefault("source_webspace_id", webspace_id)
@@ -388,10 +407,18 @@ def _builder_topic_ref(
     except Exception:
         token = str(session.get("draft_id") or session.get("scenario_id") or binding.get("runtime_scenario_id") or "default").strip()
         token = re.sub(r"[^A-Za-z0-9_.:-]+", ".", token).strip(".") or "default"
+        scenario_token = str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip()
+        if scenario_token:
+            scenario_safe = re.sub(r"[^A-Za-z0-9_.:-]+", ".", scenario_token).strip(".") or token
+            fallback_topic_id = f"prompt-project:scenario:{scenario_safe}"
+            fallback_thread_id = fallback_topic_id
+        else:
+            fallback_topic_id = f"builder:{webspace_id}:{token}"
+            fallback_thread_id = f"thread.builder.{webspace_id}.{token}"
         return {
             "schema": "adaos.conversation.topic_ref.v1",
-            "topic_id": f"builder:{webspace_id}:{token}",
-            "thread_id": f"thread.builder.{webspace_id}.{token}",
+            "topic_id": fallback_topic_id,
+            "thread_id": fallback_thread_id,
             "topic_kind": "builder_runtime",
             "webspace_id": webspace_id,
             "source_webspace_id": webspace_id,
