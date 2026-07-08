@@ -1,5 +1,5 @@
 name: redevice_voice
-version: 0.1.7
+version: 0.1.8
 description: Debug ReDevice voice endpoint skill over EndpointAudioService with VAD
   or push-to-talk capture and member-side STT routing.
 runtime:
@@ -126,13 +126,13 @@ data_routes:
   - receiver: redevice_voice.state
     schema: redevice-voice-state.v1
     description: Debug ReDevice voice endpoint state stream.
-updated_at: '2026-06-19T11:08:50+00:00'
+updated_at: '2026-07-08T17:36:06+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3030.28a9402e
-    recorded_at: '2026-06-19T11:08:50+00:00'
+    min_version: 0.1.0+3564.55f7b169
+    recorded_at: '2026-07-08T17:36:06+00:00'
     source: skill_push
-    min_commit: 28a9402e301e78b04f9eb10b76f115d2cbb1a4fe
-    min_short_commit: 28a9402e
-    build_date: '2026-06-19T10:57:20+00:00'
+    min_commit: 55f7b16997ca9976acc010191849d42782f50949
+    min_short_commit: 55f7b169
+    build_date: '2026-07-08T20:35:43+03:00'
 

@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import subscribe, tool
+from adaos.sdk.data import device_access
 from adaos.sdk.data import skill_memory
 from adaos.sdk.io import (
     build_capture_command,
@@ -21,7 +22,7 @@ from adaos.sdk.io import (
     stop_endpoint_audio_session,
     verify_audio_input_content,
 )
-from adaos.sdk.redevice import ReDeviceBridge, choose_endpoint as sdk_choose_endpoint
+from adaos.sdk.redevice import choose_endpoint as sdk_choose_endpoint
 
 try:
     from adaos.services.yjs.webspace import default_webspace_id
@@ -144,7 +145,10 @@ def _compact_endpoint(endpoint: Mapping[str, Any], selected_code: str) -> dict[s
 
 
 def _load_endpoints() -> list[dict[str, Any]]:
-    return ReDeviceBridge(timeout=12).list_endpoints(sync_registry=True)
+    try:
+        return [dict(item) for item in device_access.list_endpoint_devices(kind="redevice", sync_registry=True)]
+    except Exception:
+        return []
 
 
 def _choose_endpoint(endpoints: list[Mapping[str, Any]], code: str | None = None) -> Mapping[str, Any] | None:
@@ -306,7 +310,13 @@ def start_redevice_voice(
     command["payload"] = payload
     policy = _mapping(_mapping(command.get("payload")).get("endpoint_policy_check"))
     transport = _mapping(_mapping(command.get("payload")).get("transport"))
-    result = ReDeviceBridge(timeout=12).send_command(pair_code, command)
+    result = device_access.send_endpoint_command(
+        device_ref=_text(endpoint.get("ref")) or None,
+        code=pair_code,
+        command=command,
+        requested_by={"node_id": "member", "skill_id": "redevice_voice"},
+        constraints={"audio_session_id": session_id},
+    )
     if not bool(result.get("ok")):
         session = stop_endpoint_audio_session(state, reason="command_enqueue_failed")
     state["last_command"] = {

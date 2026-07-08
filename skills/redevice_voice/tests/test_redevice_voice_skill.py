@@ -81,6 +81,7 @@ def test_start_redevice_voice_uses_audio_session_id(monkeypatch) -> None:
     mod = _load_redevice_voice_module()
     endpoint = {
         "code": "SNX68P2A",
+        "ref": "redevice:endpoint-1",
         "endpoint_id": "endpoint-1",
         "state": "consumed",
         "endpoint_manifest": {"services": {"audio_input_endpoint": {"enabled": True}}},
@@ -88,20 +89,19 @@ def test_start_redevice_voice_uses_audio_session_id(monkeypatch) -> None:
     sent: dict[str, object] = {}
     session = {"schema_version": "audio-session.v1", "session_id": "audio:test-session", "state": "active"}
 
-    class FakeBridge:
-        def __init__(self, timeout=0):
-            self.timeout = timeout
-
-        def send_command(self, code, command):
-            sent["code"] = code
-            sent["command"] = command
-            return {"ok": True, "state": "queued"}
-
     monkeypatch.setattr(mod, "_load_state", lambda: {"events": []})
     monkeypatch.setattr(mod, "_save_state", lambda state: dict(state))
     monkeypatch.setattr(mod, "_publish", lambda state, endpoints, webspace_id=None: None)
     monkeypatch.setattr(mod, "_load_endpoints", lambda: [endpoint])
-    monkeypatch.setattr(mod, "ReDeviceBridge", FakeBridge)
+
+    def fake_send_endpoint_command(device_ref=None, code=None, command=None, **kwargs):
+        sent["device_ref"] = device_ref
+        sent["code"] = code
+        sent["command"] = command
+        sent["kwargs"] = kwargs
+        return {"ok": True, "state": "queued"}
+
+    monkeypatch.setattr(mod.device_access, "send_endpoint_command", fake_send_endpoint_command)
 
     def fake_create_session(state, selected_endpoint, **kwargs):
         state["session"] = dict(session)
@@ -113,5 +113,7 @@ def test_start_redevice_voice_uses_audio_session_id(monkeypatch) -> None:
 
     assert result["ok"] is True
     assert result["session"]["session_id"] == "audio:test-session"
+    assert sent["device_ref"] == "redevice:endpoint-1"
     assert sent["code"] == "SNX68P2A"
     assert sent["command"]["payload"]["session_id"] == "audio:test-session"
+    assert sent["kwargs"]["constraints"] == {"audio_session_id": "audio:test-session"}
