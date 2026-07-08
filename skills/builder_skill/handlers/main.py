@@ -1309,16 +1309,243 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
     }
 
 
+def _schema_ref_name(ref: Any) -> str | None:
+    token = str(ref or "").strip()
+    if token.startswith("#/$defs/"):
+        return token.rsplit("/", 1)[-1].replace("~1", "/").replace("~0", "~")
+    return None
+
+
+def _resolve_schema_ref(schema: Mapping[str, Any], ref: Any) -> Mapping[str, Any] | None:
+    token = str(ref or "").strip()
+    if not token.startswith("#/"):
+        return None
+    node: Any = schema
+    for raw_part in token[2:].split("/"):
+        part = raw_part.replace("~1", "/").replace("~0", "~")
+        if not isinstance(node, Mapping) or part not in node:
+            return None
+        node = node.get(part)
+    return node if isinstance(node, Mapping) else None
+
+
+def _collect_schema_refs(
+    node: Any,
+    schema: Mapping[str, Any],
+    refs: list[str],
+    seen_nodes: set[int],
+    *,
+    depth: int = 0,
+    max_depth: int = 14,
+    max_refs: int = 64,
+) -> bool:
+    if len(refs) >= max_refs:
+        return True
+    if depth > max_depth:
+        return False
+    if isinstance(node, Mapping):
+        marker = id(node)
+        if marker in seen_nodes:
+            return False
+        seen_nodes.add(marker)
+        ref_name = _schema_ref_name(node.get("$ref"))
+        if ref_name:
+            if ref_name not in refs:
+                refs.append(ref_name)
+                if len(refs) >= max_refs:
+                    return True
+            resolved = _resolve_schema_ref(schema, node.get("$ref"))
+            if isinstance(resolved, Mapping):
+                return _collect_schema_refs(
+                    resolved,
+                    schema,
+                    refs,
+                    seen_nodes,
+                    depth=depth + 1,
+                    max_depth=max_depth,
+                    max_refs=max_refs,
+                )
+        for key in ("properties", "patternProperties"):
+            value = node.get(key)
+            if isinstance(value, Mapping):
+                for child in value.values():
+                    if _collect_schema_refs(
+                        child,
+                        schema,
+                        refs,
+                        seen_nodes,
+                        depth=depth + 1,
+                        max_depth=max_depth,
+                        max_refs=max_refs,
+                    ):
+                        return True
+        for key in (
+            "additionalProperties",
+            "items",
+            "prefixItems",
+            "oneOf",
+            "anyOf",
+            "allOf",
+            "then",
+            "else",
+            "if",
+            "not",
+        ):
+            if _collect_schema_refs(
+                node.get(key),
+                schema,
+                refs,
+                seen_nodes,
+                depth=depth + 1,
+                max_depth=max_depth,
+                max_refs=max_refs,
+            ):
+                return True
+    elif isinstance(node, list):
+        for item in node:
+            if _collect_schema_refs(
+                item,
+                schema,
+                refs,
+                seen_nodes,
+                depth=depth + 1,
+                max_depth=max_depth,
+                max_refs=max_refs,
+            ):
+                return True
+    return False
+
+
+def _compact_schema_node(
+    node: Any,
+    *,
+    depth: int = 0,
+    max_depth: int = 3,
+    max_properties: int = 32,
+    max_enum: int = 48,
+) -> Any:
+    if not isinstance(node, Mapping):
+        return node
+    ref_name = _schema_ref_name(node.get("$ref"))
+    if ref_name:
+        return {"$ref": ref_name}
+    result: dict[str, Any] = {}
+    for key in ("type", "const", "default", "minLength", "minimum", "maximum"):
+        if key in node:
+            result[key] = node.get(key)
+    enum_values = node.get("enum")
+    if isinstance(enum_values, list):
+        result["enum"] = enum_values[:max_enum]
+        if len(enum_values) > max_enum:
+            result["enum_truncated"] = len(enum_values) - max_enum
+    required = node.get("required")
+    if isinstance(required, list) and required:
+        result["required"] = [str(item) for item in required if str(item or "").strip()]
+    additional = node.get("additionalProperties")
+    if isinstance(additional, bool):
+        result["additionalProperties"] = additional
+    elif isinstance(additional, Mapping) and depth < max_depth:
+        result["additionalProperties"] = _compact_schema_node(
+            additional,
+            depth=depth + 1,
+            max_depth=max_depth,
+            max_properties=max_properties,
+            max_enum=max_enum,
+        )
+    properties = node.get("properties")
+    if isinstance(properties, Mapping) and depth < max_depth:
+        compact_props: dict[str, Any] = {}
+        for index, (key, value) in enumerate(properties.items()):
+            if index >= max_properties:
+                result["properties_truncated"] = len(properties) - max_properties
+                break
+            compact_props[str(key)] = _compact_schema_node(
+                value,
+                depth=depth + 1,
+                max_depth=max_depth,
+                max_properties=max_properties,
+                max_enum=max_enum,
+            )
+        if compact_props:
+            result["properties"] = compact_props
+    items = node.get("items")
+    if isinstance(items, Mapping) and depth < max_depth:
+        result["items"] = _compact_schema_node(
+            items,
+            depth=depth + 1,
+            max_depth=max_depth,
+            max_properties=max_properties,
+            max_enum=max_enum,
+        )
+    for key in ("oneOf", "anyOf", "allOf"):
+        options = node.get(key)
+        if isinstance(options, list) and options and depth < max_depth:
+            result[key] = [
+                _compact_schema_node(
+                    item,
+                    depth=depth + 1,
+                    max_depth=max_depth,
+                    max_properties=max_properties,
+                    max_enum=max_enum,
+                )
+                for item in options[:8]
+                if isinstance(item, Mapping)
+            ]
+            if len(options) > 8:
+                result[f"{key}_truncated"] = len(options) - 8
+    description = str(node.get("description") or "").strip()
+    if description:
+        result["description"] = description[:220]
+    return result or {"type": "any"}
+
+
+def _generated_webui_schema_summary(schema: Mapping[str, Any]) -> dict[str, Any]:
+    root_contract: dict[str, Any] = {
+        "type": "object",
+        "required": ["schema", "ui"],
+        "additionalProperties": True,
+        "properties": {
+            "schema": {"const": "adaos.webui.v1"},
+            "ui": {"$ref": "#/$defs/uiRoot"},
+        },
+    }
+    refs: list[str] = []
+    truncated = _collect_schema_refs(root_contract, schema, refs, set())
+    defs = schema.get("$defs") if isinstance(schema.get("$defs"), Mapping) else {}
+    compact_defs: dict[str, Any] = {}
+    for name in refs:
+        raw_def = defs.get(name) if isinstance(defs, Mapping) else None
+        if isinstance(raw_def, Mapping):
+            compact_defs[name] = _compact_schema_node(raw_def)
+    try:
+        schema_hash = hashlib.sha256(_compact_json(schema).encode("utf-8")).hexdigest()[:12]
+    except Exception:
+        schema_hash = ""
+    return {
+        "source": "generated_from_json_schema",
+        "schema_id": str(schema.get("$id") or "adaos.webui.v1"),
+        "schema_hash": schema_hash,
+        "entrypoint": "ui.application.desktop.pageSchema",
+        "bounded": {"max_ref_depth": 14, "max_defs": 64, "truncated": bool(truncated)},
+        "root_contract": _compact_schema_node(root_contract),
+        "defs": compact_defs,
+    }
+
+
 def _builder_webui_abi_summary() -> dict[str, Any]:
+    schema = _load_webui_schema()
+    schema_contract = _generated_webui_schema_summary(schema) if schema else {
+        "source": "fallback_minimal_contract",
+        "entrypoint": "ui.application.desktop.pageSchema",
+        "root_contract": {
+            "required": ["schema", "ui"],
+            "properties": {"schema": {"const": "adaos.webui.v1"}, "ui": {"type": "object"}},
+        },
+    }
     return {
         "schema": "adaos.webui.v1",
         "validated_by": "src/adaos/abi/webui.v1.schema.json",
-        "root_shape": {
-            "schema": "adaos.webui.v1",
-            "ui": {"application": {"desktop": {"pageSchema": "required complete renderable page schema"}}},
-        },
-        "page_schema_required": ["id", "layout", "widgets"],
-        "widget_required": ["id", "type"],
+        "schema_contract": schema_contract,
         "supported_widget_contracts": _builder_runtime_component_contracts(),
         "notes": [
             "Return only the complete updated ui.application.desktop.pageSchema inside the root webui manifest.",
@@ -2950,6 +3177,7 @@ def _builder_llm_webui_transform_request(
         "project_memory": project_memory,
         "recent_patch_history": history,
         "webui_v1_abi": _builder_webui_abi_summary(),
+        "webui_v1_schema": "see webui_v1_abi.schema_contract; validated by src/adaos/abi/webui.v1.schema.json",
         "required_output_shape": {
             "schema": "adaos.webui.v1",
             "ui": {
