@@ -175,6 +175,8 @@ def test_browsers_skill_browser_tiles_include_online_flag(monkeypatch) -> None:
     ])
 
     assert tiles[0]["title"] == "Dev Browser"
+    assert tiles[0]["device_ref"] == "browser:browser-1"
+    assert tiles[0]["browser_device_id"] == "browser-1"
     assert tiles[0]["online"] is True
     assert tiles[0]["status"] == "online"
     assert tiles[1]["online"] is False
@@ -367,6 +369,47 @@ def test_browsers_skill_stream_payload_filters_online_only_by_default(monkeypatc
 
     assert [item["id"] for item in default_rows] == ["browser-online"]
     assert {item["id"] for item in all_rows} == {"browser-online", "browser-offline"}
+
+
+def test_browsers_skill_selected_browser_summary_uses_selected_live_entry(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    mod._SELECTED_BROWSER_BY_WS.clear()
+    mod._PROJECTION_RUNTIME.reset()
+
+    entries = [
+        {
+            "id": "browser-offline",
+            "display_name": "Offline browser",
+            "access_class": "device",
+            "online": False,
+        },
+        {
+            "id": "browser-online::tab-1",
+            "display_name": "Online browser",
+            "access_class": "client",
+            "lifetime_mode": "fixed",
+            "online": True,
+            "last_webspace_id": "desktop",
+            "parent_browser_device_id": "browser-online",
+        },
+    ]
+    monkeypatch.setattr(mod.workspace_index, "list_workspaces", lambda: [])
+    monkeypatch.setattr(mod.sdk_access_links, "list_browser_links", lambda: [dict(item) for item in entries])
+    monkeypatch.setattr(
+        mod.sdk_access_links,
+        "get_browser_link",
+        lambda device_id: next((dict(item) for item in entries if item["id"] == device_id), None),
+    )
+    monkeypatch.setattr(mod.sdk_access_links, "lifetime_label", lambda entry: "Fixed" if entry.get("access_class") == "client" else "Permanent")
+
+    result = mod.select_browser("browser-online::tab-1", webspace_id="desktop")
+    summary = mod._build_stream_payload("browsers.current_summary", "desktop")
+    current_name = mod._build_stream_payload("browsers.current_name", "desktop")
+
+    assert result["selected_device_id"] == "browser-online::tab-1"
+    assert {"title": "Browser", "description": "Online browser"} in summary
+    assert {"title": "Status", "description": "online"} in summary
+    assert current_name == {"value": "Online browser", "device_id": "browser-online::tab-1"}
 
 
 def test_browsers_skill_refresh_event_handler_does_not_wait_for_projection(monkeypatch) -> None:
