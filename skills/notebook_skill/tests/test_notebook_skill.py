@@ -307,6 +307,11 @@ def test_notebook_ui_reads_editor_and_widget_from_stream():
         "path": "editor",
     }
     assert attachments["inputs"]["collectionKey"] == "attachments"
+    assert attachments["inputs"]["detailsPath"] == "url"
+    assert [button["id"] for button in attachments["inputs"]["buttons"]] == ["open", "download"]
+    assert attachments["actions"][0]["type"] == "openUrl"
+    assert attachments["actions"][0]["params"]["url"] == "$event.url"
+    assert attachments["actions"][1]["params"]["url"] == "$event.download_url"
 
 
 def test_notebook_webui_contract_is_valid():
@@ -357,6 +362,8 @@ def test_attach_note_file_updates_editor_and_widget(monkeypatch):
 
     assert result["ok"] is True
     assert result["attachment"]["kind"] == "photo"
+    assert result["attachment"]["url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.jpg"
+    assert result["attachment"]["download_url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.jpg?download=1"
     assert projected[-1][1]["editor"]["attachments"][0]["name"] == "photo.jpg"
 
 
@@ -375,6 +382,13 @@ def test_attach_note_upload_accepts_sanitized_upload_payload(monkeypatch):
             "sha256": "a" * 64,
             "purpose": "photos",
         },
+        "artifact_ref": {
+            "artifact_id": "skill_file:notebook_skill:photos:" + "a" * 16,
+            "name": "photo.gif",
+            "purpose": "photos",
+            "relative_path": "uploads/photos/photo.gif",
+            "mime": "image/gif",
+        },
         "webspace_id": "desktop",
         "side_effect_class": "local_write",
     })
@@ -383,7 +397,12 @@ def test_attach_note_upload_accepts_sanitized_upload_payload(monkeypatch):
     assert result["attachment"]["kind"] == "photo"
     assert result["attachment"]["name"] == "photo.gif"
     assert result["attachment"]["artifact_ref"]["artifact_id"] == "skill_file:notebook_skill:photos:aaaaaaaaaaaaaaaa"
+    assert result["attachment"]["artifact_ref"]["relative_path"] == "uploads/photos/photo.gif"
+    assert result["attachment"]["url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.gif"
+    assert result["attachment"]["download_url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.gif?download=1"
+    assert result["attachment"]["summary"] == "image/gif | 123 B"
     assert projected[-1][1]["editor"]["attachments"][0]["mime"] == "image/gif"
+    assert projected[-1][1]["editor"]["attachments"][0]["url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.gif"
 
 
 def test_note_cards_use_first_line_title_and_remaining_preview(monkeypatch):

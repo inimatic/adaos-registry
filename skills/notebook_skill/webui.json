@@ -532,13 +532,46 @@
               "inputs": {
                 "collectionKey": "attachments",
                 "titleKey": "name",
-                "subtitleKey": "mime",
-                "detailsPath": "path",
+                "subtitleKey": "summary",
+                "detailsPath": "url",
+                "buttons": [
+                  {
+                    "id": "open",
+                    "label": "Open",
+                    "icon": "open-outline",
+                    "whenKey": "url"
+                  },
+                  {
+                    "id": "download",
+                    "label": "Download",
+                    "icon": "download-outline",
+                    "whenKey": "download_url"
+                  }
+                ],
                 "emptyText": "No attachments",
                 "emptyText_i18n": {
                   "key": "notebook.empty.attachments"
                 }
               },
+              "actions": [
+                {
+                  "on": "click:open",
+                  "type": "openUrl",
+                  "params": {
+                    "url": "$event.url",
+                    "target": "_blank"
+                  }
+                },
+                {
+                  "on": "click:download",
+                  "type": "openUrl",
+                  "params": {
+                    "url": "$event.download_url",
+                    "target": "_blank",
+                    "download": true
+                  }
+                }
+              ],
               "title_i18n": {
                 "key": "notebook.attachments"
               }
@@ -568,6 +601,7 @@
                     "note_id": "$state.notebookSelectedNoteId",
                     "kind": "photo",
                     "side_effect_class": "local_write",
+                    "artifact_ref": "$event.artifact_ref",
                     "upload": {
                       "name": "$event.file.name",
                       "mime": "$event.file.mime",
@@ -607,6 +641,7 @@
                     "note_id": "$state.notebookSelectedNoteId",
                     "kind": "attachment",
                     "side_effect_class": "local_write",
+                    "artifact_ref": "$event.artifact_ref",
                     "upload": {
                       "name": "$event.file.name",
                       "mime": "$event.file.mime",

@@ -8,6 +8,7 @@ import threading
 import time
 from copy import deepcopy
 from typing import Any, Mapping
+from urllib.parse import quote
 
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import skill_memory_get, skill_memory_set
@@ -420,7 +421,7 @@ def _note_list_items() -> list[dict[str, Any]]:
         updated = float(note.get("updated_at") or 0)
         content = str(note.get("content") or "")
         preview = _note_card_preview(note)
-        attachments = list(note.get("attachments") or [])
+        attachments = [_project_attachment(item) for item in list(note.get("attachments") or []) if isinstance(item, Mapping)]
         items.append(
             {
                 "id": note_id,
@@ -450,7 +451,7 @@ def _snapshot() -> dict[str, Any]:
     editor = {
         "id": editor_note["id"],
         "content": editor_note["content"],
-        "attachments": list(editor_note.get("attachments") or []),
+        "attachments": [_project_attachment(item) for item in list(editor_note.get("attachments") or []) if isinstance(item, Mapping)],
         "updated_at": editor_note.get("updated_at"),
         "updated_label": _now_iso(float(editor_note.get("updated_at") or _now())),
         "version": int(editor_note.get("version") or 0),
@@ -465,7 +466,7 @@ def _snapshot() -> dict[str, Any]:
         "display": {
             "id": display_note["id"],
             "content": display_note["content"],
-            "attachments": list(display_note.get("attachments") or []),
+            "attachments": [_project_attachment(item) for item in list(display_note.get("attachments") or []) if isinstance(item, Mapping)],
             "updated_at": display_note.get("updated_at"),
             "updated_label": _now_iso(float(display_note.get("updated_at") or _now())),
             "version": int(display_note.get("version") or 0),
@@ -479,7 +480,7 @@ def _snapshot() -> dict[str, Any]:
             "text": latest_preview,
             "preview": latest_preview,
             "description": latest_preview,
-            "attachments": list(latest_note.get("attachments") or []),
+            "attachments": [_project_attachment(item) for item in list(latest_note.get("attachments") or []) if isinstance(item, Mapping)],
             "updated_at": latest_note.get("updated_at"),
             "updated_label": _now_iso(float(latest_note.get("updated_at") or _now())),
             "version": int(latest_note.get("version") or 0),
@@ -494,7 +495,7 @@ def _snapshot() -> dict[str, Any]:
                     "text": latest_preview,
                     "preview": latest_preview,
                     "description": latest_preview,
-                    "attachments": list(latest_note.get("attachments") or []),
+                    "attachments": [_project_attachment(item) for item in list(latest_note.get("attachments") or []) if isinstance(item, Mapping)],
                     "updated_at": latest_note.get("updated_at"),
                 }
             ]
@@ -840,18 +841,133 @@ def save_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[s
     return {"ok": True, "note": deepcopy(note), "snapshot": snap}
 
 
-def _safe_upload_ref(upload: Mapping[str, Any], artifact: Mapping[str, Any]) -> dict[str, Any]:
+def _default_attachment_purpose(kind: str) -> str:
+    return "photos" if str(kind or "").strip() == "photo" else "attachments"
+
+
+def _clean_upload_relative_path(value: Any) -> str:
+    raw = str(value or "").strip().replace("\\", "/").lstrip("/")
+    if not raw or ":" in raw:
+        return ""
+    parts = raw.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        return ""
+    return "/".join(parts)
+
+
+def _fallback_upload_relative_path(*, purpose: str, name: str) -> str:
+    purpose_token = str(purpose or "").strip()
+    name_token = str(name or "").strip()
+    if not purpose_token or not name_token:
+        return ""
+    return _clean_upload_relative_path(f"uploads/{purpose_token}/{name_token}")
+
+
+def _skill_file_url(relative_path: Any, *, download: bool = False) -> str:
+    rel = _clean_upload_relative_path(relative_path)
+    if not rel:
+        return ""
+    encoded = "/".join(quote(part, safe="") for part in rel.split("/"))
+    suffix = "?download=1" if download else ""
+    return f"/api/skills/{_SKILL_NAME}/files/content/{encoded}{suffix}"
+
+
+def _format_size(value: Any) -> str:
+    try:
+        size = int(value or 0)
+    except Exception:
+        return ""
+    if size <= 0:
+        return ""
+    units = ("B", "KB", "MB", "GB")
+    amount = float(size)
+    unit = units[0]
+    for candidate in units:
+        unit = candidate
+        if amount < 1024 or candidate == units[-1]:
+            break
+        amount /= 1024
+    if unit == "B":
+        return f"{int(amount)} B"
+    return f"{amount:.1f} {unit}".rstrip("0").rstrip(".")
+
+
+def _attachment_summary(mime: Any, size_bytes: Any) -> str:
+    parts = [part for part in (str(mime or "").strip(), _format_size(size_bytes)) if part]
+    return " | ".join(parts)
+
+
+def _attachment_icon(kind: str, mime: Any) -> str:
+    mime_token = str(mime or "").strip().lower()
+    if str(kind or "").strip() == "photo" or mime_token.startswith("image/"):
+        return "image-outline"
+    return "document-attach-outline"
+
+
+def _project_attachment(value: Mapping[str, Any]) -> dict[str, Any]:
+    out = dict(value or {})
+    artifact = out.get("artifact_ref") if isinstance(out.get("artifact_ref"), Mapping) else {}
+    kind = "photo" if str(out.get("kind") or "").strip() == "photo" else "file"
+    name = str(out.get("name") or artifact.get("name") or artifact.get("filename") or "attachment").strip()
+    mime = str(out.get("mime") or artifact.get("mime") or "").strip() or None
+    size_bytes = out.get("size_bytes") or artifact.get("size_bytes")
+    purpose = str(artifact.get("purpose") or _default_attachment_purpose(kind)).strip()
+    relative_path = _clean_upload_relative_path(out.get("relative_path") or artifact.get("relative_path"))
+    if not relative_path:
+        relative_path = _fallback_upload_relative_path(purpose=purpose, name=name)
+    url = str(out.get("url") or "").strip() or _skill_file_url(relative_path)
+    download_url = str(out.get("download_url") or "").strip() or _skill_file_url(relative_path, download=True)
+    out.update(
+        {
+            "kind": kind,
+            "name": name,
+            "mime": mime,
+            "size_bytes": size_bytes,
+            "summary": str(out.get("summary") or "").strip() or _attachment_summary(mime, size_bytes),
+            "icon": str(out.get("icon") or "").strip() or _attachment_icon(kind, mime),
+            "relative_path": relative_path or None,
+            "url": url or None,
+            "download_url": download_url or None,
+        }
+    )
+    if url:
+        out["path"] = url
+    return out
+
+
+def _safe_upload_ref(
+    upload: Mapping[str, Any],
+    artifact: Mapping[str, Any],
+    *,
+    default_purpose: str = "attachments",
+) -> dict[str, Any]:
     sha256 = str(upload.get("sha256") or artifact.get("sha256") or "").strip()
-    purpose = str(upload.get("purpose") or artifact.get("purpose") or "attachments").strip() or "attachments"
+    purpose = str(upload.get("purpose") or artifact.get("purpose") or default_purpose).strip() or default_purpose
     name = str(upload.get("name") or artifact.get("name") or artifact.get("filename") or "").strip()
+    relative_path = _clean_upload_relative_path(upload.get("relative_path") or artifact.get("relative_path"))
+    if not relative_path:
+        relative_path = _fallback_upload_relative_path(purpose=purpose, name=name)
     ref: dict[str, Any] = {}
+    artifact_id = str(upload.get("artifact_id") or artifact.get("artifact_id") or artifact.get("id") or "").strip()
     if sha256:
         ref["sha256"] = sha256
         ref["artifact_id"] = f"skill_file:{_SKILL_NAME}:{purpose}:{sha256[:16]}"
+        ref["id"] = ref["artifact_id"]
+    elif artifact_id.startswith(f"skill_file:{_SKILL_NAME}:"):
+        ref["artifact_id"] = artifact_id
+        ref["id"] = artifact_id
     if purpose:
         ref["purpose"] = purpose
     if name:
         ref["name"] = name
+    if relative_path:
+        ref["relative_path"] = relative_path
+    mime = str(upload.get("mime") or artifact.get("mime") or "").strip()
+    if mime:
+        ref["mime"] = mime
+    size_bytes = upload.get("size_bytes") or artifact.get("size_bytes")
+    if size_bytes:
+        ref["size_bytes"] = size_bytes
     return ref
 
 
@@ -868,15 +984,26 @@ def _attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) -
     file_meta = body.get("file") if isinstance(body.get("file"), Mapping) else {}
     upload = body.get("upload") if isinstance(body.get("upload"), Mapping) else {}
     kind = "photo" if str(body.get("kind") or "").strip() == "photo" else "file"
-    safe_ref = _safe_upload_ref(upload, artifact)
+    safe_ref = _safe_upload_ref(upload, artifact, default_purpose=_default_attachment_purpose(kind))
+    name = str(upload.get("name") or file_meta.get("name") or artifact.get("filename") or artifact.get("name") or "attachment").strip()
+    mime = str(upload.get("mime") or file_meta.get("mime") or artifact.get("mime") or "").strip() or None
+    size_bytes = upload.get("size_bytes") or file_meta.get("size_bytes") or artifact.get("size_bytes")
+    relative_path = str(safe_ref.get("relative_path") or "").strip()
+    url = _skill_file_url(relative_path)
+    download_url = _skill_file_url(relative_path, download=True)
     attachment = {
         "id": f"att-{int(_now() * 1000)}",
         "kind": kind,
-        "name": str(upload.get("name") or file_meta.get("name") or artifact.get("filename") or artifact.get("name") or "attachment").strip(),
-        "mime": str(upload.get("mime") or file_meta.get("mime") or artifact.get("mime") or "").strip() or None,
-        "size_bytes": upload.get("size_bytes") or file_meta.get("size_bytes") or artifact.get("size_bytes"),
+        "name": name,
+        "mime": mime,
+        "size_bytes": size_bytes,
+        "summary": _attachment_summary(mime, size_bytes),
+        "icon": _attachment_icon(kind, mime),
         "artifact_ref": safe_ref or dict(artifact),
-        "path": body.get("path") or artifact.get("path") or artifact.get("local_path") or artifact.get("stored_path"),
+        "relative_path": relative_path or None,
+        "url": url or None,
+        "download_url": download_url or None,
+        "path": url or body.get("path") or artifact.get("path") or artifact.get("local_path") or artifact.get("stored_path"),
     }
     note.setdefault("attachments", []).append(attachment)
     note["updated_at"] = _now()
