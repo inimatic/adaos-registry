@@ -30,6 +30,11 @@ def load_module(monkeypatch, memory=None):
     return mod, projected, streams
 
 
+def skill_file_url(relative_path: str, *, download: bool = False) -> str:
+    query = "download=1&token=dev-local-token" if download else "token=dev-local-token"
+    return f"http://127.0.0.1:8777/api/skills/notebook_skill/files/content/{relative_path}?{query}"
+
+
 def test_create_save_and_select_note_updates_projection_and_stream(monkeypatch):
     mod, projected, streams = load_module(monkeypatch)
 
@@ -362,8 +367,8 @@ def test_attach_note_file_updates_editor_and_widget(monkeypatch):
 
     assert result["ok"] is True
     assert result["attachment"]["kind"] == "photo"
-    assert result["attachment"]["url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.jpg"
-    assert result["attachment"]["download_url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.jpg?download=1"
+    assert result["attachment"]["url"] == skill_file_url("uploads/photos/photo.jpg")
+    assert result["attachment"]["download_url"] == skill_file_url("uploads/photos/photo.jpg", download=True)
     assert projected[-1][1]["editor"]["attachments"][0]["name"] == "photo.jpg"
 
 
@@ -398,11 +403,44 @@ def test_attach_note_upload_accepts_sanitized_upload_payload(monkeypatch):
     assert result["attachment"]["name"] == "photo.gif"
     assert result["attachment"]["artifact_ref"]["artifact_id"] == "skill_file:notebook_skill:photos:aaaaaaaaaaaaaaaa"
     assert result["attachment"]["artifact_ref"]["relative_path"] == "uploads/photos/photo.gif"
-    assert result["attachment"]["url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.gif"
-    assert result["attachment"]["download_url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.gif?download=1"
+    assert result["attachment"]["url"] == skill_file_url("uploads/photos/photo.gif")
+    assert result["attachment"]["download_url"] == skill_file_url("uploads/photos/photo.gif", download=True)
     assert result["attachment"]["summary"] == "image/gif | 123 B"
     assert projected[-1][1]["editor"]["attachments"][0]["mime"] == "image/gif"
-    assert projected[-1][1]["editor"]["attachments"][0]["url"] == "/api/skills/notebook_skill/files/content/uploads/photos/photo.gif"
+    assert projected[-1][1]["editor"]["attachments"][0]["url"] == skill_file_url("uploads/photos/photo.gif")
+
+
+def test_attach_note_upload_uses_current_note_when_state_note_id_is_unresolved(monkeypatch):
+    mod, projected, _streams = load_module(monkeypatch)
+    created = mod.create_note({"content": "current note", "webspace_id": "desktop"})
+    note_id = created["note"]["id"]
+
+    result = mod.attach_note_upload({
+        "note_id": "$state.notebookSelectedNoteId",
+        "kind": "photo",
+        "upload": {
+            "name": "fallback.jpg",
+            "size_bytes": 321,
+            "mime": "image/jpeg",
+            "sha256": "b" * 64,
+            "purpose": "photos",
+        },
+        "artifact_ref": {
+            "artifact_id": "skill_file:notebook_skill:photos:" + "b" * 16,
+            "name": "fallback.jpg",
+            "purpose": "photos",
+            "relative_path": "uploads/photos/fallback.jpg",
+            "mime": "image/jpeg",
+        },
+        "webspace_id": "desktop",
+        "side_effect_class": "local_write",
+    })
+
+    assert result["ok"] is True
+    assert result["note"]["id"] == note_id
+    assert result["attachment"]["url"] == skill_file_url("uploads/photos/fallback.jpg")
+    assert mod._STATE["notes"][note_id]["attachments"][0]["name"] == "fallback.jpg"
+    assert projected[-1][1]["editor"]["attachments"][0]["name"] == "fallback.jpg"
 
 
 def test_note_cards_use_first_line_title_and_remaining_preview(monkeypatch):
@@ -459,7 +497,7 @@ def test_stream_payload_uses_compact_cards_and_safe_attachment_links(monkeypatch
     assert "text" not in payload["items"][0]
     assert payload["items"][0]["preview"].endswith("...")
     assert payload["editor"]["content"].startswith("Title 7\n")
-    assert payload["editor"]["attachments"][0]["url"] == "/api/skills/notebook_skill/files/content/uploads/photos/local.gif"
+    assert payload["editor"]["attachments"][0]["url"] == skill_file_url("uploads/photos/local.gif")
     assert "local_path" not in encoded
     assert "stored_path" not in encoded
     assert "file:///" not in encoded

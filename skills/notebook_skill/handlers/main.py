@@ -8,7 +8,7 @@ import threading
 import time
 from copy import deepcopy
 from typing import Any, Mapping
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import skill_memory_get, skill_memory_set
@@ -400,21 +400,44 @@ def _editing_note() -> dict[str, Any] | None:
     return note if isinstance(note, dict) else None
 
 
-def _note_id_from_payload(payload: Mapping[str, Any], *, fallback_selected: bool = True) -> str:
+def _clean_note_id_token(value: Any) -> str:
+    token = str(value or "").strip()
+    if not token or token.startswith("$") or token.lower() in {"null", "none", "undefined"}:
+        return ""
+    return token
+
+
+def _current_note_id() -> str:
+    notes = _STATE.get("notes") if isinstance(_STATE.get("notes"), Mapping) else {}
+    for key in ("editing_note_id", "display_note_id"):
+        note_id = _clean_note_id_token(_STATE.get(key))
+        if note_id and isinstance(notes.get(note_id), dict):
+            return note_id
+    for item in list(_STATE.get("order") or []):
+        note_id = _clean_note_id_token(item)
+        if note_id and isinstance(notes.get(note_id), dict):
+            return note_id
+    return ""
+
+
+def _explicit_note_id_from_payload(payload: Mapping[str, Any]) -> str:
     for key in ("note_id", "id"):
-        token = str(payload.get(key) or "").strip()
-        if token and not token.startswith("$"):
+        token = _clean_note_id_token(payload.get(key))
+        if token:
             return token
     event = payload.get("event")
     if isinstance(event, Mapping):
-        token = str(event.get("note_id") or event.get("id") or "").strip()
+        token = _clean_note_id_token(event.get("note_id") or event.get("id"))
         if token:
             return token
-    return (
-        str(_STATE.get("editing_note_id") or _STATE.get("display_note_id") or "")
-        if fallback_selected
-        else ""
-    )
+    return ""
+
+
+def _note_id_from_payload(payload: Mapping[str, Any], *, fallback_selected: bool = True) -> str:
+    explicit = _explicit_note_id_from_payload(payload)
+    if explicit:
+        return explicit
+    return _current_note_id() if fallback_selected else ""
 
 
 def _note_list_items() -> list[dict[str, Any]]:
@@ -953,13 +976,88 @@ def _fallback_upload_relative_path(*, purpose: str, name: str) -> str:
     return _clean_upload_relative_path(f"uploads/{purpose_token}/{name_token}")
 
 
+def _config_text_attr(name: str) -> str:
+    try:
+        conf = getattr(get_ctx(), "config", None)
+        value = getattr(conf, name, None) if conf is not None else None
+        if value:
+            return str(value).strip()
+    except Exception:
+        pass
+    try:
+        value = getattr(load_config(), name, None)
+        if value:
+            return str(value).strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _local_api_base_url() -> str:
+    candidates = [
+        os.getenv("ADAOS_LOCAL_API_URL") or "",
+        os.getenv("ADAOS_LOCAL_API_BASE") or "",
+        os.getenv("ADAOS_RUNTIME_API_URL") or "",
+        os.getenv("ADAOS_CONTROL_API_URL") or "",
+        _config_text_attr("local_api_url"),
+        "http://127.0.0.1:8777",
+    ]
+    for item in candidates:
+        token = str(item or "").strip().rstrip("/")
+        if not token:
+            continue
+        if "://" not in token:
+            token = f"http://{token}"
+        token = token.replace("://0.0.0.0", "://127.0.0.1").replace("://[::]", "://127.0.0.1")
+        return token
+    return "http://127.0.0.1:8777"
+
+
+def _local_api_token() -> str:
+    for item in (os.getenv("ADAOS_TOKEN") or "", _config_text_attr("token"), "dev-local-token"):
+        token = str(item or "").strip()
+        if token:
+            return token
+    return "dev-local-token"
+
+
+def _append_token_query(url: str) -> str:
+    token = _local_api_token()
+    if not token or "token=" in url:
+        return url
+    return f"{url}{'&' if '?' in url else '?'}{urlencode({'token': token})}"
+
+
 def _skill_file_url(relative_path: Any, *, download: bool = False) -> str:
     rel = _clean_upload_relative_path(relative_path)
     if not rel:
         return ""
     encoded = "/".join(quote(part, safe="") for part in rel.split("/"))
-    suffix = "?download=1" if download else ""
-    return f"/api/skills/{_SKILL_NAME}/files/content/{encoded}{suffix}"
+    url = f"{_local_api_base_url()}/api/skills/{_SKILL_NAME}/files/content/{encoded}"
+    params: list[tuple[str, str]] = []
+    if download:
+        params.append(("download", "1"))
+    token = _local_api_token()
+    if token:
+        params.append(("token", token))
+    return f"{url}?{urlencode(params)}" if params else url
+
+
+def _browser_safe_url(raw_url: Any) -> str:
+    raw = str(raw_url or "").strip()
+    if not raw:
+        return ""
+    lowered = raw.lower()
+    if lowered.startswith("file:") or "\\" in raw:
+        return ""
+    content_path = f"/api/skills/{_SKILL_NAME}/files/content/"
+    if raw.startswith(content_path):
+        return _append_token_query(f"{_local_api_base_url()}{raw}")
+    dev_origins = ("http://127.0.0.1:8100", "http://localhost:8100")
+    for origin in dev_origins:
+        if lowered.startswith(f"{origin}{content_path}".lower()):
+            return _append_token_query(f"{_local_api_base_url()}{raw[len(origin):]}")
+    return raw
 
 
 def _format_size(value: Any) -> str:
@@ -1037,8 +1135,8 @@ def _project_attachment(value: Mapping[str, Any]) -> dict[str, Any]:
     relative_path = _clean_upload_relative_path(raw.get("relative_path") or artifact.get("relative_path"))
     if not relative_path:
         relative_path = _fallback_upload_relative_path(purpose=purpose, name=name)
-    url = str(raw.get("url") or "").strip() or _skill_file_url(relative_path)
-    download_url = str(raw.get("download_url") or "").strip() or _skill_file_url(relative_path, download=True)
+    url = _skill_file_url(relative_path) or _browser_safe_url(raw.get("url"))
+    download_url = _skill_file_url(relative_path, download=True) or _browser_safe_url(raw.get("download_url"))
     attachment_id = str(raw.get("id") or artifact.get("artifact_id") or artifact.get("id") or "").strip()
     out: dict[str, Any] = {
         "id": attachment_id or None,
@@ -1108,10 +1206,26 @@ def _attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) -
     body.update({k: v for k, v in kwargs.items() if v is not None})
     ws = _webspace_id(body)
     _prepare_state(ws)
-    note_id = _note_id_from_payload(body)
+    requested_note_id = _explicit_note_id_from_payload(body)
+    note_id = requested_note_id or _note_id_from_payload(body)
     note = _STATE["notes"].get(note_id)
+    if not isinstance(note, dict) and requested_note_id:
+        fallback_note_id = _current_note_id()
+        fallback_note = _STATE["notes"].get(fallback_note_id)
+        if isinstance(fallback_note, dict):
+            _LOG.warning(
+                "attach_note_file note_id fallback: requested=%s fallback=%s webspace=%s",
+                requested_note_id,
+                fallback_note_id,
+                ws,
+            )
+            note_id = fallback_note_id
+            note = fallback_note
     if not isinstance(note, dict):
         return {"ok": False, "error": "note_not_found", "note_id": note_id}
+    raw_note_id = str(body.get("note_id") or "").strip()
+    if raw_note_id and raw_note_id != note_id and not requested_note_id:
+        _LOG.warning("attach_note_file unresolved note_id token: raw=%s fallback=%s webspace=%s", raw_note_id, note_id, ws)
     artifact = body.get("artifact_ref") if isinstance(body.get("artifact_ref"), Mapping) else {}
     file_meta = body.get("file") if isinstance(body.get("file"), Mapping) else {}
     upload = body.get("upload") if isinstance(body.get("upload"), Mapping) else {}
