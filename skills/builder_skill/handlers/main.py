@@ -1306,6 +1306,20 @@ def _canonical_webui_payload(payload: Mapping[str, Any] | None, page_schema: Map
     return _set_webui_page_schema(data, page_schema)
 
 
+def _with_builder_page_schema_meta(page_schema: Mapping[str, Any], preview_state: Mapping[str, Any]) -> dict[str, Any]:
+    data = _repair_text_tree(copy.deepcopy(dict(page_schema)))
+    version = str(preview_state.get("version") or "").strip()
+    if not version:
+        return data
+    meta = data.get("meta") if isinstance(data.get("meta"), dict) else {}
+    builder = meta.get("builder") if isinstance(meta.get("builder"), dict) else {}
+    builder["proto"] = version
+    builder["ui_revision"] = version
+    meta["builder"] = builder
+    data["meta"] = meta
+    return data
+
+
 def _builder_runtime_component_contracts() -> dict[str, Any]:
     return {
         "ui.form": {
@@ -1597,7 +1611,7 @@ def _write_webui(artifact_root: str | None, preview_state: Mapping[str, Any]) ->
         return
     preview_state = _repair_text_tree(dict(preview_state))
     _ensure_builder_project_files(root, preview_state)
-    page_schema = _page_schema_from_preview(preview_state)
+    page_schema = _with_builder_page_schema_meta(_page_schema_from_preview(preview_state), preview_state)
     payload = {
         "schema": "adaos.webui.v1",
         "generated_by": SKILL_ID,
@@ -1638,6 +1652,7 @@ def _write_webui_payload(artifact_root: str | None, payload: Mapping[str, Any]) 
     if not page_schema and isinstance(preview_state, Mapping):
         page_schema = _page_schema_from_preview(preview_state)
     if page_schema:
+        page_schema = _with_builder_page_schema_meta(page_schema, preview_state if isinstance(preview_state, Mapping) else {})
         data = _canonical_webui_payload(data, page_schema)
     if isinstance(preview_state, Mapping):
         _ensure_builder_project_files(root, preview_state)
@@ -2314,7 +2329,7 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
 
 def _write_scenario_page_schema_value(root: Path, page_schema: Mapping[str, Any], preview_state: Mapping[str, Any]) -> None:
     preview_state = _repair_text_tree(dict(preview_state))
-    page_schema = _repair_text_tree(copy.deepcopy(dict(page_schema)))
+    page_schema = _with_builder_page_schema_meta(page_schema, preview_state)
     manifest = root / "scenario.json"
     if not manifest.exists() or not page_schema:
         return
@@ -3667,6 +3682,137 @@ def _parse_llm_webui_transform_output(
         ],
         "raw_response": output_text,
     }
+
+
+def _repair_llm_webui_transform_output(
+    *,
+    session: Mapping[str, Any],
+    instruction: str,
+    previous_preview: Mapping[str, Any],
+    output_text: str,
+    validation_error: Mapping[str, Any],
+    request_id: str = "",
+    job_id: str = "",
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    request = _builder_llm_webui_transform_request(
+        session=session,
+        instruction=instruction,
+        preview_state=previous_preview,
+    )
+    repair_request_id = _builder_llm_request_id(
+        session=session,
+        instruction=instruction,
+        current_payload=request["current_payload"],
+        attempt=2,
+    )
+    repair_prompt = _compact_json(
+        {
+            "task": "Repair the previous Builder JSON response. Return only corrected JSON.",
+            "validation_error": dict(validation_error),
+            "previous_response": str(output_text or "")[:20000],
+            "original_request": request["base_request"],
+            "required_output_shape": {
+                "schema": "adaos.webui.v1",
+                "ui": {
+                    "application": {
+                        "desktop": {
+                            "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
+                        }
+                    }
+                },
+                "comment": "short user-facing text",
+                "unable_reason": "optional diagnostic",
+            },
+        }
+    )
+    try:
+        from adaos.sdk.llm.llm_client import send_response
+
+        response = send_response(
+            [
+                {"role": "system", "content": str(request["system_prompt"])},
+                {"role": "user", "content": repair_prompt},
+            ],
+            temperature=0,
+            max_tokens=_builder_llm_max_tokens(),
+            request_id=repair_request_id,
+            timeout=_builder_llm_timeout_s(),
+        )
+        repaired_output = str(response.get("output_text") or "")
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": "llm_webui_transform_repair_failed",
+            "detail": f"{type(exc).__name__}: {exc}",
+            "attempts": [
+                {
+                    "attempt": 1,
+                    "ok": False,
+                    "request_id": request_id,
+                    "job_id": job_id,
+                    "validation": dict(validation_error),
+                },
+                {
+                    "attempt": 2,
+                    "ok": False,
+                    "request_id": repair_request_id,
+                    "error": "repair_request_failed",
+                },
+            ],
+            "last_response": str(output_text or "")[:12000],
+            "comment": "Не смог собрать валидный UI JSON.",
+        }
+    try:
+        result = _parse_llm_webui_transform_output(
+            output_text=repaired_output,
+            previous_preview=previous_preview,
+            request_id=repair_request_id,
+            job_id=job_id,
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error": "llm_webui_transform_repair_invalid",
+            "detail": f"{type(exc).__name__}: {exc}",
+            "attempts": [
+                {
+                    "attempt": 1,
+                    "ok": False,
+                    "request_id": request_id,
+                    "job_id": job_id,
+                    "validation": dict(validation_error),
+                },
+                {
+                    "attempt": 2,
+                    "ok": False,
+                    "request_id": repair_request_id,
+                    "job_id": job_id,
+                    "validation": {"error": f"{type(exc).__name__}: {exc}"},
+                },
+            ],
+            "last_response": repaired_output[:12000] or str(output_text or "")[:12000],
+            "comment": "Не смог собрать валидный UI JSON.",
+        }
+    initial_attempt = {
+        "attempt": 1,
+        "ok": False,
+        "request_id": request_id,
+        "job_id": job_id,
+        "validation": dict(validation_error),
+    }
+    attempts = [initial_attempt]
+    for item in (result.get("attempts") if isinstance(result.get("attempts"), list) else []):
+        if isinstance(item, Mapping):
+            attempts.append(dict(item))
+    result["attempts"] = attempts
+    result["raw_response"] = repaired_output
+    result["repair"] = {
+        "schema": "adaos.builder.llm_repair.v1",
+        "request_id": repair_request_id,
+        "repaired": True,
+    }
+    return result
 
 
 def _workbench_service():
@@ -5663,27 +5809,41 @@ def _complete_llm_webui_job(
             job_id=job_id,
         )
     except Exception as exc:
-        _mark_llm_job_failed(
-            ws=ws,
+        llm_result = _repair_llm_webui_transform_output(
             session=session,
+            instruction=request_text,
+            previous_preview=previous_preview,
+            output_text=output_text,
+            validation_error={"error": "llm_response_parse_failed", "detail": f"{type(exc).__name__}: {exc}"},
+            request_id=request_id,
             job_id=job_id,
-            detail=f"{type(exc).__name__}: {exc}",
-            binding=binding,
-            topic_ref=topic,
             _meta=_meta,
         )
-        return
     if not llm_result.get("ok"):
-        _mark_llm_job_failed(
-            ws=ws,
+        llm_result = _repair_llm_webui_transform_output(
             session=session,
+            instruction=request_text,
+            previous_preview=previous_preview,
+            output_text=str(llm_result.get("last_response") or output_text),
+            validation_error=dict(llm_result.get("validation") or {
+                "error": llm_result.get("error") or "invalid_llm_response",
+                "detail": llm_result.get("detail") or "",
+            }),
+            request_id=request_id,
             job_id=job_id,
-            detail=str(llm_result.get("detail") or llm_result.get("error") or "invalid_llm_response"),
-            binding=binding,
-            topic_ref=topic,
             _meta=_meta,
         )
-        return
+        if not llm_result.get("ok"):
+            _mark_llm_job_failed(
+                ws=ws,
+                session=session,
+                job_id=job_id,
+                detail=str(llm_result.get("detail") or llm_result.get("error") or "invalid_llm_response"),
+                binding=binding,
+                topic_ref=topic,
+                _meta=_meta,
+            )
+            return
     llm_result["job"] = job
     pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
     if isinstance(pending, dict) and job_id in pending:

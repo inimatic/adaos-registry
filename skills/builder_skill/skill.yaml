@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.2.11
+version: 0.2.12
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -358,13 +358,13 @@ conversation:
     - builder
     - buikder
     - билдер
-updated_at: '2026-07-08T16:17:22+00:00'
+updated_at: '2026-07-08T17:26:44+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3554.6c7c3133
-    recorded_at: '2026-07-08T16:17:22+00:00'
+    min_version: 0.1.0+3559.fdbe4d8a
+    recorded_at: '2026-07-08T17:26:45+00:00'
     source: skill_push
-    min_commit: 6c7c3133729c49cccc7897b2178abe48cc17ceb8
-    min_short_commit: 6c7c3133
-    build_date: '2026-07-08T19:03:45+03:00'
+    min_commit: fdbe4d8aed57c58bb43411df1d9f378b38de5c53
+    min_short_commit: fdbe4d8a
+    build_date: '2026-07-08T20:23:57+03:00'
 
