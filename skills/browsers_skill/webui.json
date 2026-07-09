@@ -10,7 +10,7 @@
         "budget": { "maxPayloadBytes": 4096, "maxPublishHz": 2, "maxSnapshotHz": 1, "maxItems": 1 },
         "guardVisibility": { "degradedState": "Keep last compact browser totals.", "log": "service.browsers_skill.runtime.log", "quarantine": false, "metric": "webio_stream_guard.browsers.summary" },
         "route": { "kind": "stream", "owner": "skill:browsers_skill", "surface": "app:browsers.summary", "firstPaint": "empty browser totals", "recovery": "snapshot requested on stream subscribe" },
-        "initialState": { "title": "Browsers", "value": 0, "subtitle": "0 devices | 0 clients", "details": "0 online" }
+        "initialState": { "title": "Browsers", "value": 0, "subtitle": "0 devices | 0 endpoints", "details": "0 online" }
       },
       "browsers.devices": {
         "mode": "replace",
@@ -26,8 +26,8 @@
         "transport": "hub",
         "snapshotPolicy": "on_subscribe",
         "budget": { "maxPayloadBytes": 32768, "maxPublishHz": 2, "maxSnapshotHz": 1, "maxItems": 128 },
-        "guardVisibility": { "degradedState": "Keep last compact browser client list.", "log": "service.browsers_skill.runtime.log", "quarantine": false, "metric": "webio_stream_guard.browsers.clients" },
-        "route": { "kind": "stream", "owner": "skill:browsers_skill", "surface": "app:browsers.clients", "firstPaint": "empty browser clients list", "recovery": "snapshot requested on stream subscribe" },
+        "guardVisibility": { "degradedState": "Keep last compact browser endpoint list.", "log": "service.browsers_skill.runtime.log", "quarantine": false, "metric": "webio_stream_guard.browsers.clients" },
+        "route": { "kind": "stream", "owner": "skill:browsers_skill", "surface": "app:browsers.clients", "firstPaint": "empty browser endpoints list", "recovery": "snapshot requested on stream subscribe" },
         "initialState": []
       },
       "browsers.current_summary": {
@@ -198,7 +198,7 @@
               "id": "browsers-clients",
               "type": "ui.list",
               "area": "main",
-              "title": "Clients",
+              "title": "Endpoints",
               "dataSource": {
                 "kind": "stream",
                 "receiver": "browsers.clients",
@@ -213,7 +213,7 @@
                 "showDetails": true,
                 "itemAccordion": true,
                 "onlineOnlyStateKey": "browsersOnlineOnly",
-                "emptyText": "No temporary browser clients",
+                "emptyText": "No active browser endpoints",
                 "buttons": [
                   {
                     "id": "settings",
@@ -275,20 +275,48 @@
               }
             },
             {
+              "id": "browser-current-device-name",
+              "type": "input.text",
+              "area": "main",
+              "title": "Device name",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "browsers.current_device_name"
+              },
+              "inputs": {
+                "bindField": "value",
+                "suggestionsKey": "suggestions",
+                "placeholder": "My laptop",
+                "commitMode": "manual",
+                "saveLabel": "Save device name",
+                "helper": "Physical device name is stored in the hub device registry."
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "browsers_skill.rename_selected_browser_device_name",
+                  "params": {
+                    "name": "$event.value"
+                  }
+                }
+              ]
+            },
+            {
               "id": "browser-current-name",
               "type": "input.text",
               "area": "main",
-              "title": "Browser name",
+              "title": "Endpoint name",
               "dataSource": {
                 "kind": "stream",
                 "receiver": "browsers.current_name"
               },
               "inputs": {
                 "bindField": "value",
-                "placeholder": "Living room TV",
+                "placeholder": "Chrome",
                 "commitMode": "manual",
-                "saveLabel": "Save name",
-                "helper": "Device ID is immutable. This name is stored in hub access policy and is not written back to the remote browser."
+                "saveLabel": "Save endpoint name",
+                "helper": "Endpoint name is stored in the hub device registry and is not written back to the browser profile."
               },
               "actions": [
                 {
@@ -298,6 +326,28 @@
                   "params": {
                     "name": "$event.value"
                   }
+                }
+              ]
+            },
+            {
+              "id": "browser-identify-actions",
+              "type": "input.commandBar",
+              "area": "main",
+              "title": "Identify",
+              "inputs": {
+                "buttons": [
+                  {
+                    "id": "identify",
+                    "label": "Signal endpoint"
+                  }
+                ],
+                "size": "small"
+              },
+              "actions": [
+                {
+                  "on": "click:identify",
+                  "type": "callSkill",
+                  "target": "browsers_skill.identify_selected_browser"
                 }
               ]
             },

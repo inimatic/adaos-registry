@@ -46,6 +46,7 @@ REQUIRES_DATA_PROJECTIONS = [
     "browsers.devices",
     "browsers.clients",
     "browsers.current_summary",
+    "browsers.current_device_name",
     "browsers.current_name",
 ]
 _DATA_PROJECTION_ENTRIES = [
@@ -53,6 +54,7 @@ _DATA_PROJECTION_ENTRIES = [
     {"scope": "subnet", "slot": "browsers.devices", "targets": [{"backend": "yjs", "path": "data/browsers/devices"}]},
     {"scope": "subnet", "slot": "browsers.clients", "targets": [{"backend": "yjs", "path": "data/browsers/clients"}]},
     {"scope": "subnet", "slot": "browsers.current_summary", "targets": [{"backend": "yjs", "path": "data/browsers/current_summary"}]},
+    {"scope": "subnet", "slot": "browsers.current_device_name", "targets": [{"backend": "yjs", "path": "data/browsers/current_device_name"}]},
     {"scope": "subnet", "slot": "browsers.current_name", "targets": [{"backend": "yjs", "path": "data/browsers/current_name"}]},
 ]
 
@@ -69,6 +71,7 @@ _PROJECTION_SLOTS = [
     _projection_slot("browsers.devices", "data/browsers/devices"),
     _projection_slot("browsers.clients", "data/browsers/clients"),
     _projection_slot("browsers.current_summary", "data/browsers/current_summary"),
+    _projection_slot("browsers.current_device_name", "data/browsers/current_device_name"),
     _projection_slot("browsers.current_name", "data/browsers/current_name"),
 ]
 _PROJECTION_SLOT_BY_NAME = {slot.name: slot for slot in _PROJECTION_SLOTS}
@@ -102,6 +105,7 @@ _STREAM_RUNTIME = StreamRuntime(
         StreamReceiver("browsers.devices", build=_build_registered_stream_payload, min_interval_s=0.25),
         StreamReceiver("browsers.clients", build=_build_registered_stream_payload, min_interval_s=0.25),
         StreamReceiver("browsers.current_summary", build=_build_registered_stream_payload, min_interval_s=0.25),
+        StreamReceiver("browsers.current_device_name", build=_build_registered_stream_payload, min_interval_s=0.25),
         StreamReceiver("browsers.current_name", build=_build_registered_stream_payload, min_interval_s=0.25),
     ],
     stream_publish=_sdk_stream_publish,
@@ -337,7 +341,14 @@ def _ensure_skill_data_projections() -> None:
 
 def _browser_title(entry: Mapping[str, Any]) -> str:
     return (
-        str(entry.get("display_name") or "").strip()
+        str(entry.get("title") or "").strip()
+        or str(entry.get("effective_name") or "").strip()
+        or (
+            str(entry.get("device_display_name") or "").strip()
+            if str(entry.get("access_class") or "device").strip().lower() != "client"
+            else ""
+        )
+        or _browser_endpoint_name(entry)
         or str(entry.get("hostname") or "").strip()
         or str(entry.get("id") or "").strip()
         or "browser"
@@ -355,8 +366,30 @@ def _browser_client_version(entry: Mapping[str, Any]) -> str:
     )
 
 
+def _browser_device_name(entry: Mapping[str, Any]) -> str:
+    return str(entry.get("device_display_name") or "").strip()
+
+
+def _browser_endpoint_name(entry: Mapping[str, Any]) -> str:
+    return (
+        str(entry.get("endpoint_display_name") or "").strip()
+        or str(entry.get("endpoint_title") or "").strip()
+        or str(entry.get("display_name") or "").strip()
+        or str(entry.get("draft_name") or "").strip()
+    )
+
+
 def _browser_subtitle(entry: Mapping[str, Any]) -> str:
     bits: list[str] = []
+    access_class = str(entry.get("access_class") or "device").strip().lower() or "device"
+    device_name = _browser_device_name(entry)
+    endpoint_name = _browser_endpoint_name(entry)
+    title = _browser_title(entry)
+    if access_class == "client":
+        if device_name and device_name.casefold() != title.casefold():
+            bits.append(f"Device {device_name}")
+    elif endpoint_name and endpoint_name.casefold() != title.casefold():
+        bits.append(f"Endpoint {endpoint_name}")
     webspace_id = str(entry.get("last_webspace_id") or "").strip()
     if webspace_id:
         bits.append(f"Webspace {webspace_id}")
@@ -371,6 +404,8 @@ def _browser_subtitle(entry: Mapping[str, Any]) -> str:
 def _browser_details(entry: Mapping[str, Any]) -> str:
     rows = [
         f"ID: {str(entry.get('id') or '').strip() or '-'}",
+        f"Device name: {_browser_device_name(entry) or '-'}",
+        f"Endpoint name: {_browser_endpoint_name(entry) or '-'}",
         f"Access: {str(entry.get('access_class') or 'device').strip() or 'device'}",
         f"Client version: {_browser_client_version(entry) or '-'}",
         f"Lifetime: {sdk_access_links.lifetime_label(dict(entry))}",
@@ -389,6 +424,8 @@ def _browser_tiles(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "device_ref": f"browser:{str(entry.get('id') or '').strip()}",
             "browser_device_id": str(entry.get("id") or "").strip(),
             "parent_browser_device_id": str(entry.get("parent_browser_device_id") or "").strip() or None,
+            "device_display_name": _browser_device_name(entry) or None,
+            "endpoint_display_name": _browser_endpoint_name(entry) or None,
             "title": _browser_title(entry),
             "subtitle": _browser_subtitle(entry),
             "content": _browser_details(entry),
@@ -441,22 +478,33 @@ def _online_tiles(items: list[dict[str, Any]], params: Mapping[str, Any] | None)
     return [item for item in items if bool(item.get("online"))]
 
 
-def _current_browser_payload(device_id: str | None) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def _device_name_suggestions() -> list[dict[str, Any]]:
+    try:
+        return sdk_device_access.list_registered_device_names()
+    except Exception:
+        return []
+
+
+def _current_browser_payload(device_id: str | None) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
     entry = sdk_access_links.get_browser_link(str(device_id or "").strip()) if device_id else None
     if not entry:
         return (
             [
                 {
                     "title": "No browser selected",
-                    "description": "Pick a browser from Devices or Clients.",
+                    "description": "Pick a browser from Devices or Endpoints.",
                 }
             ],
             {"value": ""},
+            {"value": "", "suggestions": _device_name_suggestions()},
         )
     device_id = str(entry.get("id") or "").strip()
+    endpoint_name = _browser_endpoint_name(entry) or _browser_title(entry)
+    device_name = _browser_device_name(entry)
     summary = [
         {"title": "Device ID", "description": device_id or "-"},
-        {"title": "Browser", "description": _browser_title(entry)},
+        {"title": "Endpoint", "description": endpoint_name or "-"},
+        {"title": "Device name", "description": device_name or "-"},
         {"title": "Access", "description": str(entry.get("access_class") or "device").strip() or "device"},
         {"title": "Client version", "description": _browser_client_version(entry) or "-"},
         {"title": "Lifetime", "description": sdk_access_links.lifetime_label(entry)},
@@ -464,7 +512,15 @@ def _current_browser_payload(device_id: str | None) -> tuple[list[dict[str, Any]
         {"title": "Last seen", "description": _iso(entry.get("last_seen_at")) or "-"},
         {"title": "Status", "description": "online" if bool(entry.get("online")) else "offline"},
     ]
-    return summary, {"value": _browser_title(entry), "device_id": device_id}
+    return (
+        summary,
+        {"value": endpoint_name, "device_id": device_id},
+        {
+            "value": device_name,
+            "device_id": device_id,
+            "suggestions": _device_name_suggestions(),
+        },
+    )
 
 
 def _resolve_current_browser_id(entries: list[Mapping[str, Any]], webspace_id: str) -> str | None:
@@ -504,16 +560,17 @@ def _build_snapshot(target_ws: str | None = None) -> tuple[dict[str, Any], str]:
     summary = {
         "title": "Browsers",
         "value": len(all_entries),
-        "subtitle": f"{len(devices)} devices | {len(clients)} clients",
+        "subtitle": f"{len(devices)} devices | {len(clients)} endpoints",
         "details": f"{sum(1 for entry in all_entries if bool(entry.get('online')))} online",
     }
     current_device_id = _resolve_current_browser_id(devices + clients, effective_ws)
-    current_summary, current_name = _current_browser_payload(current_device_id)
+    current_summary, current_name, current_device_name = _current_browser_payload(current_device_id)
     payload = {
         "summary": summary,
         "devices": _browser_tiles(devices),
         "clients": _browser_tiles(clients),
         "current_summary": current_summary,
+        "current_device_name": current_device_name,
         "current_name": current_name,
     }
     with _SNAPSHOT_CACHE_LOCK:
@@ -527,11 +584,12 @@ async def _publish_snapshot(target_ws: str | None = None, *, fanout: bool = Fals
     available_entries = list(payload["devices"]) + list(payload["clients"])
     for ws in _projection_webspaces(effective_ws, fanout=fanout):
         current_id = _resolve_current_browser_id(available_entries, ws)
-        ws_current_summary, ws_current_name = _current_browser_payload(current_id)
+        ws_current_summary, ws_current_name, ws_current_device_name = _current_browser_payload(current_id)
         await _set_projection_if_changed("browsers.summary", payload["summary"], webspace_id=ws, force=force)
         await _set_projection_if_changed("browsers.devices", payload["devices"], webspace_id=ws, force=force)
         await _set_projection_if_changed("browsers.clients", payload["clients"], webspace_id=ws, force=force)
         await _set_projection_if_changed("browsers.current_summary", ws_current_summary, webspace_id=ws, force=force)
+        await _set_projection_if_changed("browsers.current_device_name", ws_current_device_name, webspace_id=ws, force=force)
         await _set_projection_if_changed("browsers.current_name", ws_current_name, webspace_id=ws, force=force)
     return payload
 
@@ -545,12 +603,13 @@ def _build_stream_payload(
     payload, effective_ws = _build_snapshot(webspace_id)
     available_entries = list(payload["devices"]) + list(payload["clients"])
     current_id = _resolve_current_browser_id(available_entries, effective_ws)
-    current_summary, current_name = _current_browser_payload(current_id)
+    current_summary, current_name, current_device_name = _current_browser_payload(current_id)
     data_by_receiver = {
         "browsers.summary": payload["summary"],
         "browsers.devices": _online_tiles(payload["devices"], params),
         "browsers.clients": _online_tiles(payload["clients"], params),
         "browsers.current_summary": current_summary,
+        "browsers.current_device_name": current_device_name,
         "browsers.current_name": current_name,
     }
     return data_by_receiver.get(receiver)
@@ -651,6 +710,26 @@ def rename_selected_browser(name: str, webspace_id: str | None = None) -> dict[s
 
 
 @tool
+def rename_selected_browser_device_name(name: str, webspace_id: str | None = None) -> dict[str, Any]:
+    target_ws = str(webspace_id or "default").strip() or "default"
+    device_id = str(_SELECTED_BROWSER_BY_WS.get(target_ws) or "").strip()
+    if not device_id:
+        return {"ok": False, "error": "browser_not_selected"}
+    result = sdk_device_access.rename_browser_device_name(f"browser:{device_id}", str(name or "").strip())
+    _refresh_snapshot_sync(target_ws)
+    return result
+
+
+@tool
+def identify_selected_browser(webspace_id: str | None = None) -> dict[str, Any]:
+    target_ws = str(webspace_id or "default").strip() or "default"
+    device_id = str(_SELECTED_BROWSER_BY_WS.get(target_ws) or "").strip()
+    if not device_id:
+        return {"ok": False, "error": "browser_not_selected"}
+    return sdk_device_access.identify_device(f"browser:{device_id}", webspace_id=target_ws)
+
+
+@tool
 def set_selected_browser_lifetime(preset: str, webspace_id: str | None = None) -> dict[str, Any]:
     target_ws = str(webspace_id or "default").strip() or "default"
     device_id = str(_SELECTED_BROWSER_BY_WS.get(target_ws) or "").strip()
@@ -718,6 +797,50 @@ def rename_device(
     result = sdk_device_access.rename_device(resolved, str(name or "").strip())
     _refresh_snapshot_sync(webspace_id)
     return result
+
+
+@tool
+def rename_browser_device_name(
+    name: str,
+    device_ref: str | None = None,
+    browser_device_id: str | None = None,
+    device_id: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    resolved = _coerce_device_ref(
+        device_ref=device_ref,
+        browser_device_id=browser_device_id,
+        device_id=device_id,
+        webspace_id=webspace_id,
+    )
+    if not resolved:
+        return {"ok": False, "error": "device_ref_required"}
+    result = sdk_device_access.rename_browser_device_name(resolved, str(name or "").strip())
+    _refresh_snapshot_sync(webspace_id)
+    return result
+
+
+@tool
+def get_registered_device_names(kind: str | None = None) -> dict[str, Any]:
+    return {"ok": True, "items": sdk_device_access.list_registered_device_names(kind)}
+
+
+@tool
+def identify_device(
+    device_ref: str | None = None,
+    browser_device_id: str | None = None,
+    device_id: str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    resolved = _coerce_device_ref(
+        device_ref=device_ref,
+        browser_device_id=browser_device_id,
+        device_id=device_id,
+        webspace_id=webspace_id,
+    )
+    if not resolved:
+        return {"ok": False, "error": "device_ref_required"}
+    return sdk_device_access.identify_device(resolved, webspace_id=webspace_id)
 
 
 @tool

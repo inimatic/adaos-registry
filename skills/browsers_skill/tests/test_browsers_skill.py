@@ -163,6 +163,7 @@ def test_browsers_skill_browser_tiles_include_online_flag(monkeypatch) -> None:
         {
             "id": "browser-1",
             "display_name": "Dev Browser",
+            "device_display_name": "Мой телефон",
             "access_class": "device",
             "online": True,
         },
@@ -174,13 +175,56 @@ def test_browsers_skill_browser_tiles_include_online_flag(monkeypatch) -> None:
         },
     ])
 
-    assert tiles[0]["title"] == "Dev Browser"
+    assert tiles[0]["title"] == "Мой телефон"
     assert tiles[0]["device_ref"] == "browser:browser-1"
     assert tiles[0]["browser_device_id"] == "browser-1"
+    assert tiles[0]["device_display_name"] == "Мой телефон"
+    assert tiles[0]["endpoint_display_name"] == "Dev Browser"
+    assert "Endpoint Dev Browser" in tiles[0]["subtitle"]
+    assert "Device name: Мой телефон" in tiles[0]["content"]
+    assert "Endpoint name: Dev Browser" in tiles[0]["content"]
     assert tiles[0]["online"] is True
     assert tiles[0]["status"] == "online"
     assert tiles[1]["online"] is False
     assert tiles[1]["status"] == "offline"
+
+
+def test_browsers_skill_summary_labels_client_rows_as_endpoints(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    mod._SELECTED_BROWSER_BY_WS.clear()
+    mod._SNAPSHOT_CACHE.clear()
+
+    entries = [
+        {
+            "id": "dev-phone",
+            "display_name": "Chrome",
+            "device_display_name": "Phone",
+            "access_class": "device",
+            "online": True,
+        },
+        {
+            "id": "dev-phone::webrtc",
+            "display_name": "Chrome",
+            "device_display_name": "Phone",
+            "access_class": "client",
+            "online": True,
+            "parent_browser_device_id": "dev-phone",
+        },
+    ]
+
+    monkeypatch.setattr(mod.sdk_access_links, "list_browser_links", lambda: [dict(entry) for entry in entries])
+    monkeypatch.setattr(
+        mod.sdk_access_links,
+        "get_browser_link",
+        lambda device_id: next((dict(entry) for entry in entries if entry["id"] == device_id), None),
+    )
+    monkeypatch.setattr(mod.sdk_access_links, "lifetime_label", lambda _entry: "Permanent")
+
+    payload, _webspace_id = mod._build_snapshot("desktop")
+
+    assert payload["summary"]["subtitle"] == "1 devices | 1 endpoints"
+    assert payload["devices"][0]["title"] == "Phone"
+    assert payload["clients"][0]["title"] == "Chrome"
 
 
 def test_browsers_skill_surfaces_client_build_version(monkeypatch) -> None:
@@ -197,7 +241,7 @@ def test_browsers_skill_surfaces_client_build_version(monkeypatch) -> None:
     tiles = mod._browser_tiles([dict(entry)])
     monkeypatch.setattr(mod.sdk_access_links, "get_browser_link", lambda device_id: dict(entry))
 
-    summary, _name = mod._current_browser_payload("browser-1")
+    summary, _name, _device_name = mod._current_browser_payload("browser-1")
 
     assert tiles[0]["client_build_version"] == "0.0.67+08ad430"
     assert "client 0.0.67+08ad430" in tiles[0]["subtitle"]
@@ -334,7 +378,7 @@ def test_browsers_skill_yjs_projection_requires_active_demand(monkeypatch) -> No
     asyncio.run(mod._publish_snapshot("desktop"))
 
     diagnostics = mod._PROJECTION_RUNTIME.diagnostics_snapshot()
-    assert diagnostics["pressure_blocked_total"] == 5
+    assert diagnostics["pressure_blocked_total"] == 6
     assert diagnostics["last_result"]["reason"] == "no_active_projection_demand"
 
 
@@ -407,9 +451,41 @@ def test_browsers_skill_selected_browser_summary_uses_selected_live_entry(monkey
     current_name = mod._build_stream_payload("browsers.current_name", "desktop")
 
     assert result["selected_device_id"] == "browser-online::tab-1"
-    assert {"title": "Browser", "description": "Online browser"} in summary
+    assert {"title": "Endpoint", "description": "Online browser"} in summary
     assert {"title": "Status", "description": "online"} in summary
     assert current_name == {"value": "Online browser", "device_id": "browser-online::tab-1"}
+
+
+def test_browsers_skill_rename_browser_device_name_refreshes_without_renaming_endpoint(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    seen: list[tuple[str, str]] = []
+
+    def _fake_rename(device_ref: str, name: str):
+        seen.append((device_ref, name))
+        return {
+            "ok": True,
+            "device_ref": device_ref,
+            "entry": {
+                "display_name": "Chrome",
+                "device_display_name": name,
+            },
+        }
+
+    refreshes: list[str | None] = []
+    monkeypatch.setattr(mod.sdk_device_access, "rename_browser_device_name", _fake_rename)
+    monkeypatch.setattr(mod, "_refresh_snapshot_sync", lambda webspace_id=None: refreshes.append(webspace_id))
+
+    result = mod.rename_browser_device_name(
+        "Мой телефон",
+        browser_device_id="dev-browser",
+        webspace_id="desktop",
+    )
+
+    assert result["ok"] is True
+    assert result["entry"]["display_name"] == "Chrome"
+    assert result["entry"]["device_display_name"] == "Мой телефон"
+    assert seen == [("browser:dev-browser", "Мой телефон")]
+    assert refreshes == ["desktop"]
 
 
 def test_browsers_skill_refresh_event_handler_does_not_wait_for_projection(monkeypatch) -> None:
@@ -547,6 +623,51 @@ def test_browsers_skill_rename_device_uses_generic_device_ref(monkeypatch) -> No
 
     assert result == {"ok": True, "device_ref": "member:member-4"}
     assert seen == [("member:member-4", "Workshop display")]
+
+
+def test_browsers_skill_current_payload_exposes_device_name_suggestions(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+
+    monkeypatch.setattr(
+        mod.sdk_access_links,
+        "get_browser_link",
+        lambda device_id: {
+            "id": "dev-phone",
+            "access_class": "device",
+            "device_display_name": "My phone",
+            "display_name": "Chrome",
+            "online": True,
+            "lifetime_mode": "permanent",
+        },
+    )
+    monkeypatch.setattr(
+        mod.sdk_device_access,
+        "list_registered_device_names",
+        lambda: [{"value": "My phone", "label": "My phone", "subtitle": "1/1 online | browser"}],
+    )
+
+    summary, endpoint_name, device_name = mod._current_browser_payload("dev-phone")
+
+    assert summary[1]["title"] == "Endpoint"
+    assert endpoint_name["value"] == "Chrome"
+    assert device_name["value"] == "My phone"
+    assert device_name["suggestions"][0]["value"] == "My phone"
+
+
+def test_browsers_skill_identify_device_uses_sdk_device_access(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    seen: list[tuple[str, str | None]] = []
+
+    def _fake_identify(device_ref: str, webspace_id: str | None = None):
+        seen.append((str(device_ref or "").strip(), webspace_id))
+        return {"ok": True, "device_ref": device_ref, "request_id": "identify-1"}
+
+    monkeypatch.setattr(mod.sdk_device_access, "identify_device", _fake_identify)
+
+    result = mod.identify_device(device_ref="browser:dev-phone", webspace_id="desktop")
+
+    assert result == {"ok": True, "device_ref": "browser:dev-phone", "request_id": "identify-1"}
+    assert seen == [("browser:dev-phone", "desktop")]
 
 
 def test_browsers_skill_adopt_link_uses_sdk_device_access(monkeypatch) -> None:

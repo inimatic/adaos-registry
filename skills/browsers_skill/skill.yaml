@@ -1,5 +1,5 @@
 name: browsers_skill
-version: 0.15.17
+version: 0.15.18
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -359,13 +359,13 @@ tools:
   output_schema:
     type: object
 exports: {}
-updated_at: '2026-07-05T04:53:12+00:00'
+updated_at: '2026-07-09T21:39:35+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.465+3499.72fbb554
-    recorded_at: '2026-07-05T04:53:12+00:00'
+    min_version: 0.1.0+3599.4f7bfed0
+    recorded_at: '2026-07-09T21:39:36+00:00'
     source: skill_push
-    min_commit: 72fbb55442ff1991220c39cba2a81aa51efd353f
-    min_short_commit: 72fbb554
-    build_date: '2026-07-05T07:33:57+03:00'
+    min_commit: 4f7bfed09275be79d6af3198950e2895cf60f50a
+    min_short_commit: 4f7bfed0
+    build_date: '2026-07-09T21:16:37+00:00'
 
