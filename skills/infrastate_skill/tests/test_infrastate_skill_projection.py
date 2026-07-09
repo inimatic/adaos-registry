@@ -249,7 +249,7 @@ def test_infrastate_update_actions_use_member_label():
     items = mod._update_actions(_Conf(), {"selected_node_id": "member-1"}, reliability)
 
     assert items
-    assert items[0]["title"] == "Update skills & scenarios (Edge One)"
+    assert items[0]["title"] == "Update (Edge One)"
 
 
 def test_infrastate_inventory_update_actions_include_bulk_controls():
@@ -269,6 +269,58 @@ def test_infrastate_inventory_update_actions_include_bulk_controls():
         "marketplace",
     ]
     assert [item["label"] for item in items] == ["Update", "Activate", "Validate", "Test", "Marketplace"]
+    assert [item["title"] for item in items] == ["Update", "Activate", "Validate", "Test", "Marketplace"]
+
+
+def test_infrastate_inventory_update_actions_show_bulk_progress(monkeypatch):
+    mod = _load_infrastate_module()
+
+    class _Conf:
+        role = "hub"
+        node_id = "hub-1"
+
+    items = mod._update_actions(
+        _Conf(),
+        {
+            "selected_node_id": "hub-1",
+            "inventory_bulk_action": "inventory_activate",
+            "inventory_bulk_action_running": True,
+        },
+        {},
+    )
+
+    by_id = {item["id"]: item for item in items}
+    assert by_id["inventory_activate"]["label"] == "Activating..."
+    assert by_id["inventory_activate"]["disabled"] is True
+    assert by_id["inventory_validate"]["disabled"] is True
+
+    monkeypatch.setattr(mod.time, "time", lambda: 100.0)
+    items = mod._update_actions(
+        _Conf(),
+        {
+            "selected_node_id": "hub-1",
+            "inventory_bulk_action": "inventory_activate",
+            "inventory_bulk_action_running": False,
+            "inventory_bulk_action_finished_at": 95.0,
+            "inventory_bulk_action_failed": False,
+        },
+        {},
+    )
+    by_id = {item["id"]: item for item in items}
+    assert by_id["inventory_activate"]["label"] == "Activated"
+    assert by_id["inventory_activate"]["disabled"] is False
+
+
+def test_infrastate_compact_action_list_preserves_disabled_state():
+    mod = _load_infrastate_module()
+
+    compact = mod._compact_action_list_for_yjs(
+        [{"id": "inventory_activate", "label": "Activating...", "title": "Activating...", "disabled": True}]
+    )
+
+    assert compact == [
+        {"id": "inventory_activate", "label": "Activating...", "title": "Activating...", "disabled": True}
+    ]
 
 
 def test_infrastate_inventory_bulk_action_dispatch_does_not_require_row_name(monkeypatch):

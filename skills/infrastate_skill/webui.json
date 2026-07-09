@@ -1145,28 +1145,28 @@
         {
           "id": "adaos_update",
           "label": "Update",
-          "title": "Update skills & scenarios",
+          "title": "Update",
           "status": "ok",
           "description": "Run workspace sync on the selected node"
         },
         {
           "id": "inventory_activate",
           "label": "Activate",
-          "title": "Activate skills",
+          "title": "Activate",
           "status": "ok",
           "description": "Activate prepared skill runtimes and refresh scenario dependencies"
         },
         {
           "id": "inventory_validate",
           "label": "Validate",
-          "title": "Validate skills & scenarios",
+          "title": "Validate",
           "status": "ok",
           "description": "Validate installed workspace skills and scenarios"
         },
         {
           "id": "inventory_test",
           "label": "Test",
-          "title": "Test skills & scenarios",
+          "title": "Test",
           "status": "ok",
           "description": "Run available skill and scenario tests"
         },

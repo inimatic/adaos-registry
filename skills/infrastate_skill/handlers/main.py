@@ -651,7 +651,7 @@ def _compact_action_list_for_yjs(value: Any) -> list[dict[str, Any]]:
         out.append(
             {
                 key: _cache_copy(item.get(key))
-                for key in ("id", "title", "status", "subtitle", "description")
+                for key in ("id", "label", "title", "status", "subtitle", "description", "disabled")
                 if key in item
             }
         )
@@ -707,6 +707,12 @@ def _compact_ui_state_for_yjs(value: Any) -> dict[str, Any]:
         "background_refresh_webspace_id",
         "last_action",
         "last_error",
+        "inventory_bulk_action",
+        "inventory_bulk_action_running",
+        "inventory_bulk_action_started_at",
+        "inventory_bulk_action_finished_at",
+        "inventory_bulk_action_failed",
+        "inventory_bulk_action_error",
     )
     return {key: _cache_copy(value.get(key)) for key in keys if key in value}
 
@@ -3732,16 +3738,44 @@ def _marketplace_items(
     }
 
 
+_INVENTORY_BULK_ACTION_LABELS: dict[str, tuple[str, str, str]] = {
+    "inventory_activate": ("Activate", "Activating...", "Activated"),
+    "inventory_validate": ("Validate", "Validating...", "Validated"),
+    "inventory_test": ("Test", "Testing...", "Tested"),
+}
+
+
+def _inventory_bulk_action_presentation(action_id: str, ui_state: dict[str, Any]) -> dict[str, Any]:
+    base, running_label, done_label = _INVENTORY_BULK_ACTION_LABELS.get(action_id, ("", "", ""))
+    if not base:
+        return {}
+    current = str(ui_state.get("inventory_bulk_action") or "").strip()
+    running = bool(ui_state.get("inventory_bulk_action_running"))
+    if running:
+        if current == action_id:
+            return {"label": running_label, "title": running_label, "status": "pending", "disabled": True}
+        return {"label": base, "title": base, "status": "idle", "disabled": True}
+    try:
+        finished_at = float(ui_state.get("inventory_bulk_action_finished_at") or 0.0)
+    except Exception:
+        finished_at = 0.0
+    if current == action_id and finished_at > 0.0 and (time.time() - finished_at) <= 10.0:
+        failed = bool(ui_state.get("inventory_bulk_action_failed"))
+        label = f"{base} failed" if failed else done_label
+        return {"label": label, "title": label, "status": "warn" if failed else "ok", "disabled": False}
+    return {"label": base, "title": base, "status": "ok", "disabled": False}
+
+
 def _update_actions(conf, ui_state: dict[str, Any], reliability: dict[str, Any]) -> list[dict[str, Any]]:
     selected_node_id = str(ui_state.get("selected_node_id") or getattr(conf, "node_id", "") or "").strip()
     local_node_id = str(getattr(conf, "node_id", "") or "").strip()
     role = str(getattr(conf, "role", "") or "").strip().lower()
     target_kind = "local" if not selected_node_id or selected_node_id == local_node_id else "member"
-    title = "Update skills & scenarios"
+    title = "Update"
     if target_kind == "member":
         member = _selected_member_entry(reliability, selected_node_id)
         member_label = str(member.get("node_label") or member.get("label") or "").strip() or "Member"
-        title = f"Update skills & scenarios ({member_label})"
+        title = f"Update ({member_label})"
     description = "Sync workspace sources for skills and scenarios and refresh runtime projections."
     if target_kind == "member" and role != "hub":
         return [
@@ -3768,26 +3802,30 @@ def _update_actions(conf, ui_state: dict[str, Any], reliability: dict[str, Any])
                 {
                     "id": "inventory_activate",
                     "label": "Activate",
-                    "title": "Activate skills",
+                    "title": "Activate",
                     "status": "ok",
                     "description": "Activate prepared skill runtimes and refresh scenario dependencies.",
                 },
                 {
                     "id": "inventory_validate",
                     "label": "Validate",
-                    "title": "Validate skills & scenarios",
+                    "title": "Validate",
                     "status": "ok",
                     "description": "Validate installed workspace skills and scenarios.",
                 },
                 {
                     "id": "inventory_test",
                     "label": "Test",
-                    "title": "Test skills & scenarios",
+                    "title": "Test",
                     "status": "ok",
                     "description": "Run available skill and scenario tests.",
                 },
             ]
         )
+        for item in items:
+            patch = _inventory_bulk_action_presentation(str(item.get("id") or ""), ui_state)
+            if patch:
+                item.update(patch)
     items.append(
         {
             "id": "marketplace",
@@ -4794,6 +4832,56 @@ def _write_ui_state(**updates: Any) -> dict[str, Any]:
 def _inventory_drift_only_enabled(ui_state: dict[str, Any] | None = None) -> bool:
     state = ui_state if isinstance(ui_state, dict) else _ui_state()
     return bool(state.get("inventory_drift_only"))
+
+
+def _is_inventory_bulk_action(action_id: str | None) -> bool:
+    return str(action_id or "").strip() in _INVENTORY_BULK_ACTION_LABELS
+
+
+def _mark_inventory_bulk_action_started(action_id: str, *, webspace_id: str | None) -> None:
+    now = time.time()
+    _write_ui_state(
+        inventory_bulk_action=action_id,
+        inventory_bulk_action_running=True,
+        inventory_bulk_action_started_at=now,
+        inventory_bulk_action_finished_at=0.0,
+        inventory_bulk_action_failed=False,
+        inventory_bulk_action_error="",
+        last_action=action_id,
+        last_action_ts=now,
+        last_error="",
+    )
+    _schedule_snapshot_refresh(
+        webspace_id=webspace_id,
+        reason=f"infrastate.action:{action_id}:started",
+    )
+
+
+def _mark_inventory_bulk_action_finished(
+    action_id: str,
+    *,
+    webspace_id: str | None,
+    result: dict[str, Any] | None,
+    error: BaseException | None,
+) -> None:
+    now = time.time()
+    failed = bool(error) or not bool((result or {}).get("ok", False))
+    err_text = _result_error(error) if error else str((result or {}).get("error") or "")
+    _write_ui_state(
+        inventory_bulk_action=action_id,
+        inventory_bulk_action_running=False,
+        inventory_bulk_action_finished_at=now,
+        inventory_bulk_action_failed=failed,
+        inventory_bulk_action_error=err_text,
+        last_action=action_id,
+        last_action_ts=now,
+        last_result=result or {},
+        last_error=err_text if failed else "",
+    )
+    _schedule_snapshot_refresh(
+        webspace_id=webspace_id,
+        reason=f"infrastate.action:{action_id}:finished",
+    )
 
 
 def _filter_inventory_drift(items: list[dict[str, Any]], *, drift_only: bool) -> list[dict[str, Any]]:
@@ -8066,7 +8154,7 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
         if str(getattr(conf, "role", "") or "").strip().lower() != "hub":
             raise ValueError("remote member control can only be requested from hub")
         current_rev = str(status.get("target_rev") or os.getenv("ADAOS_REV") or "").strip()
-        current_version = str(_extract_param(payload, "target_version") or "").strip()
+        current_version = str(_extract_param(payload, "target_version") or status.get("target_version") or "").strip()
         request_action = {
             "member_start_update": "update",
             "member_cancel_update": "cancel",
@@ -8114,7 +8202,7 @@ def _perform_action(action_id: str, conf, payload: Any | None = None) -> dict[st
         return result
     if action_id == "start_update":
         current_rev = str(status.get("target_rev") or os.getenv("ADAOS_REV") or "").strip()
-        current_version = str(_extract_param(payload, "target_version") or "").strip()
+        current_version = str(_extract_param(payload, "target_version") or status.get("target_version") or "").strip()
         result = _post_local_admin(
             conf,
             "/api/admin/update/start",
@@ -9282,6 +9370,8 @@ def on_action(evt: Any) -> None:
     try:
         if action_id:
             _invalidate_after_action(action_id, webspace_id=webspace_id)
+            if _is_inventory_bulk_action(action_id):
+                _mark_inventory_bulk_action_started(action_id, webspace_id=webspace_id)
             _publish_inventory_action_pending_patch(action_id, payload=payload, webspace_id=webspace_id)
             result = _perform_action(action_id, conf, payload)
     except Exception as exc:
@@ -9298,6 +9388,13 @@ def on_action(evt: Any) -> None:
                 result=result,
                 error=action_error,
             )
+            if _is_inventory_bulk_action(action_id):
+                _mark_inventory_bulk_action_finished(
+                    action_id,
+                    webspace_id=webspace_id,
+                    result=result,
+                    error=action_error,
+                )
             _schedule_action_inventory_streams(action_id, webspace_id=webspace_id)
     _schedule_snapshot_refresh(
         webspace_id=webspace_id,
