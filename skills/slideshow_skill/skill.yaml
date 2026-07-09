@@ -1,7 +1,7 @@
 name: slideshow_skill
-version: 0.1.53
-description: ReDevice slideshow pilot skill that renders cached thumbnails on an assigned
-  endpoint and records endpoint surface events.
+version: 0.1.54
+description: Slideshow pilot skill that shows photos in the widget and can optionally
+  project cached thumbnails to assigned ReDevice endpoints.
 supported_locales:
 - en
 - ru
@@ -53,7 +53,8 @@ tools:
         items:
           type: string
 - name: list_slideshow_photos
-  description: List source photos that can be sent to a ReDevice slideshow endpoint.
+  description: List source photos that can be shown in the widget or sent to a ReDevice
+    slideshow endpoint.
   entry: handlers.main:list_slideshow_photos
   input_schema:
     type: object
@@ -160,8 +161,8 @@ tools:
         items:
           type: object
 - name: start_redevice_slideshow
-  description: Convert source photos to cached thumbnails and queue a display.render_surface
-    command for a ReDevice endpoint.
+  description: Start slideshow playback in the widget and queue a display.render_surface
+    command when a ReDevice endpoint is selected.
   entry: handlers.main:start_redevice_slideshow
   input_schema:
     type: object
@@ -316,8 +317,8 @@ tools:
         items:
           type: string
 - name: control_redevice_slideshow
-  description: Control the shared slideshow state and broadcast it to selected ReDevice
-    endpoints.
+  description: Control the shared slideshow state for the widget and broadcast it to
+    selected ReDevice endpoints when present.
   entry: handlers.main:control_redevice_slideshow
   input_schema:
     type: object

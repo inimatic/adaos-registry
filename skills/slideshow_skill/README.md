@@ -1,12 +1,16 @@
 # slideshow_skill
 
-Pilot skill for ReDevice endpoint surfaces.
+Pilot skill for slideshow playback in the AdaOS widget, with optional ReDevice
+endpoint projection.
 
-The skill runs on a hub/member node and queues `display.render_surface`
-commands for admitted ReDevice endpoints. It does not install UI on the
-endpoint. The ReDevice agent receives concrete slideshow surface commands,
-renders bounded cached JPEG thumbnails, and sends normalized surface events
-such as `next` and `favorite_toggle` back to the root API.
+The skill runs on a hub/member node and owns the slideshow sequence itself. It
+publishes the current frame to `slideshow_skill.session` so the widget can show
+and advance photos without any ReDevice endpoint. When endpoints are selected,
+it also queues `display.render_surface` commands for admitted ReDevice agents.
+It does not install UI on the endpoint. The ReDevice agent receives concrete
+slideshow surface commands, renders bounded cached JPEG thumbnails, and sends
+normalized surface events such as `next` and `favorite_toggle` back to the root
+API.
 
 Dashboard flow:
 
@@ -16,8 +20,8 @@ Dashboard flow:
 4. `Refresh index` starts a background SQLite index refresh for the source tree.
 5. `Folders` opens a separate folder picker backed by the indexed source tree.
 6. `Preview photos` shows indexed files in the current folder/scope.
-7. `Play` starts the skill-owned slideshow sequence and sends the current cache window.
-8. `Stop` clears the active ReDevice slideshow surface.
+7. `Play` starts the skill-owned slideshow sequence and updates the widget; if endpoints are selected, it sends the current cache window to them.
+8. `Stop` stops widget playback and clears the active ReDevice slideshow surface when endpoints are selected.
 9. Desktop widgets expose the current frame plus Play, Stop, Prev, Next, and Fav controls.
 
 Large libraries:

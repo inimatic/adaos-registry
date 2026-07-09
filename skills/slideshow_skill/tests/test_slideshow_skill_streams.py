@@ -844,6 +844,92 @@ def test_service_tick_advances_running_slideshow_without_modal(monkeypatch, tmp_
     assert saved[-1]["current_index"] == 1
 
 
+def test_control_start_runs_widget_slideshow_without_redevice(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(3)]
+    for photo in photos:
+        photo.write_bytes(b"jpeg")
+
+    state = {
+        "source_dir": str(tmp_path),
+        "selected_codes": [],
+        "sync": True,
+        "running": False,
+        "interval_ms": 7000,
+        "last_service_tick_at": 0,
+        "current_index": 0,
+        "mode": "sequential",
+        "scope": "all",
+        "display_mode": "fit",
+        "fullscreen": True,
+    }
+    published: list[tuple[str, dict[str, object]]] = []
+    started: list[str | None] = []
+
+    monkeypatch.setattr(mod, "_load_state", lambda: dict(state))
+    monkeypatch.setattr(mod, "_save_state", lambda next_state: state.update(dict(next_state)) or next_state)
+    monkeypatch.setattr(mod, "_load_devices", lambda: [])
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: photos)
+    monkeypatch.setattr(
+        mod,
+        "_session_payload",
+        lambda next_state, files, **_kwargs: {
+            "ok": bool(files),
+            "running": bool(next_state.get("running")),
+            "label": "Widget only",
+            "frame": {"label": f"{int(next_state.get('current_index') or 0) + 1}/{len(files)}"},
+        },
+    )
+    monkeypatch.setattr(mod, "_publish", lambda receiver, payload, *_args, **_kwargs: published.append((receiver, dict(payload))))
+    monkeypatch.setattr(mod, "_ensure_polling", lambda webspace_id=None: started.append(webspace_id))
+
+    result = mod.control_redevice_slideshow("start", webspace_id="ws-1")
+
+    assert result["ok"] is True
+    assert result["endpoint_required"] is False
+    assert result["playback_mode"] == "widget"
+    assert state["running"] is True
+    assert [item[0] for item in published] == ["slideshow_skill.command", "slideshow_skill.session"]
+    assert published[-1][1]["label"] == "Widget only"
+    assert started == ["ws-1"]
+
+
+def test_service_tick_advances_widget_only_slideshow(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(4)]
+    for photo in photos:
+        photo.write_bytes(b"jpeg")
+
+    saved: list[dict[str, object]] = []
+    monkeypatch.setattr(mod.time, "time", lambda: 100.0)
+    monkeypatch.setattr(mod, "_save_state", lambda next_state: saved.append(dict(next_state)) or next_state)
+    monkeypatch.setattr(
+        mod,
+        "_send_to_selected",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("widget-only slideshow must not send ReDevice commands")
+        ),
+    )
+
+    state = {
+        "selected_codes": [],
+        "sync": True,
+        "running": True,
+        "interval_ms": 7000,
+        "last_service_tick_at": 90.0,
+        "current_index": 0,
+        "mode": "sequential",
+        "scope": "all",
+    }
+
+    assert mod._apply_service_tick(state, photos, webspace_id="ws-1") is True
+    assert state["current_index"] == 1
+    assert state["last_service_tick_at"] == 100.0
+    assert saved[-1]["current_index"] == 1
+
+
 def test_service_tick_reasserts_surface_without_advancing(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 

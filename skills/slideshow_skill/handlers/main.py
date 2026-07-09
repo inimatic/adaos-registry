@@ -1505,7 +1505,7 @@ def _hide_current_photo(state: dict[str, Any], files: list[Path]) -> dict[str, A
 
 def _selected_endpoint_label(selected_codes: list[str]) -> str:
     if not selected_codes:
-        return "No endpoint"
+        return "Widget only"
     try:
         devices = _load_devices()
         items = [compact_endpoint(item, selected_codes=set(selected_codes)) for item in devices]
@@ -1584,7 +1584,7 @@ def _session_payload(
     if resolve_endpoint_label:
         header = _selected_endpoint_label(selected_codes)
     else:
-        header = _text(state.get("selected_label")) or ", ".join(selected_codes) or "No endpoint"
+        header = _text(state.get("selected_label")) or ", ".join(selected_codes) or "Widget only"
     favorite_count = _favorite_count(root)
     favorite = bool(content_ref and _is_favorite(root, content_ref))
     filtered_count = len(selected)
@@ -1822,12 +1822,17 @@ def _healed_pair_codes(devices: list[Mapping[str, Any]], codes: list[str]) -> li
 
 def _command_items(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     results = list(payload.get("results") or [])
-    title = "Slideshow command queued" if payload.get("ok") else "Slideshow command failed"
+    if _text(payload.get("playback_mode")) == "widget":
+        title = "Slideshow active in widget" if payload.get("ok") else "Slideshow widget failed"
+        subtitle = f"widget only | {payload.get('item_count', 0)} photos"
+    else:
+        title = "Slideshow command queued" if payload.get("ok") else "Slideshow command failed"
+        subtitle = f"{len(results)} endpoints | {payload.get('item_count', 0)} cached photos"
     return [
         {
             "id": _text(payload.get("command_id")) or "last-command",
             "title": title,
-            "subtitle": f"{len(results)} endpoints | {payload.get('item_count', 0)} cached photos",
+            "subtitle": subtitle,
             "content": _compact_command_payload(payload, include_items=False),
         }
     ]
@@ -1883,6 +1888,11 @@ def _compact_command_payload(payload: Mapping[str, Any] | None, *, include_items
         "results": [_compact_result(_mapping(item)) for item in list(data.get("results") or [])[:16]],
         "updated_at": _text(data.get("updated_at")),
     }
+    if "endpoint_required" in data:
+        compact["endpoint_required"] = bool(data.get("endpoint_required"))
+    playback_mode = _text(data.get("playback_mode"))
+    if playback_mode:
+        compact["playback_mode"] = playback_mode
     if include_items:
         compact["items"] = [
             {
@@ -2026,7 +2036,12 @@ def _send_to_selected(
             state["selected_codes"] = target_codes
             _save_state(state)
     if not target_codes:
-        return {"ok": False, "error": "no_redevice_endpoint"}
+        return _publish_widget_only_state(
+            state,
+            files,
+            webspace_id=webspace_id,
+            reason="no_redevice_endpoint",
+        )
     target_codes = _healed_pair_codes(devices, target_codes)
     if configured_codes and isinstance(state, dict):
         healed_configured = _healed_pair_codes(devices, configured_codes)
@@ -2170,6 +2185,64 @@ def _send_to_selected(
         webspace_id,
     )
     return payload
+
+
+def _publish_widget_only_state(
+    state: Mapping[str, Any],
+    files: list[Path],
+    *,
+    webspace_id: str | None = None,
+    reason: str = "no_redevice_endpoint",
+) -> dict[str, Any]:
+    selected = _selected_photos(files, state)
+    payload = {
+        "ok": bool(selected),
+        "error": None if selected else "no_supported_photos",
+        "command_id": "",
+        "source_dir": state.get("source_dir"),
+        "selected_codes": _unique_texts(state.get("selected_codes")),
+        "target_codes": [],
+        "sent_codes": [],
+        "item_count": len(selected),
+        "cache_target": 0,
+        "cache_budget_limited": False,
+        "content_bytes": 0,
+        "direct_candidate_count": 0,
+        "direct_media_ready": bool(direct_media_base_urls()),
+        "items": [],
+        "results": [
+            {
+                "code": "",
+                "ok": True,
+                "error": None,
+                "command_id": "",
+                "state": "widget_only",
+                "online_state": "not_required",
+                "item_count": len(selected),
+                "reason": reason,
+            }
+        ]
+        if selected
+        else [],
+        "endpoint_required": False,
+        "playback_mode": "widget",
+        "updated_at": _now(),
+    }
+    compact = _remember_command_payload(payload)
+    _publish(_COMMAND_RECEIVER, compact, webspace_id)
+    _publish(
+        _SESSION_RECEIVER,
+        _session_payload(
+            state,
+            files,
+            last_command=compact,
+            webspace_id=webspace_id,
+            schedule_prewarm=True,
+            defer_media=_index_busy_for_state(state),
+        ),
+        webspace_id,
+    )
+    return compact
 
 
 def _sync_running_surface(
@@ -2365,8 +2438,6 @@ def _apply_service_tick(
     if not state.get("running"):
         return False
     selected_codes = _unique_texts(state.get("selected_codes"))
-    if not selected_codes:
-        return False
     conflicts = _active_app_conflicts(devices or [], selected_codes)
     if conflicts:
         state["running"] = False
@@ -2407,10 +2478,11 @@ def _apply_service_tick(
 def _poll_once(webspace_id: str | None = None) -> None:
     try:
         state = _load_state()
-        if not _unique_texts(state.get("selected_codes")):
-            return
-        devices = _load_devices()
+        selected_codes = _unique_texts(state.get("selected_codes"))
         running = bool(state.get("running"))
+        if not running and not selected_codes:
+            return
+        devices = _load_devices() if selected_codes else []
         files = _files_for_state(state, _MAX_CONTROL_SCAN) if running else []
         state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=running)
         if running:
