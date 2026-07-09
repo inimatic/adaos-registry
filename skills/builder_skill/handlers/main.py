@@ -39,6 +39,51 @@ PROMPT_REVISION_FILES = (
     Path("prepare") / "general_prompt.md",
     Path("generate") / "general_prompt.md",
 )
+BUILDER_WEBUI_SCHEMA_FORCED_DEFS = (
+    "formInputs",
+    "formField",
+    "formFieldType",
+    "formOption",
+    "formValidation",
+    "formBranching",
+    "formQuiz",
+)
+BUILDER_FORM_CHOICE_FIELD_TYPES = {
+    "select",
+    "dropdown",
+    "choice",
+    "enum",
+    "combobox",
+    "searchableselect",
+    "searchable_select",
+    "singlechoice",
+    "single_choice",
+    "radio",
+    "radiogroup",
+    "radio_group",
+    "multichoice",
+    "multi_choice",
+    "multiplechoice",
+    "multiple_choice",
+    "checkboxes",
+    "checkboxgroup",
+    "checkbox_group",
+    "chips",
+    "tags",
+}
+BUILDER_FORM_GRID_FIELD_TYPES = {
+    "singlechoicegrid",
+    "single_choice_grid",
+    "multiplechoicegrid",
+    "multiple_choice_grid",
+    "radiogrid",
+    "checkboxgrid",
+    "checkbox_grid",
+    "multichoicegrid",
+    "multi_choice_grid",
+    "ratinggrid",
+    "rating_grid",
+}
 
 _FALLBACK_MEMORY: dict[str, Any] = {}
 _LOG = logging.getLogger("adaos.skills.builder_skill")
@@ -1158,6 +1203,11 @@ def _default_builder_memory_text(preview_state: Mapping[str, Any]) -> str:
     summary = preview_state.get("user_summary") if isinstance(preview_state.get("user_summary"), Mapping) else {}
     lines = [
         f"# {title}",
+        "",
+        "## Builder memory",
+        "- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.",
+        "- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.",
+        "- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.",
     ]
     for heading, key in (
         ("Assumptions", "assumptions"),
@@ -1172,6 +1222,37 @@ def _default_builder_memory_text(preview_state: Mapping[str, Any]) -> str:
         lines.extend(f"- {str(item)}" for item in values[:12])
     lines.append("")
     return "\n".join(lines)
+
+
+def _neutralize_legacy_builder_memory_text(text: str) -> str:
+    source = _repair_mojibake_text(text)
+    if "The first data model uses fields:" not in source:
+        return source
+    return re.sub(
+        r"The first data model uses fields:\s*([^\n\r]+)",
+        r"The initial scaffold started with fields: \1; this list is not a fixed product contract",
+        source,
+    )
+
+
+def _neutralize_legacy_user_summary(summary: Mapping[str, Any] | None) -> dict[str, Any]:
+    data = copy.deepcopy(dict(summary or {})) if isinstance(summary, Mapping) else {}
+    assumptions = data.get("assumptions")
+    if isinstance(assumptions, list):
+        data["assumptions"] = [
+            _neutralize_legacy_builder_memory_text(item) if isinstance(item, str) else item
+            for item in assumptions
+        ]
+    return data
+
+
+def _normalize_builder_project_memory_file(path: Path) -> None:
+    if not path.exists():
+        return
+    source = _read_text_file(path)
+    normalized = _neutralize_legacy_builder_memory_text(source)
+    if normalized != source:
+        _write_text_file(path, normalized)
 
 
 def _legacy_default_builder_system_prompt_text() -> str:
@@ -1191,6 +1272,8 @@ def _ensure_builder_project_files(root: Path, preview_state: Mapping[str, Any]) 
     memory_path = root / BUILDER_MEMORY_FILE
     if not memory_path.exists():
         _write_text_file(memory_path, _default_builder_memory_text(preview_state))
+    else:
+        _normalize_builder_project_memory_file(memory_path)
     system_prompt_path = root / BUILDER_SYSTEM_PROMPT_FILE
     if not system_prompt_path.exists():
         _write_text_file(system_prompt_path, _default_builder_system_prompt_text())
@@ -1199,9 +1282,21 @@ def _ensure_builder_project_files(root: Path, preview_state: Mapping[str, Any]) 
     tz_path = root / PROMPT_TZ_BASE_FILE
     if not tz_path.exists():
         _write_text_file(tz_path, _read_text_file(memory_path))
+    else:
+        _normalize_builder_project_memory_file(tz_path)
     state_path = root / "prompt_state.json"
     if state_path.exists():
         state = _load_json_file(state_path)
+        if state:
+            current_base_tz = str(state.get("base_tz") or "")
+            normalized_base_tz = (
+                _neutralize_legacy_builder_memory_text(current_base_tz)
+                if current_base_tz.strip()
+                else _read_text_file(tz_path)
+            )
+            if normalized_base_tz != current_base_tz:
+                state["base_tz"] = normalized_base_tz
+                state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         if state and not str(state.get("base_tz") or "").strip():
             state["base_tz"] = _read_text_file(tz_path)
             state_path.write_text(json.dumps(state, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -1467,12 +1562,88 @@ def _with_builder_page_schema_meta(page_schema: Mapping[str, Any], preview_state
     return data
 
 
+def _schema_def(schema: Mapping[str, Any] | None, name: str) -> Mapping[str, Any] | None:
+    defs = schema.get("$defs") if isinstance(schema, Mapping) and isinstance(schema.get("$defs"), Mapping) else {}
+    value = defs.get(name) if isinstance(defs, Mapping) else None
+    return value if isinstance(value, Mapping) else None
+
+
+def _webui_form_field_types(schema: Mapping[str, Any] | None = None) -> list[str]:
+    schema = schema if isinstance(schema, Mapping) else _load_webui_schema()
+    field_type_def = _schema_def(schema, "formFieldType")
+    values = field_type_def.get("enum") if isinstance(field_type_def, Mapping) else None
+    result = [str(item) for item in values if str(item or "").strip()] if isinstance(values, list) else []
+    if result:
+        return result
+    return [
+        "text",
+        "textarea",
+        "number",
+        "integer",
+        "email",
+        "url",
+        "phone",
+        "date",
+        "time",
+        "dateTime",
+        "dateRange",
+        "timeRange",
+        "toggle",
+        "select",
+        "combobox",
+        "chips",
+        "radio",
+        "multiChoice",
+        "linearScale",
+        "rating",
+        "fileUpload",
+        "radioGrid",
+        "checkboxGrid",
+        "ratingGrid",
+    ]
+
+
 def _builder_runtime_component_contracts() -> dict[str, Any]:
+    field_types = _webui_form_field_types()
     return {
         "ui.form": {
             "purpose": "Editable input area for a draft record.",
             "inputs": {
-                "fields": "Array of field descriptors: id, type, label. Supported field types: text, number, date, toggle, select. Select fields must include non-empty options.",
+                "fields": {
+                    "shape": "Array of field descriptors: id, type, label/title/question, optional description/helpText/placeholder/default/validation/options/rows/columns.",
+                    "supported_field_types": field_types,
+                    "selection_guidance": [
+                        "Choose the most semantically precise supported type; use text only when no more specific type fits.",
+                        "Refactor existing generic text fields into more precise types whenever the current label or user instruction implies one.",
+                        "Use email/url/phone/password/pin for typed contact or secret inputs.",
+                        "Use textarea/paragraph/longText for multi-line descriptions.",
+                        "Use date/time/dateTime/dateRange/timeRange for temporal input.",
+                        "Use toggle/boolean/switch for yes/no agreement or completion.",
+                        "Use select/combobox/radio/singleChoice for one value from options.",
+                        "Use multiChoice/checkboxes/chips/tags for several values from options.",
+                        "Use linearScale/rating for numeric sentiment, importance, readiness, or priority.",
+                        "Use fileUpload/file for attachments.",
+                        "Use radioGrid/checkboxGrid/ratingGrid when the user asks for a matrix/table of choices across rows and columns.",
+                        "For questionnaires and application forms, every requested user answer must be represented as a ui.form field; display widgets may supplement but must not replace input fields.",
+                    ],
+                    "semantic_examples": {
+                        "email address": "email",
+                        "phone number": "phone",
+                        "convenient dates or date interval": "dateRange",
+                        "convenient time or time window": "timeRange",
+                        "several interests/tags/topics": "multiChoice or chips",
+                        "abstract, notes, comment, description": "textarea",
+                        "expected duration": "number, select, or timeRange depending on wording",
+                        "presentation language": "select, combobox, or chips",
+                        "required equipment": "multiChoice or chips",
+                        "attachment, document, presentation, upload": "fileUpload",
+                        "importance, satisfaction, priority, readiness score": "linearScale or rating",
+                        "rate several factors": "ratingGrid or linearScale fields",
+                        "mark choices by days/sections/categories": "checkboxGrid or radioGrid",
+                    },
+                    "options": "Choice fields must include non-empty options/choices/items with labels and values.",
+                    "grid": "Grid fields must include non-empty rows and columns/cols.",
+                },
                 "submitLabel": "Button label.",
                 "submitPlacement": "Optional: top or bottom.",
             },
@@ -1616,8 +1787,8 @@ def _compact_schema_node(
     *,
     depth: int = 0,
     max_depth: int = 3,
-    max_properties: int = 32,
-    max_enum: int = 48,
+    max_properties: int = 64,
+    max_enum: int = 96,
 ) -> Any:
     if not isinstance(node, Mapping):
         return node
@@ -1706,6 +1877,14 @@ def _generated_webui_schema_summary(schema: Mapping[str, Any]) -> dict[str, Any]
     }
     refs: list[str] = []
     truncated = _collect_schema_refs(root_contract, schema, refs, set())
+    for name in BUILDER_WEBUI_SCHEMA_FORCED_DEFS:
+        before_count = len(refs)
+        truncated = (
+            _collect_schema_refs({"$ref": f"#/$defs/{name}"}, schema, refs, set(), max_refs=96)
+            or truncated
+        )
+        if len(refs) == before_count and name not in refs and _schema_def(schema, name) is not None:
+            refs.append(name)
     defs = schema.get("$defs") if isinstance(schema.get("$defs"), Mapping) else {}
     compact_defs: dict[str, Any] = {}
     for name in refs:
@@ -2084,6 +2263,14 @@ def _normalize_field_options(value: Any) -> list[Any]:
         if isinstance(item, (str, int, float, bool)) and str(item).strip():
             options.append(item)
     return options
+
+
+def _field_options_from_any_key(field: Mapping[str, Any], keys: Sequence[str]) -> list[Any]:
+    for key in keys:
+        options = _normalize_field_options(field.get(key))
+        if options:
+            return options
+    return []
 
 
 def _form_field_type(field: Mapping[str, Any]) -> str:
@@ -2660,7 +2847,7 @@ def _draft_user_summary(session: Mapping[str, Any]) -> dict[str, list[str]]:
     return {
         "assumptions": [
             "This is a local dev prototype, not an activated runtime change",
-            f"The first data model uses fields: {labels or 'title, notes, status'}",
+            f"The initial scaffold started with fields: {labels or 'title, notes, status'}; this list is not a fixed product contract",
         ],
         "preview": [
             f"Scenario {scenario_id} has a form, table, mock data, and declarative webui.json",
@@ -3015,6 +3202,58 @@ def _repair_text_tree(value: Any) -> Any:
     return value
 
 
+def _prototype_review_notes_from_meta(_meta: Mapping[str, Any] | None) -> str:
+    if not isinstance(_meta, Mapping):
+        return ""
+    raw = _meta.get("prototype_review_notes")
+    if raw is None:
+        raw = _meta.get("prototypeReviewNotes")
+    if isinstance(raw, str):
+        return _repair_mojibake_text(raw).strip()[:12000]
+    if not isinstance(raw, Mapping):
+        return ""
+    notes = _repair_mojibake_text(raw.get("notes")).strip()
+    if notes:
+        return notes[:12000]
+    comments = raw.get("comments")
+    if not isinstance(comments, list):
+        return ""
+    lines: list[str] = []
+    revision = _repair_mojibake_text(raw.get("revision_key")).strip()
+    if revision:
+        lines.append(f"Prototype review notes for {revision}:")
+    for item in comments:
+        if not isinstance(item, Mapping):
+            continue
+        text = _repair_mojibake_text(item.get("text")).strip()
+        if not text:
+            continue
+        element = item.get("element")
+        if isinstance(element, Mapping):
+            ref = _repair_mojibake_text(element.get("ref")).strip()
+            kind = _repair_mojibake_text(element.get("kind")).strip()
+            label = _repair_mojibake_text(element.get("label")).strip()
+            target = " ".join(part for part in (kind, ref, f'"{label}"' if label else "") if part).strip()
+        else:
+            target = ""
+        lines.append(f"- {target}: {text}" if target else f"- {text}")
+    return "\n".join(lines).strip()[:12000]
+
+
+def _instruction_with_prototype_review_notes(instruction: Any, _meta: Mapping[str, Any] | None) -> str:
+    text = _repair_mojibake_text(instruction).strip()
+    notes = _prototype_review_notes_from_meta(_meta)
+    if not notes:
+        return text
+    if notes in text:
+        return text
+    return (
+        f"{text}\n\n"
+        "Prototype review notes from the current dev preview. Treat these as concrete feedback for the next UI revision:\n"
+        f"{notes}"
+    ).strip()
+
+
 def _text_contains_any(text: str, tokens: Iterable[str]) -> bool:
     token_list = [str(token or "").lower() for token in tokens if str(token or "")]
     if not token_list:
@@ -3362,9 +3601,11 @@ def _project_memory(session: Mapping[str, Any]) -> dict[str, Any]:
         system_prompt_path = artifact_root / BUILDER_SYSTEM_PROMPT_FILE
         if system_prompt_path.exists():
             system_prompt_text = _read_text_file(system_prompt_path, limit=8000)
+    memory_text = _neutralize_legacy_builder_memory_text(memory_text)
+    technical_spec_text = _neutralize_legacy_builder_memory_text(technical_spec_text)
     return {
         "source_idea": str(session.get("source_idea") or ""),
-        "user_summary": copy.deepcopy(dict(session.get("user_summary") or {})) if isinstance(session.get("user_summary"), Mapping) else {},
+        "user_summary": _neutralize_legacy_user_summary(session.get("user_summary") if isinstance(session.get("user_summary"), Mapping) else {}),
         "memory_text": memory_text,
         "technical_spec_text": technical_spec_text,
         "project_system_prompt_text": system_prompt_text,
@@ -3464,6 +3705,12 @@ def _builder_llm_webui_transform_request(
         "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
         "If cards need combined text like status plus date, add a derived string property to the relevant static dataSource.value rows, then point previewKey to that property. "
         "Use the supplied compact adaos.webui.v1 ABI summary as the webui.json compatibility contract. "
+        "When creating or editing ui.form fields, choose the most semantically precise supported formFieldType from the ABI enum; use generic text only as a fallback. "
+        "Do not preserve an existing generic text field when the user's request or the field label clearly implies a more specific supported type. "
+        "When the user asks people to select, mark, rate, upload, schedule, or enter structured values, model that as editable ui.form fields instead of a read-only table unless the user explicitly asks for a static table. "
+        "For questionnaire, survey, registration, application, and intake prototypes, treat phrases such as indicate, choose, mark, attach, rate, enter, or their localized equivalents as data-capture requirements that need ui.form fields. "
+        "Static ui.table/ui.list widgets may preview sample data, but they must not replace the fields used to collect the user's answers. "
+        "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
         "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
         "When the user asks for sample data, realistic examples, a different domain, or translation, update the relevant widget dataSource/static values inside ui.application.desktop.pageSchema instead of leaving old rows in place. "
         "Do not rely on hidden application code to generate domain examples after your response; your JSON must be complete. "
@@ -3622,13 +3869,26 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                     "detail": f"widgets[{widget_index}].inputs.fields[{field_index}] must be an object",
                 }
             field_type = str(field.get("type") or "").strip().lower()
-            if field_type in {"select", "dropdown", "choice", "enum"} and not _normalize_field_options(field.get("options")):
+            if field_type in BUILDER_FORM_CHOICE_FIELD_TYPES and not _field_options_from_any_key(
+                field,
+                ("options", "choices", "items"),
+            ):
                 field_id = str(field.get("id") or field_index)
                 return {
                     "ok": False,
                     "error": "component_contract_invalid",
-                    "detail": f"ui.form field '{field_id}' is {field_type} but options are missing or empty",
+                    "detail": f"ui.form field '{field_id}' is {field_type} but options/choices/items are missing or empty",
                 }
+            if field_type in BUILDER_FORM_GRID_FIELD_TYPES:
+                rows = _field_options_from_any_key(field, ("rows",))
+                columns = _field_options_from_any_key(field, ("columns", "cols"))
+                if not rows or not columns:
+                    field_id = str(field.get("id") or field_index)
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": f"ui.form grid field '{field_id}' is {field_type} but rows and columns are required",
+                    }
     return {"ok": True}
 
 
@@ -6629,7 +6889,7 @@ def update_current_scenario(
             "topic": topic,
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
-    text = _repair_mojibake_text(instruction).strip()
+    text = _instruction_with_prototype_review_notes(instruction, _meta)
     lowered = text.lower()
     patch = {
         "id": f"patch_{_hash_suffix(session['id'] + text + str(_now()))}",
