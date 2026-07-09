@@ -255,16 +255,36 @@ def _internal_data_dir() -> pathlib.Path:
     if override:
         path = pathlib.Path(override)
     else:
-        try:
-            base_dir = pathlib.Path(os.getenv("ADAOS_BASE_DIR") or "").expanduser()
-            if not str(base_dir):
+        def absolute_base(value: Any) -> pathlib.Path | None:
+            raw = str(value or "").strip()
+            if not raw:
+                return None
+            candidate = pathlib.Path(raw).expanduser()
+            return candidate if candidate.is_absolute() else None
+
+        env_base = absolute_base(os.getenv("ADAOS_BASE_DIR"))
+        if env_base is not None:
+            path = env_base / "state" / "media_indexer_skill" / "internal"
+        else:
+            candidates: List[pathlib.Path] = []
+            try:
                 ctx = get_ctx()
                 base_dir_value = ctx.paths.base_dir()
-                base_dir = pathlib.Path(base_dir_value() if callable(base_dir_value) else base_dir_value).expanduser()
-            path = base_dir / "state" / "media_indexer_skill" / "internal"
-        except Exception:
-            base_dir = pathlib.Path(os.getenv("ADAOS_BASE_DIR") or pathlib.Path.home() / ".adaos")
-            path = base_dir / "state" / "media_indexer_skill" / "internal"
+                ctx_base = absolute_base(base_dir_value() if callable(base_dir_value) else base_dir_value)
+                if ctx_base is not None:
+                    candidates.append(ctx_base)
+            except Exception:
+                pass
+            home_base = pathlib.Path.home().expanduser() / ".adaos"
+            if home_base not in candidates:
+                candidates.append(home_base)
+            selected = candidates[0]
+            for candidate in candidates:
+                candidate_path = candidate / "state" / "media_indexer_skill" / "internal"
+                if (candidate_path / "faiss" / "metadata.json").exists():
+                    selected = candidate
+                    break
+            path = selected / "state" / "media_indexer_skill" / "internal"
     path.mkdir(parents=True, exist_ok=True)
     return path
 
@@ -2050,6 +2070,9 @@ async def on_media_indexer_action(evt: Any) -> None:
             _snapshot_payload(
                 status=_status_payload(value="ready", subtitle="Directory selected", description=f"Media source: {directory or 'not set'}"),
                 form=form,
+                include_library=False,
+                include_results=False,
+                include_playback=False,
             ),
             webspace_id=webspace_id,
         )
@@ -2060,6 +2083,9 @@ async def on_media_indexer_action(evt: Any) -> None:
             _snapshot_payload(
                 status=_status_payload(value="ready", subtitle="Query selected", description=f"Query: {query or 'not set'}"),
                 form=form,
+                include_library=False,
+                include_results=False,
+                include_playback=False,
             ),
             webspace_id=webspace_id,
         )
@@ -2098,12 +2124,18 @@ async def on_media_indexer_action(evt: Any) -> None:
                 subtitle="Indexing is already running",
                 description="Wait for the current scan to finish.",
             )
-            await _project_snapshot_async(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
+            await _project_snapshot_async(
+                _snapshot_payload(status=status, form=form, include_library=False, include_results=False, include_playback=False),
+                webspace_id=webspace_id,
+            )
             _publish_operation({"value": status["value"], "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
             return
 
         status = _status_payload(value="scanning", subtitle="Building media library", description=f"Scanning {directory or 'no directory'}")
-        await _project_snapshot_async(_snapshot_payload(status=status, form=form), webspace_id=webspace_id)
+        await _project_snapshot_async(
+            _snapshot_payload(status=status, form=form, include_library=False, include_results=False, include_playback=False),
+            webspace_id=webspace_id,
+        )
         _publish_operation({"value": "scanning", "subtitle": "Building media library", "description": status["description"]}, webspace_id=webspace_id)
         _state["scan_in_progress"] = True
         loop = asyncio.get_running_loop()
@@ -2201,7 +2233,16 @@ async def on_media_indexer_action(evt: Any) -> None:
             error="" if ok else "; ".join(errors[:3]),
             indexed_count=indexed_count,
         )
-        await _project_snapshot_async(_snapshot_payload(status=final_status, form=_current_form(k=k), diagnostics=diagnostics), webspace_id=webspace_id)
+        await _project_snapshot_async(
+            _snapshot_payload(
+                status=final_status,
+                form=_current_form(k=k),
+                diagnostics=diagnostics,
+                include_results=False,
+                include_playback=False,
+            ),
+            webspace_id=webspace_id,
+        )
         _publish_operation(
             {
                 "value": final_status["value"],
@@ -2217,11 +2258,17 @@ async def on_media_indexer_action(evt: Any) -> None:
     if action_id == "search":
         if not query.strip():
             status = _status_payload(value="ready", subtitle="Enter a search query", description="Try: movie, music, Queen, Inception, sunset.")
-            await _project_snapshot_async(_snapshot_payload(status=status, form=form, include_library=False), webspace_id=webspace_id)
+            await _project_snapshot_async(
+                _snapshot_payload(status=status, form=form, include_library=False, include_results=False, include_playback=False),
+                webspace_id=webspace_id,
+            )
             _publish_operation({"value": "ready", "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
             return
         status = _status_payload(value="searching", subtitle="Semantic search", description=f"Searching for: {query}")
-        await _project_snapshot_async(_snapshot_payload(status=status, form=form, include_library=False), webspace_id=webspace_id)
+        await _project_snapshot_async(
+            _snapshot_payload(status=status, form=form, include_library=False, include_results=False, include_playback=False),
+            webspace_id=webspace_id,
+        )
         _publish_operation({"value": "searching", "subtitle": "Semantic search", "description": status["description"]}, webspace_id=webspace_id)
         result = await asyncio.to_thread(search_media, query, k=k)
         results = list(result.get("results") or [])
@@ -2233,7 +2280,13 @@ async def on_media_indexer_action(evt: Any) -> None:
             error=error,
         )
         await _project_snapshot_async(
-            _snapshot_payload(status=final_status, form=_current_form(k=k), results=results, include_library=False),
+            _snapshot_payload(
+                status=final_status,
+                form=_current_form(k=k),
+                results=results,
+                include_library=False,
+                include_playback=False,
+            ),
             webspace_id=webspace_id,
         )
         _publish_operation(

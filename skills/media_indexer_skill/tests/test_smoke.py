@@ -30,6 +30,8 @@ def test_manifest_declares_runtime_contracts() -> None:
     assert any(route["route"] == "stream" and route["receiver"] == "media_indexer.operations" for route in manifest["data_routes"])
     assert manifest["lifecycle"]["rehydrate"] == "rehydrate"
     assert manifest["lifecycle"]["dispose"] == "dispose"
+    yjs_routes = [route for route in manifest["data_routes"] if route.get("route") == "yjs"]
+    assert yjs_routes[0]["budget"]["max_payload_bytes"] >= 65536
 
 
 def test_webui_declares_compact_yjs_and_stream_receiver() -> None:
@@ -138,6 +140,27 @@ def test_internal_data_dir_defaults_to_stable_skill_state(monkeypatch, tmp_path:
     assert main._internal_data_dir() == tmp_path / "adaos" / "state" / "media_indexer_skill" / "internal"
 
 
+def test_internal_data_dir_ignores_relative_context_base(monkeypatch, tmp_path: pathlib.Path) -> None:
+    monkeypatch.delenv("MEDIA_INDEXER_DATA_DIR", raising=False)
+    monkeypatch.delenv("ADAOS_BASE_DIR", raising=False)
+
+    home = tmp_path / "home"
+    index_dir = home / ".adaos" / "state" / "media_indexer_skill" / "internal" / "faiss"
+    index_dir.mkdir(parents=True)
+    (index_dir / "metadata.json").write_text("{}", encoding="utf-8")
+
+    main = importlib.import_module("handlers.main")
+
+    monkeypatch.setattr(main.pathlib.Path, "home", classmethod(lambda cls: home))
+    monkeypatch.setattr(
+        main,
+        "get_ctx",
+        lambda: SimpleNamespace(paths=SimpleNamespace(base_dir=lambda: "state")),
+    )
+
+    assert main._internal_data_dir() == home / ".adaos" / "state" / "media_indexer_skill" / "internal"
+
+
 def test_scan_action_uses_webspace_form_directory_when_payload_omits_directory(
     monkeypatch,
     tmp_path: pathlib.Path,
@@ -225,6 +248,45 @@ def test_scan_action_projects_error_when_indexer_raises(monkeypatch, tmp_path: p
         assert projected[-1]["status"]["value"] == "error"
         assert "model init failed" in projected[-1]["status"]["error"]
         assert main._state["scan_in_progress"] is False
+
+    asyncio.run(run_case())
+
+
+def test_set_directory_action_projects_compact_form_snapshot(monkeypatch, tmp_path: pathlib.Path) -> None:
+    async def run_case() -> None:
+        monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(tmp_path / "skill_env.json"))
+        monkeypatch.setenv("MEDIA_INDEXER_DATA_DIR", str(tmp_path / "data"))
+
+        main = importlib.import_module("handlers.main")
+        main.dispose()
+        media_dir = tmp_path / "media"
+        media_dir.mkdir()
+        memory: dict[str, dict] = {}
+        projected: list[dict] = []
+
+        main._state["library_items"] = [{"title": f"item-{idx}", "path": str(media_dir / f"song-{idx}.mp3")} for idx in range(30)]
+        main._state["last_results"] = [{"title": "old result", "details_text": "x" * 10000}]
+
+        monkeypatch.setattr(main, "_safe_memory_get", lambda key, default=None: memory.get(key, default))
+        monkeypatch.setattr(main, "_safe_memory_set", lambda key, value: memory.__setitem__(key, value))
+
+        async def fake_project_snapshot(snapshot: dict, **_kwargs) -> None:
+            projected.append(snapshot)
+
+        monkeypatch.setattr(main, "_project_snapshot_async", fake_project_snapshot)
+
+        await main.on_media_indexer_action(
+            SimpleNamespace(payload={"id": "set_directory", "directory": str(media_dir), "webspace_id": "ws-1"})
+        )
+
+        assert projected
+        snapshot = projected[-1]
+        assert snapshot["status"]["value"] == "ready"
+        assert snapshot["form"]["directory"] == str(media_dir)
+        assert snapshot["library"] == []
+        assert snapshot["results"] == []
+        assert snapshot["playback"]["items"] == []
+        assert memory[main.SETTINGS_KEY]["selected_directory"] == str(media_dir)
 
     asyncio.run(run_case())
 
@@ -884,3 +946,4 @@ def test_media_indexer_playback_resolver_requires_indexed_root(monkeypatch, tmp_
     assert payload["mime_type"] == "video/mp4"
     with pytest.raises(PermissionError):
         library.resolve_media_indexer_content("b" * 32)
+

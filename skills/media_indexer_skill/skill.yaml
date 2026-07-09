@@ -1,5 +1,5 @@
 name: media_indexer_skill
-version: 0.1.28
+version: 0.1.29
 description: Semantic indexing and multimodal search for local media files (video,
   audio, images) using NER, FAISS and CLIP.
 runtime:
@@ -32,7 +32,7 @@ data_routes:
   update_source:
   - media_indexer.action
   budget:
-    max_payload_bytes: 8192
+    max_payload_bytes: 65536
     max_publish_hz: 0.5
     snapshot_policy: on_subscribe
   guard_visibility:
@@ -220,13 +220,13 @@ tools:
     properties:
       status:
         type: string
-updated_at: '2026-06-25T06:20:25+00:00'
+updated_at: '2026-07-09T21:40:31+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3200.ed85cbd8
-    recorded_at: '2026-06-25T06:20:26+00:00'
+    min_version: 0.1.0+3599.4f7bfed0
+    recorded_at: '2026-07-09T21:40:31+00:00'
     source: skill_push
-    min_commit: ed85cbd8d9299aa6dee4a764d2c4f60ce99af6ca
-    min_short_commit: ed85cbd8
-    build_date: '2026-06-25T08:59:30+03:00'
+    min_commit: 4f7bfed09275be79d6af3198950e2895cf60f50a
+    min_short_commit: 4f7bfed0
+    build_date: '2026-07-09T21:16:37+00:00'
 
