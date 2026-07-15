@@ -4848,10 +4848,11 @@ def _parse_llm_webui_transform_output(
     payload, preview = _normalise_llm_webui_payload(parsed, previous_preview=previous_preview)
     validation = _validate_builder_webui_payload(payload, preview)
     if not validation.get("ok"):
+        detail = str(validation.get("detail") or validation.get("error") or "LLM response did not pass Builder validation")
         return {
             "ok": False,
             "error": "llm_webui_transform_invalid",
-            "detail": "LLM response did not pass Builder validation",
+            "detail": detail,
             "validation": validation,
             "attempts": [
                 {
@@ -7811,12 +7812,17 @@ def _complete_llm_webui_job(
                 _meta=_meta,
             )
         if not llm_result.get("ok"):
+            validation_detail = ""
+            validation_payload = llm_result.get("validation")
+            if isinstance(validation_payload, Mapping):
+                validation_detail = str(validation_payload.get("detail") or validation_payload.get("error") or "")
             _LOG.debug(
-                "builder LLM job validation repair start scenario=%s job_id=%s request_id=%s error=%s",
+                "builder LLM job validation repair start scenario=%s job_id=%s request_id=%s error=%s detail=%s",
                 str(session.get("scenario_id") or ""),
                 job_id,
                 request_id,
                 str(llm_result.get("error") or ""),
+                validation_detail or str(llm_result.get("detail") or ""),
             )
             llm_result = _repair_llm_webui_transform_output(
                 session=session,
