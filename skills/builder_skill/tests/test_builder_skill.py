@@ -2618,6 +2618,163 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
     assert state["base_tz"] == first_tz
 
 
+def test_set_ui_revision_current_migrates_legacy_root_modals(monkeypatch, tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "legacy_modal_revision"
+    revision_dir = artifact_root / "ui_revisions"
+    revision_dir.mkdir(parents=True)
+    (artifact_root / "scenario.json").write_text(
+        '{"id":"legacy_modal_revision","version":"0.1.0","name":"legacy_modal_revision","steps":[]}',
+        encoding="utf-8",
+    )
+    page_schema = {
+        "id": "legacy_modal_revision",
+        "layout": {"type": "single", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "open-details",
+                "type": "ui.actions",
+                "area": "main",
+                "title": "Open details",
+                "actions": [{"on": "click", "type": "openModal", "params": {"modalId": "details_modal"}}],
+            }
+        ],
+    }
+    modal_schema = {
+        "id": "details_modal",
+        "layout": {"type": "single", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [{"id": "details", "type": "item.details", "area": "main", "title": "Details"}],
+    }
+    preview = {"title": "Legacy Modal Revision", "page_schema": page_schema, "version": "004"}
+    (revision_dir / "004.json").write_text(
+        json.dumps(
+            {
+                "schema": "adaos.builder.ui_revision.v1",
+                "revision": "004",
+                "after_webui": {
+                    "schema": "adaos.webui.v1",
+                    "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+                    "modals": {"details_modal": {"title": "Details", "schema": modal_schema}},
+                },
+                "preview_state": preview,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    (revision_dir / "current.txt").write_text("013\n", encoding="utf-8")
+    skill._save_session(
+        "builder-legacy-modal",
+        {
+            "id": "builder_session_legacy_modal",
+            "webspace_id": "builder-legacy-modal",
+            "status": "drafting",
+            "title": "Legacy Modal Revision",
+            "scenario_id": "legacy_modal_revision",
+            "draft_id": "draft.legacy.modal",
+            "artifact_root": str(artifact_root),
+            "preview_state": preview,
+            "ui_revision": "013",
+            "version": "013",
+        },
+    )
+    monkeypatch.setattr(
+        skill,
+        "_ensure_workbench",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "binding": {"runtime_scenario_id": "legacy_modal_revision", "active_draft_id": "draft.legacy.modal"},
+        },
+    )
+    monkeypatch.setattr(
+        skill,
+        "_schedule_dev_runtime_reload_after_revision",
+        lambda *args, **kwargs: {"ok": True, "scheduled": True, "revision": kwargs.get("revision")},
+    )
+
+    restored = skill.set_ui_revision_current("004", webspace_id="builder-legacy-modal")
+
+    assert restored["ok"] is True
+    saved = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
+    assert "modals" not in saved
+    assert saved["ui"]["application"]["modals"]["details_modal"]["schema"]["id"] == "details_modal"
+    assert saved["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["actions"][0]["params"]["modalId"] == "details_modal"
+
+
+def test_write_ui_revision_does_not_overwrite_existing_revision(tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "revision_collision"
+    revision_dir = artifact_root / "ui_revisions"
+    revision_dir.mkdir(parents=True)
+    for number in range(1, 5):
+        (revision_dir / f"{number:03d}.json").write_text(
+            json.dumps({"revision": f"{number:03d}", "marker": number}),
+            encoding="utf-8",
+        )
+    original_004 = (revision_dir / "004.json").read_text(encoding="utf-8")
+    session = {
+        "id": "builder_session_collision",
+        "scenario_id": "revision_collision",
+        "draft_id": "draft.revision.collision",
+        "artifact_root": str(artifact_root),
+        "ui_revisions": [{"revision": "004", "path": str(revision_dir / "004.json")}],
+    }
+
+    written = skill._write_ui_revision(
+        session=session,
+        request_text="change UI",
+        patch={"operation": "llm_webui_transform"},
+        before_webui={},
+        after_webui={"schema": "adaos.webui.v1"},
+        preview_state={"title": "Revision Collision"},
+        revision="004",
+    )
+
+    assert written["revision"] == "005"
+    assert (revision_dir / "004.json").read_text(encoding="utf-8") == original_004
+    assert (revision_dir / "005.json").exists()
+    assert (revision_dir / "current.txt").read_text(encoding="utf-8").strip() == "005"
+    assert session["ui_revision"] == "005"
+
+
+def test_set_ui_revision_current_failure_keeps_project_topic(monkeypatch, tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "revision_failure_topic"
+    artifact_root.mkdir(parents=True)
+    (artifact_root / "scenario.json").write_text(
+        '{"id":"revision_failure_topic","version":"0.1.0","name":"revision_failure_topic","steps":[]}',
+        encoding="utf-8",
+    )
+    skill._save_session(
+        "builder-revision-failure",
+        {
+            "id": "builder_session_revision_failure",
+            "webspace_id": "builder-revision-failure",
+            "status": "drafting",
+            "title": "Revision Failure Topic",
+            "scenario_id": "revision_failure_topic",
+            "draft_id": "draft.revision.failure",
+            "artifact_root": str(artifact_root),
+            "preview_state": {"title": "Revision Failure Topic"},
+        },
+    )
+    emitted: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda *args, **kwargs: emitted.append({"args": args, "kwargs": kwargs}),
+    )
+
+    result = skill.set_ui_revision_current("999", webspace_id="builder-revision-failure")
+
+    expected_topic = "prompt-project:scenario:revision_failure_topic"
+    assert result["ok"] is False
+    assert result["dialog"]["topic_id"] == expected_topic
+    assert result["dialog"]["thread_id"] == expected_topic
+    assert emitted
+    assert emitted[0]["kwargs"]["topic_ref"]["topic_id"] == expected_topic
+
+
 def test_write_webui_keeps_builder_skill_out_of_runtime_dependencies(tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "prototype"

@@ -2072,6 +2072,8 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "When the request says restore, recover, bring back, undo removal, or similar localized phrases, inspect last_revision_delta if present. Reintroduce the matching removed widgets/modals/actions and preserve their semantic owner: if the removed element belonged to a detail modal/panel/container, restore it inside the current detail modal/panel/aux area rather than as a detached global main action. "
         "For tabbed content, use input.commandBar with variant='segmented', initialState for the active tab, and visibleIf on the tab content widgets. "
         "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget, and never put modal declarations in a root-level modals object. "
+        "Do not create a right/aux panel only for a generic prototype summary or detached action; use right/aux only when it is a meaningful detail, inspector, side panel, comparison, or user-requested secondary workspace. "
+        "If a form/list/table prototype does not need a true side panel, keep the layout stack/flow or put supporting actions near the owning widget in the main area. "
         "If the user says things like 'add a modal window', 'make tabs', 'show details after selecting an item', 'validate this field', or similar localized phrases, infer the corresponding internal widgets/actions without asking the user to mention schema property names. "
         "Static ui.table/ui.list widgets may preview sample data, but they must not replace the fields used to collect the user's answers. "
         "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
@@ -2501,6 +2503,12 @@ def _write_ui_revision(
     match = re.search(r"(\d+)", revision)
     revision = f"{int(match.group(1)):03d}" if match else f"{_next_ui_revision_number(revision_dir):03d}"
     path = revision_dir / f"{revision}.json"
+    if path.exists():
+        next_number = _next_ui_revision_number(revision_dir)
+        while (revision_dir / f"{next_number:03d}.json").exists():
+            next_number += 1
+        revision = f"{next_number:03d}"
+        path = revision_dir / f"{revision}.json"
     preview_for_revision = _sync_preview_revision_version(preview_state, revision)
     before_for_revision = _repair_text_tree(copy.deepcopy(dict(before_webui or {})))
     after_for_revision = _repair_text_tree(copy.deepcopy(dict(after_webui or {})))
@@ -2540,7 +2548,11 @@ def _write_ui_revision(
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     (revision_dir / "current.txt").write_text(revision + "\n", encoding="utf-8")
     session["ui_revision"] = revision
-    revisions = [dict(item) for item in session.get("ui_revisions", []) if isinstance(item, Mapping)]
+    revisions = [
+        dict(item)
+        for item in session.get("ui_revisions", [])
+        if isinstance(item, Mapping) and str(item.get("revision") or "").strip() != revision
+    ]
     revisions.append(
         {
             "revision": revision,
@@ -4040,10 +4052,10 @@ def _builder_llm_job_timeout_s() -> float:
 def _builder_llm_repair_job_timeout_s() -> float:
     raw = os.getenv("ADAOS_BUILDER_LLM_REPAIR_JOB_TIMEOUT_S")
     try:
-        value = float(raw) if raw else min(_builder_llm_job_timeout_s(), 60.0)
+        value = float(raw) if raw else _builder_llm_job_timeout_s()
     except (TypeError, ValueError):
-        value = 60.0
-    return max(10.0, min(value, 180.0))
+        value = _builder_llm_job_timeout_s()
+    return max(10.0, min(value, 600.0))
 
 
 def _builder_llm_job_poll_interval_s() -> float:
@@ -8650,16 +8662,17 @@ def set_ui_revision_current(
         timings_ms["emit_chat"] = _elapsed_ms(stage_started)
         timings_ms["total"] = _elapsed_ms(started_at)
         return {"ok": False, "error": "session_not_found", "message": message, "dialog": _dialog_state(ws), "timings_ms": timings_ms}
+    failure_topic = _builder_topic_ref(ws, session=session, _meta=_meta)
     stage_started = time.perf_counter()
     revision_payload = _read_ui_revision(session, revision)
     timings_ms["read_revision"] = _elapsed_ms(stage_started)
     if not revision_payload:
         message = _builder_revision_message("revision_not_found", revision=revision, scenario_id=session.get("scenario_id"))
         stage_started = time.perf_counter()
-        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session)
+        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, topic_ref=failure_topic)
         timings_ms["emit_chat"] = _elapsed_ms(stage_started)
         timings_ms["total"] = _elapsed_ms(started_at)
-        return {"ok": False, "error": "revision_not_found", "message": message, "dialog": _dialog_state(ws), "timings_ms": timings_ms}
+        return {"ok": False, "error": "revision_not_found", "message": message, "dialog": _dialog_state(ws, topic_ref=failure_topic), "timings_ms": timings_ms}
     after_webui = revision_payload.get("after_webui") if isinstance(revision_payload.get("after_webui"), Mapping) else {}
     preview = after_webui.get("preview_state") if isinstance(after_webui.get("preview_state"), Mapping) else revision_payload.get("preview_state")
     if not isinstance(after_webui, Mapping) or not isinstance(preview, Mapping):
@@ -8669,10 +8682,13 @@ def set_ui_revision_current(
             scenario_id=session.get("scenario_id"),
         )
         stage_started = time.perf_counter()
-        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session)
+        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, topic_ref=failure_topic)
         timings_ms["emit_chat"] = _elapsed_ms(stage_started)
         timings_ms["total"] = _elapsed_ms(started_at)
-        return {"ok": False, "error": "revision_invalid", "message": message, "dialog": _dialog_state(ws), "timings_ms": timings_ms}
+        return {"ok": False, "error": "revision_invalid", "message": message, "dialog": _dialog_state(ws, topic_ref=failure_topic), "timings_ms": timings_ms}
+    stage_started = time.perf_counter()
+    after_webui = _canonicalise_webui_modal_locations(_repair_text_tree(copy.deepcopy(dict(after_webui))))
+    timings_ms["canonicalize_webui"] = _elapsed_ms(stage_started)
     stage_started = time.perf_counter()
     validation = _validate_builder_webui_payload(after_webui, preview)
     timings_ms["validate_webui"] = _elapsed_ms(stage_started)
@@ -8684,10 +8700,10 @@ def set_ui_revision_current(
             detail=validation.get("detail") or validation.get("error"),
         )
         stage_started = time.perf_counter()
-        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session)
+        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, topic_ref=failure_topic)
         timings_ms["emit_chat"] = _elapsed_ms(stage_started)
         timings_ms["total"] = _elapsed_ms(started_at)
-        return {"ok": False, "error": "revision_validation_failed", "validation": validation, "message": message, "dialog": _dialog_state(ws), "timings_ms": timings_ms}
+        return {"ok": False, "error": "revision_validation_failed", "validation": validation, "message": message, "dialog": _dialog_state(ws, topic_ref=failure_topic), "timings_ms": timings_ms}
     stage_started = time.perf_counter()
     session["preview_state"] = copy.deepcopy(dict(preview))
     session["webui_payload"] = copy.deepcopy(dict(after_webui))
