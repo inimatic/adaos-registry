@@ -1856,6 +1856,39 @@ def test_normalise_llm_payload_accepts_webui_schema_wrapper() -> None:
     assert fields[1]["options"][0]["value"] == "male"
 
 
+def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "request_center",
+        "layout": {"type": "split", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "open-comment",
+                "type": "ui.actions",
+                "area": "main",
+                "actions": [{"on": "click", "type": "openModal", "params": {"modalId": "comment_modal"}}],
+            }
+        ],
+    }
+    parsed = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+        "modals": {
+            "comment_modal": {
+                "title": "Add comment",
+                "schema": {"id": "comment_modal_schema", "layout": {"type": "stack"}, "widgets": []},
+            }
+        },
+    }
+
+    payload, preview = skill._normalise_llm_webui_payload(parsed, previous_preview={"title": "Requests"})
+
+    assert "modals" not in payload
+    assert payload["ui"]["application"]["modals"]["comment_modal"]["title"] == "Add comment"
+    assert preview["page_schema"] == page_schema
+    assert skill._validate_builder_webui_payload(payload, preview)["ok"] is True
+
+
 def test_builder_webui_validation_rejects_select_without_options() -> None:
     skill = _load_module()
     page_schema = {

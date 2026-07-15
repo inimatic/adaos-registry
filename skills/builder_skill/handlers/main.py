@@ -1715,10 +1715,39 @@ def _set_webui_page_schema(payload: dict[str, Any], page_schema: Mapping[str, An
     return payload
 
 
+def _canonicalise_webui_modal_locations(payload: dict[str, Any]) -> dict[str, Any]:
+    ui = payload.get("ui") if isinstance(payload.get("ui"), dict) else {}
+    app = ui.get("application") if isinstance(ui.get("application"), dict) else {}
+    desktop = app.get("desktop") if isinstance(app.get("desktop"), dict) else {}
+    app_modals = app.get("modals") if isinstance(app.get("modals"), dict) else {}
+
+    migrated: dict[str, Any] = {}
+    root_modals = payload.pop("modals", None)
+    if isinstance(root_modals, Mapping):
+        migrated.update(copy.deepcopy(dict(root_modals)))
+
+    desktop_modals = desktop.pop("modals", None)
+    if isinstance(desktop_modals, Mapping):
+        migrated.update(copy.deepcopy(dict(desktop_modals)))
+
+    if migrated:
+        merged = copy.deepcopy(migrated)
+        merged.update(copy.deepcopy(dict(app_modals)))
+        app["modals"] = merged
+    if desktop or "desktop" in app:
+        app["desktop"] = desktop
+    if app or "application" in ui:
+        ui["application"] = app
+    if ui:
+        payload["ui"] = ui
+    return payload
+
+
 def _canonical_webui_payload(payload: Mapping[str, Any] | None, page_schema: Mapping[str, Any]) -> dict[str, Any]:
     data = copy.deepcopy(dict(payload or {}))
     for key in ("preview_state", "current_ui", "page_schema", "runtime_context"):
         data.pop(key, None)
+    data = _canonicalise_webui_modal_locations(data)
     data.setdefault("generated_by", SKILL_ID)
     return _set_webui_page_schema(data, page_schema)
 
