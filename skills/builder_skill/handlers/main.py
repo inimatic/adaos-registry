@@ -1913,6 +1913,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         "master_detail_and_tabs": {
             "master_detail": "For master-detail prototypes use split/focus-detail layout for side-by-side detail, or an item-triggered modal/drawer for compact detail. The master ui.list/ui.table must own the selection action; detail containers react to the selected record.",
             "modal_detail": "If detail should open in a modal/dialog, attach openModal to the master item select/click action after updating selected state. Put detail-only secondary actions such as add comment inside the detail modal/panel, not as detached global buttons.",
+            "side_panel_detail": "If detail should be shown in a right-side panel, use a split/focus-detail layout with a main/master area and an aux/right/detail area. Natural area ids like details are acceptable, but set role to aux/right/detail when possible.",
             "tabs": "For tabs use input.commandBar variant='segmented' plus initialState.activeTab and visibleIf expressions on tab content widgets, unless the user asks for a static tab mock.",
             "details": "Use static data examples that show the selected/default record clearly; do not leave generic placeholder rows from the scaffold.",
         },
@@ -1998,6 +1999,8 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "Use canonical visibility expressions like $state.activeTab === 'overview'; avoid state.activeTab == 'overview' in new output. "
         "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
         "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
+        "When a request says the detail should be in a right panel or side panel, use a split/focus-detail layout with a main master area and a right/detail aux area; do not put detail below the master unless the screen is compact. "
+        "When the request says restore, recover, bring back, undo removal, or similar localized phrases, inspect last_revision_delta if present. Reintroduce the matching removed widgets/modals/actions and preserve their semantic owner: if the removed element belonged to a detail modal/panel/container, restore it inside the current detail modal/panel/aux area rather than as a detached global main action. "
         "For tabbed content, use input.commandBar with variant='segmented', initialState for the active tab, and visibleIf on the tab content widgets. "
         "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget. "
         "If the user says things like 'add a modal window', 'make tabs', 'show details after selecting an item', 'validate this field', or similar localized phrases, infer the corresponding internal widgets/actions without asking the user to mention schema property names. "
@@ -3965,6 +3968,15 @@ def _builder_llm_job_timeout_s() -> float:
     return max(30.0, min(value, 600.0))
 
 
+def _builder_llm_repair_job_timeout_s() -> float:
+    raw = os.getenv("ADAOS_BUILDER_LLM_REPAIR_JOB_TIMEOUT_S")
+    try:
+        value = float(raw) if raw else min(_builder_llm_job_timeout_s(), 60.0)
+    except (TypeError, ValueError):
+        value = 60.0
+    return max(10.0, min(value, 180.0))
+
+
 def _builder_llm_job_poll_interval_s() -> float:
     raw = os.getenv("ADAOS_BUILDER_LLM_JOB_POLL_INTERVAL_S")
     try:
@@ -4013,6 +4025,189 @@ def _project_memory(session: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(item, Mapping)
         ],
     }
+
+
+def _current_ui_revision_payload(session: Mapping[str, Any]) -> dict[str, Any]:
+    revision_dir = _ui_revision_dir(str(session.get("artifact_root") or ""))
+    if revision_dir is None or not revision_dir.exists():
+        return {}
+    revision = str(session.get("ui_revision") or "").strip()
+    if not revision:
+        try:
+            revision = (revision_dir / "current.txt").read_text(encoding="utf-8-sig").strip()
+        except Exception:
+            revision = ""
+    match = re.search(r"(\d+)", revision)
+    if match:
+        path = revision_dir / f"{int(match.group(1)):03d}.json"
+        if path.exists():
+            return _load_json_file(path)
+    try:
+        latest = sorted(
+            revision_dir.glob("*.json"),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )
+    except Exception:
+        latest = []
+    return _load_json_file(latest[0]) if latest else {}
+
+
+def _webui_application(payload: Mapping[str, Any] | None) -> Mapping[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {}
+    ui = payload.get("ui")
+    if not isinstance(ui, Mapping):
+        return {}
+    app = ui.get("application")
+    return app if isinstance(app, Mapping) else {}
+
+
+def _collect_webui_widget_delta_items(payload: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
+    items: dict[str, dict[str, Any]] = {}
+
+    def _add(widget: Any, *, path: str, owner: str = "", modal_id: str = "") -> None:
+        if not isinstance(widget, Mapping):
+            return
+        wid = str(widget.get("id") or "").strip()
+        if not wid:
+            return
+        actions = widget.get("actions") if isinstance(widget.get("actions"), list) else []
+        action_types = [
+            str(action.get("type") or "").strip()
+            for action in actions
+            if isinstance(action, Mapping) and str(action.get("type") or "").strip()
+        ]
+        opens_modals = []
+        for action in actions:
+            if not isinstance(action, Mapping):
+                continue
+            if str(action.get("type") or "").strip() != "openModal":
+                continue
+            params = action.get("params") if isinstance(action.get("params"), Mapping) else {}
+            modal_ref = str(params.get("modalId") or params.get("modal_id") or "").strip()
+            if modal_ref:
+                opens_modals.append(modal_ref)
+        item = {
+            "id": wid,
+            "type": str(widget.get("type") or "").strip(),
+            "title": str(widget.get("title") or "").strip(),
+            "area": str(widget.get("area") or "").strip(),
+            "path": path,
+        }
+        if owner:
+            item["owner"] = owner
+        if modal_id:
+            item["modal_id"] = modal_id
+        if action_types:
+            item["action_types"] = action_types[:6]
+        if opens_modals:
+            item["opens_modals"] = opens_modals[:6]
+        items[f"{path}:{wid}"] = item
+
+    page_schema = _extract_webui_page_schema(payload)
+    page_widgets = page_schema.get("widgets") if isinstance(page_schema.get("widgets"), list) else []
+    for widget in page_widgets:
+        _add(widget, path="ui.application.desktop.pageSchema.widgets", owner="desktop")
+
+    app = _webui_application(payload)
+    modals = app.get("modals") if isinstance(app.get("modals"), Mapping) else {}
+    for modal_id, modal in modals.items():
+        if not isinstance(modal, Mapping):
+            continue
+        schema = modal.get("schema") if isinstance(modal.get("schema"), Mapping) else {}
+        widgets = schema.get("widgets") if isinstance(schema.get("widgets"), list) else []
+        for widget in widgets:
+            _add(
+                widget,
+                path=f"ui.application.modals.{modal_id}.schema.widgets",
+                owner=f"modal:{modal_id}",
+                modal_id=str(modal_id),
+            )
+    return items
+
+
+def _collect_webui_modal_delta_items(payload: Mapping[str, Any] | None) -> dict[str, dict[str, Any]]:
+    app = _webui_application(payload)
+    modals = app.get("modals") if isinstance(app.get("modals"), Mapping) else {}
+    items: dict[str, dict[str, Any]] = {}
+    for modal_id, modal in modals.items():
+        if not isinstance(modal, Mapping):
+            continue
+        presentation = modal.get("presentation") if isinstance(modal.get("presentation"), Mapping) else {}
+        items[str(modal_id)] = {
+            "id": str(modal_id),
+            "title": str(modal.get("title") or "").strip(),
+            "presentation": str(presentation.get("kind") or "").strip(),
+        }
+    return items
+
+
+def _delta_added_removed(
+    before_items: Mapping[str, Mapping[str, Any]],
+    after_items: Mapping[str, Mapping[str, Any]],
+    *,
+    limit: int = 18,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    before_keys = set(before_items)
+    after_keys = set(after_items)
+    removed = [dict(before_items[key]) for key in sorted(before_keys - after_keys)]
+    added = [dict(after_items[key]) for key in sorted(after_keys - before_keys)]
+    return removed[:limit], added[:limit]
+
+
+def _latest_ui_revision_delta(session: Mapping[str, Any]) -> dict[str, Any]:
+    revision_payload = _current_ui_revision_payload(session)
+    if not revision_payload:
+        return {}
+    before = revision_payload.get("before_webui")
+    after = revision_payload.get("after_webui")
+    if not isinstance(before, Mapping) or not isinstance(after, Mapping):
+        return {}
+    before_widgets = _collect_webui_widget_delta_items(before)
+    after_widgets = _collect_webui_widget_delta_items(after)
+    removed_widgets, added_widgets = _delta_added_removed(before_widgets, after_widgets)
+    before_modals = _collect_webui_modal_delta_items(before)
+    after_modals = _collect_webui_modal_delta_items(after)
+    removed_modals, added_modals = _delta_added_removed(before_modals, after_modals, limit=12)
+    moved_widgets: list[dict[str, Any]] = []
+    before_by_id = {str(item.get("id") or ""): item for item in before_widgets.values()}
+    after_by_id = {str(item.get("id") or ""): item for item in after_widgets.values()}
+    for wid in sorted(set(before_by_id) & set(after_by_id)):
+        before_item = before_by_id[wid]
+        after_item = after_by_id[wid]
+        if (
+            str(before_item.get("area") or "") != str(after_item.get("area") or "")
+            or str(before_item.get("owner") or "") != str(after_item.get("owner") or "")
+            or str(before_item.get("path") or "") != str(after_item.get("path") or "")
+        ):
+            moved_widgets.append(
+                {
+                    "id": wid,
+                    "type": str(after_item.get("type") or before_item.get("type") or ""),
+                    "from": {
+                        "area": str(before_item.get("area") or ""),
+                        "owner": str(before_item.get("owner") or ""),
+                        "path": str(before_item.get("path") or ""),
+                    },
+                    "to": {
+                        "area": str(after_item.get("area") or ""),
+                        "owner": str(after_item.get("owner") or ""),
+                        "path": str(after_item.get("path") or ""),
+                    },
+                }
+            )
+    request = revision_payload.get("request") if isinstance(revision_payload.get("request"), Mapping) else {}
+    delta = {
+        "revision": str(revision_payload.get("revision") or session.get("ui_revision") or ""),
+        "request": str(request.get("text") or "")[:700],
+        "removed_widgets": removed_widgets,
+        "added_widgets": added_widgets,
+        "moved_widgets": moved_widgets[:18],
+        "removed_modals": removed_modals,
+        "added_modals": added_modals,
+    }
+    return {key: value for key, value in delta.items() if value not in ("", [], {}, None)}
 
 
 def _current_webui_payload(session: Mapping[str, Any], preview_state: Mapping[str, Any]) -> dict[str, Any]:
@@ -4112,6 +4307,7 @@ def _builder_llm_webui_transform_request(
         "project_memory": project_memory,
         "runtime_context": _builder_runtime_context(session, current_payload),
         "recent_patch_history": history,
+        "last_revision_delta": _latest_ui_revision_delta(session),
         "current_webui_json": current_payload,
         "instruction": instruction,
     }
@@ -4732,10 +4928,20 @@ def _repair_llm_webui_transform_output(
             },
         }
     )
+    repair_job_id = ""
+    repair_base_url = ""
     try:
-        from adaos.sdk.llm.llm_client import send_response
+        from adaos.sdk.llm.llm_client import submit_response_job, wait_response_job
 
-        response = send_response(
+        repair_started_at = _now()
+        _LOG.debug(
+            "builder LLM repair job submit start scenario=%s request_id=%s original_job_id=%s timeout_s=%.1f",
+            str(session.get("scenario_id") or ""),
+            repair_request_id,
+            job_id,
+            _builder_llm_job_submit_timeout_s(),
+        )
+        response = submit_response_job(
             [
                 {"role": "system", "content": str(request["system_prompt"])},
                 {"role": "user", "content": repair_prompt},
@@ -4744,8 +4950,55 @@ def _repair_llm_webui_transform_output(
             temperature=0,
             max_tokens=_builder_llm_max_tokens(),
             request_id=repair_request_id,
-            timeout=_builder_llm_timeout_s(),
+            timeout=_builder_llm_job_submit_timeout_s(),
         )
+        repair_job_id = str(response.get("job_id") or response.get("id") or "").strip()
+        client = response.get("_client") if isinstance(response.get("_client"), Mapping) else {}
+        repair_base_url = str(client.get("base_url") or "").strip()
+        repair_status = str(response.get("status") or "").strip().lower()
+        _LOG.debug(
+            "builder LLM repair job submit completed scenario=%s request_id=%s original_job_id=%s repair_job_id=%s base_url=%s status=%s elapsed_ms=%d",
+            str(session.get("scenario_id") or ""),
+            repair_request_id,
+            job_id,
+            repair_job_id,
+            repair_base_url,
+            repair_status,
+            int((_now() - repair_started_at) * 1000),
+        )
+        if repair_status != "succeeded":
+            if not repair_job_id:
+                raise RuntimeError("repair job submit did not return job_id")
+            repair_wait_timeout_s = _builder_llm_repair_job_timeout_s()
+            _LOG.debug(
+                "builder LLM repair job wait start scenario=%s request_id=%s original_job_id=%s repair_job_id=%s base_url=%s timeout_s=%.1f",
+                str(session.get("scenario_id") or ""),
+                repair_request_id,
+                job_id,
+                repair_job_id,
+                repair_base_url,
+                repair_wait_timeout_s,
+            )
+            response = wait_response_job(
+                repair_job_id,
+                base_url=repair_base_url or None,
+                timeout_s=repair_wait_timeout_s,
+                poll_interval_s=_builder_llm_job_poll_interval_s(),
+                request_timeout=6.0,
+            )
+            repair_status = str(response.get("status") or "").strip().lower()
+            _LOG.debug(
+                "builder LLM repair job wait completed scenario=%s request_id=%s original_job_id=%s repair_job_id=%s base_url=%s status=%s elapsed_ms=%d",
+                str(session.get("scenario_id") or ""),
+                repair_request_id,
+                job_id,
+                repair_job_id,
+                repair_base_url,
+                repair_status,
+                int((_now() - repair_started_at) * 1000),
+            )
+            if repair_status != "succeeded":
+                raise RuntimeError(f"repair job did not succeed: {response.get('error') or response}")
         repaired_output = str(response.get("output_text") or "")
     except Exception as exc:
         return {
@@ -4764,6 +5017,8 @@ def _repair_llm_webui_transform_output(
                     "attempt": 2,
                     "ok": False,
                     "request_id": repair_request_id,
+                    "job_id": repair_job_id,
+                    "base_url": repair_base_url,
                     "error": "repair_request_failed",
                 },
             ],
@@ -7473,91 +7728,147 @@ def _complete_llm_webui_job(
             _meta=_meta,
         )
         return
-    output_text = str(job.get("output_text") or "")
-    previous_preview = (
-        before_webui.get("preview_state")
-        if isinstance(before_webui, Mapping) and isinstance(before_webui.get("preview_state"), Mapping)
-        else session.get("preview_state")
-        if isinstance(session.get("preview_state"), Mapping)
-        else {}
-    )
     try:
-        llm_result = _parse_llm_webui_transform_output(
-            output_text=output_text,
-            previous_preview=previous_preview,
-            request_id=request_id,
-            job_id=job_id,
+        output_text = str(job.get("output_text") or "")
+        previous_preview = (
+            before_webui.get("preview_state")
+            if isinstance(before_webui, Mapping) and isinstance(before_webui.get("preview_state"), Mapping)
+            else session.get("preview_state")
+            if isinstance(session.get("preview_state"), Mapping)
+            else {}
         )
-    except Exception as exc:
-        llm_result = _repair_llm_webui_transform_output(
-            session=session,
-            instruction=request_text,
-            previous_preview=previous_preview,
-            output_text=output_text,
-            validation_error={"error": "llm_response_parse_failed", "detail": f"{type(exc).__name__}: {exc}"},
-            request_id=request_id,
-            job_id=job_id,
-            _meta=_meta,
+        _LOG.debug(
+            "builder LLM job parse start scenario=%s job_id=%s request_id=%s output_chars=%d",
+            str(session.get("scenario_id") or ""),
+            job_id,
+            request_id,
+            len(output_text),
         )
-    if not llm_result.get("ok"):
-        llm_result = _repair_llm_webui_transform_output(
-            session=session,
-            instruction=request_text,
-            previous_preview=previous_preview,
-            output_text=str(llm_result.get("last_response") or output_text),
-            validation_error=dict(llm_result.get("validation") or {
-                "error": llm_result.get("error") or "invalid_llm_response",
-                "detail": llm_result.get("detail") or "",
-            }),
-            request_id=request_id,
-            job_id=job_id,
-            _meta=_meta,
-        )
-        if not llm_result.get("ok"):
-            _mark_llm_job_failed(
-                ws=ws,
-                session=session,
+        try:
+            llm_result = _parse_llm_webui_transform_output(
+                output_text=output_text,
+                previous_preview=previous_preview,
+                request_id=request_id,
                 job_id=job_id,
-                detail=str(llm_result.get("detail") or llm_result.get("error") or "invalid_llm_response"),
-                binding=binding,
-                topic_ref=topic,
+            )
+        except Exception as exc:
+            _LOG.warning(
+                "builder LLM job parse failed; trying repair scenario=%s job_id=%s request_id=%s detail=%s",
+                str(session.get("scenario_id") or ""),
+                job_id,
+                request_id,
+                f"{type(exc).__name__}: {exc}",
+            )
+            llm_result = _repair_llm_webui_transform_output(
+                session=session,
+                instruction=request_text,
+                previous_preview=previous_preview,
+                output_text=output_text,
+                validation_error={"error": "llm_response_parse_failed", "detail": f"{type(exc).__name__}: {exc}"},
+                request_id=request_id,
+                job_id=job_id,
                 _meta=_meta,
             )
-            return
-    llm_result["job"] = job
-    model_id = _builder_llm_model_for_session(session, _meta)
-    if model_id:
-        llm_result["model"] = model_id
-    llm_result["profile"] = _builder_llm_prompt_profile(model_id)
-    _update_llm_job_status(session, job_id, "succeeded")
-    result = _finalize_llm_webui_transform_result(
-        ws=ws,
-        session=session,
-        binding=binding,
-        patch=dict(patch),
-        request_text=request_text,
-        before_webui=before_webui,
-        llm_result=llm_result,
-        auto_apply=auto_apply,
-        _meta=_meta,
-    )
-    _LOG.debug(
-        "builder LLM job applied scenario=%s job_id=%s request_id=%s elapsed_ms=%d ok=%s",
-        str(session.get("scenario_id") or ""),
-        job_id,
-        request_id,
-        int((_now() - started_at) * 1000),
-        bool(result.get("ok", True)) if isinstance(result, Mapping) else True,
-    )
-    _safe_emit_chat(
-        str(result.get("message") or ""),
-        webspace_id=ws,
-        _meta=_meta,
-        session=result.get("session") if isinstance(result.get("session"), Mapping) else session,
-        binding=binding,
-        topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic,
-        actions=result.get("message_actions") if isinstance(result.get("message_actions"), list) else None,
-    )
+        if not llm_result.get("ok"):
+            _LOG.debug(
+                "builder LLM job validation repair start scenario=%s job_id=%s request_id=%s error=%s",
+                str(session.get("scenario_id") or ""),
+                job_id,
+                request_id,
+                str(llm_result.get("error") or ""),
+            )
+            llm_result = _repair_llm_webui_transform_output(
+                session=session,
+                instruction=request_text,
+                previous_preview=previous_preview,
+                output_text=str(llm_result.get("last_response") or output_text),
+                validation_error=dict(llm_result.get("validation") or {
+                    "error": llm_result.get("error") or "invalid_llm_response",
+                    "detail": llm_result.get("detail") or "",
+                }),
+                request_id=request_id,
+                job_id=job_id,
+                _meta=_meta,
+            )
+            if not llm_result.get("ok"):
+                _mark_llm_job_failed(
+                    ws=ws,
+                    session=session,
+                    job_id=job_id,
+                    detail=str(llm_result.get("detail") or llm_result.get("error") or "invalid_llm_response"),
+                    binding=binding,
+                    topic_ref=topic,
+                    _meta=_meta,
+                )
+                return
+        _LOG.debug(
+            "builder LLM job parse completed scenario=%s job_id=%s request_id=%s ok=%s",
+            str(session.get("scenario_id") or ""),
+            job_id,
+            request_id,
+            bool(llm_result.get("ok")),
+        )
+        llm_result["job"] = job
+        model_id = _builder_llm_model_for_session(session, _meta)
+        if model_id:
+            llm_result["model"] = model_id
+        llm_result["profile"] = _builder_llm_prompt_profile(model_id)
+        _LOG.debug(
+            "builder LLM job finalize start scenario=%s job_id=%s request_id=%s",
+            str(session.get("scenario_id") or ""),
+            job_id,
+            request_id,
+        )
+        result = _finalize_llm_webui_transform_result(
+            ws=ws,
+            session=session,
+            binding=binding,
+            patch=dict(patch),
+            request_text=request_text,
+            before_webui=before_webui,
+            llm_result=llm_result,
+            auto_apply=auto_apply,
+            _meta=_meta,
+        )
+        _update_llm_job_status(session, job_id, "succeeded")
+        _save_session(ws, session)
+        _LOG.debug(
+            "builder LLM job applied scenario=%s job_id=%s request_id=%s elapsed_ms=%d ok=%s",
+            str(session.get("scenario_id") or ""),
+            job_id,
+            request_id,
+            int((_now() - started_at) * 1000),
+            bool(result.get("ok", True)) if isinstance(result, Mapping) else True,
+        )
+        _safe_emit_chat(
+            str(result.get("message") or ""),
+            webspace_id=ws,
+            _meta=_meta,
+            session=result.get("session") if isinstance(result.get("session"), Mapping) else session,
+            binding=binding,
+            topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic,
+            actions=result.get("message_actions") if isinstance(result.get("message_actions"), list) else None,
+        )
+    except Exception as exc:
+        detail = f"{type(exc).__name__}: {exc}"
+        _LOG.exception(
+            "builder LLM job postprocess failed scenario=%s job_id=%s request_id=%s elapsed_ms=%d detail=%s",
+            str(session.get("scenario_id") or ""),
+            job_id,
+            request_id,
+            int((_now() - started_at) * 1000),
+            detail,
+        )
+        _mark_llm_job_failed(
+            ws=ws,
+            session=session,
+            job_id=job_id,
+            detail=f"postprocess_failed: {detail}",
+            binding=binding,
+            topic_ref=topic,
+            _meta=_meta,
+        )
+        return
 
 
 def _start_llm_webui_job_worker(

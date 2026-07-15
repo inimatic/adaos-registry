@@ -1301,10 +1301,77 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
         encoding="utf-8",
     )
     (artifact_root / "builder_system_prompt.md").write_text("Always prefer conference vocabulary.\n", encoding="utf-8")
+    before_page_schema = copy.deepcopy(page_schema)
+    before_page_schema["widgets"] = [
+        {
+            "id": "prototype-cards",
+            "type": "ui.list",
+            "area": "main",
+            "inputs": {"variant": "cards", "titleKey": "title", "subtitleKey": "notes", "previewKey": "status"},
+            "actions": [
+                {"on": "select", "type": "updateState", "params": {"selectedId": "$event.id"}},
+                {"on": "select", "type": "openModal", "params": {"modalId": "request_detail_modal"}},
+            ],
+        }
+    ]
+    before_webui = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {"pageSchema": before_page_schema},
+                "modals": {
+                    "request_detail_modal": {
+                        "title": "Request details",
+                        "schema": {
+                            "id": "request_detail_modal_schema",
+                            "layout": {"type": "single", "areas": [{"id": "modal-main"}]},
+                            "widgets": [
+                                {
+                                    "id": "add-comment-action",
+                                    "type": "ui.actions",
+                                    "area": "modal-main",
+                                    "title": "Add comment",
+                                    "actions": [
+                                        {"on": "click", "type": "openModal", "params": {"modalId": "comment_modal"}}
+                                    ],
+                                }
+                            ],
+                        },
+                    },
+                    "comment_modal": {
+                        "title": "Add comment",
+                        "schema": {
+                            "id": "comment_modal_schema",
+                            "layout": {"type": "single", "areas": [{"id": "form"}]},
+                            "widgets": [{"id": "comment-form", "type": "ui.form", "area": "form"}],
+                        },
+                    },
+                },
+            }
+        },
+    }
+    after_webui = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    revision_dir = artifact_root / "ui_revisions"
+    revision_dir.mkdir()
+    (revision_dir / "current.txt").write_text("002\n", encoding="utf-8")
+    (revision_dir / "002.json").write_text(
+        json.dumps(
+            {
+                "revision": "002",
+                "request": {"text": "Move request details into a right panel"},
+                "before_webui": before_webui,
+                "after_webui": after_webui,
+                "preview_state": {},
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
     session = {
         "id": "builder_session_context",
         "scenario_id": "llm_context",
         "artifact_root": str(artifact_root),
+        "ui_revision": "002",
         "datasource_id": "prototype_items",
         "fields": [{"id": "title", "type": "string", "label": "Title"}],
         "user_summary": {"assumptions": ["The first data model uses fields: Title, Notes, Status"]},
@@ -1331,6 +1398,13 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "state_and_visibility" in user_payload["runtime_component_contracts"]
     assert "visibleIf" in user_payload["runtime_component_contracts"]["state_and_visibility"]
     assert "view an example" in user_payload["runtime_component_contracts"]["state_and_visibility"]["local_interaction"]
+    delta = user_payload["last_revision_delta"]
+    assert delta["revision"] == "002"
+    assert delta["request"] == "Move request details into a right panel"
+    assert {"id": "comment_modal", "title": "Add comment", "presentation": ""} in delta["removed_modals"]
+    removed_by_id = {item["id"]: item for item in delta["removed_widgets"]}
+    assert removed_by_id["add-comment-action"]["owner"] == "modal:request_detail_modal"
+    assert removed_by_id["add-comment-action"]["opens_modals"] == ["comment_modal"]
     affordances = user_payload["prototyping_affordances"]
     assert affordances["role"] == "Adaptive UI prototyping designer-programmer."
     assert "separate requirement" in affordances["meaningful_transformation"][1]
@@ -1360,7 +1434,7 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     command_bar_pattern = command_bar_contract["example_pattern"]
     assert command_bar_pattern["initialState"] == {"exampleMode": "empty"}
     assert command_bar_pattern["widgets"][0]["actions"][0]["params"] == {"exampleMode": "$event.id"}
-    assert command_bar_pattern["widgets"][1]["visibleIf"] == "state.exampleMode == 'sample'"
+    assert command_bar_pattern["widgets"][1]["visibleIf"] == "$state.exampleMode === 'sample'"
     schema_defs = user_payload["webui_v1_abi"]["schema_contract"]["defs"]
     assert "formInputs" in schema_defs
     assert "formField" in schema_defs
@@ -1608,20 +1682,34 @@ def test_async_llm_completion_repairs_missing_page_schema(monkeypatch, tmp_path)
     monkeypatch.setattr(skill, "_schedule_dev_runtime_reload_after_revision", lambda *args, **kwargs: {"ok": True, "scheduled": True})
     monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **_kwargs: emitted.append(str(text)))
 
-    monkeypatch.setattr(
-        llm_client,
-        "wait_response_job",
-        lambda *args, **kwargs: {
+    wait_calls = []
+
+    def fake_wait_response_job(job_id, *args, **kwargs):
+        wait_calls.append(str(job_id))
+        if str(job_id) == "llm_job_repair_fix":
+            return {
+                "ok": True,
+                "job_id": "llm_job_repair_fix",
+                "status": "succeeded",
+                "output_text": json.dumps({**payload, "comment": "Repaired."}, ensure_ascii=False),
+            }
+        return {
             "ok": True,
             "job_id": "llm_job_repair",
             "status": "succeeded",
             "output_text": json.dumps({"comment": "Missing page schema."}, ensure_ascii=False),
-        },
-    )
+        }
+
+    monkeypatch.setattr(llm_client, "wait_response_job", fake_wait_response_job)
     monkeypatch.setattr(
         llm_client,
-        "send_response",
-        lambda *args, **kwargs: {"output_text": json.dumps({**payload, "comment": "Repaired."}, ensure_ascii=False)},
+        "submit_response_job",
+        lambda *args, **kwargs: {
+            "ok": True,
+            "job_id": "llm_job_repair_fix",
+            "status": "queued",
+            "_client": {"base_url": "https://ru.api.inimatic.com"},
+        },
     )
 
     skill._complete_llm_webui_job(
@@ -1648,6 +1736,7 @@ def test_async_llm_completion_repairs_missing_page_schema(monkeypatch, tmp_path)
     )
 
     assert emitted
+    assert "llm_job_repair_fix" in wait_calls
     assert not any("LLM payload must contain ui.application.desktop.pageSchema" in item for item in emitted)
     saved = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
     assert saved["ui"]["application"]["desktop"]["pageSchema"]["id"] == page_schema["id"]
