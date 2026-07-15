@@ -349,7 +349,7 @@ def _invalidate_scenario_runtime_caches(root: Path, reason: str) -> None:
         scenarios_loader.invalidate_cache(scenario_id=scenario_id, space="dev")
         scenarios_loader.invalidate_cache(scenario_id=scenario_id, space="workspace")
     except Exception:
-        _log.debug("failed to invalidate scenario loader cache scenario=%s", scenario_id, exc_info=True)
+        _LOG.debug("failed to invalidate scenario loader cache scenario=%s", scenario_id, exc_info=True)
     try:
         from adaos.services.scenario import webspace_runtime  # pylint: disable=import-outside-toplevel
 
@@ -357,7 +357,7 @@ def _invalidate_scenario_runtime_caches(root: Path, reason: str) -> None:
         if callable(invalidate):
             invalidate(scenario_id=scenario_id, reason=reason)
     except Exception:
-        _log.debug("failed to invalidate resolved webspace cache scenario=%s", scenario_id, exc_info=True)
+        _LOG.debug("failed to invalidate resolved webspace cache scenario=%s", scenario_id, exc_info=True)
 
 
 def _load_json_file(path: Path) -> dict[str, Any]:
@@ -4211,6 +4211,82 @@ def _validate_preview_state_payload(preview_state: Mapping[str, Any]) -> dict[st
     return {"ok": True}
 
 
+def _iter_mapping_nodes(value: Any, path: str = "$") -> Iterable[tuple[str, Mapping[str, Any]]]:
+    if isinstance(value, Mapping):
+        yield path, value
+        for key, child in value.items():
+            child_path = f"{path}.{key}"
+            yield from _iter_mapping_nodes(child, child_path)
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from _iter_mapping_nodes(child, f"{path}[{index}]")
+
+
+def _modal_id_from_open_modal_action(action: Mapping[str, Any]) -> str:
+    params = action.get("params") if isinstance(action.get("params"), Mapping) else {}
+    for candidate in (params.get("modalId"), params.get("modal_id"), action.get("modalId"), action.get("openModal")):
+        modal_id = str(candidate or "").strip()
+        if modal_id:
+            return modal_id
+    return ""
+
+
+def _validate_webui_modal_contracts(payload: Mapping[str, Any]) -> dict[str, Any]:
+    root_modals = payload.get("modals")
+    if isinstance(root_modals, Mapping) and root_modals:
+        return {
+            "ok": False,
+            "error": "component_contract_invalid",
+            "detail": "Modals must be declared under ui.application.modals, not at root modals",
+        }
+
+    application = _extract_webui_application(payload)
+    desktop = application.get("desktop") if isinstance(application.get("desktop"), Mapping) else {}
+    if isinstance(desktop.get("modals"), Mapping) and desktop.get("modals"):
+        return {
+            "ok": False,
+            "error": "component_contract_invalid",
+            "detail": "Modals must be declared under ui.application.modals, not ui.application.desktop.modals",
+        }
+
+    modals = application.get("modals") if isinstance(application.get("modals"), Mapping) else {}
+    declared_modal_ids = {str(modal_id).strip() for modal_id in modals.keys() if str(modal_id).strip()}
+    for modal_id, modal in modals.items():
+        if not isinstance(modal, Mapping):
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": f"ui.application.modals.{modal_id} must be an object",
+            }
+        if not isinstance(modal.get("schema"), Mapping):
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": f"ui.application.modals.{modal_id}.schema must be an object",
+            }
+
+    for path, node in _iter_mapping_nodes(application, "$.ui.application"):
+        if str(node.get("type") or "").strip() != "openModal":
+            continue
+        modal_id = _modal_id_from_open_modal_action(node)
+        if not modal_id:
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": f"{path} opens a modal but params.modalId is missing",
+            }
+        if modal_id.startswith("$"):
+            continue
+        if modal_id not in declared_modal_ids:
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": f"{path} opens undeclared modal '{modal_id}'; declare it in ui.application.modals",
+            }
+    return {"ok": True}
+
+
 def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(page_schema, Mapping):
         return {"ok": False, "error": "page_schema_invalid", "detail": "ui.application.desktop.pageSchema must be an object"}
@@ -4274,6 +4350,9 @@ def _validate_builder_webui_payload(payload: Mapping[str, Any], preview_state: M
     component_validation = _validate_page_schema_component_contracts(page_schema)
     if not component_validation.get("ok"):
         return component_validation
+    modal_validation = _validate_webui_modal_contracts(payload)
+    if not modal_validation.get("ok"):
+        return modal_validation
     preview_validation = _validate_preview_state_payload(preview_state)
     if not preview_validation.get("ok"):
         return preview_validation

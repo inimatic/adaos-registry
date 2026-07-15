@@ -1808,6 +1808,66 @@ def test_builder_webui_validation_rejects_select_without_options() -> None:
     assert skill._validate_builder_webui_payload(fixed_payload, {"page_schema": fixed_page_schema})["ok"] is True
 
 
+def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "request_center",
+        "title": "Request center",
+        "layout": {"type": "split", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "open-detail",
+                "type": "ui.actions",
+                "area": "main",
+                "actions": [{"on": "click", "type": "openModal", "params": {"modalId": "request_detail_modal"}}],
+            }
+        ],
+    }
+    payload = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+
+    validation = skill._validate_builder_webui_payload(payload, {"page_schema": page_schema})
+
+    assert validation["ok"] is False
+    assert validation["error"] == "component_contract_invalid"
+    assert "undeclared modal" in validation["detail"]
+
+    fixed_payload = copy.deepcopy(payload)
+    fixed_payload["ui"]["application"]["modals"] = {
+        "request_detail_modal": {
+            "title": "Request detail",
+            "schema": {"id": "request_detail_modal_schema", "layout": {"type": "stack"}, "widgets": []},
+        }
+    }
+
+    assert skill._validate_builder_webui_payload(fixed_payload, {"page_schema": page_schema})["ok"] is True
+
+
+def test_builder_webui_validation_rejects_root_level_modals() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "request_center",
+        "title": "Request center",
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [{"id": "requests", "type": "ui.list", "area": "main"}],
+    }
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": page_schema}}},
+        "modals": {
+            "request_detail_modal": {
+                "title": "Request detail",
+                "schema": {"id": "request_detail_modal_schema", "layout": {"type": "stack"}, "widgets": []},
+            }
+        },
+    }
+
+    validation = skill._validate_builder_webui_payload(payload, {"page_schema": page_schema})
+
+    assert validation["ok"] is False
+    assert validation["error"] == "component_contract_invalid"
+    assert "ui.application.modals" in validation["detail"]
+
+
 def test_write_webui_payload_projects_canonical_page_schema_to_scenario(tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "canonical_webui"
