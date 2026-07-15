@@ -1895,6 +1895,16 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
     assert skill._validate_builder_webui_payload(payload, preview)["ok"] is True
 
 
+def test_builder_system_prompt_allows_replaceable_picsum_placeholders() -> None:
+    skill = _load_module()
+
+    prompt = skill._builder_llm_system_prompt()
+
+    assert "https://picsum.photos/" in prompt
+    assert "replaceable placeholder image URLs" in prompt
+    assert "local seed assets or generated images" in prompt
+
+
 def test_builder_webui_validation_rejects_select_without_options() -> None:
     skill = _load_module()
     page_schema = {

@@ -2053,6 +2053,8 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "Decompose the user's instruction into explicit requirements and satisfy each one; do not let a broad form/layout request hide later requirements such as examples, local controls, variant switching, translations, or sample data. "
         "Use the supplied prototyping_affordances to vary field order, grouping, labels, field types, layout, widgets, local interactions, and mock data when that better fits the user's request. "
         "Interactive prototype elements may update local page state or static/mock data; do not invent real external integrations or side effects unless explicitly requested and declared. "
+        "For early visual prototypes that need sample images, use replaceable placeholder image URLs from https://picsum.photos/ with deterministic seeds, for example https://picsum.photos/seed/recipe-salad/640/420. Treat those URLs as temporary sample assets that the user can later replace with local seed assets or generated images. "
+        "When using placeholder images, put meaningful alt/title/caption text and keep the image subject aligned with the row/card domain; do not use image placeholders as final product content. "
         "Avoid duplicate-only, rename-only, or no-op transformations for design requests; revise the JSON before answering if the result does not visibly satisfy the request. "
         "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
         "If cards need combined text like status plus date, add a derived string property to the relevant static dataSource.value rows, then point previewKey to that property. "
