@@ -1862,7 +1862,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "purpose": "Use ui.application.modals when the user asks for a modal, dialog, popup, drawer, sheet, or separate overlay surface.",
             "shape": "Add ui.application.modals.<modalId>={title,presentation:{kind:'modal'|'drawer'|'sheet'|'sideSheet'},schema:{id,layout,widgets}} alongside ui.application.desktop.pageSchema.",
             "open_action": "Open a declared modal from a button/action with actions=[{on:'click', type:'openModal', params:{modalId:'comment_modal'}}].",
-            "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel.",
+            "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. Never return a root-level modals object; modal declarations live only in ui.application.modals.",
         },
         "input.commandBar": {
             "purpose": "Segmented or toolbar-like local controls for choosing a mode, filter, draft state, or preview perspective.",
@@ -1949,7 +1949,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "interaction": "May add local selectors, command bars, buttons, and visibleIf-driven states for prototype-only flows; when the user asks to choose, compare, preview, or view an example, include an explicit local control.",
             "mock_data": "May create realistic static rows/examples in the requested domain and keep them aligned with fields and display widgets.",
             "copy": "May rewrite labels, titles, section names, placeholders, helper text, and empty states in the user's language.",
-            "modals": "When the user asks for a modal/dialog/drawer/sheet, declare it in ui.application.modals and open it with an openModal action from the relevant UI element. In master-detail, the relevant element is usually the selected master row/card.",
+            "modals": "When the user asks for a modal/dialog/drawer/sheet, declare it in ui.application.modals and open it with an openModal action from the relevant UI element. In master-detail, the relevant element is usually the selected master row/card. Do not put modal declarations in root modals or ui.application.desktop.modals.",
             "natural_language_mapping": "Map ordinary words to ABI structures: modal/dialog/window -> declared modal; tab/section switch -> segmented command bar plus state-driven content; selected item/details -> master-detail; required/error/check -> field validation; compare/variants -> local switching controls.",
         },
         "self_check": [
@@ -1979,7 +1979,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
         "The root object must be an adaos.webui.v1 manifest with schema='adaos.webui.v1'. "
         "The renderable source of truth is ui.application.desktop.pageSchema. "
-        "Return the complete updated pageSchema under ui.application.desktop.pageSchema; if the prototype needs modals, also return ui.application.modals. Do not return preview_state, current_ui, or a root-level page_schema. "
+        "Return the complete updated pageSchema under ui.application.desktop.pageSchema; if the prototype needs modals, also return ui.application.modals. Do not return preview_state, current_ui, a root-level page_schema, or root-level modals. "
         "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
         "Treat the current UI as starting material, not as a fixed contract: make meaningful visible changes when the request implies design, workflow, layout, or prototype evolution. "
         "Decompose the user's instruction into explicit requirements and satisfy each one; do not let a broad form/layout request hide later requirements such as examples, local controls, variant switching, translations, or sample data. "
@@ -2002,7 +2002,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "When a request says the detail should be in a right panel or side panel, use a split/focus-detail layout with a main master area and a right/detail aux area; do not put detail below the master unless the screen is compact. "
         "When the request says restore, recover, bring back, undo removal, or similar localized phrases, inspect last_revision_delta if present. Reintroduce the matching removed widgets/modals/actions and preserve their semantic owner: if the removed element belonged to a detail modal/panel/container, restore it inside the current detail modal/panel/aux area rather than as a detached global main action. "
         "For tabbed content, use input.commandBar with variant='segmented', initialState for the active tab, and visibleIf on the tab content widgets. "
-        "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget. "
+        "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget, and never put modal declarations in a root-level modals object. "
         "If the user says things like 'add a modal window', 'make tabs', 'show details after selecting an item', 'validate this field', or similar localized phrases, infer the corresponding internal widgets/actions without asking the user to mention schema property names. "
         "Static ui.table/ui.list widgets may preview sample data, but they must not replace the fields used to collect the user's answers. "
         "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
@@ -4296,9 +4296,11 @@ def _builder_llm_webui_transform_request(
                 "application": {
                     "desktop": {
                         "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
-                    }
+                    },
+                    "modals": "optional object of modalId to {title,presentation,schema}; never top-level modals",
                 }
             },
+            "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
             "comment": "short user-facing text about what changed or why it could not be changed",
             "unable_reason": "short optional diagnostic if request cannot be implemented",
         },
@@ -4911,7 +4913,7 @@ def _repair_llm_webui_transform_output(
     )
     repair_prompt = _compact_json(
         {
-            "task": "Repair the previous Builder JSON response. Return only corrected JSON.",
+            "task": "Repair the previous Builder JSON response. Return only corrected JSON. If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key.",
             "validation_error": dict(validation_error),
             "previous_response": str(output_text or "")[:20000],
             "original_request": request["base_request"],
@@ -4921,9 +4923,11 @@ def _repair_llm_webui_transform_output(
                     "application": {
                         "desktop": {
                             "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
-                        }
+                        },
+                        "modals": "optional object of modalId to {title,presentation,schema}; never top-level modals",
                     }
                 },
+                "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
                 "comment": "short user-facing text",
                 "unable_reason": "optional diagnostic",
             },
