@@ -1454,10 +1454,14 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "Break broad or composite user concepts into atomic fields" in request["system_prompt"]
     assert "add an explicit local control" in request["system_prompt"]
     assert "data-capture requirements that need ui.form fields" in request["system_prompt"]
+    assert "local development prototype until an explicit activation/release step" in request["system_prompt"]
+    assert "meaningless placeholders like Request 1" in request["system_prompt"]
+    assert "Static sample rows must match the active domain" in request["system_prompt"]
     assert (artifact_root / "builder_memory.md").exists()
     assert (artifact_root / "tz" / "base_tz.md").exists()
     assert "starting point only" in user_payload["project_memory"]["memory_text"]
     assert "not a fixed product contract" in user_payload["project_memory"]["user_summary"]["assumptions"][0]
+    assert "local dev prototype" not in user_payload["project_memory"]["memory_text"]
 
 
 def test_builder_form_component_contract_validates_choice_and_grid_fields() -> None:
@@ -1518,7 +1522,7 @@ def test_builder_project_memory_repairs_mojibake_and_legacy_constraints(tmp_path
     (artifact_root / "tz").mkdir(parents=True)
     mojibake_fields = "РќР°Р·РІР°РЅРёРµ, Р—Р°РјРµС‚РєРё, РЎС‚Р°С‚СѓСЃ"
     (artifact_root / "builder_memory.md").write_text(
-        f"# Memory\n- The first data model uses fields: {mojibake_fields}\n",
+        f"# Memory\n- This is a local dev prototype, not an activated runtime change\n- The first data model uses fields: {mojibake_fields}\n",
         encoding="utf-8",
     )
     (artifact_root / "tz" / "base_tz.md").write_text(
@@ -1540,6 +1544,7 @@ def test_builder_project_memory_repairs_mojibake_and_legacy_constraints(tmp_path
     assert "Рќ" not in memory["memory_text"]
     assert "Название, Заметки, Статус" in memory["memory_text"]
     assert "not a fixed product contract" in memory["memory_text"]
+    assert "local dev prototype" not in memory["memory_text"]
     assert "Рќ" not in memory["technical_spec_text"]
     assert "Название, Заметки, Статус" in memory["technical_spec_text"]
     assert "not a fixed product contract" in memory["user_summary"]["assumptions"][0]
@@ -1552,6 +1557,7 @@ def test_builder_project_memory_repairs_mojibake_and_legacy_constraints(tmp_path
     assert "Рќ" not in memory_file_text
     assert "Название, Заметки, Статус" in memory_file_text
     assert "not a fixed product contract" in tz_file_text
+    assert "local dev prototype" not in memory_file_text
     assert "Рќ" not in state["base_tz"]
     assert "not a fixed product contract" in state["base_tz"]
 

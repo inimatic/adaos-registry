@@ -1393,13 +1393,18 @@ def _default_builder_memory_text(preview_state: Mapping[str, Any]) -> str:
 
 def _neutralize_legacy_builder_memory_text(text: str) -> str:
     source = _repair_mojibake_text(text)
-    if "The first data model uses fields:" not in source:
-        return source
-    return re.sub(
-        r"The first data model uses fields:\s*([^\n\r]+)",
-        r"The initial scaffold started with fields: \1; this list is not a fixed product contract",
+    source = re.sub(
+        r"(?m)^\s*-\s*This is a local dev prototype, not an activated runtime change\s*\r?\n?",
+        "",
         source,
     )
+    if "The first data model uses fields:" in source:
+        source = re.sub(
+            r"The first data model uses fields:\s*([^\n\r]+)",
+            r"The initial scaffold started with fields: \1; this list is not a fixed product contract",
+            source,
+        )
+    return source
 
 
 def _neutralize_legacy_user_summary(summary: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -1409,6 +1414,7 @@ def _neutralize_legacy_user_summary(summary: Mapping[str, Any] | None) -> dict[s
         data["assumptions"] = [
             _neutralize_legacy_builder_memory_text(item) if isinstance(item, str) else item
             for item in assumptions
+            if str(item or "").strip() != "This is a local dev prototype, not an activated runtime change"
         ]
     return data
 
@@ -1943,6 +1949,23 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "master_detail": "For master-detail prototypes use split/focus-detail layout for side-by-side detail, or an item-triggered modal/drawer for compact detail. The master ui.list/ui.table must own the selection action; detail containers react to the selected record.",
             "modal_detail": "If detail should open in a modal/dialog, attach openModal to the master item select/click action after updating selected state. Put detail-only secondary actions such as add comment inside the detail modal/panel, not as detached global buttons.",
             "side_panel_detail": "If detail should be shown in a right-side panel, use a split/focus-detail layout with a main/master area and an aux/right/detail area. Natural area ids like details are acceptable, but set role to aux/right/detail when possible.",
+            "state_bound_detail_pattern": {
+                "initialState": {"selectedRequestId": "req1", "activeTab": "overview"},
+                "master_widget": {
+                    "type": "ui.list",
+                    "area": "main",
+                    "dataSource": {"kind": "static", "value": [{"id": "req1", "title": "Concrete domain item"}]},
+                    "inputs": {"titleKey": "title", "subtitleKey": "status"},
+                    "actions": [{"on": "select", "type": "updateState", "params": {"selectedRequestId": "$event.id"}}],
+                },
+                "detail_widget": {
+                    "type": "item.details",
+                    "area": "details",
+                    "dataSource": {"kind": "static", "value": {"req1": {"title": "Concrete domain item", "status": "Open"}}},
+                    "inputs": {"selectedStateKey": "selectedRequestId"},
+                },
+                "rule": "For selectable master-detail, detail data must be keyed by the same id that the master writes into state, or otherwise visibly change from the selected state. Static one-size-fits-all detail text is not master-detail.",
+            },
             "side_panel_action_pattern": {
                 "layout": {"type": "split", "pattern": "focus-detail", "areas": [{"id": "main", "role": "main"}, {"id": "details", "role": "aux"}]},
                 "widgets": [
@@ -1997,8 +2020,10 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "For move/place requests, find the requested element by id, title, label, button text, or semantic role and verify its area/container changed to the requested destination. If the element cannot be found, create the expected element in the destination and remove stale duplicates.",
             "If the request asks to preview, view an example, compare alternatives, choose a mode, or switch between variants, verify the page includes a visible local control such as input.commandBar/input.selector/ui.actions plus matching updateState and initialState/visibleIf before answering.",
             "If the user asks for a modal/dialog/drawer/sheet, verify ui.application.modals contains the surface and a relevant item/control action opens it with type openModal.",
+            "If a list/card/table selection should change details, verify the master action updates a selected state key and the detail widgets read data keyed by that selected value; do not return static details that ignore selection.",
             "Verify local visibility expressions use $state.<key> comparisons, for example $state.activeTab === 'overview'.",
             "If the user explicitly asks for local elements, controls, or a way to view examples, static mock rows alone are not enough; add a dedicated control widget that changes local state.",
+            "After changing domain, title, or requested subject matter, verify every static sample row and detail example uses that subject rather than scaffold placeholders or a previous domain.",
             "Before answering mixed requests, make an internal checklist from each user-request clause and revise if any clause is only implied rather than visibly represented.",
             "Prefer a compact, inspectable prototype over exhaustive UI, but do not omit requested data-capture behavior.",
         ],
@@ -2014,6 +2039,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "You are AdaOS Builder, an adaptive UI prototyping designer-programmer. "
         f"Prompt profile: {profile_id}; provider hint: {provider}; model hint: {model_hint}. "
         "Transform the current prototype UI according to the user's instruction. "
+        "All Builder work in this flow is a local development prototype until an explicit activation/release step; this is global execution context, not project-specific memory. "
         "The user should not need to know AdaOS schema terms; interpret natural UI/product language and map it to the correct internal ABI structures yourself. "
         "AdaOS, not the model, owns deterministic validation, review, revision storage, and safe apply. "
         "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
@@ -2023,6 +2049,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
         "For move/place requests, the named widget/control must move by changing its area/container/owner; keeping it in the old area is not a valid response. "
         "Treat the current UI as starting material, not as a fixed contract: make meaningful visible changes when the request implies design, workflow, layout, or prototype evolution. "
+        "When creating a new prototype, infer the domain from the user's request, scenario title, and project memory; if the domain is underspecified, make the uncertainty visible in labels/help text instead of filling the UI with meaningless placeholders like Request 1, Notes 1, or Title 1. "
         "Decompose the user's instruction into explicit requirements and satisfy each one; do not let a broad form/layout request hide later requirements such as examples, local controls, variant switching, translations, or sample data. "
         "Use the supplied prototyping_affordances to vary field order, grouping, labels, field types, layout, widgets, local interactions, and mock data when that better fits the user's request. "
         "Interactive prototype elements may update local page state or static/mock data; do not invent real external integrations or side effects unless explicitly requested and declared. "
@@ -2050,6 +2077,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
         "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
         "When the user asks for sample data, realistic examples, a different domain, or translation, update the relevant widget dataSource/static values inside ui.application.desktop.pageSchema instead of leaving old rows in place. "
+        "Static sample rows must match the active domain and visible fields; after a domain/layout change, stale rows from another domain are invalid even when the JSON schema is valid. "
         "Do not rely on hidden application code to generate domain examples after your response; your JSON must be complete. "
         "For checkbox/toggle semantics use boolean fields and boolean UI/table kinds; do not represent booleans as literal strings like 'true'/'false' unless the user asks for text. "
         "If you cannot safely satisfy the request, keep the previous UI valid and set unable_reason plus a short comment."
@@ -3279,7 +3307,6 @@ def _draft_user_summary(session: Mapping[str, Any]) -> dict[str, list[str]]:
     datasource_id = str(session.get("datasource_id") or "items").strip() or "items"
     return {
         "assumptions": [
-            "This is a local dev prototype, not an activated runtime change",
             f"The initial scaffold started with fields: {labels or 'title, notes, status'}; this list is not a fixed product contract",
         ],
         "preview": [
@@ -4955,7 +4982,12 @@ def _repair_llm_webui_transform_output(
     )
     repair_prompt = _compact_json(
         {
-            "task": "Repair the previous Builder JSON response. Return only corrected JSON. If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key.",
+            "task": (
+                "Repair the previous Builder JSON response. Return only corrected JSON. "
+                "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
+                "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, or change the action to open an already declared modal. "
+                "Do not invent a different modal id while leaving the referenced id undeclared."
+            ),
             "validation_error": dict(validation_error),
             "previous_response": str(output_text or "")[:20000],
             "original_request": request["base_request"],
