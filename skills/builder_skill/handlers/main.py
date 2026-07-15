@@ -2334,9 +2334,11 @@ def _compact_llm_result(result: Mapping[str, Any] | None) -> dict[str, Any] | No
     if not isinstance(result, Mapping):
         return None
     compact: dict[str, Any] = {}
-    for key in ("ok", "error", "detail", "comment", "unable_reason", "attempts"):
+    for key in ("ok", "error", "detail", "comment", "unable_reason", "attempts", "model", "provider", "profile_id"):
         if key in result:
             compact[key] = copy.deepcopy(result.get(key))
+    if isinstance(result.get("profile"), Mapping):
+        compact["profile"] = copy.deepcopy(dict(result["profile"]))
     if isinstance(result.get("timing"), Mapping):
         compact["timing"] = copy.deepcopy(dict(result["timing"]))
     if isinstance(result.get("validation"), Mapping):
@@ -2356,6 +2358,7 @@ def _write_ui_revision(
     after_webui: Mapping[str, Any] | None,
     preview_state: Mapping[str, Any],
     llm_result: Mapping[str, Any] | None = None,
+    llm_model: str | None = None,
     revision: str | None = None,
 ) -> dict[str, Any] | None:
     revision_dir = _ui_revision_dir(str(session.get("artifact_root") or ""))
@@ -2373,6 +2376,19 @@ def _write_ui_revision(
         before_for_revision["preview_state"]["version"] = revision
     if isinstance(after_for_revision.get("preview_state"), dict):
         after_for_revision["preview_state"]["version"] = revision
+    model_id = str(
+        llm_model
+        or (llm_result.get("model") if isinstance(llm_result, Mapping) else "")
+        or _builder_llm_model_for_session(session, None)
+        or ""
+    ).strip()
+    profile = _builder_llm_prompt_profile(model_id)
+    inference = {
+        "provider": str(profile.get("provider") or "").strip() or None,
+        "model": model_id or str(profile.get("model") or "").strip() or None,
+        "profile_id": str(profile.get("id") or "").strip() or None,
+        "temperature": profile.get("temperature"),
+    }
     payload = {
         "schema": "adaos.builder.ui_revision.v1",
         "revision": revision,
@@ -2380,6 +2396,7 @@ def _write_ui_revision(
         "session_id": session.get("id"),
         "scenario_id": session.get("scenario_id"),
         "draft_id": session.get("draft_id"),
+        "inference": {k: v for k, v in inference.items() if v not in (None, "")},
         "request": {"text": _display_request_text(request_text, patch)},
         "patch": _repair_text_tree(copy.deepcopy(dict(patch))),
         "llm": _compact_llm_result(llm_result),
@@ -2398,6 +2415,7 @@ def _write_ui_revision(
             "path": str(path),
             "request": str(request_text or ""),
             "operation": str(patch.get("operation") or ""),
+            "model": model_id,
             "created_at": payload["created_at"],
         }
     )
@@ -6231,6 +6249,7 @@ def create_scenario_draft(
         after_webui=_current_webui_payload(session, preview),
         preview_state=preview,
         llm_result=None,
+        llm_model=_builder_llm_model_for_session(session, _meta),
         revision=initial_revision,
     )
     _save_session(ws, session)
@@ -6424,6 +6443,7 @@ def _finalize_scenario_update(
         after_webui=after_webui,
         preview_state=preview,
         llm_result=llm_result,
+        llm_model=_builder_llm_model_for_session(session, _meta),
         revision=next_revision,
     )
     if revision_info:
@@ -6573,10 +6593,12 @@ def _submit_llm_webui_transform_job(
     ]
     system_prompt_bytes = len(str(request["system_prompt"]).encode("utf-8", errors="replace"))
     user_prompt_bytes = len(str(request["user_prompt"]).encode("utf-8", errors="replace"))
+    selected_model = _builder_llm_model_for_session(session, _meta)
     _LOG.debug(
-        "builder LLM job submit start scenario=%s request_id=%s context_build_ms=%d system_prompt_bytes=%d user_prompt_bytes=%d",
+        "builder LLM job submit start scenario=%s request_id=%s model=%s context_build_ms=%d system_prompt_bytes=%d user_prompt_bytes=%d",
         str(session.get("scenario_id") or ""),
         request_id,
+        selected_model or "",
         int((context_ready_at - started_at) * 1000),
         system_prompt_bytes,
         user_prompt_bytes,
@@ -6599,6 +6621,7 @@ def _submit_llm_webui_transform_job(
             "error": "llm_job_submit_failed",
             "detail": detail,
             "request_id": request_id,
+            "model": selected_model,
             "timing": {
                 "context_build_ms": int((context_ready_at - started_at) * 1000),
                 "submit_ms": 0,
@@ -6622,7 +6645,7 @@ def _submit_llm_webui_transform_job(
         try:
             response = submit_response_job(
                 messages,
-                model=_builder_llm_model_for_session(session, _meta),
+                model=selected_model,
                 temperature=_builder_llm_temperature(),
                 max_tokens=_builder_llm_max_tokens(),
                 request_id=request_id,
@@ -6670,6 +6693,7 @@ def _submit_llm_webui_transform_job(
                 "error": "llm_job_submit_timeout" if _looks_like_timeout(detail) else "llm_job_submit_failed",
                 "detail": detail,
                 "request_id": request_id,
+                "model": selected_model,
                 "timing": {
                     "context_build_ms": int((context_ready_at - started_at) * 1000),
                     "submit_ms": int((failed_at - context_ready_at) * 1000),
@@ -6685,6 +6709,7 @@ def _submit_llm_webui_transform_job(
             "error": "llm_job_submit_failed",
             "detail": "submit_response_job returned no response",
             "request_id": request_id,
+            "model": selected_model,
             "timing": {
                 "context_build_ms": int((context_ready_at - started_at) * 1000),
                 "submit_ms": int((failed_at - context_ready_at) * 1000),
@@ -6724,6 +6749,7 @@ def _submit_llm_webui_transform_job(
             "status": status,
             "job_id": job_id,
             "request_id": request_id,
+            "model": selected_model,
             "base_url": base_url,
             "job": response,
             "timing": timing,
@@ -6738,6 +6764,7 @@ def _submit_llm_webui_transform_job(
         "detail": str(response.get("error") or response),
         "request_id": request_id,
         "job_id": job_id,
+        "model": selected_model,
         "job": response,
         "timing": timing,
     }
@@ -6888,6 +6915,7 @@ def _ensure_llm_job_link(
     base_url: str | None = None,
     request_text: str | None = None,
     patch_id: Any = None,
+    model: str | None = None,
     status: str | None = None,
 ) -> None:
     local_id = str(local_job_id or "").strip()
@@ -6903,6 +6931,7 @@ def _ensure_llm_job_link(
         "base_url": str(base_url or "").strip() or None,
         "request_text": str(request_text or ""),
         "patch_id": patch_id,
+        "model": str(model or "").strip() or None,
     }
     if local_id:
         local_entry = dict(updated.get(local_id) or {})
@@ -6918,6 +6947,8 @@ def _ensure_llm_job_link(
             local_entry.setdefault("request_text", str(request_text))
         if patch_id is not None:
             local_entry.setdefault("patch_id", patch_id)
+        if model:
+            local_entry.setdefault("model", str(model))
         local_entry.setdefault("created_at", now)
         if status:
             local_entry["status"] = _merged_llm_job_status(str(local_entry.get("status") or ""), status)
@@ -7054,6 +7085,15 @@ def _reconcile_pending_llm_jobs_from_revisions(session: dict[str, Any]) -> bool:
                 base_url=str(job.get("base_url") or ""),
                 request_text=job_request_text or request_text,
                 patch_id=job_patch_id or patch_id,
+                model=str(
+                    (
+                        payload.get("inference", {}).get("model")
+                        if isinstance(payload.get("inference"), Mapping)
+                        else ""
+                    )
+                    or job.get("model")
+                    or ""
+                ).strip(),
                 status="submitted",
             )
             _update_llm_job_status(session, root_job_id or job_key, "succeeded")
@@ -7179,6 +7219,7 @@ def _complete_llm_webui_job(
         base_url=base_url,
         request_text=request_text,
         patch_id=patch.get("id") if isinstance(patch, Mapping) else None,
+        model=_builder_llm_model_for_session(session, _meta),
         status="submitted",
     )
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
@@ -7304,6 +7345,10 @@ def _complete_llm_webui_job(
             )
             return
     llm_result["job"] = job
+    model_id = _builder_llm_model_for_session(session, _meta)
+    if model_id:
+        llm_result["model"] = model_id
+    llm_result["profile"] = _builder_llm_prompt_profile(model_id)
     _update_llm_job_status(session, job_id, "succeeded")
     result = _finalize_llm_webui_transform_result(
         ws=ws,
@@ -7576,6 +7621,7 @@ def update_current_scenario(
                     "dialog": _dialog_state(ws, topic_ref=topic),
                 }
             local_job_id = _local_llm_job_id(session, text)
+            selected_model = _builder_llm_model_for_session(session, _meta)
             pending_jobs = dict(session.get("pending_llm_jobs") or {}) if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
             pending_jobs[local_job_id] = {
                 "schema": "adaos.builder.llm_job.v1",
@@ -7583,6 +7629,7 @@ def update_current_scenario(
                 "status": "submitting",
                 "request_text": text,
                 "patch_id": patch.get("id"),
+                "model": selected_model,
                 "created_at": _now(),
             }
             session["pending_llm_jobs"] = pending_jobs

@@ -1210,8 +1210,10 @@
                 "title": "Available LLM models",
                 "dataSource": {
                   "kind": "skill",
-                  "name": "prompt_engineer_skill.prompt_llm_list_models",
+                  "name": "prompt_engineer_skill.prompt_llm_model_options",
                   "params": {
+                    "object_type": "$state.currentObjectType",
+                    "object_id": "$state.currentObjectId",
                     "scope": "development"
                   }
                 },

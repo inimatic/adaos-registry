@@ -1982,6 +1982,7 @@ def test_update_current_scenario_sample_data_uses_llm_payload_and_refreshes_file
         encoding="utf-8",
     )
     monkeypatch.setenv("ADAOS_BUILDER_LLM_IN_TESTS", "1")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_MODEL", "gpt-test-builder")
     published: list[tuple[str, dict]] = []
 
     class _Workbench:
@@ -2074,6 +2075,8 @@ def test_update_current_scenario_sample_data_uses_llm_payload_and_refreshes_file
     )
     revision = json.loads((artifact_root / "ui_revisions" / "001.json").read_text(encoding="utf-8"))
     assert revision["llm"]["ok"] is True
+    assert revision["inference"]["model"] == "gpt-test-builder"
+    assert revision["inference"]["provider"] == "openai"
     assert revision["preview_state"]["mock_data"]["prototype_items"][0]["title"] == "Book venue"
 
 

@@ -838,6 +838,44 @@ def prompt_llm_list_models(payload: Optional[Dict[str, Any]] = None, **kwargs: A
     return {"ok": True, "scope": scope, "data": data}
 
 
+def _fallback_development_llm_profiles() -> List[Dict[str, Any]]:
+    raw = str(os.getenv("ADAOS_BUILDER_DEVELOPMENT_MODELS") or "").strip()
+    defaults = ["gpt-5", "gpt-4.1", "gpt-4o-mini"]
+    tokens = [item.strip() for item in raw.split(",") if item.strip()] if raw else defaults
+    out: List[Dict[str, Any]] = []
+    for index, model_id in enumerate(tokens):
+        label = {
+            "gpt-5": "GPT-5",
+            "gpt-4.1": "GPT-4.1",
+            "gpt-4o-mini": "GPT-4o mini",
+        }.get(model_id, model_id)
+        out.append(
+            {
+                "id": model_id,
+                "model": model_id,
+                "label": label,
+                "provider": "openai" if model_id.startswith(("gpt-", "o1", "o3", "o4")) else "",
+                "scope": "development",
+                "default": index == 0,
+                "source": "hub_fallback",
+            }
+        )
+    return out
+
+
+def _root_payload_has_development_profiles(data: Any) -> bool:
+    if not isinstance(data, dict):
+        return False
+    for key in ("model_profiles", "dev_model_profiles"):
+        value = data.get(key)
+        if isinstance(value, list) and value:
+            return True
+    nested = data.get("data")
+    if isinstance(nested, dict):
+        return _root_payload_has_development_profiles(nested)
+    return False
+
+
 def _llm_model_options_from_root_payload(data: Any) -> List[Dict[str, Any]]:
     source = data if isinstance(data, dict) else {}
     raw_profiles = source.get("model_profiles") or source.get("dev_model_profiles") or []
@@ -870,7 +908,15 @@ def _llm_model_options_from_root_payload(data: Any) -> List[Dict[str, Any]]:
             _append_profile(profile)
 
     if not items:
-        raw_models = source.get("data") if isinstance(source.get("data"), list) else data if isinstance(data, list) else []
+        nested = source.get("data")
+        if isinstance(nested, dict):
+            raw_profiles = nested.get("model_profiles") or nested.get("dev_model_profiles") or []
+            if isinstance(raw_profiles, list):
+                for profile in raw_profiles:
+                    _append_profile(profile)
+            raw_models = nested.get("data") if isinstance(nested.get("data"), list) else []
+        else:
+            raw_models = source.get("data") if isinstance(source.get("data"), list) else data if isinstance(data, list) else []
         for raw in raw_models:
             if isinstance(raw, dict):
                 _append_profile(raw)
@@ -922,6 +968,13 @@ def prompt_llm_model_options(payload: Optional[Dict[str, Any]] = None, **kwargs:
     models = prompt_llm_list_models({"scope": scope, "timeout": payload.get("timeout")})
     data = models.get("data") if models.get("ok") else {}
     options = _llm_model_options_from_root_payload(data)
+    source = "root"
+    if scope == "development" and not _root_payload_has_development_profiles(data):
+        options = _fallback_development_llm_profiles()
+        source = "hub_fallback"
+    elif not options and scope == "development":
+        options = _fallback_development_llm_profiles()
+        source = "hub_fallback"
     state = _load_state(object_type, object_id) if object_type in {"skill", "scenario"} and object_id else {}
     selected = _selected_llm_model_from_state(state, options)
     for item in options:
@@ -931,6 +984,7 @@ def prompt_llm_model_options(payload: Optional[Dict[str, Any]] = None, **kwargs:
         "scope": scope,
         "value": selected,
         "options": options,
+        "source": source,
         "error": models.get("error"),
     }
 
