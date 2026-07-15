@@ -1968,6 +1968,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "Treat every explicit clause in the user's instruction as a separate requirement; broad first clauses must not cause later clauses to be dropped.",
             "When the user asks for a prototype/design/layout/workflow change, make a visible semantic change, not a rename-only, duplicate-only, or no-op patch.",
             "Change fields, grouping, order, labels, helper text, component types, layout areas, density, widgets, actions, and mock data when that better serves the request.",
+            "When the user asks to move/place a named visible element into a named panel, section, modal, tab, or side area, update that element's area/container/semantic owner. Do not leave the named element in its old area and only change surrounding layout.",
             "Turn broad categories into concrete interface decisions: split composite inputs, replace vague text fields with precise supported controls, and add realistic options/examples.",
             "If creating several comparable surfaces, make each one meaningfully different across structure, field order, component types, copy, density, support widgets, or interaction model.",
         ],
@@ -1984,6 +1985,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
         "self_check": [
             "Before returning JSON, compare the output to the user's request and the previous UI.",
             "If the result mostly duplicates existing widgets, preserves the same field ids in the same order, or leaves stale sample data after a design request, revise before answering.",
+            "For move/place requests, find the requested element by id, title, label, button text, or semantic role and verify its area/container changed to the requested destination. If the element cannot be found, create the expected element in the destination and remove stale duplicates.",
             "If the request asks to preview, view an example, compare alternatives, choose a mode, or switch between variants, verify the page includes a visible local control such as input.commandBar/input.selector/ui.actions plus matching updateState and initialState/visibleIf before answering.",
             "If the user asks for a modal/dialog/drawer/sheet, verify ui.application.modals contains the surface and a relevant item/control action opens it with type openModal.",
             "Verify local visibility expressions use $state.<key> comparisons, for example $state.activeTab === 'overview'.",
@@ -2010,6 +2012,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "The renderable source of truth is ui.application.desktop.pageSchema. "
         "Return the complete updated pageSchema under ui.application.desktop.pageSchema; if the prototype needs modals, also return ui.application.modals. Do not return preview_state, current_ui, a root-level page_schema, or root-level modals. "
         "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
+        "For move/place requests, the named widget/control must move by changing its area/container/owner; keeping it in the old area is not a valid response. "
         "Treat the current UI as starting material, not as a fixed contract: make meaningful visible changes when the request implies design, workflow, layout, or prototype evolution. "
         "Decompose the user's instruction into explicit requirements and satisfy each one; do not let a broad form/layout request hide later requirements such as examples, local controls, variant switching, translations, or sample data. "
         "Use the supplied prototyping_affordances to vary field order, grouping, labels, field types, layout, widgets, local interactions, and mock data when that better fits the user's request. "
@@ -2029,6 +2032,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
         "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
         "When a request says the detail should be in a right panel or side panel, use a split/focus-detail layout with a main master area and a right/detail aux area; do not put detail below the master unless the screen is compact. "
+        "If the user asks to move a detail-related control into that right/detail panel, set that control's widget area to the right/detail aux area or put it inside the declared detail modal/panel schema. "
         "When the request says restore, recover, bring back, undo removal, or similar localized phrases, inspect last_revision_delta if present. Reintroduce the matching removed widgets/modals/actions and preserve their semantic owner: if the removed element belonged to a detail modal/panel/container, restore it inside the current detail modal/panel/aux area rather than as a detached global main action. "
         "For tabbed content, use input.commandBar with variant='segmented', initialState for the active tab, and visibleIf on the tab content widgets. "
         "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget, and never put modal declarations in a root-level modals object. "
