@@ -5000,6 +5000,14 @@ def _repair_llm_webui_transform_output(
             if repair_status != "succeeded":
                 raise RuntimeError(f"repair job did not succeed: {response.get('error') or response}")
         repaired_output = str(response.get("output_text") or "")
+        _LOG.debug(
+            "builder LLM repair output received scenario=%s request_id=%s original_job_id=%s repair_job_id=%s output_chars=%d",
+            str(session.get("scenario_id") or ""),
+            repair_request_id,
+            job_id,
+            repair_job_id,
+            len(repaired_output),
+        )
     except Exception as exc:
         return {
             "ok": False,
@@ -5026,11 +5034,28 @@ def _repair_llm_webui_transform_output(
             "comment": "Не смог собрать валидный UI JSON.",
         }
     try:
+        _LOG.debug(
+            "builder LLM repair parse start scenario=%s request_id=%s original_job_id=%s repair_job_id=%s output_chars=%d",
+            str(session.get("scenario_id") or ""),
+            repair_request_id,
+            job_id,
+            repair_job_id,
+            len(repaired_output),
+        )
         result = _parse_llm_webui_transform_output(
             output_text=repaired_output,
             previous_preview=previous_preview,
             request_id=repair_request_id,
             job_id=job_id,
+        )
+        _LOG.debug(
+            "builder LLM repair parse completed scenario=%s request_id=%s original_job_id=%s repair_job_id=%s ok=%s error=%s",
+            str(session.get("scenario_id") or ""),
+            repair_request_id,
+            job_id,
+            repair_job_id,
+            bool(result.get("ok")),
+            str(result.get("error") or ""),
         )
     except Exception as exc:
         return {
@@ -7215,14 +7240,30 @@ def _mark_llm_job_failed(
     topic_ref: Mapping[str, Any] | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> None:
+    _LOG.warning(
+        "builder LLM job marking failed scenario=%s job_id=%s detail=%s",
+        str(session.get("scenario_id") or ""),
+        job_id,
+        detail,
+    )
     _update_llm_job_status(session, job_id, "failed", detail=detail)
     _save_session(ws, session)
+    _LOG.debug(
+        "builder LLM job failed status saved scenario=%s job_id=%s",
+        str(session.get("scenario_id") or ""),
+        job_id,
+    )
     topic = topic_ref if isinstance(topic_ref, Mapping) else _builder_topic_ref(ws, session=session, binding=binding or {}, _meta=_meta)
     message = (
         f"{AGENT_LABEL}: LLM-\u0437\u0430\u0434\u0430\u0447\u0430 {job_id or ''} "
         f"\u0434\u043b\u044f {session.get('scenario_id')} \u043d\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043b\u0430\u0441\u044c. {detail}"
     ).strip()
     _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding or {}, topic_ref=topic)
+    _LOG.debug(
+        "builder LLM job failed chat emitted scenario=%s job_id=%s",
+        str(session.get("scenario_id") or ""),
+        job_id,
+    )
 
 
 _ACTIVE_LLM_JOB_STATUSES = frozenset({"submitting", "submitted", "queued", "running"})
@@ -7791,6 +7832,14 @@ def _complete_llm_webui_job(
                 _meta=_meta,
             )
             if not llm_result.get("ok"):
+                _LOG.warning(
+                    "builder LLM job validation repair failed scenario=%s job_id=%s request_id=%s error=%s detail=%s",
+                    str(session.get("scenario_id") or ""),
+                    job_id,
+                    request_id,
+                    str(llm_result.get("error") or ""),
+                    str(llm_result.get("detail") or ""),
+                )
                 _mark_llm_job_failed(
                     ws=ws,
                     session=session,
