@@ -1943,6 +1943,15 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "master_detail": "For master-detail prototypes use split/focus-detail layout for side-by-side detail, or an item-triggered modal/drawer for compact detail. The master ui.list/ui.table must own the selection action; detail containers react to the selected record.",
             "modal_detail": "If detail should open in a modal/dialog, attach openModal to the master item select/click action after updating selected state. Put detail-only secondary actions such as add comment inside the detail modal/panel, not as detached global buttons.",
             "side_panel_detail": "If detail should be shown in a right-side panel, use a split/focus-detail layout with a main/master area and an aux/right/detail area. Natural area ids like details are acceptable, but set role to aux/right/detail when possible.",
+            "side_panel_action_pattern": {
+                "layout": {"type": "split", "pattern": "focus-detail", "areas": [{"id": "main", "role": "main"}, {"id": "details", "role": "aux"}]},
+                "widgets": [
+                    {"id": "master-list", "type": "ui.list", "area": "main", "actions": [{"on": "select", "type": "updateState", "params": {"selectedId": "$event.id"}}]},
+                    {"id": "selected-detail", "type": "item.details", "area": "details"},
+                    {"id": "detail-actions", "type": "ui.actions", "area": "details", "actions": [{"on": "click", "type": "openModal", "params": {"modalId": "detail_action_modal"}}]},
+                ],
+                "rule": "A control that belongs to the selected detail uses the same detail area as the detail content, not the master/main area.",
+            },
             "tabs": "For tabs use input.commandBar variant='segmented' plus initialState.activeTab and visibleIf expressions on tab content widgets, unless the user asks for a static tab mock.",
             "details": "Use static data examples that show the selected/default record clearly; do not leave generic placeholder rows from the scaffold.",
         },
