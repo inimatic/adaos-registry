@@ -1841,7 +1841,24 @@ def test_write_webui_payload_projects_canonical_page_schema_to_scenario(tmp_path
             }
         ],
     }
-    payload = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {"pageSchema": page_schema},
+                "modals": {
+                    "comment_modal": {
+                        "title": "Comment",
+                        "schema": {
+                            "id": "comment_modal_schema",
+                            "layout": {"type": "single", "areas": [{"id": "main"}]},
+                            "widgets": [],
+                        },
+                    }
+                },
+            }
+        },
+    }
 
     skill._write_webui_payload(str(artifact_root), payload)
 
@@ -1851,6 +1868,7 @@ def test_write_webui_payload_projects_canonical_page_schema_to_scenario(tmp_path
     assert saved_webui["schema"] == "adaos.webui.v1"
     assert "preview_state" not in saved_webui
     assert saved_field["options"][0]["value"] == "economic"
+    assert saved_scenario["ui"]["application"]["modals"]["comment_modal"]["title"] == "Comment"
 
 
 def test_legacy_page_schema_from_preview_preserves_select_options_from_current_ui() -> None:

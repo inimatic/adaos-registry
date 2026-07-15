@@ -339,6 +339,27 @@ def _write_text_file(path: Path, value: str) -> None:
     path.write_text(str(value or ""), encoding="utf-8")
 
 
+def _invalidate_scenario_runtime_caches(root: Path, reason: str) -> None:
+    scenario_id = str(root.name or "").strip()
+    if not scenario_id:
+        return
+    try:
+        from adaos.services.scenarios import loader as scenarios_loader  # pylint: disable=import-outside-toplevel
+
+        scenarios_loader.invalidate_cache(scenario_id=scenario_id, space="dev")
+        scenarios_loader.invalidate_cache(scenario_id=scenario_id, space="workspace")
+    except Exception:
+        _log.debug("failed to invalidate scenario loader cache scenario=%s", scenario_id, exc_info=True)
+    try:
+        from adaos.services.scenario import webspace_runtime  # pylint: disable=import-outside-toplevel
+
+        invalidate = getattr(webspace_runtime, "_invalidate_resolved_webspace_cache", None)
+        if callable(invalidate):
+            invalidate(scenario_id=scenario_id, reason=reason)
+    except Exception:
+        _log.debug("failed to invalidate resolved webspace cache scenario=%s", scenario_id, exc_info=True)
+
+
 def _load_json_file(path: Path) -> dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8-sig") or "{}")
@@ -1674,6 +1695,14 @@ def _extract_webui_page_schema(payload: Mapping[str, Any] | None) -> dict[str, A
     return _repair_text_tree(copy.deepcopy(dict(page_schema))) if page_schema else {}
 
 
+def _extract_webui_application(payload: Mapping[str, Any] | None) -> dict[str, Any]:
+    if not isinstance(payload, Mapping):
+        return {}
+    ui = payload.get("ui") if isinstance(payload.get("ui"), Mapping) else {}
+    app = ui.get("application") if isinstance(ui.get("application"), Mapping) else {}
+    return _repair_text_tree(copy.deepcopy(dict(app))) if app else {}
+
+
 def _set_webui_page_schema(payload: dict[str, Any], page_schema: Mapping[str, Any]) -> dict[str, Any]:
     payload["schema"] = "adaos.webui.v1"
     ui = payload.get("ui") if isinstance(payload.get("ui"), dict) else {}
@@ -2270,7 +2299,7 @@ def _write_webui(artifact_root: str | None, preview_state: Mapping[str, Any]) ->
         },
     }
     (root / "webui.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    _write_scenario_page_schema_value(root, page_schema, preview_state)
+    _write_scenario_application_value(root, payload["ui"]["application"], preview_state)
 
 
 def _write_webui_payload(artifact_root: str | None, payload: Mapping[str, Any]) -> None:
@@ -2310,7 +2339,11 @@ def _write_webui_payload(artifact_root: str | None, payload: Mapping[str, Any]) 
     data.setdefault("generated_by", SKILL_ID)
     (root / "webui.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     if page_schema:
-        _write_scenario_page_schema_value(root, page_schema, preview_state if isinstance(preview_state, Mapping) else {})
+        _write_scenario_application_value(
+            root,
+            _extract_webui_application(data),
+            preview_state if isinstance(preview_state, Mapping) else {},
+        )
     elif isinstance(preview_state, Mapping):
         _write_scenario_page_schema(root, preview_state)
 
@@ -3068,8 +3101,15 @@ def _page_schema_from_preview(preview_state: Mapping[str, Any]) -> dict[str, Any
     }
 
 
-def _write_scenario_page_schema_value(root: Path, page_schema: Mapping[str, Any], preview_state: Mapping[str, Any]) -> None:
+def _write_scenario_application_value(
+    root: Path,
+    application: Mapping[str, Any],
+    preview_state: Mapping[str, Any],
+) -> None:
     preview_state = _repair_text_tree(dict(preview_state))
+    application = _repair_text_tree(copy.deepcopy(dict(application or {})))
+    desktop = application.get("desktop") if isinstance(application.get("desktop"), Mapping) else {}
+    page_schema = desktop.get("pageSchema") if isinstance(desktop.get("pageSchema"), Mapping) else {}
     page_schema = _with_builder_page_schema_meta(page_schema, preview_state)
     manifest = root / "scenario.json"
     if not manifest.exists() or not page_schema:
@@ -3110,13 +3150,19 @@ def _write_scenario_page_schema_value(root: Path, page_schema: Mapping[str, Any]
     skills["required"] = required_list
     runtime["skills"] = skills
     scenario["runtime"] = runtime
+    application.setdefault("version", "0.1")
+    desktop = application.get("desktop") if isinstance(application.get("desktop"), dict) else {}
+    desktop["pageSchema"] = page_schema
+    application["desktop"] = desktop
     scenario.setdefault("ui", {})
-    scenario["ui"].setdefault("application", {})
-    scenario["ui"]["application"].setdefault("version", "0.1")
-    scenario["ui"]["application"].setdefault("desktop", {})
-    scenario["ui"]["application"]["desktop"]["pageSchema"] = page_schema
+    scenario["ui"]["application"] = application
     manifest.write_text(json.dumps(scenario, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _invalidate_scenario_runtime_caches(root, "builder_write_scenario_application")
     _write_scenario_manifest(root, scenario, preview_state)
+
+
+def _write_scenario_page_schema_value(root: Path, page_schema: Mapping[str, Any], preview_state: Mapping[str, Any]) -> None:
+    _write_scenario_application_value(root, {"desktop": {"pageSchema": page_schema}}, preview_state)
 
 
 def _write_scenario_page_schema(root: Path, preview_state: Mapping[str, Any]) -> None:
