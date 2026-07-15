@@ -329,6 +329,45 @@ def _builder_llm_max_tokens() -> int:
     return max(1000, min(value, 12000))
 
 
+def _builder_llm_temperature() -> float:
+    raw = os.getenv("ADAOS_BUILDER_LLM_TEMPERATURE")
+    try:
+        value = float(raw) if raw else 0.2
+    except (TypeError, ValueError):
+        value = 0.2
+    return max(0.0, min(value, 1.0))
+
+
+def _builder_llm_model() -> str | None:
+    token = str(os.getenv("ADAOS_BUILDER_LLM_MODEL") or "").strip()
+    return token or None
+
+
+def _builder_llm_prompt_profile() -> dict[str, Any]:
+    model_hint = (
+        _builder_llm_model()
+        or str(os.getenv("ADAOS_LLM_MODEL") or "").strip()
+        or str(os.getenv("OPENAI_RESPONSES_MODEL") or "").strip()
+        or "root-default"
+    )
+    provider = str(os.getenv("ADAOS_BUILDER_LLM_PROVIDER") or os.getenv("ADAOS_LLM_PROVIDER") or "").strip().lower()
+    if not provider:
+        lowered_model = model_hint.lower()
+        provider = "openai" if lowered_model.startswith(("gpt-", "o1", "o3", "o4", "chatgpt")) else "root-default"
+    profile_id = str(os.getenv("ADAOS_BUILDER_LLM_PROMPT_PROFILE") or "").strip().lower()
+    if not profile_id:
+        profile_id = "default"
+    return {
+        "schema": "adaos.builder.llm_prompt_profile.v1",
+        "id": profile_id,
+        "provider": provider,
+        "model": model_hint,
+        "temperature": _builder_llm_temperature(),
+        "strategy": "compact_abi_plus_affordance_map",
+        "variant_policy": "Prompt profiles may vary by provider/model, but the output contract remains adaos.webui.v1.",
+    }
+
+
 def _builder_llm_request_id(
     *,
     session: Mapping[str, Any],
@@ -1668,11 +1707,113 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "When a card needs combined text, add a derived string property to each static dataSource.value row, then point previewKey to that property.",
             ],
         },
+        "ui.actions": {
+            "purpose": "A compact command surface for local prototype actions.",
+            "inputs": {
+                "buttons": "Array of {id,label,icon?}. Use for explicit commands, mode changes, or mock workflow actions.",
+                "variant": "Optional: toolbar, stack, compact, segmented.",
+                "size": "Optional: small, medium, large.",
+            },
+            "actions": "Use local updateState for prototype-only state changes; use callSkill only for real declared skill calls.",
+        },
+        "input.commandBar": {
+            "purpose": "Segmented or toolbar-like local controls for choosing a mode, filter, draft state, or preview perspective.",
+            "inputs": {
+                "variant": "Use 'segmented' for mutually exclusive local choices.",
+                "selectedStateKey": "State key that stores the selected button id.",
+                "buttons": "Array of {id,label,icon?}.",
+            },
+            "actions": "For local prototype interaction use actions=[{on:'click', type:'updateState', params:{stateKey:'$event.id'}}].",
+        },
+        "input.selector": {
+            "purpose": "Dropdown-like local selector when a compact choice control is more appropriate than buttons.",
+            "inputs": {
+                "options": "Array of {label,value}.",
+                "stateKey": "State key that stores the selected value.",
+                "placeholder": "Optional empty prompt.",
+            },
+        },
+        "state_and_visibility": {
+            "initialState": "pageSchema.initialState can seed local prototype values, selected modes, mock workflow state, and temporary examples.",
+            "visibleIf": "Widgets and fields may use visibleIf expressions to show different prototype surfaces based on local state.",
+            "local_interaction": "Interactive prototype controls should update local page state and static/mock data only unless the user explicitly asks for a real integration.",
+        },
         "layout": {
-            "areas": "The current rapid prototype normally uses split layout areas 'main' and 'right'.",
+            "patterns": "Use stack for linear flows, split/sidebar-content for supporting panels, grid/dashboard for overview surfaces, and flow-like layouts for compact prototypes.",
+            "areas": "Areas are flexible slots. Keep only areas that serve the requested prototype; do not preserve split main/right when it creates empty or misleading space.",
             "move_widgets": "To move visible sections, update pageSchema.widgets[*].area and keep layout.areas consistent.",
         },
     }
+
+
+def _builder_prototyping_affordances() -> dict[str, Any]:
+    return {
+        "role": "Adaptive UI prototyping designer-programmer.",
+        "safety_boundary": [
+            "AdaOS handles deterministic schema validation, revisions, review, and safe apply.",
+            "The LLM may freely reshape the declarative UI inside adaos.webui.v1, but must not invent unsupported component types or real side effects.",
+            "Interactive controls may demonstrate behavior with local page state, static data, and mock examples.",
+        ],
+        "meaningful_transformation": [
+            "Treat current_webui_json as the starting material, not as a constraint to preserve.",
+            "When the user asks for a prototype/design/layout/workflow change, make a visible semantic change, not a rename-only, duplicate-only, or no-op patch.",
+            "Change fields, grouping, order, labels, helper text, component types, layout areas, density, widgets, actions, and mock data when that better serves the request.",
+            "If creating several comparable surfaces, make each one meaningfully different across structure, field order, component types, copy, density, support widgets, or interaction model.",
+        ],
+        "ui_freedom_map": {
+            "forms": "May split into sections, reorder fields, choose more precise field types, add/remove helper text, defaults, options, validation, and submit placement.",
+            "layout": "May switch stack/split/grid/sidebar patterns, remove unused areas, move widgets, and change density to match the requested experience.",
+            "display": "May use table/list/cards/details/metrics/json preview surfaces for examples, summaries, and comparison.",
+            "interaction": "May add local selectors, command bars, buttons, and visibleIf-driven states for prototype-only flows.",
+            "mock_data": "May create realistic static rows/examples in the requested domain and keep them aligned with fields and display widgets.",
+            "copy": "May rewrite labels, titles, section names, placeholders, helper text, and empty states in the user's language.",
+        },
+        "self_check": [
+            "Before returning JSON, compare the output to the user's request and the previous UI.",
+            "If the result mostly duplicates existing widgets, preserves the same field ids in the same order, or leaves stale sample data after a design request, revise before answering.",
+            "Prefer a compact, inspectable prototype over exhaustive UI, but do not omit requested data-capture behavior.",
+        ],
+    }
+
+
+def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profile: Mapping[str, Any] | None = None) -> str:
+    profile = prompt_profile if isinstance(prompt_profile, Mapping) else _builder_llm_prompt_profile()
+    profile_id = str(profile.get("id") or "default")
+    provider = str(profile.get("provider") or "root-default")
+    model_hint = str(profile.get("model") or "root-default")
+    system_prompt = (
+        "You are AdaOS Builder, an adaptive UI prototyping designer-programmer. "
+        f"Prompt profile: {profile_id}; provider hint: {provider}; model hint: {model_hint}. "
+        "Transform the current prototype UI according to the user's instruction. "
+        "AdaOS, not the model, owns deterministic validation, review, revision storage, and safe apply. "
+        "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
+        "The root object must be an adaos.webui.v1 manifest with schema='adaos.webui.v1'. "
+        "The renderable source of truth is ui.application.desktop.pageSchema. "
+        "Return the complete updated pageSchema under ui.application.desktop.pageSchema; do not return preview_state, current_ui, or a root-level page_schema. "
+        "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
+        "Treat the current UI as starting material, not as a fixed contract: make meaningful visible changes when the request implies design, workflow, layout, or prototype evolution. "
+        "Use the supplied prototyping_affordances to vary field order, grouping, labels, field types, layout, widgets, local interactions, and mock data when that better fits the user's request. "
+        "Interactive prototype elements may update local page state or static/mock data; do not invent real external integrations or side effects unless explicitly requested and declared. "
+        "Avoid duplicate-only, rename-only, or no-op transformations for design requests; revise the JSON before answering if the result does not visibly satisfy the request. "
+        "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
+        "If cards need combined text like status plus date, add a derived string property to the relevant static dataSource.value rows, then point previewKey to that property. "
+        "Use the supplied compact adaos.webui.v1 ABI summary as the webui.json compatibility contract. "
+        "When creating or editing ui.form fields, choose the most semantically precise supported formFieldType from the ABI enum; use generic text only as a fallback. "
+        "Do not preserve an existing generic text field when the user's request or the field label clearly implies a more specific supported type. "
+        "When the user asks people to select, mark, rate, upload, schedule, or enter structured values, model that as editable ui.form fields instead of a read-only table unless the user explicitly asks for a static table. "
+        "For questionnaire, survey, registration, application, and intake prototypes, treat phrases such as indicate, choose, mark, attach, rate, enter, or their localized equivalents as data-capture requirements that need ui.form fields. "
+        "Static ui.table/ui.list widgets may preview sample data, but they must not replace the fields used to collect the user's answers. "
+        "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
+        "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
+        "When the user asks for sample data, realistic examples, a different domain, or translation, update the relevant widget dataSource/static values inside ui.application.desktop.pageSchema instead of leaving old rows in place. "
+        "Do not rely on hidden application code to generate domain examples after your response; your JSON must be complete. "
+        "For checkbox/toggle semantics use boolean fields and boolean UI/table kinds; do not represent booleans as literal strings like 'true'/'false' unless the user asks for text. "
+        "If you cannot safely satisfy the request, keep the previous UI valid and set unable_reason plus a short comment."
+    )
+    project_prompt = str(project_system_prompt or "").strip()
+    if project_prompt and project_prompt != _default_builder_system_prompt_text().strip():
+        system_prompt += "\n\nProject-specific Builder system prompt:\n" + project_prompt[:8000]
+    return system_prompt
 
 
 def _schema_ref_name(ref: Any) -> str | None:
@@ -3694,34 +3835,16 @@ def _builder_llm_webui_transform_request(
         for item in (session.get("patches") if isinstance(session.get("patches"), list) else [])[-8:]
         if isinstance(item, Mapping)
     ]
-    system_prompt = (
-        "You are AdaOS Builder, a deterministic UI prototyping programmer. "
-        "Transform the current prototype UI according to the user's instruction. "
-        "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
-        "The root object must be an adaos.webui.v1 manifest with schema='adaos.webui.v1'. "
-        "The renderable source of truth is ui.application.desktop.pageSchema. "
-        "Return the complete updated pageSchema under ui.application.desktop.pageSchema; do not return preview_state, current_ui, or a root-level page_schema. "
-        "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
-        "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
-        "If cards need combined text like status plus date, add a derived string property to the relevant static dataSource.value rows, then point previewKey to that property. "
-        "Use the supplied compact adaos.webui.v1 ABI summary as the webui.json compatibility contract. "
-        "When creating or editing ui.form fields, choose the most semantically precise supported formFieldType from the ABI enum; use generic text only as a fallback. "
-        "Do not preserve an existing generic text field when the user's request or the field label clearly implies a more specific supported type. "
-        "When the user asks people to select, mark, rate, upload, schedule, or enter structured values, model that as editable ui.form fields instead of a read-only table unless the user explicitly asks for a static table. "
-        "For questionnaire, survey, registration, application, and intake prototypes, treat phrases such as indicate, choose, mark, attach, rate, enter, or their localized equivalents as data-capture requirements that need ui.form fields. "
-        "Static ui.table/ui.list widgets may preview sample data, but they must not replace the fields used to collect the user's answers. "
-        "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
-        "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
-        "When the user asks for sample data, realistic examples, a different domain, or translation, update the relevant widget dataSource/static values inside ui.application.desktop.pageSchema instead of leaving old rows in place. "
-        "Do not rely on hidden application code to generate domain examples after your response; your JSON must be complete. "
-        "For checkbox/toggle semantics use boolean fields and boolean UI/table kinds; do not represent booleans as literal strings like 'true'/'false' unless the user asks for text. "
-        "If you cannot safely satisfy the request, keep the previous UI valid and set unable_reason plus a short comment."
+    prompt_profile = _builder_llm_prompt_profile()
+    system_prompt = _builder_llm_system_prompt(
+        project_system_prompt=project_system_prompt,
+        prompt_profile=prompt_profile,
     )
-    if project_system_prompt and project_system_prompt != _default_builder_system_prompt_text().strip():
-        system_prompt += "\n\nProject-specific Builder system prompt:\n" + project_system_prompt[:8000]
     base_request = {
+        "llm_prompt_profile": prompt_profile,
         "webui_v1_abi": _builder_webui_abi_summary(),
         "runtime_component_contracts": _builder_runtime_component_contracts(),
+        "prototyping_affordances": _builder_prototyping_affordances(),
         "webui_v1_schema": "see webui_v1_abi.schema_contract; validated by src/adaos/abi/webui.v1.schema.json",
         "required_output_shape": {
             "schema": "adaos.webui.v1",
@@ -4061,6 +4184,7 @@ def _apply_llm_webui_transform(
 
         timeout_s = _builder_llm_timeout_s()
         max_tokens = _builder_llm_max_tokens()
+        temperature = _builder_llm_temperature()
         for attempt in range(1, 3):
             request_id = _builder_llm_request_id(
                 session=session,
@@ -4086,7 +4210,8 @@ def _apply_llm_webui_transform(
             try:
                 response = send_response(
                     messages,
-                    temperature=0,
+                    model=_builder_llm_model(),
+                    temperature=temperature if attempt == 1 else 0,
                     max_tokens=max_tokens,
                     request_id=request_id,
                     timeout=timeout_s,
@@ -4256,6 +4381,7 @@ def _repair_llm_webui_transform_output(
                 {"role": "system", "content": str(request["system_prompt"])},
                 {"role": "user", "content": repair_prompt},
             ],
+            model=_builder_llm_model(),
             temperature=0,
             max_tokens=_builder_llm_max_tokens(),
             request_id=repair_request_id,
@@ -6334,7 +6460,8 @@ def _submit_llm_webui_transform_job(
         try:
             response = submit_response_job(
                 messages,
-                temperature=0,
+                model=_builder_llm_model(),
+                temperature=_builder_llm_temperature(),
                 max_tokens=_builder_llm_max_tokens(),
                 request_id=request_id,
                 timeout=_builder_llm_job_submit_timeout_s(),

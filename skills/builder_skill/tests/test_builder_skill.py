@@ -752,6 +752,9 @@ def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(monkeypat
 
     monkeypatch.setenv("ADAOS_BUILDER_LLM_TIMEOUT_S", "181")
     monkeypatch.setenv("ADAOS_BUILDER_LLM_MAX_TOKENS", "4321")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_TEMPERATURE", "0.35")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_PROMPT_PROFILE", "openai-default")
     page_schema = {
         "id": "todo_list",
         "title": "Todo List",
@@ -785,11 +788,49 @@ def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(monkeypat
     assert result["ok"] is True
     kwargs = captured["kwargs"]
     assert kwargs["timeout"] == 181
+    assert kwargs["model"] == "gpt-4o-mini"
     assert kwargs["max_tokens"] == 4321
+    assert kwargs["temperature"] == 0.35
     assert str(kwargs["request_id"]).startswith("builder-ui-")
     user_prompt = captured["messages"][1]["content"]
     assert "\n" not in user_prompt
     assert "webui_v1_schema" in user_prompt
+    user_payload = json.loads(user_prompt)
+    assert user_payload["llm_prompt_profile"]["id"] == "openai-default"
+    assert user_payload["llm_prompt_profile"]["model"] == "gpt-4o-mini"
+    assert "Prompt profile: openai-default" in captured["messages"][0]["content"]
+
+
+def test_builder_llm_temperature_defaults_to_mild_prototyping(monkeypatch) -> None:
+    skill = _load_module()
+
+    monkeypatch.delenv("ADAOS_BUILDER_LLM_TEMPERATURE", raising=False)
+    assert skill._builder_llm_temperature() == 0.2
+
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_TEMPERATURE", "bad")
+    assert skill._builder_llm_temperature() == 0.2
+
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_TEMPERATURE", "2")
+    assert skill._builder_llm_temperature() == 1.0
+
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_TEMPERATURE", "-1")
+    assert skill._builder_llm_temperature() == 0.0
+
+
+def test_builder_llm_prompt_profile_tracks_provider_and_model(monkeypatch) -> None:
+    skill = _load_module()
+
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_MODEL", "gpt-4o-mini")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_PROVIDER", "openai")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_PROMPT_PROFILE", "default")
+
+    profile = skill._builder_llm_prompt_profile()
+
+    assert profile["schema"] == "adaos.builder.llm_prompt_profile.v1"
+    assert profile["id"] == "default"
+    assert profile["provider"] == "openai"
+    assert profile["model"] == "gpt-4o-mini"
+    assert profile["strategy"] == "compact_abi_plus_affordance_map"
 
 
 def test_builder_llm_job_submit_timeout_default_allows_root_fallback(monkeypatch) -> None:
@@ -812,6 +853,7 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     )
     monkeypatch.setenv("ADAOS_BUILDER_LLM_IN_TESTS", "1")
     monkeypatch.setenv("ADAOS_BUILDER_LLM_ASYNC_IN_TESTS", "1")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_TEMPERATURE", "0.25")
     emitted: list[str] = []
     finished = threading.Event()
     refresh_calls: list[dict] = []
@@ -933,6 +975,8 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     assert refresh_calls and refresh_calls[0]["revision"] == "001"
     assert submit_calls[0]["kwargs"]["request_id"].startswith("builder-ui-")
     assert "-job-" in submit_calls[0]["kwargs"]["request_id"]
+    assert submit_calls[0]["kwargs"]["temperature"] == 0.25
+    assert "prototyping_affordances" in submit_calls[0]["messages"][1]["content"]
 
 
 def test_update_current_scenario_blocks_parallel_llm_jobs(monkeypatch) -> None:
@@ -1095,8 +1139,18 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert current["schema"] == "adaos.webui.v1"
     assert "preview_state" not in current
     assert current["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["id"] == "prototype-cards"
+    assert user_payload["llm_prompt_profile"]["schema"] == "adaos.builder.llm_prompt_profile.v1"
+    assert user_payload["llm_prompt_profile"]["id"] == "default"
+    assert user_payload["llm_prompt_profile"]["variant_policy"].startswith("Prompt profiles may vary")
     assert user_payload["runtime_context"]["current_page_schema"]["widgets"][0]["inputs"]["previewKey"] == "status"
     assert user_payload["runtime_component_contracts"]["ui.list"]["inputs"]["previewKey"].startswith("Single object path")
+    assert "input.commandBar" in user_payload["runtime_component_contracts"]
+    assert "state_and_visibility" in user_payload["runtime_component_contracts"]
+    assert "visibleIf" in user_payload["runtime_component_contracts"]["state_and_visibility"]
+    affordances = user_payload["prototyping_affordances"]
+    assert affordances["role"] == "Adaptive UI prototyping designer-programmer."
+    assert "visible semantic change" in affordances["meaningful_transformation"][1]
+    assert "mock_data" in affordances["ui_freedom_map"]
     form_contract = user_payload["runtime_component_contracts"]["ui.form"]["inputs"]["fields"]
     assert "email" in form_contract["supported_field_types"]
     assert "textarea" in form_contract["supported_field_types"]
@@ -1117,6 +1171,9 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "email" in schema_defs["formFieldType"]["enum"]
     assert "ratingGrid" in schema_defs["formFieldType"]["enum"]
     assert "Always prefer conference vocabulary" in request["system_prompt"]
+    assert "adaptive UI prototyping designer-programmer" in request["system_prompt"]
+    assert "meaningful visible changes" in request["system_prompt"]
+    assert "duplicate-only" in request["system_prompt"]
     assert "choose the most semantically precise supported formFieldType" in request["system_prompt"]
     assert "Do not preserve an existing generic text field" in request["system_prompt"]
     assert "data-capture requirements that need ui.form fields" in request["system_prompt"]
