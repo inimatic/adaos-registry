@@ -42,6 +42,7 @@ PROMPT_REVISION_FILES = (
 BUILDER_WEBUI_SCHEMA_FORCED_DEFS = (
     "formInputs",
     "formField",
+    "formInputType",
     "formFieldType",
     "formOption",
     "formValidation",
@@ -115,6 +116,57 @@ def _source_webspace_id(value: str | None = None, _meta: Mapping[str, Any] | Non
     if token.endswith("-dev") and len(token) > 4:
         return token[:-4]
     return token
+
+
+def _scenario_id_from_prompt_topic(value: Any) -> str:
+    token = str(value or "").strip()
+    prefix = "prompt-project:scenario:"
+    if not token.startswith(prefix):
+        return ""
+    scenario_id = token[len(prefix) :].strip()
+    if not scenario_id or any(ch in scenario_id for ch in "\\/"):
+        return ""
+    return scenario_id
+
+
+def _requested_scenario_id_from_meta(_meta: Mapping[str, Any] | None = None) -> str:
+    if not isinstance(_meta, Mapping):
+        return ""
+    for key in ("thread_id", "conversation_thread_id", "conversation_topic_id", "topic_id"):
+        scenario_id = _scenario_id_from_prompt_topic(_meta.get(key))
+        if scenario_id:
+            return scenario_id
+    topic = _meta.get("builder_topic") if isinstance(_meta.get("builder_topic"), Mapping) else {}
+    for key in ("scenario_id", "project_id"):
+        token = str(topic.get(key) or "").strip()
+        if token:
+            return token
+    for key in ("thread_id", "topic_id"):
+        scenario_id = _scenario_id_from_prompt_topic(topic.get(key))
+        if scenario_id:
+            return scenario_id
+    return ""
+
+
+def _align_workbench_binding_to_meta(webspace_id: str, _meta: Mapping[str, Any] | None = None) -> dict[str, Any] | None:
+    scenario_id = _requested_scenario_id_from_meta(_meta)
+    if not scenario_id:
+        return None
+    try:
+        svc = _workbench_service()
+        binding = svc.get_workspace_binding(webspace_id)
+        current = str(binding.get("runtime_scenario_id") or "").strip()
+        if current == scenario_id:
+            return binding
+        return svc.set_active_draft(
+            source_webspace_id=webspace_id,
+            active_draft_id=None,
+            runtime_scenario_id=scenario_id,
+            persist_projection=True,
+        )
+    except Exception:
+        _LOG.debug("failed to align builder workbench binding to meta scenario=%s", scenario_id, exc_info=True)
+        return None
 
 
 def _paired_dev_webspace_id(source_webspace_id: str) -> str | None:
@@ -338,14 +390,51 @@ def _builder_llm_temperature() -> float:
     return max(0.0, min(value, 1.0))
 
 
-def _builder_llm_model() -> str | None:
+def _builder_llm_model_from_meta(_meta: Mapping[str, Any] | None = None) -> str | None:
+    meta = dict(_meta or {}) if isinstance(_meta, Mapping) else {}
+    for key in ("builder_llm_model", "llm_model", "model"):
+        token = str(meta.get(key) or "").strip()
+        if token:
+            return token
+    return None
+
+
+def _builder_llm_env_model() -> str | None:
     token = str(os.getenv("ADAOS_BUILDER_LLM_MODEL") or "").strip()
     return token or None
 
 
-def _builder_llm_prompt_profile() -> dict[str, Any]:
+def _builder_llm_model(_meta: Mapping[str, Any] | None = None) -> str | None:
+    return _builder_llm_model_from_meta(_meta) or _builder_llm_env_model()
+
+
+def _builder_llm_model_from_session(session: Mapping[str, Any] | None) -> str | None:
+    if not isinstance(session, Mapping):
+        return None
+    root = _project_artifact_root(session)
+    if root is None:
+        return None
+    state = _load_json_file(root / "prompt_state.json")
+    if not isinstance(state, Mapping):
+        return None
+    for key in ("builder_llm_model", "llm_model", "llm_profile_id"):
+        token = str(state.get(key) or "").strip()
+        if token:
+            return token
+    return None
+
+
+def _builder_llm_model_for_session(
+    session: Mapping[str, Any] | None,
+    _meta: Mapping[str, Any] | None = None,
+) -> str | None:
+    return _builder_llm_model_from_meta(_meta) or _builder_llm_model_from_session(session) or _builder_llm_env_model()
+
+
+def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
     model_hint = (
-        _builder_llm_model()
+        str(model or "").strip()
+        or _builder_llm_model()
         or str(os.getenv("ADAOS_LLM_MODEL") or "").strip()
         or str(os.getenv("OPENAI_RESPONSES_MODEL") or "").strip()
         or "root-default"
@@ -679,6 +768,21 @@ def _chat_meta(
     return meta
 
 
+def _is_api_tool_call(_meta: Mapping[str, Any] | None) -> bool:
+    meta = dict(_meta or {}) if isinstance(_meta, Mapping) else {}
+    return str(meta.get("action_source") or "").strip() == "api_tool_call"
+
+
+def _api_request_chat_meta(_meta: Mapping[str, Any] | None) -> dict[str, Any]:
+    meta = dict(_meta or {}) if isinstance(_meta, Mapping) else {}
+    meta.setdefault("action_source", "api_tool_call")
+    meta.setdefault("origin_label", "API")
+    meta["active_agent_id"] = "api"
+    meta["active_agent_label"] = "API"
+    meta["recipient_label"] = AGENT_LABEL
+    return meta
+
+
 def _source_refs(
     *,
     webspace_id: str,
@@ -826,6 +930,7 @@ def _safe_emit_chat(
     binding: Mapping[str, Any] | None = None,
     topic_ref: Mapping[str, Any] | None = None,
     actions: Sequence[Mapping[str, Any]] | None = None,
+    from_: str = "hub",
 ) -> None:
     try:
         from adaos.sdk.io.out import chat_append
@@ -838,12 +943,14 @@ def _safe_emit_chat(
             targets.append(dev_ws)
         for target in targets:
             meta = _chat_meta(_meta, webspace_id=target, session=session, binding=binding, topic_ref=topic_ref)
+            if from_ == "hub" and _is_api_tool_call(_meta):
+                meta.setdefault("recipient_label", "API")
 
             def _append_chat() -> Mapping[str, bool]:
                 try:
-                    return chat_append(text, from_="hub", actions=actions, _meta=meta)
+                    return chat_append(text, from_=from_, actions=actions, _meta=meta)
                 except TypeError:
-                    return chat_append(text, from_="hub", _meta=meta)
+                    return chat_append(text, from_=from_, _meta=meta)
 
             pool = ThreadPoolExecutor(max_workers=1)
             try:
@@ -1609,7 +1716,7 @@ def _schema_def(schema: Mapping[str, Any] | None, name: str) -> Mapping[str, Any
 
 def _webui_form_field_types(schema: Mapping[str, Any] | None = None) -> list[str]:
     schema = schema if isinstance(schema, Mapping) else _load_webui_schema()
-    field_type_def = _schema_def(schema, "formFieldType")
+    field_type_def = _schema_def(schema, "formInputType") or _schema_def(schema, "formFieldType")
     values = field_type_def.get("enum") if isinstance(field_type_def, Mapping) else None
     result = [str(item) for item in values if str(item or "").strip()] if isinstance(values, list) else []
     if result:
@@ -1832,7 +1939,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
         "If cards need combined text like status plus date, add a derived string property to the relevant static dataSource.value rows, then point previewKey to that property. "
         "Use the supplied compact adaos.webui.v1 ABI summary as the webui.json compatibility contract. "
-        "When creating or editing ui.form fields, put the most semantically precise supported form field type in each field's required 'type' property; the ABI enum for that property is named formFieldType. Use generic text only as a fallback. "
+        "When creating or editing ui.form fields, put the most semantically precise supported input kind in each field's required 'type' property; the ABI enum for that property is named formInputType. Use generic text only as a fallback. "
         "Do not preserve an existing generic text field when the user's request or the field label clearly implies a more specific supported type. "
         "Break broad or composite user concepts into atomic fields when creating forms: contacts should normally become email plus phone/messenger fields, personal data should become name plus relevant contact fields, and preferences should become concrete choices plus optional other text when appropriate. "
         "When the user asks people to select, mark, rate, upload, schedule, or enter structured values, model that as editable ui.form fields instead of a read-only table unless the user explicitly asks for a static table. "
@@ -3871,6 +3978,7 @@ def _builder_llm_webui_transform_request(
     session: Mapping[str, Any],
     instruction: str,
     preview_state: Mapping[str, Any],
+    _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     current_payload = _current_webui_payload(session, preview_state)
     project_memory = _project_memory(session)
@@ -3885,7 +3993,8 @@ def _builder_llm_webui_transform_request(
         for item in (session.get("patches") if isinstance(session.get("patches"), list) else [])[-8:]
         if isinstance(item, Mapping)
     ]
-    prompt_profile = _builder_llm_prompt_profile()
+    selected_model = _builder_llm_model_for_session(session, _meta)
+    prompt_profile = _builder_llm_prompt_profile(selected_model)
     system_prompt = _builder_llm_system_prompt(
         project_system_prompt=project_system_prompt,
         prompt_profile=prompt_profile,
@@ -4221,6 +4330,7 @@ def _apply_llm_webui_transform(
         session=session,
         instruction=instruction,
         preview_state=preview_state,
+        _meta=_meta,
     )
     current_payload = request["current_payload"]
     system_prompt = str(request["system_prompt"])
@@ -4260,7 +4370,7 @@ def _apply_llm_webui_transform(
             try:
                 response = send_response(
                     messages,
-                    model=_builder_llm_model(),
+                    model=_builder_llm_model_for_session(session, _meta),
                     temperature=temperature if attempt == 1 else 0,
                     max_tokens=max_tokens,
                     request_id=request_id,
@@ -4396,6 +4506,7 @@ def _repair_llm_webui_transform_output(
         session=session,
         instruction=instruction,
         preview_state=previous_preview,
+        _meta=_meta,
     )
     repair_request_id = _builder_llm_request_id(
         session=session,
@@ -4431,7 +4542,7 @@ def _repair_llm_webui_transform_output(
                 {"role": "system", "content": str(request["system_prompt"])},
                 {"role": "user", "content": repair_prompt},
             ],
-            model=_builder_llm_model(),
+            model=_builder_llm_model_for_session(session, _meta),
             temperature=0,
             max_tokens=_builder_llm_max_tokens(),
             request_id=repair_request_id,
@@ -6445,6 +6556,7 @@ def _submit_llm_webui_transform_job(
         session=session,
         instruction=instruction,
         preview_state=preview_state,
+        _meta=_meta,
     )
     context_ready_at = _now()
     current_payload = request["current_payload"]
@@ -6510,7 +6622,7 @@ def _submit_llm_webui_transform_job(
         try:
             response = submit_response_job(
                 messages,
-                model=_builder_llm_model(),
+                model=_builder_llm_model_for_session(session, _meta),
                 temperature=_builder_llm_temperature(),
                 max_tokens=_builder_llm_max_tokens(),
                 request_id=request_id,
@@ -7371,16 +7483,33 @@ def update_current_scenario(
     started_at = time.perf_counter()
     ws = _source_webspace_id(webspace_id, _meta)
     source_done_at = time.perf_counter()
+    requested_binding = _align_workbench_binding_to_meta(ws, _meta)
+    binding_align_done_at = time.perf_counter()
     session, binding = _target_session(ws)
+    if requested_binding is not None:
+        binding.update(requested_binding)
     target_done_at = time.perf_counter()
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     topic_done_at = time.perf_counter()
     if not session:
+        message = _target_required_message(binding)
+        if _is_api_tool_call(_meta):
+            request_text = str(instruction or "").strip()
+            if request_text:
+                _safe_emit_chat(
+                    request_text,
+                    webspace_id=ws,
+                    _meta=_api_request_chat_meta(_meta),
+                    binding=binding,
+                    topic_ref=topic,
+                    from_="api",
+                )
+            _safe_emit_chat(message, webspace_id=ws, _meta=_meta, binding=binding, topic_ref=topic)
         return {
             "ok": True,
             "status": "target_required",
             "needs_selection": True,
-            "message": _target_required_message(binding),
+            "message": message,
             "binding": binding,
             "topic": topic,
             "dialog": _dialog_state(ws, topic_ref=topic),
@@ -7403,6 +7532,16 @@ def update_current_scenario(
     preview_done_at = time.perf_counter()
     before_webui = _current_webui_payload(session, base_preview)
     before_webui_done_at = time.perf_counter()
+    if _is_api_tool_call(_meta) and text:
+        _safe_emit_chat(
+            text,
+            webspace_id=ws,
+            _meta=_api_request_chat_meta(_meta),
+            session=session,
+            binding=binding,
+            topic_ref=topic,
+            from_="api",
+        )
     llm_result: dict[str, Any] | None = None
     llm_owned_content_change = _wants_llm_owned_content_change(text)
     if text and _builder_llm_primary_enabled(_meta):
@@ -7420,6 +7559,8 @@ def update_current_scenario(
                     f"{f' ({active_job_id})' if active_job_id else ''}. "
                     "Дождитесь результата и повторите запрос."
                 )
+                if _is_api_tool_call(_meta):
+                    _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding, topic_ref=topic)
                 return {
                     "ok": True,
                     "status": "llm_busy",
@@ -7464,11 +7605,12 @@ def update_current_scenario(
             total_ms = (dialog_done_at - started_at) * 1000.0
             if total_ms >= 1000:
                 _LOG.warning(
-                    "builder update async prepare slow scenario=%s total_ms=%.1f source_ms=%.1f target_ms=%.1f topic_ms=%.1f preview_ms=%.1f before_webui_ms=%.1f save_ms=%.1f worker_ms=%.1f dialog_ms=%.1f",
+                    "builder update async prepare slow scenario=%s total_ms=%.1f source_ms=%.1f binding_align_ms=%.1f target_ms=%.1f topic_ms=%.1f preview_ms=%.1f before_webui_ms=%.1f save_ms=%.1f worker_ms=%.1f dialog_ms=%.1f",
                     str(session.get("scenario_id") or ""),
                     total_ms,
                     (source_done_at - started_at) * 1000.0,
-                    (target_done_at - source_done_at) * 1000.0,
+                    (binding_align_done_at - source_done_at) * 1000.0,
+                    (target_done_at - binding_align_done_at) * 1000.0,
                     (topic_done_at - target_done_at) * 1000.0,
                     (preview_done_at - topic_done_at) * 1000.0,
                     (before_webui_done_at - preview_done_at) * 1000.0,
@@ -7476,6 +7618,12 @@ def update_current_scenario(
                     (worker_done_at - save_done_at) * 1000.0,
                     (dialog_done_at - worker_done_at) * 1000.0,
                 )
+            message = (
+                f"{AGENT_LABEL}: \u043f\u0440\u0438\u043d\u044f\u043b \u0437\u0430\u043f\u0440\u043e\u0441 \u0434\u043b\u044f {session.get('scenario_id')} "
+                f"\u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u044e LLM-\u0437\u0430\u0434\u0430\u0447\u0443. Job: {local_job_id}."
+            )
+            if _is_api_tool_call(_meta):
+                _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding, topic_ref=topic)
             return {
                 "ok": True,
                 "status": "llm_submitting",
@@ -7492,10 +7640,7 @@ def update_current_scenario(
                     "base_url": None,
                     "timing": {"submit_deferred": True},
                 },
-                "message": (
-                    f"{AGENT_LABEL}: \u043f\u0440\u0438\u043d\u044f\u043b \u0437\u0430\u043f\u0440\u043e\u0441 \u0434\u043b\u044f {session.get('scenario_id')} "
-                    f"\u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u044e LLM-\u0437\u0430\u0434\u0430\u0447\u0443. Job: {local_job_id}."
-                ),
+                "message": message,
                 "dialog": dialog,
             }
         else:

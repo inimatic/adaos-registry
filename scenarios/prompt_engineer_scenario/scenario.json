@@ -80,7 +80,8 @@
               "currentObjectId": "object_id",
               "currentStage": "state",
               "builderTopicId": "topic_id",
-              "builderConversationId": "conversation_id"
+              "builderConversationId": "conversation_id",
+              "builderLlmModel": "builder_llm_model"
             }
           },
           "layout": {
@@ -487,7 +488,8 @@
                   "conversation_topic_id": "$state.builderTopicId",
                   "thread_id": "$state.builderTopicId",
                   "active_agent_id": "agent:builder_skill:builder",
-                  "active_agent_label": "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440"
+                  "active_agent_label": "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440",
+                  "builder_llm_model": "$state.builderLlmModel"
                 },
                 "placeholder_i18n": {
                   "key": "prompt_ide.builder_placeholder"
@@ -621,6 +623,7 @@
                       "currentStage": "file",
                       "currentFilePath": "tz/base_tz.md",
                       "currentFileEditable": true,
+                      "builderLlmModel": "$event.builder_llm_model",
                       "builderTopicId": "prompt-project:$event.object_type:$event.object_id",
                       "builderConversationId": "conv.skill.builder_skill.default.$client.webspaceId"
                     }
@@ -765,6 +768,7 @@
                       "currentStage": "file",
                       "currentFilePath": "tz/base_tz.md",
                       "currentFileEditable": true,
+                      "builderLlmModel": "",
                       "builderTopicId": "prompt-project:$state.createObjectType:$state.createObjectName",
                       "builderConversationId": "conv.skill.builder_skill.default.$client.webspaceId"
                     }
@@ -1158,13 +1162,58 @@
             },
             "widgets": [
               {
+                "id": "llm-profile-model-selector",
+                "type": "input.selector",
+                "area": "main",
+                "title": "Development model",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "prompt_engineer_skill.prompt_llm_model_options",
+                  "params": {
+                    "object_type": "$state.currentObjectType",
+                    "object_id": "$state.currentObjectId",
+                    "scope": "development"
+                  }
+                },
+                "inputs": {
+                  "optionLabelPath": "label",
+                  "optionValuePath": "id",
+                  "valuePath": "value"
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "callSkill",
+                    "target": "prompt_engineer_skill.prompt_set_llm_profile",
+                    "params": {
+                      "object_type": "$state.currentObjectType",
+                      "object_id": "$state.currentObjectId",
+                      "model": "$event.value"
+                    }
+                  },
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "builderLlmModel": "$event.value"
+                    }
+                  }
+                ],
+                "title_i18n": {
+                  "key": "prompt_ide.llm_profile_model"
+                }
+              },
+              {
                 "id": "llm-profile-models",
                 "type": "item.details",
                 "area": "main",
                 "title": "Available LLM models",
                 "dataSource": {
                   "kind": "skill",
-                  "name": "prompt_engineer_skill.prompt_llm_list_models"
+                  "name": "prompt_engineer_skill.prompt_llm_list_models",
+                  "params": {
+                    "scope": "development"
+                  }
                 },
                 "title_i18n": {
                   "key": "prompt_ide.available_llm_models"
@@ -1269,6 +1318,7 @@
             "prompt_ide.save": "Save",
             "prompt_ide.add_tz_addendum": "Add TZ addendum",
             "prompt_ide.llm_profile": "LLM profile",
+            "prompt_ide.llm_profile_model": "Development model",
             "prompt_ide.available_llm_models": "Available LLM models",
             "prompt_ide.llm_status": "LLM status",
             "prompt_ide.description_draft": "Prompt engineering IDE workspace (draft layout)."
@@ -1331,6 +1381,7 @@
             "prompt_ide.save": "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c",
             "prompt_ide.add_tz_addendum": "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043a \u0422\u0417",
             "prompt_ide.llm_profile": "\u041f\u0440\u043e\u0444\u0438\u043b\u044c LLM",
+            "prompt_ide.llm_profile_model": "\u041c\u043e\u0434\u0435\u043b\u044c \u0434\u043b\u044f \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0438",
             "prompt_ide.available_llm_models": "\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0435 \u043c\u043e\u0434\u0435\u043b\u0438 LLM",
             "prompt_ide.llm_status": "\u0421\u0442\u0430\u0442\u0443\u0441 LLM",
             "prompt_ide.description_draft": "\u0420\u0430\u0431\u043e\u0447\u0430\u044f \u043e\u0431\u043b\u0430\u0441\u0442\u044c Prompt IDE (\u0447\u0435\u0440\u043d\u043e\u0432\u043e\u0439 layout)."

@@ -2,6 +2,7 @@
 # Main handler!
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -183,6 +184,21 @@ def _builder_topic_id(object_type: str, object_id: str) -> str:
     return f"prompt-project:{kind}:{item_id}"
 
 
+def _source_webspace_id_from_payload(payload: Optional[Dict[str, Any]] = None) -> str:
+    data = payload if isinstance(payload, dict) else {}
+    meta = data.get("_meta") if isinstance(data.get("_meta"), dict) else {}
+    for value in (
+        data.get("source_webspace_id"),
+        meta.get("source_webspace_id"),
+        data.get("webspace_id"),
+        meta.get("webspace_id"),
+    ):
+        token = str(value or "").strip()
+        if token:
+            return token
+    return "desktop"
+
+
 def _scenario_manifest_projection(object_id: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     source = data if isinstance(data, dict) else {}
     out: Dict[str, Any] = {}
@@ -211,19 +227,49 @@ def _ensure_scenario_yaml(project_root: Path, object_id: str, data: Optional[Dic
     return path
 
 
-def _emit_builder_preview_selected(object_type: str, object_id: str) -> None:
+def _emit_builder_preview_selected(object_type: str, object_id: str, *, source_webspace_id: str = "desktop") -> None:
     if str(object_type or "").strip().lower() != "scenario":
         return
     scenario_id = str(object_id or "").strip()
     if not scenario_id:
         return
+    source_ws = str(source_webspace_id or "").strip() or "desktop"
+    try:
+        from adaos.services.builder.workbench import BuilderWorkbenchService
+
+        svc = BuilderWorkbenchService()
+        svc.set_active_draft(
+            source_webspace_id=source_ws,
+            active_draft_id=None,
+            runtime_scenario_id=scenario_id,
+            persist_projection=True,
+        )
+        ensure = getattr(svc, "ensure_dev_webspace", None)
+        if callable(ensure):
+            try:
+                asyncio.get_running_loop()
+            except RuntimeError:
+                asyncio.run(
+                    ensure(
+                        source_ws,
+                        active_draft_id=None,
+                        runtime_scenario_id=scenario_id,
+                        wait_for_rebuild=False,
+                    )
+                )
+            else:
+                # If this happens inside an already-running loop, the async
+                # builder.preview.selected subscriber below remains the fallback.
+                pass
+    except Exception:
+        _log.debug("failed to set builder preview binding for scenario:%s", scenario_id, exc_info=True)
     try:
         ctx = _require_ctx()
         bus_emit(
             ctx.bus,
             "builder.preview.selected",
             {
-                "source_webspace_id": "desktop",
+                "source_webspace_id": source_ws,
                 "object_type": "scenario",
                 "object_id": scenario_id,
                 "scenario_id": scenario_id,
@@ -389,6 +435,10 @@ def _default_state(object_type: str, object_id: str) -> Dict[str, Any]:
             "iterations": [],
         },
         "llm_profile_id": None,
+        "builder_llm_model": None,
+        "llm_provider": None,
+        "llm_profile": None,
+        "llm_profile_updated_at": None,
         "target_node_id": None,
         "workflow_state": "tz",
     }
@@ -516,6 +566,10 @@ def _normalize_state(raw: Any, object_type: str, object_id: str, root: Path) -> 
     raw["generate"] = generate
 
     raw.setdefault("llm_profile_id", None)
+    raw.setdefault("builder_llm_model", None)
+    raw.setdefault("llm_provider", None)
+    raw.setdefault("llm_profile", None)
+    raw.setdefault("llm_profile_updated_at", None)
     raw.setdefault("target_node_id", None)
     raw.setdefault("workflow_state", "tz")
 
@@ -586,13 +640,19 @@ def prompt_select_project(payload: Optional[Dict[str, Any]] = None, **kwargs: An
     object_id = str(payload.get("object_id") or payload.get("project_id") or "").strip()
     if object_type not in {"skill", "scenario"} or not object_id:
         return {"ok": False, "error": "object_type and object_id are required"}
+    state: Dict[str, Any] = {}
+    try:
+        state = _load_state(object_type, object_id)
+    except Exception:
+        state = {}
     _emit_project_changed(object_type, object_id, reason="project_selected")
-    _emit_builder_preview_selected(object_type, object_id)
+    _emit_builder_preview_selected(object_type, object_id, source_webspace_id=_source_webspace_id_from_payload(payload))
     return {
         "ok": True,
         "object_type": object_type,
         "object_id": object_id,
         "builder_topic_id": _builder_topic_id(object_type, object_id),
+        "builder_llm_model": str(state.get("builder_llm_model") or state.get("llm_profile_id") or "").strip(),
     }
 
 
@@ -769,12 +829,156 @@ def prompt_llm_list_models(payload: Optional[Dict[str, Any]] = None, **kwargs: A
 
     payload = _payload_with_kwargs(payload, **kwargs)
     timeout = payload.get("timeout")
+    scope = str(payload.get("scope") or "development").strip() or "development"
     try:
-        data = list_llm_models(timeout=float(timeout) if timeout is not None else None)
+        data = list_llm_models(timeout=float(timeout) if timeout is not None else None, scope=scope)
     except Exception as exc:
         _log.warning("prompt_llm_list_models failed: %s", exc, exc_info=True)
         return {"ok": False, "error": str(exc)}
-    return {"ok": True, "data": data}
+    return {"ok": True, "scope": scope, "data": data}
+
+
+def _llm_model_options_from_root_payload(data: Any) -> List[Dict[str, Any]]:
+    source = data if isinstance(data, dict) else {}
+    raw_profiles = source.get("model_profiles") or source.get("dev_model_profiles") or []
+    items: List[Dict[str, Any]] = []
+
+    def _append_profile(raw: Any) -> None:
+        if not isinstance(raw, dict):
+            return
+        model_id = str(raw.get("id") or raw.get("model") or "").strip()
+        if not model_id:
+            return
+        provider = str(raw.get("provider") or "").strip()
+        scope = str(raw.get("scope") or raw.get("profile_scope") or "development").strip() or "development"
+        label = str(raw.get("label") or model_id).strip() or model_id
+        item: Dict[str, Any] = {
+            "id": model_id,
+            "model": model_id,
+            "label": label,
+            "provider": provider,
+            "scope": scope,
+            "default": bool(raw.get("default")),
+        }
+        for key in ("description", "reasoning", "temperature"):
+            if raw.get(key) not in (None, ""):
+                item[key] = raw.get(key)
+        items.append(item)
+
+    if isinstance(raw_profiles, list):
+        for profile in raw_profiles:
+            _append_profile(profile)
+
+    if not items:
+        raw_models = source.get("data") if isinstance(source.get("data"), list) else data if isinstance(data, list) else []
+        for raw in raw_models:
+            if isinstance(raw, dict):
+                _append_profile(raw)
+            else:
+                token = str(raw or "").strip()
+                if token:
+                    items.append(
+                        {
+                            "id": token,
+                            "model": token,
+                            "label": token,
+                            "provider": "",
+                            "scope": "development",
+                            "default": False,
+                        }
+                    )
+
+    seen: set[str] = set()
+    deduped: List[Dict[str, Any]] = []
+    for item in items:
+        model_id = str(item.get("id") or "").strip()
+        if not model_id or model_id in seen:
+            continue
+        seen.add(model_id)
+        deduped.append(item)
+    return deduped
+
+
+def _selected_llm_model_from_state(state: Dict[str, Any], options: List[Dict[str, Any]]) -> str:
+    for key in ("builder_llm_model", "llm_model", "llm_profile_id"):
+        token = str(state.get(key) or "").strip()
+        if token:
+            return token
+    for item in options:
+        if item.get("default"):
+            return str(item.get("id") or "").strip()
+    return str(options[0].get("id") or "").strip() if options else ""
+
+
+@tool("prompt_llm_model_options")
+def prompt_llm_model_options(payload: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+    """
+    Return development-scoped LLM model options plus the project selection.
+    """
+    payload = _payload_with_kwargs(payload, **kwargs)
+    object_type = str(payload.get("object_type") or "").strip().lower()
+    object_id = str(payload.get("object_id") or "").strip()
+    scope = str(payload.get("scope") or "development").strip() or "development"
+    models = prompt_llm_list_models({"scope": scope, "timeout": payload.get("timeout")})
+    data = models.get("data") if models.get("ok") else {}
+    options = _llm_model_options_from_root_payload(data)
+    state = _load_state(object_type, object_id) if object_type in {"skill", "scenario"} and object_id else {}
+    selected = _selected_llm_model_from_state(state, options)
+    for item in options:
+        item["selected"] = str(item.get("id") or "") == selected
+    return {
+        "ok": bool(models.get("ok")),
+        "scope": scope,
+        "value": selected,
+        "options": options,
+        "error": models.get("error"),
+    }
+
+
+@tool("prompt_set_llm_profile")
+def prompt_set_llm_profile(payload: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Dict[str, Any]:
+    """
+    Persist the Builder LLM model profile for the selected Prompt IDE project.
+    """
+    payload = _payload_with_kwargs(payload, **kwargs)
+    object_type = str(payload.get("object_type") or "").strip().lower()
+    object_id = str(payload.get("object_id") or "").strip()
+    model = str(payload.get("model") or payload.get("value") or payload.get("llm_model") or "").strip()
+    if object_type not in {"skill", "scenario"} or not object_id:
+        return {"ok": False, "error": "object_type and object_id are required"}
+    if not model:
+        return {"ok": False, "error": "model is required"}
+
+    selection = prompt_llm_model_options({"object_type": object_type, "object_id": object_id})
+    options = selection.get("options") if isinstance(selection.get("options"), list) else []
+    option_by_id = {str(item.get("id") or "").strip(): item for item in options if isinstance(item, dict)}
+    selected_profile = option_by_id.get(model) or {
+        "id": model,
+        "model": model,
+        "label": model,
+        "provider": "",
+        "scope": "development",
+        "default": False,
+    }
+
+    root = _project_root(object_type, object_id)
+    state = _load_state(object_type, object_id)
+    state["llm_profile_id"] = model
+    state["builder_llm_model"] = model
+    state["llm_provider"] = selected_profile.get("provider")
+    state["llm_profile"] = selected_profile
+    state["llm_profile_updated_at"] = _now_utc_iso()
+    _write_state(root, state)
+    _emit_project_changed(object_type, object_id, reason="llm_profile_changed")
+    return {
+        "ok": True,
+        "object_type": object_type,
+        "object_id": object_id,
+        "llm_profile_id": model,
+        "builder_llm_model": model,
+        "llm_profile": selected_profile,
+        "state": state,
+    }
 
 
 @tool("tz_add_reset")
@@ -895,8 +1099,11 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
         proto_revision = _current_proto_revision(project_root)
         # Per-project workflow state (if any) from PromptProjectState.
         wf_state = "tz"
+        llm_model = ""
         try:
-            wf_state = _load_state("scenario", name).get("workflow_state") or "tz"
+            state = _load_state("scenario", name)
+            wf_state = state.get("workflow_state") or "tz"
+            llm_model = str(state.get("builder_llm_model") or state.get("llm_profile_id") or "").strip()
         except Exception:  # pragma: no cover - best-effort
             wf_state = "tz"
 
@@ -909,6 +1116,7 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
             "proto_revision": proto_revision,
             "updated_at": datetime.fromtimestamp(path.stat().st_mtime, tz=timezone.utc).isoformat() if path and path.exists() else None,
             "workflow_state": wf_state,
+            "builder_llm_model": llm_model,
         }
 
     def _skill_meta(name: str) -> Dict[str, Any]:
@@ -922,8 +1130,11 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
             except Exception:
                 updated_at = None
         wf_state = "tz"
+        llm_model = ""
         try:
-            wf_state = _load_state("skill", name).get("workflow_state") or "tz"
+            state = _load_state("skill", name)
+            wf_state = state.get("workflow_state") or "tz"
+            llm_model = str(state.get("builder_llm_model") or state.get("llm_profile_id") or "").strip()
         except Exception:  # pragma: no cover - best-effort
             wf_state = "tz"
 
@@ -935,6 +1146,7 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
             "version": data.get("version") or "",
             "updated_at": updated_at,
             "workflow_state": wf_state,
+            "builder_llm_model": llm_model,
         }
 
     items: List[Dict[str, Any]] = []
@@ -959,6 +1171,7 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
                 "kindLabel": f"proto {meta['proto_revision']}" if meta.get("proto_revision") else "scenario",
                 "updated_at": meta["updated_at"],
                 "workflow_state": meta["workflow_state"],
+                "builder_llm_model": meta.get("builder_llm_model") or "",
                 "builder_topic_id": _builder_topic_id("scenario", name),
             }
         )
@@ -983,6 +1196,7 @@ def prompt_list_dev_objects(payload: Optional[Dict[str, Any]] = None, **kwargs: 
                 "kindLabel": "skill",
                 "updated_at": meta["updated_at"],
                 "workflow_state": meta["workflow_state"],
+                "builder_llm_model": meta.get("builder_llm_model") or "",
                 "builder_topic_id": _builder_topic_id("skill", name),
             }
         )
@@ -1055,8 +1269,11 @@ def prompt_list_project_objects(payload: Optional[Dict[str, Any]] = None, **kwar
 
         # Per-project workflow state (if any) from PromptProjectState.
         wf_state = "tz"
+        llm_model = ""
         try:
-            wf_state = _load_state(kind, name).get("workflow_state") or "tz"
+            state = _load_state(kind, name)
+            wf_state = state.get("workflow_state") or "tz"
+            llm_model = str(state.get("builder_llm_model") or state.get("llm_profile_id") or "").strip()
         except Exception:  # pragma: no cover - best-effort
             wf_state = "tz"
 
@@ -1084,6 +1301,7 @@ def prompt_list_project_objects(payload: Optional[Dict[str, Any]] = None, **kwar
             ),
             "updated_at": meta["updated_at"],
             "workflow_state": wf_state,
+            "builder_llm_model": llm_model,
         }
 
     if project_type == "skill":
@@ -1494,7 +1712,7 @@ def prompt_create_dev_project(payload: Optional[Dict[str, Any]] = None, **kwargs
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
     _emit_project_changed(kind, result.name, reason="project_created")
-    _emit_builder_preview_selected(kind, result.name)
+    _emit_builder_preview_selected(kind, result.name, source_webspace_id=_source_webspace_id_from_payload(payload))
 
     return {
         "ok": True,
@@ -1640,7 +1858,7 @@ def prompt_update_project_meta(payload: Optional[Dict[str, Any]] = None, **kwarg
         return {"ok": False, "error": str(exc)}
 
     _emit_project_changed(object_type, object_id, reason="project_meta_updated")
-    _emit_builder_preview_selected(object_type, object_id)
+    _emit_builder_preview_selected(object_type, object_id, source_webspace_id=_source_webspace_id_from_payload(payload))
     return prompt_get_project_meta({"object_type": object_type, "object_id": object_id})
 
 

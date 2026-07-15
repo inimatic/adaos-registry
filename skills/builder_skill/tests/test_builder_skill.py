@@ -8,6 +8,7 @@ import logging
 import sys
 import threading
 import time
+import types
 from pathlib import Path
 
 import yaml
@@ -32,6 +33,12 @@ if str(SRC_ROOT) not in sys.path:
 
 
 def _load_module():
+    if "y_py" not in sys.modules:
+        sys.modules["y_py"] = types.SimpleNamespace(YDoc=object)
+    if "ypy_websocket" not in sys.modules:
+        ystore_mod = types.SimpleNamespace(BaseYStore=object, YDocNotFound=RuntimeError)
+        sys.modules["ypy_websocket"] = types.SimpleNamespace(ystore=ystore_mod)
+        sys.modules["ypy_websocket.ystore"] = ystore_mod
     spec = importlib.util.spec_from_file_location("builder_skill_under_test", SKILL_ROOT / "handlers" / "main.py")
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
@@ -120,6 +127,36 @@ def test_builder_topic_ref_replaces_stale_prompt_project_topic(monkeypatch) -> N
     assert topic["topic_id"] == "prompt-project:scenario:prototype_app_4d5758e5"
     assert topic["scenario_id"] == "prototype_app_4d5758e5"
     assert topic["project_id"] == "prototype_app_4d5758e5"
+
+
+def test_builder_aligns_stale_workbench_binding_to_incoming_prompt_topic(monkeypatch) -> None:
+    skill = _load_module()
+    calls: list[dict] = []
+
+    class _Svc:
+        def get_workspace_binding(self, webspace_id):
+            calls.append({"method": "get_workspace_binding", "webspace_id": webspace_id})
+            return {"runtime_scenario_id": "codex_eval_survey2", "dev_webspace_id": "desktop-dev"}
+
+        def set_active_draft(self, **kwargs):
+            calls.append({"method": "set_active_draft", **kwargs})
+            return {
+                "runtime_scenario_id": kwargs.get("runtime_scenario_id"),
+                "dev_webspace_id": "desktop-dev",
+            }
+
+    monkeypatch.setattr(skill, "_workbench_service", lambda: _Svc())
+
+    binding = skill._align_workbench_binding_to_meta(
+        "desktop",
+        {"conversation_topic_id": "prompt-project:scenario:codex_eval_survey3"},
+    )
+
+    assert binding["runtime_scenario_id"] == "codex_eval_survey3"
+    assert calls[-1]["method"] == "set_active_draft"
+    assert calls[-1]["source_webspace_id"] == "desktop"
+    assert calls[-1]["runtime_scenario_id"] == "codex_eval_survey3"
+    assert calls[-1]["active_draft_id"] is None
 
 
 def test_save_session_batches_sessions_and_current_pointer(monkeypatch) -> None:
@@ -1327,9 +1364,10 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     schema_defs = user_payload["webui_v1_abi"]["schema_contract"]["defs"]
     assert "formInputs" in schema_defs
     assert "formField" in schema_defs
+    assert "formInputType" in schema_defs
     assert "formFieldType" in schema_defs
-    assert "email" in schema_defs["formFieldType"]["enum"]
-    assert "ratingGrid" in schema_defs["formFieldType"]["enum"]
+    assert "email" in schema_defs["formInputType"]["enum"]
+    assert "ratingGrid" in schema_defs["formInputType"]["enum"]
     assert "Always prefer conference vocabulary" in request["system_prompt"]
     assert "adaptive UI prototyping designer-programmer" in request["system_prompt"]
     assert "meaningful visible changes" in request["system_prompt"]

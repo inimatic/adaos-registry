@@ -606,6 +606,8 @@ tools:
   input_schema:
     type: object
     properties:
+      scope:
+        type: string
       timeout:
         type:
         - number
@@ -621,6 +623,70 @@ tools:
         type:
         - object
         - 'null'
+- name: prompt_llm_model_options
+  description: List development LLM model options and current project selection
+  entry: handlers.main:prompt_llm_model_options
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - skill
+        - scenario
+      object_id:
+        type: string
+      scope:
+        type: string
+      timeout:
+        type:
+        - number
+        - 'null'
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      value:
+        type: string
+      options:
+        type: array
+        items:
+          type: object
+- name: prompt_set_llm_profile
+  description: Persist selected Builder LLM model profile for the project
+  entry: handlers.main:prompt_set_llm_profile
+  input_schema:
+    type: object
+    required:
+    - object_type
+    - object_id
+    - model
+    properties:
+      object_type:
+        type: string
+        enum:
+        - skill
+        - scenario
+      object_id:
+        type: string
+        minLength: 1
+      model:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      builder_llm_model:
+        type: string
+      llm_profile:
+        type: object
 - name: tz_add_reset
   description: Reset TZ addenda for current project
   entry: handlers.main:tz_add_reset

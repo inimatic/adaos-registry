@@ -243,6 +243,7 @@ def _policy_summary(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         "access_mode": str(policy.get("access_mode") or "open"),
         "default_model": str(policy.get("default_model") or "gpt-4o-mini"),
         "allowed_models": list(policy.get("allowed_models") or []),
+        "dev_model_profiles": list(policy.get("dev_model_profiles") or []),
         "allowed_subnets": list(policy.get("allowed_subnets") or []),
         "fleet_overview": overview,
         "top_retire_candidates": _lifecycle_candidates(snapshot)[:5],
