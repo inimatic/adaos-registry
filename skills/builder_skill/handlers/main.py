@@ -1825,7 +1825,13 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "variant": "Optional: toolbar, stack, compact, segmented.",
                 "size": "Optional: small, medium, large.",
             },
-            "actions": "Use local updateState for prototype-only state changes; use callSkill only for real declared skill calls.",
+            "actions": "Use local updateState for prototype-only state changes; use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls.",
+        },
+        "application_modals": {
+            "purpose": "Use ui.application.modals when the user asks for a modal, dialog, popup, drawer, sheet, or separate overlay surface.",
+            "shape": "Add ui.application.modals.<modalId>={title,presentation:{kind:'modal'|'drawer'|'sheet'|'sideSheet'},schema:{id,layout,widgets}} alongside ui.application.desktop.pageSchema.",
+            "open_action": "Open a declared modal from a button/action with actions=[{on:'click', type:'openModal', params:{modalId:'comment_modal'}}].",
+            "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel.",
         },
         "input.commandBar": {
             "purpose": "Segmented or toolbar-like local controls for choosing a mode, filter, draft state, or preview perspective.",
@@ -1851,7 +1857,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                     {
                         "id": "sample-preview",
                         "type": "item.details",
-                        "visibleIf": "state.exampleMode == 'sample'",
+                        "visibleIf": "$state.exampleMode === 'sample'",
                         "dataSource": {
                             "kind": "static",
                             "value": {"title": "Example values", "fields": ["Replace with realistic sample values"]},
@@ -1870,8 +1876,13 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         },
         "state_and_visibility": {
             "initialState": "pageSchema.initialState can seed local prototype values, selected modes, mock workflow state, and temporary examples.",
-            "visibleIf": "Widgets and fields may use visibleIf expressions to show different prototype surfaces based on local state.",
+            "visibleIf": "Widgets and fields may use visibleIf expressions to show different prototype surfaces based on local state. Prefer canonical expressions like $state.activeTab === 'overview'.",
             "local_interaction": "Interactive prototype controls should update local page state and static/mock data only unless the user explicitly asks for a real integration. If the user asks to view an example, compare variants, choose a mode, or preview a state, include an explicit local input.commandBar/input.selector/ui.actions widget and seed matching initialState.",
+        },
+        "master_detail_and_tabs": {
+            "master_detail": "For master-detail prototypes use split/focus-detail layout, a ui.list/ui.table master widget with a select/updateState action, and detail widgets visible for the selected record.",
+            "tabs": "For tabs use input.commandBar variant='segmented' plus initialState.activeTab and visibleIf expressions on tab content widgets, unless the user asks for a static tab mock.",
+            "details": "Use static data examples that show the selected/default record clearly; do not leave generic placeholder rows from the scaffold.",
         },
         "layout": {
             "patterns": "Use stack for linear flows, split/sidebar-content for supporting panels, grid/dashboard for overview surfaces, and flow-like layouts for compact prototypes.",
@@ -1904,11 +1915,14 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "interaction": "May add local selectors, command bars, buttons, and visibleIf-driven states for prototype-only flows; when the user asks to choose, compare, preview, or view an example, include an explicit local control.",
             "mock_data": "May create realistic static rows/examples in the requested domain and keep them aligned with fields and display widgets.",
             "copy": "May rewrite labels, titles, section names, placeholders, helper text, and empty states in the user's language.",
+            "modals": "When the user asks for a modal/dialog/drawer/sheet, declare it in ui.application.modals and open it with an openModal action from the page.",
         },
         "self_check": [
             "Before returning JSON, compare the output to the user's request and the previous UI.",
             "If the result mostly duplicates existing widgets, preserves the same field ids in the same order, or leaves stale sample data after a design request, revise before answering.",
             "If the request asks to preview, view an example, compare alternatives, choose a mode, or switch between variants, verify the page includes a visible local control such as input.commandBar/input.selector/ui.actions plus matching updateState and initialState/visibleIf before answering.",
+            "If the user asks for a modal/dialog/drawer/sheet, verify ui.application.modals contains the surface and some page action opens it with type openModal.",
+            "Verify local visibility expressions use $state.<key> comparisons, for example $state.activeTab === 'overview'.",
             "If the user explicitly asks for local elements, controls, or a way to view examples, static mock rows alone are not enough; add a dedicated control widget that changes local state.",
             "Before answering mixed requests, make an internal checklist from each user-request clause and revise if any clause is only implied rather than visibly represented.",
             "Prefer a compact, inspectable prototype over exhaustive UI, but do not omit requested data-capture behavior.",
@@ -1929,7 +1943,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
         "The root object must be an adaos.webui.v1 manifest with schema='adaos.webui.v1'. "
         "The renderable source of truth is ui.application.desktop.pageSchema. "
-        "Return the complete updated pageSchema under ui.application.desktop.pageSchema; do not return preview_state, current_ui, or a root-level page_schema. "
+        "Return the complete updated pageSchema under ui.application.desktop.pageSchema; if the prototype needs modals, also return ui.application.modals. Do not return preview_state, current_ui, or a root-level page_schema. "
         "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
         "Treat the current UI as starting material, not as a fixed contract: make meaningful visible changes when the request implies design, workflow, layout, or prototype evolution. "
         "Decompose the user's instruction into explicit requirements and satisfy each one; do not let a broad form/layout request hide later requirements such as examples, local controls, variant switching, translations, or sample data. "
@@ -1946,6 +1960,10 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "For questionnaire, survey, registration, application, and intake prototypes, treat phrases such as indicate, choose, mark, attach, rate, enter, or their localized equivalents as data-capture requirements that need ui.form fields. "
         "When the user asks to choose between variants, compare layouts, preview examples, view sample state, use local elements, add elements for viewing an example, or switch modes, add an explicit local control such as input.commandBar, input.selector, or ui.actions with local updateState and visibleIf/initialState instead of only duplicating static content or sample rows. "
         "A requested local control is not complete unless at least one widget or form field visibly reacts to the local state set by that control. "
+        "Use canonical visibility expressions like $state.activeTab === 'overview'; avoid state.activeTab == 'overview' in new output. "
+        "For master-detail prototypes use a split or focus-detail layout, a master ui.list/ui.table with select/updateState, and detail widgets that react to selected state. "
+        "For tabbed content, use input.commandBar with variant='segmented', initialState for the active tab, and visibleIf on the tab content widgets. "
+        "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget. "
         "Static ui.table/ui.list widgets may preview sample data, but they must not replace the fields used to collect the user's answers. "
         "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
         "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "

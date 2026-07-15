@@ -1170,12 +1170,31 @@
                   "kind": "skill",
                   "name": "prompt_engineer_skill.prompt_llm_model_options",
                   "params": {
-                    "object_type": "$state.currentObjectType",
-                    "object_id": "$state.currentObjectId",
                     "scope": "development"
                   }
                 },
                 "inputs": {
+                  "defaultValue": "$state.builderLlmModel",
+                  "options": [
+                    {
+                      "id": "gpt-5",
+                      "label": "GPT-5",
+                      "provider": "openai",
+                      "scope": "development"
+                    },
+                    {
+                      "id": "gpt-4.1",
+                      "label": "GPT-4.1",
+                      "provider": "openai",
+                      "scope": "development"
+                    },
+                    {
+                      "id": "gpt-4o-mini",
+                      "label": "GPT-4o mini",
+                      "provider": "openai",
+                      "scope": "development"
+                    }
+                  ],
                   "optionLabelPath": "label",
                   "optionValuePath": "id",
                   "valuePath": "value"
@@ -1212,8 +1231,6 @@
                   "kind": "skill",
                   "name": "prompt_engineer_skill.prompt_llm_model_options",
                   "params": {
-                    "object_type": "$state.currentObjectType",
-                    "object_id": "$state.currentObjectId",
                     "scope": "development"
                   }
                 },
