@@ -1160,10 +1160,14 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "ratingGrid" in form_contract["supported_field_types"]
     assert "Choose the most semantically precise supported type" in form_contract["selection_guidance"][0]
     assert "Refactor existing generic text fields" in form_contract["selection_guidance"][1]
+    assert "Prefer atomic inputs" in form_contract["selection_guidance"][2]
     assert "every requested user answer" in form_contract["selection_guidance"][-1]
+    assert form_contract["semantic_examples"]["contacts"].startswith("email plus phone")
     assert form_contract["semantic_examples"]["convenient dates or date interval"] == "dateRange"
     assert form_contract["semantic_examples"]["rate several factors"] == "ratingGrid or linearScale fields"
     assert form_contract["semantic_examples"]["mark choices by days/sections/categories"] == "checkboxGrid or radioGrid"
+    assert "atomic fields" in affordances["ui_freedom_map"]["forms"]
+    assert "explicit local control" in affordances["ui_freedom_map"]["interaction"]
     schema_defs = user_payload["webui_v1_abi"]["schema_contract"]["defs"]
     assert "formInputs" in schema_defs
     assert "formField" in schema_defs
@@ -1176,6 +1180,8 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "duplicate-only" in request["system_prompt"]
     assert "choose the most semantically precise supported formFieldType" in request["system_prompt"]
     assert "Do not preserve an existing generic text field" in request["system_prompt"]
+    assert "Break broad or composite user concepts into atomic fields" in request["system_prompt"]
+    assert "add an explicit local control" in request["system_prompt"]
     assert "data-capture requirements that need ui.form fields" in request["system_prompt"]
     assert (artifact_root / "builder_memory.md").exists()
     assert (artifact_root / "tz" / "base_tz.md").exists()

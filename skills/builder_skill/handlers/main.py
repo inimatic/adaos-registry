@@ -1654,12 +1654,13 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                     "selection_guidance": [
                         "Choose the most semantically precise supported type; use text only when no more specific type fits.",
                         "Refactor existing generic text fields into more precise types whenever the current label or user instruction implies one.",
+                        "Prefer atomic inputs over broad composite fields: split contacts, personal data, address, schedule, or preferences into specific fields when useful.",
                         "Use email/url/phone/password/pin for typed contact or secret inputs.",
                         "Use textarea/paragraph/longText for multi-line descriptions.",
                         "Use date/time/dateTime/dateRange/timeRange for temporal input.",
                         "Use toggle/boolean/switch for yes/no agreement or completion.",
                         "Use select/combobox/radio/singleChoice for one value from options.",
-                        "Use multiChoice/checkboxes/chips/tags for several values from options.",
+                        "Use multiChoice/checkboxes/chips/tags for several values from options; for plural favorites or preferred items, offer options plus an 'other' text field when appropriate.",
                         "Use linearScale/rating for numeric sentiment, importance, readiness, or priority.",
                         "Use fileUpload/file for attachments.",
                         "Use radioGrid/checkboxGrid/ratingGrid when the user asks for a matrix/table of choices across rows and columns.",
@@ -1668,9 +1669,12 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                     "semantic_examples": {
                         "email address": "email",
                         "phone number": "phone",
+                        "contacts": "email plus phone or messenger fields, not one generic text field",
+                        "personal data": "full name plus relevant atomic identity/contact fields",
                         "convenient dates or date interval": "dateRange",
                         "convenient time or time window": "timeRange",
                         "several interests/tags/topics": "multiChoice or chips",
+                        "several favorite places/items/options": "multiChoice or chips plus optional other text",
                         "abstract, notes, comment, description": "textarea",
                         "expected duration": "number, select, or timeRange depending on wording",
                         "presentation language": "select, combobox, or chips",
@@ -1758,13 +1762,14 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "Treat current_webui_json as the starting material, not as a constraint to preserve.",
             "When the user asks for a prototype/design/layout/workflow change, make a visible semantic change, not a rename-only, duplicate-only, or no-op patch.",
             "Change fields, grouping, order, labels, helper text, component types, layout areas, density, widgets, actions, and mock data when that better serves the request.",
+            "Turn broad categories into concrete interface decisions: split composite inputs, replace vague text fields with precise supported controls, and add realistic options/examples.",
             "If creating several comparable surfaces, make each one meaningfully different across structure, field order, component types, copy, density, support widgets, or interaction model.",
         ],
         "ui_freedom_map": {
-            "forms": "May split into sections, reorder fields, choose more precise field types, add/remove helper text, defaults, options, validation, and submit placement.",
+            "forms": "May split into sections and atomic fields, reorder fields, choose more precise field types, add/remove helper text, defaults, options, validation, and submit placement.",
             "layout": "May switch stack/split/grid/sidebar patterns, remove unused areas, move widgets, and change density to match the requested experience.",
             "display": "May use table/list/cards/details/metrics/json preview surfaces for examples, summaries, and comparison.",
-            "interaction": "May add local selectors, command bars, buttons, and visibleIf-driven states for prototype-only flows.",
+            "interaction": "May add local selectors, command bars, buttons, and visibleIf-driven states for prototype-only flows; when the user asks to choose, compare, preview, or view an example, include an explicit local control.",
             "mock_data": "May create realistic static rows/examples in the requested domain and keep them aligned with fields and display widgets.",
             "copy": "May rewrite labels, titles, section names, placeholders, helper text, and empty states in the user's language.",
         },
@@ -1800,8 +1805,10 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "Use the supplied compact adaos.webui.v1 ABI summary as the webui.json compatibility contract. "
         "When creating or editing ui.form fields, choose the most semantically precise supported formFieldType from the ABI enum; use generic text only as a fallback. "
         "Do not preserve an existing generic text field when the user's request or the field label clearly implies a more specific supported type. "
+        "Break broad or composite user concepts into atomic fields when that creates a better prototype: contacts may become email plus phone/messenger, personal data may become name plus contact fields, preferences may become choices plus an optional other field. "
         "When the user asks people to select, mark, rate, upload, schedule, or enter structured values, model that as editable ui.form fields instead of a read-only table unless the user explicitly asks for a static table. "
         "For questionnaire, survey, registration, application, and intake prototypes, treat phrases such as indicate, choose, mark, attach, rate, enter, or their localized equivalents as data-capture requirements that need ui.form fields. "
+        "When the user asks to choose between variants, compare layouts, preview examples, or switch modes, add an explicit local control such as input.commandBar, input.selector, or ui.actions with local state/visibleIf instead of only duplicating static content. "
         "Static ui.table/ui.list widgets may preview sample data, but they must not replace the fields used to collect the user's answers. "
         "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
         "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
