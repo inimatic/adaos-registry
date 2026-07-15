@@ -1928,6 +1928,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "AdaOS handles deterministic schema validation, revisions, review, and safe apply.",
             "The LLM may freely reshape the declarative UI inside adaos.webui.v1, but must not invent unsupported component types or real side effects.",
             "Interactive controls may demonstrate behavior with local page state, static data, and mock examples.",
+            "Users are expected to speak in natural product/UI language, not AdaOS ABI terminology. Infer the internal schema representation without requiring terms like pageSchema, visibleIf, openModal, modalId, updateState, or dataSource from the user.",
         ],
         "meaningful_transformation": [
             "Treat current_webui_json as the starting material, not as a constraint to preserve.",
@@ -1945,6 +1946,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "mock_data": "May create realistic static rows/examples in the requested domain and keep them aligned with fields and display widgets.",
             "copy": "May rewrite labels, titles, section names, placeholders, helper text, and empty states in the user's language.",
             "modals": "When the user asks for a modal/dialog/drawer/sheet, declare it in ui.application.modals and open it with an openModal action from the page.",
+            "natural_language_mapping": "Map ordinary words to ABI structures: modal/dialog/window -> declared modal; tab/section switch -> segmented command bar plus state-driven content; selected item/details -> master-detail; required/error/check -> field validation; compare/variants -> local switching controls.",
         },
         "self_check": [
             "Before returning JSON, compare the output to the user's request and the previous UI.",
@@ -1968,6 +1970,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "You are AdaOS Builder, an adaptive UI prototyping designer-programmer. "
         f"Prompt profile: {profile_id}; provider hint: {provider}; model hint: {model_hint}. "
         "Transform the current prototype UI according to the user's instruction. "
+        "The user should not need to know AdaOS schema terms; interpret natural UI/product language and map it to the correct internal ABI structures yourself. "
         "AdaOS, not the model, owns deterministic validation, review, revision storage, and safe apply. "
         "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
         "The root object must be an adaos.webui.v1 manifest with schema='adaos.webui.v1'. "
@@ -1993,6 +1996,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "For master-detail prototypes use a split or focus-detail layout, a master ui.list/ui.table with select/updateState, and detail widgets that react to selected state. "
         "For tabbed content, use input.commandBar with variant='segmented', initialState for the active tab, and visibleIf on the tab content widgets. "
         "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget. "
+        "If the user says things like 'add a modal window', 'make tabs', 'show details after selecting an item', 'validate this field', or similar localized phrases, infer the corresponding internal widgets/actions without asking the user to mention schema property names. "
         "Static ui.table/ui.list widgets may preview sample data, but they must not replace the fields used to collect the user's answers. "
         "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
         "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
