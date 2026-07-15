@@ -49,6 +49,20 @@ BUILDER_WEBUI_SCHEMA_FORCED_DEFS = (
     "formBranching",
     "formQuiz",
 )
+BUILDER_WEBUI_SCHEMA_CORE_DEFS = (
+    "uiRoot",
+    "uiApplication",
+    "uiDesktopApplication",
+    "pageSchema",
+    "layout",
+    "area",
+    "widgetConfig",
+    "widgetType",
+    "dataSource",
+    "action",
+    "modalDef",
+    "listInputs",
+)
 BUILDER_FORM_CHOICE_FIELD_TYPES = {
     "select",
     "dropdown",
@@ -402,6 +416,14 @@ def _builder_llm_max_tokens() -> int:
     return max(1000, min(value, 12000))
 
 
+def _builder_llm_max_tokens_for_model(model: str | None) -> int:
+    configured = _builder_llm_max_tokens()
+    token = str(model or "").strip().lower()
+    if token.startswith("gpt-5") and not os.getenv("ADAOS_BUILDER_LLM_MAX_TOKENS"):
+        return 12000
+    return configured
+
+
 def _builder_llm_temperature() -> float:
     raw = os.getenv("ADAOS_BUILDER_LLM_TEMPERATURE")
     try:
@@ -409,6 +431,22 @@ def _builder_llm_temperature() -> float:
     except (TypeError, ValueError):
         value = 0.2
     return max(0.0, min(value, 1.0))
+
+
+def _builder_llm_temperature_for_model(model: str | None, *, repair: bool = False) -> float | None:
+    token = str(model or "").strip().lower()
+    if token.startswith(("gpt-5", "o1", "o3", "o4")):
+        return None
+    return 0.0 if repair else _builder_llm_temperature()
+
+
+def _builder_llm_reasoning_for_model(model: str | None) -> dict[str, str] | None:
+    token = str(model or "").strip().lower()
+    if token.startswith("gpt-5-pro"):
+        return None
+    if token.startswith("gpt-5"):
+        return {"effort": "minimal"}
+    return None
 
 
 def _builder_llm_model_from_meta(_meta: Mapping[str, Any] | None = None) -> str | None:
@@ -472,7 +510,9 @@ def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
         "id": profile_id,
         "provider": provider,
         "model": model_hint,
-        "temperature": _builder_llm_temperature(),
+        "temperature": _builder_llm_temperature_for_model(model_hint),
+        "reasoning": _builder_llm_reasoning_for_model(model_hint),
+        "max_output_tokens": _builder_llm_max_tokens_for_model(model_hint),
         "strategy": "compact_abi_plus_affordance_map",
         "variant_policy": "Prompt profiles may vary by provider/model, but the output contract remains adaos.webui.v1.",
     }
@@ -542,14 +582,41 @@ def _looks_like_llm_request_id_conflict(exc: Exception | str) -> bool:
 
 def _scenario_id_from_idea(idea: str) -> str:
     lowered = _repair_mojibake_text(idea).lower()
-    if "shopping" in lowered or "shop" in lowered or "\u043f\u043e\u043a\u0443\u043f" in lowered:
+    explicit_title = _explicit_prototype_title(idea)
+    classifier_text = explicit_title.lower() if explicit_title else lowered
+    if _looks_like_shopping_list_title(classifier_text):
         base = "shopping_list"
-    elif "todo" in lowered or "\u0437\u0430\u0434\u0430\u0447" in lowered:
+    elif _looks_like_todo_list_title(classifier_text):
         base = "todo_list"
     else:
-        ascii_base = re.sub(r"[^a-z0-9]+", "_", lowered).strip("_")
+        ascii_base = re.sub(r"[^a-z0-9]+", "_", classifier_text).strip("_")
         base = ascii_base[:40].strip("_") or "prototype_app"
     return f"{base}_{_hash_suffix(idea)}"
+
+
+def _explicit_prototype_title(idea: str) -> str:
+    text = _repair_mojibake_text(idea).strip()
+    if not text:
+        return ""
+    for pattern in (
+        r"[\u00ab\u201c\"]\s*([^\u00bb\u201d\"]{2,96}?)\s*[\u00bb\u201d\"]",
+        r"\b(?:named|called)\s+([A-Za-z0-9][^.,;:\n]{1,95})",
+        r"\b(?:назови|под названием)\s+([^.,;:\n]{2,96})",
+    ):
+        match = re.search(pattern, text, re.IGNORECASE)
+        if match:
+            return re.sub(r"\s+", " ", match.group(1)).strip(" .,:;\t\r\n")
+    return ""
+
+
+def _looks_like_shopping_list_title(text: str) -> bool:
+    token = str(text or "").strip().lower()
+    return bool(re.search(r"\bshopping\s+list\b|\bshop(?:ping)?\s+list\b|\u0441\u043f\u0438\u0441\u043e\u043a\s+\u043f\u043e\u043a\u0443\u043f\u043e\u043a", token))
+
+
+def _looks_like_todo_list_title(text: str) -> bool:
+    token = str(text or "").strip().lower()
+    return bool(re.search(r"\bto[ -]?do\s+list\b|\btask\s+list\b|\u0441\u043f\u0438\u0441\u043e\u043a\s+\u0437\u0430\u0434\u0430\u0447", token))
 
 
 def _conversation_id(webspace_id: str) -> str:
@@ -1120,8 +1187,9 @@ async def _on_builder_pending_action_response(evt: Any) -> None:
 
 
 def _build_fields(idea: str) -> list[dict[str, Any]]:
-    lowered = str(idea or "").lower()
-    if "shopping" in lowered or "\u043f\u043e\u043a\u0443\u043f" in lowered:
+    explicit_title = _explicit_prototype_title(idea)
+    classifier_text = explicit_title.lower() if explicit_title else str(idea or "").lower()
+    if _looks_like_shopping_list_title(classifier_text):
         return [
             {"id": "item", "type": "string", "label": "\u0422\u043e\u0432\u0430\u0440", "required": True},
             {"id": "quantity", "type": "number", "label": "\u041a\u043e\u043b-\u0432\u043e", "required": False},
@@ -1860,29 +1928,67 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 },
                 "submitLabel": "Button label.",
                 "submitPlacement": "Optional: top or bottom.",
+                "layout": "Optional stack or responsiveGrid. Use responsiveGrid for compact filters and related short fields; it automatically collapses on narrow screens.",
+                "minFieldWidth": "For responsiveGrid, optional minimum field width in pixels (120..640).",
+                "field_span": "Each field may set span to a positive grid-column count or 'full'. Use full for long text, uploads, and controls that should occupy a complete row.",
             },
         },
         "ui.table": {
-            "purpose": "Static table preview.",
+            "purpose": "Dense text/boolean/action comparison preview. Do not use a table as an image gallery or card catalog.",
             "inputs": {
-                "columns": "Array of {key,label}. Boolean columns may include kind='boolean'.",
+                "columns": "Array of {key,label,kind?}. Supported kinds are text/default, icon, boolean, and buttons; image is not a supported table cell kind.",
                 "filters": "Optional filters by row key/stateKey.",
             },
         },
         "ui.list": {
-            "purpose": "List or card preview. For cards set inputs.variant='cards'.",
+            "purpose": "List, grouped collection, or image-rich card catalog. For cards set inputs.variant='cards'.",
             "inputs": {
                 "titleKey": "Single object path used as the card title.",
                 "subtitleKey": "Single object path used as the card subtitle.",
                 "previewKey": "Single object path used as the small preview text; this is not a template engine.",
+                "imageKey": "Single object path used as the card image URL. Deterministic picsum URLs are allowed for replaceable prototype imagery.",
+                "imageAltKey": "Optional object path used as accessible image alt text; falls back to the card title.",
+                "badgeKey": "Optional object path used as the primary compact badge.",
+                "meta": "Optional array of {key,label?,kind?} descriptors for compact card metadata. kind may be text, badge, or boolean.",
+                "groupBy": "Optional object path used to group rows/cards.",
+                "groupDisplay": "For grouped cards use 'sections' or 'accordion'.",
+                "filters": (
+                    "Optional array of {key,stateKey,operator?}; operator may be equals, contains, includes, "
+                    "truthy, lte, or gte. Use numeric option values with lte/gte for numeric range filters; "
+                    "do not encode comparisons such as '<=20' into a string value. Empty/all state values do not filter. "
+                    "For a neutral 'Any' option in a numeric range selector, use an empty string value rather than 0; zero remains a valid numeric threshold."
+                ),
+                "buttons": "Optional per-item actions {id,label?,icon?,whenKey?,whenEquals?}; card buttons dispatch click:<id> actions.",
+                "cardMinWidth": "Optional responsive minimum card width in pixels (120..480).",
+                "cardImageRatio": "Optional CSS aspect ratio such as '16 / 9' or '4 / 3'.",
                 "emptyText": "Empty-state text.",
             },
             "actions": "For master-detail flows attach select actions directly to the list/table item. A typical modal detail item click uses actions=[{on:'select',type:'updateState',params:{selectedId:'$event.id'}},{on:'select',type:'openModal',params:{modalId:'detail_modal'}}].",
             "notes": [
                 "Do not put '{{a}} - {{b}}' into titleKey/subtitleKey/previewKey.",
                 "When a card needs combined text, add a derived string property to each static dataSource.value row, then point previewKey to that property.",
+                "Use cards rather than a table when images, favorites, products, people, places, media, or other visually scannable entities are central to the experience.",
+                "For image cards, every sample row should provide the imageKey value plus realistic title, preview, and metadata values.",
                 "Do not place one detached page-level 'open details' button for all master items when the natural action is selecting a concrete item.",
             ],
+        },
+        "item.details": {
+            "purpose": "Readable detail surface for the item selected in a master list, table, or card collection.",
+            "inputs": {
+                "selectedStateKey": "State key containing the selected item id; the static dataSource may be a map keyed by those ids.",
+                "fields": "Optional ordered detail field descriptors. Without fields, object properties are rendered automatically.",
+                "imageKey": "Optional object path for a large responsive detail image.",
+                "imageAltKey": "Optional object path for accessible image alt text; falls back to title/name/label.",
+                "imageRatio": "Optional aspect ratio such as '16 / 9' or '4 / 3'.",
+            },
+        },
+        "visual.image": {
+            "purpose": "A standalone responsive image/hero/detail visual. Collection thumbnails belong in ui.list variant='cards' via imageKey.",
+            "inputs": {
+                "src": "Image URL or resource reference.",
+                "alt": "Meaningful accessible alternative text.",
+                "fit": "Optional contain or cover behavior.",
+            },
         },
         "ui.actions": {
             "purpose": "A compact command surface for local prototype actions.",
@@ -1942,7 +2048,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         },
         "state_and_visibility": {
             "initialState": "pageSchema.initialState can seed local prototype values, selected modes, mock workflow state, and temporary examples.",
-            "visibleIf": "Widgets and fields may use visibleIf expressions to show different prototype surfaces based on local state. Prefer canonical expressions like $state.activeTab === 'overview'.",
+            "visibleIf": "Widgets and fields may use visibleIf expressions to show different prototype surfaces based on local state. Use canonical $state paths with ===/!== and combine conditions with &&, ||, !, and parentheses when needed.",
             "local_interaction": "Interactive prototype controls should update local page state and static/mock data only unless the user explicitly asks for a real integration. If the user asks to view an example, compare variants, choose a mode, or preview a state, include an explicit local input.commandBar/input.selector/ui.actions widget and seed matching initialState.",
         },
         "master_detail_and_tabs": {
@@ -2007,7 +2113,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
         "ui_freedom_map": {
             "forms": "May split into sections and atomic fields, reorder fields, choose more precise field types, add/remove helper text, defaults, options, validation, and submit placement.",
             "layout": "May switch stack/split/grid/sidebar patterns, remove unused areas, move widgets, and change density to match the requested experience.",
-            "display": "May use table/list/cards/details/metrics/json preview surfaces for examples, summaries, and comparison.",
+            "display": "May use table/list/cards/details/images/metrics/json preview surfaces for examples, summaries, and comparison. Prefer image-rich cards for visually scannable entities and tables for dense comparison.",
             "interaction": "May add local selectors, command bars, buttons, and visibleIf-driven states for prototype-only flows; when the user asks to choose, compare, preview, or view an example, include an explicit local control.",
             "mock_data": "May create realistic static rows/examples in the requested domain and keep them aligned with fields and display widgets.",
             "copy": "May rewrite labels, titles, section names, placeholders, helper text, and empty states in the user's language.",
@@ -2055,6 +2161,8 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "Interactive prototype elements may update local page state or static/mock data; do not invent real external integrations or side effects unless explicitly requested and declared. "
         "For early visual prototypes that need sample images, use replaceable placeholder image URLs from https://picsum.photos/ with deterministic seeds, for example https://picsum.photos/seed/recipe-salad/640/420. Treat those URLs as temporary sample assets that the user can later replace with local seed assets or generated images. "
         "When using placeholder images, put meaningful alt/title/caption text and keep the image subject aligned with the row/card domain; do not use image placeholders as final product content. "
+        "For image-rich catalogs, galleries, products, people, places, media, or similar visually scannable collections, prefer ui.list with inputs.variant='cards', imageKey, titleKey, previewKey, and useful metadata over ui.table. A ui.table image column is not supported. "
+        "When the user asks for grouped visual collections, combine ui.list cards with groupBy and groupDisplay instead of falling back to a plain table. "
         "Avoid duplicate-only, rename-only, or no-op transformations for design requests; revise the JSON before answering if the result does not visibly satisfy the request. "
         "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
         "If cards need combined text like status plus date, add a derived string property to the relevant static dataSource.value rows, then point previewKey to that property. "
@@ -2292,22 +2400,15 @@ def _generated_webui_schema_summary(schema: Mapping[str, Any]) -> dict[str, Any]
             "ui": {"$ref": "#/$defs/uiRoot"},
         },
     }
-    refs: list[str] = []
-    truncated = _collect_schema_refs(root_contract, schema, refs, set())
-    for name in BUILDER_WEBUI_SCHEMA_FORCED_DEFS:
-        before_count = len(refs)
-        truncated = (
-            _collect_schema_refs({"$ref": f"#/$defs/{name}"}, schema, refs, set(), max_refs=96)
-            or truncated
-        )
-        if len(refs) == before_count and name not in refs and _schema_def(schema, name) is not None:
-            refs.append(name)
     defs = schema.get("$defs") if isinstance(schema.get("$defs"), Mapping) else {}
     compact_defs: dict[str, Any] = {}
-    for name in refs:
+    requested_defs = tuple(dict.fromkeys((*BUILDER_WEBUI_SCHEMA_CORE_DEFS, *BUILDER_WEBUI_SCHEMA_FORCED_DEFS)))
+    for name in requested_defs:
         raw_def = defs.get(name) if isinstance(defs, Mapping) else None
         if isinstance(raw_def, Mapping):
-            compact_defs[name] = _compact_schema_node(raw_def)
+            compact_defs[name] = _strip_schema_descriptions(
+                _compact_schema_node(raw_def, max_depth=1, max_properties=72, max_enum=128)
+            )
     try:
         schema_hash = hashlib.sha256(_compact_json(schema).encode("utf-8")).hexdigest()[:12]
     except Exception:
@@ -2317,10 +2418,26 @@ def _generated_webui_schema_summary(schema: Mapping[str, Any]) -> dict[str, Any]
         "schema_id": str(schema.get("$id") or "adaos.webui.v1"),
         "schema_hash": schema_hash,
         "entrypoint": "ui.application.desktop.pageSchema",
-        "bounded": {"max_ref_depth": 14, "max_defs": 64, "truncated": bool(truncated)},
+        "bounded": {
+            "strategy": "generated_core_vocabulary",
+            "included_defs": len(compact_defs),
+            "full_schema_validation": True,
+        },
         "root_contract": _compact_schema_node(root_contract),
         "defs": compact_defs,
     }
+
+
+def _strip_schema_descriptions(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): _strip_schema_descriptions(item)
+            for key, item in value.items()
+            if str(key) != "description"
+        }
+    if isinstance(value, list):
+        return [_strip_schema_descriptions(item) for item in value]
+    return value
 
 
 def _builder_webui_abi_summary() -> dict[str, Any]:
@@ -2337,7 +2454,6 @@ def _builder_webui_abi_summary() -> dict[str, Any]:
         "schema": "adaos.webui.v1",
         "validated_by": "src/adaos/abi/webui.v1.schema.json",
         "schema_contract": schema_contract,
-        "supported_widget_contracts": _builder_runtime_component_contracts(),
         "notes": [
             "Return only the complete updated ui.application.desktop.pageSchema inside the root webui manifest.",
             "Keep dataSource static values in the widgets that render them.",
@@ -4324,7 +4440,6 @@ def _current_webui_payload(session: Mapping[str, Any], preview_state: Mapping[st
 def _builder_runtime_context(session: Mapping[str, Any], current_payload: Mapping[str, Any]) -> dict[str, Any]:
     artifact_root = _project_artifact_root(session)
     scenario_manifest = _current_scenario_yaml_manifest(artifact_root) or (_current_scenario_manifest(artifact_root) if artifact_root is not None else {})
-    current_page_schema = _extract_webui_page_schema(current_payload)
     return {
         "scenario_manifest_path": str(scenario_manifest.get("__path") or "") if scenario_manifest else "",
         "scenario_manifest_summary": {
@@ -4337,8 +4452,21 @@ def _builder_runtime_context(session: Mapping[str, Any], current_payload: Mappin
         }
         if scenario_manifest
         else {},
-        "current_page_schema": current_page_schema,
     }
+
+
+def _builder_project_memory_context(project_memory: Mapping[str, Any]) -> dict[str, Any]:
+    memory_text = str(project_memory.get("memory_text") or "").strip()
+    technical_spec_text = str(project_memory.get("technical_spec_text") or "").strip()
+    context = {
+        "source_idea": str(project_memory.get("source_idea") or "").strip(),
+        "user_summary": project_memory.get("user_summary") if isinstance(project_memory.get("user_summary"), Mapping) else {},
+        "memory_text": memory_text,
+        "current_revision": str(project_memory.get("current_revision") or "").strip(),
+    }
+    if technical_spec_text and technical_spec_text != memory_text:
+        context["technical_spec_text"] = technical_spec_text
+    return context
 
 
 def _builder_llm_webui_transform_request(
@@ -4389,7 +4517,7 @@ def _builder_llm_webui_transform_request(
         },
         "scenario_id": session.get("scenario_id"),
         "title": session.get("title"),
-        "project_memory": project_memory,
+        "project_memory": _builder_project_memory_context(project_memory),
         "runtime_context": _builder_runtime_context(session, current_payload),
         "recent_patch_history": history,
         "last_revision_delta": _latest_ui_revision_delta(session),
@@ -4612,6 +4740,27 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
         widget_type = str(widget.get("type") or "").strip()
         if not widget_type:
             return {"ok": False, "error": "page_schema_invalid", "detail": f"widgets[{widget_index}].type is required"}
+        if widget_type == "ui.table":
+            inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
+            columns = inputs.get("columns") if isinstance(inputs.get("columns"), list) else []
+            for column_index, column in enumerate(columns):
+                if not isinstance(column, Mapping):
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": f"widgets[{widget_index}].inputs.columns[{column_index}] must be an object",
+                    }
+                kind = str(column.get("kind") or "").strip().lower()
+                if kind and kind not in {"text", "icon", "boolean", "buttons", "status"}:
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": (
+                            f"widgets[{widget_index}].inputs.columns[{column_index}].kind={kind!r} is not rendered by ui.table; "
+                            "use text/icon/boolean/buttons or choose a different widget such as ui.list cards"
+                        ),
+                    }
+            continue
         if widget_type != "ui.form":
             continue
         inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
@@ -4822,8 +4971,10 @@ def _apply_llm_webui_transform(
         from adaos.sdk.llm.llm_client import send_response
 
         timeout_s = _builder_llm_timeout_s()
-        max_tokens = _builder_llm_max_tokens()
-        temperature = _builder_llm_temperature()
+        selected_model = _builder_llm_model_for_session(session, _meta)
+        max_tokens = _builder_llm_max_tokens_for_model(selected_model)
+        temperature = _builder_llm_temperature_for_model(selected_model)
+        reasoning = _builder_llm_reasoning_for_model(selected_model)
         for attempt in range(1, 3):
             request_id = _builder_llm_request_id(
                 session=session,
@@ -4849,9 +5000,10 @@ def _apply_llm_webui_transform(
             try:
                 response = send_response(
                     messages,
-                    model=_builder_llm_model_for_session(session, _meta),
-                    temperature=temperature if attempt == 1 else 0,
+                    model=selected_model,
+                    temperature=temperature if attempt == 1 else _builder_llm_temperature_for_model(selected_model, repair=True),
                     max_tokens=max_tokens,
+                    reasoning=reasoning,
                     request_id=request_id,
                     timeout=timeout_s,
                 )
@@ -5034,14 +5186,19 @@ def _repair_llm_webui_transform_output(
             job_id,
             _builder_llm_job_submit_timeout_s(),
         )
+        selected_model = _builder_llm_model_for_session(session, _meta)
         response = submit_response_job(
             [
                 {"role": "system", "content": str(request["system_prompt"])},
                 {"role": "user", "content": repair_prompt},
             ],
-            model=_builder_llm_model_for_session(session, _meta),
-            temperature=0,
-            max_tokens=_builder_llm_max_tokens(),
+            model=selected_model,
+            temperature=_builder_llm_temperature_for_model(
+                selected_model,
+                repair=True,
+            ),
+            max_tokens=_builder_llm_max_tokens_for_model(selected_model),
+            reasoning=_builder_llm_reasoning_for_model(selected_model),
             request_id=repair_request_id,
             timeout=_builder_llm_job_submit_timeout_s(),
         )
@@ -6743,11 +6900,12 @@ def create_scenario_draft(
     sid = re.sub(r"[^a-z0-9_.-]+", "_", str(scenario_id or "").strip().lower()).strip("._-") or _scenario_id_from_idea(source_idea)
     fields = _build_fields(source_idea)
     session_id = f"builder_session_{_hash_suffix(ws + sid + source_idea)}"
+    explicit_title = _explicit_prototype_title(source_idea)
     session = {
         "id": session_id,
         "webspace_id": ws,
         "status": "drafting",
-        "title": "\u0421\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a" if "shopping" in sid else sid.replace("_", " ").title(),
+        "title": explicit_title or ("\u0421\u043f\u0438\u0441\u043e\u043a \u043f\u043e\u043a\u0443\u043f\u043e\u043a" if sid.startswith("shopping_list_") else sid.replace("_", " ").title()),
         "source_idea": source_idea,
         "scenario_id": sid,
         "datasource_id": "shopping_items" if "shopping" in sid else "prototype_items",
@@ -7199,8 +7357,9 @@ def _submit_llm_webui_transform_job(
             response = submit_response_job(
                 messages,
                 model=selected_model,
-                temperature=_builder_llm_temperature(),
-                max_tokens=_builder_llm_max_tokens(),
+                temperature=_builder_llm_temperature_for_model(selected_model),
+                max_tokens=_builder_llm_max_tokens_for_model(selected_model),
+                reasoning=_builder_llm_reasoning_for_model(selected_model),
                 request_id=request_id,
                 timeout=_builder_llm_job_submit_timeout_s(),
             )
@@ -7776,8 +7935,13 @@ def _complete_llm_webui_job(
     auto_apply: bool,
     _meta: Mapping[str, Any] | None,
     local_job_id: str | None = None,
+    session_snapshot: Mapping[str, Any] | None = None,
 ) -> None:
-    session = _load_session(ws, session_id)
+    session = (
+        copy.deepcopy(dict(session_snapshot))
+        if isinstance(session_snapshot, Mapping)
+        else _load_session(ws, session_id)
+    )
     if not session:
         return
     _ensure_llm_job_link(
@@ -8047,6 +8211,7 @@ def _start_llm_webui_job_worker(
             "local_job_id": None,
             "auto_apply": auto_apply,
             "_meta": dict(_meta or {}),
+            "session_snapshot": copy.deepcopy(dict(session)),
         },
         name=f"builder-llm-job:{job_id}",
         daemon=True,
@@ -8057,103 +8222,6 @@ def _start_llm_webui_job_worker(
 def _local_llm_job_id(session: Mapping[str, Any], instruction: str) -> str:
     seed = f"{session.get('id') or ''}:{session.get('scenario_id') or ''}:{instruction}:{_now()}"
     return f"builder_llm_submit_{_hash_suffix(seed)}"
-
-
-def _start_llm_webui_submit_worker(
-    *,
-    ws: str,
-    session: Mapping[str, Any],
-    binding: Mapping[str, Any],
-    patch: Mapping[str, Any],
-    request_text: str,
-    before_webui: Mapping[str, Any] | None,
-    local_job_id: str,
-    auto_apply: bool,
-    _meta: Mapping[str, Any] | None,
-) -> None:
-    def _runner() -> None:
-        loaded = _load_session(ws, str(session.get("id") or "")) or copy.deepcopy(dict(session))
-        preview_state = loaded.get("preview_state") if isinstance(loaded.get("preview_state"), Mapping) else _preview_state(session=loaded)
-        submit_result = _submit_llm_webui_transform_job(
-            session=loaded,
-            instruction=request_text,
-            preview_state=preview_state,
-            job_nonce=local_job_id,
-            _meta=_meta,
-        )
-        topic = _builder_topic_ref(ws, session=loaded, binding=binding, _meta=_meta)
-        if not submit_result.get("pending"):
-            _mark_llm_job_failed(
-                ws=ws,
-                session=loaded,
-                job_id=local_job_id,
-                detail=str(submit_result.get("detail") or submit_result.get("error") or "llm_job_submit_failed"),
-                binding=binding,
-                topic_ref=topic,
-                _meta=_meta,
-            )
-            return
-        job_id = str(submit_result.get("job_id") or "").strip()
-        request_id = str(submit_result.get("request_id") or "").strip()
-        base_url = str(submit_result.get("base_url") or "").strip()
-        pending_jobs = dict(loaded.get("pending_llm_jobs") or {}) if isinstance(loaded.get("pending_llm_jobs"), Mapping) else {}
-        local_entry = dict(pending_jobs.get(local_job_id) or {})
-        local_entry.update(
-            {
-                "status": "submitted",
-                "root_job_id": job_id,
-                "request_id": request_id,
-                "base_url": base_url or None,
-                "submitted_at": _now(),
-                "timing": dict(submit_result.get("timing") or {}) if isinstance(submit_result.get("timing"), Mapping) else {},
-            }
-        )
-        pending_jobs[local_job_id] = local_entry
-        pending_jobs[job_id] = {
-            "schema": "adaos.builder.llm_job.v1",
-            "job_id": job_id,
-            "local_job_id": local_job_id,
-            "request_id": request_id,
-            "base_url": base_url,
-            "status": str(submit_result.get("status") or "queued"),
-            "request_text": request_text,
-            "patch_id": patch.get("id"),
-            "created_at": _now(),
-            "timing": dict(submit_result.get("timing") or {}) if isinstance(submit_result.get("timing"), Mapping) else {},
-        }
-        loaded["pending_llm_jobs"] = pending_jobs
-        _save_session(ws, loaded)
-        _safe_emit_chat(
-            str(submit_result.get("message") or (
-                f"{AGENT_LABEL}: отправил LLM-задачу для {loaded.get('scenario_id')}. Job: {job_id}."
-            )),
-            webspace_id=ws,
-            _meta=_meta,
-            session=loaded,
-            binding=binding,
-            topic_ref=topic,
-        )
-        _complete_llm_webui_job(
-            ws=ws,
-            session_id=str(loaded.get("id") or session.get("id") or ""),
-            binding=binding,
-            patch=patch,
-            request_text=request_text,
-            before_webui=before_webui,
-            job_id=job_id,
-            base_url=base_url,
-            request_id=request_id,
-            local_job_id=local_job_id,
-            auto_apply=auto_apply,
-            _meta=_meta,
-        )
-
-    thread = threading.Thread(
-        target=_runner,
-        name=f"builder-llm-submit:{local_job_id}",
-        daemon=True,
-    )
-    thread.start()
 
 
 @tool(summary="Update current scenario prototype.", side_effects="local_write")
@@ -8259,28 +8327,60 @@ def update_current_scenario(
                     "dialog": _dialog_state(ws, topic_ref=topic),
                 }
             local_job_id = _local_llm_job_id(session, text)
-            selected_model = _builder_llm_model_for_session(session, _meta)
-            pending_jobs = dict(session.get("pending_llm_jobs") or {}) if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
-            pending_jobs[local_job_id] = {
-                "schema": "adaos.builder.llm_job.v1",
-                "job_id": local_job_id,
-                "status": "submitting",
-                "request_text": text,
-                "patch_id": patch.get("id"),
-                "model": selected_model,
-                "created_at": _now(),
-            }
-            session["pending_llm_jobs"] = pending_jobs
+            submit_result = _submit_llm_webui_transform_job(
+                session=session,
+                instruction=text,
+                preview_state=base_preview,
+                job_nonce=local_job_id,
+                _meta=_meta,
+            )
+            if not submit_result.get("pending"):
+                detail = str(submit_result.get("detail") or submit_result.get("error") or "llm_job_submit_failed")
+                message = (
+                    f"{AGENT_LABEL}: не смог поставить LLM-задачу для {session.get('scenario_id')}. "
+                    f"{detail}"
+                )
+                if _is_api_tool_call(_meta):
+                    _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding, topic_ref=topic)
+                return {
+                    "ok": False,
+                    "status": "llm_submit_failed",
+                    "error": submit_result.get("error") or "llm_job_submit_failed",
+                    "detail": detail,
+                    "session_id": session.get("id"),
+                    "scenario_id": session.get("scenario_id"),
+                    "topic": {k: v for k, v in topic.items() if k != "stored"},
+                    "message": message,
+                    "llm_job": submit_result,
+                    "dialog": _dialog_state(ws, topic_ref=topic),
+                }
+            job_id = str(submit_result.get("job_id") or "").strip()
+            request_id = str(submit_result.get("request_id") or "").strip()
+            base_url = str(submit_result.get("base_url") or "").strip()
+            selected_model = str(submit_result.get("model") or _builder_llm_model_for_session(session, _meta) or "").strip()
+            _ensure_llm_job_link(
+                session,
+                local_job_id=local_job_id,
+                root_job_id=job_id,
+                request_id=request_id,
+                base_url=base_url,
+                request_text=text,
+                patch_id=patch.get("id"),
+                model=selected_model,
+                status=str(submit_result.get("status") or "queued"),
+            )
             _save_session(ws, session)
             save_done_at = time.perf_counter()
-            _start_llm_webui_submit_worker(
+            _start_llm_webui_job_worker(
                 ws=ws,
                 session=session,
                 binding=binding,
                 patch=patch,
                 request_text=text,
                 before_webui=before_webui,
-                local_job_id=local_job_id,
+                job_id=job_id,
+                base_url=base_url,
+                request_id=request_id,
                 auto_apply=auto_apply,
                 _meta=_meta,
             )
@@ -8303,15 +8403,14 @@ def update_current_scenario(
                     (worker_done_at - save_done_at) * 1000.0,
                     (dialog_done_at - worker_done_at) * 1000.0,
                 )
-            message = (
-                f"{AGENT_LABEL}: \u043f\u0440\u0438\u043d\u044f\u043b \u0437\u0430\u043f\u0440\u043e\u0441 \u0434\u043b\u044f {session.get('scenario_id')} "
-                f"\u0438 \u043e\u0442\u043f\u0440\u0430\u0432\u043b\u044f\u044e LLM-\u0437\u0430\u0434\u0430\u0447\u0443. Job: {local_job_id}."
-            )
+            message = str(submit_result.get("message") or (
+                f"{AGENT_LABEL}: отправил LLM-задачу для {session.get('scenario_id')}. Job: {job_id}."
+            ))
             if _is_api_tool_call(_meta):
                 _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding, topic_ref=topic)
             return {
                 "ok": True,
-                "status": "llm_submitting",
+                "status": "llm_pending",
                 "session_id": session.get("id"),
                 "scenario_id": session.get("scenario_id"),
                 "patch": patch,
@@ -8319,11 +8418,13 @@ def update_current_scenario(
                 "topic": {k: v for k, v in topic.items() if k != "stored"},
                 "pending_action": None,
                 "llm_job": {
-                    "job_id": local_job_id,
-                    "status": "submitting",
-                    "request_id": "",
-                    "base_url": None,
-                    "timing": {"submit_deferred": True},
+                    "job_id": job_id,
+                    "local_job_id": local_job_id,
+                    "status": str(submit_result.get("status") or "queued"),
+                    "request_id": request_id,
+                    "base_url": base_url or None,
+                    "model": selected_model or None,
+                    "timing": dict(submit_result.get("timing") or {}),
                 },
                 "message": message,
                 "dialog": dialog,

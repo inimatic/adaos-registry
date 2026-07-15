@@ -59,6 +59,26 @@ def test_manifest_declares_builder_dialog_agent() -> None:
     assert manifest["conversation"]["agents"][0]["id"] == "agent:builder_skill:builder"
 
 
+def test_explicit_app_title_wins_over_incidental_shopping_list_mention() -> None:
+    skill = _load_module()
+    idea = (
+        'Конструктор, создай мобильное приложение «Книга рецептов». '
+        'В карточке рецепта добавь действие «Добавить ингредиенты в список покупок».'
+    )
+
+    assert skill._explicit_prototype_title(idea) == "Книга рецептов"
+    assert skill._scenario_id_from_idea(idea).startswith("prototype_app_")
+    assert [field["id"] for field in skill._build_fields(idea)] == ["title", "notes", "status"]
+
+
+def test_explicit_shopping_list_title_keeps_shopping_scaffold() -> None:
+    skill = _load_module()
+    idea = 'Конструктор, создай приложение «Список покупок».'
+
+    assert skill._scenario_id_from_idea(idea).startswith("shopping_list_")
+    assert [field["id"] for field in skill._build_fields(idea)] == ["item", "quantity", "category", "done"]
+
+
 def test_builder_topic_ref_normalizes_old_session_topic_without_store(monkeypatch) -> None:
     skill = _load_module()
     calls: list[dict] = []
@@ -855,6 +875,26 @@ def test_builder_llm_temperature_defaults_to_mild_prototyping(monkeypatch) -> No
     assert skill._builder_llm_temperature() == 0.0
 
 
+def test_builder_omits_temperature_for_reasoning_model_families() -> None:
+    skill = _load_module()
+
+    assert skill._builder_llm_temperature_for_model("gpt-5") is None
+    assert skill._builder_llm_temperature_for_model("gpt-5-mini", repair=True) is None
+    assert skill._builder_llm_temperature_for_model("o4-mini") is None
+    assert skill._builder_llm_temperature_for_model("gpt-4.1", repair=True) == 0.0
+
+
+def test_builder_configures_fast_complete_json_for_gpt5(monkeypatch) -> None:
+    skill = _load_module()
+
+    monkeypatch.delenv("ADAOS_BUILDER_LLM_MAX_TOKENS", raising=False)
+    assert skill._builder_llm_reasoning_for_model("gpt-5") == {"effort": "minimal"}
+    assert skill._builder_llm_max_tokens_for_model("gpt-5") == 12000
+    assert skill._builder_llm_reasoning_for_model("gpt-5-pro") is None
+    assert skill._builder_llm_reasoning_for_model("gpt-4.1") is None
+    assert skill._builder_llm_max_tokens_for_model("gpt-4.1") == 5000
+
+
 def test_builder_llm_prompt_profile_tracks_provider_and_model(monkeypatch) -> None:
     skill = _load_module()
 
@@ -955,12 +995,8 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     skill._save_session("builder-async", session)
 
     submit_calls: list[dict] = []
-    submit_started = threading.Event()
-    release_submit = threading.Event()
 
     def _submit_response_job(messages, **kwargs):
-        submit_started.set()
-        assert release_submit.wait(3)
         submit_calls.append({"messages": list(messages), "kwargs": dict(kwargs)})
         return {
             "ok": True,
@@ -990,11 +1026,10 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
         webspace_id="builder-async",
     )
 
-    assert result["status"] == "llm_submitting"
-    assert result["llm_job"]["job_id"].startswith("builder_llm_submit_")
-    assert submit_started.wait(3)
-    assert not submit_calls
-    release_submit.set()
+    assert result["status"] == "llm_pending"
+    assert result["llm_job"]["job_id"] == "llm_job_async_test"
+    assert result["llm_job"]["local_job_id"].startswith("builder_llm_submit_")
+    assert submit_calls
     deadline = time.monotonic() + 3
     while time.monotonic() < deadline and not refresh_calls:
         time.sleep(0.02)
@@ -1063,7 +1098,7 @@ def test_update_current_scenario_blocks_parallel_llm_jobs(monkeypatch) -> None:
     def _unexpected_start_worker(**_kwargs):
         raise AssertionError("parallel LLM worker must not start")
 
-    monkeypatch.setattr(skill, "_start_llm_webui_submit_worker", _unexpected_start_worker)
+    monkeypatch.setattr(skill, "_start_llm_webui_job_worker", _unexpected_start_worker)
 
     result = skill.update_current_scenario("Добавь поле", webspace_id="desktop")
 
@@ -1392,7 +1427,8 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert user_payload["llm_prompt_profile"]["schema"] == "adaos.builder.llm_prompt_profile.v1"
     assert user_payload["llm_prompt_profile"]["id"] == "default"
     assert user_payload["llm_prompt_profile"]["variant_policy"].startswith("Prompt profiles may vary")
-    assert user_payload["runtime_context"]["current_page_schema"]["widgets"][0]["inputs"]["previewKey"] == "status"
+    assert "current_page_schema" not in user_payload["runtime_context"]
+    assert user_payload["current_webui_json"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["inputs"]["previewKey"] == "status"
     assert user_payload["runtime_component_contracts"]["ui.list"]["inputs"]["previewKey"].startswith("Single object path")
     assert "input.commandBar" in user_payload["runtime_component_contracts"]
     assert "state_and_visibility" in user_payload["runtime_component_contracts"]
@@ -1462,6 +1498,7 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "starting point only" in user_payload["project_memory"]["memory_text"]
     assert "not a fixed product contract" in user_payload["project_memory"]["user_summary"]["assumptions"][0]
     assert "local dev prototype" not in user_payload["project_memory"]["memory_text"]
+    assert len(request["user_prompt"].encode("utf-8")) < 50_000
 
 
 def test_builder_form_component_contract_validates_choice_and_grid_fields() -> None:
@@ -1903,6 +1940,28 @@ def test_builder_system_prompt_allows_replaceable_picsum_placeholders() -> None:
     assert "https://picsum.photos/" in prompt
     assert "replaceable placeholder image URLs" in prompt
     assert "local seed assets or generated images" in prompt
+
+
+def test_builder_component_contract_rejects_unrendered_table_image_cells() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "catalog",
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "catalog-table",
+                "type": "ui.table",
+                "area": "main",
+                "inputs": {"columns": [{"key": "image", "label": "Image", "kind": "image"}]},
+            }
+        ],
+    }
+
+    result = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert result["ok"] is False
+    assert result["error"] == "component_contract_invalid"
+    assert "ui.list cards" in result["detail"]
 
 
 def test_builder_webui_validation_rejects_select_without_options() -> None:
@@ -4028,7 +4087,9 @@ def test_ensure_workbench_schedules_async_direct_runtime_switch(monkeypatch) -> 
     assert result["projection"]["direct"]["mode"] == "thread"
     assert result["projection"]["event"]["skipped"] == "direct_workbench_ensure"
     assert elapsed < 0.5
-    assert [item["method"] for item in calls] == ["set_active_draft", "snapshot"]
+    methods = [item["method"] for item in calls]
+    assert methods[:2] == ["set_active_draft", "snapshot"]
+    assert methods[2:] in ([], ["ensure_dev_webspace"])
 
 
 def test_safe_emit_chat_does_not_wait_for_stuck_append(monkeypatch) -> None:
