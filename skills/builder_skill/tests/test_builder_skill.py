@@ -1868,6 +1868,30 @@ def test_builder_webui_validation_rejects_root_level_modals() -> None:
     assert "ui.application.modals" in validation["detail"]
 
 
+def test_builder_webui_validation_rejects_question_mark_encoding_loss() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "request_center",
+        "title": "Request center",
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "open-detail",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {"buttons": [{"id": "open", "label": "??????? ?????? ??????"}]},
+            }
+        ],
+    }
+    payload = {"schema": "adaos.webui.v1", "ui": {"application": {"desktop": {"pageSchema": page_schema}}}}
+
+    validation = skill._validate_builder_webui_payload(payload, {"page_schema": page_schema})
+
+    assert validation["ok"] is False
+    assert validation["error"] == "text_encoding_suspect"
+    assert "question marks" in validation["detail"]
+
+
 def test_write_webui_payload_projects_canonical_page_schema_to_scenario(tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "canonical_webui"

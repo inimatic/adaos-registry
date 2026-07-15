@@ -1842,9 +1842,11 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "previewKey": "Single object path used as the small preview text; this is not a template engine.",
                 "emptyText": "Empty-state text.",
             },
+            "actions": "For master-detail flows attach select actions directly to the list/table item. A typical modal detail item click uses actions=[{on:'select',type:'updateState',params:{selectedId:'$event.id'}},{on:'select',type:'openModal',params:{modalId:'detail_modal'}}].",
             "notes": [
                 "Do not put '{{a}} - {{b}}' into titleKey/subtitleKey/previewKey.",
                 "When a card needs combined text, add a derived string property to each static dataSource.value row, then point previewKey to that property.",
+                "Do not place one detached page-level 'open details' button for all master items when the natural action is selecting a concrete item.",
             ],
         },
         "ui.actions": {
@@ -1909,7 +1911,8 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "local_interaction": "Interactive prototype controls should update local page state and static/mock data only unless the user explicitly asks for a real integration. If the user asks to view an example, compare variants, choose a mode, or preview a state, include an explicit local input.commandBar/input.selector/ui.actions widget and seed matching initialState.",
         },
         "master_detail_and_tabs": {
-            "master_detail": "For master-detail prototypes use split/focus-detail layout, a ui.list/ui.table master widget with a select/updateState action, and detail widgets visible for the selected record.",
+            "master_detail": "For master-detail prototypes use split/focus-detail layout for side-by-side detail, or an item-triggered modal/drawer for compact detail. The master ui.list/ui.table must own the selection action; detail containers react to the selected record.",
+            "modal_detail": "If detail should open in a modal/dialog, attach openModal to the master item select/click action after updating selected state. Put detail-only secondary actions such as add comment inside the detail modal/panel, not as detached global buttons.",
             "tabs": "For tabs use input.commandBar variant='segmented' plus initialState.activeTab and visibleIf expressions on tab content widgets, unless the user asks for a static tab mock.",
             "details": "Use static data examples that show the selected/default record clearly; do not leave generic placeholder rows from the scaffold.",
         },
@@ -1945,14 +1948,14 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "interaction": "May add local selectors, command bars, buttons, and visibleIf-driven states for prototype-only flows; when the user asks to choose, compare, preview, or view an example, include an explicit local control.",
             "mock_data": "May create realistic static rows/examples in the requested domain and keep them aligned with fields and display widgets.",
             "copy": "May rewrite labels, titles, section names, placeholders, helper text, and empty states in the user's language.",
-            "modals": "When the user asks for a modal/dialog/drawer/sheet, declare it in ui.application.modals and open it with an openModal action from the page.",
+            "modals": "When the user asks for a modal/dialog/drawer/sheet, declare it in ui.application.modals and open it with an openModal action from the relevant UI element. In master-detail, the relevant element is usually the selected master row/card.",
             "natural_language_mapping": "Map ordinary words to ABI structures: modal/dialog/window -> declared modal; tab/section switch -> segmented command bar plus state-driven content; selected item/details -> master-detail; required/error/check -> field validation; compare/variants -> local switching controls.",
         },
         "self_check": [
             "Before returning JSON, compare the output to the user's request and the previous UI.",
             "If the result mostly duplicates existing widgets, preserves the same field ids in the same order, or leaves stale sample data after a design request, revise before answering.",
             "If the request asks to preview, view an example, compare alternatives, choose a mode, or switch between variants, verify the page includes a visible local control such as input.commandBar/input.selector/ui.actions plus matching updateState and initialState/visibleIf before answering.",
-            "If the user asks for a modal/dialog/drawer/sheet, verify ui.application.modals contains the surface and some page action opens it with type openModal.",
+            "If the user asks for a modal/dialog/drawer/sheet, verify ui.application.modals contains the surface and a relevant item/control action opens it with type openModal.",
             "Verify local visibility expressions use $state.<key> comparisons, for example $state.activeTab === 'overview'.",
             "If the user explicitly asks for local elements, controls, or a way to view examples, static mock rows alone are not enough; add a dedicated control widget that changes local state.",
             "Before answering mixed requests, make an internal checklist from each user-request clause and revise if any clause is only implied rather than visibly represented.",
@@ -1993,7 +1996,8 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "When the user asks to choose between variants, compare layouts, preview examples, view sample state, use local elements, add elements for viewing an example, or switch modes, add an explicit local control such as input.commandBar, input.selector, or ui.actions with local updateState and visibleIf/initialState instead of only duplicating static content or sample rows. "
         "A requested local control is not complete unless at least one widget or form field visibly reacts to the local state set by that control. "
         "Use canonical visibility expressions like $state.activeTab === 'overview'; avoid state.activeTab == 'overview' in new output. "
-        "For master-detail prototypes use a split or focus-detail layout, a master ui.list/ui.table with select/updateState, and detail widgets that react to selected state. "
+        "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
+        "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
         "For tabbed content, use input.commandBar with variant='segmented', initialState for the active tab, and visibleIf on the tab content widgets. "
         "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget. "
         "If the user says things like 'add a modal window', 'make tabs', 'show details after selecting an item', 'validate this field', or similar localized phrases, infer the corresponding internal widgets/actions without asking the user to mention schema property names. "
@@ -4223,6 +4227,32 @@ def _iter_mapping_nodes(value: Any, path: str = "$") -> Iterable[tuple[str, Mapp
             yield from _iter_mapping_nodes(child, f"{path}[{index}]")
 
 
+def _iter_text_nodes(value: Any, path: str = "$") -> Iterable[tuple[str, str]]:
+    if isinstance(value, str):
+        yield path, value
+        return
+    if isinstance(value, Mapping):
+        for key, child in value.items():
+            yield from _iter_text_nodes(child, f"{path}.{key}")
+        return
+    if isinstance(value, list):
+        for index, child in enumerate(value):
+            yield from _iter_text_nodes(child, f"{path}[{index}]")
+
+
+def _validate_webui_text_integrity(payload: Mapping[str, Any]) -> dict[str, Any]:
+    application = _extract_webui_application(payload)
+    for path, text in _iter_text_nodes(application, "$.ui.application"):
+        if re.search(r"\?{4,}", text):
+            snippet = text[:80].replace("\n", "\\n")
+            return {
+                "ok": False,
+                "error": "text_encoding_suspect",
+                "detail": f"{path} contains a long run of question marks; probable encoding loss: {snippet!r}",
+            }
+    return {"ok": True}
+
+
 def _modal_id_from_open_modal_action(action: Mapping[str, Any]) -> str:
     params = action.get("params") if isinstance(action.get("params"), Mapping) else {}
     for candidate in (params.get("modalId"), params.get("modal_id"), action.get("modalId"), action.get("openModal")):
@@ -4347,6 +4377,9 @@ def _validate_builder_webui_payload(payload: Mapping[str, Any], preview_state: M
             "error": "page_schema_missing",
             "detail": "LLM response must contain ui.application.desktop.pageSchema",
         }
+    text_validation = _validate_webui_text_integrity(payload)
+    if not text_validation.get("ok"):
+        return text_validation
     component_validation = _validate_page_schema_component_contracts(page_schema)
     if not component_validation.get("ok"):
         return component_validation
