@@ -1654,7 +1654,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                     "selection_guidance": [
                         "Choose the most semantically precise supported type; use text only when no more specific type fits.",
                         "Refactor existing generic text fields into more precise types whenever the current label or user instruction implies one.",
-                        "Prefer atomic inputs over broad composite fields: split contacts, personal data, address, schedule, or preferences into specific fields when useful.",
+                        "Prefer atomic inputs over broad composite fields; in forms do not leave contacts, personal data, address, schedule, or preferences as one generic field when concrete subfields are implied.",
                         "Use email/url/phone/password/pin for typed contact or secret inputs.",
                         "Use textarea/paragraph/longText for multi-line descriptions.",
                         "Use date/time/dateTime/dateRange/timeRange for temporal input.",
@@ -1727,7 +1727,31 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "selectedStateKey": "State key that stores the selected button id.",
                 "buttons": "Array of {id,label,icon?}.",
             },
-            "actions": "For local prototype interaction use actions=[{on:'click', type:'updateState', params:{stateKey:'$event.id'}}].",
+            "actions": "For local prototype interaction use actions=[{on:'click', type:'updateState', params:{selectedMode:'$event.id'}}] where selectedMode is the concrete state key. A control is incomplete unless another widget or field visibly reacts to that state.",
+            "example_pattern": {
+                "initialState": {"exampleMode": "empty"},
+                "widgets": [
+                    {
+                        "id": "example-mode",
+                        "type": "input.commandBar",
+                        "inputs": {
+                            "variant": "segmented",
+                            "selectedStateKey": "exampleMode",
+                            "buttons": [{"id": "empty", "label": "Empty"}, {"id": "sample", "label": "Example"}],
+                        },
+                        "actions": [{"on": "click", "type": "updateState", "params": {"exampleMode": "$event.id"}}],
+                    },
+                    {
+                        "id": "sample-preview",
+                        "type": "item.details",
+                        "visibleIf": "state.exampleMode == 'sample'",
+                        "dataSource": {
+                            "kind": "static",
+                            "value": {"title": "Example values", "fields": ["Replace with realistic sample values"]},
+                        },
+                    },
+                ],
+            },
         },
         "input.selector": {
             "purpose": "Dropdown-like local selector when a compact choice control is more appropriate than buttons.",
@@ -1740,7 +1764,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         "state_and_visibility": {
             "initialState": "pageSchema.initialState can seed local prototype values, selected modes, mock workflow state, and temporary examples.",
             "visibleIf": "Widgets and fields may use visibleIf expressions to show different prototype surfaces based on local state.",
-            "local_interaction": "Interactive prototype controls should update local page state and static/mock data only unless the user explicitly asks for a real integration.",
+            "local_interaction": "Interactive prototype controls should update local page state and static/mock data only unless the user explicitly asks for a real integration. If the user asks to view an example, compare variants, choose a mode, or preview a state, include an explicit local input.commandBar/input.selector/ui.actions widget and seed matching initialState.",
         },
         "layout": {
             "patterns": "Use stack for linear flows, split/sidebar-content for supporting panels, grid/dashboard for overview surfaces, and flow-like layouts for compact prototypes.",
@@ -1760,6 +1784,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
         ],
         "meaningful_transformation": [
             "Treat current_webui_json as the starting material, not as a constraint to preserve.",
+            "Treat every explicit clause in the user's instruction as a separate requirement; broad first clauses must not cause later clauses to be dropped.",
             "When the user asks for a prototype/design/layout/workflow change, make a visible semantic change, not a rename-only, duplicate-only, or no-op patch.",
             "Change fields, grouping, order, labels, helper text, component types, layout areas, density, widgets, actions, and mock data when that better serves the request.",
             "Turn broad categories into concrete interface decisions: split composite inputs, replace vague text fields with precise supported controls, and add realistic options/examples.",
@@ -1776,6 +1801,9 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
         "self_check": [
             "Before returning JSON, compare the output to the user's request and the previous UI.",
             "If the result mostly duplicates existing widgets, preserves the same field ids in the same order, or leaves stale sample data after a design request, revise before answering.",
+            "If the request asks to preview, view an example, compare alternatives, choose a mode, or switch between variants, verify the page includes a visible local control such as input.commandBar/input.selector/ui.actions plus matching updateState and initialState/visibleIf before answering.",
+            "If the user explicitly asks for local elements, controls, or a way to view examples, static mock rows alone are not enough; add a dedicated control widget that changes local state.",
+            "Before answering mixed requests, make an internal checklist from each user-request clause and revise if any clause is only implied rather than visibly represented.",
             "Prefer a compact, inspectable prototype over exhaustive UI, but do not omit requested data-capture behavior.",
         ],
     }
@@ -1797,18 +1825,20 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "Return the complete updated pageSchema under ui.application.desktop.pageSchema; do not return preview_state, current_ui, or a root-level page_schema. "
         "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
         "Treat the current UI as starting material, not as a fixed contract: make meaningful visible changes when the request implies design, workflow, layout, or prototype evolution. "
+        "Decompose the user's instruction into explicit requirements and satisfy each one; do not let a broad form/layout request hide later requirements such as examples, local controls, variant switching, translations, or sample data. "
         "Use the supplied prototyping_affordances to vary field order, grouping, labels, field types, layout, widgets, local interactions, and mock data when that better fits the user's request. "
         "Interactive prototype elements may update local page state or static/mock data; do not invent real external integrations or side effects unless explicitly requested and declared. "
         "Avoid duplicate-only, rename-only, or no-op transformations for design requests; revise the JSON before answering if the result does not visibly satisfy the request. "
         "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
         "If cards need combined text like status plus date, add a derived string property to the relevant static dataSource.value rows, then point previewKey to that property. "
         "Use the supplied compact adaos.webui.v1 ABI summary as the webui.json compatibility contract. "
-        "When creating or editing ui.form fields, choose the most semantically precise supported formFieldType from the ABI enum; use generic text only as a fallback. "
+        "When creating or editing ui.form fields, put the most semantically precise supported form field type in each field's required 'type' property; the ABI enum for that property is named formFieldType. Use generic text only as a fallback. "
         "Do not preserve an existing generic text field when the user's request or the field label clearly implies a more specific supported type. "
-        "Break broad or composite user concepts into atomic fields when that creates a better prototype: contacts may become email plus phone/messenger, personal data may become name plus contact fields, preferences may become choices plus an optional other field. "
+        "Break broad or composite user concepts into atomic fields when creating forms: contacts should normally become email plus phone/messenger fields, personal data should become name plus relevant contact fields, and preferences should become concrete choices plus optional other text when appropriate. "
         "When the user asks people to select, mark, rate, upload, schedule, or enter structured values, model that as editable ui.form fields instead of a read-only table unless the user explicitly asks for a static table. "
         "For questionnaire, survey, registration, application, and intake prototypes, treat phrases such as indicate, choose, mark, attach, rate, enter, or their localized equivalents as data-capture requirements that need ui.form fields. "
-        "When the user asks to choose between variants, compare layouts, preview examples, or switch modes, add an explicit local control such as input.commandBar, input.selector, or ui.actions with local state/visibleIf instead of only duplicating static content. "
+        "When the user asks to choose between variants, compare layouts, preview examples, view sample state, use local elements, add elements for viewing an example, or switch modes, add an explicit local control such as input.commandBar, input.selector, or ui.actions with local updateState and visibleIf/initialState instead of only duplicating static content or sample rows. "
+        "A requested local control is not complete unless at least one widget or form field visibly reacts to the local state set by that control. "
         "Static ui.table/ui.list widgets may preview sample data, but they must not replace the fields used to collect the user's answers. "
         "Represent emails, URLs, phones, dates, times, ranges, files, one-choice inputs, multi-choice inputs, ratings, scales, and grid/matrix questions with their dedicated field types when supported. "
         "You are responsible for all domain-specific content: sample rows, translations, labels, examples, copy, and mock data. "
@@ -2952,7 +2982,20 @@ def _write_scenario_page_schema(root: Path, preview_state: Mapping[str, Any]) ->
 
 def _save_session(webspace_id: str, session: dict[str, Any]) -> dict[str, Any]:
     session["updated_at"] = _now()
+    _normalise_pending_llm_jobs(session)
     sessions = _sessions(webspace_id)
+    existing = sessions.get(str(session.get("id") or ""))
+    if isinstance(existing, Mapping):
+        _log_pending_llm_job_state_races(
+            scenario_id=str(session.get("scenario_id") or existing.get("scenario_id") or ""),
+            existing=existing.get("pending_llm_jobs") if isinstance(existing.get("pending_llm_jobs"), Mapping) else {},
+            incoming=session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), Mapping) else {},
+        )
+        session["pending_llm_jobs"] = _merge_pending_llm_jobs(
+            existing.get("pending_llm_jobs") if isinstance(existing.get("pending_llm_jobs"), Mapping) else {},
+            session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), Mapping) else {},
+        )
+        _normalise_pending_llm_jobs(session)
     sessions[str(session["id"])] = copy.deepcopy(session)
     _mem_set_many(
         {
@@ -6609,6 +6652,309 @@ def _mark_llm_job_failed(
 
 
 _ACTIVE_LLM_JOB_STATUSES = frozenset({"submitting", "submitted", "queued", "running"})
+_TERMINAL_LLM_JOB_STATUSES = frozenset({"succeeded", "failed", "cancelled", "canceled"})
+
+
+def _llm_job_related_ids(key: str, value: Mapping[str, Any]) -> set[str]:
+    return {
+        item
+        for item in {
+            str(key or "").strip(),
+            str(value.get("job_id") or "").strip(),
+            str(value.get("local_job_id") or "").strip(),
+            str(value.get("root_job_id") or "").strip(),
+        }
+        if item
+    }
+
+
+def _log_pending_llm_job_state_races(
+    *,
+    scenario_id: str,
+    existing: Mapping[str, Any] | None,
+    incoming: Mapping[str, Any] | None,
+) -> None:
+    existing_items = [
+        (str(key), dict(value), _llm_job_related_ids(str(key), value))
+        for key, value in (existing or {}).items()
+        if isinstance(value, Mapping)
+    ]
+    for key, value in (incoming or {}).items():
+        if not isinstance(value, Mapping):
+            continue
+        incoming_status = str(value.get("status") or "").strip().lower()
+        if incoming_status not in _ACTIVE_LLM_JOB_STATUSES:
+            continue
+        incoming_ids = _llm_job_related_ids(str(key), value)
+        if not incoming_ids:
+            continue
+        for existing_key, existing_value, existing_ids in existing_items:
+            if not (incoming_ids & existing_ids):
+                continue
+            existing_status = str(existing_value.get("status") or "").strip().lower()
+            if existing_status not in _TERMINAL_LLM_JOB_STATUSES:
+                continue
+            _LOG.warning(
+                "builder pending LLM job state race ignored scenario=%s incoming_job=%s incoming_status=%s existing_job=%s existing_status=%s root_job_id=%s local_job_id=%s patch_id=%s request_id=%s",
+                scenario_id,
+                str(key),
+                incoming_status,
+                existing_key,
+                existing_status,
+                str(value.get("root_job_id") or existing_value.get("root_job_id") or ""),
+                str(value.get("local_job_id") or existing_value.get("local_job_id") or ""),
+                str(value.get("patch_id") or existing_value.get("patch_id") or ""),
+                str(value.get("request_id") or existing_value.get("request_id") or ""),
+            )
+            break
+
+
+def _merged_llm_job_status(existing: str, incoming: str) -> str:
+    left = str(existing or "").strip().lower()
+    right = str(incoming or "").strip().lower()
+    if left == "failed" or right == "failed":
+        return "failed"
+    if left in _TERMINAL_LLM_JOB_STATUSES:
+        return left
+    if right in _TERMINAL_LLM_JOB_STATUSES:
+        return right
+    rank = {"": 0, "submitting": 1, "submitted": 2, "queued": 3, "running": 4}
+    return right if rank.get(right, 0) >= rank.get(left, 0) else left
+
+
+def _merge_pending_llm_jobs(
+    existing: Mapping[str, Any] | None,
+    incoming: Mapping[str, Any] | None,
+) -> dict[str, dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {
+        str(key): dict(value)
+        for key, value in (existing or {}).items()
+        if isinstance(value, Mapping)
+    }
+    for key, value in (incoming or {}).items():
+        if not isinstance(value, Mapping):
+            continue
+        token = str(key or "").strip()
+        if not token:
+            continue
+        current = dict(merged.get(token) or {})
+        incoming_item = dict(value)
+        status = _merged_llm_job_status(
+            str(current.get("status") or ""),
+            str(incoming_item.get("status") or ""),
+        )
+        current.update({k: v for k, v in incoming_item.items() if v not in (None, "")})
+        if status:
+            current["status"] = status
+        for link_key in ("job_id", "local_job_id", "root_job_id", "request_id", "base_url", "patch_id", "request_text"):
+            if not current.get(link_key) and incoming_item.get(link_key):
+                current[link_key] = incoming_item.get(link_key)
+        for time_key in ("created_at", "submitted_at", "started_at"):
+            if current.get(time_key) is None and incoming_item.get(time_key) is not None:
+                current[time_key] = incoming_item.get(time_key)
+        if current.get("finished_at") is not None or incoming_item.get("finished_at") is not None:
+            try:
+                current["finished_at"] = max(float(current.get("finished_at") or 0.0), float(incoming_item.get("finished_at") or 0.0))
+            except Exception:
+                current["finished_at"] = current.get("finished_at") or incoming_item.get("finished_at")
+        merged[token] = current
+    holder: dict[str, Any] = {"pending_llm_jobs": merged}
+    _normalise_pending_llm_jobs(holder)
+    return {
+        str(key): dict(value)
+        for key, value in (holder.get("pending_llm_jobs") or {}).items()
+        if isinstance(value, Mapping)
+    }
+
+
+def _ensure_llm_job_link(
+    session: dict[str, Any],
+    *,
+    local_job_id: str | None,
+    root_job_id: str | None,
+    request_id: str | None = None,
+    base_url: str | None = None,
+    request_text: str | None = None,
+    patch_id: Any = None,
+    status: str | None = None,
+) -> None:
+    local_id = str(local_job_id or "").strip()
+    root_id = str(root_job_id or "").strip()
+    if not local_id and not root_id:
+        return
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
+    updated = dict(pending)
+    now = _now()
+    base_fields = {
+        "schema": "adaos.builder.llm_job.v1",
+        "request_id": str(request_id or "").strip() or None,
+        "base_url": str(base_url or "").strip() or None,
+        "request_text": str(request_text or ""),
+        "patch_id": patch_id,
+    }
+    if local_id:
+        local_entry = dict(updated.get(local_id) or {})
+        local_entry.setdefault("schema", "adaos.builder.llm_job.v1")
+        local_entry["job_id"] = local_entry.get("job_id") or local_id
+        if root_id:
+            local_entry["root_job_id"] = root_id
+        if request_id:
+            local_entry["request_id"] = str(request_id)
+        if base_url:
+            local_entry["base_url"] = str(base_url)
+        if request_text:
+            local_entry.setdefault("request_text", str(request_text))
+        if patch_id is not None:
+            local_entry.setdefault("patch_id", patch_id)
+        local_entry.setdefault("created_at", now)
+        if status:
+            local_entry["status"] = _merged_llm_job_status(str(local_entry.get("status") or ""), status)
+        else:
+            local_entry.setdefault("status", "submitted" if root_id else "submitting")
+        updated[local_id] = local_entry
+    if root_id:
+        root_entry = dict(updated.get(root_id) or {})
+        root_entry.update({k: v for k, v in base_fields.items() if v not in (None, "")})
+        root_entry["job_id"] = root_id
+        if local_id:
+            root_entry["local_job_id"] = local_id
+        root_entry.setdefault("created_at", now)
+        root_entry["status"] = _merged_llm_job_status(str(root_entry.get("status") or ""), status or "queued")
+        updated[root_id] = root_entry
+    session["pending_llm_jobs"] = updated
+    _normalise_pending_llm_jobs(session)
+
+
+def _normalise_pending_llm_jobs(session: dict[str, Any]) -> None:
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
+    if not isinstance(pending, dict) or not pending:
+        return
+    updated = {str(key): dict(value) for key, value in pending.items() if isinstance(value, Mapping)}
+    groups: dict[str, set[str]] = {}
+    for key, value in updated.items():
+        related = {
+            key,
+            str(value.get("job_id") or "").strip(),
+            str(value.get("local_job_id") or "").strip(),
+            str(value.get("root_job_id") or "").strip(),
+        }
+        related = {item for item in related if item}
+        if not related:
+            continue
+        group_key = sorted(related)[0]
+        merged = set(related)
+        for existing_key, existing_ids in list(groups.items()):
+            if merged & existing_ids:
+                merged |= existing_ids
+                groups.pop(existing_key, None)
+        groups[group_key] = merged
+    now = _now()
+    for related_ids in groups.values():
+        terminal_status = ""
+        terminal_detail = ""
+        finished_at = 0.0
+        for related_id in related_ids:
+            item = updated.get(related_id)
+            if not isinstance(item, Mapping):
+                continue
+            status = str(item.get("status") or "").strip().lower()
+            if status in _TERMINAL_LLM_JOB_STATUSES:
+                if status == "failed":
+                    terminal_status = "failed"
+                elif not terminal_status:
+                    terminal_status = status
+                terminal_detail = terminal_detail or str(item.get("detail") or "")
+                try:
+                    finished_at = max(finished_at, float(item.get("finished_at") or 0.0))
+                except Exception:
+                    pass
+        if not terminal_status:
+            continue
+        for related_id in related_ids:
+            if not isinstance(updated.get(related_id), Mapping):
+                continue
+            item = dict(updated[related_id])
+            item["status"] = terminal_status
+            item.setdefault("finished_at", finished_at or now)
+            if terminal_detail and not item.get("detail"):
+                item["detail"] = terminal_detail
+            updated[related_id] = item
+    session["pending_llm_jobs"] = updated
+
+
+def _reconcile_pending_llm_jobs_from_revisions(session: dict[str, Any]) -> bool:
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
+    if not isinstance(pending, dict) or not pending:
+        return False
+    active_items = [
+        (str(key), dict(value))
+        for key, value in pending.items()
+        if isinstance(value, Mapping)
+        and str(value.get("status") or "").strip().lower() in _ACTIVE_LLM_JOB_STATUSES
+    ]
+    if not active_items:
+        return False
+    revision_dir = _ui_revision_dir(str(session.get("artifact_root") or ""))
+    if revision_dir is None or not revision_dir.exists():
+        return False
+    try:
+        revision_files = sorted(
+            revision_dir.glob("*.json"),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )[:20]
+    except Exception:
+        return False
+    changed = False
+    for revision_file in revision_files:
+        payload = _read_json_file(revision_file)
+        patch = payload.get("patch") if isinstance(payload.get("patch"), Mapping) else {}
+        if not patch:
+            continue
+        patch_id = str(patch.get("id") or "").strip()
+        request = payload.get("request") if isinstance(payload.get("request"), Mapping) else {}
+        request_text = str(request.get("text") or patch.get("summary") or "").strip()
+        patch_diff = patch.get("diff") if isinstance(patch.get("diff"), Mapping) else {}
+        attempts = patch_diff.get("attempts") if isinstance(patch_diff.get("attempts"), list) else []
+        root_job_id = ""
+        request_id = ""
+        for attempt in attempts:
+            if not isinstance(attempt, Mapping):
+                continue
+            root_job_id = root_job_id or str(attempt.get("job_id") or "").strip()
+            request_id = request_id or str(attempt.get("request_id") or "").strip()
+        for job_key, job in active_items:
+            job_patch_id = str(job.get("patch_id") or "").strip()
+            job_request_text = str(job.get("request_text") or "").strip()
+            if patch_id and job_patch_id == patch_id:
+                matched = True
+            elif request_text and job_request_text == request_text:
+                matched = True
+            else:
+                matched = False
+            if not matched:
+                continue
+            _ensure_llm_job_link(
+                session,
+                local_job_id=str(job.get("local_job_id") or job_key or "").strip(),
+                root_job_id=root_job_id,
+                request_id=request_id,
+                base_url=str(job.get("base_url") or ""),
+                request_text=job_request_text or request_text,
+                patch_id=job_patch_id or patch_id,
+                status="submitted",
+            )
+            _update_llm_job_status(session, root_job_id or job_key, "succeeded")
+            _LOG.warning(
+                "builder pending LLM job reconciled from revision artifact scenario=%s local_job_id=%s root_job_id=%s patch_id=%s revision=%s",
+                str(session.get("scenario_id") or ""),
+                str(job.get("local_job_id") or job_key or ""),
+                root_job_id,
+                job_patch_id or patch_id,
+                str(payload.get("revision") or revision_file.stem),
+            )
+            changed = True
+    return changed
 
 
 def _update_llm_job_status(
@@ -6660,6 +7006,9 @@ def _update_llm_job_status(
 
 
 def _active_llm_job(session: Mapping[str, Any]) -> dict[str, Any] | None:
+    if isinstance(session, dict):
+        _reconcile_pending_llm_jobs_from_revisions(session)
+        _normalise_pending_llm_jobs(session)
     pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
     if not isinstance(pending, Mapping):
         return None
@@ -6705,10 +7054,21 @@ def _complete_llm_webui_job(
     request_id: str,
     auto_apply: bool,
     _meta: Mapping[str, Any] | None,
+    local_job_id: str | None = None,
 ) -> None:
     session = _load_session(ws, session_id)
     if not session:
         return
+    _ensure_llm_job_link(
+        session,
+        local_job_id=local_job_id,
+        root_job_id=job_id,
+        request_id=request_id,
+        base_url=base_url,
+        request_text=request_text,
+        patch_id=patch.get("id") if isinstance(patch, Mapping) else None,
+        status="submitted",
+    )
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
     started_at = _now()
     timeout_s = _builder_llm_job_timeout_s()
@@ -6889,6 +7249,7 @@ def _start_llm_webui_job_worker(
             "job_id": job_id,
             "base_url": base_url,
             "request_id": request_id,
+            "local_job_id": None,
             "auto_apply": auto_apply,
             "_meta": dict(_meta or {}),
         },
@@ -6987,6 +7348,7 @@ def _start_llm_webui_submit_worker(
             job_id=job_id,
             base_url=base_url,
             request_id=request_id,
+            local_job_id=local_job_id,
             auto_apply=auto_apply,
             _meta=_meta,
         )
@@ -7393,7 +7755,12 @@ def get_session(
     preview = (session or {}).get("preview_state") if isinstance(session, dict) else None
     workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False)
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
+    session_changed = False
+    if isinstance(session, dict):
+        session_changed = _reconcile_pending_llm_jobs_from_revisions(session)
     if isinstance(session, dict) and _sync_session_from_artifacts(session, binding):
+        session_changed = True
+    if isinstance(session, dict) and session_changed:
         _save_session(ws, session)
         preview = session.get("preview_state") if isinstance(session.get("preview_state"), Mapping) else preview
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)

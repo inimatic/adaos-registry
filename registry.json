@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-15T06:23:53+00:00",
+  "updated_at": "2026-07-15T06:30:51+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -92,8 +92,8 @@
       "kind": "skill",
       "id": "conversation_companions",
       "name": "conversation_companions",
-      "version": "0.1.11",
-      "updated_at": "2026-07-05T04:52:42+00:00",
+      "version": "0.1.12",
+      "updated_at": "2026-07-05T04:54:28+00:00",
       "path": "skills/conversation_companions",
       "manifest": "skills/conversation_companions/skill.yaml",
       "source": {
@@ -566,7 +566,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-07-02T21:27:18+00:00",
+      "updated_at": "2026-07-15T06:30:52+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
@@ -718,6 +718,7 @@
         "name": "infrascope",
         "id": "infrascope"
       },
+      "title": "Infrascope",
       "description": "Operator control-plane scenario for overview, inventory, and in-context object inspection.",
       "skills": {
         "required": [
@@ -742,6 +743,7 @@
         "name": "new_face_vision",
         "id": "new_face_vision_scenario"
       },
+      "title": "New Face Vision",
       "description": "Desktop scenario for frame analysis through new_face_vision_skill.",
       "manifest_id": "new_face_vision_scenario",
       "skills": {
@@ -767,6 +769,7 @@
         "name": "prompt_engineer_scenario",
         "id": "prompt_engineer_scenario"
       },
+      "title": "Prompt IDE",
       "description": "Prompt engineering IDE workspace for dev skills and scenarios.",
       "skills": {
         "required": [
@@ -791,6 +794,7 @@
         "name": "redevice_user_face",
         "id": "redevice_user_face"
       },
+      "title": "ReDevice User Face",
       "description": "Scenario that groups ReDevice endpoint settings, slideshow, and voice endpoint skills around the Endpoint Registry model.",
       "skills": {
         "required": [
@@ -820,6 +824,7 @@
         "name": "taiga_ui_demo_scenario",
         "id": "taiga_ui_demo_scenario"
       },
+      "title": "Taiga UI Demo Scenario",
       "description": "Desktop demo scenario for the first semantic Web UI control task with a table, chart payload, and live event stream.",
       "skills": {
         "required": [
@@ -845,6 +850,7 @@
         "name": "web_desktop",
         "id": "web_desktop"
       },
+      "title": "Web Desktop",
       "description": "Desktop shell scenario that defines the main UI layout, registry and base catalog.",
       "skills": {
         "required": [

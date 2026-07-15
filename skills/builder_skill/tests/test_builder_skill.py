@@ -4,6 +4,7 @@ import asyncio
 import copy
 import importlib.util
 import json
+import logging
 import sys
 import threading
 import time
@@ -1038,6 +1039,151 @@ def test_update_current_scenario_blocks_parallel_llm_jobs(monkeypatch) -> None:
     assert session["pending_llm_jobs"]["llm_job_busy"]["status"] == "succeeded"
 
 
+def test_llm_job_link_normalises_terminal_status_after_stale_session_load() -> None:
+    skill = _load_module()
+    session = {
+        "id": "builder_session_race",
+        "pending_llm_jobs": {
+            "builder_llm_submit_race": {
+                "schema": "adaos.builder.llm_job.v1",
+                "job_id": "builder_llm_submit_race",
+                "status": "submitting",
+                "request_text": "change ui",
+                "created_at": time.time(),
+            }
+        },
+    }
+
+    skill._ensure_llm_job_link(
+        session,
+        local_job_id="builder_llm_submit_race",
+        root_job_id="llm_job_race",
+        request_id="request-race",
+        base_url="https://api.inimatic.com",
+        request_text="change ui",
+        patch_id="patch-race",
+        status="submitted",
+    )
+    skill._update_llm_job_status(session, "llm_job_race", "succeeded")
+
+    assert skill._active_llm_job(session) is None
+    assert session["pending_llm_jobs"]["builder_llm_submit_race"]["status"] == "succeeded"
+    assert session["pending_llm_jobs"]["llm_job_race"]["status"] == "succeeded"
+    assert session["pending_llm_jobs"]["builder_llm_submit_race"]["root_job_id"] == "llm_job_race"
+    assert session["pending_llm_jobs"]["llm_job_race"]["local_job_id"] == "builder_llm_submit_race"
+
+
+def test_active_llm_job_reconciles_orphan_local_job_from_ui_revision(tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "prototype"
+    revision_dir = artifact_root / "ui_revisions"
+    revision_dir.mkdir(parents=True)
+    (revision_dir / "001.json").write_text(
+        json.dumps(
+            {
+                "schema": "adaos.builder.ui_revision.v1",
+                "revision": "001",
+                "request": {"text": "change ui"},
+                "patch": {
+                    "id": "patch-race",
+                    "operation": "llm_webui_transform",
+                    "diff": {
+                        "attempts": [
+                            {
+                                "attempt": 1,
+                                "ok": True,
+                                "request_id": "request-race",
+                                "job_id": "llm_job_race",
+                            }
+                        ]
+                    },
+                },
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    session = {
+        "id": "builder_session_race",
+        "artifact_root": str(artifact_root),
+        "pending_llm_jobs": {
+            "builder_llm_submit_race": {
+                "schema": "adaos.builder.llm_job.v1",
+                "job_id": "builder_llm_submit_race",
+                "status": "submitting",
+                "request_text": "change ui",
+                "patch_id": "patch-race",
+                "created_at": time.time(),
+            }
+        },
+    }
+
+    assert skill._active_llm_job(session) is None
+    assert session["pending_llm_jobs"]["builder_llm_submit_race"]["status"] == "succeeded"
+    assert session["pending_llm_jobs"]["llm_job_race"]["status"] == "succeeded"
+
+
+def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state(caplog) -> None:
+    skill = _load_module()
+    skill._FALLBACK_MEMORY.clear()
+    webspace_id = "builder-merge-jobs"
+    skill._save_session(
+        webspace_id,
+        {
+            "id": "builder_session_merge",
+            "pending_llm_jobs": {
+                "builder_llm_submit_merge": {
+                    "schema": "adaos.builder.llm_job.v1",
+                    "job_id": "builder_llm_submit_merge",
+                    "status": "submitted",
+                    "root_job_id": "llm_job_merge",
+                    "request_text": "change ui",
+                    "patch_id": "patch-merge",
+                    "created_at": time.time(),
+                },
+                "llm_job_merge": {
+                    "schema": "adaos.builder.llm_job.v1",
+                    "job_id": "llm_job_merge",
+                    "local_job_id": "builder_llm_submit_merge",
+                    "status": "succeeded",
+                    "request_text": "change ui",
+                    "patch_id": "patch-merge",
+                    "finished_at": time.time(),
+                },
+            },
+        },
+    )
+
+    caplog.set_level(logging.WARNING, logger=skill._LOG.name)
+    skill._save_session(
+        webspace_id,
+        {
+            "id": "builder_session_merge",
+            "scenario_id": "merge_scenario",
+            "pending_llm_jobs": {
+                "builder_llm_submit_merge": {
+                    "schema": "adaos.builder.llm_job.v1",
+                    "job_id": "builder_llm_submit_merge",
+                    "status": "submitting",
+                    "request_text": "change ui",
+                    "patch_id": "patch-merge",
+                    "created_at": time.time(),
+                }
+            },
+        },
+    )
+
+    loaded = skill._load_session(webspace_id, "builder_session_merge")
+    assert loaded is not None
+    pending = loaded["pending_llm_jobs"]
+    assert pending["builder_llm_submit_merge"]["status"] == "succeeded"
+    assert pending["builder_llm_submit_merge"]["root_job_id"] == "llm_job_merge"
+    assert pending["llm_job_merge"]["status"] == "succeeded"
+    assert pending["llm_job_merge"]["local_job_id"] == "builder_llm_submit_merge"
+    assert "builder pending LLM job state race ignored" in caplog.text
+    assert "merge_scenario" in caplog.text
+
+
 def test_submit_llm_webui_transform_job_retries_request_id_conflict(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
@@ -1147,9 +1293,11 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "input.commandBar" in user_payload["runtime_component_contracts"]
     assert "state_and_visibility" in user_payload["runtime_component_contracts"]
     assert "visibleIf" in user_payload["runtime_component_contracts"]["state_and_visibility"]
+    assert "view an example" in user_payload["runtime_component_contracts"]["state_and_visibility"]["local_interaction"]
     affordances = user_payload["prototyping_affordances"]
     assert affordances["role"] == "Adaptive UI prototyping designer-programmer."
-    assert "visible semantic change" in affordances["meaningful_transformation"][1]
+    assert "separate requirement" in affordances["meaningful_transformation"][1]
+    assert "visible semantic change" in affordances["meaningful_transformation"][2]
     assert "mock_data" in affordances["ui_freedom_map"]
     form_contract = user_payload["runtime_component_contracts"]["ui.form"]["inputs"]["fields"]
     assert "email" in form_contract["supported_field_types"]
@@ -1160,7 +1308,7 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "ratingGrid" in form_contract["supported_field_types"]
     assert "Choose the most semantically precise supported type" in form_contract["selection_guidance"][0]
     assert "Refactor existing generic text fields" in form_contract["selection_guidance"][1]
-    assert "Prefer atomic inputs" in form_contract["selection_guidance"][2]
+    assert "do not leave contacts" in form_contract["selection_guidance"][2]
     assert "every requested user answer" in form_contract["selection_guidance"][-1]
     assert form_contract["semantic_examples"]["contacts"].startswith("email plus phone")
     assert form_contract["semantic_examples"]["convenient dates or date interval"] == "dateRange"
@@ -1168,6 +1316,14 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert form_contract["semantic_examples"]["mark choices by days/sections/categories"] == "checkboxGrid or radioGrid"
     assert "atomic fields" in affordances["ui_freedom_map"]["forms"]
     assert "explicit local control" in affordances["ui_freedom_map"]["interaction"]
+    assert "input.commandBar/input.selector/ui.actions" in " ".join(affordances["self_check"])
+    assert "static mock rows alone are not enough" in " ".join(affordances["self_check"])
+    assert "internal checklist" in " ".join(affordances["self_check"])
+    command_bar_contract = user_payload["runtime_component_contracts"]["input.commandBar"]
+    command_bar_pattern = command_bar_contract["example_pattern"]
+    assert command_bar_pattern["initialState"] == {"exampleMode": "empty"}
+    assert command_bar_pattern["widgets"][0]["actions"][0]["params"] == {"exampleMode": "$event.id"}
+    assert command_bar_pattern["widgets"][1]["visibleIf"] == "state.exampleMode == 'sample'"
     schema_defs = user_payload["webui_v1_abi"]["schema_contract"]["defs"]
     assert "formInputs" in schema_defs
     assert "formField" in schema_defs
@@ -1178,7 +1334,10 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "adaptive UI prototyping designer-programmer" in request["system_prompt"]
     assert "meaningful visible changes" in request["system_prompt"]
     assert "duplicate-only" in request["system_prompt"]
-    assert "choose the most semantically precise supported formFieldType" in request["system_prompt"]
+    assert "field's required 'type' property" in request["system_prompt"]
+    assert "static content or sample rows" in request["system_prompt"]
+    assert "Decompose the user's instruction into explicit requirements" in request["system_prompt"]
+    assert "visibly reacts to the local state" in request["system_prompt"]
     assert "Do not preserve an existing generic text field" in request["system_prompt"]
     assert "Break broad or composite user concepts into atomic fields" in request["system_prompt"]
     assert "add an explicit local control" in request["system_prompt"]
