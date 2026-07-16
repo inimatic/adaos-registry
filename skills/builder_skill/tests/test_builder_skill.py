@@ -2489,6 +2489,50 @@ def test_builder_component_contract_rejects_flattened_input_properties() -> None
     assert "inputs.secondaryActions" in validation["detail"]
 
 
+def test_builder_modal_contract_reports_component_and_action_issues_together() -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "widgets": [{"id": "catalog", "type": "ui.list", "area": "main"}],
+                    }
+                },
+                "modals": {
+                    "add_recipe": {
+                        "schema": {
+                            "id": "add_recipe",
+                            "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                            "widgets": [
+                                {
+                                    "id": "form",
+                                    "type": "ui.form",
+                                    "area": "main",
+                                    "inputs": {"fields": [{"id": "title", "type": "shortText"}]},
+                                    "inputs_secondaryActions": [{"id": "cancel", "label": "Cancel"}],
+                                    "actions": [
+                                        {"on": "click:cancel", "type": "openModal", "params": {"modalId": ""}}
+                                    ],
+                                }
+                            ],
+                        }
+                    }
+                },
+            }
+        },
+    }
+
+    validation = skill._validate_webui_modal_contracts(payload)
+
+    assert validation["ok"] is False
+    assert "inputs_secondaryActions" in validation["detail"]
+    assert "params.modalId is missing" in validation["detail"]
+
+
 def test_builder_component_contract_accepts_composed_detail_actions_and_form_cancel() -> None:
     skill = _load_module()
     detail_schema = {

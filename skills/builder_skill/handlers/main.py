@@ -5225,6 +5225,7 @@ def _validate_webui_modal_contracts(payload: Mapping[str, Any]) -> dict[str, Any
     modals = application.get("modals") if isinstance(application.get("modals"), Mapping) else {}
     declared_modal_ids = {str(modal_id).strip() for modal_id in modals.keys() if str(modal_id).strip()}
     modal_component_issues: list[str] = []
+    modal_action_issues: list[str] = []
     for modal_id, modal in modals.items():
         if not isinstance(modal, Mapping):
             return {
@@ -5249,24 +5250,20 @@ def _validate_webui_modal_contracts(payload: Mapping[str, Any]) -> dict[str, Any
             continue
         modal_id = _modal_id_from_open_modal_action(node)
         if not modal_id:
-            return {
-                "ok": False,
-                "error": "component_contract_invalid",
-                "detail": f"{path} opens a modal but params.modalId is missing",
-            }
+            modal_action_issues.append(f"{path} opens a modal but params.modalId is missing")
+            continue
         if modal_id.startswith("$"):
             continue
         if modal_id not in declared_modal_ids:
-            return {
-                "ok": False,
-                "error": "component_contract_invalid",
-                "detail": f"{path} opens undeclared modal '{modal_id}'; declare it in ui.application.modals",
-            }
-    if modal_component_issues:
+            modal_action_issues.append(
+                f"{path} opens undeclared modal '{modal_id}'; declare it in ui.application.modals"
+            )
+    modal_issues = [*modal_component_issues, *modal_action_issues]
+    if modal_issues:
         return {
             "ok": False,
             "error": "component_contract_invalid",
-            "detail": "; ".join(modal_component_issues),
+            "detail": "; ".join(modal_issues),
         }
     return {"ok": True}
 
