@@ -1110,6 +1110,9 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     assert submit_calls[0]["kwargs"]["request_id"].startswith("builder-ui-")
     assert "-job-" in submit_calls[0]["kwargs"]["request_id"]
     assert submit_calls[0]["kwargs"]["temperature"] == 0.25
+    system_content = submit_calls[0]["messages"][0]["content"]
+    assert "real Ionicons v7 names" in system_content
+    assert "create-outline instead of edit" in system_content
     assert "prototyping_affordances" in submit_calls[0]["messages"][1]["content"]
     assert "current_webui_json" in submit_calls[0]["messages"][2]["content"]
 
