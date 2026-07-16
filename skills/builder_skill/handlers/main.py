@@ -8999,6 +8999,7 @@ def update_current_scenario(
             topic_ref=topic,
             from_="api",
         )
+    request_emit_done_at = time.perf_counter()
     llm_result: dict[str, Any] | None = None
     llm_owned_content_change = _wants_llm_owned_content_change(text)
     if text and _builder_llm_primary_enabled(_meta):
@@ -9040,6 +9041,7 @@ def update_current_scenario(
                 job_nonce=local_job_id,
                 _meta=_meta,
             )
+            submit_done_at = time.perf_counter()
             if not submit_result.get("pending"):
                 detail = str(submit_result.get("detail") or submit_result.get("error") or "llm_job_submit_failed")
                 message = (
@@ -9075,6 +9077,7 @@ def update_current_scenario(
                 model=selected_model,
                 status=str(submit_result.get("status") or "queued"),
             )
+            job_link_done_at = time.perf_counter()
             _save_session(ws, session)
             save_done_at = time.perf_counter()
             _start_llm_webui_job_worker(
@@ -9096,7 +9099,7 @@ def update_current_scenario(
             total_ms = (dialog_done_at - started_at) * 1000.0
             if total_ms >= 1000:
                 _LOG.warning(
-                    "builder update async prepare slow scenario=%s total_ms=%.1f source_ms=%.1f binding_align_ms=%.1f target_ms=%.1f topic_ms=%.1f preview_ms=%.1f before_webui_ms=%.1f save_ms=%.1f worker_ms=%.1f dialog_ms=%.1f",
+                    "builder update async prepare slow scenario=%s total_ms=%.1f source_ms=%.1f binding_align_ms=%.1f target_ms=%.1f topic_ms=%.1f preview_ms=%.1f before_webui_ms=%.1f request_emit_ms=%.1f root_submit_ms=%.1f job_link_ms=%.1f session_save_ms=%.1f worker_ms=%.1f dialog_ms=%.1f",
                     str(session.get("scenario_id") or ""),
                     total_ms,
                     (source_done_at - started_at) * 1000.0,
@@ -9105,7 +9108,10 @@ def update_current_scenario(
                     (topic_done_at - target_done_at) * 1000.0,
                     (preview_done_at - topic_done_at) * 1000.0,
                     (before_webui_done_at - preview_done_at) * 1000.0,
-                    (save_done_at - before_webui_done_at) * 1000.0,
+                    (request_emit_done_at - before_webui_done_at) * 1000.0,
+                    (submit_done_at - request_emit_done_at) * 1000.0,
+                    (job_link_done_at - submit_done_at) * 1000.0,
+                    (save_done_at - job_link_done_at) * 1000.0,
                     (worker_done_at - save_done_at) * 1000.0,
                     (dialog_done_at - worker_done_at) * 1000.0,
                 )
