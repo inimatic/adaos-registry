@@ -2413,6 +2413,58 @@ def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_
     assert "not rendered by ui.form" not in validation["detail"]
 
 
+def test_builder_canonical_payload_migrates_legacy_dotted_widget_properties() -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "widgets": [
+                            {"id": "catalog", "type": "ui.list", "area": "main"}
+                        ],
+                    }
+                },
+                "modals": {
+                    "edit_modal": {
+                        "schema": {
+                            "id": "edit_modal",
+                            "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                            "widgets": [
+                                {
+                                    "id": "edit_form",
+                                    "type": "ui.form",
+                                    "area": "modal",
+                                    "inputs": {"fields": [{"id": "title", "type": "shortText"}]},
+                                    "inputs.secondaryActions": [
+                                        {"id": "cancel", "label": "Cancel"}
+                                    ],
+                                    "actions": [
+                                        {"on": "click:cancel", "type": "closeModal"}
+                                    ],
+                                }
+                            ],
+                        }
+                    }
+                },
+            }
+        },
+    }
+
+    canonical = skill._canonical_webui_payload(
+        payload,
+        payload["ui"]["application"]["desktop"]["pageSchema"],
+    )
+    form = canonical["ui"]["application"]["modals"]["edit_modal"]["schema"]["widgets"][0]
+
+    assert "inputs.secondaryActions" not in form
+    assert form["inputs"]["secondaryActions"] == [{"id": "cancel", "label": "Cancel"}]
+    assert skill._validate_builder_webui_payload(canonical, {})["ok"] is True
+
+
 def test_builder_component_contract_accepts_composed_detail_actions_and_form_cancel() -> None:
     skill = _load_module()
     detail_schema = {

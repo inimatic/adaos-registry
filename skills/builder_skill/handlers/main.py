@@ -1873,11 +1873,49 @@ def _canonicalise_webui_modal_locations(payload: dict[str, Any]) -> dict[str, An
     return payload
 
 
+def _canonicalise_legacy_dotted_widget_properties(payload: dict[str, Any]) -> dict[str, Any]:
+    ui = payload.get("ui") if isinstance(payload.get("ui"), dict) else {}
+    app = ui.get("application") if isinstance(ui.get("application"), dict) else {}
+    page_schemas: list[dict[str, Any]] = []
+    desktop = app.get("desktop") if isinstance(app.get("desktop"), dict) else {}
+    desktop_schema = desktop.get("pageSchema") if isinstance(desktop.get("pageSchema"), dict) else None
+    if desktop_schema is not None:
+        page_schemas.append(desktop_schema)
+    modals = app.get("modals") if isinstance(app.get("modals"), Mapping) else {}
+    for modal in modals.values():
+        if not isinstance(modal, Mapping):
+            continue
+        modal_schema = modal.get("schema")
+        if isinstance(modal_schema, dict):
+            page_schemas.append(modal_schema)
+
+    for page_schema in page_schemas:
+        widgets = page_schema.get("widgets") if isinstance(page_schema.get("widgets"), list) else []
+        for widget in widgets:
+            if not isinstance(widget, dict):
+                continue
+            for dotted_key in [str(key) for key in widget.keys() if "." in str(key)]:
+                value = widget.pop(dotted_key)
+                parts = [part for part in dotted_key.split(".") if part]
+                if len(parts) < 2:
+                    continue
+                target: dict[str, Any] = widget
+                for part in parts[:-1]:
+                    current = target.get(part)
+                    if not isinstance(current, dict):
+                        current = {}
+                        target[part] = current
+                    target = current
+                target.setdefault(parts[-1], value)
+    return payload
+
+
 def _canonical_webui_payload(payload: Mapping[str, Any] | None, page_schema: Mapping[str, Any]) -> dict[str, Any]:
     data = copy.deepcopy(dict(payload or {}))
     for key in ("preview_state", "current_ui", "page_schema", "runtime_context"):
         data.pop(key, None)
     data = _canonicalise_webui_modal_locations(data)
+    data = _canonicalise_legacy_dotted_widget_properties(data)
     data.setdefault("generated_by", SKILL_ID)
     return _set_webui_page_schema(data, page_schema)
 
