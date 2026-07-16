@@ -1014,8 +1014,39 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
             "ok": True,
             "schema": "adaos.root.llm.job.v1",
             "job_id": job_id,
+            "request_id": "builder-ui-telemetry-test",
             "status": "succeeded",
             "output_text": json.dumps({**payload, "comment": "Adapted conference sample data."}, ensure_ascii=False),
+            "response": {
+                "id": "resp_builder_telemetry_test",
+                "status": "completed",
+                "model": "gpt-5",
+                "service_tier": "default",
+                "usage": {
+                    "input_tokens": 1200,
+                    "input_tokens_details": {"cached_tokens": 768},
+                    "output_tokens": 340,
+                    "output_tokens_details": {"reasoning_tokens": 0},
+                    "total_tokens": 1540,
+                },
+            },
+            "_protocol": {
+                "timing": {"queue_ms": 12, "execution_ms": 3456, "total_ms": 3468},
+                "usage": {
+                    "input_tokens": 1200,
+                    "cached_input_tokens": 768,
+                    "output_tokens": 340,
+                    "reasoning_tokens": 0,
+                    "total_tokens": 1540,
+                },
+                "provider": {
+                    "response_id": "resp_builder_telemetry_test",
+                    "service_tier": "default",
+                    "upstream_request_id": "req_builder_telemetry_test",
+                },
+                "tools": {"requested_count": 0, "used_count": 0, "output_type_counts": {"message": 1}},
+                "mcp": {"used_mcp": False, "item_count": 0, "items": []},
+            },
         }
 
     monkeypatch.setattr(llm_client, "submit_response_job", _submit_response_job)
@@ -1045,6 +1076,15 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     assert rows[1]["title"] == "Invite speakers"
     revision_files = sorted((artifact_root / "ui_revisions").glob("*.json"))
     assert revision_files
+    revision = json.loads(revision_files[-1].read_text(encoding="utf-8"))
+    assert revision["inference"]["response_id"] == "resp_builder_telemetry_test"
+    assert revision["inference"]["service_tier"] == "default"
+    telemetry = revision["llm"]["telemetry"]
+    assert telemetry["timing"]["execution_ms"] == 3456
+    assert telemetry["usage"]["cached_input_tokens"] == 768
+    assert telemetry["provider"]["upstream_request_id"] == "req_builder_telemetry_test"
+    assert telemetry["tools"]["used_count"] == 0
+    assert telemetry["mcp"]["used_mcp"] is False
     assert refresh_calls and refresh_calls[0]["revision"] == "001"
     assert submit_calls[0]["kwargs"]["request_id"].startswith("builder-ui-")
     assert "-job-" in submit_calls[0]["kwargs"]["request_id"]

@@ -2582,6 +2582,42 @@ def _sync_preview_revision_version(preview_state: Mapping[str, Any], revision: s
     return preview
 
 
+def _llm_job_telemetry(job: Mapping[str, Any] | None, *, wait_elapsed_ms: int | None = None) -> dict[str, Any]:
+    if not isinstance(job, Mapping):
+        return {}
+    protocol = job.get("_protocol") if isinstance(job.get("_protocol"), Mapping) else {}
+    envelope = job.get("telemetry") if isinstance(job.get("telemetry"), Mapping) else {}
+    response = job.get("response") if isinstance(job.get("response"), Mapping) else {}
+
+    timing = protocol.get("timing") if isinstance(protocol.get("timing"), Mapping) else envelope.get("timing")
+    usage = protocol.get("usage") if isinstance(protocol.get("usage"), Mapping) else response.get("usage")
+    provider = protocol.get("provider") if isinstance(protocol.get("provider"), Mapping) else envelope.get("provider")
+    provider_payload = dict(provider) if isinstance(provider, Mapping) else {}
+    for source_key, target_key in (
+        ("id", "response_id"),
+        ("status", "response_status"),
+        ("model", "model"),
+        ("service_tier", "service_tier"),
+    ):
+        value = response.get(source_key)
+        if value not in (None, "") and provider_payload.get(target_key) in (None, ""):
+            provider_payload[target_key] = value
+
+    telemetry: dict[str, Any] = {
+        "root_job_id": str(job.get("job_id") or "").strip() or None,
+        "request_id": str(job.get("request_id") or protocol.get("request_id") or "").strip() or None,
+        "status": str(job.get("status") or "").strip() or None,
+        "wait_elapsed_ms": int(wait_elapsed_ms) if wait_elapsed_ms is not None else None,
+        "timing": copy.deepcopy(dict(timing)) if isinstance(timing, Mapping) else None,
+        "provider": copy.deepcopy(provider_payload) if provider_payload else None,
+        "usage": copy.deepcopy(dict(usage)) if isinstance(usage, Mapping) else None,
+        "tools": copy.deepcopy(dict(protocol["tools"])) if isinstance(protocol.get("tools"), Mapping) else None,
+        "mcp": copy.deepcopy(dict(protocol["mcp"])) if isinstance(protocol.get("mcp"), Mapping) else None,
+        "retry": copy.deepcopy(protocol.get("retry")) if protocol.get("retry") else None,
+    }
+    return {key: _repair_text_tree(value) for key, value in telemetry.items() if value not in (None, "", [], {})}
+
+
 def _compact_llm_result(result: Mapping[str, Any] | None) -> dict[str, Any] | None:
     if not isinstance(result, Mapping):
         return None
@@ -2593,6 +2629,8 @@ def _compact_llm_result(result: Mapping[str, Any] | None) -> dict[str, Any] | No
         compact["profile"] = copy.deepcopy(dict(result["profile"]))
     if isinstance(result.get("timing"), Mapping):
         compact["timing"] = copy.deepcopy(dict(result["timing"]))
+    if isinstance(result.get("telemetry"), Mapping):
+        compact["telemetry"] = copy.deepcopy(dict(result["telemetry"]))
     if isinstance(result.get("validation"), Mapping):
         compact["validation"] = copy.deepcopy(dict(result["validation"]))
     raw = str(result.get("last_response") or result.get("raw_response") or "").strip()
@@ -2647,6 +2685,11 @@ def _write_ui_revision(
         "profile_id": str(profile.get("id") or "").strip() or None,
         "temperature": profile.get("temperature"),
     }
+    telemetry = llm_result.get("telemetry") if isinstance(llm_result, Mapping) and isinstance(llm_result.get("telemetry"), Mapping) else {}
+    provider_telemetry = telemetry.get("provider") if isinstance(telemetry.get("provider"), Mapping) else {}
+    if provider_telemetry:
+        inference["response_id"] = provider_telemetry.get("response_id")
+        inference["service_tier"] = provider_telemetry.get("service_tier")
     payload = {
         "schema": "adaos.builder.ui_revision.v1",
         "revision": revision,
@@ -7997,7 +8040,9 @@ def _complete_llm_webui_job(
             _meta=_meta,
         )
         return
+    wait_elapsed_ms = int((_now() - started_at) * 1000)
     status = str(job.get("status") or "").strip().lower()
+    job_telemetry = _llm_job_telemetry(job, wait_elapsed_ms=wait_elapsed_ms)
     _LOG.debug(
         "builder LLM job wait completed scenario=%s job_id=%s request_id=%s base_url=%s status=%s elapsed_ms=%d",
         str(session.get("scenario_id") or ""),
@@ -8005,7 +8050,31 @@ def _complete_llm_webui_job(
         request_id,
         base_url,
         status,
-        int((_now() - started_at) * 1000),
+        wait_elapsed_ms,
+    )
+    telemetry_timing = job_telemetry.get("timing") if isinstance(job_telemetry.get("timing"), Mapping) else {}
+    telemetry_usage = job_telemetry.get("usage") if isinstance(job_telemetry.get("usage"), Mapping) else {}
+    telemetry_tools = job_telemetry.get("tools") if isinstance(job_telemetry.get("tools"), Mapping) else {}
+    telemetry_mcp = job_telemetry.get("mcp") if isinstance(job_telemetry.get("mcp"), Mapping) else {}
+    telemetry_provider = job_telemetry.get("provider") if isinstance(job_telemetry.get("provider"), Mapping) else {}
+    _LOG.info(
+        "builder LLM telemetry scenario=%s job_id=%s response_id=%s wait_ms=%d queue_ms=%s execution_ms=%s "
+        "input_tokens=%s cached_input_tokens=%s output_tokens=%s reasoning_tokens=%s service_tier=%s "
+        "requested_tools=%s used_tools=%s used_mcp=%s",
+        str(session.get("scenario_id") or ""),
+        job_id,
+        str(telemetry_provider.get("response_id") or ""),
+        wait_elapsed_ms,
+        str(telemetry_timing.get("queue_ms") or ""),
+        str(telemetry_timing.get("execution_ms") or ""),
+        str(telemetry_usage.get("input_tokens") or ""),
+        str(telemetry_usage.get("cached_input_tokens") or ""),
+        str(telemetry_usage.get("output_tokens") or ""),
+        str(telemetry_usage.get("reasoning_tokens") or ""),
+        str(telemetry_provider.get("service_tier") or ""),
+        str(telemetry_tools.get("requested_count") or 0),
+        str(telemetry_tools.get("used_count") or 0),
+        str(bool(telemetry_mcp.get("used_mcp"))),
     )
     if status != "succeeded":
         _LOG.warning(
@@ -8120,6 +8189,7 @@ def _complete_llm_webui_job(
             bool(llm_result.get("ok")),
         )
         llm_result["job"] = job
+        llm_result["telemetry"] = job_telemetry
         model_id = _builder_llm_model_for_session(session, _meta)
         if model_id:
             llm_result["model"] = model_id
