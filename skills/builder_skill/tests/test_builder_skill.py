@@ -1982,6 +1982,99 @@ def test_builder_system_prompt_allows_replaceable_picsum_placeholders() -> None:
     assert "local seed assets or generated images" in prompt
 
 
+def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "title": "Recipe draft",
+                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "widgets": [
+                            {
+                                "id": "recipe-title",
+                                "type": "ui.jsonViewer",
+                                "area": "main",
+                                "inputs": {"text": "Recipe draft"},
+                            }
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    base_hash = skill._webui_source_fingerprint(before)
+    output = "\n".join(
+        [
+            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/title",
+                    "value": "Recipe book",
+                }
+            ),
+            json.dumps({"type": "complete", "comment": "Renamed the recipe book."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+        request_id="request-1",
+        job_id="job-1",
+    )
+
+    assert result["ok"] is True
+    assert before["ui"]["application"]["desktop"]["pageSchema"]["title"] == "Recipe draft"
+    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"] == "Recipe book"
+    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["id"] == "recipe-title"
+    assert result["semantic_patch_stream"]["operation_count"] == 1
+    assert result["attempts"][0]["output_mode"] == "jsonl_patch_v1"
+
+
+def test_builder_patch_stream_rejects_wrong_base_hash() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "layout": {"type": "stack"},
+                        "widgets": [{"id": "title", "type": "ui.jsonViewer", "inputs": {"value": {"title": "Recipes"}}}],
+                    }
+                }
+            }
+        },
+    }
+    output = "\n".join(
+        [
+            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": "wrong"}),
+            json.dumps({"type": "patch", "seq": 1, "op": "replace", "path": "/schema", "value": "adaos.webui.v1"}),
+            json.dumps({"type": "complete", "comment": "No-op"}),
+        ]
+    )
+
+    try:
+        skill._parse_llm_webui_transform_output(
+            output_text=output,
+            before_webui=before,
+            previous_preview={},
+        )
+    except ValueError as exc:
+        assert "base_hash mismatch" in str(exc)
+    else:
+        raise AssertionError("wrong patch base hash must be rejected")
+
+
 def test_builder_component_contract_rejects_unrendered_table_image_cells() -> None:
     skill = _load_module()
     page_schema = {

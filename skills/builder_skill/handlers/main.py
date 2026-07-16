@@ -507,6 +507,7 @@ def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
         profile_id = "default"
     return {
         "schema": "adaos.builder.llm_prompt_profile.v1",
+        "version": "2026-07-16",
         "id": profile_id,
         "provider": provider,
         "model": model_hint,
@@ -516,6 +517,54 @@ def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
         "strategy": "compact_abi_plus_affordance_map",
         "variant_policy": "Prompt profiles may vary by provider/model, but the output contract remains adaos.webui.v1.",
     }
+
+
+def _builder_llm_stream_enabled(_meta: Mapping[str, Any] | None = None) -> bool:
+    meta = dict(_meta or {}) if isinstance(_meta, Mapping) else {}
+    if "builder_llm_stream" in meta:
+        return bool(meta.get("builder_llm_stream"))
+    return str(os.getenv("ADAOS_BUILDER_LLM_STREAM") or "1").strip().lower() not in {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+
+
+def _builder_llm_prompt_cache_key(model: str | None, prompt_profile: Mapping[str, Any]) -> str:
+    seed = {
+        "provider": str(prompt_profile.get("provider") or "root-default"),
+        "model": str(model or prompt_profile.get("model") or "root-default"),
+        "prompt_profile": str(prompt_profile.get("id") or "default"),
+        "prompt_profile_version": str(prompt_profile.get("version") or "unversioned"),
+        "webui_abi": "adaos.webui.v1",
+        "output_mode": str(os.getenv("ADAOS_BUILDER_LLM_OUTPUT_MODE") or "jsonl_patch_v1").strip().lower(),
+    }
+    digest = hashlib.sha256(_compact_json(seed).encode("utf-8", errors="replace")).hexdigest()
+    return f"adaos-builder-{digest[:32]}"
+
+
+def _builder_llm_progress_meta(
+    _meta: Mapping[str, Any] | None,
+    *,
+    job_id: str,
+    phase: str,
+    status: str,
+    seq: int = 0,
+    label: str = "",
+) -> dict[str, Any]:
+    meta = dict(_meta or {}) if isinstance(_meta, Mapping) else {}
+    meta.update(
+        {
+            "progress_group_id": str(job_id or "").strip(),
+            "progress_phase": str(phase or "").strip(),
+            "progress_status": str(status or "").strip(),
+            "progress_seq": int(seq or 0),
+        }
+    )
+    if label:
+        meta["progress_label"] = label
+    return meta
 
 
 def _builder_llm_request_id(
@@ -2136,11 +2185,31 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
     }
 
 
-def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profile: Mapping[str, Any] | None = None) -> str:
+def _builder_llm_system_prompt(
+    *,
+    project_system_prompt: str = "",
+    prompt_profile: Mapping[str, Any] | None = None,
+    output_mode: str = "full_webui",
+) -> str:
     profile = prompt_profile if isinstance(prompt_profile, Mapping) else _builder_llm_prompt_profile()
     profile_id = str(profile.get("id") or "default")
     provider = str(profile.get("provider") or "root-default")
     model_hint = str(profile.get("model") or "root-default")
+    patch_output = str(output_mode or "").strip().lower() == "jsonl_patch_v1"
+    output_contract = (
+        "Return only newline-delimited JSON objects (JSONL), one complete object per line, with no markdown or prose. "
+        "The first line must be a meta object with schema='adaos.builder.webui_patch_stream.v1' and the supplied base_hash. "
+        "Each following patch line must contain type='patch', a strictly increasing seq, and one RFC 6902 op/path/value or from operation. "
+        "The last line must contain type='complete', comment, and optional unable_reason. "
+        "Generate the smallest coherent patch set that satisfies the request and preserves unrelated UI. "
+        if patch_output
+        else (
+            "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
+            "The root object must be an adaos.webui.v1 manifest with schema='adaos.webui.v1'. "
+            "The renderable source of truth is ui.application.desktop.pageSchema. "
+            "Return the complete updated pageSchema under ui.application.desktop.pageSchema; if the prototype needs modals, also return ui.application.modals. Do not return preview_state, current_ui, a root-level page_schema, or root-level modals. "
+        )
+    )
     system_prompt = (
         "You are AdaOS Builder, an adaptive UI prototyping designer-programmer. "
         f"Prompt profile: {profile_id}; provider hint: {provider}; model hint: {model_hint}. "
@@ -2148,10 +2217,7 @@ def _builder_llm_system_prompt(*, project_system_prompt: str = "", prompt_profil
         "All Builder work in this flow is a local development prototype until an explicit activation/release step; this is global execution context, not project-specific memory. "
         "The user should not need to know AdaOS schema terms; interpret natural UI/product language and map it to the correct internal ABI structures yourself. "
         "AdaOS, not the model, owns deterministic validation, review, revision storage, and safe apply. "
-        "Return only one JSON object. Do not include markdown, code fences, or prose outside JSON. "
-        "The root object must be an adaos.webui.v1 manifest with schema='adaos.webui.v1'. "
-        "The renderable source of truth is ui.application.desktop.pageSchema. "
-        "Return the complete updated pageSchema under ui.application.desktop.pageSchema; if the prototype needs modals, also return ui.application.modals. Do not return preview_state, current_ui, a root-level page_schema, or root-level modals. "
+        + output_contract +
         "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
         "For move/place requests, the named widget/control must move by changing its area/container/owner; keeping it in the old area is not a valid response. "
         "Treat the current UI as starting material, not as a fixed contract: make meaningful visible changes when the request implies design, workflow, layout, or prototype evolution. "
@@ -2633,6 +2699,8 @@ def _compact_llm_result(result: Mapping[str, Any] | None) -> dict[str, Any] | No
         compact["telemetry"] = copy.deepcopy(dict(result["telemetry"]))
     if isinstance(result.get("validation"), Mapping):
         compact["validation"] = copy.deepcopy(dict(result["validation"]))
+    if isinstance(result.get("semantic_patch_stream"), Mapping):
+        compact["semantic_patch_stream"] = copy.deepcopy(dict(result["semantic_patch_stream"]))
     raw = str(result.get("last_response") or result.get("raw_response") or "").strip()
     if raw:
         compact["raw_response"] = raw[:12000]
@@ -4534,9 +4602,13 @@ def _builder_llm_webui_transform_request(
     ]
     selected_model = _builder_llm_model_for_session(session, _meta)
     prompt_profile = _builder_llm_prompt_profile(selected_model)
+    output_mode = str(os.getenv("ADAOS_BUILDER_LLM_OUTPUT_MODE") or "jsonl_patch_v1").strip().lower()
+    if output_mode not in {"jsonl_patch_v1", "full_webui"}:
+        output_mode = "jsonl_patch_v1"
     system_prompt = _builder_llm_system_prompt(
         project_system_prompt=project_system_prompt,
         prompt_profile=prompt_profile,
+        output_mode=output_mode,
     )
     base_request = {
         "llm_prompt_profile": prompt_profile,
@@ -4544,20 +4616,33 @@ def _builder_llm_webui_transform_request(
         "runtime_component_contracts": _builder_runtime_component_contracts(),
         "prototyping_affordances": _builder_prototyping_affordances(),
         "webui_v1_schema": "see webui_v1_abi.schema_contract; validated by src/adaos/abi/webui.v1.schema.json",
-        "required_output_shape": {
-            "schema": "adaos.webui.v1",
-            "ui": {
-                "application": {
-                    "desktop": {
-                        "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
-                    },
-                    "modals": "optional object of modalId to {title,presentation,schema}; never top-level modals",
-                }
-            },
-            "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
-            "comment": "short user-facing text about what changed or why it could not be changed",
-            "unable_reason": "short optional diagnostic if request cannot be implemented",
-        },
+        "requested_output_contract": (
+            {
+                "schema": "adaos.builder.webui_patch_stream.v1",
+                "format": "jsonl",
+                "base_revision": str(session.get("ui_revision") or session.get("version") or "current"),
+                "base_hash": _webui_source_fingerprint(current_payload),
+                "operations": ["add", "remove", "replace", "move", "copy", "test"],
+                "line_shapes": {
+                    "meta": {"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": "exact supplied hash"},
+                    "patch": {"type": "patch", "seq": "1..N", "op": "RFC 6902 op", "path": "JSON Pointer", "value": "when required", "from": "when required"},
+                    "complete": {"type": "complete", "comment": "short user-facing summary", "unable_reason": "optional"},
+                },
+                "rules": [
+                    "One complete compact JSON object per physical line; no code fences.",
+                    "Preserve unrelated UI and use the smallest coherent patch set.",
+                    "Use test guards before index-sensitive destructive changes when practical.",
+                    "The patched result must remain a complete adaos.webui.v1 document.",
+                ],
+            }
+            if output_mode == "jsonl_patch_v1"
+            else {
+                "schema": "adaos.webui.v1",
+                "ui.application.desktop.pageSchema": "complete renderable pageSchema",
+                "ui.application.modals": "optional declared modals",
+                "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
+            }
+        ),
         "scenario_id": session.get("scenario_id"),
         "title": session.get("title"),
         "project_memory": _builder_project_memory_context(project_memory),
@@ -4625,6 +4710,217 @@ def _extract_json_object(text: str) -> dict[str, Any]:
             except Exception:
                 pass
     raise ValueError("LLM response does not contain a JSON object")
+
+
+def _extract_json_stream_objects(text: str) -> list[dict[str, Any]]:
+    source = re.sub(r"```(?:jsonl?|ndjson)?", "", str(text or ""), flags=re.IGNORECASE).replace("```", "")
+    objects: list[dict[str, Any]] = []
+    start: int | None = None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index, char in enumerate(source):
+        if start is None:
+            if char == "{":
+                start = index
+                depth = 1
+                in_string = False
+                escaped = False
+            continue
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                fragment = source[start : index + 1]
+                parsed = json.loads(fragment)
+                if isinstance(parsed, dict):
+                    objects.append(parsed)
+                start = None
+    if start is not None:
+        raise ValueError("LLM JSONL stream ended with an incomplete object")
+    return objects
+
+
+def _json_pointer_parts(path: Any) -> list[str]:
+    pointer = str(path if path is not None else "")
+    if pointer == "":
+        return []
+    if not pointer.startswith("/") or len(pointer) > 2048:
+        raise ValueError(f"invalid JSON Pointer: {pointer[:120]}")
+    return [part.replace("~1", "/").replace("~0", "~") for part in pointer[1:].split("/")]
+
+
+def _json_pointer_index(token: str, length: int, *, allow_end: bool = False) -> int:
+    if token == "-" and allow_end:
+        return length
+    if not re.fullmatch(r"0|[1-9]\d*", token):
+        raise ValueError(f"invalid array index: {token}")
+    index = int(token)
+    maximum = length if allow_end else length - 1
+    if index < 0 or index > maximum:
+        raise IndexError(f"array index out of bounds: {index}")
+    return index
+
+
+def _json_pointer_get(document: Any, path: Any) -> Any:
+    node = document
+    for token in _json_pointer_parts(path):
+        if isinstance(node, list):
+            node = node[_json_pointer_index(token, len(node))]
+        elif isinstance(node, Mapping):
+            if token not in node:
+                raise KeyError(f"JSON Pointer member not found: {token}")
+            node = node[token]
+        else:
+            raise TypeError(f"JSON Pointer traverses scalar at {token}")
+    return node
+
+
+def _json_pointer_parent(document: Any, path: Any) -> tuple[Any, str]:
+    parts = _json_pointer_parts(path)
+    if not parts:
+        return None, ""
+    node = document
+    for token in parts[:-1]:
+        if isinstance(node, list):
+            node = node[_json_pointer_index(token, len(node))]
+        elif isinstance(node, dict):
+            if token not in node:
+                raise KeyError(f"JSON Pointer member not found: {token}")
+            node = node[token]
+        else:
+            raise TypeError(f"JSON Pointer traverses scalar at {token}")
+    return node, parts[-1]
+
+
+def _apply_json_patch_operation(document: Any, operation: Mapping[str, Any]) -> Any:
+    op = str(operation.get("op") or "").strip().lower()
+    if op not in {"add", "remove", "replace", "move", "copy", "test"}:
+        raise ValueError(f"unsupported JSON Patch operation: {op}")
+    path = str(operation.get("path") if operation.get("path") is not None else "")
+    if op == "test":
+        if _json_pointer_get(document, path) != operation.get("value"):
+            raise ValueError(f"JSON Patch test failed at {path}")
+        return document
+    if op in {"move", "copy"}:
+        from_path = operation.get("from")
+        if from_path is None:
+            raise ValueError(f"JSON Patch {op} requires from")
+        value = copy.deepcopy(_json_pointer_get(document, from_path))
+        if op == "move":
+            document = _apply_json_patch_operation(document, {"op": "remove", "path": str(from_path)})
+        return _apply_json_patch_operation(document, {"op": "add", "path": path, "value": value})
+    if op == "remove":
+        parent, token = _json_pointer_parent(document, path)
+        if parent is None:
+            raise ValueError("removing the whole webui document is not allowed")
+        if isinstance(parent, list):
+            parent.pop(_json_pointer_index(token, len(parent)))
+        elif isinstance(parent, dict):
+            if token not in parent:
+                raise KeyError(f"JSON Patch member not found: {token}")
+            del parent[token]
+        else:
+            raise TypeError(f"JSON Patch remove parent is scalar at {path}")
+        return document
+    value = copy.deepcopy(operation.get("value"))
+    parent, token = _json_pointer_parent(document, path)
+    if parent is None:
+        if not isinstance(value, dict):
+            raise ValueError("the webui root replacement must remain an object")
+        return value
+    if isinstance(parent, list):
+        if op == "add":
+            parent.insert(_json_pointer_index(token, len(parent), allow_end=True), value)
+        else:
+            parent[_json_pointer_index(token, len(parent))] = value
+    elif isinstance(parent, dict):
+        if op == "replace" and token not in parent:
+            raise KeyError(f"JSON Patch member not found: {token}")
+        parent[token] = value
+    else:
+        raise TypeError(f"JSON Patch {op} parent is scalar at {path}")
+    return document
+
+
+def _parse_llm_webui_patch_stream(
+    *,
+    output_text: str,
+    before_webui: Mapping[str, Any],
+    previous_preview: Mapping[str, Any],
+) -> dict[str, Any] | None:
+    objects = _extract_json_stream_objects(output_text)
+    if not objects:
+        return None
+    first_schema = str(objects[0].get("schema") or "").strip()
+    is_stream = first_schema in {
+        "adaos.builder.webui_patch_stream.v1",
+        "adaos.builder.webui_patch_batch.v1",
+    } or any(str(item.get("type") or "").strip() == "patch" for item in objects)
+    if not is_stream:
+        return None
+    if first_schema == "adaos.builder.webui_patch_batch.v1" and isinstance(objects[0].get("patches"), list):
+        meta = objects[0]
+        patch_items = [dict(item) for item in objects[0]["patches"] if isinstance(item, Mapping)]
+        complete = objects[0]
+    else:
+        meta = next((item for item in objects if str(item.get("type") or "") == "meta"), objects[0])
+        patch_items = [dict(item) for item in objects if str(item.get("type") or "") == "patch"]
+        complete = next((item for item in reversed(objects) if str(item.get("type") or "") == "complete"), {})
+    expected_hash = _webui_source_fingerprint(before_webui)
+    actual_hash = str(meta.get("base_hash") or "").strip()
+    if actual_hash and actual_hash != expected_hash:
+        raise ValueError(f"LLM patch base_hash mismatch: expected {expected_hash}, got {actual_hash}")
+    if not patch_items and not str(complete.get("unable_reason") or "").strip():
+        raise ValueError("LLM patch stream does not contain patch operations")
+    if len(patch_items) > 128:
+        raise ValueError("LLM patch stream exceeds 128 operations")
+    candidate: Any = copy.deepcopy(dict(before_webui))
+    journal: list[dict[str, Any]] = []
+    expected_seq = 1
+    for raw in patch_items:
+        try:
+            seq = int(raw.get("seq") or expected_seq)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("LLM patch seq must be an integer") from exc
+        if seq != expected_seq:
+            raise ValueError(f"LLM patch sequence mismatch: expected {expected_seq}, got {seq}")
+        operation = {key: copy.deepcopy(raw.get(key)) for key in ("op", "path", "from", "value") if key in raw}
+        if len(_compact_json(operation).encode("utf-8", errors="replace")) > 1_000_000:
+            raise ValueError(f"LLM patch operation {seq} exceeds size limit")
+        candidate = _apply_json_patch_operation(candidate, operation)
+        journal.append({"seq": seq, **operation})
+        expected_seq += 1
+    if not isinstance(candidate, Mapping):
+        raise ValueError("LLM patch result must be an object")
+    payload, preview = _normalise_llm_webui_payload(dict(candidate), previous_preview=previous_preview)
+    validation = _validate_builder_webui_payload(payload, preview)
+    return {
+        "ok": bool(validation.get("ok")),
+        "payload": payload,
+        "preview_state": preview,
+        "comment": str(complete.get("comment") or complete.get("summary") or "").strip(),
+        "unable_reason": str(complete.get("unable_reason") or "").strip(),
+        "validation": validation,
+        "semantic_patch_stream": {
+            "schema": "adaos.builder.webui_patch_stream.v1",
+            "base_hash": expected_hash,
+            "operation_count": len(journal),
+            "patches": journal,
+        },
+        "raw_response": output_text,
+    }
 
 
 def _validate_webui_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -5121,9 +5417,36 @@ def _parse_llm_webui_transform_output(
     *,
     output_text: str,
     previous_preview: Mapping[str, Any],
+    before_webui: Mapping[str, Any] | None = None,
     request_id: str = "",
     job_id: str = "",
 ) -> dict[str, Any]:
+    if isinstance(before_webui, Mapping):
+        patch_result = _parse_llm_webui_patch_stream(
+            output_text=output_text,
+            before_webui=before_webui,
+            previous_preview=previous_preview,
+        )
+        if patch_result is not None:
+            patch_result["attempts"] = [
+                {
+                    "attempt": 1,
+                    "ok": bool(patch_result.get("ok")),
+                    "request_id": request_id,
+                    "job_id": job_id,
+                    "validation": patch_result.get("validation"),
+                    "output_mode": "jsonl_patch_v1",
+                }
+            ]
+            if not patch_result.get("ok"):
+                patch_result.update(
+                    {
+                        "error": "llm_webui_transform_invalid",
+                        "detail": str((patch_result.get("validation") or {}).get("detail") or "patched UI did not pass validation"),
+                        "last_response": output_text,
+                    }
+                )
+            return patch_result
     parsed = _extract_json_object(output_text)
     payload, preview = _normalise_llm_webui_payload(parsed, previous_preview=previous_preview)
     validation = _validate_builder_webui_payload(payload, preview)
@@ -5230,6 +5553,7 @@ def _repair_llm_webui_transform_output(
             _builder_llm_job_submit_timeout_s(),
         )
         selected_model = _builder_llm_model_for_session(session, _meta)
+        prompt_profile = _builder_llm_prompt_profile(selected_model)
         response = submit_response_job(
             [
                 {"role": "system", "content": str(request["system_prompt"])},
@@ -5243,6 +5567,10 @@ def _repair_llm_webui_transform_output(
             max_tokens=_builder_llm_max_tokens_for_model(selected_model),
             reasoning=_builder_llm_reasoning_for_model(selected_model),
             request_id=repair_request_id,
+            stream=_builder_llm_stream_enabled(_meta),
+            prompt_cache_key=_builder_llm_prompt_cache_key(selected_model, prompt_profile),
+            prompt_cache_retention=str(os.getenv("ADAOS_BUILDER_LLM_PROMPT_CACHE_RETENTION") or "").strip() or None,
+            stream_protocol="jsonl" if str(os.getenv("ADAOS_BUILDER_LLM_OUTPUT_MODE") or "jsonl_patch_v1").strip().lower() == "jsonl_patch_v1" else None,
             timeout=_builder_llm_job_submit_timeout_s(),
         )
         repair_job_id = str(response.get("job_id") or response.get("id") or "").strip()
@@ -7348,6 +7676,7 @@ def _submit_llm_webui_transform_job(
     system_prompt_bytes = len(str(request["system_prompt"]).encode("utf-8", errors="replace"))
     user_prompt_bytes = len(str(request["user_prompt"]).encode("utf-8", errors="replace"))
     selected_model = _builder_llm_model_for_session(session, _meta)
+    prompt_profile = _builder_llm_prompt_profile(selected_model)
     _LOG.debug(
         "builder LLM job submit start scenario=%s request_id=%s model=%s context_build_ms=%d system_prompt_bytes=%d user_prompt_bytes=%d",
         str(session.get("scenario_id") or ""),
@@ -7404,6 +7733,10 @@ def _submit_llm_webui_transform_job(
                 max_tokens=_builder_llm_max_tokens_for_model(selected_model),
                 reasoning=_builder_llm_reasoning_for_model(selected_model),
                 request_id=request_id,
+                stream=_builder_llm_stream_enabled(_meta),
+                prompt_cache_key=_builder_llm_prompt_cache_key(selected_model, prompt_profile),
+                prompt_cache_retention=str(os.getenv("ADAOS_BUILDER_LLM_PROMPT_CACHE_RETENTION") or "").strip() or None,
+                stream_protocol="jsonl" if str(os.getenv("ADAOS_BUILDER_LLM_OUTPUT_MODE") or "jsonl_patch_v1").strip().lower() == "jsonl_patch_v1" else None,
                 timeout=_builder_llm_job_submit_timeout_s(),
             )
             submit_done_at = _now()
@@ -7553,7 +7886,20 @@ def _mark_llm_job_failed(
         f"{AGENT_LABEL}: LLM-\u0437\u0430\u0434\u0430\u0447\u0430 {job_id or ''} "
         f"\u0434\u043b\u044f {session.get('scenario_id')} \u043d\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043b\u0430\u0441\u044c. {detail}"
     ).strip()
-    _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding or {}, topic_ref=topic)
+    _safe_emit_chat(
+        message,
+        webspace_id=ws,
+        _meta=_builder_llm_progress_meta(
+            _meta,
+            job_id=job_id,
+            phase="failed",
+            status="failed",
+            label="Ошибка",
+        ),
+        session=session,
+        binding=binding or {},
+        topic_ref=topic,
+    )
     _LOG.debug(
         "builder LLM job failed chat emitted scenario=%s job_id=%s",
         str(session.get("scenario_id") or ""),
@@ -8011,6 +8357,63 @@ def _complete_llm_webui_job(
         timeout_s,
         poll_interval_s,
     )
+    emitted_progress_phases: set[str] = set()
+    last_semantic_patch_count = 0
+
+    def _on_progress(progress: Mapping[str, Any]) -> None:
+        nonlocal last_semantic_patch_count
+        phase = str(progress.get("current_phase") or "").strip().lower()
+        semantic_events = progress.get("semantic_events") if isinstance(progress.get("semantic_events"), list) else []
+        semantic_patch_count = sum(
+            1 for item in semantic_events if isinstance(item, Mapping) and str(item.get("type") or "") == "patch"
+        )
+        repeated_generation_progress = (
+            phase == "generating"
+            and phase in emitted_progress_phases
+            and semantic_patch_count > last_semantic_patch_count
+        )
+        if phase not in {"provider", "generating", "validating"} or (
+            phase in emitted_progress_phases and not repeated_generation_progress
+        ):
+            return
+        emitted_progress_phases.add(phase)
+        last_semantic_patch_count = max(last_semantic_patch_count, semantic_patch_count)
+        try:
+            seq = int(progress.get("seq") or 0)
+        except (TypeError, ValueError):
+            seq = 0
+        try:
+            output_chars = int(progress.get("output_chars") or 0)
+        except (TypeError, ValueError):
+            output_chars = 0
+        labels = {
+            "provider": "LLM",
+            "generating": "Генерация",
+            "validating": "Проверка",
+        }
+        messages = {
+            "provider": f"{AGENT_LABEL}: LLM приняла задачу для {session.get('scenario_id')}.",
+            "generating": (
+                f"{AGENT_LABEL}: формирует изменение для {session.get('scenario_id')}"
+                f"{f' ({semantic_patch_count} операций)' if semantic_patch_count else f' ({output_chars} символов)' if output_chars else ''}."
+            ),
+            "validating": f"{AGENT_LABEL}: получила результат и проверяет UI для {session.get('scenario_id')}.",
+        }
+        _safe_emit_chat(
+            messages[phase],
+            webspace_id=ws,
+            _meta=_builder_llm_progress_meta(
+                _meta,
+                job_id=job_id,
+                phase=phase,
+                status="active" if phase != "validating" else "complete",
+                seq=seq,
+                label=labels[phase],
+            ),
+            session=session,
+            binding=binding,
+            topic_ref=topic,
+        )
     try:
         from adaos.sdk.llm.llm_client import wait_response_job
 
@@ -8019,6 +8422,7 @@ def _complete_llm_webui_job(
             base_url=base_url or None,
             timeout_s=timeout_s,
             poll_interval_s=poll_interval_s,
+            progress_callback=_on_progress,
         )
     except Exception as exc:
         _LOG.warning(
@@ -8115,6 +8519,7 @@ def _complete_llm_webui_job(
             llm_result = _parse_llm_webui_transform_output(
                 output_text=output_text,
                 previous_preview=previous_preview,
+                before_webui=before_webui,
                 request_id=request_id,
                 job_id=job_id,
             )
@@ -8224,7 +8629,16 @@ def _complete_llm_webui_job(
         _safe_emit_chat(
             str(result.get("message") or ""),
             webspace_id=ws,
-            _meta=_meta,
+            _meta=_builder_llm_progress_meta(
+                _meta,
+                job_id=job_id,
+                phase="completed",
+                status="complete",
+                seq=int((job.get("progress") or {}).get("seq") or 0) + 1
+                if isinstance(job.get("progress"), Mapping)
+                else 0,
+                label="Готово",
+            ),
             session=result.get("session") if isinstance(result.get("session"), Mapping) else session,
             binding=binding,
             topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic,
@@ -8477,7 +8891,20 @@ def update_current_scenario(
                 f"{AGENT_LABEL}: отправил LLM-задачу для {session.get('scenario_id')}. Job: {job_id}."
             ))
             if _is_api_tool_call(_meta):
-                _safe_emit_chat(message, webspace_id=ws, _meta=_meta, session=session, binding=binding, topic_ref=topic)
+                _safe_emit_chat(
+                    message,
+                    webspace_id=ws,
+                    _meta=_builder_llm_progress_meta(
+                        _meta,
+                        job_id=job_id,
+                        phase="accepted",
+                        status="complete",
+                        label="Принято",
+                    ),
+                    session=session,
+                    binding=binding,
+                    topic_ref=topic,
+                )
             return {
                 "ok": True,
                 "status": "llm_pending",
