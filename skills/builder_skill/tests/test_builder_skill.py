@@ -1988,6 +1988,15 @@ def test_builder_system_prompt_allows_replaceable_picsum_placeholders() -> None:
     assert "local seed assets or generated images" in prompt
 
 
+def test_builder_patch_prompt_distinguishes_add_from_replace() -> None:
+    skill = _load_module()
+
+    prompt = skill._builder_llm_system_prompt(output_mode="jsonl_patch_v1")
+
+    assert "Use add when creating a missing object member" in prompt
+    assert "replace only when the target member already exists" in prompt
+
+
 def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> None:
     skill = _load_module()
     before = {

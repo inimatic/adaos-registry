@@ -507,7 +507,7 @@ def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
         profile_id = "default"
     return {
         "schema": "adaos.builder.llm_prompt_profile.v1",
-        "version": "2026-07-16.5",
+        "version": "2026-07-16.6",
         "id": profile_id,
         "provider": provider,
         "model": model_hint,
@@ -2210,6 +2210,7 @@ def _builder_llm_system_prompt(
         "Return only newline-delimited JSON objects (JSONL), one complete object per line, with no markdown or prose. "
         "The first line must be a meta object with schema='adaos.builder.webui_patch_stream.v1' and the supplied base_hash. "
         "Each following patch line must contain type='patch', a strictly increasing seq, and one RFC 6902 op/path/value or from operation. "
+        "Use add when creating a missing object member and replace only when the target member already exists after all preceding patches. "
         "When addressing an existing object inside an id-bearing array such as pageSchema.widgets, use the AdaOS stable-id JSON Pointer token @<id>, "
         "for example /ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/fields, instead of a numeric index that can shift after earlier operations. "
         "The last line must contain type='complete', comment, and optional unable_reason. "
@@ -4643,6 +4644,7 @@ def _builder_llm_webui_transform_request(
                 "The patched result must remain a complete adaos.webui.v1 document.",
                 "After a nested object or array value, close both the value and the outer patch object before the newline.",
                 "Address existing widgets with /widgets/@<widget-id>/... so removes or moves earlier in the stream cannot shift the target.",
+                "RFC 6902 replace requires the final path member to exist; use add to create a missing object member.",
             ],
         }
         if output_mode == "jsonl_patch_v1"
@@ -5711,7 +5713,11 @@ def _repair_llm_webui_transform_output(
         "Repair the previous Builder JSONL patch stream. Return only corrected JSONL: "
         "one complete compact JSON object per physical line, beginning with the required meta object, "
         "followed by strictly ordered RFC 6902 patch objects, and ending with one complete object. "
-        "Preserve the supplied base_hash and correct the reported syntax or validation problem."
+        "Preserve the supplied base_hash and correct the reported syntax or validation problem. "
+        "If validation reports that a JSON Patch member is missing, use add when the request creates that member, "
+        "or correct the path when the member should already exist; do not replace the requested component property "
+        "with an unrelated field-based workaround. For item.details, a large rendered image must use inputs.imageKey, "
+        "not a field whose value is the image URL."
         if patch_output
         else (
             "Repair the previous Builder JSON response. Return only corrected JSON. "
