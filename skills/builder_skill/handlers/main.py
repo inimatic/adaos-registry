@@ -2355,7 +2355,7 @@ def _builder_llm_system_prompt(
         "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
         "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
         "Labeled item.details actions render visible detail buttons and execute their declared action. Use a sibling ui.actions widget only for a separate toolbar, segmented control, or independently positioned commands. "
-        "For ui.form, only supported form lifecycle triggers render buttons: submit, validate, save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put behavior in widget.actions and labels there (submit may use inputs.submitLabel). Optional inputs.secondaryActions entries only customize the label and presentation of a matching declared action. Never use dotted widget keys such as inputs.secondaryActions. "
+        "For ui.form, only supported form lifecycle triggers render buttons: submit, validate, save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put behavior in widget.actions and labels there (submit may use inputs.submitLabel). A cancel button that closes the current modal uses type='closeModal'; never model closing as openModal with a pseudo modal id such as '__close__'. Optional inputs.secondaryActions entries only customize the label and presentation of a matching declared action. Never use dotted widget keys such as inputs.secondaryActions. "
         "When a request says the detail should be in a right panel or side panel, use a split/focus-detail layout with a main master area and a right/detail aux area; do not put detail below the master unless the screen is compact. "
         "If the user asks to move a detail-related control into that right/detail panel, set that control's widget area to the right/detail aux area or put it inside the declared detail modal/panel schema. "
         "When the request says restore, recover, bring back, undo removal, or similar localized phrases, inspect last_revision_delta if present. Reintroduce the matching removed widgets/modals/actions and preserve their semantic owner: if the removed element belonged to a detail modal/panel/container, restore it inside the current detail modal/panel/aux area rather than as a detached global main action. "
@@ -4698,6 +4698,7 @@ def _builder_llm_webui_transform_request(
     session: Mapping[str, Any],
     instruction: str,
     preview_state: Mapping[str, Any],
+    output_mode: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     current_payload = _current_webui_payload(session, preview_state)
@@ -4715,13 +4716,15 @@ def _builder_llm_webui_transform_request(
     ]
     selected_model = _builder_llm_model_for_session(session, _meta)
     prompt_profile = _builder_llm_prompt_profile(selected_model)
-    output_mode = str(os.getenv("ADAOS_BUILDER_LLM_OUTPUT_MODE") or "jsonl_patch_v1").strip().lower()
-    if output_mode not in {"jsonl_patch_v1", "full_webui"}:
-        output_mode = "jsonl_patch_v1"
+    resolved_output_mode = str(
+        output_mode or os.getenv("ADAOS_BUILDER_LLM_OUTPUT_MODE") or "jsonl_patch_v1"
+    ).strip().lower()
+    if resolved_output_mode not in {"jsonl_patch_v1", "full_webui"}:
+        resolved_output_mode = "jsonl_patch_v1"
     system_prompt = _builder_llm_system_prompt(
         project_system_prompt=project_system_prompt,
         prompt_profile=prompt_profile,
-        output_mode=output_mode,
+        output_mode=resolved_output_mode,
     )
     patch_base = {
         "base_revision": str(session.get("ui_revision") or session.get("version") or "current"),
@@ -4748,7 +4751,7 @@ def _builder_llm_webui_transform_request(
                 "RFC 6902 never creates intermediate parents. If a parent object/array is absent, add that exact parent before adding descendants under it.",
             ],
         }
-        if output_mode == "jsonl_patch_v1"
+        if resolved_output_mode == "jsonl_patch_v1"
         else {
             "schema": "adaos.webui.v1",
             "ui.application.desktop.pageSchema": "complete renderable pageSchema",
@@ -4765,7 +4768,7 @@ def _builder_llm_webui_transform_request(
         "requested_output_contract": requested_output_contract,
     }
     dynamic_request = {
-        "patch_base": patch_base if output_mode == "jsonl_patch_v1" else {},
+        "patch_base": patch_base if resolved_output_mode == "jsonl_patch_v1" else {},
         "scenario_id": session.get("scenario_id"),
         "title": session.get("title"),
         "project_memory": _builder_project_memory_context(project_memory),
@@ -5283,6 +5286,11 @@ def _validate_webui_modal_contracts(payload: Mapping[str, Any]) -> dict[str, Any
         if modal_id.startswith("$"):
             continue
         if modal_id not in declared_modal_ids:
+            if modal_id == "__close__":
+                modal_action_issues.append(
+                    f"{path} uses openModal with pseudo modal id '__close__'; use action type closeModal to close the current modal"
+                )
+                continue
             modal_action_issues.append(
                 f"{path} opens undeclared modal '{modal_id}'; declare it in ui.application.modals"
             )
@@ -5886,6 +5894,7 @@ def _repair_llm_webui_transform_output(
         session=session,
         instruction=instruction,
         preview_state=previous_preview,
+        output_mode="full_webui",
         _meta=_meta,
     )
     repair_request_base_id = _builder_llm_request_id(
@@ -5907,47 +5916,31 @@ def _repair_llm_webui_transform_output(
         )
     )
     repair_request_id = f"{repair_request_base_id}-repair-{repair_identity}"
-    output_mode = str(os.getenv("ADAOS_BUILDER_LLM_OUTPUT_MODE") or "jsonl_patch_v1").strip().lower()
-    patch_output = output_mode == "jsonl_patch_v1"
+    patch_output = False
     repair_task = (
-        "Repair the previous Builder JSONL patch stream. Return only corrected JSONL: "
-        "one complete compact JSON object per physical line, beginning with the required meta object, "
-        "followed by strictly ordered RFC 6902 patch objects, and ending with one complete object. "
-        "Preserve the supplied base_hash and correct the reported syntax or validation problem. "
-        "If validation reports that a JSON Patch member is missing, use add when the request creates that member, "
-        "or correct the path when the member should already exist; do not replace the requested component property "
-        "with an unrelated field-based workaround. If an intermediate parent path is missing, first emit an add operation "
-        "for that exact parent with the appropriate empty object or array, then add its descendants; RFC 6902 never creates "
-        "intermediate containers. JSON Pointer separates every object key with '/': use /ui/application/modals, never "
-        "/ui/application.modals. Every pageSchema.autoActions item must contain the required nested action object. "
-        "For item.details, a large rendered image must use inputs.imageKey, "
-        "not a field whose value is the image URL."
-        if patch_output
-        else (
-            "Repair the previous Builder JSON response. Return only corrected JSON. "
-            "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
-            "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, or change the action to open an already declared modal. "
-            "Do not invent a different modal id while leaving the referenced id undeclared."
-        )
+        "Repair the previous Builder response and return one complete corrected adaos.webui.v1 JSON object. "
+        "Use current_webui_json as the source of truth and apply the original user request while correcting every reported validation issue. "
+        "Do not return another JSON Patch stream: a failed positional patch is not a reliable base for repair. "
+        "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
+        "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, "
+        "or use the appropriate non-opening action such as closeModal for closing the current modal. "
+        "Do not invent a different modal id while leaving the referenced id undeclared."
     )
     required_output_shape: dict[str, Any]
-    if patch_output:
-        required_output_shape = dict(request["base_request"]["requested_output_contract"])
-    else:
-        required_output_shape = {
-            "schema": "adaos.webui.v1",
-            "ui": {
-                "application": {
-                    "desktop": {
-                        "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
-                    },
-                    "modals": "optional object of modalId to {title,presentation,schema}; never top-level modals",
-                }
-            },
-            "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
-            "comment": "short user-facing text",
-            "unable_reason": "optional diagnostic",
-        }
+    required_output_shape = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
+                },
+                "modals": "optional object of modalId to {title,presentation,schema}; never top-level modals",
+            }
+        },
+        "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
+        "comment": "short user-facing text",
+        "unable_reason": "optional diagnostic",
+    }
     repair_prompt = _compact_json(
         {
             "task": repair_task,

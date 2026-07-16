@@ -1872,16 +1872,18 @@ def test_async_llm_completion_repairs_missing_page_schema(monkeypatch, tmp_path)
         }
 
     monkeypatch.setattr(llm_client, "wait_response_job", fake_wait_response_job)
-    monkeypatch.setattr(
-        llm_client,
-        "submit_response_job",
-        lambda *args, **kwargs: {
+    submit_calls = []
+
+    def fake_submit_response_job(*args, **kwargs):
+        submit_calls.append({"args": args, "kwargs": kwargs})
+        return {
             "ok": True,
             "job_id": "llm_job_repair_fix",
             "status": "queued",
             "_client": {"base_url": "https://ru.api.inimatic.com"},
-        },
-    )
+        }
+
+    monkeypatch.setattr(llm_client, "submit_response_job", fake_submit_response_job)
 
     skill._complete_llm_webui_job(
         ws="builder-repair",
@@ -1908,6 +1910,9 @@ def test_async_llm_completion_repairs_missing_page_schema(monkeypatch, tmp_path)
 
     assert emitted
     assert "llm_job_repair_fix" in wait_calls
+    assert submit_calls
+    assert submit_calls[0]["kwargs"]["stream_protocol"] is None
+    assert "Return only one JSON object" in submit_calls[0]["args"][0][0]["content"]
     assert not any("LLM payload must contain ui.application.desktop.pageSchema" in item for item in emitted)
     saved = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
     assert saved["ui"]["application"]["desktop"]["pageSchema"]["id"] == page_schema["id"]
@@ -2594,6 +2599,51 @@ def test_builder_modal_contract_reports_component_and_action_issues_together() -
     assert validation["ok"] is False
     assert "inputs_secondaryActions" in validation["detail"]
     assert "params.modalId is missing" in validation["detail"]
+
+
+def test_builder_modal_contract_recommends_close_modal_for_pseudo_close_id() -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "widgets": [{"id": "catalog", "type": "ui.list", "area": "main"}],
+                    }
+                },
+                "modals": {
+                    "add_recipe": {
+                        "schema": {
+                            "id": "add_recipe",
+                            "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                            "widgets": [
+                                {
+                                    "id": "form",
+                                    "type": "ui.form",
+                                    "area": "main",
+                                    "actions": [
+                                        {
+                                            "on": "click:cancel",
+                                            "type": "openModal",
+                                            "params": {"modalId": "__close__"},
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    }
+                },
+            }
+        },
+    }
+
+    validation = skill._validate_webui_modal_contracts(payload)
+
+    assert validation["ok"] is False
+    assert "use action type closeModal" in validation["detail"]
 
 
 def test_builder_component_contract_accepts_composed_detail_actions_and_form_cancel() -> None:
