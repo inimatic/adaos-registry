@@ -2128,6 +2128,60 @@ def test_builder_patch_stream_repairs_only_missing_outer_line_closer() -> None:
     ]
 
 
+def test_builder_patch_stream_stable_id_path_survives_prior_array_remove() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "widgets": [
+                            {"id": "remove-me", "type": "input.selector", "area": "main"},
+                            {
+                                "id": "recipe-details",
+                                "type": "item.details",
+                                "area": "main",
+                                "inputs": {"fields": [{"label": "Old", "path": "old"}]},
+                            },
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    base_hash = skill._webui_source_fingerprint(before)
+    output = "\n".join(
+        [
+            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            json.dumps({"type": "patch", "seq": 1, "op": "remove", "path": "/ui/application/desktop/pageSchema/widgets/@remove-me"}),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 2,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/fields",
+                    "value": [{"label": "Title", "path": "title"}],
+                }
+            ),
+            json.dumps({"type": "complete", "comment": "Updated details."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    widgets = result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"]
+    assert result["ok"] is True
+    assert [item["id"] for item in widgets] == ["recipe-details"]
+    assert widgets[0]["inputs"]["fields"] == [{"label": "Title", "path": "title"}]
+
+
 def test_builder_component_contract_rejects_data_source_nested_in_inputs() -> None:
     skill = _load_module()
     page_schema = {

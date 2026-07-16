@@ -507,7 +507,7 @@ def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
         profile_id = "default"
     return {
         "schema": "adaos.builder.llm_prompt_profile.v1",
-        "version": "2026-07-16.3",
+        "version": "2026-07-16.4",
         "id": profile_id,
         "provider": provider,
         "model": model_hint,
@@ -2209,6 +2209,8 @@ def _builder_llm_system_prompt(
         "Return only newline-delimited JSON objects (JSONL), one complete object per line, with no markdown or prose. "
         "The first line must be a meta object with schema='adaos.builder.webui_patch_stream.v1' and the supplied base_hash. "
         "Each following patch line must contain type='patch', a strictly increasing seq, and one RFC 6902 op/path/value or from operation. "
+        "When addressing an existing object inside an id-bearing array such as pageSchema.widgets, use the AdaOS stable-id JSON Pointer token @<id>, "
+        "for example /ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/fields, instead of a numeric index that can shift after earlier operations. "
         "The last line must contain type='complete', comment, and optional unable_reason. "
         "Generate the smallest coherent patch set that satisfies the request and preserves unrelated UI. "
         if patch_output
@@ -4630,7 +4632,7 @@ def _builder_llm_webui_transform_request(
             "operations": ["add", "remove", "replace", "move", "copy", "test"],
             "line_shapes": {
                 "meta": {"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": "exact supplied hash"},
-                "patch": {"type": "patch", "seq": "1..N", "op": "RFC 6902 op", "path": "JSON Pointer", "value": "when required", "from": "when required"},
+                "patch": {"type": "patch", "seq": "1..N", "op": "RFC 6902 op", "path": "JSON Pointer; use @<id> for existing members of id-bearing arrays", "value": "when required", "from": "when required"},
                 "complete": {"type": "complete", "comment": "short user-facing summary", "unable_reason": "optional"},
             },
             "rules": [
@@ -4639,6 +4641,7 @@ def _builder_llm_webui_transform_request(
                 "Use test guards before index-sensitive destructive changes when practical.",
                 "The patched result must remain a complete adaos.webui.v1 document.",
                 "After a nested object or array value, close both the value and the outer patch object before the newline.",
+                "Address existing widgets with /widgets/@<widget-id>/... so removes or moves earlier in the stream cannot shift the target.",
             ],
         }
         if output_mode == "jsonl_patch_v1"
@@ -4861,11 +4864,27 @@ def _json_pointer_index(token: str, length: int, *, allow_end: bool = False) -> 
     return index
 
 
+def _json_pointer_list_index(items: list[Any], token: str, *, allow_end: bool = False) -> int:
+    if token.startswith("@") and len(token) > 1:
+        stable_id = token[1:]
+        matches = [
+            index
+            for index, item in enumerate(items)
+            if isinstance(item, Mapping) and str(item.get("id") or "") == stable_id
+        ]
+        if not matches:
+            raise KeyError(f"JSON Pointer stable id not found: {stable_id}")
+        if len(matches) > 1:
+            raise ValueError(f"JSON Pointer stable id is ambiguous: {stable_id}")
+        return matches[0]
+    return _json_pointer_index(token, len(items), allow_end=allow_end)
+
+
 def _json_pointer_get(document: Any, path: Any) -> Any:
     node = document
     for token in _json_pointer_parts(path):
         if isinstance(node, list):
-            node = node[_json_pointer_index(token, len(node))]
+            node = node[_json_pointer_list_index(node, token)]
         elif isinstance(node, Mapping):
             if token not in node:
                 raise KeyError(f"JSON Pointer member not found: {token}")
@@ -4882,7 +4901,7 @@ def _json_pointer_parent(document: Any, path: Any) -> tuple[Any, str]:
     node = document
     for token in parts[:-1]:
         if isinstance(node, list):
-            node = node[_json_pointer_index(token, len(node))]
+            node = node[_json_pointer_list_index(node, token)]
         elif isinstance(node, dict):
             if token not in node:
                 raise KeyError(f"JSON Pointer member not found: {token}")
@@ -4914,7 +4933,7 @@ def _apply_json_patch_operation(document: Any, operation: Mapping[str, Any]) -> 
         if parent is None:
             raise ValueError("removing the whole webui document is not allowed")
         if isinstance(parent, list):
-            parent.pop(_json_pointer_index(token, len(parent)))
+            parent.pop(_json_pointer_list_index(parent, token))
         elif isinstance(parent, dict):
             if token not in parent:
                 raise KeyError(f"JSON Patch member not found: {token}")
@@ -4930,9 +4949,11 @@ def _apply_json_patch_operation(document: Any, operation: Mapping[str, Any]) -> 
         return value
     if isinstance(parent, list):
         if op == "add":
-            parent.insert(_json_pointer_index(token, len(parent), allow_end=True), value)
+            if token.startswith("@"):
+                raise ValueError("JSON Patch add cannot insert at a stable-id token; use /- or a numeric index")
+            parent.insert(_json_pointer_list_index(parent, token, allow_end=True), value)
         else:
-            parent[_json_pointer_index(token, len(parent))] = value
+            parent[_json_pointer_list_index(parent, token)] = value
     elif isinstance(parent, dict):
         if op == "replace" and token not in parent:
             raise KeyError(f"JSON Patch member not found: {token}")
