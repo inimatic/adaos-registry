@@ -5506,37 +5506,65 @@ def _repair_llm_webui_transform_output(
         preview_state=previous_preview,
         _meta=_meta,
     )
-    repair_request_id = _builder_llm_request_id(
+    repair_request_base_id = _builder_llm_request_id(
         session=session,
         instruction=instruction,
         current_payload=request["current_payload"],
         attempt=2,
     )
+    repair_identity = _hash_suffix(
+        _compact_json(
+            {
+                "original_job_id": job_id,
+                "original_request_id": request_id,
+                "validation_error": dict(validation_error),
+                "response_hash": hashlib.sha256(
+                    str(output_text or "").encode("utf-8", errors="replace")
+                ).hexdigest(),
+            }
+        )
+    )
+    repair_request_id = f"{repair_request_base_id}-repair-{repair_identity}"
+    output_mode = str(os.getenv("ADAOS_BUILDER_LLM_OUTPUT_MODE") or "jsonl_patch_v1").strip().lower()
+    patch_output = output_mode == "jsonl_patch_v1"
+    repair_task = (
+        "Repair the previous Builder JSONL patch stream. Return only corrected JSONL: "
+        "one complete compact JSON object per physical line, beginning with the required meta object, "
+        "followed by strictly ordered RFC 6902 patch objects, and ending with one complete object. "
+        "Preserve the supplied base_hash and correct the reported syntax or validation problem."
+        if patch_output
+        else (
+            "Repair the previous Builder JSON response. Return only corrected JSON. "
+            "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
+            "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, or change the action to open an already declared modal. "
+            "Do not invent a different modal id while leaving the referenced id undeclared."
+        )
+    )
+    required_output_shape: dict[str, Any]
+    if patch_output:
+        required_output_shape = dict(request["base_request"]["requested_output_contract"])
+    else:
+        required_output_shape = {
+            "schema": "adaos.webui.v1",
+            "ui": {
+                "application": {
+                    "desktop": {
+                        "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
+                    },
+                    "modals": "optional object of modalId to {title,presentation,schema}; never top-level modals",
+                }
+            },
+            "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
+            "comment": "short user-facing text",
+            "unable_reason": "optional diagnostic",
+        }
     repair_prompt = _compact_json(
         {
-            "task": (
-                "Repair the previous Builder JSON response. Return only corrected JSON. "
-                "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
-                "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, or change the action to open an already declared modal. "
-                "Do not invent a different modal id while leaving the referenced id undeclared."
-            ),
+            "task": repair_task,
             "validation_error": dict(validation_error),
             "previous_response": str(output_text or "")[:20000],
             "original_request": request["base_request"],
-            "required_output_shape": {
-                "schema": "adaos.webui.v1",
-                "ui": {
-                    "application": {
-                        "desktop": {
-                            "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
-                        },
-                        "modals": "optional object of modalId to {title,presentation,schema}; never top-level modals",
-                    }
-                },
-                "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
-                "comment": "short user-facing text",
-                "unable_reason": "optional diagnostic",
-            },
+            "required_output_shape": required_output_shape,
         }
     )
     repair_job_id = ""
@@ -5570,7 +5598,7 @@ def _repair_llm_webui_transform_output(
             stream=_builder_llm_stream_enabled(_meta),
             prompt_cache_key=_builder_llm_prompt_cache_key(selected_model, prompt_profile),
             prompt_cache_retention=str(os.getenv("ADAOS_BUILDER_LLM_PROMPT_CACHE_RETENTION") or "").strip() or None,
-            stream_protocol="jsonl" if str(os.getenv("ADAOS_BUILDER_LLM_OUTPUT_MODE") or "jsonl_patch_v1").strip().lower() == "jsonl_patch_v1" else None,
+            stream_protocol="jsonl" if patch_output else None,
             timeout=_builder_llm_job_submit_timeout_s(),
         )
         repair_job_id = str(response.get("job_id") or response.get("id") or "").strip()
@@ -5666,8 +5694,9 @@ def _repair_llm_webui_transform_output(
         result = _parse_llm_webui_transform_output(
             output_text=repaired_output,
             previous_preview=previous_preview,
+            before_webui=request["current_payload"] if patch_output else None,
             request_id=repair_request_id,
-            job_id=job_id,
+            job_id=repair_job_id,
         )
         _LOG.debug(
             "builder LLM repair parse completed scenario=%s request_id=%s original_job_id=%s repair_job_id=%s ok=%s error=%s",
@@ -8515,6 +8544,7 @@ def _complete_llm_webui_job(
             request_id,
             len(output_text),
         )
+        repair_attempted = False
         try:
             llm_result = _parse_llm_webui_transform_output(
                 output_text=output_text,
@@ -8541,7 +8571,8 @@ def _complete_llm_webui_job(
                 job_id=job_id,
                 _meta=_meta,
             )
-        if not llm_result.get("ok"):
+            repair_attempted = True
+        if not llm_result.get("ok") and not repair_attempted:
             validation_detail = ""
             validation_payload = llm_result.get("validation")
             if isinstance(validation_payload, Mapping):
@@ -8567,25 +8598,26 @@ def _complete_llm_webui_job(
                 job_id=job_id,
                 _meta=_meta,
             )
-            if not llm_result.get("ok"):
-                _LOG.warning(
-                    "builder LLM job validation repair failed scenario=%s job_id=%s request_id=%s error=%s detail=%s",
-                    str(session.get("scenario_id") or ""),
-                    job_id,
-                    request_id,
-                    str(llm_result.get("error") or ""),
-                    str(llm_result.get("detail") or ""),
-                )
-                _mark_llm_job_failed(
-                    ws=ws,
-                    session=session,
-                    job_id=job_id,
-                    detail=str(llm_result.get("detail") or llm_result.get("error") or "invalid_llm_response"),
-                    binding=binding,
-                    topic_ref=topic,
-                    _meta=_meta,
-                )
-                return
+            repair_attempted = True
+        if not llm_result.get("ok"):
+            _LOG.warning(
+                "builder LLM job validation repair failed scenario=%s job_id=%s request_id=%s error=%s detail=%s",
+                str(session.get("scenario_id") or ""),
+                job_id,
+                request_id,
+                str(llm_result.get("error") or ""),
+                str(llm_result.get("detail") or ""),
+            )
+            _mark_llm_job_failed(
+                ws=ws,
+                session=session,
+                job_id=job_id,
+                detail=str(llm_result.get("detail") or llm_result.get("error") or "invalid_llm_response"),
+                binding=binding,
+                topic_ref=topic,
+                _meta=_meta,
+            )
+            return
         _LOG.debug(
             "builder LLM job parse completed scenario=%s job_id=%s request_id=%s ok=%s",
             str(session.get("scenario_id") or ""),
