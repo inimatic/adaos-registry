@@ -1172,6 +1172,23 @@ def test_update_current_scenario_blocks_parallel_llm_jobs(monkeypatch) -> None:
     assert session["pending_llm_jobs"]["llm_job_busy"]["status"] == "succeeded"
 
 
+def test_development_profile_kwargs_supports_new_and_legacy_sdk_signatures() -> None:
+    skill = _load_module()
+
+    def new_sdk(messages, *, profile_scope=None):
+        return messages, profile_scope
+
+    def compatibility_sdk(messages, **kwargs):
+        return messages, kwargs
+
+    def legacy_sdk(messages, *, model=None):
+        return messages, model
+
+    assert skill._development_profile_kwargs(new_sdk) == {"profile_scope": "development"}
+    assert skill._development_profile_kwargs(compatibility_sdk) == {"profile_scope": "development"}
+    assert skill._development_profile_kwargs(legacy_sdk) == {}
+
+
 def test_llm_job_link_normalises_terminal_status_after_stale_session_load() -> None:
     skill = _load_module()
     session = {
@@ -1254,6 +1271,51 @@ def test_active_llm_job_reconciles_orphan_local_job_from_ui_revision(tmp_path) -
     assert skill._active_llm_job(session) is None
     assert session["pending_llm_jobs"]["builder_llm_submit_race"]["status"] == "succeeded"
     assert session["pending_llm_jobs"]["llm_job_race"]["status"] == "succeeded"
+
+
+def test_active_llm_job_reconciles_failed_worker_from_terminal_journal(tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "prototype"
+    artifact_root.mkdir(parents=True)
+    session = {
+        "id": "builder_session_failed_worker",
+        "scenario_id": "failed_worker",
+        "artifact_root": str(artifact_root),
+        "pending_llm_jobs": {
+            "builder_llm_submit_failed": {
+                "schema": "adaos.builder.llm_job.v1",
+                "job_id": "builder_llm_submit_failed",
+                "root_job_id": "llm_job_failed",
+                "status": "submitted",
+                "request_id": "request-failed",
+                "patch_id": "patch-failed",
+                "created_at": time.time(),
+            },
+            "llm_job_failed": {
+                "schema": "adaos.builder.llm_job.v1",
+                "job_id": "llm_job_failed",
+                "local_job_id": "builder_llm_submit_failed",
+                "status": "running",
+                "created_at": time.time(),
+            },
+        },
+    }
+
+    path = skill._write_llm_job_terminal_artifact(
+        session,
+        "llm_job_failed",
+        "failed",
+        detail="postprocess_failed: invalid modal contract",
+    )
+
+    assert path is not None and path.exists()
+    assert skill._active_llm_job(session) is None
+    assert session["pending_llm_jobs"]["builder_llm_submit_failed"]["status"] == "failed"
+    assert session["pending_llm_jobs"]["llm_job_failed"]["status"] == "failed"
+    assert "invalid modal contract" in session["pending_llm_jobs"]["llm_job_failed"]["detail"]
+    journal = json.loads(path.read_text(encoding="utf-8"))
+    assert journal["schema"] == "adaos.builder.llm_job_result.v1"
+    assert journal["related_ids"] == ["builder_llm_submit_failed", "llm_job_failed"]
 
 
 def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state(caplog) -> None:

@@ -353,6 +353,20 @@ def _write_text_file(path: Path, value: str) -> None:
     path.write_text(str(value or ""), encoding="utf-8")
 
 
+def _write_json_file_atomic(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{threading.get_ident()}.{time.time_ns()}.tmp")
+    try:
+        tmp.write_text(json.dumps(dict(payload), ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
+    finally:
+        try:
+            if tmp.exists():
+                tmp.unlink()
+        except Exception:
+            pass
+
+
 def _invalidate_scenario_runtime_caches(root: Path, reason: str) -> None:
     scenario_id = str(root.name or "").strip()
     if not scenario_id:
@@ -488,6 +502,19 @@ def _builder_llm_model_for_session(
     _meta: Mapping[str, Any] | None = None,
 ) -> str | None:
     return _builder_llm_model_from_meta(_meta) or _builder_llm_model_from_session(session) or _builder_llm_env_model()
+
+
+def _development_profile_kwargs(callable_obj: Any) -> dict[str, str]:
+    """Keep Builder compatible while core and a runtime skill update independently."""
+    try:
+        parameters = inspect.signature(callable_obj).parameters.values()
+    except (TypeError, ValueError):
+        return {}
+    supports_keyword = any(
+        parameter.name == "profile_scope" or parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters
+    )
+    return {"profile_scope": "development"} if supports_keyword else {}
 
 
 def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
@@ -5701,7 +5728,7 @@ def _apply_llm_webui_transform(
                 response = send_response(
                     messages,
                     model=selected_model,
-                    profile_scope="development",
+                    **_development_profile_kwargs(send_response),
                     temperature=temperature if attempt == 1 else _builder_llm_temperature_for_model(selected_model, repair=True),
                     max_tokens=max_tokens,
                     reasoning=reasoning,
@@ -5952,7 +5979,7 @@ def _repair_llm_webui_transform_output(
                 {"role": "user", "content": repair_prompt},
             ],
             model=selected_model,
-            profile_scope="development",
+            **_development_profile_kwargs(submit_response_job),
             temperature=_builder_llm_temperature_for_model(
                 selected_model,
                 repair=True,
@@ -8113,7 +8140,7 @@ def _submit_llm_webui_transform_job(
             response = submit_response_job(
                 messages,
                 model=selected_model,
-                profile_scope="development",
+                **_development_profile_kwargs(submit_response_job),
                 temperature=_builder_llm_temperature_for_model(selected_model),
                 max_tokens=_builder_llm_max_tokens_for_model(selected_model),
                 reasoning=_builder_llm_reasoning_for_model(selected_model),
@@ -8260,6 +8287,7 @@ def _mark_llm_job_failed(
         detail,
     )
     _update_llm_job_status(session, job_id, "failed", detail=detail)
+    _write_llm_job_terminal_artifact(session, job_id, "failed", detail=detail)
     _save_session(ws, session)
     _LOG.debug(
         "builder LLM job failed status saved scenario=%s job_id=%s",
@@ -8294,6 +8322,66 @@ def _mark_llm_job_failed(
 
 _ACTIVE_LLM_JOB_STATUSES = frozenset({"submitting", "submitted", "queued", "running"})
 _TERMINAL_LLM_JOB_STATUSES = frozenset({"succeeded", "failed", "cancelled", "canceled"})
+
+
+def _llm_job_journal_dir(session: Mapping[str, Any]) -> Path | None:
+    root = _project_artifact_root(session)
+    return root / "llm_jobs" if root is not None else None
+
+
+def _write_llm_job_terminal_artifact(
+    session: Mapping[str, Any],
+    job_id: str,
+    status: str,
+    *,
+    detail: str | None = None,
+) -> Path | None:
+    token = str(job_id or "").strip()
+    terminal_status = str(status or "").strip().lower()
+    if not token or terminal_status not in _TERMINAL_LLM_JOB_STATUSES:
+        return None
+    journal_dir = _llm_job_journal_dir(session)
+    if journal_dir is None:
+        return None
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
+    related_ids: set[str] = {token}
+    matched: dict[str, Any] = {}
+    for key, value in pending.items():
+        if not isinstance(value, Mapping):
+            continue
+        ids = _llm_job_related_ids(str(key), value)
+        if token in ids:
+            related_ids |= ids
+            matched.update({k: v for k, v in value.items() if v not in (None, "")})
+    safe_job_id = re.sub(r"[^A-Za-z0-9_.-]+", "_", token).strip("._-") or _hash_suffix(token)
+    payload = {
+        "schema": "adaos.builder.llm_job_result.v1",
+        "job_id": token,
+        "local_job_id": str(matched.get("local_job_id") or "").strip() or None,
+        "root_job_id": str(matched.get("root_job_id") or "").strip() or None,
+        "related_ids": sorted(related_ids),
+        "session_id": str(session.get("id") or "").strip() or None,
+        "scenario_id": str(session.get("scenario_id") or "").strip() or None,
+        "request_id": str(matched.get("request_id") or "").strip() or None,
+        "patch_id": str(matched.get("patch_id") or "").strip() or None,
+        "model": str(matched.get("model") or "").strip() or None,
+        "status": terminal_status,
+        "detail": str(detail or matched.get("detail") or "").strip() or None,
+        "finished_at": _now(),
+    }
+    path = journal_dir / f"{safe_job_id}.json"
+    try:
+        _write_json_file_atomic(path, {key: value for key, value in payload.items() if value is not None})
+    except Exception:
+        _LOG.exception(
+            "builder LLM terminal journal write failed scenario=%s job_id=%s status=%s path=%s",
+            str(session.get("scenario_id") or ""),
+            token,
+            terminal_status,
+            path,
+        )
+        return None
+    return path
 
 
 def _llm_job_related_ids(key: str, value: Mapping[str, Any]) -> set[str]:
@@ -8611,6 +8699,82 @@ def _reconcile_pending_llm_jobs_from_revisions(session: dict[str, Any]) -> bool:
     return changed
 
 
+def _reconcile_pending_llm_jobs_from_journal(session: dict[str, Any]) -> bool:
+    pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), dict) else {}
+    active_items = [
+        (str(key), dict(value), _llm_job_related_ids(str(key), value))
+        for key, value in pending.items()
+        if isinstance(value, Mapping)
+        and str(value.get("status") or "").strip().lower() in _ACTIVE_LLM_JOB_STATUSES
+    ]
+    if not active_items:
+        return False
+    journal_dir = _llm_job_journal_dir(session)
+    if journal_dir is None or not journal_dir.exists():
+        return False
+    try:
+        journal_files = sorted(
+            journal_dir.glob("*.json"),
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )[:100]
+    except Exception:
+        return False
+    changed = False
+    for journal_file in journal_files:
+        payload = _read_json_file(journal_file)
+        status = str(payload.get("status") or "").strip().lower()
+        if status not in _TERMINAL_LLM_JOB_STATUSES:
+            continue
+        artifact_ids = {
+            str(item or "").strip()
+            for item in payload.get("related_ids", [])
+            if str(item or "").strip()
+        }
+        artifact_ids |= {
+            item
+            for item in {
+                str(payload.get("job_id") or "").strip(),
+                str(payload.get("local_job_id") or "").strip(),
+                str(payload.get("root_job_id") or "").strip(),
+            }
+            if item
+        }
+        for key, value, related_ids in active_items:
+            if not (artifact_ids & related_ids):
+                continue
+            root_job_id = str(payload.get("root_job_id") or value.get("root_job_id") or "").strip()
+            local_job_id = str(payload.get("local_job_id") or value.get("local_job_id") or key or "").strip()
+            if root_job_id:
+                _ensure_llm_job_link(
+                    session,
+                    local_job_id=local_job_id,
+                    root_job_id=root_job_id,
+                    request_id=str(payload.get("request_id") or value.get("request_id") or "").strip(),
+                    request_text=str(value.get("request_text") or ""),
+                    patch_id=payload.get("patch_id") or value.get("patch_id"),
+                    model=str(payload.get("model") or value.get("model") or "").strip(),
+                    status="submitted",
+                )
+            terminal_id = root_job_id or str(payload.get("job_id") or key).strip()
+            _update_llm_job_status(
+                session,
+                terminal_id,
+                status,
+                detail=str(payload.get("detail") or "").strip() or None,
+            )
+            _LOG.warning(
+                "builder pending LLM job reconciled from terminal journal scenario=%s local_job_id=%s root_job_id=%s status=%s artifact=%s",
+                str(session.get("scenario_id") or ""),
+                local_job_id,
+                root_job_id,
+                status,
+                journal_file,
+            )
+            changed = True
+    return changed
+
+
 def _update_llm_job_status(
     session: dict[str, Any],
     job_id: str,
@@ -8661,6 +8825,7 @@ def _update_llm_job_status(
 
 def _active_llm_job(session: Mapping[str, Any]) -> dict[str, Any] | None:
     if isinstance(session, dict):
+        _reconcile_pending_llm_jobs_from_journal(session)
         _reconcile_pending_llm_jobs_from_revisions(session)
         _normalise_pending_llm_jobs(session)
     pending = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
@@ -9005,6 +9170,7 @@ def _complete_llm_webui_job(
             _meta=_meta,
         )
         _update_llm_job_status(session, job_id, "succeeded")
+        _write_llm_job_terminal_artifact(session, job_id, "succeeded")
         _save_session(ws, session)
         _LOG.debug(
             "builder LLM job applied scenario=%s job_id=%s request_id=%s elapsed_ms=%d ok=%s",
@@ -9573,7 +9739,8 @@ def get_session(
     binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else {}
     session_changed = False
     if isinstance(session, dict):
-        session_changed = _reconcile_pending_llm_jobs_from_revisions(session)
+        session_changed = _reconcile_pending_llm_jobs_from_journal(session)
+        session_changed = _reconcile_pending_llm_jobs_from_revisions(session) or session_changed
     if isinstance(session, dict) and _sync_session_from_artifacts(session, binding):
         session_changed = True
     if isinstance(session, dict) and session_changed:
