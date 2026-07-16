@@ -5312,6 +5312,18 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                     "and are ignored by the runtime, so place the value inside the corresponding object"
                 ),
             }
+        flattened_input_keys = [str(key) for key in widget.keys() if str(key).startswith("inputs_")]
+        if flattened_input_keys:
+            flattened_key = flattened_input_keys[0]
+            nested_key = flattened_key[len("inputs_") :]
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": (
+                    f"widgets[{widget_index}] contains flattened property {flattened_key!r}; it is ignored by the "
+                    f"runtime, so move the value to widgets[{widget_index}].inputs.{nested_key}"
+                ),
+            }
         inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
         if isinstance(inputs.get("dataSource"), Mapping):
             return {

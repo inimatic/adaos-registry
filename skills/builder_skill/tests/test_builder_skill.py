@@ -2465,6 +2465,30 @@ def test_builder_canonical_payload_migrates_legacy_dotted_widget_properties() ->
     assert skill._validate_builder_webui_payload(canonical, {})["ok"] is True
 
 
+def test_builder_component_contract_rejects_flattened_input_properties() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "recipe-modal",
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "recipe-form",
+                "type": "ui.form",
+                "area": "main",
+                "inputs": {"fields": [{"id": "title", "type": "shortText"}]},
+                "inputs_secondaryActions": [{"id": "cancel", "label": "Cancel"}],
+                "actions": [{"on": "click:cancel", "type": "closeModal"}],
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "inputs_secondaryActions" in validation["detail"]
+    assert "inputs.secondaryActions" in validation["detail"]
+
+
 def test_builder_component_contract_accepts_composed_detail_actions_and_form_cancel() -> None:
     skill = _load_module()
     detail_schema = {
