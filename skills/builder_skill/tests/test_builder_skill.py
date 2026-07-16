@@ -1052,6 +1052,9 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     assert result["status"] == "llm_pending"
     assert result["llm_job"]["job_id"] == "llm_job_async_test"
     assert result["llm_job"]["local_job_id"].startswith("builder_llm_submit_")
+    assert result["message_meta"]["progress_group_id"] == "llm_job_async_test"
+    assert result["message_meta"]["progress_phase"] == "accepted"
+    assert result["message_meta"]["progress_seq"] == 0
     assert submit_calls
     deadline = time.monotonic() + 3
     while time.monotonic() < deadline and not refresh_calls:
