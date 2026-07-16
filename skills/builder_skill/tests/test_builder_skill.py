@@ -2153,6 +2153,55 @@ def test_builder_component_contract_rejects_data_source_nested_in_inputs() -> No
     assert "move dataSource" in validation["detail"]
 
 
+def test_builder_component_contract_rejects_unrendered_details_fields() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "details",
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "recipe-detail",
+                "type": "item.details",
+                "area": "main",
+                "dataSource": {"kind": "static", "value": {"title": "Soup"}},
+                "inputs": {"fields": [{"id": "title", "type": "staticContent", "content": "$item.title"}]},
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "item.details ignores" in validation["detail"]
+
+
+def test_builder_component_contract_rejects_invented_update_state_operators() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "actions",
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "favorite",
+                "type": "ui.actions",
+                "area": "main",
+                "actions": [
+                    {
+                        "on": "click",
+                        "type": "updateState",
+                        "params": {"favorites": {"$merge": True, "$value": {"$toggle": True}}},
+                    }
+                ],
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "unsupported updateState operator" in validation["detail"]
+
+
 def test_builder_component_contract_rejects_unrendered_table_image_cells() -> None:
     skill = _load_module()
     page_schema = {

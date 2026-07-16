@@ -507,7 +507,7 @@ def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
         profile_id = "default"
     return {
         "schema": "adaos.builder.llm_prompt_profile.v1",
-        "version": "2026-07-16.2",
+        "version": "2026-07-16.3",
         "id": profile_id,
         "provider": provider,
         "model": model_hint,
@@ -2025,7 +2025,12 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "purpose": "Readable detail surface for the item selected in a master list, table, or card collection.",
             "inputs": {
                 "selectedStateKey": "State key containing the selected item id; the static dataSource may be a map keyed by those ids.",
-                "fields": "Optional ordered detail field descriptors. Without fields, object properties are rendered automatically.",
+                "fields": (
+                    "Optional ordered descriptors {id?,label?,key?|path?|value?}. Use key/path for one selected object path. "
+                    "Use value with brace interpolation such as '{category} • {time}' for combined text. Arrays selected by key/path render one item per line. "
+                    "Do not use form field type/content descriptors, $item expressions, JavaScript, map(), or join(); item.details does not execute them. "
+                    "Without fields, non-image object properties are rendered automatically."
+                ),
                 "imageKey": "Optional object path for a large responsive detail image.",
                 "imageAltKey": "Optional object path for accessible image alt text; falls back to title/name/label.",
                 "imageRatio": "Optional aspect ratio such as '16 / 9' or '4 / 3'.",
@@ -2046,7 +2051,11 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "variant": "Optional: toolbar, stack, compact, segmented.",
                 "size": "Optional: small, medium, large.",
             },
-            "actions": "Use local updateState for prototype-only state changes; use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls.",
+            "actions": (
+                "Use local updateState for prototype-only state changes; params are a direct state patch and may resolve $event.*, $state.*, and $client.* values. "
+                "Do not invent operators such as $merge, $toggle, $append, or JavaScript expressions. Use a simple explicit boolean/status value for a mock action when one click is sufficient. "
+                "Use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls."
+            ),
         },
         "application_modals": {
             "purpose": "Use ui.application.modals when the user asks for a modal, dialog, popup, drawer, sheet, or separate overlay surface.",
@@ -5170,6 +5179,57 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                     "move dataSource to widgets[{widget_index}].dataSource"
                 ),
             }
+        actions = widget.get("actions") if isinstance(widget.get("actions"), list) else []
+        for action_index, action in enumerate(actions):
+            if not isinstance(action, Mapping) or str(action.get("type") or "").strip() != "updateState":
+                continue
+            params = action.get("params") if isinstance(action.get("params"), Mapping) else {}
+            unsupported = next(
+                (
+                    key
+                    for key in ("$merge", "$toggle", "$append", "$remove")
+                    if key in _compact_json(params)
+                ),
+                "",
+            )
+            if unsupported:
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": (
+                        f"widgets[{widget_index}].actions[{action_index}].params uses unsupported updateState operator "
+                        f"{unsupported}; updateState accepts a direct state patch with $event/$state/$client references"
+                    ),
+                }
+        if widget_type == "item.details":
+            fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
+            for field_index, field in enumerate(fields):
+                if not isinstance(field, Mapping):
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": f"widgets[{widget_index}].inputs.fields[{field_index}] must be an object",
+                    }
+                if "type" in field or "content" in field:
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": (
+                            f"widgets[{widget_index}].inputs.fields[{field_index}] uses form-style type/content that item.details ignores; "
+                            "use label plus key/path, or value with {path} interpolation"
+                        ),
+                    }
+                template = str(field.get("value") or "")
+                if "$item" in template or re.search(r"\.(?:map|join|filter)\s*\(", template):
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": (
+                            f"widgets[{widget_index}].inputs.fields[{field_index}].value contains an executable expression; "
+                            "item.details supports only literal text and {path} interpolation"
+                        ),
+                    }
+            continue
         if widget_type == "ui.table":
             columns = inputs.get("columns") if isinstance(inputs.get("columns"), list) else []
             for column_index, column in enumerate(columns):
