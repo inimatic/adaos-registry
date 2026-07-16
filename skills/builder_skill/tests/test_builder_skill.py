@@ -2020,6 +2020,7 @@ def test_builder_patch_prompt_distinguishes_add_from_replace() -> None:
     assert "Use add when creating a missing object member" in prompt
     assert "replace only when the target member already exists" in prompt
     assert "RFC 6902 does not create intermediate containers" in prompt
+    assert "ui.application.modals is /ui/application/modals" in prompt
 
 
 def test_builder_component_contract_describes_nested_auto_action_shape() -> None:

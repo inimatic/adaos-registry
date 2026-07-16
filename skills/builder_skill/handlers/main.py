@@ -2278,6 +2278,7 @@ def _builder_llm_system_prompt(
         "Each following patch line must contain type='patch', a strictly increasing seq, and one RFC 6902 op/path/value or from operation. "
         "Use add when creating a missing object member and replace only when the target member already exists after all preceding patches. "
         "RFC 6902 does not create intermediate containers: before adding a descendant such as /ui/application/modals/detail, first add /ui/application/modals with value={} when that parent is absent. "
+        "JSON Pointer separates every object key with '/': the hierarchy ui.application.modals is /ui/application/modals, never /ui/application.modals. "
         "When addressing an existing object inside an id-bearing array such as pageSchema.widgets, use the AdaOS stable-id JSON Pointer token @<id>, "
         "for example /ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/fields, instead of a numeric index that can shift after earlier operations. "
         "The last line must contain type='complete', comment, and optional unable_reason. "
@@ -5890,7 +5891,8 @@ def _repair_llm_webui_transform_output(
         "or correct the path when the member should already exist; do not replace the requested component property "
         "with an unrelated field-based workaround. If an intermediate parent path is missing, first emit an add operation "
         "for that exact parent with the appropriate empty object or array, then add its descendants; RFC 6902 never creates "
-        "intermediate containers. Every pageSchema.autoActions item must contain the required nested action object. "
+        "intermediate containers. JSON Pointer separates every object key with '/': use /ui/application/modals, never "
+        "/ui/application.modals. Every pageSchema.autoActions item must contain the required nested action object. "
         "For item.details, a large rendered image must use inputs.imageKey, "
         "not a field whose value is the image URL."
         if patch_output
