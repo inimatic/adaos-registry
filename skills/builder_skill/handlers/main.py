@@ -4712,8 +4712,77 @@ def _extract_json_object(text: str) -> dict[str, Any]:
     raise ValueError("LLM response does not contain a JSON object")
 
 
-def _extract_json_stream_objects(text: str) -> list[dict[str, Any]]:
+def _close_trivially_unbalanced_json(line: str) -> tuple[str | None, int]:
+    source = str(line or "").strip()
+    if not source.startswith("{"):
+        return None, 0
+    stack: list[str] = []
+    in_string = False
+    escaped = False
+    pairs = {"}": "{", "]": "["}
+    for char in source:
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "{[":
+            stack.append(char)
+        elif char in "}]":
+            if not stack or stack[-1] != pairs[char]:
+                return None, 0
+            stack.pop()
+    if in_string or not stack or len(stack) > 2:
+        return None, 0
+    suffix = "".join("}" if opener == "{" else "]" for opener in reversed(stack))
+    repaired = source + suffix
+    try:
+        parsed = json.loads(repaired)
+    except Exception:
+        return None, 0
+    return (repaired, len(stack)) if isinstance(parsed, dict) else (None, 0)
+
+
+def _extract_json_stream_objects(
+    text: str,
+    *,
+    syntax_repairs: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
     source = re.sub(r"```(?:jsonl?|ndjson)?", "", str(text or ""), flags=re.IGNORECASE).replace("```", "")
+    line_objects: list[dict[str, Any]] = []
+    line_mode_valid = True
+    for line_number, raw_line in enumerate(source.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+        except Exception:
+            repaired, added_closers = _close_trivially_unbalanced_json(line)
+            if not repaired:
+                line_mode_valid = False
+                break
+            parsed = json.loads(repaired)
+            if syntax_repairs is not None:
+                syntax_repairs.append(
+                    {
+                        "line": line_number,
+                        "repair": "append_missing_container_closers",
+                        "added_closers": added_closers,
+                    }
+                )
+        if not isinstance(parsed, dict):
+            line_mode_valid = False
+            break
+        line_objects.append(parsed)
+    if line_mode_valid and line_objects:
+        return line_objects
+
     objects: list[dict[str, Any]] = []
     start: int | None = None
     depth = 0
@@ -4860,7 +4929,8 @@ def _parse_llm_webui_patch_stream(
     before_webui: Mapping[str, Any],
     previous_preview: Mapping[str, Any],
 ) -> dict[str, Any] | None:
-    objects = _extract_json_stream_objects(output_text)
+    syntax_repairs: list[dict[str, Any]] = []
+    objects = _extract_json_stream_objects(output_text, syntax_repairs=syntax_repairs)
     if not objects:
         return None
     first_schema = str(objects[0].get("schema") or "").strip()
@@ -4918,6 +4988,7 @@ def _parse_llm_webui_patch_stream(
             "base_hash": expected_hash,
             "operation_count": len(journal),
             "patches": journal,
+            "syntax_repairs": syntax_repairs,
         },
         "raw_response": output_text,
     }
@@ -5079,8 +5150,17 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
         widget_type = str(widget.get("type") or "").strip()
         if not widget_type:
             return {"ok": False, "error": "page_schema_invalid", "detail": f"widgets[{widget_index}].type is required"}
+        inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
+        if isinstance(inputs.get("dataSource"), Mapping):
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": (
+                    f"widgets[{widget_index}].inputs.dataSource is not consumed by the runtime; "
+                    "move dataSource to widgets[{widget_index}].dataSource"
+                ),
+            }
         if widget_type == "ui.table":
-            inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
             columns = inputs.get("columns") if isinstance(inputs.get("columns"), list) else []
             for column_index, column in enumerate(columns):
                 if not isinstance(column, Mapping):
@@ -5102,7 +5182,6 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
             continue
         if widget_type != "ui.form":
             continue
-        inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
         fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
         for field_index, field in enumerate(fields):
             if not isinstance(field, Mapping):

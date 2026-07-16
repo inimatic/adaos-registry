@@ -2075,6 +2075,78 @@ def test_builder_patch_stream_rejects_wrong_base_hash() -> None:
         raise AssertionError("wrong patch base hash must be rejected")
 
 
+def test_builder_patch_stream_repairs_only_missing_outer_line_closer() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "widgets": [{"id": "title", "type": "ui.jsonViewer", "area": "main"}],
+                    }
+                }
+            }
+        },
+    }
+    base_hash = skill._webui_source_fingerprint(before)
+    malformed_patch = json.dumps(
+        {
+            "type": "patch",
+            "seq": 1,
+            "op": "add",
+            "path": "/ui/application/desktop/pageSchema/widgets/-",
+            "value": {"id": "cards", "type": "ui.list", "area": "main", "inputs": {"variant": "cards"}},
+        }
+    )[:-1]
+    output = "\n".join(
+        [
+            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            malformed_patch,
+            json.dumps({"type": "complete", "comment": "Added cards."}),
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][-1]["id"] == "cards"
+    assert result["semantic_patch_stream"]["syntax_repairs"] == [
+        {"line": 2, "repair": "append_missing_container_closers", "added_closers": 1}
+    ]
+
+
+def test_builder_component_contract_rejects_data_source_nested_in_inputs() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "catalog",
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "recipe-cards",
+                "type": "ui.list",
+                "area": "main",
+                "inputs": {
+                    "variant": "cards",
+                    "dataSource": {"kind": "static", "value": [{"title": "Soup"}]},
+                },
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert validation["error"] == "component_contract_invalid"
+    assert "move dataSource" in validation["detail"]
+
+
 def test_builder_component_contract_rejects_unrendered_table_image_cells() -> None:
     skill = _load_module()
     page_schema = {
