@@ -5691,6 +5691,7 @@ def _apply_llm_webui_transform(
                 response = send_response(
                     messages,
                     model=selected_model,
+                    profile_scope="development",
                     temperature=temperature if attempt == 1 else _builder_llm_temperature_for_model(selected_model, repair=True),
                     max_tokens=max_tokens,
                     reasoning=reasoning,
@@ -5940,6 +5941,7 @@ def _repair_llm_webui_transform_output(
                 {"role": "user", "content": repair_prompt},
             ],
             model=selected_model,
+            profile_scope="development",
             temperature=_builder_llm_temperature_for_model(
                 selected_model,
                 repair=True,
@@ -8100,6 +8102,7 @@ def _submit_llm_webui_transform_job(
             response = submit_response_job(
                 messages,
                 model=selected_model,
+                profile_scope="development",
                 temperature=_builder_llm_temperature_for_model(selected_model),
                 max_tokens=_builder_llm_max_tokens_for_model(selected_model),
                 reasoning=_builder_llm_reasoning_for_model(selected_model),
