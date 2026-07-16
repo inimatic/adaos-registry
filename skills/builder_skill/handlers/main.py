@@ -1994,7 +1994,8 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "actions": (
                 "Visible built-in form commands are declared in widget.actions. Supported triggers are submit, validate, "
                 "save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put the visible label on "
-                "the action (submit may use inputs.submitLabel). Do not invent inputs.secondaryActions. For arbitrary "
+                "the action (submit may use inputs.submitLabel). Optional inputs.secondaryActions entries may customize "
+                "the label and primary/secondary/tertiary presentation of a matching declared action. For arbitrary "
                 "commands that are not form lifecycle actions, add a sibling ui.actions widget."
             ),
         },
@@ -2055,9 +2056,9 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "imageRatio": "Optional aspect ratio such as '16 / 9' or '4 / 3'.",
             },
             "actions": (
-                "item.details does not render controls from its actions array. For visible commands such as Edit, "
-                "Delete, or Add comment, add a sibling ui.actions widget in the same page/modal area with "
-                "inputs.buttons and matching click:<button-id> actions."
+                "Labeled entries in item.details actions render as detail buttons and execute their declared action. "
+                "Use a sibling ui.actions widget only when the commands need a separate toolbar, segmented control, "
+                "or independently positioned command surface."
             ),
         },
         "visual.image": {
@@ -2287,8 +2288,8 @@ def _builder_llm_system_prompt(
         "For pageSchema.autoActions, each item must wrap the executable action in its required action property, for example {intervalMs:5000,action:{type:'updateState',params:{tick:true}}}; do not put type directly on the autoActions item. "
         "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
         "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
-        "item.details actions bind no visible controls. To show Edit, Delete, Add comment, or another detail command, compose a sibling ui.actions widget in the same detail area or modal schema, define inputs.buttons, and bind click:<button-id> actions there. "
-        "For ui.form, only supported form lifecycle triggers render buttons: submit, validate, save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put button labels on those actions (submit may use inputs.submitLabel), and do not invent inputs.secondaryActions or dotted widget keys such as inputs.secondaryActions. "
+        "Labeled item.details actions render visible detail buttons and execute their declared action. Use a sibling ui.actions widget only for a separate toolbar, segmented control, or independently positioned commands. "
+        "For ui.form, only supported form lifecycle triggers render buttons: submit, validate, save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put behavior in widget.actions and labels there (submit may use inputs.submitLabel). Optional inputs.secondaryActions entries only customize the label and presentation of a matching declared action. Never use dotted widget keys such as inputs.secondaryActions. "
         "When a request says the detail should be in a right panel or side panel, use a split/focus-detail layout with a main master area and a right/detail aux area; do not put detail below the master unless the screen is compact. "
         "If the user asks to move a detail-related control into that right/detail panel, set that control's widget area to the right/detail aux area or put it inside the declared detail modal/panel schema. "
         "When the request says restore, recover, bring back, undo removal, or similar localized phrases, inspect last_revision_delta if present. Reintroduce the matching removed widgets/modals/actions and preserve their semantic owner: if the removed element belonged to a detail modal/panel/container, restore it inside the current detail modal/panel/aux area rather than as a detached global main action. "
@@ -5299,13 +5300,21 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                     ),
                 }
         if widget_type == "item.details":
-            if actions:
+            invisible_action_index = next(
+                (
+                    action_index
+                    for action_index, action in enumerate(actions)
+                    if isinstance(action, Mapping) and not str(action.get("label") or action.get("title") or "").strip()
+                ),
+                None,
+            )
+            if invisible_action_index is not None:
                 return {
                     "ok": False,
                     "error": "component_contract_invalid",
                     "detail": (
-                        f"widgets[{widget_index}].actions is not rendered by item.details; add a sibling ui.actions "
-                        "widget in the same area with inputs.buttons and matching click:<button-id> actions"
+                        f"widgets[{widget_index}].actions[{invisible_action_index}] has no label and cannot render a "
+                        "visible item.details command; add a label or move the action to an explicit ui.actions widget"
                     ),
                 }
             fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
@@ -5358,15 +5367,43 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
             continue
         if widget_type != "ui.form":
             continue
-        if "secondaryActions" in inputs:
-            return {
-                "ok": False,
-                "error": "component_contract_invalid",
-                "detail": (
-                    f"widgets[{widget_index}].inputs.secondaryActions is not rendered by ui.form; use supported "
-                    "widget.actions triggers such as cancel/click:cancel with a label, or a sibling ui.actions widget"
-                ),
+        secondary_actions = inputs.get("secondaryActions")
+        if secondary_actions is not None:
+            if not isinstance(secondary_actions, list):
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": f"widgets[{widget_index}].inputs.secondaryActions must be an array",
+                }
+            declared_triggers = {
+                str(action.get("on") or "").strip().lower().replace("-", "_")
+                for action in actions
+                if isinstance(action, Mapping)
             }
+            declared_triggers.update(
+                trigger.split(":", 1)[1]
+                for trigger in list(declared_triggers)
+                if trigger.startswith("click:")
+            )
+            for secondary_index, secondary in enumerate(secondary_actions):
+                if not isinstance(secondary, Mapping) or not str(secondary.get("id") or "").strip():
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": (
+                            f"widgets[{widget_index}].inputs.secondaryActions[{secondary_index}] must contain an id"
+                        ),
+                    }
+                secondary_id = str(secondary.get("id") or "").strip().lower().replace("-", "_")
+                if secondary_id not in declared_triggers and f"click:{secondary_id}" not in declared_triggers:
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": (
+                            f"widgets[{widget_index}].inputs.secondaryActions[{secondary_index}].id={secondary_id!r} "
+                            "has no matching widget.actions trigger"
+                        ),
+                    }
         fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
         for field_index, field in enumerate(fields):
             if not isinstance(field, Mapping):

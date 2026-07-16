@@ -2037,9 +2037,9 @@ def test_builder_component_contract_describes_visible_form_and_detail_actions() 
     prompt = skill._builder_llm_system_prompt()
 
     assert "cancel/click:cancel" in contracts["ui.form"]["actions"]
-    assert "Do not invent inputs.secondaryActions" in contracts["ui.form"]["actions"]
-    assert "sibling ui.actions" in contracts["item.details"]["actions"]
-    assert "item.details actions bind no visible controls" in prompt
+    assert "inputs.secondaryActions" in contracts["ui.form"]["actions"]
+    assert "Labeled entries" in contracts["item.details"]["actions"]
+    assert "Labeled item.details actions render visible detail buttons" in prompt
     assert "dotted widget keys" in prompt
 
 
@@ -2330,7 +2330,7 @@ def test_builder_component_contract_rejects_unrendered_details_fields() -> None:
     assert "item.details ignores" in validation["detail"]
 
 
-def test_builder_component_contract_rejects_non_rendered_detail_and_form_actions() -> None:
+def test_builder_component_contract_accepts_visible_detail_and_form_actions_but_rejects_dotted_keys() -> None:
     skill = _load_module()
     payload = {
         "schema": "adaos.webui.v1",
@@ -2378,6 +2378,9 @@ def test_builder_component_contract_rejects_non_rendered_detail_and_form_actions
                                         "fields": [{"id": "title", "type": "shortText"}],
                                         "secondaryActions": [{"id": "cancel", "label": "Cancel"}],
                                     },
+                                    "actions": [
+                                        {"on": "click:cancel", "type": "closeModal"}
+                                    ],
                                 }
                             ],
                         }
@@ -2405,9 +2408,9 @@ def test_builder_component_contract_rejects_non_rendered_detail_and_form_actions
     validation = skill._validate_webui_modal_contracts(payload)
 
     assert validation["ok"] is False
-    assert "item.details" in validation["detail"]
-    assert "inputs.secondaryActions" in validation["detail"]
     assert "dotted property" in validation["detail"]
+    assert "not rendered by item.details" not in validation["detail"]
+    assert "not rendered by ui.form" not in validation["detail"]
 
 
 def test_builder_component_contract_accepts_composed_detail_actions_and_form_cancel() -> None:
@@ -2416,27 +2419,61 @@ def test_builder_component_contract_accepts_composed_detail_actions_and_form_can
         "id": "detail_modal",
         "layout": {"type": "stack", "areas": [{"id": "modal"}]},
         "widgets": [
-            {"id": "details", "type": "item.details", "area": "modal"},
             {
-                "id": "detail_actions",
-                "type": "ui.actions",
+                "id": "details",
+                "type": "item.details",
                 "area": "modal",
-                "inputs": {"variant": "stack", "buttons": [{"id": "edit", "label": "Edit"}]},
                 "actions": [
-                    {"on": "click:edit", "type": "openModal", "params": {"modalId": "edit_modal"}}
+                    {
+                        "id": "edit",
+                        "label": "Edit",
+                        "on": "click",
+                        "type": "openModal",
+                        "params": {"modalId": "edit_modal"},
+                    }
                 ],
             },
             {
                 "id": "edit_form",
                 "type": "ui.form",
                 "area": "modal",
-                "inputs": {"showSubmit": True, "fields": [{"id": "title", "type": "shortText"}]},
-                "actions": [{"on": "click:cancel", "type": "closeModal", "label": "Cancel"}],
+                "inputs": {
+                    "showSubmit": True,
+                    "fields": [{"id": "title", "type": "shortText"}],
+                    "secondaryActions": [
+                        {"id": "cancel", "label": "Cancel", "variant": "secondary"}
+                    ],
+                },
+                "actions": [{"on": "click:cancel", "type": "closeModal"}],
             },
         ],
     }
 
     assert skill._validate_page_schema_component_contracts(detail_schema)["ok"] is True
+
+
+def test_builder_component_contract_rejects_secondary_form_action_without_behavior() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "form_modal",
+        "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+        "widgets": [
+            {
+                "id": "form",
+                "type": "ui.form",
+                "area": "modal",
+                "inputs": {
+                    "fields": [{"id": "title", "type": "shortText"}],
+                    "secondaryActions": [{"id": "cancel", "label": "Cancel"}],
+                },
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "has no matching widget.actions trigger" in validation["detail"]
 
 
 def test_builder_component_contract_rejects_invented_update_state_operators() -> None:
