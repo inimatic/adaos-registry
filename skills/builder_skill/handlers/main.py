@@ -6699,6 +6699,14 @@ def _project_words() -> tuple[str, ...]:
 
 def _is_explicit_create_request(text: str) -> bool:
     lowered = _normalise_command_text(text)
+    if re.search(
+        r"(?:\b(?:create|build|make)\s+(?:(?:a|an|new)\s+){0,2}(?:app|application|project|scenario|prototype|skill)\b)"
+        r"|(?:\b(?:\u0441\u043e\u0437\u0434\u0430\u0439|\u0441\u0434\u0435\u043b\u0430\u0439|\u0441\u043e\u0431\u0435\u0440\u0438|\u043f\u043e\u0441\u0442\u0440\u043e\u0439)\s+"
+        r"(?:(?:\u043d\u043e\u0432\u044b\u0439|\u043d\u043e\u0432\u043e\u0435|\u043d\u043e\u0432\u0443\u044e)\s+)?"
+        r"(?:\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435|\u043f\u0440\u043e\u0435\u043a\u0442|\u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439|\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f|\u043d\u0430\u0432\u044b\u043a)\b)",
+        lowered,
+    ):
+        return True
     explicit_object_create = _has_any(
         lowered,
         (
