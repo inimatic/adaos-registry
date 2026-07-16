@@ -9149,7 +9149,13 @@ def _complete_llm_webui_job(
         )
         llm_result["job"] = job
         llm_result["telemetry"] = job_telemetry
-        model_id = _builder_llm_model_for_session(session, _meta)
+        job_response = job.get("response") if isinstance(job.get("response"), Mapping) else {}
+        model_id = str(
+            job.get("model")
+            or job_response.get("model")
+            or _builder_llm_model_for_session(session, _meta)
+            or ""
+        ).strip() or None
         if model_id:
             llm_result["model"] = model_id
         llm_result["profile"] = _builder_llm_prompt_profile(model_id)

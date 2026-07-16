@@ -1097,6 +1097,7 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     revision_files = sorted((artifact_root / "ui_revisions").glob("*.json"))
     assert revision_files
     revision = json.loads(revision_files[-1].read_text(encoding="utf-8"))
+    assert revision["inference"]["model"] == "gpt-5"
     assert revision["inference"]["response_id"] == "resp_builder_telemetry_test"
     assert revision["inference"]["service_tier"] == "default"
     telemetry = revision["llm"]["telemetry"]
