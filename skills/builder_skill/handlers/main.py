@@ -912,10 +912,12 @@ def _is_api_tool_call(_meta: Mapping[str, Any] | None) -> bool:
 
 def _api_request_chat_meta(_meta: Mapping[str, Any] | None) -> dict[str, Any]:
     meta = dict(_meta or {}) if isinstance(_meta, Mapping) else {}
+    origin_id = str(meta.get("request_origin_id") or "api").strip() or "api"
+    origin_label = str(meta.get("request_origin_label") or meta.get("origin_label") or "API").strip() or "API"
     meta.setdefault("action_source", "api_tool_call")
-    meta.setdefault("origin_label", "API")
-    meta["active_agent_id"] = "api"
-    meta["active_agent_label"] = "API"
+    meta["origin_label"] = origin_label
+    meta["active_agent_id"] = origin_id
+    meta["active_agent_label"] = origin_label
     meta["recipient_label"] = AGENT_LABEL
     return meta
 
@@ -1081,7 +1083,12 @@ def _safe_emit_chat(
         for target in targets:
             meta = _chat_meta(_meta, webspace_id=target, session=session, binding=binding, topic_ref=topic_ref)
             if from_ == "hub" and _is_api_tool_call(_meta):
-                meta.setdefault("recipient_label", "API")
+                recipient_label = str(
+                    (_meta or {}).get("request_origin_label")
+                    if isinstance(_meta, Mapping)
+                    else ""
+                ).strip() or "API"
+                meta.setdefault("recipient_label", recipient_label)
 
             def _append_chat() -> Mapping[str, bool]:
                 try:
@@ -1884,6 +1891,9 @@ def _with_builder_page_schema_meta(page_schema: Mapping[str, Any], preview_state
     builder = meta.get("builder") if isinstance(meta.get("builder"), dict) else {}
     builder["proto"] = version
     builder["ui_revision"] = version
+    scenario_id = str(preview_state.get("scenario_id") or "").strip()
+    if scenario_id:
+        builder["scenario_id"] = scenario_id
     meta["builder"] = builder
     data["meta"] = meta
     return data
@@ -2007,7 +2017,9 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                     "do not encode comparisons such as '<=20' into a string value. Empty/all state values do not filter. "
                     "For a neutral 'Any' option in a numeric range selector, use an empty string value rather than 0; zero remains a valid numeric threshold."
                 ),
-                "buttons": "Optional per-item actions {id,label?,icon?,whenKey?,whenEquals?}; card buttons dispatch click:<id> actions.",
+                "buttons": "Optional per-item actions {id,label?,icon?,whenKey?,whenEquals?}; these render on each item/card and dispatch click:<id>. Do not use them for a list toolbar command.",
+                "addButton": "Set true to show one list-level Add command next to card search; dispatches the add/click:add action event.",
+                "addButtonLabel": "Optional label for the list-level Add command.",
                 "cardMinWidth": "Optional responsive minimum card width in pixels (120..480).",
                 "cardImageRatio": "Optional CSS aspect ratio such as '16 / 9' or '4 / 3'.",
                 "emptyText": "Empty-state text.",
@@ -2239,6 +2251,7 @@ def _builder_llm_system_prompt(
         "When the user asks to move, remove, resize, redesign, or otherwise change visible widgets, update ui.application.desktop.pageSchema.widgets and layout. "
         "For move/place requests, the named widget/control must move by changing its area/container/owner; keeping it in the old area is not a valid response. "
         "Treat the current UI as starting material, not as a fixed contract: make meaningful visible changes when the request implies design, workflow, layout, or prototype evolution. "
+        "Treat user requests as edits unless replacement is explicit: preserve unrelated widgets, modal declarations, data, and existing actions. When adding an interaction to an existing actions array, append the new action instead of replacing the array and verify that prior item selection, navigation, and modal behavior remains available. "
         "When creating a new prototype, infer the domain from the user's request, scenario title, and project memory; if the domain is underspecified, make the uncertainty visible in labels/help text instead of filling the UI with meaningless placeholders like Request 1, Notes 1, or Title 1. "
         "Decompose the user's instruction into explicit requirements and satisfy each one; do not let a broad form/layout request hide later requirements such as examples, local controls, variant switching, translations, or sample data. "
         "Use the supplied prototyping_affordances to vary field order, grouping, labels, field types, layout, widgets, local interactions, and mock data when that better fits the user's request. "
@@ -2249,6 +2262,7 @@ def _builder_llm_system_prompt(
         "When the user asks for grouped visual collections, combine ui.list cards with groupBy and groupDisplay instead of falling back to a plain table. "
         "Avoid duplicate-only, rename-only, or no-op transformations for design requests; revise the JSON before answering if the result does not visibly satisfy the request. "
         "The runtime uses ui.list inputs titleKey/subtitleKey/previewKey as single object paths, not templates. "
+        "For one list-level Add command next to card search, set ui.list inputs.addButton=true and addButtonLabel, then handle on:'add' or on:'click:add' in widget.actions. inputs.buttons are per-item/card commands, not toolbar commands. "
         "If cards need combined text like status plus date, add a derived string property to the relevant static dataSource.value rows, then point previewKey to that property. "
         "Use the supplied compact adaos.webui.v1 ABI summary as the webui.json compatibility contract. "
         "When creating or editing ui.form fields, put the most semantically precise supported input kind in each field's required 'type' property; the ABI enum for that property is named formInputType. Use generic text only as a fallback. "
@@ -7736,8 +7750,14 @@ def _finalize_scenario_update(
     else:
         preview = _preview_state(session=session)
     preview = _repair_text_tree(dict(preview))
+    scenario_id = str(session.get("scenario_id") or "").strip()
+    if scenario_id:
+        preview["scenario_id"] = scenario_id
     if patch.get("operation") == "llm_webui_transform" and isinstance(session.get("webui_payload"), Mapping):
         payload = copy.deepcopy(dict(session["webui_payload"]))
+        page_schema = _extract_webui_page_schema(payload)
+        if page_schema:
+            payload = _set_webui_page_schema(payload, _with_builder_page_schema_meta(page_schema, preview))
         session["webui_payload"] = payload
         _write_webui_payload(str(session.get("artifact_root") or ""), payload)
     else:

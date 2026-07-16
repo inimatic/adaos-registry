@@ -619,6 +619,11 @@ def test_update_current_scenario_prefers_llm_for_ui_changes_when_enabled(monkeyp
     assert result["preview_state"]["layout_order"] == "cards_first"
     assert result["ui_revision"]["revision"] == "002"
     assert len(llm_calls) == 1
+    written_webui = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
+    builder_meta = written_webui["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]
+    assert builder_meta["ui_revision"] == "002"
+    assert builder_meta["proto"] == "002"
+    assert builder_meta["scenario_id"] == created["scenario_id"]
 
     result = skill.update_current_scenario(
         "apply review comments",
@@ -639,6 +644,26 @@ def test_update_current_scenario_prefers_llm_for_ui_changes_when_enabled(monkeyp
     assert "apply review comments" in llm_calls[-1]["instruction"]
     assert "Prototype review notes from the current dev preview" in llm_calls[-1]["instruction"]
     assert "Move this field to the top" in llm_calls[-1]["instruction"]
+
+
+def test_api_request_chat_meta_uses_semantic_request_origin() -> None:
+    skill = _load_module()
+
+    review = skill._api_request_chat_meta(
+        {
+            "action_source": "api_tool_call",
+            "request_origin_id": "prototype_review_notes",
+            "request_origin_label": "Review notes",
+        }
+    )
+    generic = skill._api_request_chat_meta({"action_source": "api_tool_call"})
+
+    assert review["active_agent_id"] == "prototype_review_notes"
+    assert review["active_agent_label"] == "Review notes"
+    assert review["origin_label"] == "Review notes"
+    assert review["recipient_label"] == skill.AGENT_LABEL
+    assert generic["active_agent_id"] == "api"
+    assert generic["active_agent_label"] == "API"
 
 
 def test_update_current_scenario_recovers_artifact_root_for_ui_revisions(monkeypatch, tmp_path) -> None:
@@ -1468,6 +1493,9 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "current_page_schema" not in user_payload["runtime_context"]
     assert user_payload["current_webui_json"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["inputs"]["previewKey"] == "status"
     assert user_payload["runtime_component_contracts"]["ui.list"]["inputs"]["previewKey"].startswith("Single object path")
+    assert user_payload["runtime_component_contracts"]["ui.list"]["inputs"]["addButton"].startswith("Set true")
+    assert "per-item/card commands" in request["system_prompt"]
+    assert "preserve unrelated widgets" in request["system_prompt"]
     assert "input.commandBar" in user_payload["runtime_component_contracts"]
     assert "state_and_visibility" in user_payload["runtime_component_contracts"]
     assert "visibleIf" in user_payload["runtime_component_contracts"]["state_and_visibility"]
