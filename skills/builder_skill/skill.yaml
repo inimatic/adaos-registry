@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.2.47
+version: 0.2.48
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -90,8 +90,7 @@ tools:
     properties:
       pending_action:
         type: object
-        description: Builder review Pending Action linked to conversation/thread/source
-          refs.
+        description: Reserved for destructive or release-stage Builder actions.
 - name: update_current_scenario
   description: Apply a safe declarative UI patch to the current Builder scenario session.
   entry: handlers.main:update_current_scenario
@@ -114,8 +113,7 @@ tools:
     properties:
       pending_action:
         type: object
-        description: Builder patch review Pending Action linked to conversation/thread/source
-          refs.
+        description: Reserved for destructive or release-stage Builder actions.
 - name: get_session
   description: Return the current Builder rapid prototyping session.
   entry: handlers.main:get_session

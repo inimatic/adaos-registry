@@ -370,7 +370,7 @@ def test_create_shopping_list_scenario_draft_writes_declarative_webui(tmp_path, 
     assert {item["type"] for item in page_schema["widgets"]} >= {"ui.form", "ui.table"}
 
 
-def test_create_draft_publishes_pending_action_with_conversation_refs(monkeypatch, tmp_path) -> None:
+def test_create_draft_does_not_publish_pending_action_for_reversible_local_revision(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"
     published: list[dict] = []
@@ -412,21 +412,10 @@ def test_create_draft_publishes_pending_action_with_conversation_refs(monkeypatc
         },
     )
 
-    assert result["pending_action"]["id"] == "pa.builder.draft"
+    assert result["pending_action"] is None
     assert result["topic"]["thread_id"].startswith("prompt-project:scenario:")
     assert result["dialog"]["thread_id"] == result["topic"]["thread_id"]
-    assert published[0]["kind"] == "builder.scenario_draft.review"
-    assert published[0]["response_topic"] == "builder.pending_action.response"
-    assert published[0]["domain_ref"]["conversation_id"] == "conv.skill.builder_skill.default.builder-pa-ws"
-    assert published[0]["domain_ref"]["thread_id"] == result["topic"]["thread_id"]
-    refs = published[0]["metadata"]["source_refs"]
-    assert refs["draft_id"] == "draft.shopping"
-    assert refs["thread_id"] == result["topic"]["thread_id"]
-    assert refs["turn_trace_id"] == "trace.builder.1"
-    assert refs["message_id"] == "msg.builder.1"
-    risk = published[0]["metadata"]["approval_policy"]["action_risk"]
-    assert risk["schema"] == "adaos.conversation.action_risk.v1"
-    assert risk["risk_class"] == "local_write"
+    assert published == []
 
 
 def test_update_current_scenario_adds_card_view(monkeypatch, tmp_path) -> None:
@@ -1995,6 +1984,16 @@ def test_builder_patch_prompt_distinguishes_add_from_replace() -> None:
 
     assert "Use add when creating a missing object member" in prompt
     assert "replace only when the target member already exists" in prompt
+    assert "RFC 6902 does not create intermediate containers" in prompt
+
+
+def test_builder_component_contract_describes_nested_auto_action_shape() -> None:
+    skill = _load_module()
+
+    contract = skill._builder_runtime_component_contracts()["page_schema_auto_actions"]
+
+    assert "action:{type,params?,...}" in contract["shape"]
+    assert "nested action property is required" in contract["shape"]
 
 
 def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> None:
@@ -2189,6 +2188,52 @@ def test_builder_patch_stream_stable_id_path_survives_prior_array_remove() -> No
     assert result["ok"] is True
     assert [item["id"] for item in widgets] == ["recipe-details"]
     assert widgets[0]["inputs"]["fields"] == [{"label": "Title", "path": "title"}]
+
+
+def test_builder_patch_stream_reports_missing_intermediate_parent() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "widgets": [],
+                    }
+                }
+            }
+        },
+    }
+    base_hash = skill._webui_source_fingerprint(before)
+    output = "\n".join(
+        [
+            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "add",
+                    "path": "/ui/application/modals/detail",
+                    "value": {"title": "Details", "schema": {"id": "detail", "layout": {"type": "stack"}, "widgets": []}},
+                }
+            ),
+            json.dumps({"type": "complete", "comment": "Added details."}),
+        ]
+    )
+
+    try:
+        skill._parse_llm_webui_transform_output(
+            output_text=output,
+            before_webui=before,
+            previous_preview={},
+        )
+    except KeyError as exc:
+        assert "JSON Patch parent path missing: /ui/application/modals" in str(exc)
+        assert "add that parent container" in str(exc)
+    else:
+        raise AssertionError("missing intermediate JSON Patch parent must be rejected")
 
 
 def test_builder_component_contract_rejects_data_source_nested_in_inputs() -> None:
@@ -3311,7 +3356,7 @@ def test_chat_first_idea_creates_preview_and_accepts_correction(monkeypatch, tmp
     assert created["preview_state"]["user_summary"]["assumptions"]
     assert "Assumptions:" in created["message"]
     assert (artifact_root / "webui.json").exists()
-    assert published[0]["kind"] == "builder.scenario_draft.review"
+    assert published == []
     assert emitted[0]["kwargs"]["topic_ref"]["thread_id"] == created["topic"]["thread_id"]
 
     updated = skill.chat("show the result as cards", webspace_id="builder-first-idea")
@@ -3325,7 +3370,7 @@ def test_chat_first_idea_creates_preview_and_accepts_correction(monkeypatch, tmp
     cards = next(item for item in widgets if item["id"] == "prototype-cards")
     assert cards["type"] == "ui.list"
     assert cards["inputs"]["variant"] == "cards"
-    assert published[-1]["kind"] == "builder.scenario_patch.review"
+    assert published == []
 
 
 def test_chat_guides_underspecified_first_idea(monkeypatch) -> None:
@@ -3451,7 +3496,7 @@ def test_update_current_scenario_handles_layout_column_and_date_requests(monkeyp
     ]
 
 
-def test_update_current_scenario_publishes_patch_pending_action(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_does_not_publish_pending_action_for_reversible_revision(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"
     published: list[dict] = []
@@ -3482,17 +3527,12 @@ def test_update_current_scenario_publishes_patch_pending_action(monkeypatch, tmp
         _meta={"turn_trace_id": "trace.patch.1", "conversation_id": "conv.skill.builder_skill.default.builder-pa-patch"},
     )
 
-    patch_actions = [item for item in published if item["kind"] == "builder.scenario_patch.review"]
-    assert patch_actions
-    action = patch_actions[-1]
-    assert action["domain_ref"]["patch_id"] == result["patch"]["id"]
-    assert action["metadata"]["source_refs"]["patch_id"] == result["patch"]["id"]
-    assert action["metadata"]["source_refs"]["turn_trace_id"] == "trace.patch.1"
-    assert action["metadata"]["approval_policy"]["action_risk"]["risk_class"] == "local_write"
-    assert result["patch"]["pending_action_id"] == "pa.builder.2"
+    assert published == []
+    assert result["pending_action"] is None
+    assert "pending_action_id" not in result["patch"]
 
 
-def test_update_current_scenario_does_not_wait_forever_for_pending_action(monkeypatch, tmp_path) -> None:
+def test_update_current_scenario_does_not_call_pending_action_service_for_local_revision(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "pending_timeout"
 
@@ -3533,7 +3573,7 @@ def test_update_current_scenario_does_not_wait_forever_for_pending_action(monkey
     result = skill.update_current_scenario("show cards", webspace_id="builder-pending-timeout")
 
     assert result["ui_revision"]["revision"] == "002"
-    assert result["pending_action"]["error"] == "pending_action_publish_timeout"
+    assert result["pending_action"] is None
     assert result["message_actions"]
     assert "\u0420\u0435\u0432\u0438\u0437\u0438\u044f UI: 002" in result["message"]
 

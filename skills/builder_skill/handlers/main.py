@@ -507,7 +507,7 @@ def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
         profile_id = "default"
     return {
         "schema": "adaos.builder.llm_prompt_profile.v1",
-        "version": "2026-07-16.6",
+        "version": "2026-07-16.7",
         "id": profile_id,
         "provider": provider,
         "model": model_hint,
@@ -2064,6 +2064,10 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "open_action": "Open a declared modal from a button/action with actions=[{on:'click', type:'openModal', params:{modalId:'comment_modal'}}].",
             "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. Never return a root-level modals object; modal declarations live only in ui.application.modals.",
         },
+        "page_schema_auto_actions": {
+            "purpose": "Optional interval actions active only while a page or modal is mounted.",
+            "shape": "pageSchema.autoActions is an array of {id?,intervalMs?,enabledIf?,action:{type,params?,...}}. The nested action property is required; type and params do not belong directly on the autoActions item.",
+        },
         "input.commandBar": {
             "purpose": "Segmented or toolbar-like local controls for choosing a mode, filter, draft state, or preview perspective.",
             "inputs": {
@@ -2211,6 +2215,7 @@ def _builder_llm_system_prompt(
         "The first line must be a meta object with schema='adaos.builder.webui_patch_stream.v1' and the supplied base_hash. "
         "Each following patch line must contain type='patch', a strictly increasing seq, and one RFC 6902 op/path/value or from operation. "
         "Use add when creating a missing object member and replace only when the target member already exists after all preceding patches. "
+        "RFC 6902 does not create intermediate containers: before adding a descendant such as /ui/application/modals/detail, first add /ui/application/modals with value={} when that parent is absent. "
         "When addressing an existing object inside an id-bearing array such as pageSchema.widgets, use the AdaOS stable-id JSON Pointer token @<id>, "
         "for example /ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/fields, instead of a numeric index that can shift after earlier operations. "
         "The last line must contain type='complete', comment, and optional unable_reason. "
@@ -2254,6 +2259,7 @@ def _builder_llm_system_prompt(
         "When the user asks to choose between variants, compare layouts, preview examples, view sample state, use local elements, add elements for viewing an example, or switch modes, add an explicit local control such as input.commandBar, input.selector, or ui.actions with local updateState and visibleIf/initialState instead of only duplicating static content or sample rows. "
         "A requested local control is not complete unless at least one widget or form field visibly reacts to the local state set by that control. "
         "Use canonical visibility expressions like $state.activeTab === 'overview'; avoid state.activeTab == 'overview' in new output. "
+        "For pageSchema.autoActions, each item must wrap the executable action in its required action property, for example {intervalMs:5000,action:{type:'updateState',params:{tick:true}}}; do not put type directly on the autoActions item. "
         "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
         "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
         "When a request says the detail should be in a right panel or side panel, use a split/focus-detail layout with a main master area and a right/detail aux area; do not put detail below the master unless the screen is compact. "
@@ -4645,6 +4651,7 @@ def _builder_llm_webui_transform_request(
                 "After a nested object or array value, close both the value and the outer patch object before the newline.",
                 "Address existing widgets with /widgets/@<widget-id>/... so removes or moves earlier in the stream cannot shift the target.",
                 "RFC 6902 replace requires the final path member to exist; use add to create a missing object member.",
+                "RFC 6902 never creates intermediate parents. If a parent object/array is absent, add that exact parent before adding descendants under it.",
             ],
         }
         if output_mode == "jsonl_patch_v1"
@@ -4902,12 +4909,19 @@ def _json_pointer_parent(document: Any, path: Any) -> tuple[Any, str]:
     if not parts:
         return None, ""
     node = document
+    traversed: list[str] = []
     for token in parts[:-1]:
+        traversed.append(token)
         if isinstance(node, list):
             node = node[_json_pointer_list_index(node, token)]
         elif isinstance(node, dict):
             if token not in node:
-                raise KeyError(f"JSON Pointer member not found: {token}")
+                parent_path = "/" + "/".join(
+                    part.replace("~", "~0").replace("/", "~1") for part in traversed
+                )
+                raise KeyError(
+                    f"JSON Patch parent path missing: {parent_path}; add that parent container before patching descendants"
+                )
             node = node[token]
         else:
             raise TypeError(f"JSON Pointer traverses scalar at {token}")
@@ -5716,7 +5730,10 @@ def _repair_llm_webui_transform_output(
         "Preserve the supplied base_hash and correct the reported syntax or validation problem. "
         "If validation reports that a JSON Patch member is missing, use add when the request creates that member, "
         "or correct the path when the member should already exist; do not replace the requested component property "
-        "with an unrelated field-based workaround. For item.details, a large rendered image must use inputs.imageKey, "
+        "with an unrelated field-based workaround. If an intermediate parent path is missing, first emit an add operation "
+        "for that exact parent with the appropriate empty object or array, then add its descendants; RFC 6902 never creates "
+        "intermediate containers. Every pageSchema.autoActions item must contain the required nested action object. "
+        "For item.details, a large rendered image must use inputs.imageKey, "
         "not a field whose value is the image URL."
         if patch_output
         else (
@@ -7460,9 +7477,10 @@ def chat(
     result = update_current_scenario(instruction=utterance, webspace_id=ws, auto_apply=auto_apply, _meta=_meta)
     if result.get("ok"):
         actions = result.get("message_actions") if isinstance(result.get("message_actions"), list) else None
+        result_message_meta = result.get("message_meta") if isinstance(result.get("message_meta"), Mapping) else _meta
         emit_kwargs = {
             "webspace_id": ws,
-            "_meta": _meta,
+            "_meta": result_message_meta,
             "session": session,
             "binding": binding,
             "topic_ref": result.get("topic") if isinstance(result.get("topic"), Mapping) else topic,
@@ -7470,6 +7488,7 @@ def chat(
         }
         if str(result.get("status") or "") in {"llm_pending", "llm_submitting"}:
             _schedule_safe_emit_chat(str(result.get("message") or ""), delay_s=0.0, **emit_kwargs)
+            result = {**result, "chat_emit": {"mode": "receipt_only", "persisted": True}}
         else:
             _safe_emit_chat(str(result.get("message") or ""), **emit_kwargs)
     return {**result, "dialog": _dialog_state(ws, topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic)}
@@ -7577,17 +7596,9 @@ def create_scenario_draft(
     message = _message_created(session)
     if session.get("draft_error"):
         message += f" \u041f\u0440\u0435\u0434\u0443\u043f\u0440\u0435\u0436\u0434\u0435\u043d\u0438\u0435: dev draft \u043d\u0435 \u0441\u043e\u0437\u0434\u0430\u043d ({session['draft_error']})."
-    pending_action = _publish_review_pending_action(
-        webspace_id=ws,
-        session=session,
-        request_text=source_idea,
-        kind="builder.scenario_draft.review",
-        summary=f"Review Builder draft {sid}",
-        _meta=_meta,
-    )
-    if pending_action and pending_action.get("id"):
-        session["pending_action_id"] = pending_action.get("id")
-        _save_session(ws, session)
+    # Local prototype revisions are already ABI-validated, revisioned, and reversible.
+    # Pending Actions remain reserved for destructive operations and release/activation.
+    pending_action = None
     actions = _revision_chat_actions(session, str(session.get("ui_revision") or ""))
     return {
         "ok": True,
@@ -7774,20 +7785,7 @@ def _finalize_scenario_update(
         session=session,
         reason="builder_project_updated",
     )
-    pending_action = _publish_review_pending_action(
-        webspace_id=ws,
-        session=session,
-        request_text=request_text,
-        kind="builder.scenario_patch.review",
-        summary=f"Review Builder patch {patch['operation']} for {session.get('scenario_id')}",
-        _meta=_meta,
-        patch=patch,
-    )
-    if pending_action and pending_action.get("id"):
-        patch["pending_action_id"] = pending_action.get("id")
-        session["patches"][-1] = patch
-        session["pending_action_id"] = pending_action.get("id")
-        _save_session(ws, session)
+    pending_action = None
     not_implemented = patch.get("diff", {}).get("not_implemented") if isinstance(patch.get("diff"), Mapping) else None
     llm_comment = str((llm_result or {}).get("comment") or "").strip() if isinstance(llm_result, Mapping) else ""
     unable_reason = str((llm_result or {}).get("unable_reason") or "").strip() if isinstance(llm_result, Mapping) else ""
@@ -9118,21 +9116,14 @@ def update_current_scenario(
             message = str(submit_result.get("message") or (
                 f"{AGENT_LABEL}: отправил LLM-задачу для {session.get('scenario_id')}. Job: {job_id}."
             ))
-            if _is_api_tool_call(_meta):
-                _safe_emit_chat(
-                    message,
-                    webspace_id=ws,
-                    _meta=_builder_llm_progress_meta(
-                        _meta,
-                        job_id=job_id,
-                        phase="accepted",
-                        status="complete",
-                        label="Принято",
-                    ),
-                    session=session,
-                    binding=binding,
-                    topic_ref=topic,
-                )
+            message_meta = _builder_llm_progress_meta(
+                _meta,
+                job_id=job_id,
+                phase="accepted",
+                status="complete",
+                seq=0,
+                label="Принято",
+            )
             return {
                 "ok": True,
                 "status": "llm_pending",
@@ -9142,6 +9133,7 @@ def update_current_scenario(
                 "preview_state": base_preview,
                 "topic": {k: v for k, v in topic.items() if k != "stored"},
                 "pending_action": None,
+                "message_meta": message_meta,
                 "llm_job": {
                     "job_id": job_id,
                     "local_job_id": local_job_id,
