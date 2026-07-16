@@ -507,7 +507,7 @@ def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
         profile_id = "default"
     return {
         "schema": "adaos.builder.llm_prompt_profile.v1",
-        "version": "2026-07-16",
+        "version": "2026-07-16.2",
         "id": profile_id,
         "provider": provider,
         "model": model_hint,
@@ -4610,39 +4610,46 @@ def _builder_llm_webui_transform_request(
         prompt_profile=prompt_profile,
         output_mode=output_mode,
     )
-    base_request = {
+    patch_base = {
+        "base_revision": str(session.get("ui_revision") or session.get("version") or "current"),
+        "base_hash": _webui_source_fingerprint(current_payload),
+    }
+    requested_output_contract = (
+        {
+            "schema": "adaos.builder.webui_patch_stream.v1",
+            "format": "jsonl",
+            "operations": ["add", "remove", "replace", "move", "copy", "test"],
+            "line_shapes": {
+                "meta": {"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": "exact supplied hash"},
+                "patch": {"type": "patch", "seq": "1..N", "op": "RFC 6902 op", "path": "JSON Pointer", "value": "when required", "from": "when required"},
+                "complete": {"type": "complete", "comment": "short user-facing summary", "unable_reason": "optional"},
+            },
+            "rules": [
+                "One complete compact JSON object per physical line; no code fences.",
+                "Preserve unrelated UI and use the smallest coherent patch set.",
+                "Use test guards before index-sensitive destructive changes when practical.",
+                "The patched result must remain a complete adaos.webui.v1 document.",
+                "After a nested object or array value, close both the value and the outer patch object before the newline.",
+            ],
+        }
+        if output_mode == "jsonl_patch_v1"
+        else {
+            "schema": "adaos.webui.v1",
+            "ui.application.desktop.pageSchema": "complete renderable pageSchema",
+            "ui.application.modals": "optional declared modals",
+            "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
+        }
+    )
+    stable_request = {
         "llm_prompt_profile": prompt_profile,
         "webui_v1_abi": _builder_webui_abi_summary(),
         "runtime_component_contracts": _builder_runtime_component_contracts(),
         "prototyping_affordances": _builder_prototyping_affordances(),
         "webui_v1_schema": "see webui_v1_abi.schema_contract; validated by src/adaos/abi/webui.v1.schema.json",
-        "requested_output_contract": (
-            {
-                "schema": "adaos.builder.webui_patch_stream.v1",
-                "format": "jsonl",
-                "base_revision": str(session.get("ui_revision") or session.get("version") or "current"),
-                "base_hash": _webui_source_fingerprint(current_payload),
-                "operations": ["add", "remove", "replace", "move", "copy", "test"],
-                "line_shapes": {
-                    "meta": {"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": "exact supplied hash"},
-                    "patch": {"type": "patch", "seq": "1..N", "op": "RFC 6902 op", "path": "JSON Pointer", "value": "when required", "from": "when required"},
-                    "complete": {"type": "complete", "comment": "short user-facing summary", "unable_reason": "optional"},
-                },
-                "rules": [
-                    "One complete compact JSON object per physical line; no code fences.",
-                    "Preserve unrelated UI and use the smallest coherent patch set.",
-                    "Use test guards before index-sensitive destructive changes when practical.",
-                    "The patched result must remain a complete adaos.webui.v1 document.",
-                ],
-            }
-            if output_mode == "jsonl_patch_v1"
-            else {
-                "schema": "adaos.webui.v1",
-                "ui.application.desktop.pageSchema": "complete renderable pageSchema",
-                "ui.application.modals": "optional declared modals",
-                "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
-            }
-        ),
+        "requested_output_contract": requested_output_contract,
+    }
+    dynamic_request = {
+        "patch_base": patch_base if output_mode == "jsonl_patch_v1" else {},
         "scenario_id": session.get("scenario_id"),
         "title": session.get("title"),
         "project_memory": _builder_project_memory_context(project_memory),
@@ -4652,11 +4659,14 @@ def _builder_llm_webui_transform_request(
         "current_webui_json": current_payload,
         "instruction": instruction,
     }
+    base_request = {**stable_request, **dynamic_request}
     return {
         "current_payload": current_payload,
         "system_prompt": system_prompt,
-        "user_prompt": _compact_json(base_request),
+        "stable_user_prompt": _compact_json({"stable_builder_context": stable_request}),
+        "user_prompt": _compact_json({"builder_request": dynamic_request}),
         "base_request": base_request,
+        "dynamic_request": dynamic_request,
     }
 
 
@@ -5380,8 +5390,9 @@ def _apply_llm_webui_transform(
     )
     current_payload = request["current_payload"]
     system_prompt = str(request["system_prompt"])
+    stable_user_prompt = str(request["stable_user_prompt"])
     user_prompt = str(request["user_prompt"])
-    base_request = request["base_request"]
+    dynamic_request = request["dynamic_request"]
     attempts: list[dict[str, Any]] = []
     last_response = ""
     last_error: dict[str, Any] | None = None
@@ -5401,18 +5412,23 @@ def _apply_llm_webui_transform(
                 attempt=attempt,
             )
             if attempt == 1:
-                messages = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_prompt}]
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": stable_user_prompt},
+                    {"role": "user", "content": user_prompt},
+                ]
             else:
                 repair_prompt = _compact_json(
                     {
-                        "task": "Repair the previous Builder JSON response. Return only corrected JSON.",
+                        "task": "Repair the previous Builder response under the requested output contract. Return only the corrected output.",
                         "validation_error": last_error or {},
                         "previous_response": last_response[:20000],
-                        "original_request": base_request,
+                        "original_request": dynamic_request,
                     }
                 )
                 messages = [
                     {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": stable_user_prompt},
                     {"role": "user", "content": repair_prompt},
                 ]
             try:
@@ -5439,29 +5455,22 @@ def _apply_llm_webui_transform(
             output_text = str(response.get("output_text") or "")
             last_response = output_text
             try:
-                parsed = _extract_json_object(output_text)
-                payload, preview = _normalise_llm_webui_payload(
-                    parsed,
+                result = _parse_llm_webui_transform_output(
+                    output_text=output_text,
                     previous_preview=current_payload.get("preview_state")
                     if isinstance(current_payload.get("preview_state"), Mapping)
                     else preview_state,
+                    before_webui=current_payload,
+                    request_id=request_id,
                 )
-                validation = _validate_builder_webui_payload(payload, preview)
+                validation = result.get("validation") if isinstance(result.get("validation"), Mapping) else {}
                 attempts.append({"attempt": attempt, "ok": bool(validation.get("ok")), "request_id": request_id, "validation": validation})
-                if not validation.get("ok"):
-                    last_error = dict(validation)
+                if not result.get("ok"):
+                    last_error = dict(validation or {"error": result.get("error"), "detail": result.get("detail")})
                     last_error["request_id"] = request_id
                     continue
-                return {
-                    "ok": True,
-                    "payload": payload,
-                    "preview_state": preview,
-                    "comment": str(parsed.get("comment") or parsed.get("summary") or "").strip(),
-                    "unable_reason": str(parsed.get("unable_reason") or "").strip(),
-                    "validation": validation,
-                    "attempts": attempts,
-                    "raw_response": output_text,
-                }
+                result["attempts"] = attempts
+                return result
             except Exception as exc:
                 last_error = {
                     "ok": False,
@@ -5642,7 +5651,7 @@ def _repair_llm_webui_transform_output(
             "task": repair_task,
             "validation_error": dict(validation_error),
             "previous_response": str(output_text or "")[:20000],
-            "original_request": request["base_request"],
+            "original_request": request["dynamic_request"],
             "required_output_shape": required_output_shape,
         }
     )
@@ -5664,6 +5673,7 @@ def _repair_llm_webui_transform_output(
         response = submit_response_job(
             [
                 {"role": "system", "content": str(request["system_prompt"])},
+                {"role": "user", "content": str(request["stable_user_prompt"])},
                 {"role": "user", "content": repair_prompt},
             ],
             model=selected_model,
@@ -7779,19 +7789,22 @@ def _submit_llm_webui_transform_job(
     )
     messages = [
         {"role": "system", "content": str(request["system_prompt"])},
+        {"role": "user", "content": str(request["stable_user_prompt"])},
         {"role": "user", "content": str(request["user_prompt"])},
     ]
     system_prompt_bytes = len(str(request["system_prompt"]).encode("utf-8", errors="replace"))
+    stable_prompt_bytes = len(str(request["stable_user_prompt"]).encode("utf-8", errors="replace"))
     user_prompt_bytes = len(str(request["user_prompt"]).encode("utf-8", errors="replace"))
     selected_model = _builder_llm_model_for_session(session, _meta)
     prompt_profile = _builder_llm_prompt_profile(selected_model)
     _LOG.debug(
-        "builder LLM job submit start scenario=%s request_id=%s model=%s context_build_ms=%d system_prompt_bytes=%d user_prompt_bytes=%d",
+        "builder LLM job submit start scenario=%s request_id=%s model=%s context_build_ms=%d system_prompt_bytes=%d stable_prompt_bytes=%d user_prompt_bytes=%d",
         str(session.get("scenario_id") or ""),
         request_id,
         selected_model or "",
         int((context_ready_at - started_at) * 1000),
         system_prompt_bytes,
+        stable_prompt_bytes,
         user_prompt_bytes,
     )
     try:

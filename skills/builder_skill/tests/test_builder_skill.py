@@ -850,12 +850,15 @@ def test_llm_webui_transform_uses_stable_request_id_and_compact_prompt(monkeypat
     assert kwargs["max_tokens"] == 4321
     assert kwargs["temperature"] == 0.35
     assert str(kwargs["request_id"]).startswith("builder-ui-")
-    user_prompt = captured["messages"][1]["content"]
+    stable_prompt = captured["messages"][1]["content"]
+    user_prompt = captured["messages"][2]["content"]
+    assert "\n" not in stable_prompt
     assert "\n" not in user_prompt
-    assert "webui_v1_schema" in user_prompt
-    user_payload = json.loads(user_prompt)
-    assert user_payload["llm_prompt_profile"]["id"] == "openai-default"
-    assert user_payload["llm_prompt_profile"]["model"] == "gpt-4o-mini"
+    assert "webui_v1_schema" in stable_prompt
+    stable_payload = json.loads(stable_prompt)["stable_builder_context"]
+    assert stable_payload["llm_prompt_profile"]["id"] == "openai-default"
+    assert stable_payload["llm_prompt_profile"]["model"] == "gpt-4o-mini"
+    assert json.loads(user_prompt)["builder_request"]["instruction"] == "Adapt sample data for conference preparation"
     assert "Prompt profile: openai-default" in captured["messages"][0]["content"]
 
 
@@ -1090,6 +1093,7 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     assert "-job-" in submit_calls[0]["kwargs"]["request_id"]
     assert submit_calls[0]["kwargs"]["temperature"] == 0.25
     assert "prototyping_affordances" in submit_calls[0]["messages"][1]["content"]
+    assert "current_webui_json" in submit_calls[0]["messages"][2]["content"]
 
 
 def test_update_current_scenario_blocks_parallel_llm_jobs(monkeypatch) -> None:
@@ -1459,7 +1463,9 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
         preview_state=preview,
     )
 
-    user_payload = json.loads(request["user_prompt"])
+    stable_payload = json.loads(request["stable_user_prompt"])["stable_builder_context"]
+    dynamic_payload = json.loads(request["user_prompt"])["builder_request"]
+    user_payload = {**stable_payload, **dynamic_payload}
     current = user_payload["current_webui_json"]
     assert current["schema"] == "adaos.webui.v1"
     assert "preview_state" not in current
