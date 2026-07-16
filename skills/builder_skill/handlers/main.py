@@ -507,7 +507,7 @@ def _builder_llm_prompt_profile(model: str | None = None) -> dict[str, Any]:
         profile_id = "default"
     return {
         "schema": "adaos.builder.llm_prompt_profile.v1",
-        "version": "2026-07-16.4",
+        "version": "2026-07-16.5",
         "id": profile_id,
         "provider": provider,
         "model": model_hint,
@@ -2029,6 +2029,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                     "Optional ordered descriptors {id?,label?,key?|path?|value?}. Use key/path for one selected object path. "
                     "Use value with brace interpolation such as '{category} • {time}' for combined text. Arrays selected by key/path render one item per line. "
                     "Do not use form field type/content descriptors, $item expressions, JavaScript, map(), or join(); item.details does not execute them. "
+                    "Do not add an image/photo field: a field path renders its URL as text; use inputs.imageKey for the large rendered image. "
                     "Without fields, non-image object properties are rendered automatically."
                 ),
                 "imageKey": "Optional object path for a large responsive detail image.",
@@ -2053,7 +2054,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             },
             "actions": (
                 "Use local updateState for prototype-only state changes; params are a direct state patch and may resolve $event.*, $state.*, and $client.* values. "
-                "Do not invent operators such as $merge, $toggle, $append, or JavaScript expressions. Use a simple explicit boolean/status value for a mock action when one click is sufficient. "
+                "Do not invent object keys beginning with $, such as $merge, $toggle, $set, or $append, and do not use JavaScript expressions. Use a simple explicit boolean/status value for a mock action when one click is sufficient. "
                 "Use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls."
             ),
         },
@@ -5176,6 +5177,23 @@ def _validate_webui_modal_contracts(payload: Mapping[str, Any]) -> dict[str, Any
     return {"ok": True}
 
 
+def _unsupported_action_param_operator(value: Any) -> str:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            token = str(key or "")
+            if token.startswith("$"):
+                return token
+            found = _unsupported_action_param_operator(nested)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for nested in value:
+            found = _unsupported_action_param_operator(nested)
+            if found:
+                return found
+    return ""
+
+
 def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(page_schema, Mapping):
         return {"ok": False, "error": "page_schema_invalid", "detail": "ui.application.desktop.pageSchema must be an object"}
@@ -5205,14 +5223,7 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
             if not isinstance(action, Mapping) or str(action.get("type") or "").strip() != "updateState":
                 continue
             params = action.get("params") if isinstance(action.get("params"), Mapping) else {}
-            unsupported = next(
-                (
-                    key
-                    for key in ("$merge", "$toggle", "$append", "$remove")
-                    if key in _compact_json(params)
-                ),
-                "",
-            )
+            unsupported = _unsupported_action_param_operator(params)
             if unsupported:
                 return {
                     "ok": False,

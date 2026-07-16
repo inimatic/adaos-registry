@@ -2254,6 +2254,7 @@ def test_builder_component_contract_rejects_invented_update_state_operators() ->
 
     assert validation["ok"] is False
     assert "unsupported updateState operator" in validation["detail"]
+    assert skill._unsupported_action_param_operator({"favorite": {"$set": True}}) == "$set"
 
 
 def test_builder_component_contract_rejects_unrendered_table_image_cells() -> None:
