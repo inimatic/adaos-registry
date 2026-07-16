@@ -1985,7 +1985,11 @@ def test_normalise_llm_payload_moves_root_modals_into_application() -> None:
         "modals": {
             "comment_modal": {
                 "title": "Add comment",
-                "schema": {"id": "comment_modal_schema", "layout": {"type": "stack"}, "widgets": []},
+                "schema": {
+                    "id": "comment_modal_schema",
+                    "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                    "widgets": [{"id": "comment", "type": "ui.form", "area": "modal", "inputs": {"fields": [{"id": "text", "type": "longText"}]}}],
+                },
             }
         },
     }
@@ -2025,6 +2029,18 @@ def test_builder_component_contract_describes_nested_auto_action_shape() -> None
 
     assert "action:{type,params?,...}" in contract["shape"]
     assert "nested action property is required" in contract["shape"]
+
+
+def test_builder_component_contract_describes_visible_form_and_detail_actions() -> None:
+    skill = _load_module()
+    contracts = skill._builder_runtime_component_contracts()
+    prompt = skill._builder_llm_system_prompt()
+
+    assert "cancel/click:cancel" in contracts["ui.form"]["actions"]
+    assert "Do not invent inputs.secondaryActions" in contracts["ui.form"]["actions"]
+    assert "sibling ui.actions" in contracts["item.details"]["actions"]
+    assert "item.details actions bind no visible controls" in prompt
+    assert "dotted widget keys" in prompt
 
 
 def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> None:
@@ -2314,6 +2330,115 @@ def test_builder_component_contract_rejects_unrendered_details_fields() -> None:
     assert "item.details ignores" in validation["detail"]
 
 
+def test_builder_component_contract_rejects_non_rendered_detail_and_form_actions() -> None:
+    skill = _load_module()
+    payload = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+                        "widgets": [{"id": "catalog", "type": "ui.list", "area": "main"}],
+                    }
+                },
+                "modals": {
+                    "detail_modal": {
+                        "schema": {
+                            "id": "detail_modal",
+                            "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                            "widgets": [
+                                {
+                                    "id": "details",
+                                    "type": "item.details",
+                                    "area": "modal",
+                                    "actions": [
+                                        {
+                                            "on": "click",
+                                            "type": "openModal",
+                                            "params": {"modalId": "edit_modal"},
+                                            "label": "Edit",
+                                        }
+                                    ],
+                                }
+                            ],
+                        }
+                    },
+                    "add_modal": {
+                        "schema": {
+                            "id": "add_modal",
+                            "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                            "widgets": [
+                                {
+                                    "id": "add_form",
+                                    "type": "ui.form",
+                                    "area": "modal",
+                                    "inputs": {
+                                        "fields": [{"id": "title", "type": "shortText"}],
+                                        "secondaryActions": [{"id": "cancel", "label": "Cancel"}],
+                                    },
+                                }
+                            ],
+                        }
+                    },
+                    "edit_modal": {
+                        "schema": {
+                            "id": "edit_modal",
+                            "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                            "widgets": [
+                                {
+                                    "id": "edit_form",
+                                    "type": "ui.form",
+                                    "area": "modal",
+                                    "inputs": {"fields": [{"id": "title", "type": "shortText"}]},
+                                    "inputs.secondaryActions": [{"id": "cancel", "label": "Cancel"}],
+                                }
+                            ],
+                        }
+                    },
+                },
+            }
+        },
+    }
+
+    validation = skill._validate_webui_modal_contracts(payload)
+
+    assert validation["ok"] is False
+    assert "item.details" in validation["detail"]
+    assert "inputs.secondaryActions" in validation["detail"]
+    assert "dotted property" in validation["detail"]
+
+
+def test_builder_component_contract_accepts_composed_detail_actions_and_form_cancel() -> None:
+    skill = _load_module()
+    detail_schema = {
+        "id": "detail_modal",
+        "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+        "widgets": [
+            {"id": "details", "type": "item.details", "area": "modal"},
+            {
+                "id": "detail_actions",
+                "type": "ui.actions",
+                "area": "modal",
+                "inputs": {"variant": "stack", "buttons": [{"id": "edit", "label": "Edit"}]},
+                "actions": [
+                    {"on": "click:edit", "type": "openModal", "params": {"modalId": "edit_modal"}}
+                ],
+            },
+            {
+                "id": "edit_form",
+                "type": "ui.form",
+                "area": "modal",
+                "inputs": {"showSubmit": True, "fields": [{"id": "title", "type": "shortText"}]},
+                "actions": [{"on": "click:cancel", "type": "closeModal", "label": "Cancel"}],
+            },
+        ],
+    }
+
+    assert skill._validate_page_schema_component_contracts(detail_schema)["ok"] is True
+
+
 def test_builder_component_contract_rejects_invented_update_state_operators() -> None:
     skill = _load_module()
     page_schema = {
@@ -2432,7 +2557,11 @@ def test_builder_webui_validation_rejects_undeclared_modal_action() -> None:
     fixed_payload["ui"]["application"]["modals"] = {
         "request_detail_modal": {
             "title": "Request detail",
-            "schema": {"id": "request_detail_modal_schema", "layout": {"type": "stack"}, "widgets": []},
+            "schema": {
+                "id": "request_detail_modal_schema",
+                "layout": {"type": "stack", "areas": [{"id": "modal"}]},
+                "widgets": [{"id": "details", "type": "item.details", "area": "modal"}],
+            },
         }
     }
 

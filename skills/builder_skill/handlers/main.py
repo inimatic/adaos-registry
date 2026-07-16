@@ -1991,6 +1991,12 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "minFieldWidth": "For responsiveGrid, optional minimum field width in pixels (120..640).",
                 "field_span": "Each field may set span to a positive grid-column count or 'full'. Use full for long text, uploads, and controls that should occupy a complete row.",
             },
+            "actions": (
+                "Visible built-in form commands are declared in widget.actions. Supported triggers are submit, validate, "
+                "save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put the visible label on "
+                "the action (submit may use inputs.submitLabel). Do not invent inputs.secondaryActions. For arbitrary "
+                "commands that are not form lifecycle actions, add a sibling ui.actions widget."
+            ),
         },
         "ui.table": {
             "purpose": "Dense text/boolean/action comparison preview. Do not use a table as an image gallery or card catalog.",
@@ -2048,6 +2054,11 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "imageAltKey": "Optional object path for accessible image alt text; falls back to title/name/label.",
                 "imageRatio": "Optional aspect ratio such as '16 / 9' or '4 / 3'.",
             },
+            "actions": (
+                "item.details does not render controls from its actions array. For visible commands such as Edit, "
+                "Delete, or Add comment, add a sibling ui.actions widget in the same page/modal area with "
+                "inputs.buttons and matching click:<button-id> actions."
+            ),
         },
         "visual.image": {
             "purpose": "A standalone responsive image/hero/detail visual. Collection thumbnails belong in ui.list variant='cards' via imageKey.",
@@ -2074,7 +2085,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "purpose": "Use ui.application.modals when the user asks for a modal, dialog, popup, drawer, sheet, or separate overlay surface.",
             "shape": "Add ui.application.modals.<modalId>={title,presentation:{kind:'modal'|'drawer'|'sheet'|'sideSheet'},schema:{id,layout,widgets}} alongside ui.application.desktop.pageSchema.",
             "open_action": "Open a declared modal from a button/action with actions=[{on:'click', type:'openModal', params:{modalId:'comment_modal'}}].",
-            "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. Never return a root-level modals object; modal declarations live only in ui.application.modals.",
+            "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. Never return a root-level modals object; modal declarations live only in ui.application.modals. A modal may compose several widgets in one area, for example item.details followed by ui.actions for visible detail commands.",
         },
         "page_schema_auto_actions": {
             "purpose": "Optional interval actions active only while a page or modal is mounted.",
@@ -2276,6 +2287,8 @@ def _builder_llm_system_prompt(
         "For pageSchema.autoActions, each item must wrap the executable action in its required action property, for example {intervalMs:5000,action:{type:'updateState',params:{tick:true}}}; do not put type directly on the autoActions item. "
         "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
         "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
+        "item.details actions bind no visible controls. To show Edit, Delete, Add comment, or another detail command, compose a sibling ui.actions widget in the same detail area or modal schema, define inputs.buttons, and bind click:<button-id> actions there. "
+        "For ui.form, only supported form lifecycle triggers render buttons: submit, validate, save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put button labels on those actions (submit may use inputs.submitLabel), and do not invent inputs.secondaryActions or dotted widget keys such as inputs.secondaryActions. "
         "When a request says the detail should be in a right panel or side panel, use a split/focus-detail layout with a main master area and a right/detail aux area; do not put detail below the master unless the screen is compact. "
         "If the user asks to move a detail-related control into that right/detail panel, set that control's widget area to the right/detail aux area or put it inside the declared detail modal/panel schema. "
         "When the request says restore, recover, bring back, undo removal, or similar localized phrases, inspect last_revision_delta if present. Reintroduce the matching removed widgets/modals/actions and preserve their semantic owner: if the removed element belonged to a detail modal/panel/container, restore it inside the current detail modal/panel/aux area rather than as a detached global main action. "
@@ -5172,6 +5185,7 @@ def _validate_webui_modal_contracts(payload: Mapping[str, Any]) -> dict[str, Any
 
     modals = application.get("modals") if isinstance(application.get("modals"), Mapping) else {}
     declared_modal_ids = {str(modal_id).strip() for modal_id in modals.keys() if str(modal_id).strip()}
+    modal_component_issues: list[str] = []
     for modal_id, modal in modals.items():
         if not isinstance(modal, Mapping):
             return {
@@ -5185,6 +5199,11 @@ def _validate_webui_modal_contracts(payload: Mapping[str, Any]) -> dict[str, Any
                 "error": "component_contract_invalid",
                 "detail": f"ui.application.modals.{modal_id}.schema must be an object",
             }
+        modal_validation = _validate_page_schema_component_contracts(modal["schema"])
+        if not modal_validation.get("ok"):
+            modal_component_issues.append(
+                f"ui.application.modals.{modal_id}.schema: {modal_validation.get('detail') or modal_validation.get('error')}"
+            )
 
     for path, node in _iter_mapping_nodes(application, "$.ui.application"):
         if str(node.get("type") or "").strip() != "openModal":
@@ -5204,6 +5223,12 @@ def _validate_webui_modal_contracts(payload: Mapping[str, Any]) -> dict[str, Any
                 "error": "component_contract_invalid",
                 "detail": f"{path} opens undeclared modal '{modal_id}'; declare it in ui.application.modals",
             }
+    if modal_component_issues:
+        return {
+            "ok": False,
+            "error": "component_contract_invalid",
+            "detail": "; ".join(modal_component_issues),
+        }
     return {"ok": True}
 
 
@@ -5238,6 +5263,16 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
         widget_type = str(widget.get("type") or "").strip()
         if not widget_type:
             return {"ok": False, "error": "page_schema_invalid", "detail": f"widgets[{widget_index}].type is required"}
+        dotted_keys = [str(key) for key in widget.keys() if "." in str(key)]
+        if dotted_keys:
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": (
+                    f"widgets[{widget_index}] contains dotted property {dotted_keys[0]!r}; dotted keys are not nested "
+                    "and are ignored by the runtime, so place the value inside the corresponding object"
+                ),
+            }
         inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
         if isinstance(inputs.get("dataSource"), Mapping):
             return {
@@ -5264,6 +5299,15 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                     ),
                 }
         if widget_type == "item.details":
+            if actions:
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": (
+                        f"widgets[{widget_index}].actions is not rendered by item.details; add a sibling ui.actions "
+                        "widget in the same area with inputs.buttons and matching click:<button-id> actions"
+                    ),
+                }
             fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
             for field_index, field in enumerate(fields):
                 if not isinstance(field, Mapping):
@@ -5314,6 +5358,15 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
             continue
         if widget_type != "ui.form":
             continue
+        if "secondaryActions" in inputs:
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": (
+                    f"widgets[{widget_index}].inputs.secondaryActions is not rendered by ui.form; use supported "
+                    "widget.actions triggers such as cancel/click:cancel with a label, or a sibling ui.actions widget"
+                ),
+            }
         fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
         for field_index, field in enumerate(fields):
             if not isinstance(field, Mapping):
@@ -5348,8 +5401,6 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
 
 def _validate_builder_webui_payload(payload: Mapping[str, Any], preview_state: Mapping[str, Any]) -> dict[str, Any]:
     webui_validation = _validate_webui_payload(payload)
-    if not webui_validation.get("ok"):
-        return webui_validation
     page_schema = _extract_webui_page_schema(payload)
     if not page_schema:
         return {
@@ -5357,18 +5408,26 @@ def _validate_builder_webui_payload(payload: Mapping[str, Any], preview_state: M
             "error": "page_schema_missing",
             "detail": "LLM response must contain ui.application.desktop.pageSchema",
         }
-    text_validation = _validate_webui_text_integrity(payload)
-    if not text_validation.get("ok"):
-        return text_validation
-    component_validation = _validate_page_schema_component_contracts(page_schema)
-    if not component_validation.get("ok"):
-        return component_validation
-    modal_validation = _validate_webui_modal_contracts(payload)
-    if not modal_validation.get("ok"):
-        return modal_validation
-    preview_validation = _validate_preview_state_payload(preview_state)
-    if not preview_validation.get("ok"):
-        return preview_validation
+    validations = [
+        webui_validation,
+        _validate_webui_text_integrity(payload),
+        _validate_page_schema_component_contracts(page_schema),
+        _validate_webui_modal_contracts(payload),
+        _validate_preview_state_payload(preview_state),
+    ]
+    failures = [validation for validation in validations if not validation.get("ok")]
+    if failures:
+        first = failures[0]
+        details: list[str] = []
+        for validation in failures:
+            detail = str(validation.get("detail") or validation.get("error") or "validation failed").strip()
+            if detail and detail not in details:
+                details.append(detail)
+        return {
+            "ok": False,
+            "error": first.get("error") or "webui_validation_failed",
+            "detail": " | ".join(details),
+        }
     return {
         "ok": True,
         "schema": webui_validation.get("schema") or "adaos.webui.v1",
