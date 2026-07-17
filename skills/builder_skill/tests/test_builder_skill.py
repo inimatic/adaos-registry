@@ -1974,6 +1974,7 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(monkeypatc
     assert repair_current["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["title"] == "Live cart"
     assert repair_request["original_request"]["repair_base"].startswith("partially transformed")
     assert "remove that property instead of using an empty string" in repair_request["task"]
+    assert "every click target must exist in the same widget" in repair_request["task"]
 
 
 def test_repair_keeps_malformed_patch_response_compact(monkeypatch) -> None:

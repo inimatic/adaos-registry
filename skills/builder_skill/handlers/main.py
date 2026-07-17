@@ -6303,6 +6303,7 @@ def _repair_llm_webui_transform_output(
             "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
             "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, "
             "or use the appropriate non-opening action such as closeModal for closing the current modal. "
+            "If validation says an action targets an unknown button or control, restore the referenced control when it is required by the request, or remove the orphan action; every click target must exist in the same widget. "
             "Do not invent a different modal id while leaving the referenced id undeclared."
         )
     required_output_shape: dict[str, Any]
