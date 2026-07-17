@@ -2086,10 +2086,10 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "groupBy": "Optional object path used to group rows/cards.",
                 "groupDisplay": "For grouped cards use 'sections' or 'accordion'.",
                 "filters": (
-                    "Optional array of {key,stateKey,operator?,enabledIf?}; operator may be equals, contains, includes, in, "
+                    "Optional array of {key,stateKey?,value?,operator?,enabledIf?}; provide either stateKey for a user-controlled filter or value for a literal/declarative threshold. Operators may be equals, contains, includes, in, "
                     "truthy, lte, or gte. Use in when the item key must be a member of an array in state, for example favorites. "
                     "Use enabledIf with a canonical $state expression when a filter has its own on/off mode; do not derive a duplicate filter array with a timer. "
-                    "Use numeric option values with lte/gte for numeric range filters; "
+                    "Use numeric option values with lt/lte/gt/gte for numeric range filters; a resolved row quantity can be filtered with {key:'quantity',operator:'gt',value:0}. "
                     "do not encode comparisons such as '<=20' into a string value. Empty/all state values do not filter. "
                     "For a neutral 'Any' option in a numeric range selector, use an empty string value rather than 0; zero remains a valid numeric threshold."
                 ),
@@ -2220,7 +2220,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "{kind:'expression',op,args?}. Supported ops: add, subtract, multiply, divide, min, max, round, "
                 "equals, gt, gte, lt, lte, and, or, not, if, count, and formatNumber. Use these for live summaries, "
                 "line amounts, counters, discounts, and totals; never embed JavaScript. Exact references and expressions preserve their value type. "
-                "For readable computed summaries use item.details with a static dataSource containing these values. "
+                "For readable computed summaries use item.details with a static dataSource containing these values. Within one static object, later fields may reference earlier resolved fields through $data.<field>; order dependent fields after their inputs. "
                 "Form staticContent is literal copy and does not interpolate state or computed expressions."
             ),
             "reactive_static_collections": (
