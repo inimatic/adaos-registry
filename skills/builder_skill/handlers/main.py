@@ -2061,7 +2061,9 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put the visible label on "
                 "the action (submit may use inputs.submitLabel). Optional inputs.secondaryActions entries may customize "
                 "the label and primary/secondary/tertiary presentation of a matching declared action. For arbitrary "
-                "commands that are not form lifecycle actions, add a sibling ui.actions widget."
+                "commands that are not form lifecycle actions, add a sibling ui.actions widget. Field changes may run "
+                "non-visual local behavior with on='change:<fieldId>'; the event exposes id, fieldId, stateKey, value, "
+                "and current values. Use inputs.autoCommit=true when simply copying each field value to its stateKey."
             ),
         },
         "ui.table": {
@@ -2144,14 +2146,16 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "actions": (
                 "Use local updateState for prototype-only state changes; params are a direct state patch and may resolve $event.*, $state.*, and $client.* values. "
                 "Do not invent object keys beginning with $, such as $merge, $toggle, $set, or $append, and do not use JavaScript expressions. Use a simple explicit boolean/status value for a mock action when one click is sufficient. "
-                "Use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls."
+                "Use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls. "
+                "Prefer on='click:<buttonId>' for one button. on='click' without action.id applies to every button; "
+                "on='click' with action.id applies only to the button with that id. Do not emit duplicate actions for one button."
             ),
         },
         "application_modals": {
             "purpose": "Use ui.application.modals when the user asks for a modal, dialog, popup, drawer, sheet, or separate overlay surface.",
             "shape": "Add ui.application.modals.<modalId>={title,presentation:{kind:'modal'|'drawer'|'sheet'|'sideSheet'},schema:{id,layout,widgets}} alongside ui.application.desktop.pageSchema.",
             "open_action": "Open a declared modal from a button/action with actions=[{on:'click', type:'openModal', params:{modalId:'comment_modal'}}].",
-            "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. Never return a root-level modals object; modal declarations live only in ui.application.modals. A modal may compose several widgets in one area, for example item.details followed by ui.actions for visible detail commands.",
+            "rule": "Do not model an explicitly requested modal only as a hidden inline widget; use a declared modal unless the user asks for an inline panel. When replacing an inline detail with a modal, remove the old inline detail/actions and any now-unused layout area instead of retaining a second copy with visibleIf=false. Never return a root-level modals object; modal declarations live only in ui.application.modals. A modal may compose several widgets in one area, for example item.details followed by ui.actions for visible detail commands.",
         },
         "page_schema_auto_actions": {
             "purpose": "Optional interval actions active only while a page or modal is mounted.",
@@ -2200,7 +2204,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         },
         "state_and_visibility": {
             "initialState": "pageSchema.initialState can seed local prototype values, selected modes, mock workflow state, and temporary examples.",
-            "visibleIf": "Widgets and fields may use visibleIf expressions to show different prototype surfaces based on local state. Use canonical $state paths with ===/!== and combine conditions with &&, ||, !, and parentheses when needed.",
+            "visibleIf": "Widgets and fields may use visibleIf expressions to show different prototype surfaces based on local state. Use canonical $state paths with ===/!== and combine conditions with &&, ||, !, and parentheses when needed. Literal 'true' and 'false' are supported, but remove obsolete widgets rather than parking replaced UI behind visibleIf='false'.",
             "local_interaction": "Interactive prototype controls should update local page state and static/mock data only unless the user explicitly asks for a real integration. If the user asks to view an example, compare variants, choose a mode, or preview a state, include an explicit local input.commandBar/input.selector/ui.actions widget and seed matching initialState.",
         },
         "master_detail_and_tabs": {
@@ -2356,12 +2360,12 @@ def _builder_llm_system_prompt(
         "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
         "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
         "Labeled item.details actions render visible detail buttons and execute their declared action. Use a sibling ui.actions widget only for a separate toolbar, segmented control, or independently positioned commands. "
-        "For ui.form, only supported form lifecycle triggers render buttons: submit, validate, save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put behavior in widget.actions and labels there (submit may use inputs.submitLabel). A cancel button that closes the current modal uses type='closeModal'; never model closing as openModal with a pseudo modal id such as '__close__'. Optional inputs.secondaryActions entries only customize the label and presentation of a matching declared action. Never use dotted widget keys such as inputs.secondaryActions. "
+        "For ui.form, only supported form lifecycle triggers render buttons: submit, validate, save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put behavior in widget.actions and labels there (submit may use inputs.submitLabel). Non-visual field reactions may use on='change:<fieldId>' with $event.value, while inputs.autoCommit=true copies fields to their stateKey directly. A cancel button that closes the current modal uses type='closeModal'; never model closing as openModal with a pseudo modal id such as '__close__'. Optional inputs.secondaryActions entries only customize the label and presentation of a matching declared action. Never use dotted widget keys such as inputs.secondaryActions. "
         "When a request says the detail should be in a right panel or side panel, use a split/focus-detail layout with a main master area and a right/detail aux area; do not put detail below the master unless the screen is compact. "
         "If the user asks to move a detail-related control into that right/detail panel, set that control's widget area to the right/detail aux area or put it inside the declared detail modal/panel schema. "
         "When the request says restore, recover, bring back, undo removal, or similar localized phrases, inspect last_revision_delta if present. Reintroduce the matching removed widgets/modals/actions and preserve their semantic owner: if the removed element belonged to a detail modal/panel/container, restore it inside the current detail modal/panel/aux area rather than as a detached global main action. "
         "For tabbed content, use input.commandBar with variant='segmented', initialState for the active tab, and visibleIf on the tab content widgets. "
-        "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget, and never put modal declarations in a root-level modals object. "
+        "For modal/dialog/drawer/sheet requests, declare ui.application.modals.<modalId>.schema and open it from the page with an action {type:'openModal', params:{modalId:'...'}}; do not represent an explicitly requested modal only as a hidden inline widget, and never put modal declarations in a root-level modals object. If the request replaces an inline/panel detail with a modal, remove the old detail widgets/actions and collapse its unused layout area. "
         "Do not create a right/aux panel only for a generic prototype summary or detached action; use right/aux only when it is a meaningful detail, inspector, side panel, comparison, or user-requested secondary workspace. "
         "If a form/list/table prototype does not need a true side panel, keep the layout stack/flow or put supporting actions near the owning widget in the main area. "
         "If the user says things like 'add a modal window', 'make tabs', 'show details after selecting an item', 'validate this field', or similar localized phrases, infer the corresponding internal widgets/actions without asking the user to mention schema property names. "
@@ -5383,6 +5387,38 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                         f"{unsupported}; updateState accepts a direct state patch with $event/$state/$client references"
                     ),
                 }
+        if widget_type in {"ui.actions", "input.commandBar"}:
+            buttons = inputs.get("buttons") if isinstance(inputs.get("buttons"), list) else []
+            button_ids = {
+                str(button.get("id") or "").strip()
+                for button in buttons
+                if isinstance(button, Mapping) and str(button.get("id") or "").strip()
+            }
+            for action_index, action in enumerate(actions):
+                if not isinstance(action, Mapping):
+                    continue
+                trigger = str(action.get("on") or "").strip()
+                action_id = str(action.get("id") or "").strip()
+                if trigger == "click" and action_id and button_ids and action_id not in button_ids:
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": (
+                            f"widgets[{widget_index}].actions[{action_index}].id={action_id!r} has no matching "
+                            "inputs.buttons id"
+                        ),
+                    }
+                if trigger.startswith("click:") and button_ids:
+                    target_id = trigger.split(":", 1)[1].strip()
+                    if target_id and target_id not in button_ids:
+                        return {
+                            "ok": False,
+                            "error": "component_contract_invalid",
+                            "detail": (
+                                f"widgets[{widget_index}].actions[{action_index}].on targets unknown button "
+                                f"{target_id!r}"
+                            ),
+                        }
         if widget_type == "item.details":
             invisible_action_index = next(
                 (
@@ -5489,6 +5525,27 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                         ),
                     }
         fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
+        field_ids = {
+            str(field.get("id") or "").strip()
+            for field in fields
+            if isinstance(field, Mapping) and str(field.get("id") or "").strip()
+        }
+        for action_index, action in enumerate(actions):
+            if not isinstance(action, Mapping):
+                continue
+            trigger = str(action.get("on") or "").strip()
+            if not trigger.startswith("change:"):
+                continue
+            target_id = trigger.split(":", 1)[1].strip()
+            if target_id and target_id not in field_ids:
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": (
+                        f"widgets[{widget_index}].actions[{action_index}].on targets unknown form field "
+                        f"{target_id!r}"
+                    ),
+                }
         for field_index, field in enumerate(fields):
             if not isinstance(field, Mapping):
                 return {

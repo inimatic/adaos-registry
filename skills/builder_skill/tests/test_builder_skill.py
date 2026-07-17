@@ -2109,8 +2109,11 @@ def test_builder_component_contract_describes_visible_form_and_detail_actions() 
     prompt = skill._builder_llm_system_prompt()
 
     assert "cancel/click:cancel" in contracts["ui.form"]["actions"]
+    assert "change:<fieldId>" in contracts["ui.form"]["actions"]
     assert "inputs.secondaryActions" in contracts["ui.form"]["actions"]
     assert "Labeled entries" in contracts["item.details"]["actions"]
+    assert "click:<buttonId>" in contracts["ui.actions"]["actions"]
+    assert "remove the old inline detail" in contracts["application_modals"]["rule"]
     assert "Labeled item.details actions render visible detail buttons" in prompt
     assert "dotted widget keys" in prompt
 
@@ -2739,6 +2742,77 @@ def test_builder_component_contract_rejects_invented_update_state_operators() ->
     assert validation["ok"] is False
     assert "unsupported updateState operator" in validation["detail"]
     assert skill._unsupported_action_param_operator({"favorite": {"$set": True}}) == "$set"
+
+
+def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknown_command_actions() -> None:
+    skill = _load_module()
+    duplicate_action = {
+        "id": "close",
+        "on": "click",
+        "type": "closeModal",
+    }
+    page_schema = {
+        "id": "detail-modal",
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "detail-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {"buttons": [{"id": "close", "label": "Close"}]},
+                "actions": [duplicate_action, copy.deepcopy(duplicate_action)],
+            }
+        ],
+    }
+
+    assert skill._validate_page_schema_component_contracts(page_schema)["ok"] is True
+
+    page_schema["widgets"][0]["actions"] = [
+        {"id": "edit", "on": "click", "type": "openModal", "params": {"modalId": "edit-modal"}}
+    ]
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "has no matching inputs.buttons id" in validation["detail"]
+
+
+def test_builder_component_contract_accepts_field_change_and_rejects_unknown_field_target() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "catalog",
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "filters",
+                "type": "ui.form",
+                "area": "main",
+                "inputs": {
+                    "fields": [
+                        {
+                            "id": "category",
+                            "type": "select",
+                            "options": [{"label": "All", "value": ""}],
+                        }
+                    ]
+                },
+                "actions": [
+                    {
+                        "on": "change:category",
+                        "type": "updateState",
+                        "params": {"category": "$event.value"},
+                    }
+                ],
+            }
+        ],
+    }
+
+    assert skill._validate_page_schema_component_contracts(page_schema)["ok"] is True
+
+    page_schema["widgets"][0]["actions"][0]["on"] = "change:missing"
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "targets unknown form field 'missing'" in validation["detail"]
 
 
 def test_builder_component_contract_rejects_unrendered_table_image_cells() -> None:
