@@ -2448,6 +2448,7 @@ def _builder_llm_system_prompt(
         "Decompose the user's instruction into explicit requirements and satisfy each one; do not let a broad form/layout request hide later requirements such as examples, local controls, variant switching, translations, or sample data. "
         "Use the supplied prototyping_affordances to vary field order, grouping, labels, field types, layout, widgets, local interactions, and mock data when that better fits the user's request. "
         "Interactive prototype elements may update local page state or static/mock data; do not invent real external integrations or side effects unless explicitly requested and declared. "
+        "Datasource transport fields are optional and transport-specific: omit method and url for static, stream, and local/mock sources. When method is present for an HTTP source it must be exactly GET, POST, PUT, PATCH, or DELETE; never emit an empty method. "
         "For early visual prototypes that need sample images, use replaceable placeholder image URLs from https://picsum.photos/ with deterministic seeds, for example https://picsum.photos/seed/recipe-salad/640/420. Treat those URLs as temporary sample assets that the user can later replace with local seed assets or generated images. "
         "When using placeholder images, put meaningful alt/title/caption text and keep the image subject aligned with the row/card domain; do not use image placeholders as final product content. "
         "For icon properties use real Ionicons v7 names, not descriptive aliases invented for the prototype. Prefer established names such as add-outline, create-outline, close-outline, search-outline, trash-outline, star, and star-outline; for example, use create-outline instead of edit and star instead of star-filled. "
@@ -8976,9 +8977,11 @@ def _mark_llm_job_failed(
         job_id,
     )
     topic = topic_ref if isinstance(topic_ref, Mapping) else _builder_topic_ref(ws, session=session, binding=binding or {}, _meta=_meta)
+    visible_detail = _llm_job_failure_chat_detail(detail)
     message = (
         f"{AGENT_LABEL}: LLM-\u0437\u0430\u0434\u0430\u0447\u0430 {job_id or ''} "
-        f"\u0434\u043b\u044f {session.get('scenario_id')} \u043d\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043b\u0430\u0441\u044c. {detail}"
+        f"\u0434\u043b\u044f {session.get('scenario_id')} \u043d\u0435 \u0437\u0430\u0432\u0435\u0440\u0448\u0438\u043b\u0430\u0441\u044c. {visible_detail} "
+        f"\u041f\u043e\u043b\u043d\u0430\u044f \u0434\u0438\u0430\u0433\u043d\u043e\u0441\u0442\u0438\u043a\u0430: llm_jobs/{job_id}.json."
     ).strip()
     _safe_emit_chat(
         message,
@@ -8999,6 +9002,19 @@ def _mark_llm_job_failed(
         str(session.get("scenario_id") or ""),
         job_id,
     )
+
+
+def _llm_job_failure_chat_detail(detail: Any) -> str:
+    text = str(detail or "").strip()
+    if not text:
+        return "LLM \u043d\u0435 \u0432\u0435\u0440\u043d\u0443\u043b\u0430 \u043f\u0440\u0438\u043c\u0435\u043d\u0438\u043c\u044b\u0439 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442."
+    first_paragraph = text.split("\n\n", 1)[0]
+    compact = " ".join(first_paragraph.split())
+    if "ValidationError:" in compact:
+        compact = "\u041e\u0442\u0432\u0435\u0442 \u043d\u0435 \u043f\u0440\u043e\u0448\u0451\u043b ABI-\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443: " + compact.split("ValidationError:", 1)[1].strip()
+    if len(compact) > 800:
+        compact = compact[:797].rstrip() + "..."
+    return compact
 
 
 _ACTIVE_LLM_JOB_STATUSES = frozenset({"submitting", "submitted", "queued", "running"})

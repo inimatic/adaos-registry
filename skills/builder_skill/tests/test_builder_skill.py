@@ -2255,6 +2255,26 @@ def test_builder_system_prompt_allows_replaceable_picsum_placeholders() -> None:
     assert "local seed assets or generated images" in prompt
 
 
+def test_builder_system_prompt_omits_empty_datasource_transport_fields() -> None:
+    skill = _load_module()
+
+    prompt = skill._builder_llm_system_prompt()
+
+    assert "omit method and url for static, stream, and local/mock sources" in prompt
+    assert "never emit an empty method" in prompt
+
+
+def test_builder_llm_failure_chat_detail_is_compact_but_specific() -> None:
+    skill = _load_module()
+
+    detail = "ValidationError: '' is not one of ['GET', 'POST']\n\nFailed validating enum\nOn instance method"
+
+    visible = skill._llm_job_failure_chat_detail(detail)
+
+    assert visible == "\u041e\u0442\u0432\u0435\u0442 \u043d\u0435 \u043f\u0440\u043e\u0448\u0451\u043b ABI-\u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0443: '' is not one of ['GET', 'POST']"
+    assert "Failed validating" not in visible
+
+
 def test_builder_patch_prompt_distinguishes_add_from_replace() -> None:
     skill = _load_module()
 
