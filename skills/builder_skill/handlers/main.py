@@ -2086,8 +2086,9 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "groupBy": "Optional object path used to group rows/cards.",
                 "groupDisplay": "For grouped cards use 'sections' or 'accordion'.",
                 "filters": (
-                    "Optional array of {key,stateKey,operator?}; operator may be equals, contains, includes, in, "
+                    "Optional array of {key,stateKey,operator?,enabledIf?}; operator may be equals, contains, includes, in, "
                     "truthy, lte, or gte. Use in when the item key must be a member of an array in state, for example favorites. "
+                    "Use enabledIf with a canonical $state expression when a filter has its own on/off mode; do not derive a duplicate filter array with a timer. "
                     "Use numeric option values with lte/gte for numeric range filters; "
                     "do not encode comparisons such as '<=20' into a string value. Empty/all state values do not filter. "
                     "For a neutral 'Any' option in a numeric range selector, use an empty string value rather than 0; zero remains a valid numeric threshold."
