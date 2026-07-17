@@ -2427,6 +2427,66 @@ def test_builder_patch_stream_repairs_only_missing_outer_line_closer() -> None:
     ]
 
 
+def test_builder_patch_stream_drops_only_truncated_complete_marker() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "recipes",
+                        "title": "Old title",
+                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "widgets": [{"id": "title", "type": "ui.jsonViewer", "area": "main"}],
+                    }
+                }
+            }
+        },
+    }
+    base_hash = skill._webui_source_fingerprint(before)
+    output = "\n".join(
+        [
+            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            json.dumps(
+                {
+                    "type": "patch",
+                    "seq": 1,
+                    "op": "replace",
+                    "path": "/ui/application/desktop/pageSchema/title",
+                    "value": "New title",
+                }
+            ),
+            '{"type":"complete","comment":"Applied',
+        ]
+    )
+
+    result = skill._parse_llm_webui_transform_output(
+        output_text=output,
+        before_webui=before,
+        previous_preview={},
+    )
+
+    assert result["ok"] is True
+    assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["title"] == "New title"
+    assert result["semantic_patch_stream"]["syntax_repairs"] == [
+        {"repair": "drop_incomplete_complete_marker", "truncated_chars": 37}
+    ]
+
+
+def test_builder_patch_stream_rejects_truncated_patch_object() -> None:
+    skill = _load_module()
+    output = "\n".join(
+        [
+            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1"}),
+            '{"type":"patch","seq":1,"op":"replace","path":"/schema","value":"adaos.webui.v1',
+        ]
+    )
+
+    with pytest.raises(ValueError, match="incomplete object"):
+        skill._extract_json_stream_objects(output)
+
+
 def test_builder_patch_stream_stable_id_path_survives_prior_array_remove() -> None:
     skill = _load_module()
     before = {

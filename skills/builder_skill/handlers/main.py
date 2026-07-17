@@ -4996,6 +4996,20 @@ def _extract_json_stream_objects(
                     objects.append(parsed)
                 start = None
     if start is not None:
+        incomplete_tail = source[start:].lstrip()
+        has_patch = any(str(item.get("type") or "").strip() == "patch" for item in objects)
+        is_complete_marker = bool(
+            re.search(r'"type"\s*:\s*"complete"', incomplete_tail[:512])
+        )
+        if has_patch and is_complete_marker:
+            if syntax_repairs is not None:
+                syntax_repairs.append(
+                    {
+                        "repair": "drop_incomplete_complete_marker",
+                        "truncated_chars": len(incomplete_tail),
+                    }
+                )
+            return objects
         raise ValueError("LLM JSONL stream ended with an incomplete object")
     return objects
 
