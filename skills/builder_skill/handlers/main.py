@@ -6175,6 +6175,7 @@ def _repair_llm_webui_transform_output(
     previous_preview: Mapping[str, Any],
     output_text: str,
     validation_error: Mapping[str, Any],
+    candidate_payload: Mapping[str, Any] | None = None,
     request_id: str = "",
     job_id: str = "",
     _meta: Mapping[str, Any] | None = None,
@@ -6186,6 +6187,13 @@ def _repair_llm_webui_transform_output(
         output_mode="full_webui",
         _meta=_meta,
     )
+    if isinstance(candidate_payload, Mapping):
+        candidate = copy.deepcopy(dict(candidate_payload))
+        request["current_payload"] = candidate
+        dynamic_request = dict(request.get("dynamic_request") or {})
+        dynamic_request["current_webui_json"] = candidate
+        dynamic_request["repair_base"] = "partially transformed candidate; preserve its valid changes"
+        request["dynamic_request"] = dynamic_request
     repair_request_base_id = _builder_llm_request_id(
         session=session,
         instruction=instruction,
@@ -6208,7 +6216,7 @@ def _repair_llm_webui_transform_output(
     patch_output = False
     repair_task = (
         "Repair the previous Builder response and return one complete corrected adaos.webui.v1 JSON object. "
-        "Use current_webui_json as the source of truth and apply the original user request while correcting every reported validation issue. "
+        "Use current_webui_json as the source of truth and correct every reported validation issue while preserving all unrelated and already-valid changes in that candidate. "
         "Do not return another JSON Patch stream: a failed positional patch is not a reliable base for repair. "
         "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
         "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, "
@@ -9434,6 +9442,7 @@ def _complete_llm_webui_job(
                     "error": llm_result.get("error") or "invalid_llm_response",
                     "detail": llm_result.get("detail") or "",
                 }),
+                candidate_payload=llm_result.get("payload") if isinstance(llm_result.get("payload"), Mapping) else None,
                 request_id=request_id,
                 job_id=job_id,
                 _meta=_meta,

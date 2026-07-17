@@ -1923,6 +1923,56 @@ def test_async_llm_completion_repairs_missing_page_schema(monkeypatch, tmp_path)
     assert saved["ui"]["application"]["desktop"]["pageSchema"]["id"] == page_schema["id"]
 
 
+def test_repair_uses_partially_transformed_candidate_as_current_webui(monkeypatch) -> None:
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+
+    original = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": {
+            "id": "store",
+            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "widgets": [{"id": "cart", "type": "ui.list", "area": "main", "title": "Old cart"}],
+        }}}},
+    }
+    candidate = copy.deepcopy(original)
+    candidate["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["title"] = "Live cart"
+    captured_messages: list[dict] = []
+
+    monkeypatch.setattr(
+        skill,
+        "_builder_llm_webui_transform_request",
+        lambda **_kwargs: {
+            "current_payload": copy.deepcopy(original),
+            "system_prompt": "system",
+            "stable_user_prompt": "stable",
+            "dynamic_request": {"current_webui_json": copy.deepcopy(original), "instruction": "fix cart"},
+        },
+    )
+
+    def fake_submit(messages, **_kwargs):
+        captured_messages.extend(messages)
+        return {"job_id": "repair-job", "status": "succeeded", "output_text": json.dumps(candidate)}
+
+    monkeypatch.setattr(llm_client, "submit_response_job", fake_submit)
+    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", lambda **_kwargs: {"ok": True, "attempts": []})
+
+    result = skill._repair_llm_webui_transform_output(
+        session={"id": "session", "scenario_id": "store"},
+        instruction="fix cart",
+        previous_preview={},
+        output_text="invalid candidate",
+        validation_error={"detail": "one computed field is invalid"},
+        candidate_payload=candidate,
+    )
+
+    assert result["ok"] is True
+    repair_request = json.loads(captured_messages[-1]["content"])
+    repair_current = repair_request["original_request"]["current_webui_json"]
+    assert repair_current["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["title"] == "Live cart"
+    assert repair_request["original_request"]["repair_base"].startswith("partially transformed")
+
+
 def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> None:
     skill = _load_module()
     previous_page_schema = {
