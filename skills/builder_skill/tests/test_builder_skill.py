@@ -2038,6 +2038,15 @@ def test_repair_keeps_malformed_patch_response_compact(monkeypatch) -> None:
     assert "Do not return the complete webui document" in repair_request["task"]
 
 
+def test_unable_llm_result_is_terminal_diagnostic_not_a_revision() -> None:
+    skill = _load_module()
+
+    assert skill._llm_unable_detail({"ok": True, "comment": "Need a clearer request.", "unable_reason": "ambiguous"}) == (
+        "Need a clearer request. (ambiguous)"
+    )
+    assert skill._llm_unable_detail({"ok": True, "comment": "Applied."}) == ""
+
+
 def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> None:
     skill = _load_module()
     previous_page_schema = {

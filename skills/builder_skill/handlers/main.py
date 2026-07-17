@@ -2860,6 +2860,16 @@ def _compact_llm_result(result: Mapping[str, Any] | None) -> dict[str, Any] | No
     return compact
 
 
+def _llm_unable_detail(result: Mapping[str, Any] | None) -> str:
+    if not isinstance(result, Mapping):
+        return ""
+    reason = str(result.get("unable_reason") or "").strip()
+    if not reason:
+        return ""
+    comment = str(result.get("comment") or "").strip()
+    return f"{comment} ({reason})" if comment else reason
+
+
 def _write_ui_revision(
     *,
     session: dict[str, Any],
@@ -9511,6 +9521,25 @@ def _complete_llm_webui_job(
                 _meta=_meta,
             )
             repair_attempted = True
+        unable_detail = _llm_unable_detail(llm_result)
+        if unable_detail:
+            _LOG.warning(
+                "builder LLM job declined transform scenario=%s job_id=%s request_id=%s detail=%s",
+                str(session.get("scenario_id") or ""),
+                job_id,
+                request_id,
+                unable_detail,
+            )
+            _mark_llm_job_failed(
+                ws=ws,
+                session=session,
+                job_id=job_id,
+                detail=unable_detail,
+                binding=binding,
+                topic_ref=topic,
+                _meta=_meta,
+            )
+            return
         if not llm_result.get("ok"):
             _LOG.warning(
                 "builder LLM job validation repair failed scenario=%s job_id=%s request_id=%s error=%s detail=%s",
