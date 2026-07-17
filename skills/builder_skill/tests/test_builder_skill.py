@@ -3140,6 +3140,50 @@ def test_builder_component_contract_rejects_dynamic_state_index_in_static_data()
     assert "dynamic state indexing" in validation["detail"]
 
 
+def test_builder_component_contract_rejects_chained_state_reference_and_dynamic_mutation_path() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "editor",
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [{
+            "id": "file-editor",
+            "type": "item.textEditor",
+            "area": "main",
+            "dataSource": {"kind": "static", "value": {"content": "$state.files.$state.selectedId.content"}},
+            "actions": [{
+                "on": "save",
+                "type": "mutateState",
+                "params": {"operations": [{"op": "set", "path": "files.$state.selectedId.content", "value": "$event.content"}]},
+            }],
+        }],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "dynamic state indexing" in validation["detail"]
+
+
+def test_builder_component_contract_rejects_missing_tree_event_fields() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "files",
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [{
+            "id": "file-tree",
+            "type": "collection.tree",
+            "area": "main",
+            "dataSource": {"kind": "static", "value": [{"id": "memory", "title": "memory.md", "kind": "file"}]},
+            "actions": [{"on": "select", "type": "updateState", "params": {"selectedPath": "$event.path"}}],
+        }],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "does not provide 'path'" in validation["detail"]
+
+
 def test_builder_component_contract_rejects_synthetic_root_in_rootless_tree() -> None:
     skill = _load_module()
     page_schema = {

@@ -4867,7 +4867,8 @@ def _builder_component_migration_issues(payload: Mapping[str, Any]) -> list[str]
                     root_id = str(root.get("id") or "").strip().lower()
                     root_title = str(root.get("title") or "").strip().lower()
                     if isinstance(root.get("children"), list) and (
-                        root_id in {"root", "project", "files"}
+                        not root_id
+                        or root_id in {"root", "project", "files"}
                         or root_title in {"project", "files", "\u043f\u0440\u043e\u0435\u043a\u0442", "\u0444\u0430\u0439\u043b\u044b"}
                     ):
                         issues.append(
@@ -4875,6 +4876,23 @@ def _builder_component_migration_issues(payload: Mapping[str, Any]) -> list[str]
                             f"{root.get('title') or root.get('id')!r}; use that root's children as dataSource.value."
                         )
             actions = widget.get("actions") if isinstance(widget.get("actions"), list) else []
+            if widget_type == "collection.tree":
+                data_source = widget.get("dataSource") if isinstance(widget.get("dataSource"), Mapping) else {}
+                value = data_source.get("value") if str(data_source.get("kind") or "").strip() == "static" else None
+                event_fields: set[str] = set()
+                for action in actions:
+                    if isinstance(action, Mapping) and str(action.get("on") or "").strip() == "select":
+                        event_fields.update(_event_field_references(action.get("params")))
+                if event_fields and isinstance(value, list):
+                    for leaf_index, leaf in enumerate(_tree_leaf_nodes(value)):
+                        missing = sorted(field for field in event_fields if field not in leaf)
+                        if missing:
+                            issues.append(
+                                f"{widget_path} select action reads $event.{missing[0]}, but leaf "
+                                f"{leaf.get('id') or leaf_index!r} does not provide it; add every referenced event "
+                                "field to each selectable leaf."
+                            )
+                            break
             for action_index, action in enumerate(actions):
                 if not isinstance(action, Mapping) or str(action.get("type") or "").strip() != "mutateState":
                     continue
@@ -4884,6 +4902,14 @@ def _builder_component_migration_issues(payload: Mapping[str, Any]) -> list[str]
                         f"{widget_path}.actions[{action_index}] uses mutateState without params.operations; "
                         "use updateState with direct state-key params for event field copies, or provide valid mutation operations."
                     )
+                    continue
+                for operation_index, operation in enumerate(params["operations"]):
+                    mutation_path = str(operation.get("path") or "") if isinstance(operation, Mapping) else ""
+                    if "$state." in mutation_path or "$event." in mutation_path:
+                        issues.append(
+                            f"{widget_path}.actions[{action_index}].params.operations[{operation_index}].path uses "
+                            f"dynamic path {mutation_path!r}; mutation paths are literal, so write a concrete state key."
+                        )
     return list(dict.fromkeys(issues))[:24]
 
 
@@ -5640,9 +5666,37 @@ def _dynamic_state_index_reference(value: Any, path: str = "value") -> tuple[str
             found = _dynamic_state_index_reference(nested, f"{path}[{index}]")
             if found:
                 return found
-    elif isinstance(value, str) and "$state." in value and ("[" in value or "]" in value):
-        return path, value
+    elif isinstance(value, str) and "$state." in value:
+        if "[" in value or "]" in value or value.count("$state.") > 1 or ".$state." in value:
+            return path, value
     return None
+
+
+def _tree_leaf_nodes(value: Any) -> list[Mapping[str, Any]]:
+    leaves: list[Mapping[str, Any]] = []
+    if isinstance(value, list):
+        for item in value:
+            leaves.extend(_tree_leaf_nodes(item))
+    elif isinstance(value, Mapping):
+        children = value.get("children")
+        if isinstance(children, list) and children:
+            leaves.extend(_tree_leaf_nodes(children))
+        else:
+            leaves.append(value)
+    return leaves
+
+
+def _event_field_references(value: Any) -> set[str]:
+    fields: set[str] = set()
+    if isinstance(value, str):
+        fields.update(match.group(1) for match in re.finditer(r"\$event\.([A-Za-z_][A-Za-z0-9_-]*)", value))
+    elif isinstance(value, Mapping):
+        for nested in value.values():
+            fields.update(_event_field_references(nested))
+    elif isinstance(value, list):
+        for nested in value:
+            fields.update(_event_field_references(nested))
+    return fields
 
 
 def _sibling_field_state_reference(
@@ -5772,6 +5826,24 @@ def _validate_page_schema_component_contracts(
                     "dot-path references. Copy selected $event fields into concrete state keys, then reference those keys."
                 ),
             }
+        actions = widget.get("actions") if isinstance(widget.get("actions"), list) else []
+        for action_index, action in enumerate(actions):
+            if not isinstance(action, Mapping) or str(action.get("type") or "").strip() != "mutateState":
+                continue
+            params = action.get("params") if isinstance(action.get("params"), Mapping) else {}
+            operations = params.get("operations") if isinstance(params.get("operations"), list) else []
+            for operation_index, operation in enumerate(operations):
+                mutation_path = str(operation.get("path") or "") if isinstance(operation, Mapping) else ""
+                if "$state." in mutation_path or "$event." in mutation_path:
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": (
+                            f"widgets[{widget_index}].actions[{action_index}].params.operations[{operation_index}].path "
+                            f"uses dynamic path {mutation_path!r}; mutation paths are literal. Copy selection into a concrete "
+                            "state key and mutate that key, or use updateState with direct params."
+                        ),
+                    }
         sibling_ref = _sibling_field_state_reference(widget.get("dataSource"), initial_state=initial_state)
         if sibling_ref:
             field_path, state_key = sibling_ref
@@ -5812,15 +5884,16 @@ def _validate_page_schema_component_contracts(
                         "widgets with complementary visibleIf expressions."
                     ),
                 }
-        if widget_type == "collection.tree" and (inputs.get("hideRoot") is True or inputs.get("rootless") is True):
+        if widget_type == "collection.tree":
             data_source = widget.get("dataSource") if isinstance(widget.get("dataSource"), Mapping) else {}
             static_value = data_source.get("value") if str(data_source.get("kind") or "").strip() == "static" else None
-            if isinstance(static_value, list) and len(static_value) == 1 and isinstance(static_value[0], Mapping):
+            if (inputs.get("hideRoot") is True or inputs.get("rootless") is True) and isinstance(static_value, list) and len(static_value) == 1 and isinstance(static_value[0], Mapping):
                 root_candidate = static_value[0]
                 root_id = str(root_candidate.get("id") or "").strip().lower()
                 root_title = str(root_candidate.get("title") or "").strip().lower()
                 if isinstance(root_candidate.get("children"), list) and (
-                    root_id in {"root", "project", "files"}
+                    not root_id
+                    or root_id in {"root", "project", "files"}
                     or root_title in {"project", "files", "\u043f\u0440\u043e\u0435\u043a\u0442", "\u0444\u0430\u0439\u043b\u044b"}
                 ):
                     return {
@@ -5832,6 +5905,23 @@ def _validate_page_schema_component_contracts(
                             "directly as dataSource.value."
                         ),
                     }
+            event_fields = set()
+            for action in actions:
+                if isinstance(action, Mapping) and str(action.get("on") or "").strip() == "select":
+                    event_fields.update(_event_field_references(action.get("params")))
+            if event_fields and isinstance(static_value, list):
+                for leaf_index, leaf in enumerate(_tree_leaf_nodes(static_value)):
+                    missing = sorted(field for field in event_fields if field not in leaf)
+                    if missing:
+                        return {
+                            "ok": False,
+                            "error": "component_contract_invalid",
+                            "detail": (
+                                f"widgets[{widget_index}] select action reads $event.{missing[0]}, but tree leaf "
+                                f"{leaf.get('id') or leaf_index!r} does not provide {missing[0]!r}; put every referenced "
+                                "event field on each selectable leaf."
+                            ),
+                        }
         filters = inputs.get("filters") if isinstance(inputs.get("filters"), list) else []
         for filter_index, filter_item in enumerate(filters):
             if not isinstance(filter_item, Mapping):
@@ -5880,7 +5970,6 @@ def _validate_page_schema_component_contracts(
                     "move dataSource to widgets[{widget_index}].dataSource"
                 ),
             }
-        actions = widget.get("actions") if isinstance(widget.get("actions"), list) else []
         for action_index, action in enumerate(actions):
             if not isinstance(action, Mapping) or str(action.get("type") or "").strip() != "updateState":
                 continue
