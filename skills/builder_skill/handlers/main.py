@@ -5316,7 +5316,12 @@ def _validate_webui_modal_contracts(payload: Mapping[str, Any]) -> dict[str, Any
                 "error": "component_contract_invalid",
                 "detail": f"ui.application.modals.{modal_id}.schema must be an object",
             }
-        modal_validation = _validate_page_schema_component_contracts(modal["schema"])
+        desktop_page = desktop.get("pageSchema") if isinstance(desktop.get("pageSchema"), Mapping) else {}
+        shared_initial_state = desktop_page.get("initialState") if isinstance(desktop_page.get("initialState"), Mapping) else {}
+        modal_validation = _validate_page_schema_component_contracts(
+            modal["schema"],
+            inherited_initial_state=shared_initial_state,
+        )
         if not modal_validation.get("ok"):
             modal_component_issues.append(
                 f"ui.application.modals.{modal_id}.schema: {modal_validation.get('detail') or modal_validation.get('error')}"
@@ -5435,7 +5440,53 @@ def _brace_wrapped_state_reference(value: Any, path: str = "value") -> str:
     return ""
 
 
-def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) -> dict[str, Any]:
+def _sibling_field_state_reference(
+    data_source: Any,
+    *,
+    initial_state: Mapping[str, Any],
+) -> tuple[str, str] | None:
+    if not isinstance(data_source, Mapping) or str(data_source.get("kind") or "").strip() != "static":
+        return None
+
+    def inspect(value: Any, path: str) -> tuple[str, str] | None:
+        if isinstance(value, Mapping):
+            sibling_keys = {str(key) for key in value.keys()}
+            for key, nested in value.items():
+                for ref in _collect_state_refs(nested):
+                    root_key = ref.split(".", 1)[0]
+                    if root_key in sibling_keys and root_key not in initial_state:
+                        return f"{path}.{key}", root_key
+                found = inspect(nested, f"{path}.{key}")
+                if found:
+                    return found
+        elif isinstance(value, list):
+            for index, nested in enumerate(value):
+                found = inspect(nested, f"{path}[{index}]")
+                if found:
+                    return found
+        return None
+
+    return inspect(data_source.get("value"), "dataSource.value")
+
+
+def _collect_state_refs(value: Any) -> set[str]:
+    refs: set[str] = set()
+    if isinstance(value, str):
+        refs.update(match.group(1) for match in re.finditer(r"\$state\.([A-Za-z0-9_.-]+)", value))
+    elif isinstance(value, Mapping):
+        for nested in value.values():
+            refs.update(_collect_state_refs(nested))
+    elif isinstance(value, list):
+        for nested in value:
+            refs.update(_collect_state_refs(nested))
+    return refs
+
+
+def _validate_page_schema_component_contracts(
+    page_schema: Mapping[str, Any],
+    *,
+    inherited_initial_state: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     if not isinstance(page_schema, Mapping):
         return {"ok": False, "error": "page_schema_invalid", "detail": "ui.application.desktop.pageSchema must be an object"}
     widgets = page_schema.get("widgets")
@@ -5448,7 +5499,9 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
             "error": "component_contract_invalid",
             "detail": f"Unsupported declarative expression: {invalid_expression}",
         }
-    initial_state = page_schema.get("initialState") if isinstance(page_schema.get("initialState"), Mapping) else {}
+    initial_state = dict(inherited_initial_state or {})
+    if isinstance(page_schema.get("initialState"), Mapping):
+        initial_state.update(page_schema["initialState"])
     for widget_index, widget in enumerate(widgets):
         if not isinstance(widget, Mapping):
             return {"ok": False, "error": "page_schema_invalid", "detail": f"widgets[{widget_index}] must be an object"}
@@ -5488,6 +5541,17 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                 "detail": (
                     f"{wrapped_state_ref} wraps a $state reference in braces; static data resolves $state paths directly, "
                     "so remove the braces or use a declarative expression object"
+                ),
+            }
+        sibling_ref = _sibling_field_state_reference(widget.get("dataSource"), initial_state=initial_state)
+        if sibling_ref:
+            field_path, state_key = sibling_ref
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": (
+                    f"widgets[{widget_index}].{field_path} references sibling computed field {state_key!r} through $state; "
+                    f"use $data.{state_key} for a previously resolved field in the same static object"
                 ),
             }
         if widget_type == "ui.form":

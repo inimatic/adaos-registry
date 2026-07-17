@@ -2884,6 +2884,37 @@ def test_builder_component_contract_rejects_unrendered_state_templates() -> None
     assert "staticContent is literal" in validation["detail"]
 
 
+def test_builder_component_contract_distinguishes_state_from_sibling_computed_data() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "cart",
+        "initialState": {"quantity": 2},
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "totals",
+                "type": "item.details",
+                "area": "main",
+                "dataSource": {
+                    "kind": "static",
+                    "value": {
+                        "subtotal": {"kind": "expression", "op": "multiply", "args": ["$state.quantity", 100]},
+                        "discount": {"kind": "expression", "op": "multiply", "args": ["$state.subtotal", 0.1]},
+                    },
+                },
+                "inputs": {"fields": [{"key": "subtotal"}, {"key": "discount"}]},
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+    assert validation["ok"] is False
+    assert "$data.subtotal" in validation["detail"]
+
+    page_schema["widgets"][0]["dataSource"]["value"]["discount"]["args"][0] = "$data.subtotal"
+    assert skill._validate_page_schema_component_contracts(page_schema)["ok"] is True
+
+
 def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknown_command_actions() -> None:
     skill = _load_module()
     duplicate_action = {
