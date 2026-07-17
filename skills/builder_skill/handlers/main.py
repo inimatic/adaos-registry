@@ -7032,7 +7032,11 @@ def _guided_clarification_message(payload: Mapping[str, Any]) -> str:
 
 def _normalise_command_text(text: str) -> str:
     lowered = str(text or "").strip().lower().replace("\u0451", "\u0435")
-    lowered = re.sub(r"^\s*(?:builder|\u0441\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c)\s*[:,;\-]?\s*", "", lowered)
+    lowered = re.sub(
+        r"^\s*(?:builder|\u0441\u0442\u0440\u043e\u0438\u0442\u0435\u043b\u044c|\u043a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440|\u0431\u0438\u043b\u0434\u0435\u0440)\s*[:,;\-]?\s*",
+        "",
+        lowered,
+    )
     return re.sub(r"\s+", " ", lowered).strip()
 
 
@@ -7100,59 +7104,29 @@ def _is_current_project_command(text: str) -> bool:
 
 def _is_explicit_create_request(text: str) -> bool:
     lowered = _normalise_command_text(text)
-    if re.search(
-        r"(?:\b(?:create|build|make)\s+(?:(?:a|an|new)\s+){0,2}(?:app|application|project|scenario|prototype|skill)\b)"
-        r"|(?:\b(?:\u0441\u043e\u0437\u0434\u0430\u0439|\u0441\u0434\u0435\u043b\u0430\u0439|\u0441\u043e\u0431\u0435\u0440\u0438|\u043f\u043e\u0441\u0442\u0440\u043e\u0439)\s+"
-        r"(?:(?:\u043d\u043e\u0432\u044b\u0439|\u043d\u043e\u0432\u043e\u0435|\u043d\u043e\u0432\u0443\u044e)\s+)?"
-        r"(?:\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435|\u043f\u0440\u043e\u0435\u043a\u0442|\u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439|\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f|\u043d\u0430\u0432\u044b\u043a)\b)",
-        lowered,
-    ):
-        return True
-    explicit_object_create = _has_any(
-        lowered,
-        (
-            "create app",
-            "create project",
-            "create scenario",
-            "create prototype",
-            "create skill",
-            "build app",
-            "build project",
-            "build scenario",
-            "build prototype",
-            "new app",
-            "new scenario",
-            "new prototype",
-            "new skill",
-            "\u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u0438\u043b\u043e\u0436",
-            "\u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
-            "\u0441\u043e\u0437\u0434\u0430\u0439 \u0441\u0446\u0435\u043d\u0430\u0440",
-            "\u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f",
-            "\u0441\u043e\u0437\u0434\u0430\u0439 \u043d\u0430\u0432\u044b\u043a",
-            "\u0441\u0434\u0435\u043b\u0430\u0439 \u043f\u0440\u0438\u043b\u043e\u0436",
-            "\u0441\u0434\u0435\u043b\u0430\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
-            "\u0441\u0434\u0435\u043b\u0430\u0439 \u0441\u0446\u0435\u043d\u0430\u0440",
-            "\u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
-            "\u043d\u043e\u0432\u044b\u0439 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f",
-            "\u043d\u043e\u0432\u043e\u0435 \u043f\u0440\u0438\u043b\u043e\u0436",
-            "\u043d\u043e\u0432\u044b\u0439 \u0441\u0446\u0435\u043d\u0430\u0440",
-            "\u043d\u043e\u0432\u044b\u0439 \u043d\u0430\u0432\u044b\u043a",
-        ),
+    if not lowered:
+        return False
+
+    # Creation is a command, not a keyword classification. Restrict it to the
+    # beginning of the utterance so UI copy such as "New project" cannot switch
+    # an active Builder session to an unrelated draft.
+    object_en = r"(?:app(?:lication)?|project|scenario|prototype|skill)"
+    object_ru = (
+        r"(?:\u043f\u0440\u0438\u043b\u043e\u0436\u0435\u043d\u0438\u0435|\u043f\u0440\u043e\u0435\u043a\u0442|\u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439|"
+        r"\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f|\u043d\u0430\u0432\u044b\u043a)"
     )
-    if explicit_object_create:
-        return True
-    return _has_any(
-        lowered,
-        (
-            "lets build",
-            "let's build",
-            "build it",
-            "\u0441\u0434\u0435\u043b\u0430\u0435\u043c",
-            "\u0434\u0430\u0432\u0430\u0439 \u0441\u0434\u0435\u043b",
-            "\u0441\u043e\u0431\u0435\u0440",
-            "\u043f\u043e\u0441\u0442\u0440\u043e\u0438",
-        ),
+    patterns = (
+        rf"^(?:please\s+)?(?:create|build|make)\s+(?:(?:a|an|the|new)\s+){{0,2}}{object_en}\b",
+        rf"^(?:let'?s\s+)(?:create|build|make)\s+(?:(?:a|an|the|new)\s+){{0,2}}{object_en}\b",
+        rf"^(?:\u043f\u043e\u0436\u0430\u043b\u0443\u0439\u0441\u0442\u0430\s+)?"
+        rf"(?:\u0441\u043e\u0437\u0434\u0430\u0439(?:\u0442\u0435)?|\u0441\u0434\u0435\u043b\u0430\u0439(?:\u0442\u0435)?|"
+        rf"\u0441\u043e\u0431\u0435\u0440\u0438(?:\u0442\u0435)?|\u043f\u043e\u0441\u0442\u0440\u043e\u0439(?:\u0442\u0435)?)\s+"
+        rf"(?:(?:\u043d\u043e\u0432\u044b\u0439|\u043d\u043e\u0432\u043e\u0435|\u043d\u043e\u0432\u0443\u044e)\s+)?{object_ru}\b",
+        rf"^(?:\u0434\u0430\u0432\u0430\u0439(?:\u0442\u0435)?\s+)?"
+        rf"(?:\u0441\u043e\u0437\u0434\u0430\u0434\u0438\u043c|\u0441\u0434\u0435\u043b\u0430\u0435\u043c|\u0441\u043e\u0431\u0435\u0440\u0435\u043c|\u043f\u043e\u0441\u0442\u0440\u043e\u0438\u043c)\s+"
+        rf"(?:(?:\u043d\u043e\u0432\u044b\u0439|\u043d\u043e\u0432\u043e\u0435|\u043d\u043e\u0432\u0443\u044e)\s+)?{object_ru}\b",
     )
+    return any(re.match(pattern, lowered) for pattern in patterns)
 
 
 def _is_edit_like_request(text: str) -> bool:
