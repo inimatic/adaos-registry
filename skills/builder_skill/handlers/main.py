@@ -6224,11 +6224,15 @@ def _repair_llm_webui_transform_output(
     job_id: str = "",
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    raw_output = str(output_text or "")
+    repair_as_patch = not isinstance(candidate_payload, Mapping) and bool(
+        re.search(r"adaos\.builder\.webui_patch_(?:stream|batch)\.v1|\"type\"\s*:\s*\"patch\"", raw_output)
+    )
     request = _builder_llm_webui_transform_request(
         session=session,
         instruction=instruction,
         preview_state=previous_preview,
-        output_mode="full_webui",
+        output_mode="jsonl_patch_v1" if repair_as_patch else "full_webui",
         _meta=_meta,
     )
     if isinstance(candidate_payload, Mapping):
@@ -6257,31 +6261,46 @@ def _repair_llm_webui_transform_output(
         )
     )
     repair_request_id = f"{repair_request_base_id}-repair-{repair_identity}"
-    patch_output = False
-    repair_task = (
-        "Repair the previous Builder response and return one complete corrected adaos.webui.v1 JSON object. "
-        "Use current_webui_json as the source of truth and correct every reported validation issue while preserving all unrelated and already-valid changes in that candidate. "
-        "Do not return another JSON Patch stream: a failed positional patch is not a reliable base for repair. "
-        "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
-        "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, "
-        "or use the appropriate non-opening action such as closeModal for closing the current modal. "
-        "Do not invent a different modal id while leaving the referenced id undeclared."
-    )
+    patch_output = repair_as_patch
+    if patch_output:
+        repair_task = (
+            "Repair the malformed previous Builder JSONL patch stream. Return a complete corrected JSONL patch stream against current_webui_json, "
+            "starting with one meta object, followed by valid patch objects, and ending with one complete object. Preserve the intended changes, "
+            "use stable-id JSON Pointer tokens where available, and emit each JSON object on exactly one line with strict double-quoted JSON syntax. "
+            "Do not return the complete webui document."
+        )
+    else:
+        repair_task = (
+            "Repair the previous Builder response and return one complete corrected adaos.webui.v1 JSON object. "
+            "Use current_webui_json as the source of truth and correct every reported validation issue while preserving all unrelated and already-valid changes in that candidate. "
+            "Do not return another JSON Patch stream: a failed positional patch is not a reliable base for repair. "
+            "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
+            "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, "
+            "or use the appropriate non-opening action such as closeModal for closing the current modal. "
+            "Do not invent a different modal id while leaving the referenced id undeclared."
+        )
     required_output_shape: dict[str, Any]
-    required_output_shape = {
-        "schema": "adaos.webui.v1",
-        "ui": {
-            "application": {
-                "desktop": {
-                    "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
-                },
-                "modals": "optional object of modalId to {title,presentation,schema}; never top-level modals",
-            }
-        },
-        "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
-        "comment": "short user-facing text",
-        "unable_reason": "optional diagnostic",
-    }
+    if patch_output:
+        required_output_shape = {
+            "line_1": {"schema": "adaos.builder.webui_patch_stream.v1", "type": "meta", "base_hash": "patch_base.base_hash"},
+            "lines_2_to_n": {"type": "patch", "seq": "consecutive integer", "op": "RFC 6902 operation", "path": "JSON Pointer", "value": "when required"},
+            "last_line": {"type": "complete", "comment": "short user-facing text", "unable_reason": "optional diagnostic"},
+        }
+    else:
+        required_output_shape = {
+            "schema": "adaos.webui.v1",
+            "ui": {
+                "application": {
+                    "desktop": {
+                        "pageSchema": "complete AdaOS pageSchema object with id, layout, and widgets"
+                    },
+                    "modals": "optional object of modalId to {title,presentation,schema}; never top-level modals",
+                }
+            },
+            "forbidden_root_keys": ["modals", "page_schema", "preview_state", "current_ui"],
+            "comment": "short user-facing text",
+            "unable_reason": "optional diagnostic",
+        }
     repair_prompt = _compact_json(
         {
             "task": repair_task,

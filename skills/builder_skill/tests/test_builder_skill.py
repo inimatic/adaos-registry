@@ -1975,6 +1975,69 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(monkeypatc
     assert repair_request["original_request"]["repair_base"].startswith("partially transformed")
 
 
+def test_repair_keeps_malformed_patch_response_compact(monkeypatch) -> None:
+    skill = _load_module()
+    import adaos.sdk.llm.llm_client as llm_client
+
+    original = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": {
+            "id": "store",
+            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "widgets": [],
+        }}}},
+    }
+    request_modes: list[str] = []
+    parsed: dict = {}
+
+    def fake_request(**kwargs):
+        request_modes.append(str(kwargs.get("output_mode")))
+        return {
+            "current_payload": copy.deepcopy(original),
+            "system_prompt": "patch system",
+            "stable_user_prompt": "stable",
+            "dynamic_request": {"current_webui_json": copy.deepcopy(original), "patch_base": {"base_hash": "hash"}},
+        }
+
+    repaired_stream = "\n".join([
+        json.dumps({"schema": "adaos.builder.webui_patch_stream.v1", "type": "meta", "base_hash": "hash"}),
+        json.dumps({"type": "patch", "seq": 1, "op": "add", "path": "/comment", "value": "fixed"}),
+        json.dumps({"type": "complete", "comment": "Fixed."}),
+    ])
+
+    def fake_submit(messages, **kwargs):
+        parsed["messages"] = messages
+        parsed["stream_protocol"] = kwargs.get("stream_protocol")
+        return {"job_id": "repair-patch-job", "status": "succeeded", "output_text": repaired_stream}
+
+    def fake_parse(**kwargs):
+        parsed["before_webui"] = kwargs.get("before_webui")
+        return {"ok": True, "attempts": []}
+
+    monkeypatch.setattr(skill, "_builder_llm_webui_transform_request", fake_request)
+    monkeypatch.setattr(llm_client, "submit_response_job", fake_submit)
+    monkeypatch.setattr(skill, "_parse_llm_webui_transform_output", fake_parse)
+
+    malformed = (
+        '{"schema":"adaos.builder.webui_patch_stream.v1","type":"meta"}\n'
+        '{"type":"patch","seq":1,"op":"replace","path":"/ui", bad}'
+    )
+    result = skill._repair_llm_webui_transform_output(
+        session={"id": "session", "scenario_id": "store"},
+        instruction="fix totals",
+        previous_preview={},
+        output_text=malformed,
+        validation_error={"detail": "JSONDecodeError"},
+    )
+
+    assert result["ok"] is True
+    assert request_modes == ["jsonl_patch_v1"]
+    assert parsed["stream_protocol"] == "jsonl"
+    assert parsed["before_webui"] == original
+    repair_request = json.loads(parsed["messages"][-1]["content"])
+    assert "Do not return the complete webui document" in repair_request["task"]
+
+
 def test_normalise_llm_payload_uses_webui_page_schema_as_source_of_truth() -> None:
     skill = _load_module()
     previous_page_schema = {
