@@ -6283,6 +6283,7 @@ def _repair_llm_webui_transform_output(
         repair_task = (
             "Repair the previous Builder response and return one complete corrected adaos.webui.v1 JSON object. "
             "Use current_webui_json as the source of truth and correct every reported validation issue while preserving all unrelated and already-valid changes in that candidate. "
+            "When an optional property has no schema-valid value, remove that property instead of using an empty string, null, or another placeholder that violates its constraints. "
             "Do not return another JSON Patch stream: a failed positional patch is not a reliable base for repair. "
             "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
             "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, "
