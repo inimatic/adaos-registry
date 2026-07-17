@@ -2775,6 +2775,45 @@ def test_builder_component_contract_rejects_javascript_like_update_state_values(
     assert "JavaScript-like updateState expression" in validation["detail"]
 
 
+def test_builder_component_contract_rejects_unknown_expression_and_wrong_membership_direction() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "catalog",
+        "initialState": {"favorites": []},
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "catalog",
+                "type": "ui.list",
+                "area": "main",
+                "inputs": {
+                    "filters": [{"key": "id", "stateKey": "favorites", "operator": "includes"}],
+                },
+                "actions": [
+                    {
+                        "on": "click",
+                        "type": "mutateState",
+                        "params": {
+                            "operations": [
+                                {"op": "set", "path": "x", "value": {"kind": "expression", "op": "includes", "args": [[], "a"]}}
+                            ]
+                        },
+                    }
+                ],
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+    assert validation["ok"] is False
+    assert "Unsupported declarative expression" in validation["detail"]
+
+    page_schema["widgets"][0]["actions"] = []
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+    assert validation["ok"] is False
+    assert "use operator 'in'" in validation["detail"]
+
+
 def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknown_command_actions() -> None:
     skill = _load_module()
     duplicate_action = {

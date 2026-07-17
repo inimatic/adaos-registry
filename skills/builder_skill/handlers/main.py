@@ -2297,6 +2297,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "If the request asks to preview, view an example, compare alternatives, choose a mode, or switch between variants, verify the page includes a visible local control such as input.commandBar/input.selector/ui.actions plus matching updateState and initialState/visibleIf before answering.",
             "If the user asks for a modal/dialog/drawer/sheet, verify ui.application.modals contains the surface and a relevant item/control action opens it with type openModal.",
             "If a list/card/table selection should change details, verify the master action updates a selected state key and the detail widgets read data keyed by that selected value; do not return static details that ignore selection.",
+            "For an optional collection mode that keeps items whose key belongs to a state array, put one filter with operator='in', that array's stateKey, and enabledIf tied to the mode. Do not maintain a duplicate derived array or poll with autoActions.",
             "Verify local visibility expressions use $state.<key> comparisons, for example $state.activeTab === 'overview'.",
             "If the user explicitly asks for local elements, controls, or a way to view examples, static mock rows alone are not enough; add a dedicated control widget that changes local state.",
             "After changing domain, title, or requested subject matter, verify every static sample row and detail example uses that subject rather than scaffold placeholders or a previous domain.",
@@ -5364,12 +5365,50 @@ def _unsupported_update_state_expression(value: Any) -> str:
     return ""
 
 
+_DECLARATIVE_EXPRESSION_OPS = {
+    "add", "subtract", "multiply", "divide", "min", "max", "round",
+    "equals", "gt", "gte", "lt", "lte", "and", "or", "not", "if",
+    "count", "formatNumber",
+}
+
+
+def _invalid_declarative_expression(value: Any, path: str = "value") -> str:
+    if isinstance(value, Mapping):
+        if str(value.get("kind") or "").strip() == "expression":
+            op = str(value.get("op") or "").strip()
+            if op not in _DECLARATIVE_EXPRESSION_OPS:
+                return f"{path}.op={op!r} is not supported"
+            if op == "if":
+                args = value.get("args")
+                named = "condition" in value and ("then" in value or "else" in value)
+                if not named and (not isinstance(args, list) or len(args) != 3):
+                    return f"{path} if expression requires args=[condition, then, else] or named branches"
+        for key, nested in value.items():
+            found = _invalid_declarative_expression(nested, f"{path}.{key}")
+            if found:
+                return found
+    elif isinstance(value, list):
+        for index, nested in enumerate(value):
+            found = _invalid_declarative_expression(nested, f"{path}[{index}]")
+            if found:
+                return found
+    return ""
+
+
 def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(page_schema, Mapping):
         return {"ok": False, "error": "page_schema_invalid", "detail": "ui.application.desktop.pageSchema must be an object"}
     widgets = page_schema.get("widgets")
     if not isinstance(widgets, list) or not widgets:
         return {"ok": False, "error": "page_schema_invalid", "detail": "ui.application.desktop.pageSchema.widgets must be a non-empty array"}
+    invalid_expression = _invalid_declarative_expression(page_schema, "pageSchema")
+    if invalid_expression:
+        return {
+            "ok": False,
+            "error": "component_contract_invalid",
+            "detail": f"Unsupported declarative expression: {invalid_expression}",
+        }
+    initial_state = page_schema.get("initialState") if isinstance(page_schema.get("initialState"), Mapping) else {}
     for widget_index, widget in enumerate(widgets):
         if not isinstance(widget, Mapping):
             return {"ok": False, "error": "page_schema_invalid", "detail": f"widgets[{widget_index}] must be an object"}
@@ -5401,6 +5440,21 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                 ),
             }
         inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
+        filters = inputs.get("filters") if isinstance(inputs.get("filters"), list) else []
+        for filter_index, filter_item in enumerate(filters):
+            if not isinstance(filter_item, Mapping):
+                continue
+            operator = str(filter_item.get("operator") or "equals").strip().lower()
+            state_key = str(filter_item.get("stateKey") or "").strip()
+            if operator == "includes" and state_key and isinstance(initial_state.get(state_key), list):
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": (
+                        f"widgets[{widget_index}].inputs.filters[{filter_index}] uses includes with array state {state_key!r}; "
+                        "use operator 'in' when the item value must belong to the state array"
+                    ),
+                }
         if isinstance(inputs.get("dataSource"), Mapping):
             return {
                 "ok": False,
