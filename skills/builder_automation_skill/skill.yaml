@@ -1,0 +1,116 @@
+name: builder_automation_skill
+version: 0.1.0
+description: System adapter for the Builder Automation stage and its local Codex implementation loop.
+entry: handlers/main.py
+runtime:
+  python: "3.11"
+default_tool: chat
+supported_locales:
+  - en
+  - ru
+dependencies: []
+events:
+  subscribe: []
+  publish:
+    - builder.automation.changed
+tools:
+  - name: start
+    description: Start or resume implementation of the selected Builder project from an approved implementation brief.
+    entry: handlers.main:start
+    input_schema:
+      type: object
+      required: [object_type, object_id, implementation_brief]
+      properties:
+        object_type:
+          type: string
+          enum: [skill, scenario]
+        object_id:
+          type: string
+          minLength: 1
+        implementation_brief:
+          type: string
+          minLength: 1
+        webspace_id:
+          type: string
+        conversation_id:
+          type: string
+        brief_path:
+          type: string
+      additionalProperties: true
+    output_schema:
+      $ref: "#/definitions/automationResponse"
+  - name: chat
+    description: Submit one follow-up implementation instruction to the active Builder Automation session.
+    entry: handlers.main:chat
+    input_schema:
+      type: object
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+        object_type:
+          type: string
+          enum: [skill, scenario]
+        object_id:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      $ref: "#/definitions/automationResponse"
+  - name: get_state
+    description: Return the compact render-safe state of the selected or active Builder Automation session.
+    entry: handlers.main:get_state
+    input_schema:
+      type: object
+      properties:
+        object_type:
+          type: string
+          enum: [skill, scenario]
+        object_id:
+          type: string
+        webspace_id:
+          type: string
+      additionalProperties: true
+    output_schema:
+      $ref: "#/definitions/automationResponse"
+definitions:
+  automationResponse:
+    type: object
+    required: [ok, status, message, automation]
+    properties:
+      ok:
+        type: boolean
+      status:
+        type: string
+      message:
+        type: string
+      automation:
+        type: object
+data_routes:
+  - surface: builder automation lifecycle
+    route: tool/details
+    owner: skill:builder_automation_skill
+    path: get_state
+    first_paint: idle automation projection for the current Builder webspace
+    recovery: get_state reloads the persisted automation session and Skill Factory task state
+    update_source:
+      - builder.automation.changed
+    budget:
+      max_payload_bytes: 32768
+      max_publish_hz: 2
+      snapshot_policy: manual
+    guard_visibility:
+      degraded_state: Automation controls stay visible with input disabled and an explicit error state.
+      log: service.builder_automation_skill.runtime.log
+      quarantine: false
+      metric: tool_guard.builder_automation.state
+llm_hints:
+  description: Internal Builder Automation-stage adapter. It implements an approved project brief through a bounded local Codex worker.
+  side_effect_class: local_write
+  primary_actions:
+    - id: builder.automation.chat
+      intent: builder.automation.chat
+      tool: chat
+      side_effect_class: local_write

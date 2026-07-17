@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-17T20:39:20+00:00",
+  "updated_at": "2026-07-17T21:18:44+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -65,6 +65,28 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "tools_count": 10
+    },
+    {
+      "kind": "skill",
+      "id": "builder_automation_skill",
+      "name": "builder_automation_skill",
+      "version": "0.1.0",
+      "updated_at": "2026-07-17T21:18:44+00:00",
+      "path": "skills/builder_automation_skill",
+      "manifest": "skills/builder_automation_skill/skill.yaml",
+      "source": {
+        "path": "skills/builder_automation_skill",
+        "manifest": "skills/builder_automation_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "builder_automation_skill",
+        "id": "builder_automation_skill"
+      },
+      "description": "System adapter for the Builder Automation stage and its local Codex implementation loop.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 3
     },
     {
       "kind": "skill",
