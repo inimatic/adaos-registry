@@ -2037,6 +2037,7 @@ def test_repair_keeps_malformed_patch_response_compact(monkeypatch) -> None:
     assert parsed["before_webui"] == original
     repair_request = json.loads(parsed["messages"][-1]["content"])
     assert "Do not return the complete webui document" in repair_request["task"]
+    assert "Do not emit JSON Patch test operations" in repair_request["task"]
 
 
 def test_unable_llm_result_is_terminal_diagnostic_not_a_revision() -> None:

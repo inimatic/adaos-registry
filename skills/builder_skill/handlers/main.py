@@ -6277,6 +6277,7 @@ def _repair_llm_webui_transform_output(
             "Repair the malformed previous Builder JSONL patch stream. Return a complete corrected JSONL patch stream against current_webui_json, "
             "starting with one meta object, followed by valid patch objects, and ending with one complete object. Preserve the intended changes, "
             "use stable-id JSON Pointer tokens where available, and emit each JSON object on exactly one line with strict double-quoted JSON syntax. "
+            "Do not emit JSON Patch test operations in a repair stream; base_hash already protects the exact source document, so emit only necessary mutations. "
             "Do not return the complete webui document."
         )
     else:
