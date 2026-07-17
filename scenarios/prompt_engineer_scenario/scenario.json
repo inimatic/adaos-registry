@@ -6,7 +6,8 @@
   "title": "Prompt IDE",
   "description": "Prompt engineering IDE workspace (draft layout).",
   "depends": [
-    "prompt_engineer_skill"
+    "prompt_engineer_skill",
+    "builder_automation_skill"
   ],
   "workflow": {
     "initial_state": "tz",
