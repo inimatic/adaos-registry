@@ -7222,23 +7222,13 @@ def _parse_builder_command(text: str, *, allow_create: bool = True, has_session:
     if not lowered:
         return {"intent": "none"}
 
-    if _has_any(
-        lowered,
-        (
-            "\u0447\u0442\u043e \u0432 \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0435",
-            "\u043f\u043e\u043a\u0430\u0436\u0438 \u043f\u0440\u043e\u0435\u043a\u0442",
-            "\u043f\u043e\u043a\u0430\u0436\u0438 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f",
-            "\u043f\u043e\u043a\u0430\u0436\u0438 \u0447\u0435\u0440\u043d\u043e\u0432",
-            "\u0441\u043f\u0438\u0441\u043e\u043a \u043f\u0440\u043e\u0435\u043a\u0442",
-            "\u0441\u043f\u0438\u0441\u043e\u043a \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f",
-            "\u0441\u043f\u0438\u0441\u043e\u043a \u0447\u0435\u0440\u043d\u043e\u0432",
-            "list projects",
-            "list drafts",
-            "show projects",
-            "show drafts",
-            "show prototypes",
-        ),
-    ):
+    project_list_patterns = (
+        r"\u0447\u0442\u043e \u0432 \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0435",
+        r"\u043f\u043e\u043a\u0430\u0436\u0438 (?:\u043c\u043e\u0438 )?(?:\u043f\u0440\u043e\u0435\u043a\u0442\u044b|\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f\u044b|\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a\u0438)",
+        r"\u0441\u043f\u0438\u0441\u043e\u043a (?:\u043c\u043e\u0438\u0445 )?(?:\u043f\u0440\u043e\u0435\u043a\u0442\u043e\u0432|\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f\u043e\u0432|\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a\u043e\u0432)",
+        r"(?:list|show) (?:my )?(?:projects|drafts|prototypes)",
+    )
+    if any(re.fullmatch(pattern, lowered) for pattern in project_list_patterns):
         return {"intent": "project.list", "confidence": 1.0, "source": "deterministic"}
 
     if _is_current_project_command(lowered):

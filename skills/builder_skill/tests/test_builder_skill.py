@@ -4741,6 +4741,18 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     assert cart_delete["intent"] == "none"
 
 
+def test_builder_command_parser_does_not_capture_ui_copy_about_project_lists() -> None:
+    skill = _load_module()
+    request = (
+        "Измени окно выбора проекта: добавь поиск и список проектов с версией, "
+        "стабильностью и временем изменения."
+    )
+
+    parsed = skill._parse_builder_command(request, has_session=True)
+
+    assert parsed["intent"] == "none"
+
+
 def test_prompt_project_selection_defers_heavy_events(monkeypatch) -> None:
     skill = _load_module()
     calls: list[str] = []
