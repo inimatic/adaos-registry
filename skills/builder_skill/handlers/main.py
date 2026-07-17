@@ -2179,6 +2179,38 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "Exact dataSource state references use concrete dot paths only, for example $state.selectedFilePath. "
                 "Dynamic index syntax such as $state.files[$state.selectedFileId].path is not resolved by static data sources."
             ),
+            "example_pattern": {
+                "initialState": {
+                    "selectedFileId": "memory",
+                    "selectedFilePath": "builder_memory.md",
+                    "selectedFileTitle": "builder_memory.md",
+                    "selectedFileContent": "# Project memory",
+                    "selectedFileProtected": False,
+                },
+                "tree_select_actions": [
+                    {
+                        "on": "select",
+                        "type": "updateState",
+                        "params": {
+                            "selectedFileId": "$event.id",
+                            "selectedFilePath": "$event.path",
+                            "selectedFileTitle": "$event.title",
+                            "selectedFileContent": "$event.content",
+                            "selectedFileProtected": "$event.protected",
+                        },
+                    },
+                    {"on": "select", "type": "closeModal"},
+                ],
+                "editor_data_source": {
+                    "kind": "static",
+                    "params": {"selectedFileId": "$state.selectedFileId"},
+                    "value": {
+                        "id": "$state.selectedFileId",
+                        "path": "$state.selectedFilePath",
+                        "content": "$state.selectedFileContent",
+                    },
+                },
+            },
         },
         "visual.image": {
             "purpose": "A standalone responsive image/hero/detail visual. Collection thumbnails belong in ui.list variant='cards' via imageKey.",
@@ -6401,7 +6433,8 @@ def _repair_llm_webui_transform_output(
         repair_task = (
             "Repair the malformed previous Builder JSONL patch stream. Return a complete corrected JSONL patch stream against current_webui_json, "
             "starting with one meta object, followed by valid patch objects, and ending with one complete object. Preserve the intended changes, "
-            "use stable-id JSON Pointer tokens where available, and emit each JSON object on exactly one line with strict double-quoted JSON syntax. "
+            "and make the final patched document correct every reported validation_error, including invalid component state already present in current_webui_json. "
+            "Use stable-id JSON Pointer tokens where available, and emit each JSON object on exactly one line with strict double-quoted JSON syntax. "
             "Do not emit JSON Patch test operations in a repair stream; base_hash already protects the exact source document, so emit only necessary mutations. "
             "Do not return the complete webui document."
         )
