@@ -6759,6 +6759,20 @@ def _project_words() -> tuple[str, ...]:
     )
 
 
+def _is_current_project_command(text: str) -> bool:
+    lowered = _normalise_command_text(text).strip(" \t\r\n:;,.!?()[]{}\"'\u00ab\u00bb")
+    if not lowered:
+        return False
+    patterns = (
+        r"(?:\u0447\u0442\u043e\s+)?(?:\u0441\u0435\u0439\u0447\u0430\u0441\s+)?\u0432\u044b\u0431\u0440\u0430\u043d(?:\u043e|\u0430|\u044b)?",
+        r"(?:\u043f\u043e\u043a\u0430\u0436\u0438\s+)?\u0442\u0435\u043a\u0443\u0449(?:\u0438\u0439|\u0438\u0439\u0441\u044f)\s+(?:\u043f\u0440\u043e\u0435\u043a\u0442|\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f|\u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439|\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a)",
+        r"\u043d\u0430\u0434\s+\u0447\u0435\u043c\s+(?:\u043c\u044b\s+)?\u0440\u0430\u0431\u043e\u0442\u0430\u0435\u043c",
+        r"(?:(?:show|what\s+is)\s+)?(?:the\s+)?current\s+(?:project|prototype|scenario|draft)",
+        r"what\s+is\s+(?:currently\s+)?selected",
+    )
+    return any(re.fullmatch(pattern, lowered) for pattern in patterns)
+
+
 def _is_explicit_create_request(text: str) -> bool:
     lowered = _normalise_command_text(text)
     if re.search(
@@ -6879,19 +6893,7 @@ def _parse_builder_command(text: str, *, allow_create: bool = True, has_session:
     ):
         return {"intent": "project.list", "confidence": 1.0, "source": "deterministic"}
 
-    if _has_any(
-        lowered,
-        (
-            "\u0447\u0442\u043e \u0432\u044b\u0431\u0440\u0430\u043d",
-            "\u0447\u0442\u043e \u0441\u0435\u0439\u0447\u0430\u0441 \u0432\u044b\u0431\u0440\u0430\u043d",
-            "\u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0440\u043e\u0435\u043a\u0442",
-            "\u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f",
-            "\u043d\u0430\u0434 \u0447\u0435\u043c \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u043c",
-            "current project",
-            "current draft",
-            "what is selected",
-        ),
-    ):
+    if _is_current_project_command(lowered):
         return {"intent": "project.current", "confidence": 1.0, "source": "deterministic"}
 
     delete_verb = _has_any(lowered, ("delete", "remove project", "\u0443\u0434\u0430\u043b", "\u0441\u043e\u0442\u0440"))

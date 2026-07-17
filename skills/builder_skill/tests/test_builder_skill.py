@@ -4382,6 +4382,11 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
         "\u0434\u043e\u0431\u0430\u0432\u044c \u043f\u043e\u043b\u0435 \u043f\u0440\u043e\u0435\u043a\u0442 \u0438 \u0441\u043e\u0437\u0434\u0430\u0439 \u043f\u0440\u0438\u043c\u0435\u0440 \u0434\u0430\u043d\u043d\u044b\u0445",
         has_session=False,
     )
+    current = skill._parse_builder_command("What is the current project?", has_session=True)
+    design_request = skill._parse_builder_command(
+        "Redesign the workspace and show the current project identity in the header.",
+        has_session=True,
+    )
 
     assert switch["intent"] == "project.switch"
     assert switch["project_ref"] == "demo_scenario"
@@ -4389,6 +4394,8 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     assert create["intent"] == "project.create"
     assert create_new["intent"] == "project.create"
     assert edit_like_without_session["intent"] == "none"
+    assert current["intent"] == "project.current"
+    assert design_request["intent"] == "none"
 
 
 def test_prompt_project_selection_defers_heavy_events(monkeypatch) -> None:
