@@ -1977,7 +1977,7 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(monkeypatc
     assert "every click target must exist in the same widget" in repair_request["task"]
 
 
-def test_repair_keeps_malformed_patch_response_compact(monkeypatch) -> None:
+def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> None:
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
 
@@ -2001,16 +2001,13 @@ def test_repair_keeps_malformed_patch_response_compact(monkeypatch) -> None:
             "dynamic_request": {"current_webui_json": copy.deepcopy(original), "patch_base": {"base_hash": "hash"}},
         }
 
-    repaired_stream = "\n".join([
-        json.dumps({"schema": "adaos.builder.webui_patch_stream.v1", "type": "meta", "base_hash": "hash"}),
-        json.dumps({"type": "patch", "seq": 1, "op": "add", "path": "/comment", "value": "fixed"}),
-        json.dumps({"type": "complete", "comment": "Fixed."}),
-    ])
+    repaired_document = copy.deepcopy(original)
+    repaired_document["comment"] = "Fixed."
 
     def fake_submit(messages, **kwargs):
         parsed["messages"] = messages
         parsed["stream_protocol"] = kwargs.get("stream_protocol")
-        return {"job_id": "repair-patch-job", "status": "succeeded", "output_text": repaired_stream}
+        return {"job_id": "repair-patch-job", "status": "succeeded", "output_text": json.dumps(repaired_document)}
 
     def fake_parse(**kwargs):
         parsed["before_webui"] = kwargs.get("before_webui")
@@ -2033,12 +2030,12 @@ def test_repair_keeps_malformed_patch_response_compact(monkeypatch) -> None:
     )
 
     assert result["ok"] is True
-    assert request_modes == ["jsonl_patch_v1"]
-    assert parsed["stream_protocol"] == "jsonl"
-    assert parsed["before_webui"] == original
+    assert request_modes == ["full_webui"]
+    assert parsed["stream_protocol"] is None
+    assert parsed["before_webui"] is None
     repair_request = json.loads(parsed["messages"][-1]["content"])
-    assert "Do not return the complete webui document" in repair_request["task"]
-    assert "Do not emit JSON Patch test operations" in repair_request["task"]
+    assert "return one complete corrected adaos.webui.v1 JSON object" in repair_request["task"]
+    assert "Do not return another JSON Patch stream" in repair_request["task"]
 
 
 def test_unable_llm_result_is_terminal_diagnostic_not_a_revision() -> None:
