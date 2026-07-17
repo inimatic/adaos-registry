@@ -2093,6 +2093,10 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                     "do not encode comparisons such as '<=20' into a string value. Empty/all state values do not filter. "
                     "For a neutral 'Any' option in a numeric range selector, use an empty string value rather than 0; zero remains a valid numeric threshold."
                 ),
+                "sort": (
+                    "Optional {key,direction?,numeric?} for fixed sorting, or {stateKey,options:{choice:{key,direction?,numeric?}}} "
+                    "when a local selector chooses the ordering. The selector option values must match the option keys."
+                ),
                 "buttons": "Optional per-item actions {id,label?,icon?,whenKey?,whenEquals?}; these render on each item/card and dispatch click:<id>. Do not use them for a list toolbar command.",
                 "addButton": "Set true to show one list-level Add command next to card search; dispatches the add/click:add action event.",
                 "addButtonLabel": "Optional label for the list-level Add command.",
@@ -2167,7 +2171,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         },
         "page_schema_auto_actions": {
             "purpose": "Optional interval actions active only while a page or modal is mounted.",
-            "shape": "pageSchema.autoActions is an array of {id?,intervalMs,enabledIf?,action:{type,params?,...}}. intervalMs and the nested action are required; type and params do not belong directly on the autoActions item.",
+            "shape": "pageSchema.autoActions is an array of {id?,intervalMs,enabledIf?,action:{type,params?,...}}. intervalMs is required and the nested action property is required; type and params do not belong directly on the autoActions item.",
             "rule": "Use autoActions only for genuine periodic work. Do not poll to keep computed local UI values in sync; put references and expression objects in a static dataSource instead.",
         },
         "input.commandBar": {
@@ -2381,6 +2385,8 @@ def _builder_llm_system_prompt(
         "When the user asks to choose between variants, compare layouts, preview examples, view sample state, use local elements, add elements for viewing an example, or switch modes, add an explicit local control such as input.commandBar, input.selector, or ui.actions with local updateState and visibleIf/initialState instead of only duplicating static content or sample rows. "
         "A requested local control is not complete unless at least one widget or form field visibly reacts to the local state set by that control. "
         "Use canonical visibility expressions like $state.activeTab === 'overview'; avoid state.activeTab == 'overview' in new output. "
+        "Any action may use enabledIf with a canonical $state condition; a false condition skips that action. "
+        "When the UI offers sorting choices for a ui.list, connect that selector state to inputs.sort options so the visible order actually changes; do not render a decorative sort control. "
         "For pageSchema.autoActions, each item must wrap the executable action in its required action property, for example {intervalMs:5000,action:{type:'updateState',params:{tick:true}}}; do not put type directly on the autoActions item. "
         "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
         "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
