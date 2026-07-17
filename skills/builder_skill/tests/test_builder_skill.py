@@ -1997,6 +1997,11 @@ def test_transform_request_reports_existing_component_contract_violations(monkey
                         "content": "$state.files[$state.selectedFileId].content",
                     },
                 },
+            }, {
+                "id": "archive-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {"buttons": [{"id": "archive", "label": "Archive", "whenKey": "archived"}]},
             }],
         }}}},
     }
@@ -2012,6 +2017,9 @@ def test_transform_request_reports_existing_component_contract_violations(monkey
     assert diagnostic["ok"] is False
     assert "dynamic state indexing" in diagnostic["detail"]
     assert diagnostic["required_action"].startswith("Correct these existing violations")
+    issues = request["dynamic_request"]["current_component_migration_issues"]
+    assert any("dynamic state indexing" in issue for issue in issues)
+    assert any("unsupported per-button conditions" in issue for issue in issues)
 
 
 def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> None:

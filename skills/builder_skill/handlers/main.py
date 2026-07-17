@@ -4822,6 +4822,71 @@ def _builder_project_memory_context(project_memory: Mapping[str, Any]) -> dict[s
     return context
 
 
+def _builder_component_migration_issues(payload: Mapping[str, Any]) -> list[str]:
+    application = _extract_webui_application(payload)
+    desktop = application.get("desktop") if isinstance(application.get("desktop"), Mapping) else {}
+    schemas: list[tuple[str, Mapping[str, Any]]] = []
+    page_schema = desktop.get("pageSchema") if isinstance(desktop.get("pageSchema"), Mapping) else {}
+    if page_schema:
+        schemas.append(("ui.application.desktop.pageSchema", page_schema))
+    modals = application.get("modals") if isinstance(application.get("modals"), Mapping) else {}
+    for modal_id, modal in modals.items():
+        schema = modal.get("schema") if isinstance(modal, Mapping) and isinstance(modal.get("schema"), Mapping) else {}
+        if schema:
+            schemas.append((f"ui.application.modals.{modal_id}.schema", schema))
+
+    issues: list[str] = []
+    for schema_path, schema in schemas:
+        widgets = schema.get("widgets") if isinstance(schema.get("widgets"), list) else []
+        for widget_index, widget in enumerate(widgets):
+            if not isinstance(widget, Mapping):
+                continue
+            widget_path = f"{schema_path}.widgets[{widget_index}]"
+            dynamic_ref = _dynamic_state_index_reference(widget.get("dataSource"), f"{widget_path}.dataSource")
+            if dynamic_ref:
+                ref_path, ref_value = dynamic_ref
+                issues.append(
+                    f"{ref_path} uses unsupported dynamic state indexing {ref_value!r}; copy selected $event fields "
+                    "into concrete state keys and use direct $state.selected... references."
+                )
+            widget_type = str(widget.get("type") or "").strip()
+            inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
+            if widget_type in {"ui.actions", "input.commandBar"}:
+                buttons = inputs.get("buttons") if isinstance(inputs.get("buttons"), list) else []
+                for button_index, button in enumerate(buttons):
+                    if isinstance(button, Mapping) and any(key in button for key in ("whenKey", "whenEquals")):
+                        issues.append(
+                            f"{widget_path}.inputs.buttons[{button_index}] uses unsupported per-button conditions; "
+                            "split conditional commands into separate widgets with complementary visibleIf."
+                        )
+            if widget_type == "collection.tree" and (inputs.get("hideRoot") is True or inputs.get("rootless") is True):
+                data_source = widget.get("dataSource") if isinstance(widget.get("dataSource"), Mapping) else {}
+                value = data_source.get("value") if str(data_source.get("kind") or "").strip() == "static" else None
+                if isinstance(value, list) and len(value) == 1 and isinstance(value[0], Mapping):
+                    root = value[0]
+                    root_id = str(root.get("id") or "").strip().lower()
+                    root_title = str(root.get("title") or "").strip().lower()
+                    if isinstance(root.get("children"), list) and (
+                        root_id in {"root", "project", "files"}
+                        or root_title in {"project", "files", "\u043f\u0440\u043e\u0435\u043a\u0442", "\u0444\u0430\u0439\u043b\u044b"}
+                    ):
+                        issues.append(
+                            f"{widget_path} is rootless but wraps nodes in synthetic root "
+                            f"{root.get('title') or root.get('id')!r}; use that root's children as dataSource.value."
+                        )
+            actions = widget.get("actions") if isinstance(widget.get("actions"), list) else []
+            for action_index, action in enumerate(actions):
+                if not isinstance(action, Mapping) or str(action.get("type") or "").strip() != "mutateState":
+                    continue
+                params = action.get("params") if isinstance(action.get("params"), Mapping) else {}
+                if not isinstance(params.get("operations"), list):
+                    issues.append(
+                        f"{widget_path}.actions[{action_index}] uses mutateState without params.operations; "
+                        "use updateState with direct state-key params for event field copies, or provide valid mutation operations."
+                    )
+    return list(dict.fromkeys(issues))[:24]
+
+
 def _builder_llm_webui_transform_request(
     *,
     session: Mapping[str, Any],
@@ -4915,6 +4980,9 @@ def _builder_llm_webui_transform_request(
             "detail": str(current_validation.get("detail") or "Current UI does not pass the active component contract"),
             "required_action": "Correct these existing violations as part of the requested transformation.",
         }
+    migration_issues = _builder_component_migration_issues(current_payload)
+    if migration_issues:
+        dynamic_request["current_component_migration_issues"] = migration_issues
     base_request = {**stable_request, **dynamic_request}
     return {
         "current_payload": current_payload,
@@ -6420,6 +6488,9 @@ def _repair_llm_webui_transform_output(
                 "detail": str(candidate_validation.get("detail") or "Candidate UI does not pass the active component contract"),
                 "required_action": "Correct these candidate violations in the complete repair document.",
             }
+        migration_issues = _builder_component_migration_issues(candidate)
+        if migration_issues:
+            dynamic_request["current_component_migration_issues"] = migration_issues
         request["dynamic_request"] = dynamic_request
     repair_request_base_id = _builder_llm_request_id(
         session=session,
@@ -6445,6 +6516,8 @@ def _repair_llm_webui_transform_output(
         "Use current_webui_json as the source of truth and correct every reported validation issue while preserving all unrelated and already-valid changes in that candidate. "
         "When an optional property has no schema-valid value, remove that property instead of using an empty string, null, or another placeholder that violates its constraints. "
         "Do not return another JSON Patch stream: a failed patch is not a reliable repair base, and the complete result must also correct invalid state already present in current_webui_json. "
+        "For copying several selected item fields into page state, use updateState with direct params such as selectedFilePath:'$event.path'; mutateState is valid only with params.operations. "
+        "Conditional commands must be separate widgets with complementary visibleIf expressions, never buttons with whenKey/whenEquals. "
         "If the previous response has root-level modals, move them into ui.application.modals and remove the root-level modals key. "
         "If validation says an action opens an undeclared modal, either declare that exact modal id under ui.application.modals with a schema, "
         "or use the appropriate non-opening action such as closeModal for closing the current modal. "
