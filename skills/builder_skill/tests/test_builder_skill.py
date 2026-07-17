@@ -2282,6 +2282,8 @@ def test_builder_patch_prompt_distinguishes_add_from_replace() -> None:
 
     assert "Use add when creating a missing object member" in prompt
     assert "replace only when the target member already exists" in prompt
+    assert "prefer add as an upsert" in prompt
+    assert "reserve replace for paths you verified exist" in prompt
     assert "RFC 6902 does not create intermediate containers" in prompt
     assert "ui.application.modals is /ui/application/modals" in prompt
 

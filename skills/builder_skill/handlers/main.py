@@ -2418,6 +2418,7 @@ def _builder_llm_system_prompt(
         "The first line must be a meta object with schema='adaos.builder.webui_patch_stream.v1' and the supplied base_hash. "
         "Each following patch line must contain type='patch', a strictly increasing seq, and one RFC 6902 op/path/value or from operation. "
         "Use add when creating a missing object member and replace only when the target member already exists after all preceding patches. "
+        "For object members, prefer add as an upsert because RFC 6902 add both creates a missing member and replaces an existing member; reserve replace for paths you verified exist in the supplied current WebUI. "
         "RFC 6902 does not create intermediate containers: before adding a descendant such as /ui/application/modals/detail, first add /ui/application/modals with value={} when that parent is absent. "
         "JSON Pointer separates every object key with '/': the hierarchy ui.application.modals is /ui/application/modals, never /ui/application.modals. "
         "When addressing an existing object inside an id-bearing array such as pageSchema.widgets, use the AdaOS stable-id JSON Pointer token @<id>, "
@@ -4969,6 +4970,7 @@ def _builder_llm_webui_transform_request(
                 "After a nested object or array value, close both the value and the outer patch object before the newline.",
                 "Address existing widgets with /widgets/@<widget-id>/... so removes or moves earlier in the stream cannot shift the target.",
                 "RFC 6902 replace requires the final path member to exist; use add to create a missing object member.",
+                "For object members, prefer add as an upsert; reserve replace for a path verified to exist in current_webui after preceding operations.",
                 "RFC 6902 never creates intermediate parents. If a parent object/array is absent, add that exact parent before adding descendants under it.",
             ],
         }
