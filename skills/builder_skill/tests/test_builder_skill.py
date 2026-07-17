@@ -2112,9 +2112,13 @@ def test_builder_component_contract_describes_visible_form_and_detail_actions() 
     assert "change:<fieldId>" in contracts["ui.form"]["actions"]
     assert "inputs.secondaryActions" in contracts["ui.form"]["actions"]
     assert "Labeled entries" in contracts["item.details"]["actions"]
+    assert "{path} interpolation" in contracts["item.details"]["title"]
     assert "click:<buttonId>" in contracts["ui.actions"]["actions"]
+    assert "placeholder type='none'" in contracts["ui.actions"]["actions"]
     assert "remove the old inline detail" in contracts["application_modals"]["rule"]
     assert "Labeled item.details actions render visible detail buttons" in prompt
+    assert "titles support the same {path} interpolation" in prompt
+    assert "do not emit placeholder actions with type:'none'" in prompt
     assert "dotted widget keys" in prompt
 
 

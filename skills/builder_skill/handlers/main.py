@@ -2109,6 +2109,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         },
         "item.details": {
             "purpose": "Readable detail surface for the item selected in a master list, table, or card collection.",
+            "title": "May use {path} interpolation against the selected record, for example '{title}'.",
             "inputs": {
                 "selectedStateKey": "State key containing the selected item id; the static dataSource may be a map keyed by those ids.",
                 "fields": (
@@ -2148,7 +2149,8 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "Do not invent object keys beginning with $, such as $merge, $toggle, $set, or $append, and do not use JavaScript expressions. Use a simple explicit boolean/status value for a mock action when one click is sufficient. "
                 "Use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls. "
                 "Prefer on='click:<buttonId>' for one button. on='click' without action.id applies to every button; "
-                "on='click' with action.id applies only to the button with that id. Do not emit duplicate actions for one button."
+                "on='click' with action.id applies only to the button with that id. Do not emit duplicate actions for one button. "
+                "When behavior is removed, delete its action entry; never replace it with a placeholder type='none'."
             ),
         },
         "application_modals": {
@@ -2360,6 +2362,8 @@ def _builder_llm_system_prompt(
         "For master-detail prototypes use a split or focus-detail layout for side-by-side detail, or item-triggered modal/drawer detail for compact/mobile detail. The master ui.list/ui.table should own select/click actions that update selected state; when detail is modal, open the detail modal from that same item action, not from a detached global button. "
         "Place secondary actions that belong to the selected detail, such as add comment, inside the detail container/modal/panel. "
         "Labeled item.details actions render visible detail buttons and execute their declared action. Use a sibling ui.actions widget only for a separate toolbar, segmented control, or independently positioned commands. "
+        "item.details titles support the same {path} interpolation against the selected record as inputs.fields values, for example title:'{title}'. "
+        "When removing obsolete behavior, remove its action entry entirely; do not emit placeholder actions with type:'none'. The client tolerates legacy none actions only so historical revisions remain viewable. "
         "For ui.form, only supported form lifecycle triggers render buttons: submit, validate, save_draft, reset, next_section, previous_section, and cancel/click:cancel. Put behavior in widget.actions and labels there (submit may use inputs.submitLabel). Non-visual field reactions may use on='change:<fieldId>' with $event.value, while inputs.autoCommit=true copies fields to their stateKey directly. A cancel button that closes the current modal uses type='closeModal'; never model closing as openModal with a pseudo modal id such as '__close__'. Optional inputs.secondaryActions entries only customize the label and presentation of a matching declared action. Never use dotted widget keys such as inputs.secondaryActions. "
         "When a request says the detail should be in a right panel or side panel, use a split/focus-detail layout with a main master area and a right/detail aux area; do not put detail below the master unless the screen is compact. "
         "If the user asks to move a detail-related control into that right/detail panel, set that control's widget area to the right/detail aux area or put it inside the declared detail modal/panel schema. "
