@@ -2087,7 +2087,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "groupDisplay": "For grouped cards use 'sections' or 'accordion'.",
                 "filters": (
                     "Optional array of {key,stateKey?,value?,operator?,enabledIf?}; provide either stateKey for a user-controlled filter or value for a literal/declarative threshold. Operators may be equals, contains, includes, in, "
-                    "truthy, lte, or gte. Use in when the item key must be a member of an array in state, for example favorites. "
+                    "truthy, lt, lte, gt, or gte. Use in when the item key must be a member of an array in state, for example favorites. "
                     "Use enabledIf with a canonical $state expression when a filter has its own on/off mode; do not derive a duplicate filter array with a timer. "
                     "Use numeric option values with lt/lte/gt/gte for numeric range filters; a resolved row quantity can be filtered with {key:'quantity',operator:'gt',value:0}. "
                     "do not encode comparisons such as '<=20' into a string value. Empty/all state values do not filter. "
@@ -2225,7 +2225,8 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             ),
             "reactive_static_collections": (
                 "A static row may expose quantity:'$state.quantities.item1' and a computed amount expression. "
-                "To show only populated rows, use a truthy filter over the resolved quantity and a true state flag. "
+                "To show only populated rows, filter the resolved row field directly, for example {key:'quantity',operator:'gt',value:0}. "
+                "A computed field inside dataSource is data, not page state: never point stateKey or enabledIf at a dataSource field unless an action explicitly writes the same key to state. "
                 "Write mixed copy as 'Quantity: $state.quantities.item1' without braces. Do not derive row ids in autoActions."
             ),
         },
@@ -2306,6 +2307,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "If the user asks for a modal/dialog/drawer/sheet, verify ui.application.modals contains the surface and a relevant item/control action opens it with type openModal.",
             "If a list/card/table selection should change details, verify the master action updates a selected state key and the detail widgets read data keyed by that selected value; do not return static details that ignore selection.",
             "For an optional collection mode that keeps items whose key belongs to a state array, put one filter with operator='in', that array's stateKey, and enabledIf tied to the mode. Do not maintain a duplicate derived array or poll with autoActions.",
+            "For reactive static rows, filter the resolved row property with a literal/expression value. Do not treat a computed dataSource field as page state.",
             "Verify local visibility expressions use $state.<key> comparisons, for example $state.activeTab === 'overview'.",
             "If the user explicitly asks for local elements, controls, or a way to view examples, static mock rows alone are not enough; add a dedicated control widget that changes local state.",
             "After changing domain, title, or requested subject matter, verify every static sample row and detail example uses that subject rather than scaffold placeholders or a previous domain.",
@@ -5502,6 +5504,16 @@ def _validate_page_schema_component_contracts(
     initial_state = dict(inherited_initial_state or {})
     if isinstance(page_schema.get("initialState"), Mapping):
         initial_state.update(page_schema["initialState"])
+    computed_data_keys: set[str] = set()
+    for candidate_widget in widgets:
+        if not isinstance(candidate_widget, Mapping):
+            continue
+        data_source = candidate_widget.get("dataSource")
+        if not isinstance(data_source, Mapping) or str(data_source.get("kind") or "").strip() != "static":
+            continue
+        static_value = data_source.get("value")
+        if isinstance(static_value, Mapping):
+            computed_data_keys.update(str(key) for key in static_value.keys())
     for widget_index, widget in enumerate(widgets):
         if not isinstance(widget, Mapping):
             return {"ok": False, "error": "page_schema_invalid", "detail": f"widgets[{widget_index}] must be an object"}
@@ -5575,6 +5587,30 @@ def _validate_page_schema_component_contracts(
                 continue
             operator = str(filter_item.get("operator") or "equals").strip().lower()
             state_key = str(filter_item.get("stateKey") or "").strip()
+            if state_key and state_key in computed_data_keys and state_key not in initial_state:
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": (
+                        f"widgets[{widget_index}].inputs.filters[{filter_index}].stateKey={state_key!r} points to a computed "
+                        "dataSource field, but data sources do not write page state; filter a resolved row key with value, "
+                        "or explicitly write a separate state key from an action"
+                    ),
+                }
+            enabled_state_refs = {ref.split(".", 1)[0] for ref in _collect_state_refs(filter_item.get("enabledIf"))}
+            invalid_enabled_ref = next(
+                (ref for ref in enabled_state_refs if ref in computed_data_keys and ref not in initial_state),
+                "",
+            )
+            if invalid_enabled_ref:
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": (
+                        f"widgets[{widget_index}].inputs.filters[{filter_index}].enabledIf reads computed dataSource field "
+                        f"{invalid_enabled_ref!r} through $state; data sources do not write page state"
+                    ),
+                }
             if operator == "includes" and state_key and isinstance(initial_state.get(state_key), list):
                 return {
                     "ok": False,

@@ -2965,6 +2965,41 @@ def test_builder_component_contract_distinguishes_state_from_sibling_computed_da
     assert skill._validate_page_schema_component_contracts(page_schema)["ok"] is True
 
 
+def test_builder_component_contract_rejects_computed_data_as_filter_state() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "cart",
+        "initialState": {"cart": {"p1": 1}},
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "cart-list",
+                "type": "ui.list",
+                "area": "main",
+                "dataSource": {"kind": "static", "value": [{"id": "p1", "quantity": "$state.cart.p1"}]},
+                "inputs": {
+                    "filters": [
+                        {"key": "id", "operator": "in", "stateKey": "cartItemIds", "enabledIf": "$state.hasCartItems === true"}
+                    ]
+                },
+            },
+            {
+                "id": "cart-summary",
+                "type": "item.details",
+                "area": "main",
+                "dataSource": {"kind": "static", "value": {"cartItemIds": ["p1"], "hasCartItems": True}},
+            },
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+    assert validation["ok"] is False
+    assert "data sources do not write page state" in validation["detail"]
+
+    page_schema["widgets"][0]["inputs"]["filters"] = [{"key": "quantity", "operator": "gt", "value": 0}]
+    assert skill._validate_page_schema_component_contracts(page_schema)["ok"] is True
+
+
 def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknown_command_actions() -> None:
     skill = _load_module()
     duplicate_action = {
