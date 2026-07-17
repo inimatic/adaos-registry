@@ -2167,7 +2167,8 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
         },
         "page_schema_auto_actions": {
             "purpose": "Optional interval actions active only while a page or modal is mounted.",
-            "shape": "pageSchema.autoActions is an array of {id?,intervalMs?,enabledIf?,action:{type,params?,...}}. The nested action property is required; type and params do not belong directly on the autoActions item.",
+            "shape": "pageSchema.autoActions is an array of {id?,intervalMs,enabledIf?,action:{type,params?,...}}. intervalMs and the nested action are required; type and params do not belong directly on the autoActions item.",
+            "rule": "Use autoActions only for genuine periodic work. Do not poll to keep computed local UI values in sync; put references and expression objects in a static dataSource instead.",
         },
         "input.commandBar": {
             "purpose": "Segmented or toolbar-like local controls for choosing a mode, filter, draft state, or preview perspective.",
@@ -2218,7 +2219,14 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "Static dataSource values may read exact $state.* references and use side-effect-free expression objects "
                 "{kind:'expression',op,args?}. Supported ops: add, subtract, multiply, divide, min, max, round, "
                 "equals, gt, gte, lt, lte, and, or, not, if, count, and formatNumber. Use these for live summaries, "
-                "line amounts, counters, discounts, and totals; never embed JavaScript."
+                "line amounts, counters, discounts, and totals; never embed JavaScript. Exact references and expressions preserve their value type. "
+                "For readable computed summaries use item.details with a static dataSource containing these values. "
+                "Form staticContent is literal copy and does not interpolate state or computed expressions."
+            ),
+            "reactive_static_collections": (
+                "A static row may expose quantity:'$state.quantities.item1' and a computed amount expression. "
+                "To show only populated rows, use a truthy filter over the resolved quantity and a true state flag. "
+                "Write mixed copy as 'Quantity: $state.quantities.item1' without braces. Do not derive row ids in autoActions."
             ),
         },
         "master_detail_and_tabs": {
@@ -5395,6 +5403,22 @@ def _invalid_declarative_expression(value: Any, path: str = "value") -> str:
     return ""
 
 
+def _brace_wrapped_state_reference(value: Any, path: str = "value") -> str:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            found = _brace_wrapped_state_reference(nested, f"{path}.{key}")
+            if found:
+                return found
+    elif isinstance(value, list):
+        for index, nested in enumerate(value):
+            found = _brace_wrapped_state_reference(nested, f"{path}[{index}]")
+            if found:
+                return found
+    elif isinstance(value, str) and re.search(r"\{\s*\$state\.[^{}]+\}", value):
+        return path
+    return ""
+
+
 def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(page_schema, Mapping):
         return {"ok": False, "error": "page_schema_invalid", "detail": "ui.application.desktop.pageSchema must be an object"}
@@ -5440,6 +5464,31 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                 ),
             }
         inputs = widget.get("inputs") if isinstance(widget.get("inputs"), Mapping) else {}
+        wrapped_state_ref = _brace_wrapped_state_reference(widget.get("dataSource"), f"widgets[{widget_index}].dataSource")
+        if wrapped_state_ref:
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": (
+                    f"{wrapped_state_ref} wraps a $state reference in braces; static data resolves $state paths directly, "
+                    "so remove the braces or use a declarative expression object"
+                ),
+            }
+        if widget_type == "ui.form":
+            fields = inputs.get("fields") if isinstance(inputs.get("fields"), list) else []
+            for field_index, field in enumerate(fields):
+                if not isinstance(field, Mapping) or str(field.get("type") or "").strip() != "staticContent":
+                    continue
+                content = str(field.get("content") or "")
+                if "$state." in content or re.search(r"\{[A-Za-z_][A-Za-z0-9_.-]*\}", content):
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": (
+                            f"widgets[{widget_index}].inputs.fields[{field_index}] uses dynamic-looking content in staticContent; "
+                            "staticContent is literal, so render computed values through an item.details static dataSource"
+                        ),
+                    }
         filters = inputs.get("filters") if isinstance(inputs.get("filters"), list) else []
         for filter_index, filter_item in enumerate(filters):
             if not isinstance(filter_item, Mapping):

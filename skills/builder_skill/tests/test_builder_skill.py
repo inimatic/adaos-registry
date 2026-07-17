@@ -2814,6 +2814,37 @@ def test_builder_component_contract_rejects_unknown_expression_and_wrong_members
     assert "use operator 'in'" in validation["detail"]
 
 
+def test_builder_component_contract_rejects_unrendered_state_templates() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "summary",
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "rows",
+                "type": "ui.list",
+                "area": "main",
+                "dataSource": {"kind": "static", "value": [{"quantity": "Count: {$state.qty.p1}"}]},
+            }
+        ],
+    }
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+    assert validation["ok"] is False
+    assert "remove the braces" in validation["detail"]
+
+    page_schema["widgets"] = [
+        {
+            "id": "form",
+            "type": "ui.form",
+            "area": "main",
+            "inputs": {"fields": [{"id": "summary", "type": "staticContent", "content": "Total: {total}"}]},
+        }
+    ]
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+    assert validation["ok"] is False
+    assert "staticContent is literal" in validation["detail"]
+
+
 def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknown_command_actions() -> None:
     skill = _load_module()
     duplicate_action = {
