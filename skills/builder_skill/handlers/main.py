@@ -6487,6 +6487,7 @@ def _repair_llm_webui_transform_output(
             ),
             max_tokens=_builder_llm_max_tokens_for_model(selected_model),
             reasoning=_builder_llm_reasoning_for_model(selected_model),
+            text={"format": {"type": "json_object"}},
             request_id=repair_request_id,
             stream=_builder_llm_stream_enabled(_meta),
             prompt_cache_key=_builder_llm_prompt_cache_key(selected_model, prompt_profile),

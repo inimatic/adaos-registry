@@ -2007,6 +2007,7 @@ def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> Non
     def fake_submit(messages, **kwargs):
         parsed["messages"] = messages
         parsed["stream_protocol"] = kwargs.get("stream_protocol")
+        parsed["text"] = kwargs.get("text")
         return {"job_id": "repair-patch-job", "status": "succeeded", "output_text": json.dumps(repaired_document)}
 
     def fake_parse(**kwargs):
@@ -2032,6 +2033,7 @@ def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> Non
     assert result["ok"] is True
     assert request_modes == ["full_webui"]
     assert parsed["stream_protocol"] is None
+    assert parsed["text"] == {"format": {"type": "json_object"}}
     assert parsed["before_webui"] is None
     repair_request = json.loads(parsed["messages"][-1]["content"])
     assert "return one complete corrected adaos.webui.v1 JSON object" in repair_request["task"]
