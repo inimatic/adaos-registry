@@ -2086,8 +2086,9 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "groupBy": "Optional object path used to group rows/cards.",
                 "groupDisplay": "For grouped cards use 'sections' or 'accordion'.",
                 "filters": (
-                    "Optional array of {key,stateKey,operator?}; operator may be equals, contains, includes, "
-                    "truthy, lte, or gte. Use numeric option values with lte/gte for numeric range filters; "
+                    "Optional array of {key,stateKey,operator?}; operator may be equals, contains, includes, in, "
+                    "truthy, lte, or gte. Use in when the item key must be a member of an array in state, for example favorites. "
+                    "Use numeric option values with lte/gte for numeric range filters; "
                     "do not encode comparisons such as '<=20' into a string value. Empty/all state values do not filter. "
                     "For a neutral 'Any' option in a numeric range selector, use an empty string value rather than 0; zero remains a valid numeric threshold."
                 ),
@@ -2145,8 +2146,12 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "size": "Optional: small, medium, large.",
             },
             "actions": (
-                "Use local updateState for prototype-only state changes; params are a direct state patch and may resolve $event.*, $state.*, and $client.* values. "
-                "Do not invent object keys beginning with $, such as $merge, $toggle, $set, or $append, and do not use JavaScript expressions. Use a simple explicit boolean/status value for a mock action when one click is sufficient. "
+                "Use local updateState for direct prototype-only state patches; params may resolve $event.*, $state.*, and $client.* values. "
+                "For safe local mutations use mutateState with params.operations. Supported operations are "
+                "{op:'set',path,value}, {op:'toggle',path}, {op:'toggleArrayItem',path,value}, "
+                "{op:'increment',path,amount?,min?,max?,removeWhenZero?}, and {op:'remove',path}. "
+                "Paths may contain event references, for example cart.$event.id. Do not invent object keys beginning with $, "
+                "and do not use JavaScript expressions, spreads, array methods, ternaries, or dynamic object literals. "
                 "Use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls. "
                 "Prefer on='click:<buttonId>' for one button. on='click' without action.id applies to every button; "
                 "on='click' with action.id applies only to the button with that id. Do not emit duplicate actions for one button. "
@@ -2208,6 +2213,12 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "initialState": "pageSchema.initialState can seed local prototype values, selected modes, mock workflow state, and temporary examples.",
             "visibleIf": "Widgets and fields may use visibleIf expressions to show different prototype surfaces based on local state. Use canonical $state paths with ===/!== and combine conditions with &&, ||, !, and parentheses when needed. Literal 'true' and 'false' are supported, but remove obsolete widgets rather than parking replaced UI behind visibleIf='false'.",
             "local_interaction": "Interactive prototype controls should update local page state and static/mock data only unless the user explicitly asks for a real integration. If the user asks to view an example, compare variants, choose a mode, or preview a state, include an explicit local input.commandBar/input.selector/ui.actions widget and seed matching initialState.",
+            "computed_values": (
+                "Static dataSource values may read exact $state.* references and use side-effect-free expression objects "
+                "{kind:'expression',op,args?}. Supported ops: add, subtract, multiply, divide, min, max, round, "
+                "equals, gt, gte, lt, lte, and, or, not, if, count, and formatNumber. Use these for live summaries, "
+                "line amounts, counters, discounts, and totals; never embed JavaScript."
+            ),
         },
         "master_detail_and_tabs": {
             "master_detail": "For master-detail prototypes use split/focus-detail layout for side-by-side detail, or an item-triggered modal/drawer for compact detail. The master ui.list/ui.table must own the selection action; detail containers react to the selected record.",
@@ -5330,6 +5341,28 @@ def _unsupported_action_param_operator(value: Any) -> str:
     return ""
 
 
+def _unsupported_update_state_expression(value: Any) -> str:
+    if isinstance(value, Mapping):
+        for nested in value.values():
+            found = _unsupported_update_state_expression(nested)
+            if found:
+                return found
+    elif isinstance(value, list):
+        for nested in value:
+            found = _unsupported_update_state_expression(nested)
+            if found:
+                return found
+    elif isinstance(value, str) and any(token in value for token in ("$state", "$event", "$client")):
+        compact = value.strip()
+        if re.search(r"\.\.\.|\?[^:]*:|\.\s*(?:includes|map|filter|reduce|join)\s*\(|=>", compact):
+            return compact
+        if re.search(r"(?:\$state|\$event|\$client)[^\n]*\s[+*/-]\s", compact):
+            return compact
+        if compact.startswith("{") or compact.startswith("["):
+            return compact
+    return ""
+
+
 def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(page_schema, Mapping):
         return {"ok": False, "error": "page_schema_invalid", "detail": "ui.application.desktop.pageSchema must be an object"}
@@ -5389,6 +5422,16 @@ def _validate_page_schema_component_contracts(page_schema: Mapping[str, Any]) ->
                     "detail": (
                         f"widgets[{widget_index}].actions[{action_index}].params uses unsupported updateState operator "
                         f"{unsupported}; updateState accepts a direct state patch with $event/$state/$client references"
+                    ),
+                }
+            expression = _unsupported_update_state_expression(params)
+            if expression:
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": (
+                        f"widgets[{widget_index}].actions[{action_index}].params contains an unsupported JavaScript-like "
+                        "updateState expression; use a direct patch, mutateState operations, or declarative expression objects"
                     ),
                 }
         if widget_type in {"ui.actions", "input.commandBar"}:

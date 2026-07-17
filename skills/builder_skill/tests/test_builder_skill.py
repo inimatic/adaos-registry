@@ -2748,6 +2748,33 @@ def test_builder_component_contract_rejects_invented_update_state_operators() ->
     assert skill._unsupported_action_param_operator({"favorite": {"$set": True}}) == "$set"
 
 
+def test_builder_component_contract_rejects_javascript_like_update_state_values() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "actions",
+        "layout": {"type": "stack", "areas": [{"id": "main"}]},
+        "widgets": [
+            {
+                "id": "favorite",
+                "type": "ui.actions",
+                "area": "main",
+                "actions": [
+                    {
+                        "on": "click",
+                        "type": "updateState",
+                        "params": {"favorites": "$state.favorites.includes($event.id) ? [] : [$event.id]"},
+                    }
+                ],
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "JavaScript-like updateState expression" in validation["detail"]
+
+
 def test_builder_component_contract_accepts_legacy_duplicates_but_rejects_unknown_command_actions() -> None:
     skill = _load_module()
     duplicate_action = {
