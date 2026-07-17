@@ -4907,6 +4907,14 @@ def _builder_llm_webui_transform_request(
         "current_webui_json": current_payload,
         "instruction": instruction,
     }
+    current_validation = _validate_builder_webui_payload(current_payload, preview_state)
+    if not current_validation.get("ok"):
+        dynamic_request["current_webui_validation"] = {
+            "ok": False,
+            "error": str(current_validation.get("error") or "webui_validation_failed"),
+            "detail": str(current_validation.get("detail") or "Current UI does not pass the active component contract"),
+            "required_action": "Correct these existing violations as part of the requested transformation.",
+        }
     base_request = {**stable_request, **dynamic_request}
     return {
         "current_payload": current_payload,
@@ -6404,6 +6412,14 @@ def _repair_llm_webui_transform_output(
         dynamic_request = dict(request.get("dynamic_request") or {})
         dynamic_request["current_webui_json"] = candidate
         dynamic_request["repair_base"] = "partially transformed candidate; preserve its valid changes"
+        candidate_validation = _validate_builder_webui_payload(candidate, previous_preview)
+        if not candidate_validation.get("ok"):
+            dynamic_request["current_webui_validation"] = {
+                "ok": False,
+                "error": str(candidate_validation.get("error") or "webui_validation_failed"),
+                "detail": str(candidate_validation.get("detail") or "Candidate UI does not pass the active component contract"),
+                "required_action": "Correct these candidate violations in the complete repair document.",
+            }
         request["dynamic_request"] = dynamic_request
     repair_request_base_id = _builder_llm_request_id(
         session=session,

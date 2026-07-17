@@ -1977,6 +1977,43 @@ def test_repair_uses_partially_transformed_candidate_as_current_webui(monkeypatc
     assert "every click target must exist in the same widget" in repair_request["task"]
 
 
+def test_transform_request_reports_existing_component_contract_violations(monkeypatch) -> None:
+    skill = _load_module()
+    current = {
+        "schema": "adaos.webui.v1",
+        "ui": {"application": {"desktop": {"pageSchema": {
+            "id": "artifact-editor",
+            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "initialState": {"selectedFileId": "memory", "files": {}},
+            "widgets": [{
+                "id": "editor",
+                "type": "item.textEditor",
+                "area": "main",
+                "dataSource": {
+                    "kind": "static",
+                    "value": {
+                        "id": "$state.selectedFileId",
+                        "path": "$state.files[$state.selectedFileId].path",
+                        "content": "$state.files[$state.selectedFileId].content",
+                    },
+                },
+            }],
+        }}}},
+    }
+    monkeypatch.setattr(skill, "_current_webui_payload", lambda *_args, **_kwargs: copy.deepcopy(current))
+
+    request = skill._builder_llm_webui_transform_request(
+        session={"id": "session", "scenario_id": "artifact-editor"},
+        instruction="Improve the artifact workspace",
+        preview_state={"page_schema": current["ui"]["application"]["desktop"]["pageSchema"]},
+    )
+
+    diagnostic = request["dynamic_request"]["current_webui_validation"]
+    assert diagnostic["ok"] is False
+    assert "dynamic state indexing" in diagnostic["detail"]
+    assert diagnostic["required_action"].startswith("Correct these existing violations")
+
+
 def test_repair_replaces_malformed_patch_with_complete_webui(monkeypatch) -> None:
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
