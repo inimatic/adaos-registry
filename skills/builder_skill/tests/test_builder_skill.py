@@ -3948,6 +3948,7 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
     assert restored["dev_runtime_refresh"]["scheduled"] is True
     assert refresh_calls[-1]["webspace_id"] == "builder-revision"
     assert refresh_calls[-1]["revision"] == "001"
+    assert (artifact_root / "ui_revisions" / "current.txt").read_text(encoding="utf-8").strip() == "001"
     assert not any(item["type"] == "card_list" for item in restored["preview_state"]["current_ui"]["children"])
     saved = json.loads((artifact_root / "webui.json").read_text(encoding="utf-8"))
     widgets = saved["ui"]["application"]["desktop"]["pageSchema"]["widgets"]

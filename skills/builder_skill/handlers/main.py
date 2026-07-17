@@ -2135,6 +2135,47 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "or independently positioned command surface."
             ),
         },
+        "collection.tree": {
+            "purpose": "Hierarchical navigation for lifecycle nodes, folders, and project files.",
+            "inputs": {
+                "hideRoot": "Set true for a rootless tree, and pass top-level folders/files directly in dataSource.value. Do not wrap them in a synthetic Project/root node.",
+                "stateKey": "Optional state key containing the selected node id.",
+                "selectionMode": "Use leaf when folders should expand but only files should be selectable.",
+                "expanded": "Set false when folders should initially be collapsed.",
+            },
+            "actions": (
+                "A select event exposes the selected node through $event, including its id and any static path, title, content, or protected fields. "
+                "Copy concrete selected values into page state with updateState and close a picker modal with a second select action."
+            ),
+        },
+        "item.textEditor": {
+            "purpose": "Editable text or code artifact surface. Prefer this over a ui.form longText field for project-file content.",
+            "dataSource": (
+                "Provide one record object with id, path, and content. A static mock editor may bind those properties to exact $state.* references. "
+                "Include a dataSource.params state reference so selecting another record reloads the editor."
+            ),
+            "inputs": {
+                "bindField": "Field containing the editable text; normally content.",
+                "mode": "Optional markdown, json, yaml, or text display mode.",
+                "titleTemplate": "Optional title such as 'Project file: {filename}' resolved from the data record path.",
+                "descriptionByPath": "Optional localized guidance map keyed by path or filename.",
+                "stateKey": "Optional local draft namespace; drafts are scoped by record id.",
+            },
+            "actions": "Declare an on='save' action when Save should be enabled. The event exposes the edited content.",
+        },
+        "item.codeViewer": {
+            "purpose": "Read-only text or code artifact surface for protected files.",
+            "dataSource": "Provide one record with id, path, and content, using the same selected-record state pattern as item.textEditor.",
+            "rule": "Use a mutually exclusive visibleIf pair: textEditor for editable files and codeViewer for protected files.",
+        },
+        "artifact_picker_pattern": {
+            "purpose": "Compact project-file selection followed by one central editor/viewer.",
+            "flow": (
+                "Open a modal containing a rootless collection.tree. Each mock leaf carries id, path, title, content, and protected. "
+                "On select copy those concrete fields into selectedFileId/Path/Title/Content/Protected state and close the modal. "
+                "Render path/name through the editor/viewer record and titleTemplate, never through dynamic form staticContent."
+            ),
+        },
         "visual.image": {
             "purpose": "A standalone responsive image/hero/detail visual. Collection thumbnails belong in ui.list variant='cards' via imageKey.",
             "inputs": {
@@ -10272,6 +10313,12 @@ def set_ui_revision_current(
     session["ui_revision"] = str(revision_payload.get("revision") or revision)
     _merge_session_from_preview(session, preview)
     timings_ms["update_session"] = _elapsed_ms(stage_started)
+    stage_started = time.perf_counter()
+    revision_dir = _ui_revision_dir(str(session.get("artifact_root") or ""))
+    if revision_dir is not None:
+        revision_dir.mkdir(parents=True, exist_ok=True)
+        (revision_dir / "current.txt").write_text(str(session["ui_revision"]) + "\n", encoding="utf-8")
+    timings_ms["write_current_revision"] = _elapsed_ms(stage_started)
     stage_started = time.perf_counter()
     _write_webui_payload(str(session.get("artifact_root") or ""), after_webui)
     timings_ms["write_webui_payload"] = _elapsed_ms(stage_started)
