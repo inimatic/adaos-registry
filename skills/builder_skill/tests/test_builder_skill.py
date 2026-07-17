@@ -1611,6 +1611,9 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "formField" in schema_defs
     assert "formInputType" in schema_defs
     assert "formFieldType" in schema_defs
+    assert "actionButton" in schema_defs
+    assert "actionsInputs" in schema_defs
+    assert "danger" in schema_defs["actionButton"]["properties"]["kind"]["enum"]
     assert "email" in schema_defs["formInputType"]["enum"]
     assert "ratingGrid" in schema_defs["formInputType"]["enum"]
     assert "Always prefer conference vocabulary" in request["system_prompt"]
@@ -1625,6 +1628,7 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "Break broad or composite user concepts into atomic fields" in request["system_prompt"]
     assert "add an explicit local control" in request["system_prompt"]
     assert "data-capture requirements that need ui.form fields" in request["system_prompt"]
+    assert "do not invent appearance" in request["system_prompt"]
     assert "local development prototype until an explicit activation/release step" in request["system_prompt"]
     assert "meaningless placeholders like Request 1" in request["system_prompt"]
     assert "Static sample rows must match the active domain" in request["system_prompt"]

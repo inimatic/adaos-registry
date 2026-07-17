@@ -60,6 +60,8 @@ BUILDER_WEBUI_SCHEMA_CORE_DEFS = (
     "widgetType",
     "dataSource",
     "action",
+    "actionButton",
+    "actionsInputs",
     "modalDef",
     "listInputs",
 )
@@ -2453,6 +2455,7 @@ def _builder_llm_system_prompt(
         "For early visual prototypes that need sample images, use replaceable placeholder image URLs from https://picsum.photos/ with deterministic seeds, for example https://picsum.photos/seed/recipe-salad/640/420. Treat those URLs as temporary sample assets that the user can later replace with local seed assets or generated images. "
         "When using placeholder images, put meaningful alt/title/caption text and keep the image subject aligned with the row/card domain; do not use image placeholders as final product content. "
         "For icon properties use real Ionicons v7 names, not descriptive aliases invented for the prototype. Prefer established names such as add-outline, create-outline, close-outline, search-outline, trash-outline, star, and star-outline; for example, use create-outline instead of edit and star instead of star-filled. "
+        "For ui.actions and input.commandBar button intent use inputs.buttons[*].kind with primary, secondary, or danger. Use danger for destructive commands; do not invent appearance, tone, or raw CSS/color properties. "
         "For image-rich catalogs, galleries, products, people, places, media, or similar visually scannable collections, prefer ui.list with inputs.variant='cards', imageKey, titleKey, previewKey, and useful metadata over ui.table. A ui.table image column is not supported. "
         "When the user asks for grouped visual collections, combine ui.list cards with groupBy and groupDisplay instead of falling back to a plain table. "
         "Avoid duplicate-only, rename-only, or no-op transformations for design requests; revise the JSON before answering if the result does not visibly satisfy the request. "
