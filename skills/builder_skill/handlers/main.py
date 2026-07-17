@@ -5142,6 +5142,8 @@ def _parse_llm_webui_patch_stream(
         raise ValueError("LLM patch stream exceeds 128 operations")
     candidate: Any = copy.deepcopy(dict(before_webui))
     journal: list[dict[str, Any]] = []
+    mutable_operation_count = 0
+    no_op_count = 0
     expected_seq = 1
     for raw in patch_items:
         try:
@@ -5153,11 +5155,23 @@ def _parse_llm_webui_patch_stream(
         operation = {key: copy.deepcopy(raw.get(key)) for key in ("op", "path", "from", "value") if key in raw}
         if len(_compact_json(operation).encode("utf-8", errors="replace")) > 1_000_000:
             raise ValueError(f"LLM patch operation {seq} exceeds size limit")
+        before_operation = _webui_source_fingerprint(candidate)
         candidate = _apply_json_patch_operation(candidate, operation)
-        journal.append({"seq": seq, **operation})
+        is_no_op = str(operation.get("op") or "").strip().lower() != "test" and before_operation == _webui_source_fingerprint(candidate)
+        if str(operation.get("op") or "").strip().lower() != "test":
+            mutable_operation_count += 1
+            no_op_count += int(is_no_op)
+        journal.append({"seq": seq, **operation, **({"no_op": True} if is_no_op else {})})
         expected_seq += 1
     if not isinstance(candidate, Mapping):
         raise ValueError("LLM patch result must be an object")
+    meaningful_operation_count = mutable_operation_count - no_op_count
+    if mutable_operation_count and meaningful_operation_count == 0 and not str(complete.get("unable_reason") or "").strip():
+        raise ValueError("LLM patch stream contains no effective changes")
+    if mutable_operation_count >= 3 and meaningful_operation_count / mutable_operation_count <= 0.25:
+        raise ValueError(
+            f"LLM patch stream is mostly no-op: {meaningful_operation_count}/{mutable_operation_count} operations changed the document"
+        )
     payload, preview = _normalise_llm_webui_payload(dict(candidate), previous_preview=previous_preview)
     validation = _validate_builder_webui_payload(payload, preview)
     return {
@@ -5171,6 +5185,8 @@ def _parse_llm_webui_patch_stream(
             "schema": "adaos.builder.webui_patch_stream.v1",
             "base_hash": expected_hash,
             "operation_count": len(journal),
+            "meaningful_operation_count": meaningful_operation_count,
+            "no_op_count": no_op_count,
             "patches": journal,
             "syntax_repairs": syntax_repairs,
         },

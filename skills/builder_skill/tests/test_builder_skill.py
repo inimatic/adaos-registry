@@ -12,6 +12,7 @@ import types
 from pathlib import Path
 
 import yaml
+import pytest
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -2177,6 +2178,44 @@ def test_builder_patch_stream_applies_to_shadow_and_preserves_unrelated_ui() -> 
     assert result["payload"]["ui"]["application"]["desktop"]["pageSchema"]["widgets"][0]["id"] == "recipe-title"
     assert result["semantic_patch_stream"]["operation_count"] == 1
     assert result["attempts"][0]["output_mode"] == "jsonl_patch_v1"
+
+
+def test_builder_patch_stream_rejects_a_mostly_noop_delta() -> None:
+    skill = _load_module()
+    before = {
+        "schema": "adaos.webui.v1",
+        "ui": {
+            "application": {
+                "desktop": {
+                    "pageSchema": {
+                        "id": "demo",
+                        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+                        "widgets": [
+                            {"id": "summary", "type": "item.details", "area": "main", "title": "Summary"}
+                        ],
+                    }
+                }
+            }
+        },
+    }
+    base_hash = skill._webui_source_fingerprint(before)
+    output = "\n".join(
+        [
+            json.dumps({"type": "meta", "schema": "adaos.builder.webui_patch_stream.v1", "base_hash": base_hash}),
+            json.dumps({"type": "patch", "seq": 1, "op": "replace", "path": "/ui/application/desktop/pageSchema/id", "value": "demo"}),
+            json.dumps({"type": "patch", "seq": 2, "op": "replace", "path": "/ui/application/desktop/pageSchema/layout/type", "value": "stack"}),
+            json.dumps({"type": "patch", "seq": 3, "op": "replace", "path": "/ui/application/desktop/pageSchema/widgets/@summary/title", "value": "Updated summary"}),
+            json.dumps({"type": "patch", "seq": 4, "op": "replace", "path": "/ui/application/desktop/pageSchema/widgets/@summary/type", "value": "item.details"}),
+            json.dumps({"type": "complete", "comment": "Everything was changed."}),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="mostly no-op"):
+        skill._parse_llm_webui_patch_stream(
+            output_text=output,
+            before_webui=before,
+            previous_preview={},
+        )
 
 
 def test_builder_patch_stream_rejects_wrong_base_hash() -> None:
