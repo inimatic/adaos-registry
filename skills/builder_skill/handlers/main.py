@@ -2224,6 +2224,7 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "{kind:'expression',op,args?}. Supported ops: add, subtract, multiply, divide, min, max, round, "
                 "equals, gt, gte, lt, lte, and, or, not, if, count, and formatNumber. Use these for live summaries, "
                 "line amounts, counters, discounts, and totals; never embed JavaScript. Exact references and expressions preserve their value type. "
+                "When an aggregate is derived from a finite static collection, include every represented item/state key. Prefer one n-ary add expression with all terms over a deeply nested chain that can silently omit trailing items. "
                 "For readable computed summaries use item.details with a static dataSource containing these values. Within one static object, later fields may reference earlier resolved fields through $data.<field>; order dependent fields after their inputs. "
                 "Form staticContent is literal copy and does not interpolate state or computed expressions."
             ),
@@ -2312,6 +2313,7 @@ def _builder_prototyping_affordances() -> dict[str, Any]:
             "If a list/card/table selection should change details, verify the master action updates a selected state key and the detail widgets read data keyed by that selected value; do not return static details that ignore selection.",
             "For an optional collection mode that keeps items whose key belongs to a state array, put one filter with operator='in', that array's stateKey, and enabledIf tied to the mode. Do not maintain a duplicate derived array or poll with autoActions.",
             "For reactive static rows, filter the resolved row property with a literal/expression value. Do not treat a computed dataSource field as page state.",
+            "For totals, counters, filtered row sets, and other finite-collection aggregates, compare the referenced item/state keys with the source collection and verify every item is covered. Check both the first and last sample item before answering.",
             "Verify local visibility expressions use $state.<key> comparisons, for example $state.activeTab === 'overview'.",
             "If the user explicitly asks for local elements, controls, or a way to view examples, static mock rows alone are not enough; add a dedicated control widget that changes local state.",
             "After changing domain, title, or requested subject matter, verify every static sample row and detail example uses that subject rather than scaffold placeholders or a previous domain.",

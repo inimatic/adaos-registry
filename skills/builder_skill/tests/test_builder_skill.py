@@ -1599,6 +1599,8 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert "input.commandBar/input.selector/ui.actions" in " ".join(affordances["self_check"])
     assert "static mock rows alone are not enough" in " ".join(affordances["self_check"])
     assert "internal checklist" in " ".join(affordances["self_check"])
+    assert "verify every item is covered" in " ".join(affordances["self_check"])
+    assert "n-ary add expression" in user_payload["runtime_component_contracts"]["state_and_visibility"]["computed_values"]
     command_bar_contract = user_payload["runtime_component_contracts"]["input.commandBar"]
     command_bar_pattern = command_bar_contract["example_pattern"]
     assert command_bar_pattern["initialState"] == {"exampleMode": "empty"}
