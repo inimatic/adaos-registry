@@ -6868,6 +6868,46 @@ def _is_edit_like_request(text: str) -> bool:
     return _has_any(lowered, mutation_words) and _has_any(lowered, target_words)
 
 
+def _parse_project_delete_command(text: str) -> dict[str, Any] | None:
+    lowered = _normalise_command_text(text).strip(" \t\r\n:;,.!?()[]{}\"'\u00ab\u00bb")
+    if not lowered:
+        return None
+
+    current_patterns = (
+        r"^(?:delete|remove)\s+(?:(?:the\s+)?(?:current|selected))(?:\s+(?:project|prototype|scenario|draft|skill))?$",
+        r"^(?:\u0443\u0434\u0430\u043b\u0438|\u0443\u0434\u0430\u043b\u0438\u0442\u044c|\u0443\u0434\u0430\u043b\u0438\u0442\u0435|\u0441\u043e\u0442\u0440\u0438|\u0441\u043e\u0442\u0440\u0438\u0442\u0435|\u0441\u0442\u0435\u0440\u0435\u0442\u044c)\s+"
+        r"(?:\u0442\u0435\u043a\u0443\u0449(?:\u0438\u0439|\u0443\u044e|\u0435\u0435)|\u0432\u044b\u0431\u0440\u0430\u043d\u043d(?:\u044b\u0439|\u0443\u044e|\u043e\u0435))"
+        r"(?:\s+(?:\u043f\u0440\u043e\u0435\u043a\u0442|\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f|\u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439|\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a|\u043d\u0430\u0432\u044b\u043a))?$",
+    )
+    if any(re.fullmatch(pattern, lowered) for pattern in current_patterns):
+        return {
+            "intent": "project.delete",
+            "project_ref": "",
+            "target": "current",
+            "confidence": 1.0,
+            "source": "deterministic",
+        }
+
+    object_patterns = (
+        r"^(?:delete|remove)\s+(?:the\s+)?(?:project|prototype|scenario|draft|skill)(?:\s+(.+))?$",
+        r"^(?:\u0443\u0434\u0430\u043b\u0438|\u0443\u0434\u0430\u043b\u0438\u0442\u044c|\u0443\u0434\u0430\u043b\u0438\u0442\u0435|\u0441\u043e\u0442\u0440\u0438|\u0441\u043e\u0442\u0440\u0438\u0442\u0435|\u0441\u0442\u0435\u0440\u0435\u0442\u044c)\s+"
+        r"(?:\u043f\u0440\u043e\u0435\u043a\u0442|\u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f|\u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0439|\u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a|\u043d\u0430\u0432\u044b\u043a)(?:\s+(.+))?$",
+    )
+    for pattern in object_patterns:
+        match = re.fullmatch(pattern, lowered)
+        if not match:
+            continue
+        project_ref = _strip_command_ref(match.group(1) or "")
+        return {
+            "intent": "project.delete",
+            "project_ref": project_ref,
+            "target": "ref" if project_ref else "current",
+            "confidence": 1.0,
+            "source": "deterministic",
+        }
+    return None
+
+
 def _parse_builder_command(text: str, *, allow_create: bool = True, has_session: bool = False) -> dict[str, Any]:
     raw = str(text or "").strip()
     lowered = _normalise_command_text(raw)
@@ -6896,22 +6936,9 @@ def _parse_builder_command(text: str, *, allow_create: bool = True, has_session:
     if _is_current_project_command(lowered):
         return {"intent": "project.current", "confidence": 1.0, "source": "deterministic"}
 
-    delete_verb = _has_any(lowered, ("delete", "remove project", "\u0443\u0434\u0430\u043b", "\u0441\u043e\u0442\u0440"))
-    field_word = _has_any(lowered, ("field", "column", "\u043f\u043e\u043b\u0435", "\u043a\u043e\u043b\u043e\u043d"))
-    if delete_verb and not field_word:
-        current = _has_any(lowered, ("current", "\u0442\u0435\u043a\u0443\u0449", "\u0432\u044b\u0431\u0440\u0430\u043d"))
-        if current or _has_any(lowered, _project_words()):
-            ref = ""
-            match = re.search(r"(?:delete|remove project|\u0443\u0434\u0430\u043b(?:\u0438|\u0438\u0442\u044c)?|\u0441\u043e\u0442\u0440(?:\u0438|\u0435\u0442\u044c)?)\s+(.+)$", lowered)
-            if match:
-                ref = _strip_command_ref(match.group(1))
-            return {
-                "intent": "project.delete",
-                "project_ref": "" if current else ref,
-                "target": "current" if current else "ref",
-                "confidence": 1.0,
-                "source": "deterministic",
-            }
+    delete_command = _parse_project_delete_command(lowered)
+    if delete_command is not None:
+        return delete_command
 
     for pattern in (
         r"^(?:switch to|select|open)\s+(.+)$",

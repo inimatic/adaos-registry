@@ -4387,6 +4387,12 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
         "Redesign the workspace and show the current project identity in the header.",
         has_session=True,
     )
+    delete_current = skill._parse_builder_command("\u0443\u0434\u0430\u043b\u0438 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0440\u043e\u0435\u043a\u0442", has_session=True)
+    delete_named = skill._parse_builder_command("delete project demo_scenario", has_session=True)
+    cart_delete = skill._parse_builder_command(
+        "\u0422\u0435\u043a\u0443\u0449\u0430\u044f \u0432\u0435\u0440\u0441\u0438\u044f \u0441\u043b\u0438\u0448\u043a\u043e\u043c \u0443\u043f\u0440\u043e\u0449\u0435\u043d\u0430. \u0412 \u043a\u043e\u0440\u0437\u0438\u043d\u0435 \u043d\u0443\u0436\u043d\u044b \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0435 \u043a\u043e\u043b\u0438\u0447\u0435\u0441\u0442\u0432\u0430 \u0438 \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u0435 \u043f\u043e\u0437\u0438\u0446\u0438\u0438.",
+        has_session=True,
+    )
 
     assert switch["intent"] == "project.switch"
     assert switch["project_ref"] == "demo_scenario"
@@ -4396,6 +4402,17 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     assert edit_like_without_session["intent"] == "none"
     assert current["intent"] == "project.current"
     assert design_request["intent"] == "none"
+    assert delete_current == {
+        "intent": "project.delete",
+        "project_ref": "",
+        "target": "current",
+        "confidence": 1.0,
+        "source": "deterministic",
+    }
+    assert delete_named["intent"] == "project.delete"
+    assert delete_named["project_ref"] == "demo_scenario"
+    assert delete_named["target"] == "ref"
+    assert cart_delete["intent"] == "none"
 
 
 def test_prompt_project_selection_defers_heavy_events(monkeypatch) -> None:
