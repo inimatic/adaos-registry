@@ -3071,6 +3071,79 @@ def test_builder_component_contract_rejects_unrendered_state_templates() -> None
     assert "staticContent is literal" in validation["detail"]
 
 
+def test_builder_component_contract_rejects_dynamic_state_index_in_static_data() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "artifact-editor",
+        "initialState": {"files": {"a": {"content": "text"}}, "selectedFileId": "a"},
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "editor",
+                "type": "item.textEditor",
+                "area": "main",
+                "dataSource": {
+                    "kind": "static",
+                    "value": {"content": "$state.files[$state.selectedFileId].content"},
+                },
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "dynamic state indexing" in validation["detail"]
+
+
+def test_builder_component_contract_rejects_synthetic_root_in_rootless_tree() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "file-picker",
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "files",
+                "type": "collection.tree",
+                "area": "main",
+                "inputs": {"hideRoot": True},
+                "dataSource": {
+                    "kind": "static",
+                    "value": [{"id": "root", "title": "Project", "children": [{"id": "readme"}]}],
+                },
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "rootless tree" in validation["detail"]
+
+
+def test_builder_component_contract_rejects_conditional_ui_action_buttons() -> None:
+    skill = _load_module()
+    page_schema = {
+        "id": "actions",
+        "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+        "widgets": [
+            {
+                "id": "archive-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                    "buttons": [{"id": "archive", "label": "Archive", "whenKey": "$state.archived", "whenEquals": False}]
+                },
+            }
+        ],
+    }
+
+    validation = skill._validate_page_schema_component_contracts(page_schema)
+
+    assert validation["ok"] is False
+    assert "do not conditionally render individual buttons" in validation["detail"]
+
+
 def test_builder_component_contract_distinguishes_state_from_sibling_computed_data() -> None:
     skill = _load_module()
     page_schema = {

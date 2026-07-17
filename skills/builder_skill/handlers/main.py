@@ -2172,8 +2172,12 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
             "purpose": "Compact project-file selection followed by one central editor/viewer.",
             "flow": (
                 "Open a modal containing a rootless collection.tree. Each mock leaf carries id, path, title, content, and protected. "
-                "On select copy those concrete fields into selectedFileId/Path/Title/Content/Protected state and close the modal. "
+                "On select copy those concrete $event.id/path/title/content/protected fields into selectedFileId/Path/Title/Content/Protected state and close the modal. "
                 "Render path/name through the editor/viewer record and titleTemplate, never through dynamic form staticContent."
+            ),
+            "state_rule": (
+                "Exact dataSource state references use concrete dot paths only, for example $state.selectedFilePath. "
+                "Dynamic index syntax such as $state.files[$state.selectedFileId].path is not resolved by static data sources."
             ),
         },
         "visual.image": {
@@ -2201,7 +2205,9 @@ def _builder_runtime_component_contracts() -> dict[str, Any]:
                 "Use openModal with params.modalId for declared modal prototypes; use callSkill only for real declared skill calls. "
                 "Prefer on='click:<buttonId>' for one button. on='click' without action.id applies to every button; "
                 "on='click' with action.id applies only to the button with that id. Do not emit duplicate actions for one button. "
-                "When behavior is removed, delete its action entry; never replace it with a placeholder type='none'."
+                "When behavior is removed, delete its action entry; never replace it with a placeholder type='none'. "
+                "ui.actions buttons do not support per-button whenKey/whenEquals visibility. For mutually exclusive commands, "
+                "use separate ui.actions widgets with complementary visibleIf expressions."
             ),
         },
         "application_modals": {
@@ -5515,6 +5521,22 @@ def _brace_wrapped_state_reference(value: Any, path: str = "value") -> str:
     return ""
 
 
+def _dynamic_state_index_reference(value: Any, path: str = "value") -> tuple[str, str] | None:
+    if isinstance(value, Mapping):
+        for key, nested in value.items():
+            found = _dynamic_state_index_reference(nested, f"{path}.{key}")
+            if found:
+                return found
+    elif isinstance(value, list):
+        for index, nested in enumerate(value):
+            found = _dynamic_state_index_reference(nested, f"{path}[{index}]")
+            if found:
+                return found
+    elif isinstance(value, str) and "$state." in value and ("[" in value or "]" in value):
+        return path, value
+    return None
+
+
 def _sibling_field_state_reference(
     data_source: Any,
     *,
@@ -5628,6 +5650,20 @@ def _validate_page_schema_component_contracts(
                     "so remove the braces or use a declarative expression object"
                 ),
             }
+        dynamic_state_ref = _dynamic_state_index_reference(
+            widget.get("dataSource"),
+            f"widgets[{widget_index}].dataSource",
+        )
+        if dynamic_state_ref:
+            ref_path, ref_value = dynamic_state_ref
+            return {
+                "ok": False,
+                "error": "component_contract_invalid",
+                "detail": (
+                    f"{ref_path} uses dynamic state indexing {ref_value!r}; static data sources resolve only concrete "
+                    "dot-path references. Copy selected $event fields into concrete state keys, then reference those keys."
+                ),
+            }
         sibling_ref = _sibling_field_state_reference(widget.get("dataSource"), initial_state=initial_state)
         if sibling_ref:
             field_path, state_key = sibling_ref
@@ -5652,6 +5688,40 @@ def _validate_page_schema_component_contracts(
                         "detail": (
                             f"widgets[{widget_index}].inputs.fields[{field_index}] uses dynamic-looking content in staticContent; "
                             "staticContent is literal, so render computed values through an item.details static dataSource"
+                        ),
+                    }
+        if widget_type in {"ui.actions", "input.commandBar"}:
+            buttons = inputs.get("buttons") if isinstance(inputs.get("buttons"), list) else []
+            for button_index, button in enumerate(buttons):
+                if not isinstance(button, Mapping) or not any(key in button for key in ("whenKey", "whenEquals")):
+                    continue
+                return {
+                    "ok": False,
+                    "error": "component_contract_invalid",
+                    "detail": (
+                        f"widgets[{widget_index}].inputs.buttons[{button_index}] uses whenKey/whenEquals, but "
+                        "ui.actions/input.commandBar do not conditionally render individual buttons. Use separate "
+                        "widgets with complementary visibleIf expressions."
+                    ),
+                }
+        if widget_type == "collection.tree" and (inputs.get("hideRoot") is True or inputs.get("rootless") is True):
+            data_source = widget.get("dataSource") if isinstance(widget.get("dataSource"), Mapping) else {}
+            static_value = data_source.get("value") if str(data_source.get("kind") or "").strip() == "static" else None
+            if isinstance(static_value, list) and len(static_value) == 1 and isinstance(static_value[0], Mapping):
+                root_candidate = static_value[0]
+                root_id = str(root_candidate.get("id") or "").strip().lower()
+                root_title = str(root_candidate.get("title") or "").strip().lower()
+                if isinstance(root_candidate.get("children"), list) and (
+                    root_id in {"root", "project", "files"}
+                    or root_title in {"project", "files", "\u043f\u0440\u043e\u0435\u043a\u0442", "\u0444\u0430\u0439\u043b\u044b"}
+                ):
+                    return {
+                        "ok": False,
+                        "error": "component_contract_invalid",
+                        "detail": (
+                            f"widgets[{widget_index}] requests a rootless tree but wraps all nodes in synthetic root "
+                            f"{root_candidate.get('title') or root_candidate.get('id')!r}; pass that node's children "
+                            "directly as dataSource.value."
                         ),
                     }
         filters = inputs.get("filters") if isinstance(inputs.get("filters"), list) else []
