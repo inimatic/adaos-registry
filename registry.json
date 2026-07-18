@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-18T11:07:42+00:00",
+  "updated_at": "2026-07-18T11:08:15+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -458,8 +458,8 @@
       "kind": "skill",
       "id": "prompt_engineer_skill",
       "name": "prompt_engineer_skill",
-      "version": "0.6.7",
-      "updated_at": "2026-07-05T04:55:58+00:00",
+      "version": "0.6.8",
+      "updated_at": "2026-07-18T11:08:15+00:00",
       "path": "skills/prompt_engineer_skill",
       "manifest": "skills/prompt_engineer_skill/skill.yaml",
       "source": {
@@ -474,7 +474,7 @@
       "description": "Prompt IDE backend skill that manages dev scenarios/skills, technical specs and git operations.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 25
+      "tools_count": 27
     },
     {
       "kind": "skill",

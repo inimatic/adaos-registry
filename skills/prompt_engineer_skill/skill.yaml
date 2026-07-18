@@ -1,8 +1,9 @@
 name: prompt_engineer_skill
-version: 0.6.7
+version: 0.6.8
 entry: handlers/main.py
 runtime:
   python: '3.11'
+  sdk_only: true
 description: Prompt IDE backend skill that manages dev scenarios/skills, technical
   specs and git operations.
 supported_locales:
@@ -853,13 +854,13 @@ tools:
     type: object
     properties: {}
 exports: {}
-updated_at: '2026-07-05T04:55:58+00:00'
+updated_at: '2026-07-18T11:08:15+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.465+3499.72fbb554
-    recorded_at: '2026-07-05T04:55:58+00:00'
+    min_version: 0.1.0+3734.11eaf26a
+    recorded_at: '2026-07-18T11:08:16+00:00'
     source: skill_push
-    min_commit: 72fbb55442ff1991220c39cba2a81aa51efd353f
-    min_short_commit: 72fbb554
-    build_date: '2026-07-05T07:33:57+03:00'
+    min_commit: 11eaf26a57917d94e97b3850d667f1c98d7364d8
+    min_short_commit: 11eaf26a
+    build_date: '2026-07-18T14:06:08+03:00'
 

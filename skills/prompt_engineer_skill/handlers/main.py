@@ -2,7 +2,6 @@
 # Main handler!
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -13,10 +12,11 @@ from typing import Any, Dict, List, Optional
 
 import yaml
 
-from adaos.sdk.core._ctx import require_ctx
+from adaos.sdk.core.ctx import require_ctx
 from adaos.sdk.core.decorators import tool
+from adaos.sdk.builder import preview as builder_preview
+from adaos.sdk.data.events import publish as publish_event
 from adaos.sdk.root.developer import RootDeveloperService, TemplateResolutionError, RootServiceError
-from adaos.services.eventbus import emit as bus_emit
 
 _log = logging.getLogger("skills.prompt_engineer")
 _MAX_GIT_LOG_ITEMS = 50
@@ -235,49 +235,16 @@ def _emit_builder_preview_selected(object_type: str, object_id: str, *, source_w
         return
     source_ws = str(source_webspace_id or "").strip() or "desktop"
     try:
-        from adaos.services.builder.workbench import BuilderWorkbenchService
-
-        svc = BuilderWorkbenchService()
-        svc.set_active_draft(
+        builder_preview.select_project(
+            "scenario",
+            scenario_id,
             source_webspace_id=source_ws,
-            active_draft_id=None,
-            runtime_scenario_id=scenario_id,
-            persist_projection=True,
+            ensure_ready=True,
+            wait_for_rebuild=False,
+            publish_event=True,
         )
-        ensure = getattr(svc, "ensure_dev_webspace", None)
-        if callable(ensure):
-            try:
-                asyncio.get_running_loop()
-            except RuntimeError:
-                asyncio.run(
-                    ensure(
-                        source_ws,
-                        active_draft_id=None,
-                        runtime_scenario_id=scenario_id,
-                        wait_for_rebuild=False,
-                    )
-                )
-            else:
-                # If this happens inside an already-running loop, the async
-                # builder.preview.selected subscriber below remains the fallback.
-                pass
     except Exception:
         _log.debug("failed to set builder preview binding for scenario:%s", scenario_id, exc_info=True)
-    try:
-        ctx = _require_ctx()
-        bus_emit(
-            ctx.bus,
-            "builder.preview.selected",
-            {
-                "source_webspace_id": source_ws,
-                "object_type": "scenario",
-                "object_id": scenario_id,
-                "scenario_id": scenario_id,
-            },
-            "skills.prompt_engineer_skill",
-        )
-    except Exception:
-        _log.debug("failed to emit builder.preview.selected for scenario:%s", scenario_id, exc_info=True)
 
 
 def _state_path(root: Path) -> Path:
@@ -615,16 +582,14 @@ def _emit_project_changed(object_type: str, object_id: str, *, reason: str) -> N
     if kind not in {"skill", "scenario"} or not project_id:
         return
     try:
-        ctx = _require_ctx()
-        bus_emit(
-            ctx.bus,
+        publish_event(
             "prompt.project.changed",
             {
                 "object_type": kind,
                 "object_id": project_id,
                 "reason": str(reason or "").strip() or "changed",
             },
-            "skills.prompt_engineer_skill",
+            source="skills.prompt_engineer_skill",
         )
     except Exception:
         _log.debug("failed to emit prompt.project.changed for %s:%s", kind, project_id, exc_info=True)
