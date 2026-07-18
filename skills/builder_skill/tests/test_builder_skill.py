@@ -712,7 +712,7 @@ def test_update_current_scenario_recovers_artifact_root_for_ui_revisions(monkeyp
     draft_path = state_dir / "builder" / "drafts" / draft_id / "builder.draft.json"
     draft_path.parent.mkdir(parents=True, exist_ok=True)
     draft_path.write_text(json.dumps(draft_payload), encoding="utf-8")
-    sessions = skill._FALLBACK_MEMORY[skill._scoped_key(skill.SESSIONS_KEY, "builder-recover")]
+    sessions = skill._sessions("builder-recover")
     for session in sessions.values():
         session.pop("artifact_root", None)
         session["scenario_id"] = "todo_recover"
