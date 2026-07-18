@@ -3043,6 +3043,73 @@ def _write_ui_revision(
     return {"revision": revision, "path": str(path)}
 
 
+def _builder_vcs_commit_message(
+    *,
+    session: Mapping[str, Any],
+    revision: str,
+    request_text: str,
+    llm_result: Mapping[str, Any] | None,
+) -> str:
+    comment = str((llm_result or {}).get("comment") or "").strip() if isinstance(llm_result, Mapping) else ""
+    if not comment:
+        comment = str(request_text or "").strip()
+    if not comment:
+        comment = f"Builder revision {revision} for {session.get('scenario_id') or session.get('artifact_id') or 'draft'}"
+    return " ".join(comment.split())[:240]
+
+
+def _checkpoint_builder_artifact(
+    *,
+    session: dict[str, Any],
+    revision_info: Mapping[str, Any] | None,
+    request_text: str,
+    llm_result: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    artifact_id = str(session.get("scenario_id") or session.get("artifact_id") or "").strip()
+    artifact_kind = str(session.get("artifact_kind") or "scenario").strip().lower().rstrip("s")
+    revision = str((revision_info or {}).get("revision") or session.get("ui_revision") or "").strip()
+    artifact_root = Path(str(session.get("artifact_root") or "")).expanduser()
+    if not artifact_id or artifact_kind not in {"skill", "scenario"} or not artifact_root.is_dir():
+        return {"ok": False, "attempted": False, "error": "artifact_identity_missing"}
+    message = _builder_vcs_commit_message(
+        session=session,
+        revision=revision,
+        request_text=request_text,
+        llm_result=llm_result,
+    )
+    try:
+        from adaos.services.builder.workspace import BuilderWorkspaceService
+
+        service = BuilderWorkspaceService.from_context()
+        checkpoint = getattr(service, "checkpoint_artifact", None)
+        if not callable(checkpoint):
+            return {"ok": False, "attempted": False, "error": "checkpoint_service_unavailable", "message": message}
+        result = dict(checkpoint(kind=artifact_kind, artifact_id=artifact_id, message=message) or {})
+        result.update({"attempted": True, "revision": revision, "message": result.get("message") or message})
+    except Exception as exc:
+        result = {
+            "ok": False,
+            "attempted": True,
+            "kind": artifact_kind,
+            "name": artifact_id,
+            "revision": revision,
+            "message": message,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+        _LOG.warning("Builder VCS checkpoint failed kind=%s artifact=%s revision=%s: %s", artifact_kind, artifact_id, revision, exc)
+    session["vcs_checkpoint"] = copy.deepcopy(result)
+    revision_path = Path(str((revision_info or {}).get("path") or "")).expanduser()
+    if revision_path.is_file():
+        try:
+            payload = json.loads(revision_path.read_text(encoding="utf-8-sig") or "{}")
+            if isinstance(payload, dict):
+                payload["vcs_checkpoint"] = copy.deepcopy(result)
+                revision_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        except Exception:
+            _LOG.debug("failed to persist Builder VCS checkpoint in %s", revision_path, exc_info=True)
+    return result
+
+
 def _read_ui_revision(session: Mapping[str, Any], revision: str) -> dict[str, Any] | None:
     token = str(revision or "").strip()
     if not token:
@@ -8433,7 +8500,7 @@ def create_scenario_draft(
         "summary": source_idea,
         "diff": {"scenario_id": sid, "fields": fields},
     }
-    _write_ui_revision(
+    initial_revision_info = _write_ui_revision(
         session=session,
         request_text=source_idea,
         patch=initial_patch,
@@ -8443,6 +8510,12 @@ def create_scenario_draft(
         llm_result=None,
         llm_model=_builder_llm_model_for_session(session, _meta),
         revision=initial_revision,
+    )
+    vcs_checkpoint = _checkpoint_builder_artifact(
+        session=session,
+        revision_info=initial_revision_info,
+        request_text=source_idea,
+        llm_result=None,
     )
     _save_session(ws, session)
     workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False, snapshot_projection=False)
@@ -8471,6 +8544,8 @@ def create_scenario_draft(
     message = _message_created(session)
     if session.get("draft_error"):
         message += f" \u041f\u0440\u0435\u0434\u0443\u043f\u0440\u0435\u0436\u0434\u0435\u043d\u0438\u0435: dev draft \u043d\u0435 \u0441\u043e\u0437\u0434\u0430\u043d ({session['draft_error']})."
+    if vcs_checkpoint.get("attempted") and not vcs_checkpoint.get("ok"):
+        message += f" VCS checkpoint не создан: {vcs_checkpoint.get('error')}."
     # Local prototype revisions are already ABI-validated, revisioned, and reversible.
     # Pending Actions remain reserved for destructive operations and release/activation.
     pending_action = None
@@ -8490,6 +8565,7 @@ def create_scenario_draft(
         "message": message,
         "message_actions": actions,
         "ui_revision": {"revision": session.get("ui_revision")} if session.get("ui_revision") else None,
+        "vcs_checkpoint": vcs_checkpoint,
         "dialog": _dialog_state(ws, topic_ref=topic),
     }
 
@@ -8640,6 +8716,12 @@ def _finalize_scenario_update(
         patch["revision"] = revision_info.get("revision")
         patch["revision_path"] = revision_info.get("path")
         session["patches"][-1] = patch
+    vcs_checkpoint = _checkpoint_builder_artifact(
+        session=session,
+        revision_info=revision_info,
+        request_text=request_text,
+        llm_result=llm_result,
+    )
     workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False, snapshot_projection=False)
     resolved_binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else binding
     dev_runtime_refresh = _schedule_dev_runtime_reload_after_revision(
@@ -8678,6 +8760,8 @@ def _finalize_scenario_update(
         unable_reason=unable_reason,
         not_implemented=not_implemented if isinstance(not_implemented, list) else None,
     )
+    if vcs_checkpoint.get("attempted") and not vcs_checkpoint.get("ok"):
+        message += f" VCS checkpoint не создан: {vcs_checkpoint.get('error')}."
     actions = _revision_chat_actions(session, str(revision_info.get("revision") if revision_info else ""))
     return {
         "ok": True,
@@ -8694,6 +8778,7 @@ def _finalize_scenario_update(
         "message": message,
         "message_actions": actions,
         "ui_revision": revision_info,
+        "vcs_checkpoint": vcs_checkpoint,
         "llm": _compact_llm_result(llm_result),
         "dialog": _dialog_state(ws, topic_ref=topic),
     }

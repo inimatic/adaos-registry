@@ -4264,6 +4264,59 @@ def test_write_ui_revision_does_not_overwrite_existing_revision(tmp_path) -> Non
     assert session["ui_revision"] == "005"
 
 
+def test_builder_vcs_checkpoint_uses_llm_comment_and_persists_commit(monkeypatch, tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "vcs_scenario"
+    revision_dir = artifact_root / "ui_revisions"
+    revision_dir.mkdir(parents=True)
+    revision_path = revision_dir / "003.json"
+    revision_path.write_text('{"schema":"adaos.builder.ui_revision.v1","revision":"003"}', encoding="utf-8")
+    calls: list[dict] = []
+
+    class _Service:
+        @classmethod
+        def from_context(cls):
+            return cls()
+
+        def checkpoint_artifact(self, **kwargs):
+            calls.append(dict(kwargs))
+            return {
+                "ok": True,
+                "kind": kwargs["kind"],
+                "name": kwargs["artifact_id"],
+                "commit": "forge-abc123",
+                "message": kwargs["message"],
+            }
+
+    import adaos.services.builder.workspace as workspace
+
+    monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
+    session = {
+        "scenario_id": "vcs_scenario",
+        "artifact_root": str(artifact_root),
+        "ui_revision": "003",
+    }
+
+    result = skill._checkpoint_builder_artifact(
+        session=session,
+        revision_info={"revision": "003", "path": str(revision_path)},
+        request_text="Fallback request",
+        llm_result={"comment": "  Added   a modal form.  "},
+    )
+
+    assert calls == [
+        {
+            "kind": "scenario",
+            "artifact_id": "vcs_scenario",
+            "message": "Added a modal form.",
+        }
+    ]
+    assert result["commit"] == "forge-abc123"
+    persisted = json.loads(revision_path.read_text(encoding="utf-8"))
+    assert persisted["vcs_checkpoint"]["commit"] == "forge-abc123"
+    assert session["vcs_checkpoint"]["message"] == "Added a modal form."
+
+
 def test_set_ui_revision_current_failure_keeps_project_topic(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "revision_failure_topic"
