@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-18T21:30:00+00:00",
+  "updated_at": "2026-07-18T21:36:06+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -749,20 +749,35 @@
       "kind": "scenario",
       "id": "builder_pipeline_smoke_1784408500",
       "name": "builder_pipeline_smoke_1784408500",
-      "version": "0.0.1",
-      "updated_at": "2026-07-18T21:30:00+00:00",
+      "version": "0.0.2",
+      "updated_at": "2026-07-18T21:36:06+00:00",
       "path": "scenarios/builder_pipeline_smoke_1784408500",
-      "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.yaml",
+      "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.json",
       "source": {
         "path": "scenarios/builder_pipeline_smoke_1784408500",
-        "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.yaml"
+        "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.json"
       },
       "install": {
         "kind": "scenario",
         "name": "builder_pipeline_smoke_1784408500",
         "id": "builder_pipeline_smoke_1784408500"
       },
-      "trigger": "manual"
+      "description": "Runs the deterministic Builder pipeline smoke tool.",
+      "skills": {
+        "required": [
+          "builder_pipeline_smoke_1784408500_skill"
+        ]
+      },
+      "io": {
+        "input": [
+          "voice",
+          "text"
+        ],
+        "output": [
+          "voice",
+          "text"
+        ]
+      }
     },
     {
       "kind": "scenario",

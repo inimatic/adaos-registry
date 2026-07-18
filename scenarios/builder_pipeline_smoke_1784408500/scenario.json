@@ -1,6 +1,6 @@
 {
     "id": "builder_pipeline_smoke_1784408500",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "name": "builder_pipeline_smoke_1784408500",
     "description": "Runs the deterministic Builder pipeline smoke tool.",
     "depends": [
@@ -67,5 +67,5 @@
         }
     ],
     "prototype": "default",
-    "updated_at": "2026-07-18T21:30:00+00:00"
+    "updated_at": "2026-07-18T21:36:06+00:00"
 }
