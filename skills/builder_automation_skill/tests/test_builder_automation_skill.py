@@ -52,7 +52,8 @@ class _FakeService:
 
 def test_start_returns_render_safe_projection(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module, "_service", lambda: _FakeService())
+    service = _FakeService()
+    monkeypatch.setattr(module.builder_automation, "start", service.start_from_execute)
 
     result = module.start(
         object_type="scenario",
@@ -70,7 +71,9 @@ def test_start_returns_render_safe_projection(monkeypatch) -> None:
 
 def test_chat_localizes_iteration_receipt(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module, "_service", lambda: _FakeService())
+    service = _FakeService()
+    monkeypatch.setattr(module.builder_automation, "submit", service.submit_turn)
+    monkeypatch.setattr(module.builder_automation, "get_state", service.projection)
 
     result = module.chat(text="Добавь тесты", webspace_id="desktop-dev")
 
@@ -80,7 +83,8 @@ def test_chat_localizes_iteration_receipt(monkeypatch) -> None:
 
 def test_get_state_exposes_idle_state_without_faking_a_session(monkeypatch) -> None:
     module = _module()
-    monkeypatch.setattr(module, "_service", lambda: _FakeService())
+    service = _FakeService()
+    monkeypatch.setattr(module.builder_automation, "get_state", service.projection)
 
     result = module.get_state(webspace_id="desktop-dev")
 

@@ -2,12 +2,8 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+from adaos.sdk.builder import automation as builder_automation
 from adaos.sdk.core.decorators import tool
-from adaos.services.builder.automation import BuilderAutomationService
-
-
-def _service() -> BuilderAutomationService:
-    return BuilderAutomationService.from_context()
 
 
 def _webspace_id(webspace_id: str | None, meta: Mapping[str, Any] | None) -> str:
@@ -83,7 +79,7 @@ def start(
     brief_path: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    result = _service().start_from_execute(
+    result = builder_automation.start(
         object_type=object_type,
         object_id=object_id,
         implementation_brief=implementation_brief,
@@ -102,14 +98,14 @@ def chat(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    result = _service().submit_turn(
+    result = builder_automation.submit(
         text=text,
         object_type=object_type,
         object_id=object_id,
         webspace_id=_webspace_id(webspace_id, _meta),
     )
     if not result.get("automation"):
-        state = _service().projection(
+        state = builder_automation.get_state(
             object_type=object_type,
             object_id=object_id,
             webspace_id=_webspace_id(webspace_id, _meta),
@@ -125,7 +121,7 @@ def get_state(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    result = _service().projection(
+    result = builder_automation.get_state(
         object_type=object_type,
         object_id=object_id,
         webspace_id=_webspace_id(webspace_id, _meta),
@@ -136,4 +132,3 @@ def get_state(
 
 
 __all__ = ["chat", "get_state", "start"]
-
