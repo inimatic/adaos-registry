@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-18T21:29:40+00:00",
+  "updated_at": "2026-07-18T21:30:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -745,6 +745,25 @@
     }
   ],
   "scenarios": [
+    {
+      "kind": "scenario",
+      "id": "builder_pipeline_smoke_1784408500",
+      "name": "builder_pipeline_smoke_1784408500",
+      "version": "0.0.1",
+      "updated_at": "2026-07-18T21:30:00+00:00",
+      "path": "scenarios/builder_pipeline_smoke_1784408500",
+      "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.yaml",
+      "source": {
+        "path": "scenarios/builder_pipeline_smoke_1784408500",
+        "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "builder_pipeline_smoke_1784408500",
+        "id": "builder_pipeline_smoke_1784408500"
+      },
+      "trigger": "manual"
+    },
     {
       "kind": "scenario",
       "id": "infrascope",

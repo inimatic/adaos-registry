@@ -1,0 +1,71 @@
+{
+    "id": "builder_pipeline_smoke_1784408500",
+    "version": "0.0.1",
+    "name": "builder_pipeline_smoke_1784408500",
+    "description": "Runs the deterministic Builder pipeline smoke tool.",
+    "depends": [
+        "builder_pipeline_smoke_1784408500_skill"
+    ],
+    "triggers": [],
+    "slots": {},
+    "params": {},
+    "llm_hints": {
+        "description": "Run the Builder pipeline smoke check.",
+        "aliases": [],
+        "primary_actions": [
+            {
+                "id": "pipeline_smoke",
+                "intent": "builder_pipeline_smoke_1784408500.pipeline_smoke",
+                "tool": "builder_pipeline_smoke_1784408500_skill.pipeline_smoke",
+                "side_effect_class": "read_only",
+                "examples": [
+                    "Run the Builder pipeline smoke check"
+                ]
+            }
+        ],
+        "examples": [],
+        "owner_hints": []
+    },
+    "nlu": {
+        "nlu_hints": {
+            "aliases": [],
+            "examples": [],
+            "slot_schemas": {},
+            "entities": []
+        }
+    },
+    "io": {
+        "input": [
+            "voice",
+            "text"
+        ],
+        "output": [
+            "voice",
+            "text"
+        ],
+        "settings": {
+            "output.active": "voice"
+        }
+    },
+    "steps": [
+        {
+            "name": "pipeline_smoke",
+            "call": "builder_pipeline_smoke_1784408500_skill.pipeline_smoke",
+            "args": {},
+            "save_as": "pipeline_smoke_result"
+        }
+    ],
+    "data_routes": [
+        {
+            "surface": "pipeline smoke result",
+            "route": "tool/details",
+            "path": "pipeline_smoke_result",
+            "owner": "skill:builder_pipeline_smoke_1784408500_skill",
+            "first_paint": "empty until the scenario action completes",
+            "recovery": "rerun pipeline_smoke",
+            "guard_visibility": "scenario-local result"
+        }
+    ],
+    "prototype": "default",
+    "updated_at": "2026-07-18T21:30:00+00:00"
+}

@@ -1,0 +1,23 @@
+{
+  "object_type": "scenario",
+  "object_id": "builder_pipeline_smoke_1784408500",
+  "base_tz": "",
+  "tz_addenda": [],
+  "prepare": {
+    "general_prompt": "",
+    "iterations": []
+  },
+  "generate": {
+    "general_prompt": "",
+    "iterations": []
+  },
+  "llm_profile_id": null,
+  "builder_llm_model": null,
+  "llm_provider": null,
+  "llm_profile": null,
+  "llm_profile_updated_at": null,
+  "target_node_id": null,
+  "workflow_state": "automation",
+  "archived": false,
+  "updated_at": "2026-07-18T21:03:03.725073+00:00"
+}

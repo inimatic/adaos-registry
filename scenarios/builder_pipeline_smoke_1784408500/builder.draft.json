@@ -1,0 +1,56 @@
+{
+  "$schema": "../../abi/builder.draft.v1.schema.json",
+  "draft_id": "template.scenario_default",
+  "task_id": "template",
+  "status": "draft",
+  "source": {
+    "type": "template",
+    "text": "Default Builder scenario template."
+  },
+  "artifact": {
+    "kind": "scenario",
+    "id": "template-id",
+    "template_id": "scenario_default",
+    "draft_root": ".",
+    "files": [
+      { "path": "scenario.json", "role": "manifest", "required": true }
+    ]
+  },
+  "metadata": {
+    "source_idea": "Replace with the Builder task idea before publishing a draft.",
+    "assumptions": [
+      "Scenario triggers, steps, bindings, and skill dependencies must be filled from the Builder task.",
+      "Scenario drafts should prefer existing skills unless the task explicitly requires new capability work."
+    ],
+    "risk_notes": [
+      "New skill dependencies, endpoint control, broad NLU triggers, and external IO require human review."
+    ],
+    "expected_tests": [
+      "scenario schema validation",
+      "scenario dependency bootstrap preview"
+    ],
+    "route_plan_required": false,
+    "human_review_required": true
+  },
+  "quality_gates": {
+    "schemas": [
+      "scenario.schema.json"
+    ],
+    "tests": [
+      "scenario validation",
+      "dependency bootstrap preview"
+    ],
+    "previews": [
+      "action preview",
+      "NLU phrase probe"
+    ],
+    "requires_human_approval": [
+      "new skill dependencies",
+      "endpoint control",
+      "broad NLU triggers",
+      "external IO",
+      "destructive actions"
+    ]
+  },
+  "links": {}
+}
