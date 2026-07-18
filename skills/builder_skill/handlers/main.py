@@ -14,7 +14,12 @@ from collections.abc import Iterable as IterableABC
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
+from adaos.sdk import conversation as sdk_conversation
+from adaos.sdk.builder import artifacts as builder_artifacts
+from adaos.sdk.builder import preview as builder_preview
 from adaos.sdk.core.decorators import subscribe, tool
+from adaos.sdk.data import pending_actions as sdk_pending_actions
+from adaos.sdk.developer import projects as developer_projects
 
 
 SKILL_ID = "builder_skill"
@@ -187,9 +192,7 @@ def _align_workbench_binding_to_meta(webspace_id: str, _meta: Mapping[str, Any] 
 
 def _paired_dev_webspace_id(source_webspace_id: str) -> str | None:
     try:
-        from adaos.services.builder.workbench import dev_webspace_id_for_source
-
-        return dev_webspace_id_for_source(source_webspace_id)
+        return builder_preview.dev_webspace_id(source_webspace_id)
     except Exception:
         source = str(source_webspace_id or "").strip()
         return f"{source}-dev" if source else None
@@ -374,20 +377,9 @@ def _invalidate_scenario_runtime_caches(root: Path, reason: str) -> None:
     if not scenario_id:
         return
     try:
-        from adaos.services.scenarios import loader as scenarios_loader  # pylint: disable=import-outside-toplevel
-
-        scenarios_loader.invalidate_cache(scenario_id=scenario_id, space="dev")
-        scenarios_loader.invalidate_cache(scenario_id=scenario_id, space="workspace")
+        builder_preview.invalidate_scenario_caches(scenario_id, reason=reason)
     except Exception:
-        _LOG.debug("failed to invalidate scenario loader cache scenario=%s", scenario_id, exc_info=True)
-    try:
-        from adaos.services.scenario import webspace_runtime  # pylint: disable=import-outside-toplevel
-
-        invalidate = getattr(webspace_runtime, "_invalidate_resolved_webspace_cache", None)
-        if callable(invalidate):
-            invalidate(scenario_id=scenario_id, reason=reason)
-    except Exception:
-        _LOG.debug("failed to invalidate resolved webspace cache scenario=%s", scenario_id, exc_info=True)
+        _LOG.debug("failed to invalidate scenario runtime caches scenario=%s", scenario_id, exc_info=True)
 
 
 def _load_json_file(path: Path) -> dict[str, Any]:
@@ -779,10 +771,8 @@ def _builder_topic_ref(
         topic.setdefault("stored", bool(session_topic.get("stored")))
         return topic
     try:
-        from adaos.services.conversation_links import ensure_builder_topic
-
-        topic = ensure_builder_topic(
-            webspace_id,
+        topic = sdk_conversation.ensure_builder_topic(
+            webspace_id=webspace_id,
             active_draft_id=str(session.get("draft_id") or binding.get("active_draft_id") or "").strip() or None,
             scenario_id=str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip() or None,
             dev_webspace_id=str(binding.get("dev_webspace_id") or _paired_dev_webspace_id(webspace_id) or "").strip() or None,
@@ -1009,9 +999,7 @@ def _publish_review_pending_action(
     if patch:
         action_input.update({key: value for key, value in dict(patch).items() if key in {"target", "operation", "summary", "side_effect_class"}})
     try:
-        from adaos.services.conversation_safety import classify_action_risk
-
-        action_risk = classify_action_risk(action_input)
+        action_risk = sdk_conversation.classify_action_risk(action_input)
     except Exception:
         action_risk = {
             "schema": "adaos.conversation.action_risk.v1",
@@ -1021,11 +1009,10 @@ def _publish_review_pending_action(
             "reasons": [{"risk_class": "local_write", "reason": "fallback"}],
         }
     try:
-        from adaos.services.pending_actions import publish_pending_action
         from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
         def _publish() -> dict[str, Any]:
-            return publish_pending_action(
+            return sdk_pending_actions.publish_pending_action(
                 webspace_id=webspace_id,
                 kind=kind,
                 title="Review Builder change",
@@ -3102,9 +3089,7 @@ def _checkpoint_builder_artifact(
     patch_payload["change_id"] = change_id
     existing_change: Mapping[str, Any] = {}
     try:
-        from adaos.services import conversation_store
-
-        existing_change = conversation_store.get_development_change(change_id) or {}
+        existing_change = sdk_conversation.get_development_change(change_id) or {}
     except Exception:
         existing_change = {}
     topic_id = str(session.get("topic_id") or _prompt_project_topic_id(session=session)).strip()
@@ -3123,14 +3108,8 @@ def _checkpoint_builder_artifact(
     }
     metadata = {key: value for key, value in metadata.items() if value not in (None, "", [])}
     try:
-        from adaos.services.builder.workspace import BuilderWorkspaceService
-
-        service = BuilderWorkspaceService.from_context()
-        checkpoint = getattr(service, "checkpoint_artifact", None)
-        if not callable(checkpoint):
-            return {"ok": False, "attempted": False, "error": "checkpoint_service_unavailable", "message": message}
         result = dict(
-            checkpoint(
+            builder_artifacts.checkpoint(
                 kind=artifact_kind,
                 artifact_id=artifact_id,
                 message=message,
@@ -5927,8 +5906,6 @@ def _upsert_builder_change(
     extra_meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     try:
-        from adaos.services import conversation_store
-
         change_id = _builder_change_id(session=session, patch=patch)
         patch["change_id"] = change_id
         session["active_change_id"] = change_id
@@ -5936,7 +5913,7 @@ def _upsert_builder_change(
         topic_id = str(refs.get("topic_id") or session.get("topic_id") or _prompt_project_topic_id(session=session)).strip()
         thread_id = str(refs.get("thread_id") or session.get("thread_id") or topic_id).strip()
         conversation_id = str(refs.get("conversation_id") or _conversation_id(webspace_id)).strip()
-        existing = conversation_store.get_development_change(change_id) or {}
+        existing = sdk_conversation.get_development_change(change_id) or {}
         source_ids: list[str] = []
         for key in ("message_id", "source_message_id", "request_message_id"):
             value = str((_meta or {}).get(key) or refs.get(key) or "").strip()
@@ -5950,7 +5927,7 @@ def _upsert_builder_change(
         revision_refs = [{"revision": revision, "path": revision_path}] if revision else []
         commit = str((checkpoint or {}).get("commit") or "").strip()
         commit_refs = [{"commit": commit, "message": str((checkpoint or {}).get("message") or "").strip()}] if commit else []
-        return conversation_store.upsert_development_change(
+        return sdk_conversation.upsert_development_change(
             change_id=change_id,
             conversation_id=conversation_id,
             thread_id=thread_id or None,
@@ -7056,9 +7033,7 @@ def _repair_llm_webui_transform_output(
 
 
 def _workbench_service():
-    from adaos.services.builder.workbench import BuilderWorkbenchService
-
-    return BuilderWorkbenchService.from_context()
+    return builder_preview
 
 
 def _request_workbench_refresh(payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -7238,9 +7213,7 @@ def _builder_draft_payloads(session: Mapping[str, Any], binding: Mapping[str, An
             continue
         seen.add(token)
         try:
-            from adaos.services.runtime_paths import current_state_dir
-
-            payload = _read_json_file(current_state_dir() / "builder" / "drafts" / token / "builder.draft.json")
+            payload = builder_artifacts.get_draft(token)
         except Exception:
             payload = {}
         if payload:
@@ -7260,22 +7233,10 @@ def _scenario_artifact_root_from_id(scenario_id: str) -> str | None:
     if not token:
         return None
     try:
-        from adaos.services.runtime_paths import current_repo_root
-
-        repo_root = current_repo_root()
-    except Exception:
-        repo_root = Path.cwd()
-    if repo_root is None:
-        repo_root = Path.cwd()
-    dev_root = Path(repo_root) / ".adaos" / "dev"
-    try:
-        for path in sorted(dev_root.glob(f"*/scenarios/{token}")):
-            resolved = _existing_dir_path(path)
-            if resolved:
-                return resolved
+        scenario_root = developer_projects.find_scenario_root(token)
     except Exception:
         return None
-    return None
+    return _existing_dir_path(scenario_root)
 
 
 def _ensure_session_artifact_root(session: dict[str, Any], binding: Mapping[str, Any]) -> bool:
@@ -8199,7 +8160,7 @@ def _ensure_workbench_runtime_direct(
 ) -> dict[str, Any]:
     if (
         os.getenv("PYTEST_CURRENT_TEST")
-        and type(svc).__module__ == "adaos.services.builder.workbench"
+        and svc is builder_preview
         and str(os.getenv("ADAOS_BUILDER_WORKBENCH_IN_TESTS") or "").strip().lower() not in {"1", "true", "yes", "on"}
     ):
         return {"ok": False, "skipped": "actual_workbench_direct_disabled_in_tests"}
@@ -8294,7 +8255,7 @@ def _schedule_dev_runtime_reload_after_revision(
 
     if _builder_revision_materialization_enabled():
         try:
-            from adaos.services.scenario.webspace_runtime import apply_builder_revision_materialization
+            apply_builder_revision_materialization = builder_preview.materialize_revision_async
         except Exception as exc:
             materialization_import_error = f"{type(exc).__name__}: {exc}"
         else:
@@ -8399,7 +8360,7 @@ def _schedule_dev_runtime_reload_after_revision(
         materialization_import_error = "fast_path_disabled"
 
     try:
-        from adaos.services.scenario.webspace_runtime import reload_webspace_from_scenario
+        reload_webspace_from_scenario = builder_preview.reload_async
     except Exception as exc:
         try:
             from adaos.sdk.data import events
@@ -8432,7 +8393,7 @@ def _schedule_dev_runtime_reload_after_revision(
 
     async def _reload() -> dict[str, Any]:
         return await reload_webspace_from_scenario(
-            dev_webspace_id,
+            webspace_id=dev_webspace_id,
             scenario_id=scenario_id,
             action="reload",
             event_payload=event_payload,
@@ -8622,9 +8583,7 @@ def create_scenario_draft(
         "updated_at": _now(),
     }
     try:
-        from adaos.services.builder.workspace import BuilderWorkspaceService
-
-        draft = BuilderWorkspaceService.from_context().create_draft(
+        draft = builder_artifacts.create_draft(
             kind="scenario",
             artifact_id=sid,
             source_idea=source_idea,

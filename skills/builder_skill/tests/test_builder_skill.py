@@ -386,7 +386,7 @@ def test_create_draft_does_not_publish_pending_action_for_reversible_local_revis
             return {"ok": True, "draft": {"draft_id": "draft.shopping"}, "artifact_root": str(artifact_root)}
 
     import adaos.services.builder.workspace as workspace
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
 
@@ -3751,7 +3751,7 @@ def test_update_current_scenario_sample_data_uses_llm_payload_and_refreshes_file
             return {"preview_state": kwargs.get("preview_state") or {}}
 
     import adaos.sdk.data.events as events
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
@@ -3945,7 +3945,7 @@ def test_update_current_scenario_does_not_generate_domain_mock_data_without_llm(
             return {"preview_state": kwargs.get("preview_state") or {}}
 
     import adaos.sdk.data.events as events
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
@@ -4085,7 +4085,7 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
             return {"preview_state": kwargs.get("preview_state") or {}}
 
     import adaos.services.builder.workspace as workspace
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
@@ -4483,7 +4483,7 @@ def test_chat_first_idea_creates_preview_and_accepts_correction(monkeypatch, tmp
             return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
 
     import adaos.services.builder.workspace as workspace
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
@@ -4583,7 +4583,7 @@ def test_update_current_scenario_handles_layout_column_and_date_requests(monkeyp
         def snapshot(self, webspace_id, *, preview_state=None):
             return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
 
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
@@ -4659,7 +4659,7 @@ def test_update_current_scenario_does_not_publish_pending_action_for_reversible_
             return {"ok": True, "draft": {"draft_id": "draft.shopping"}, "artifact_root": str(artifact_root)}
 
     import adaos.services.builder.workspace as workspace
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
     monkeypatch.setattr(
@@ -4705,7 +4705,7 @@ def test_update_current_scenario_does_not_call_pending_action_service_for_local_
             return {"preview_state": kwargs.get("preview_state") or {}}
 
     import adaos.services.builder.workspace as workspace
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     def _slow_publish(**_kwargs):
         time.sleep(0.2)
@@ -4745,7 +4745,7 @@ def test_update_current_scenario_adds_product_units_and_filters(monkeypatch, tmp
         def snapshot(self, webspace_id, *, preview_state=None):
             return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
 
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
@@ -4887,7 +4887,7 @@ def test_chat_from_dev_webspace_updates_source_session_and_mirrors_response(monk
             return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
 
     import adaos.sdk.io.out as io_out
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
@@ -5140,7 +5140,7 @@ def test_chat_handles_builder_project_commands(monkeypatch, tmp_path) -> None:
             calls.append({"method": "snapshot", "webspace_id": webspace_id})
             return {"source_webspace_id": webspace_id, "preview_state": preview_state or {}}
 
-    import adaos.services.pending_actions as pending_actions
+    import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
