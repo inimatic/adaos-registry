@@ -44,6 +44,13 @@ def _load_module():
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+
+    # Runtime self-tests receive the active skill memory path. Keep every
+    # freshly loaded test module isolated instead of reading or mutating the
+    # user's persisted Builder sessions.
+    module._mem_get = lambda key, default=None: copy.deepcopy(module._FALLBACK_MEMORY.get(key, default))
+    module._mem_set = lambda key, value: module._FALLBACK_MEMORY.__setitem__(key, copy.deepcopy(value))
+    module._mem_set_many = lambda values: module._FALLBACK_MEMORY.update(copy.deepcopy(dict(values)))
     return module
 
 
@@ -4961,6 +4968,8 @@ def test_chat_requires_selected_builder_target(monkeypatch) -> None:
             }
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
+    monkeypatch.setattr(skill, "_sessions", lambda _webspace_id: {})
+    monkeypatch.setattr(skill, "_load_session", lambda _webspace_id: None)
     monkeypatch.setattr(skill, "_safe_emit_chat", lambda *args, **kwargs: None)
 
     result = skill.chat("\u0434\u043e\u0431\u0430\u0432\u044c \u043f\u043e\u043b\u0435 \u0446\u0435\u043d\u0430", webspace_id="desktop")
@@ -4989,6 +4998,8 @@ def test_chat_does_not_create_project_for_edit_like_request_without_target(monke
         return {"ok": True, "scenario_id": "unexpected"}
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
+    monkeypatch.setattr(skill, "_sessions", lambda _webspace_id: {})
+    monkeypatch.setattr(skill, "_load_session", lambda _webspace_id: None)
     monkeypatch.setattr(skill, "create_scenario_draft", _fake_create)
     monkeypatch.setattr(skill, "_safe_emit_chat", lambda *args, **kwargs: None)
 
