@@ -593,6 +593,10 @@ def _builder_llm_progress_meta(
     )
     if label:
         meta["progress_label"] = label
+    change_id = str(meta.get("change_id") or "").strip()
+    if change_id:
+        suffix = "result" if str(phase or "").strip() in {"completed", "failed"} else str(phase or "progress").strip()
+        meta["message_id"] = f"m.builder.{change_id}.{suffix}"
     return meta
 
 
@@ -698,7 +702,8 @@ def _looks_like_todo_list_title(text: str) -> bool:
 
 
 def _conversation_id(webspace_id: str) -> str:
-    return f"conv.skill.{SKILL_ID}.default.{webspace_id or 'default'}"
+    del webspace_id
+    return f"conv.skill.{SKILL_ID}.default"
 
 
 def _prompt_project_topic_id(session: Mapping[str, Any] | None = None, binding: Mapping[str, Any] | None = None) -> str:
@@ -1121,7 +1126,13 @@ def _safe_emit_chat(
 
             def _append_chat() -> Mapping[str, bool]:
                 try:
-                    return chat_append(text, from_=from_, actions=actions, _meta=meta)
+                    return chat_append(
+                        text,
+                        from_=from_,
+                        msg_id=str(meta.get("message_id") or "").strip() or None,
+                        actions=actions,
+                        _meta=meta,
+                    )
                 except TypeError:
                     return chat_append(text, from_=from_, _meta=meta)
 
@@ -3005,6 +3016,7 @@ def _write_ui_revision(
     if provider_telemetry:
         inference["response_id"] = provider_telemetry.get("response_id")
         inference["service_tier"] = provider_telemetry.get("service_tier")
+    change_id = str(patch.get("change_id") or session.get("active_change_id") or "").strip()
     payload = {
         "schema": "adaos.builder.ui_revision.v1",
         "revision": revision,
@@ -3012,6 +3024,7 @@ def _write_ui_revision(
         "session_id": session.get("id"),
         "scenario_id": session.get("scenario_id"),
         "draft_id": session.get("draft_id"),
+        "change_id": change_id or None,
         "inference": {k: v for k, v in inference.items() if v not in (None, "")},
         "request": {"text": _display_request_text(request_text, patch)},
         "patch": _repair_text_tree(copy.deepcopy(dict(patch))),
@@ -3036,6 +3049,7 @@ def _write_ui_revision(
             "request": str(request_text or ""),
             "operation": str(patch.get("operation") or ""),
             "model": model_id,
+            "change_id": change_id or None,
             "created_at": payload["created_at"],
         }
     )
@@ -3060,10 +3074,13 @@ def _builder_vcs_commit_message(
 
 def _checkpoint_builder_artifact(
     *,
+    webspace_id: str = "desktop",
     session: dict[str, Any],
     revision_info: Mapping[str, Any] | None,
     request_text: str,
     llm_result: Mapping[str, Any] | None,
+    patch: dict[str, Any] | None = None,
+    _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     artifact_id = str(session.get("scenario_id") or session.get("artifact_id") or "").strip()
     artifact_kind = str(session.get("artifact_kind") or "scenario").strip().lower().rstrip("s")
@@ -3077,6 +3094,34 @@ def _checkpoint_builder_artifact(
         request_text=request_text,
         llm_result=llm_result,
     )
+    patch_payload = patch if isinstance(patch, dict) else {
+        "id": f"patch_checkpoint_{revision or _hash_suffix(request_text)}",
+        "operation": "checkpoint",
+    }
+    change_id = _builder_change_id(session=session, patch=patch_payload)
+    patch_payload["change_id"] = change_id
+    existing_change: Mapping[str, Any] = {}
+    try:
+        from adaos.services import conversation_store
+
+        existing_change = conversation_store.get_development_change(change_id) or {}
+    except Exception:
+        existing_change = {}
+    topic_id = str(session.get("topic_id") or _prompt_project_topic_id(session=session)).strip()
+    thread_id = str(session.get("thread_id") or topic_id).strip()
+    result_message_id = f"m.builder.{change_id}.result"
+    metadata = {
+        "change_id": change_id,
+        "conversation_id": _conversation_id(webspace_id),
+        "topic_id": topic_id,
+        "thread_id": thread_id,
+        "revision": revision,
+        "model": str((llm_result or {}).get("model") or _builder_llm_model_for_session(session, _meta) or "").strip(),
+        "request_id": str((llm_result or {}).get("request_id") or existing_change.get("request_id") or "").strip(),
+        "result_message_id": result_message_id,
+        "source_message_ids": list(existing_change.get("source_message_ids") or []),
+    }
+    metadata = {key: value for key, value in metadata.items() if value not in (None, "", [])}
     try:
         from adaos.services.builder.workspace import BuilderWorkspaceService
 
@@ -3084,7 +3129,15 @@ def _checkpoint_builder_artifact(
         checkpoint = getattr(service, "checkpoint_artifact", None)
         if not callable(checkpoint):
             return {"ok": False, "attempted": False, "error": "checkpoint_service_unavailable", "message": message}
-        result = dict(checkpoint(kind=artifact_kind, artifact_id=artifact_id, message=message) or {})
+        result = dict(
+            checkpoint(
+                kind=artifact_kind,
+                artifact_id=artifact_id,
+                message=message,
+                metadata=metadata,
+            )
+            or {}
+        )
         result.update({"attempted": True, "revision": revision, "message": result.get("message") or message})
     except Exception as exc:
         result = {
@@ -3097,6 +3150,20 @@ def _checkpoint_builder_artifact(
             "error": f"{type(exc).__name__}: {exc}",
         }
         _LOG.warning("Builder VCS checkpoint failed kind=%s artifact=%s revision=%s: %s", artifact_kind, artifact_id, revision, exc)
+    _upsert_builder_change(
+        webspace_id=webspace_id,
+        session=session,
+        patch=patch_payload,
+        request_text=request_text,
+        status="pushed" if result.get("ok") else "checkpoint_failed",
+        _meta=_meta,
+        revision_info=revision_info,
+        checkpoint=result,
+        model=str(metadata.get("model") or "") or None,
+        request_id=str(metadata.get("request_id") or "") or None,
+        result_message_id=result_message_id,
+        extra_meta={"checkpoint_error": result.get("error")} if not result.get("ok") else None,
+    )
     session["vcs_checkpoint"] = copy.deepcopy(result)
     revision_path = Path(str((revision_info or {}).get("path") or "")).expanduser()
     if revision_path.is_file():
@@ -5814,6 +5881,97 @@ def _collect_state_refs(value: Any) -> set[str]:
     return refs
 
 
+def _builder_change_id(
+    *,
+    session: Mapping[str, Any],
+    patch: Mapping[str, Any],
+) -> str:
+    existing = str(patch.get("change_id") or "").strip()
+    if existing:
+        return existing
+    seed = ":".join(
+        (
+            str(session.get("id") or ""),
+            str(session.get("scenario_id") or session.get("artifact_id") or ""),
+            str(patch.get("id") or ""),
+        )
+    )
+    return f"builder_change_{_hash_suffix(seed)}"
+
+
+def _merge_change_refs(existing: Any, incoming: Sequence[Any]) -> list[Any]:
+    result: list[Any] = []
+    seen: set[str] = set()
+    for item in [*(existing if isinstance(existing, list) else []), *incoming]:
+        key = _compact_json(item) if isinstance(item, (Mapping, list)) else str(item)
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        result.append(copy.deepcopy(item))
+    return result
+
+
+def _upsert_builder_change(
+    *,
+    webspace_id: str,
+    session: dict[str, Any],
+    patch: dict[str, Any],
+    request_text: str,
+    status: str,
+    _meta: Mapping[str, Any] | None = None,
+    revision_info: Mapping[str, Any] | None = None,
+    checkpoint: Mapping[str, Any] | None = None,
+    request_id: str | None = None,
+    model: str | None = None,
+    result_message_id: str | None = None,
+    extra_meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any] | None:
+    try:
+        from adaos.services import conversation_store
+
+        change_id = _builder_change_id(session=session, patch=patch)
+        patch["change_id"] = change_id
+        session["active_change_id"] = change_id
+        refs = _source_refs(webspace_id=webspace_id, session=session, _meta=_meta, patch=patch)
+        topic_id = str(refs.get("topic_id") or session.get("topic_id") or _prompt_project_topic_id(session=session)).strip()
+        thread_id = str(refs.get("thread_id") or session.get("thread_id") or topic_id).strip()
+        conversation_id = str(refs.get("conversation_id") or _conversation_id(webspace_id)).strip()
+        existing = conversation_store.get_development_change(change_id) or {}
+        source_ids: list[str] = []
+        for key in ("message_id", "source_message_id", "request_message_id"):
+            value = str((_meta or {}).get(key) or refs.get(key) or "").strip()
+            if value:
+                source_ids.append(value)
+        artifact_id = str(session.get("scenario_id") or session.get("artifact_id") or "").strip()
+        artifact_kind = str(session.get("artifact_kind") or "scenario").strip().lower().rstrip("s")
+        artifact_refs = [{"kind": artifact_kind, "id": artifact_id, "path": str(session.get("artifact_root") or "")}] if artifact_id else []
+        revision = str((revision_info or {}).get("revision") or "").strip()
+        revision_path = str((revision_info or {}).get("path") or "").strip()
+        revision_refs = [{"revision": revision, "path": revision_path}] if revision else []
+        commit = str((checkpoint or {}).get("commit") or "").strip()
+        commit_refs = [{"commit": commit, "message": str((checkpoint or {}).get("message") or "").strip()}] if commit else []
+        return conversation_store.upsert_development_change(
+            change_id=change_id,
+            conversation_id=conversation_id,
+            thread_id=thread_id or None,
+            topic_id=topic_id or None,
+            status=status,
+            source_message_ids=_merge_change_refs(existing.get("source_message_ids"), source_ids),
+            source_refs={**dict(existing.get("source_refs") or {}), **refs},
+            artifact_refs=_merge_change_refs(existing.get("artifact_refs"), artifact_refs),
+            revision_refs=_merge_change_refs(existing.get("revision_refs"), revision_refs),
+            commit_refs=_merge_change_refs(existing.get("commit_refs"), commit_refs),
+            result_message_id=result_message_id,
+            request_id=str(request_id or existing.get("request_id") or "").strip() or None,
+            model=str(model or existing.get("model") or "").strip() or None,
+            summary=" ".join(str(request_text or existing.get("summary") or "").split())[:240],
+            meta={**dict(existing.get("meta") or {}), **dict(extra_meta or {})},
+        )
+    except Exception:
+        _LOG.debug("failed to persist Builder change", exc_info=True)
+        return None
+
+
 def _validate_page_schema_component_contracts(
     page_schema: Mapping[str, Any],
     *,
@@ -8500,6 +8658,15 @@ def create_scenario_draft(
         "summary": source_idea,
         "diff": {"scenario_id": sid, "fields": fields},
     }
+    _upsert_builder_change(
+        webspace_id=ws,
+        session=session,
+        patch=initial_patch,
+        request_text=source_idea,
+        status="accepted",
+        _meta=_meta,
+        model=_builder_llm_model_for_session(session, _meta),
+    )
     initial_revision_info = _write_ui_revision(
         session=session,
         request_text=source_idea,
@@ -8512,10 +8679,13 @@ def create_scenario_draft(
         revision=initial_revision,
     )
     vcs_checkpoint = _checkpoint_builder_artifact(
+        webspace_id=ws,
         session=session,
         revision_info=initial_revision_info,
         request_text=source_idea,
         llm_result=None,
+        patch=initial_patch,
+        _meta=_meta,
     )
     _save_session(ws, session)
     workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False, snapshot_projection=False)
@@ -8563,6 +8733,10 @@ def create_scenario_draft(
         "topic": {k: v for k, v in topic.items() if k != "stored"},
         "pending_action": pending_action,
         "message": message,
+        "message_meta": {
+            "change_id": str(initial_patch.get("change_id") or ""),
+            "message_id": f"m.builder.{initial_patch.get('change_id')}.result",
+        },
         "message_actions": actions,
         "ui_revision": {"revision": session.get("ui_revision")} if session.get("ui_revision") else None,
         "vcs_checkpoint": vcs_checkpoint,
@@ -8717,10 +8891,13 @@ def _finalize_scenario_update(
         patch["revision_path"] = revision_info.get("path")
         session["patches"][-1] = patch
     vcs_checkpoint = _checkpoint_builder_artifact(
+        webspace_id=ws,
         session=session,
         revision_info=revision_info,
         request_text=request_text,
         llm_result=llm_result,
+        patch=patch,
+        _meta=_meta,
     )
     workbench = _ensure_workbench(ws, session=session, preview_state=preview, refresh_runtime=False, snapshot_projection=False)
     resolved_binding = workbench.get("binding") if isinstance(workbench.get("binding"), Mapping) else binding
@@ -8776,6 +8953,10 @@ def _finalize_scenario_update(
         "topic": {k: v for k, v in topic.items() if k != "stored"},
         "pending_action": pending_action,
         "message": message,
+        "message_meta": {
+            "change_id": str(patch.get("change_id") or ""),
+            "message_id": f"m.builder.{patch.get('change_id')}.result",
+        },
         "message_actions": actions,
         "ui_revision": revision_info,
         "vcs_checkpoint": vcs_checkpoint,
@@ -9060,6 +9241,27 @@ def _mark_llm_job_failed(
     )
     _update_llm_job_status(session, job_id, "failed", detail=detail)
     _write_llm_job_terminal_artifact(session, job_id, "failed", detail=detail)
+    pending_jobs = session.get("pending_llm_jobs") if isinstance(session.get("pending_llm_jobs"), Mapping) else {}
+    job_ref = pending_jobs.get(job_id) if isinstance(pending_jobs.get(job_id), Mapping) else {}
+    change_id = str((_meta or {}).get("change_id") or job_ref.get("change_id") or session.get("active_change_id") or "").strip()
+    if change_id:
+        failure_patch = {
+            "id": str(job_ref.get("patch_id") or f"patch_{change_id}"),
+            "change_id": change_id,
+            "operation": "llm_webui_transform",
+        }
+        _upsert_builder_change(
+            webspace_id=ws,
+            session=session,
+            patch=failure_patch,
+            request_text=str(job_ref.get("request_text") or ""),
+            status="failed",
+            _meta=_meta,
+            request_id=str(job_ref.get("request_id") or "") or None,
+            model=str(job_ref.get("model") or "") or None,
+            result_message_id=f"m.builder.{change_id}.result",
+            extra_meta={"root_job_id": job_id, "error": detail},
+        )
     _save_session(ws, session)
     _LOG.debug(
         "builder LLM job failed status saved scenario=%s job_id=%s",
@@ -9292,6 +9494,7 @@ def _ensure_llm_job_link(
     base_url: str | None = None,
     request_text: str | None = None,
     patch_id: Any = None,
+    change_id: str | None = None,
     model: str | None = None,
     status: str | None = None,
 ) -> None:
@@ -9308,6 +9511,7 @@ def _ensure_llm_job_link(
         "base_url": str(base_url or "").strip() or None,
         "request_text": str(request_text or ""),
         "patch_id": patch_id,
+        "change_id": str(change_id or "").strip() or None,
         "model": str(model or "").strip() or None,
     }
     if local_id:
@@ -9324,6 +9528,8 @@ def _ensure_llm_job_link(
             local_entry.setdefault("request_text", str(request_text))
         if patch_id is not None:
             local_entry.setdefault("patch_id", patch_id)
+        if change_id:
+            local_entry.setdefault("change_id", str(change_id))
         if model:
             local_entry.setdefault("model", str(model))
         local_entry.setdefault("created_at", now)
@@ -10128,6 +10334,22 @@ def update_current_scenario(
         "summary": text,
         "diff": {},
     }
+    if _is_api_tool_call(_meta) and not str((_meta or {}).get("message_id") or "").strip():
+        request_meta = dict(_meta or {})
+        request_meta["message_id"] = f"m.builder.{_builder_change_id(session=session, patch=patch)}.request"
+        _meta = request_meta
+    _upsert_builder_change(
+        webspace_id=ws,
+        session=session,
+        patch=patch,
+        request_text=text,
+        status="accepted",
+        _meta=_meta,
+        model=_builder_llm_model_for_session(session, _meta),
+    )
+    operation_meta = dict(_meta or {})
+    operation_meta["change_id"] = str(patch.get("change_id") or "")
+    _meta = operation_meta
     fields = [dict(item) for item in session.get("fields", []) if isinstance(item, Mapping)]
     filters = [dict(item) for item in session.get("filters", []) if isinstance(item, Mapping)]
     base_preview = session.get("preview_state") if isinstance(session.get("preview_state"), dict) else _preview_state(session=session)
@@ -10219,8 +10441,20 @@ def update_current_scenario(
                 base_url=base_url,
                 request_text=text,
                 patch_id=patch.get("id"),
+                change_id=str(patch.get("change_id") or "") or None,
                 model=selected_model,
                 status=str(submit_result.get("status") or "queued"),
+            )
+            _upsert_builder_change(
+                webspace_id=ws,
+                session=session,
+                patch=patch,
+                request_text=text,
+                status="llm_pending",
+                _meta=_meta,
+                request_id=request_id,
+                model=selected_model,
+                extra_meta={"root_job_id": job_id, "local_job_id": local_job_id},
             )
             job_link_done_at = time.perf_counter()
             _save_session(ws, session)
@@ -10672,6 +10906,30 @@ def set_ui_revision_current(
         timings_ms["emit_chat"] = _elapsed_ms(stage_started)
         timings_ms["total"] = _elapsed_ms(started_at)
         return {"ok": False, "error": "revision_validation_failed", "validation": validation, "message": message, "dialog": _dialog_state(ws, topic_ref=failure_topic), "timings_ms": timings_ms}
+    previous_revision = str(session.get("ui_revision") or "").strip()
+    restore_patch = {
+        "id": f"patch_restore_{_hash_suffix(str(session.get('id') or '') + previous_revision + str(revision) + str(_now()))}",
+        "target": "ui",
+        "operation": "restore_revision",
+        "status": "applied",
+        "created_by": "builder_skill",
+        "created_at": _now(),
+        "summary": f"Restore UI revision {revision_payload.get('revision') or revision}",
+        "diff": {
+            "from_revision": previous_revision or None,
+            "to_revision": str(revision_payload.get("revision") or revision),
+        },
+    }
+    inference = revision_payload.get("inference") if isinstance(revision_payload.get("inference"), Mapping) else {}
+    _upsert_builder_change(
+        webspace_id=ws,
+        session=session,
+        patch=restore_patch,
+        request_text=str(restore_patch["summary"]),
+        status="accepted",
+        _meta=_meta,
+        model=str(inference.get("model") or "") or None,
+    )
     stage_started = time.perf_counter()
     session["preview_state"] = copy.deepcopy(dict(preview))
     session["webui_payload"] = copy.deepcopy(dict(after_webui))
@@ -10714,6 +10972,21 @@ def set_ui_revision_current(
     session["topic_ref"] = {k: v for k, v in topic.items() if k != "stored"}
     _save_session(ws, session)
     timings_ms["save_session"] = _elapsed_ms(stage_started)
+    selected_revision = str(session.get("ui_revision") or revision)
+    stage_started = time.perf_counter()
+    vcs_checkpoint = _checkpoint_builder_artifact(
+        webspace_id=ws,
+        session=session,
+        revision_info={
+            "revision": selected_revision,
+            "path": "",
+        },
+        request_text=str(restore_patch["summary"]),
+        llm_result=None,
+        patch=restore_patch,
+        _meta=_meta,
+    )
+    timings_ms["vcs_checkpoint"] = _elapsed_ms(stage_started)
     message = _builder_revision_message(
         "revision_restored",
         revision=str(session.get("ui_revision") or revision),
@@ -10742,7 +11015,12 @@ def set_ui_revision_current(
         "dev_runtime_refresh": dev_runtime_refresh,
         "chat_emit": chat_emit,
         "message": message,
+        "message_meta": {
+            "change_id": str(restore_patch.get("change_id") or ""),
+            "message_id": f"m.builder.{restore_patch.get('change_id')}.result",
+        },
         "message_actions": actions,
+        "vcs_checkpoint": vcs_checkpoint,
         "dialog": _dialog_state(ws, topic_ref=topic),
         "timings_ms": timings_ms,
     }

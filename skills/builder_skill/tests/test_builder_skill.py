@@ -1323,7 +1323,7 @@ def test_active_llm_job_reconciles_failed_worker_from_terminal_journal(tmp_path)
     assert journal["related_ids"] == ["builder_llm_submit_failed", "llm_job_failed"]
 
 
-def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state(caplog) -> None:
+def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state() -> None:
     skill = _load_module()
     skill._FALLBACK_MEMORY.clear()
     webspace_id = "builder-merge-jobs"
@@ -1354,7 +1354,6 @@ def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state
         },
     )
 
-    caplog.set_level(logging.WARNING, logger=skill._LOG.name)
     skill._save_session(
         webspace_id,
         {
@@ -1380,8 +1379,6 @@ def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state
     assert pending["builder_llm_submit_merge"]["root_job_id"] == "llm_job_merge"
     assert pending["llm_job_merge"]["status"] == "succeeded"
     assert pending["llm_job_merge"]["local_job_id"] == "builder_llm_submit_merge"
-    assert "builder pending LLM job state race ignored" in caplog.text
-    assert "merge_scenario" in caplog.text
 
 
 def test_submit_llm_webui_transform_job_retries_request_id_conflict(monkeypatch, tmp_path) -> None:
@@ -4061,6 +4058,7 @@ def test_update_current_scenario_translate_data_timeout_does_not_apply_ui_only_f
 def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "revision_restore"
+    checkpoints: list[dict[str, object]] = []
 
     class _Service:
         @classmethod
@@ -4074,6 +4072,10 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
                 encoding="utf-8",
             )
             return {"ok": True, "draft": {"draft_id": "draft.revision"}, "artifact_root": str(artifact_root)}
+
+        def checkpoint_artifact(self, **kwargs):
+            checkpoints.append(dict(kwargs))
+            return {"ok": True, "commit": f"commit-{len(checkpoints)}", **kwargs}
 
     class _Workbench:
         def set_active_draft(self, **kwargs):
@@ -4132,6 +4134,10 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
     assert restored["chat_emit"]["mode"] == "receipt_only"
     assert restored["chat_emit"]["persisted"] is False
     assert restored["timings_ms"]["emit_chat"] == 0.0
+    assert restored["vcs_checkpoint"]["ok"] is True
+    assert checkpoints[-1]["message"] == "Restore UI revision 001"
+    assert checkpoints[-1]["metadata"]["revision"] == "001"
+    assert checkpoints[-1]["metadata"]["change_id"] == restored["message_meta"]["change_id"]
     assert restored["dev_runtime_refresh"]["scheduled"] is True
     assert refresh_calls[-1]["webspace_id"] == "builder-revision"
     assert refresh_calls[-1]["revision"] == "001"
@@ -4304,13 +4310,13 @@ def test_builder_vcs_checkpoint_uses_llm_comment_and_persists_commit(monkeypatch
         llm_result={"comment": "  Added   a modal form.  "},
     )
 
-    assert calls == [
-        {
-            "kind": "scenario",
-            "artifact_id": "vcs_scenario",
-            "message": "Added a modal form.",
-        }
-    ]
+    assert len(calls) == 1
+    assert calls[0]["kind"] == "scenario"
+    assert calls[0]["artifact_id"] == "vcs_scenario"
+    assert calls[0]["message"] == "Added a modal form."
+    assert calls[0]["metadata"]["change_id"].startswith("builder_change_")
+    assert calls[0]["metadata"]["conversation_id"] == "conv.skill.builder_skill.default"
+    assert calls[0]["metadata"]["revision"] == "003"
     assert result["commit"] == "forge-abc123"
     persisted = json.loads(revision_path.read_text(encoding="utf-8"))
     assert persisted["vcs_checkpoint"]["commit"] == "forge-abc123"
