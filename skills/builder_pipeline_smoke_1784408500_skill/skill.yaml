@@ -1,0 +1,61 @@
+name: builder_pipeline_smoke_1784408500_skill
+version: 0.0.1
+description: SDK-only smoke check for the AdaOS Builder pipeline.
+supported_locales:
+- en
+entry: handlers/main.py
+default_tool: pipeline_smoke
+runtime:
+  python: '3.11'
+dependencies: []
+events:
+  subscribe: []
+  publish: []
+exports:
+  tools:
+  - pipeline_smoke
+tools:
+- name: pipeline_smoke
+  description: Return a stable marker confirming the Builder tool pipeline is operational.
+  entry: handlers.main:pipeline_smoke
+  input_schema:
+    type: object
+    properties: {}
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - marker
+    properties:
+      ok:
+        type: boolean
+        const: true
+      marker:
+        type: string
+        const: followup
+    additionalProperties: false
+llm_hints:
+  description: Run a deterministic SDK-only smoke check for the AdaOS Builder pipeline.
+  aliases:
+  - builder pipeline smoke
+  primary_actions:
+  - id: builder_pipeline_smoke_1784408500_skill.pipeline_smoke
+    intent: builder_pipeline_smoke_1784408500_skill.pipeline_smoke
+    tool: pipeline_smoke
+    side_effect_class: read_only
+    examples:
+    - Run the Builder pipeline smoke check
+  examples:
+  - Run the Builder pipeline smoke check
+  owner_hints:
+  - skill:builder_pipeline_smoke_1784408500_skill
+nlu_hints:
+  aliases:
+  - builder pipeline smoke
+  examples:
+  - Run the Builder pipeline smoke check
+  slot_schemas: {}
+  entities: []
+prototype: skill_default
+updated_at: '2026-07-18T21:29:40+00:00'

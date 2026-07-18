@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-18T21:00:18+00:00",
+  "updated_at": "2026-07-18T21:29:40+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -87,6 +87,28 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "tools_count": 3
+    },
+    {
+      "kind": "skill",
+      "id": "builder_pipeline_smoke_1784408500_skill",
+      "name": "builder_pipeline_smoke_1784408500_skill",
+      "version": "0.0.1",
+      "updated_at": "2026-07-18T21:29:40+00:00",
+      "path": "skills/builder_pipeline_smoke_1784408500_skill",
+      "manifest": "skills/builder_pipeline_smoke_1784408500_skill/skill.yaml",
+      "source": {
+        "path": "skills/builder_pipeline_smoke_1784408500_skill",
+        "manifest": "skills/builder_pipeline_smoke_1784408500_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "builder_pipeline_smoke_1784408500_skill",
+        "id": "builder_pipeline_smoke_1784408500_skill"
+      },
+      "description": "SDK-only smoke check for the AdaOS Builder pipeline.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 1
     },
     {
       "kind": "skill",
