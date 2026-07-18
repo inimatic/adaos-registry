@@ -4561,6 +4561,80 @@ def test_chat_guides_underspecified_first_idea(monkeypatch) -> None:
     assert emitted[0]["kwargs"]["topic_ref"]["thread_id"] == result["topic"]["thread_id"]
 
 
+def test_chat_routes_followup_to_automation_sdk_at_automation_stage(monkeypatch) -> None:
+    skill = _load_module()
+    emitted: list[dict] = []
+    submitted: list[dict] = []
+    session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
+    binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
+
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(
+        skill.developer_prompt_context,
+        "get",
+        lambda kind, project_id: {"workflow_state": "automation", "object_type": kind, "object_id": project_id},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_automation,
+        "get_state",
+        lambda **_kwargs: {"ok": True, "session_present": True, "automation": {"status": "completed"}},
+    )
+
+    def _submit(text, **kwargs):
+        submitted.append({"text": text, **kwargs})
+        return {"ok": True, "handled": True, "status": "automation_queued", "message": "Iteration queued."}
+
+    monkeypatch.setattr(skill.sdk_builder_automation, "submit", _submit)
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append({"text": text, **kwargs}))
+    monkeypatch.setattr(
+        skill,
+        "update_current_scenario",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("prototype route must not run")),
+    )
+
+    result = skill.chat("Add a lint gate before push.", webspace_id="desktop")
+
+    assert result["status"] == "automation_queued"
+    assert result["project"] == {"type": "scenario", "id": "builder"}
+    assert submitted == [
+        {
+            "text": "Add a lint gate before push.",
+            "object_type": "scenario",
+            "object_id": "builder",
+            "webspace_id": "desktop",
+        }
+    ]
+    assert emitted[0]["text"] == "Iteration queued."
+    assert emitted[0]["topic_ref"]["thread_id"] == "prompt-project:scenario:builder"
+
+
+def test_chat_does_not_mutate_prototype_when_automation_session_is_not_started(monkeypatch) -> None:
+    skill = _load_module()
+    emitted: list[str] = []
+    session = {"scenario_id": "builder", "artifact_root": "/dev/scenarios/builder"}
+    binding = {"runtime_scenario_id": "builder", "dev_webspace_id": "desktop-dev"}
+
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(skill.developer_prompt_context, "get", lambda *_args: {"workflow_state": "automation"})
+    monkeypatch.setattr(
+        skill.sdk_builder_automation,
+        "get_state",
+        lambda **_kwargs: {"ok": True, "session_present": False, "automation": {"status": "idle"}},
+    )
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **_kwargs: emitted.append(text))
+    monkeypatch.setattr(
+        skill,
+        "update_current_scenario",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("prototype route must not run")),
+    )
+
+    result = skill.chat("Implement the approved brief.", webspace_id="desktop")
+
+    assert result["status"] == "automation_session_required"
+    assert result["automation"]["status"] == "idle"
+    assert "ещё не запущена" in emitted[0]
+
+
 def test_update_current_scenario_handles_layout_column_and_date_requests(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "shopping_list"

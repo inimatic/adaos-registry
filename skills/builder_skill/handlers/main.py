@@ -15,10 +15,12 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
 from adaos.sdk import conversation as sdk_conversation
+from adaos.sdk.builder import automation as sdk_builder_automation
 from adaos.sdk.builder import artifacts as builder_artifacts
 from adaos.sdk.builder import preview as builder_preview
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import pending_actions as sdk_pending_actions
+from adaos.sdk.developer import prompt_context as developer_prompt_context
 from adaos.sdk.developer import projects as developer_projects
 
 
@@ -815,6 +817,106 @@ def _builder_topic_ref(
             "owner": f"skill:{SKILL_ID}",
             "stored": False,
         }
+
+
+def _chat_project_ref(
+    *,
+    topic: Mapping[str, Any] | None,
+    session: Mapping[str, Any] | None,
+    binding: Mapping[str, Any] | None,
+) -> tuple[str, str] | None:
+    """Resolve the selected DEV project without reaching into Builder services."""
+
+    topic = topic if isinstance(topic, Mapping) else {}
+    for key in ("thread_id", "topic_id"):
+        value = str(topic.get(key) or "").strip()
+        match = re.fullmatch(r"prompt-project:(skill|scenario):([A-Za-z0-9][A-Za-z0-9_.-]{0,127})", value)
+        if match:
+            return match.group(1), match.group(2)
+    session = session if isinstance(session, Mapping) else {}
+    binding = binding if isinstance(binding, Mapping) else {}
+    scenario_id = str(session.get("scenario_id") or binding.get("runtime_scenario_id") or "").strip()
+    if scenario_id:
+        return "scenario", scenario_id
+    return None
+
+
+def _route_automation_chat(
+    *,
+    utterance: str,
+    webspace_id: str,
+    session: Mapping[str, Any] | None,
+    binding: Mapping[str, Any] | None,
+    topic: Mapping[str, Any] | None,
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Delegate chat to Automation only while the selected project is at that stage."""
+
+    project_ref = _chat_project_ref(topic=topic, session=session, binding=binding)
+    if project_ref is None:
+        return None
+    object_type, object_id = project_ref
+    try:
+        context = developer_prompt_context.get(object_type, object_id)
+    except Exception:
+        return None
+    if str(context.get("workflow_state") or "").strip() != "automation":
+        return None
+
+    try:
+        automation_state = sdk_builder_automation.get_state(
+            object_type=object_type,
+            object_id=object_id,
+            webspace_id=webspace_id,
+        )
+        if not automation_state.get("session_present"):
+            result: dict[str, Any] = {
+                "ok": True,
+                "handled": True,
+                "status": "automation_session_required",
+                "message": (
+                    "Автоматизация выбрана, но сессия автономной разработки ещё не запущена. "
+                    "Откройте этап «Автоматизация» и запустите утверждённый implementation brief."
+                ),
+                "automation": automation_state.get("automation"),
+            }
+        else:
+            result = dict(
+                sdk_builder_automation.submit(
+                    utterance,
+                    object_type=object_type,
+                    object_id=object_id,
+                    webspace_id=webspace_id,
+                )
+                or {}
+            )
+    except Exception as exc:
+        result = {
+            "ok": False,
+            "handled": True,
+            "status": "automation_unavailable",
+            "error": f"{type(exc).__name__}: {exc}",
+            "message": "Не удалось передать сообщение в Automation. Проверьте состояние сессии и повторите попытку.",
+        }
+
+    message = str(result.get("message") or "").strip()
+    if message:
+        _safe_emit_chat(
+            message,
+            webspace_id=webspace_id,
+            _meta=_meta,
+            session=session,
+            binding=binding,
+            topic_ref=topic,
+        )
+    return {
+        **result,
+        "handled": True,
+        "project": {"type": object_type, "id": object_id},
+        "binding": dict(binding or {}),
+        "topic": dict(topic or {}),
+        "dialog": _dialog_state(webspace_id, topic_ref=topic),
+    }
 
 
 def _dialog_state(webspace_id: str, *, topic_ref: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -8484,6 +8586,17 @@ def chat(
     utterance = str(text or "").strip()
     session, binding = _target_session(ws)
     topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
+    command = _parse_builder_command(utterance, has_session=bool(session))
+    command["raw"] = utterance
+    intent = str(command.get("intent") or "")
+    if intent == "project.list":
+        return _handle_project_list_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
+    if intent == "project.current":
+        return _handle_project_current_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
+    if intent == "project.switch":
+        return _handle_project_switch_command(webspace_id=ws, command=command, _meta=_meta)
+    if intent == "project.delete":
+        return _handle_project_delete_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
     if _is_guided_clarification_request(utterance):
         clarification = _builder_clarification_payload(text=utterance, webspace_id=ws, topic=topic)
         message = _guided_clarification_message(clarification)
@@ -8498,17 +8611,6 @@ def chat(
             "topic": topic,
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
-    command = _parse_builder_command(utterance, has_session=bool(session))
-    command["raw"] = utterance
-    intent = str(command.get("intent") or "")
-    if intent == "project.list":
-        return _handle_project_list_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
-    if intent == "project.current":
-        return _handle_project_current_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
-    if intent == "project.switch":
-        return _handle_project_switch_command(webspace_id=ws, command=command, _meta=_meta)
-    if intent == "project.delete":
-        return _handle_project_delete_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
     if intent == "project.create":
         result = create_scenario_draft(idea=utterance or "prototype app", webspace_id=ws, _meta=_meta)
         if result.get("ok"):
@@ -8523,6 +8625,16 @@ def chat(
             )
             return {**result, "command": command, "dialog": _dialog_state(ws, topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else topic)}
         return {**result, "command": command, "dialog": _dialog_state(ws, topic_ref=topic)}
+    automation_result = _route_automation_chat(
+        utterance=utterance,
+        webspace_id=ws,
+        session=session,
+        binding=binding,
+        topic=topic,
+        _meta=_meta,
+    )
+    if automation_result is not None:
+        return automation_result
     if not session:
         message = _target_required_message(binding)
         _safe_emit_chat(message, webspace_id=ws, _meta=_meta, binding=binding, topic_ref=topic)
