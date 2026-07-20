@@ -1,0 +1,16 @@
+{
+  "schema": "adaos.builder.llm_job_result.v1",
+  "job_id": "llm_job_9757344d5405470fa03d9455",
+  "local_job_id": "builder_llm_submit_a6cc4ca9",
+  "root_job_id": "llm_job_9757344d5405470fa03d9455",
+  "related_ids": [
+    "builder_llm_submit_a6cc4ca9",
+    "llm_job_9757344d5405470fa03d9455"
+  ],
+  "session_id": "scenario.builder",
+  "scenario_id": "builder",
+  "request_id": "builder-ui-d8e4139ef4c058793ad0507d8cf9b979-job-eb71af96",
+  "patch_id": "patch_48886d37",
+  "status": "succeeded",
+  "finished_at": 1784401636.9386008
+}

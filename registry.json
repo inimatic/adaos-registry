@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-18T21:36:06+00:00",
+  "updated_at": "2026-07-20T19:39:50+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -745,6 +745,35 @@
     }
   ],
   "scenarios": [
+    {
+      "kind": "scenario",
+      "id": "builder",
+      "name": "builder",
+      "version": "0.0.1",
+      "updated_at": "2026-07-20T19:39:50+00:00",
+      "path": "scenarios/builder",
+      "manifest": "scenarios/builder/scenario.json",
+      "source": {
+        "path": "scenarios/builder",
+        "manifest": "scenarios/builder/scenario.json"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "builder",
+        "id": "builder"
+      },
+      "title": "Builder — рабочее место разработки",
+      "title_i18n": {
+        "fallback": "Builder",
+        "key": "scenario.builder.title"
+      },
+      "description": "Functional SDK-backed Builder workbench for DEV project development, automation, and publication.",
+      "skills": {
+        "required": [
+          "builder_sdk_control_skill"
+        ]
+      }
+    },
     {
       "kind": "scenario",
       "id": "builder_pipeline_smoke_1784408500",

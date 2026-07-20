@@ -1,0 +1,20 @@
+id: builder
+name: builder
+type: desktop
+title: Builder — рабочее место разработки
+description: Functional SDK-backed Builder workbench for DEV project development,
+  automation, and publication.
+version: 0.0.1
+title_i18n:
+  fallback: Builder
+  key: scenario.builder.title
+supported_locales:
+- en
+- ru
+depends:
+- builder_sdk_control_skill
+runtime:
+  skills:
+    required:
+    - builder_sdk_control_skill
+updated_at: '2026-07-20T19:39:50+00:00'
