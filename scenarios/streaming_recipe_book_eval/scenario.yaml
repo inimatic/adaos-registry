@@ -3,7 +3,7 @@ name: streaming_recipe_book_eval
 type: desktop
 title: Домашняя книга рецептов
 description: Responsive persistent recipe catalog.
-version: 0.0.1
+version: 0.0.2
 supported_locales:
 - en
 - ru
@@ -13,4 +13,4 @@ runtime:
   skills:
     required:
     - streaming_recipe_book_eval_skill
-updated_at: '2026-07-20T22:38:38+00:00'
+updated_at: '2026-07-20T22:50:10+00:00'

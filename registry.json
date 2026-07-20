@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-20T22:49:56+00:00",
+  "updated_at": "2026-07-20T22:50:10+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -962,8 +962,8 @@
       "kind": "scenario",
       "id": "streaming_recipe_book_eval",
       "name": "streaming_recipe_book_eval",
-      "version": "0.0.1",
-      "updated_at": "2026-07-20T22:38:38+00:00",
+      "version": "0.0.2",
+      "updated_at": "2026-07-20T22:50:10+00:00",
       "path": "scenarios/streaming_recipe_book_eval",
       "manifest": "scenarios/streaming_recipe_book_eval/scenario.json",
       "source": {

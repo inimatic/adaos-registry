@@ -1,6 +1,6 @@
 {
     "id": "streaming_recipe_book_eval",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "name": "streaming_recipe_book_eval",
     "type": "desktop",
     "title": "Домашняя книга рецептов",
@@ -66,5 +66,5 @@
     "ui": {
         "manifest": "webui.json"
     },
-    "updated_at": "2026-07-20T22:38:38+00:00"
+    "updated_at": "2026-07-20T22:50:10+00:00"
 }
