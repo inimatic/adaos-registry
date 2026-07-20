@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-20T22:38:38+00:00",
+  "updated_at": "2026-07-20T22:49:56+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -671,8 +671,8 @@
       "kind": "skill",
       "id": "streaming_recipe_book_eval_skill",
       "name": "streaming_recipe_book_eval_skill",
-      "version": "0.0.1",
-      "updated_at": "2026-07-20T22:38:25+00:00",
+      "version": "0.0.2",
+      "updated_at": "2026-07-20T22:49:56+00:00",
       "path": "skills/streaming_recipe_book_eval_skill",
       "manifest": "skills/streaming_recipe_book_eval_skill/skill.yaml",
       "source": {

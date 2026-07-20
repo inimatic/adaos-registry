@@ -1,6 +1,6 @@
 id: streaming_recipe_book_eval_skill
 name: streaming_recipe_book_eval_skill
-version: 0.0.1
+version: 0.0.2
 description: Persistent local recipe catalog with filtering and favorites.
 supported_locales:
 - en
@@ -261,4 +261,4 @@ llm_hints:
     intent: recipe.favorite
     tool: set_favorite
     side_effect_class: local_write
-updated_at: '2026-07-20T22:38:25+00:00'
+updated_at: '2026-07-20T22:49:56+00:00'

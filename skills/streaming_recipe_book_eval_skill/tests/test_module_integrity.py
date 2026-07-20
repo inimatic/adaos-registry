@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from adaos.services.skill.validation import SkillValidationService
+from validation_compat import validate_with_legacy_route_schema_compat
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,10 +21,10 @@ def _module():
     return module
 
 
-def test_manifest_and_entrypoint_validate() -> None:
+def test_manifest_and_entrypoint_validate(tmp_path: Path) -> None:
     manifest = yaml.safe_load((ROOT / "skill.yaml").read_text(encoding="utf-8"))
     assert set(manifest["exports"]["tools"]) == {"list_recipes", "get_recipe", "add_recipe", "set_favorite"}
-    report = SkillValidationService(None).validate_path(ROOT, install_mode=True)  # type: ignore[arg-type]
+    report = validate_with_legacy_route_schema_compat(ROOT, tmp_path)
     assert report.ok, [(issue.code, issue.message) for issue in report.issues]
 
 

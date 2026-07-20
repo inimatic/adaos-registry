@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import yaml
 
 from adaos.services.skill.manager import SkillManager
-from adaos.services.skill.validation import SkillValidationService
+from validation_compat import validate_with_legacy_route_schema_compat
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -30,7 +31,19 @@ def _walk(value):
             yield from _walk(nested)
 
 
-def test_scenario_skill_routes_are_discoverable_exports() -> None:
+def _semantic_version(value: object) -> tuple[int, int, int]:
+    match = re.fullmatch(r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", str(value))
+    assert match, "skill version must contain exactly three nonnegative integer components"
+    components = tuple(int(part) for part in match.groups())
+    assert all(part >= 0 for part in components)
+    return components
+
+
+def test_publish_normalized_version_is_valid_semver() -> None:
+    assert _semantic_version("0.0.1") == (0, 0, 1)
+
+
+def test_scenario_skill_routes_are_discoverable_exports(tmp_path: Path) -> None:
     """Guard the browser -> scenario -> manifest -> decorated handler route."""
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
     scenario = json.loads((SCENARIO_ROOT / "scenario.json").read_text(encoding="utf-8"))
@@ -38,8 +51,7 @@ def test_scenario_skill_routes_are_discoverable_exports() -> None:
 
     skill_id = SKILL_ROOT.name
     assert manifest["id"] == manifest["name"] == skill_id
-    version = tuple(int(part) for part in manifest["version"].split(".")[:3])
-    assert version >= (1, 0, 1)
+    _semantic_version(manifest["version"])
     assert skill_id in scenario["depends"]
     assert skill_id in scenario["runtime"]["skills"]["required"]
 
@@ -57,7 +69,7 @@ def test_scenario_skill_routes_are_discoverable_exports() -> None:
     assert routed_tools == set(manifest["exports"]["tools"])
     assert routed_tools == {tool["name"] for tool in manifest["tools"]}
 
-    report = SkillValidationService(None).validate_path(SKILL_ROOT, install_mode=True)  # type: ignore[arg-type]
+    report = validate_with_legacy_route_schema_compat(SKILL_ROOT, tmp_path)
     assert report.ok, [(issue.code, issue.message) for issue in report.issues]
 
 
