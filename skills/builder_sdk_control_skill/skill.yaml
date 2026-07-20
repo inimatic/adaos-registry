@@ -1,0 +1,977 @@
+name: builder_sdk_control_skill
+version: 0.0.1
+description: SDK-only backend for the functional Builder DEV scenario.
+entry: handlers/main.py
+runtime:
+  python: '3.11'
+  sdk_only: true
+default_tool: get_state
+supported_locales:
+- en
+- ru
+dependencies: []
+events:
+  subscribe: []
+  publish:
+  - builder.preview.selected
+conversation:
+  history_policy: node_local
+  evidence:
+    read: builder_changes
+tools:
+- name: list_projects
+  description: List bounded DEV projects available to Builder.
+  entry: handlers.main:list_projects
+  input_schema:
+    type: object
+    properties:
+      kind:
+        type: string
+        enum:
+        - scenario
+        - skill
+      query:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 500
+      selected_object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      selected_object_id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: array
+    items:
+      type: object
+- name: get_project
+  description: Describe one selected DEV project.
+  entry: handlers.main:get_project
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: list_project_files
+  description: List bounded files belonging to one selected DEV project.
+  entry: handlers.main:list_project_files
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 5000
+  output_schema:
+    type: array
+    items:
+      type: object
+- name: list_project_objects
+  description: List a project and its declared skill dependencies.
+  entry: handlers.main:list_project_objects
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: array
+    items:
+      type: object
+- name: list_project_file_tree
+  description: List bounded files as a nested project tree.
+  entry: handlers.main:list_project_file_tree
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 5000
+  output_schema:
+    type: array
+    items:
+      type: object
+- name: list_templates
+  description: List templates available for a DEV project kind.
+  entry: handlers.main:list_templates
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+  output_schema:
+    type: array
+    items:
+      type: object
+- name: read_project_file
+  description: Read one bounded text file from the selected DEV project.
+  entry: handlers.main:read_project_file
+  input_schema:
+    type: object
+    required:
+    - path
+    properties:
+      path:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      max_bytes:
+        type: integer
+        minimum: 1
+        maximum: 1048576
+  output_schema:
+    type: object
+- name: save_project_file
+  description: Atomically save one allowlisted DEV project text file.
+  entry: handlers.main:save_project_file
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - path
+    - text
+    properties:
+      path:
+        type: string
+        minLength: 1
+      text:
+        type: string
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      max_bytes:
+        type: integer
+        minimum: 1
+        maximum: 1048576
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: get_prompt_context
+  description: Read the bounded technical specification and project preferences.
+  entry: handlers.main:get_prompt_context
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: save_prompt_context
+  description: Atomically save the base technical specification.
+  entry: handlers.main:save_prompt_context
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - text
+    properties:
+      text:
+        type: string
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: append_prompt_addendum
+  description: Append one immutable technical-specification addendum.
+  entry: handlers.main:append_prompt_addendum
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - text
+    properties:
+      text:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      iteration_ref:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: get_llm_options
+  description: List development LLM options and the selected model.
+  entry: handlers.main:get_llm_options
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: set_llm_profile
+  description: Persist the selected Builder development LLM.
+  entry: handlers.main:set_llm_profile
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - model
+    properties:
+      model:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: update_project_metadata
+  description: Update bounded project title and description; project type remains
+    immutable.
+  entry: handlers.main:update_project_metadata
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      title:
+        type: string
+      description:
+        type: string
+      project_type:
+        type: string
+  output_schema:
+    type: object
+- name: set_workflow_state
+  description: Persist the selected Builder workflow state.
+  entry: handlers.main:set_workflow_state
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - state
+    properties:
+      state:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: archive_project
+  description: Archive or restore a DEV project in Builder.
+  entry: handlers.main:archive_project
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      archived:
+        type: boolean
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: select_preview
+  description: Select a DEV scenario in its paired preview webspace.
+  entry: handlers.main:select_preview
+  side_effects: ui_navigation
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: get_preview
+  description: Read the current Builder preview binding.
+  entry: handlers.main:get_preview
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: list_changes
+  description: List Builder Change evidence for a DEV project.
+  entry: handlers.main:list_changes
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 200
+  output_schema:
+    type: array
+    items:
+      type: object
+- name: get_automation
+  description: Read Builder Automation state for a DEV project.
+  entry: handlers.main:get_automation
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: get_lifecycle
+  description: Project Builder lifecycle with bounded automation results and durable
+    publication releases.
+  entry: handlers.main:get_lifecycle
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: array
+    maxItems: 3
+    items:
+      type: object
+      required:
+      - id
+      - kind
+      - children
+      properties:
+        id:
+          type: string
+        kind:
+          const: stage
+        children:
+          type: array
+          maxItems: 5
+          items:
+            type: object
+- name: start_automation
+  description: Start Builder Automation from an approved implementation brief.
+  entry: handlers.main:start_automation
+  side_effects: local_write
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    required:
+    - implementation_brief
+    properties:
+      implementation_brief:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+      conversation_id:
+        type: string
+      brief_path:
+        type: string
+  output_schema:
+    type: object
+- name: submit_automation
+  description: Submit one follow-up Builder Automation instruction.
+  entry: handlers.main:submit_automation
+  side_effects: local_write
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    required:
+    - text
+    properties:
+      text:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: create_project
+  description: Create a new DEV skill or scenario from a template.
+  entry: handlers.main:create_project
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - object_type
+    - object_id
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      template:
+        type: string
+  output_schema:
+    type: object
+- name: push_project
+  description: Checkpoint a DEV project in Forge.
+  entry: handlers.main:push_project
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      message:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: publish_project
+  description: Validate or publish a DEV project release.
+  entry: handlers.main:publish_project
+  timeout_seconds: 180
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      bump:
+        type: string
+        enum:
+        - major
+        - minor
+        - patch
+      dry_run:
+        type: boolean
+      force:
+        type: boolean
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: update_project
+  description: Update one DEV project from Forge through the governed SDK lifecycle.
+  entry: handlers.main:update_project
+  side_effects: local_write
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: delete_project
+  description: Plan or execute governed DEV project deletion with explicit confirmation.
+  entry: handlers.main:delete_project
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      confirm:
+        type: boolean
+      remove_local:
+        type: boolean
+  output_schema:
+    type: object
+- name: get_state
+  description: Verify the complete Builder SDK capability set.
+  entry: handlers.main:get_state
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - schema
+    - project
+    - checks
+data_routes:
+- surface: widget:builder.overview.project_state
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_project
+  first_paint: last successful project state remains visible while the selected project
+    is revalidated
+  recovery: preserve the last value and expose an explicit retry for a failed read
+  update_source:
+  - update_project_metadata
+  - set_workflow_state
+  - archive_project
+  - create_project
+  - update_project
+  - delete_project
+  - publish_project
+  budget:
+    max_payload_bytes: 32768
+    max_items: 100
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 60000
+    max_request_hz: 0.1
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.metadata
+    - builder.project.lifecycle
+  guard_visibility:
+    degraded_state: project state is stale; the last successful value and retry remain
+      visible
+    log: service.builder_sdk_control_skill.runtime.log
+    quarantine: false
+    metric: data_route.builder_project_read
+- surface: modal:builder.publication.project_status
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_project
+  first_paint: last successful publication project status or a stable skeleton
+  recovery: preserve the last value and expose an explicit retry for a failed read
+  update_source:
+  - set_workflow_state
+  - archive_project
+  - update_project
+  - push_project
+  - publish_project
+  budget:
+    max_payload_bytes: 32768
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 60000
+    max_request_hz: 0.1
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.metadata
+    - builder.project.lifecycle
+    - builder.project.publication
+  guard_visibility:
+    degraded_state: publication project status is stale; retry is available
+    log: service.builder_sdk_control_skill.runtime.log
+    quarantine: false
+    metric: data_route.builder_publication_project_read
+- surface: widgets:builder.project_file_editors
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: read_project_file
+  first_paint: last loaded file content or a stable editor skeleton
+  recovery: selected file changes by value or matching file invalidation reloads once
+  budget:
+    max_payload_bytes: 262144
+    max_items: 1
+  read_policy: &id001
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.files
+  guard_visibility:
+    degraded_state: file content is stale
+    metric: data_route.builder_files_read
+- surface: widget:builder.project_lifecycle
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_lifecycle
+  first_paint: last lifecycle tree or a stable skeleton
+  recovery: matching lifecycle invalidation reloads once
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.lifecycle
+  guard_visibility:
+    degraded_state: lifecycle is stale
+    metric: data_route.builder_lifecycle_read
+- surface: widgets:builder.preview_status
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_preview
+  first_paint: last preview binding or an unavailable placeholder
+  recovery: matching preview invalidation reloads once
+  budget:
+    max_payload_bytes: 16384
+    max_items: 10
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.preview
+  guard_visibility:
+    degraded_state: preview binding is stale
+    metric: data_route.builder_preview_read
+- surface: widget:builder.llm_options
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_llm_options
+  first_paint: last model selection or a stable selector skeleton
+  recovery: matching LLM invalidation reloads once
+  budget:
+    max_payload_bytes: 32768
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.llm
+  guard_visibility:
+    degraded_state: model options are stale
+    metric: data_route.builder_llm_read
+- surface: widgets:builder.technical_context
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_prompt_context
+  first_paint: last technical context or stable empty editors
+  recovery: matching prompt invalidation reloads once
+  budget:
+    max_payload_bytes: 131072
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.prompt
+  guard_visibility:
+    degraded_state: technical context is stale
+    metric: data_route.builder_prompt_read
+- surface: modal:builder.project_objects
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: list_project_objects
+  first_paint: last bounded object list or an empty list
+  recovery: matching file invalidation reloads once
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy: *id001
+  guard_visibility:
+    degraded_state: project objects are stale
+    metric: data_route.builder_objects_read
+- surface: modal:builder.project_file_tree
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: list_project_file_tree
+  first_paint: last bounded file tree or an empty tree
+  recovery: matching file invalidation reloads once
+  budget:
+    max_payload_bytes: 131072
+    max_items: 500
+  read_policy: *id001
+  guard_visibility:
+    degraded_state: file tree is stale
+    metric: data_route.builder_file_tree_read
+- surface: modal:builder.project_picker
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: list_projects
+  first_paint: last bounded project catalog or an empty list
+  recovery: matching catalog invalidation reloads once
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.catalog
+  guard_visibility:
+    degraded_state: project catalog is stale
+    metric: data_route.builder_catalog_read
+- surface: modal:builder.project_templates
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: list_templates
+  first_paint: last template list or an empty list
+  recovery: explicit refresh or template invalidation reloads once
+  budget:
+    max_payload_bytes: 32768
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.1
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.templates
+  guard_visibility:
+    degraded_state: project templates are stale
+    metric: data_route.builder_templates_read
+- surface: modal:builder.automation_state
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_automation
+  first_paint: last automation state or a stable idle state
+  recovery: matching automation invalidation reloads once
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.automation
+  guard_visibility:
+    degraded_state: automation state is stale
+    metric: data_route.builder_automation_read
+- surface: modal:builder.publication_history
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: list_changes
+  first_paint: last bounded change history or an empty list
+  recovery: matching publication invalidation reloads once
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.publication
+  guard_visibility:
+    degraded_state: publication history is stale
+    metric: data_route.builder_changes_read
+updated_at: '2026-07-20T20:13:25+00:00'
