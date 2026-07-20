@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-20T20:14:08+00:00",
+  "updated_at": "2026-07-20T22:38:25+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -666,6 +666,28 @@
       },
       "description": "Slideshow pilot skill that shows photos in the widget and can optionally project cached thumbnails to assigned ReDevice endpoints.",
       "tools_count": 15
+    },
+    {
+      "kind": "skill",
+      "id": "streaming_recipe_book_eval_skill",
+      "name": "streaming_recipe_book_eval_skill",
+      "version": "0.0.1",
+      "updated_at": "2026-07-20T22:38:25+00:00",
+      "path": "skills/streaming_recipe_book_eval_skill",
+      "manifest": "skills/streaming_recipe_book_eval_skill/skill.yaml",
+      "source": {
+        "path": "skills/streaming_recipe_book_eval_skill",
+        "manifest": "skills/streaming_recipe_book_eval_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "streaming_recipe_book_eval_skill",
+        "id": "streaming_recipe_book_eval_skill"
+      },
+      "description": "Persistent local recipe catalog with filtering and favorites.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 4
     },
     {
       "kind": "skill",

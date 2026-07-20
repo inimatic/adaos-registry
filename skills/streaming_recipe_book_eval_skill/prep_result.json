@@ -1,0 +1,11 @@
+{
+  "status": "ok",
+  "timestamp": "2026-07-18T00:00:00Z",
+  "resources": {
+    "storage": "skill-local data/recipes.json",
+    "network_required": false
+  },
+  "tested_hypotheses": [
+    {"name": "Local JSON persistence available", "result": true, "critical": true}
+  ]
+}

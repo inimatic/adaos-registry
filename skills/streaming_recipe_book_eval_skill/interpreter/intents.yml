@@ -1,0 +1,12 @@
+intents:
+  - intent: recipe.list
+    description: List and filter local recipes.
+    tool: list_recipes
+    examples:
+      - "покажи рецепты до 30 минут"
+      - "show favorite recipes"
+  - intent: recipe.add
+    description: Add a recipe to the local book.
+    tool: add_recipe
+    examples:
+      - "добавь новый рецепт"

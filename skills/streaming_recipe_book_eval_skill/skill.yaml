@@ -1,0 +1,264 @@
+id: streaming_recipe_book_eval_skill
+name: streaming_recipe_book_eval_skill
+version: 0.0.1
+description: Persistent local recipe catalog with filtering and favorites.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: list_recipes
+runtime:
+  python: '3.11'
+dependencies: []
+exports:
+  tools:
+  - list_recipes
+  - get_recipe
+  - add_recipe
+  - set_favorite
+tools:
+- name: list_recipes
+  description: List recipes with category, cooking-time, text, and favorite filters.
+  entry: handlers.main:list_recipes
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      category:
+        type: string
+        enum:
+        - all
+        - breakfast
+        - soup
+        - main
+      max_time_min:
+        type:
+        - integer
+        - 'null'
+        minimum: 1
+        maximum: 1440
+      query:
+        type: string
+      favorites_only:
+        type: boolean
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - count
+    properties:
+      ok:
+        type: boolean
+      items:
+        type: array
+      count:
+        type: integer
+- name: get_recipe
+  description: Load a complete recipe by id.
+  entry: handlers.main:get_recipe
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - recipe_id
+    properties:
+      recipe_id:
+        type: string
+        minLength: 1
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+- name: add_recipe
+  description: Validate and persist a new recipe.
+  entry: handlers.main:add_recipe
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - title
+    - category
+    - prep_time_min
+    - ingredients
+    - steps
+    properties:
+      title:
+        type: string
+        minLength: 1
+        maxLength: 160
+      category:
+        type: string
+        enum:
+        - breakfast
+        - soup
+        - main
+      prep_time_min:
+        type: integer
+        minimum: 1
+        maximum: 1440
+      ingredients:
+        oneOf:
+        - type: string
+        - type: array
+          items:
+            type: string
+      steps:
+        oneOf:
+        - type: string
+        - type: array
+          items:
+            type: string
+      image:
+        type: string
+      image_alt:
+        type: string
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - recipe
+    - items
+- name: set_favorite
+  description: Set a recipe favorite flag, or toggle it when favorite is omitted.
+  entry: handlers.main:set_favorite
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - recipe_id
+    properties:
+      recipe_id:
+        type: string
+        minLength: 1
+      favorite:
+        type:
+        - boolean
+        - 'null'
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+data_routes:
+- surface: scenario recipe catalog
+  route: skill-local
+  path: data/streaming_recipe_book_eval/recipes
+  owner: skill:streaming_recipe_book_eval_skill
+  first_paint: bundled seed recipes
+  recovery: list_recipes rebuilds the projection from skill-local recipes.json
+  update_source:
+  - add_recipe
+  - set_favorite
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+    ttl_ms: 86400000
+  guard_visibility: mutations are bounded to add_recipe and set_favorite
+- surface: widget:recipe.catalog
+  route: tool/details
+  tool: list_recipes
+  path: tool/list_recipes
+  owner: skill:streaming_recipe_book_eval_skill
+  first_paint: bundled seed recipes or the last successful filtered catalog
+  recovery: preserve the catalog and allow explicit retry after a failed read
+  update_source:
+  - add_recipe
+  - set_favorite
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - state_dependency_changed
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 30000
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - recipe.catalog
+  notes: list_recipes is refreshed on mount, filter changes, explicit retry, and recipe.catalog
+    invalidation; the UI preserves the last successful value. Browser reads are stale-while-revalidate,
+    cached for 30 seconds, and causally bounded to 0.2 requests/second.
+  guard_visibility: stale catalog remains visible with an explicit retry
+- surface: widget:recipe.selected_detail
+  route: tool/details
+  tool: get_recipe
+  path: tool/get_recipe
+  owner: skill:streaming_recipe_book_eval_skill
+  first_paint: last selected recipe or an empty selection state
+  recovery: selected recipe id changes by value or the user retries explicitly
+  update_source:
+  - add_recipe
+  - set_favorite
+  budget:
+    max_payload_bytes: 16384
+    max_items: 50
+  read_policy:
+    mode: cache_first
+    triggers:
+    - state_dependency_changed
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 60000
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - recipe.detail
+  notes: get_recipe is refreshed when the selection changes or recipe.detail is invalidated;
+    the UI preserves the last successful value. Browser reads are cache-first, cached
+    for 60 seconds, and causally bounded to 0.2 requests/second.
+  guard_visibility: stale recipe details remain visible with an explicit retry
+- surface: modal:recipe.detail
+  route: tool/details
+  tool: get_recipe
+  path: tool/get_recipe
+  owner: skill:streaming_recipe_book_eval_skill
+  first_paint: cached selected recipe or a stable detail skeleton
+  recovery: modal retry reuses the selected recipe id and preserves the last value
+  update_source:
+  - add_recipe
+  - set_favorite
+  budget:
+    max_payload_bytes: 16384
+    max_items: 50
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 60000
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - recipe.detail
+  notes: get_recipe is refreshed when the modal opens or recipe.detail is invalidated;
+    the UI preserves the last successful value. Browser reads are cache-first, cached
+    for 60 seconds, and causally bounded to 0.2 requests/second.
+  guard_visibility: stale modal details remain visible with an explicit retry
+llm_hints:
+  description: Manage the local recipe book.
+  aliases:
+  - recipe book
+  - книга рецептов
+  primary_actions:
+  - id: recipe.list
+    intent: recipe.list
+    tool: list_recipes
+    side_effect_class: none
+  - id: recipe.add
+    intent: recipe.add
+    tool: add_recipe
+    side_effect_class: local_write
+  - id: recipe.favorite
+    intent: recipe.favorite
+    tool: set_favorite
+    side_effect_class: local_write
+updated_at: '2026-07-20T22:38:25+00:00'
