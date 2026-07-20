@@ -1,0 +1,704 @@
+{
+  "$schema": "../../../src/adaos/abi/builder.draft.v1.schema.json",
+  "draft_id": "draft.streaming_recipe_book_eval.20260716095419744747",
+  "task_id": "btask.9de0405dea",
+  "status": "draft",
+  "source": {
+    "type": "builder_dialog",
+    "utterance": "Создай новую книгу домашних рецептов с каталогом карточек, фотографиями блюд, категориями, поиском и просмотром подробного рецепта. На телефоне каталог должен быть удобным для одной руки, а на широком экране список и выбранный рецепт можно видеть рядом. Используй реалистичные примеры завтраков, супов и основных блюд.",
+    "side_effect_class": "local_write"
+  },
+  "artifact": {
+    "kind": "scenario",
+    "id": "streaming_recipe_book_eval",
+    "template_id": "builder_scenario",
+    "draft_root": "D:\\git\\inimatic\\adaos\\.adaos\\dev\\sn_6acf0c01\\scenarios\\streaming_recipe_book_eval",
+    "files": [
+      {
+        "path": ".gitignore",
+        "role": "other",
+        "required": false
+      },
+      {
+        "path": "builder.draft.json",
+        "role": "other",
+        "required": false
+      },
+      {
+        "path": "scenario.json",
+        "role": "manifest",
+        "required": true
+      }
+    ]
+  },
+  "metadata": {
+    "source_idea": "Создай новую книгу домашних рецептов с каталогом карточек, фотографиями блюд, категориями, поиском и просмотром подробного рецепта. На телефоне каталог должен быть удобным для одной руки, а на широком экране список и выбранный рецепт можно видеть рядом. Используй реалистичные примеры завтраков, супов и основных блюд.",
+    "assumptions": [
+      "Draft workspace is isolated from active runtime state.",
+      "Apply/activation requires a separate approval and lifecycle step."
+    ],
+    "risk_notes": [
+      "Generated behavior and permissions must be reviewed before runtime apply."
+    ],
+    "expected_tests": [
+      "schema validation",
+      "Builder preview bundle"
+    ],
+    "route_plan_required": false,
+    "human_review_required": false,
+    "webspace_id": "desktop",
+    "context_packet": {
+      "schema": "adaos.context.packet.v1",
+      "conversation_id": "conv.skill.builder_skill.default.desktop",
+      "requester_owner": "skill:builder_skill",
+      "channel_id": "builder",
+      "thread_id": null,
+      "topic": null,
+      "agent_id": null,
+      "budgets": {
+        "max_tokens": 2000,
+        "max_messages": 12,
+        "max_segments": 4,
+        "max_memory_items": 8,
+        "timeout_ms": 250
+      },
+      "messages": [
+        {
+          "id": "m.1784148511014",
+          "seq": 662,
+          "role": "api",
+          "text": "Проверь текущий результат. В подробностях рецепта фотография всё ещё не отображается: адрес картинки не должен показываться текстом, по нему нужно вывести крупное изображение выбранного блюда. Фильтр времени сделан свободным числовым полем, а нужны именно варианты: любое время, до 20, до 30, до 45 и до 60 минут. Сохрани работающую числовую фильтрацию, адаптивное расположение фильтров, вкладки, карточки, избранное и форму добавления рецепта.",
+          "ts": 1784148511.0134141,
+          "actor_id": "api",
+          "actor_label": "API",
+          "token_estimate": 111,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148511014",
+            "seq": 662
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148511014",
+              "seq": 662
+            }
+          }
+        },
+        {
+          "id": "m.1784148512984",
+          "seq": 663,
+          "role": "hub",
+          "text": "Конструктор: отправил LLM-задачу для prototype_app_14504c40. Job: llm_job_c62055864da54d2aa6bf84ed.",
+          "ts": 1784148512.9829912,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 25,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148512984",
+            "seq": 663
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148512984",
+              "seq": 663
+            }
+          }
+        },
+        {
+          "id": "m.1784148513080",
+          "seq": 664,
+          "role": "hub",
+          "text": "Конструктор: отправил LLM-задачу для prototype_app_14504c40. Job: llm_job_c62055864da54d2aa6bf84ed.",
+          "ts": 1784148513.007993,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 25,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148513080",
+            "seq": 664
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148513080",
+              "seq": 664
+            }
+          }
+        },
+        {
+          "id": "m.1784148595880",
+          "seq": 665,
+          "role": "hub",
+          "text": "Конструктор: обновил прототип prototype_app_14504c40. Операция: llm_webui_transform. Исправлено отображение крупного изображения в подробностях рецепта (imageKey+imageAltKey), чтобы URL не показывался текстом. Фильтр времени переделан на выбор вариантов: любое, до 20/30/45/60 минут, при этом сохранён числовой lte-фильтр через новое состояние filterTimeMax; адаптивная сетка фильтров, вкладки, карточки, избранное и форма добавления — без изменений. Ревизия UI: 006.",
+          "ts": 1784148594.7358403,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 117,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148595880",
+            "seq": 665
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148595880",
+              "seq": 665
+            }
+          }
+        },
+        {
+          "id": "m.1784148711710",
+          "seq": 666,
+          "role": "api",
+          "text": "Проверь текущий результат. В подробностях рецепта фотография всё ещё не отображается: адрес картинки не должен показываться текстом, по нему нужно вывести крупное изображение выбранного блюда. Фильтр времени сделан свободным числовым полем, а нужны именно варианты: любое время, до 20, до 30, до 45 и до 60 минут. Сохрани работающую числовую фильтрацию, адаптивное расположение фильтров, вкладки, карточки, избранное и форму добавления рецепта.",
+          "ts": 1784148711.710376,
+          "actor_id": "api",
+          "actor_label": "API",
+          "token_estimate": 111,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148711710",
+            "seq": 666
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148711710",
+              "seq": 666
+            }
+          }
+        },
+        {
+          "id": "m.1784148713525",
+          "seq": 667,
+          "role": "hub",
+          "text": "Конструктор: отправил LLM-задачу для prototype_app_14504c40. Job: llm_job_87c6380267c243ddb1e6b98d.",
+          "ts": 1784148713.493783,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 25,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148713525",
+            "seq": 667
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148713525",
+              "seq": 667
+            }
+          }
+        },
+        {
+          "id": "m.1784148713963",
+          "seq": 668,
+          "role": "hub",
+          "text": "Конструктор: отправил LLM-задачу для prototype_app_14504c40. Job: llm_job_87c6380267c243ddb1e6b98d.",
+          "ts": 1784148713.6587813,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 25,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148713963",
+            "seq": 668
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148713963",
+              "seq": 668
+            }
+          }
+        },
+        {
+          "id": "m.1784148759410",
+          "seq": 669,
+          "role": "hub",
+          "text": "Конструктор: обновил прототип prototype_app_14504c40. Операция: llm_webui_transform. Исправлено отображение большого изображения в подробностях: теперь используется imageKey с соотношением 16/9, URL не показывается текстом. Фильтр времени переведён на предустановленные варианты: любое время, до 20, 30, 45 и 60 минут, при этом сохраняется числовая lte-фильтрация по prep_time_min. Сохранены вкладки, карточки, избранное, форма и адаптивные фильтры. Ревизия UI: 007.",
+          "ts": 1784148758.002894,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 117,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148759410",
+            "seq": 669
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148759410",
+              "seq": 669
+            }
+          }
+        },
+        {
+          "id": "m.1784148992738",
+          "seq": 670,
+          "role": "api",
+          "text": "Исправь только фильтр времени. Сейчас вариант «Любое время» имеет значение 0, поэтому список становится пустым. У нейтрального варианта должно быть пустое значение, которое отключает фильтр; варианты 20, 30, 45 и 60 должны остаться числами и ограничивать максимальное время приготовления. Сохрани остальной текущий интерфейс без новых разделов.",
+          "ts": 1784148992.7372086,
+          "actor_id": "api",
+          "actor_label": "API",
+          "token_estimate": 86,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148992738",
+            "seq": 670
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148992738",
+              "seq": 670
+            }
+          }
+        },
+        {
+          "id": "m.1784148994725",
+          "seq": 671,
+          "role": "hub",
+          "text": "Конструктор: отправил LLM-задачу для prototype_app_14504c40. Job: llm_job_0d976832f4a04b68ab86f6df.",
+          "ts": 1784148994.7235684,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 25,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148994725",
+            "seq": 671
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148994725",
+              "seq": 671
+            }
+          }
+        },
+        {
+          "id": "m.1784148994807",
+          "seq": 672,
+          "role": "hub",
+          "text": "Конструктор: отправил LLM-задачу для prototype_app_14504c40. Job: llm_job_0d976832f4a04b68ab86f6df.",
+          "ts": 1784148994.7335904,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 25,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148994807",
+            "seq": 672
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784148994807",
+              "seq": 672
+            }
+          }
+        },
+        {
+          "id": "m.1784149118462",
+          "seq": 673,
+          "role": "hub",
+          "text": "Конструктор: обновил прототип prototype_app_14504c40. Операция: llm_webui_transform. Исправлен фильтр времени: у варианта «Любое время» теперь пустое значение, отключающее фильтрацию. Числовые варианты 20/30/45/60 сохранены и продолжают ограничивать max время. Остальной интерфейс без изменений. Ревизия UI: 008.",
+          "ts": 1784149117.072579,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 78,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784149118462",
+            "seq": 673
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "message_id": "m.1784149118462",
+              "seq": 673
+            }
+          }
+        }
+      ],
+      "segments": [],
+      "memory": [],
+      "evidence_refs": [
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784149118462",
+          "seq": 673
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148994807",
+          "seq": 672
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148994725",
+          "seq": 671
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148992738",
+          "seq": 670
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148759410",
+          "seq": 669
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148713963",
+          "seq": 668
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148713525",
+          "seq": 667
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148711710",
+          "seq": 666
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148595880",
+          "seq": 665
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148513080",
+          "seq": 664
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148512984",
+          "seq": 663
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "message_id": "m.1784148511014",
+          "seq": 662
+        }
+      ],
+      "token_estimate": 770,
+      "diagnostics": {
+        "schema": "adaos.context.diagnostics.v1",
+        "selected_sources": [
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784149118462",
+            "seq": 673
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148994807",
+            "seq": 672
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148994725",
+            "seq": 671
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148992738",
+            "seq": 670
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148759410",
+            "seq": 669
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148713963",
+            "seq": 668
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148713525",
+            "seq": 667
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148711710",
+            "seq": 666
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148595880",
+            "seq": 665
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148513080",
+            "seq": 664
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148512984",
+            "seq": 663
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default.desktop",
+            "message_id": "m.1784148511014",
+            "seq": 662
+          }
+        ],
+        "skipped_sources": [],
+        "policy_denials": [],
+        "fallbacks": [
+          "summaries_unavailable",
+          "semantic_retrieval_unavailable"
+        ],
+        "search_index": {
+          "schema": "adaos.conversation.search_index_health.v1",
+          "status": "stale",
+          "fts_available": true,
+          "counts": {
+            "messages": {
+              "base": 1331,
+              "indexed": 1257
+            },
+            "memory": {
+              "base": 0,
+              "indexed": 0
+            },
+            "segments": {
+              "base": 0,
+              "indexed": 0
+            }
+          }
+        },
+        "segment_summary": {
+          "schema": "adaos.conversation.segment_summary_health.v1",
+          "status": "missing",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "thread_id": null,
+          "message_count": 673,
+          "segment_count": 0,
+          "summarized_message_count": 0,
+          "summarized_until_seq": 0,
+          "latest_seq": 673
+        },
+        "safety_flags": [],
+        "budget_exhausted": false,
+        "latency_ms": 188,
+        "selected_message_count": 12,
+        "selected_segment_count": 0,
+        "selected_memory_count": 0
+      },
+      "conversation_ref": {
+        "conversation_id": "conv.skill.builder_skill.default.desktop",
+        "webspace_id": "desktop",
+        "channel_id": "builder",
+        "owner": "skill:builder_skill",
+        "kind": "builder"
+      }
+    }
+  },
+  "quality_gates": {
+    "schemas": [
+      "scenario.schema.json"
+    ],
+    "tests": [
+      "scenario validation",
+      "dependency bootstrap preview"
+    ],
+    "previews": [
+      "diff",
+      "NLU probe",
+      "action preview",
+      "UI preview",
+      "dependency bootstrap"
+    ],
+    "requires_human_approval": [
+      "new skill dependencies",
+      "endpoint control",
+      "broad NLU triggers",
+      "external IO",
+      "destructive actions"
+    ]
+  },
+  "links": {
+    "builder_task_id": "btask.9de0405dea",
+    "conversation": {
+      "conversation_id": "conv.skill.builder_skill.default.desktop",
+      "webspace_id": "desktop",
+      "channel_id": "builder",
+      "owner": "skill:builder_skill",
+      "kind": "builder"
+    }
+  },
+  "created_by": "adaos.builder",
+  "created_at": "2026-07-16T09:54:19.978688Z",
+  "updated_at": "2026-07-16T09:54:19.978688Z"
+}

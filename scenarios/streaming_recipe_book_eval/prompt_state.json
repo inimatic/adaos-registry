@@ -1,0 +1,30 @@
+{
+  "object_type": "scenario",
+  "object_id": "streaming_recipe_book_eval",
+  "base_tz": "# Streaming Recipe Book Eval\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n\n## Assumptions\n- The initial scaffold started with fields: Название, Заметки, Статус; this list is not a fixed product contract\n\n## Expected behavior\n- The user can add records through the form and inspect them in the list\n- Follow-up Builder turns patch the current draft and refresh the preview\n\n## Preview notes\n- Scenario streaming_recipe_book_eval has a form, table, mock data, and declarative webui.json\n- Data is stored in an internal CRUD datasource named prototype_items\n\n## Risks\n- No external network, device-control, or credential access is requested\n- Validation and human review are still required before activation\n",
+  "tz_addenda": [],
+  "prepare": {
+    "general_prompt": "",
+    "iterations": []
+  },
+  "generate": {
+    "general_prompt": "",
+    "iterations": []
+  },
+  "llm_profile_id": "gpt-5",
+  "builder_llm_model": "gpt-5",
+  "llm_provider": "openai",
+  "llm_profile": {
+    "id": "gpt-5",
+    "model": "gpt-5",
+    "label": "GPT-5",
+    "provider": "openai",
+    "scope": "development",
+    "default": true,
+    "source": "hub_fallback",
+    "selected": true
+  },
+  "llm_profile_updated_at": "2026-07-16T10:17:08.159266+00:00",
+  "target_node_id": null,
+  "workflow_state": "tz"
+}

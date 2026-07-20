@@ -1,0 +1,70 @@
+{
+    "id": "streaming_recipe_book_eval",
+    "version": "0.0.1",
+    "name": "streaming_recipe_book_eval",
+    "type": "desktop",
+    "title": "Домашняя книга рецептов",
+    "description": "Responsive persistent recipe catalog.",
+    "supported_locales": [
+        "en",
+        "ru"
+    ],
+    "triggers": [],
+    "depends": [
+        "streaming_recipe_book_eval_skill"
+    ],
+    "runtime": {
+        "skills": {
+            "required": [
+                "streaming_recipe_book_eval_skill"
+            ]
+        }
+    },
+    "slots": {},
+    "params": {},
+    "steps": [],
+    "io": {
+        "input": [
+            "text",
+            "web"
+        ],
+        "output": [
+            "text",
+            "web"
+        ]
+    },
+    "llm_hints": {
+        "description": "Browse, filter, add, inspect, and favorite local recipes.",
+        "aliases": [
+            "recipe book",
+            "книга рецептов"
+        ],
+        "primary_actions": [
+            {
+                "id": "recipe.list",
+                "intent": "recipe.list",
+                "skill": "streaming_recipe_book_eval_skill",
+                "tool": "list_recipes",
+                "side_effect_class": "none"
+            },
+            {
+                "id": "recipe.add",
+                "intent": "recipe.add",
+                "skill": "streaming_recipe_book_eval_skill",
+                "tool": "add_recipe",
+                "side_effect_class": "local_write"
+            },
+            {
+                "id": "recipe.favorite",
+                "intent": "recipe.favorite",
+                "skill": "streaming_recipe_book_eval_skill",
+                "tool": "set_favorite",
+                "side_effect_class": "local_write"
+            }
+        ]
+    },
+    "ui": {
+        "manifest": "webui.json"
+    },
+    "updated_at": "2026-07-20T22:38:38+00:00"
+}

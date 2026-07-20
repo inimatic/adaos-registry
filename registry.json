@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-20T22:38:25+00:00",
+  "updated_at": "2026-07-20T22:38:38+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -955,6 +955,41 @@
         ],
         "optional": [
           "redevice_list"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "streaming_recipe_book_eval",
+      "name": "streaming_recipe_book_eval",
+      "version": "0.0.1",
+      "updated_at": "2026-07-20T22:38:38+00:00",
+      "path": "scenarios/streaming_recipe_book_eval",
+      "manifest": "scenarios/streaming_recipe_book_eval/scenario.json",
+      "source": {
+        "path": "scenarios/streaming_recipe_book_eval",
+        "manifest": "scenarios/streaming_recipe_book_eval/scenario.json"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "streaming_recipe_book_eval",
+        "id": "streaming_recipe_book_eval"
+      },
+      "title": "Домашняя книга рецептов",
+      "description": "Responsive persistent recipe catalog.",
+      "skills": {
+        "required": [
+          "streaming_recipe_book_eval_skill"
+        ]
+      },
+      "io": {
+        "input": [
+          "text",
+          "web"
+        ],
+        "output": [
+          "text",
+          "web"
         ]
       }
     },

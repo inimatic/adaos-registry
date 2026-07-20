@@ -1,0 +1,1283 @@
+{
+  "schema": "adaos.builder.ui_revision.v1",
+  "revision": "006",
+  "created_at": 1784198618.9283826,
+  "session_id": "builder_session_9b6782f0",
+  "scenario_id": "streaming_recipe_book_eval",
+  "draft_id": "draft.streaming_recipe_book_eval.20260716095419744747",
+  "inference": {
+    "provider": "openai",
+    "model": "gpt-5",
+    "profile_id": "default",
+    "response_id": "resp_090fd0dd33389d0e006a58b5ceb7d88195a242560558568b73",
+    "service_tier": "default"
+  },
+  "request": {
+    "text": "В подробностях выбранного рецепта фотография сейчас отображается как текстовая ссылка. Покажи ее крупным изображением вверху карточки, а ниже оставь название, категорию со временем, ингредиенты и шаги. Кнопка избранного должна быть простой локальной демонстрацией: по нажатию запиши обычное логическое значение без специальных операторов. Больше ничего не меняй."
+  },
+  "patch": {
+    "id": "patch_8bd8c8d5",
+    "target": "ui",
+    "operation": "llm_webui_transform",
+    "status": "applied",
+    "created_by": "llm_agent",
+    "created_at": 1784198605.1586883,
+    "summary": "В подробностях выбранного рецепта фотография сейчас отображается как текстовая ссылка. Покажи ее крупным изображением вверху карточки, а ниже оставь название, категорию со временем, ингредиенты и шаги. Кнопка избранного должна быть простой локальной демонстрацией: по нажатию запиши обычное логическое значение без специальных операторов. Больше ничего не меняй.",
+    "diff": {
+      "schema_valid": true,
+      "comment": "Фото в деталях теперь выводится крупно сверху через imageKey, ниже — название, мета, ингредиенты и шаги; кнопка избранного пишет простое булево значение.",
+      "unable_reason": "",
+      "validation": {
+        "ok": true,
+        "schema": "adaos.webui.v1",
+        "preview_state": "ok"
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": false,
+          "request_id": "builder-ui-a519b4773c5f6a7623a8502e3a995a43-job-b0479a57",
+          "job_id": "llm_job_97168e13abd346f49bed9613",
+          "validation": {
+            "ok": false,
+            "error": "component_contract_invalid",
+            "detail": "widgets[2].inputs.fields[0] uses form-style type/content that item.details ignores; use label plus key/path, or value with {path} interpolation"
+          }
+        },
+        {
+          "attempt": 1,
+          "ok": true,
+          "request_id": "builder-ui-f2c538e21fb119c2b5d832de0ed420cf-repair-7be9b32b",
+          "job_id": "llm_job_1eba79fbccad4e9990c7ecfb",
+          "validation": {
+            "ok": true,
+            "schema": "adaos.webui.v1",
+            "preview_state": "ok"
+          },
+          "output_mode": "jsonl_patch_v1"
+        }
+      ]
+    }
+  },
+  "llm": {
+    "ok": true,
+    "comment": "Фото в деталях теперь выводится крупно сверху через imageKey, ниже — название, мета, ингредиенты и шаги; кнопка избранного пишет простое булево значение.",
+    "unable_reason": "",
+    "attempts": [
+      {
+        "attempt": 1,
+        "ok": false,
+        "request_id": "builder-ui-a519b4773c5f6a7623a8502e3a995a43-job-b0479a57",
+        "job_id": "llm_job_97168e13abd346f49bed9613",
+        "validation": {
+          "ok": false,
+          "error": "component_contract_invalid",
+          "detail": "widgets[2].inputs.fields[0] uses form-style type/content that item.details ignores; use label plus key/path, or value with {path} interpolation"
+        }
+      },
+      {
+        "attempt": 1,
+        "ok": true,
+        "request_id": "builder-ui-f2c538e21fb119c2b5d832de0ed420cf-repair-7be9b32b",
+        "job_id": "llm_job_1eba79fbccad4e9990c7ecfb",
+        "validation": {
+          "ok": true,
+          "schema": "adaos.webui.v1",
+          "preview_state": "ok"
+        },
+        "output_mode": "jsonl_patch_v1"
+      }
+    ],
+    "model": "gpt-5",
+    "profile": {
+      "schema": "adaos.builder.llm_prompt_profile.v1",
+      "version": "2026-07-16.6",
+      "id": "default",
+      "provider": "openai",
+      "model": "gpt-5",
+      "temperature": null,
+      "reasoning": {
+        "effort": "minimal"
+      },
+      "max_output_tokens": 12000,
+      "strategy": "compact_abi_plus_affordance_map",
+      "variant_policy": "Prompt profiles may vary by provider/model, but the output contract remains adaos.webui.v1."
+    },
+    "telemetry": {
+      "root_job_id": "llm_job_97168e13abd346f49bed9613",
+      "request_id": "builder-ui-a519b4773c5f6a7623a8502e3a995a43-job-b0479a57",
+      "status": "succeeded",
+      "wait_elapsed_ms": 4757,
+      "timing": {
+        "queue_ms": 14,
+        "ttft_ms": 1249,
+        "execution_ms": 4570,
+        "total_ms": 4584
+      },
+      "provider": {
+        "upstream_request_id": "req_7f118b3ab56d4cc2864d25d504cc2cf8",
+        "upstream_processing_ms": 443,
+        "response_id": "resp_090fd0dd33389d0e006a58b5ceb7d88195a242560558568b73",
+        "response_status": "completed",
+        "model": "gpt-5-2025-08-07",
+        "service_tier": "default"
+      },
+      "usage": {
+        "input_tokens": 11434,
+        "cached_input_tokens": 0,
+        "cache_write_tokens": 0,
+        "output_tokens": 305,
+        "reasoning_tokens": 0,
+        "total_tokens": 11739
+      },
+      "tools": {
+        "requested_count": 0,
+        "requested": [],
+        "used_count": 0,
+        "used": [],
+        "output_type_counts": {
+          "reasoning": 1,
+          "message": 1
+        }
+      },
+      "mcp": {
+        "used_mcp": false,
+        "item_count": 0,
+        "items": []
+      }
+    },
+    "validation": {
+      "ok": true,
+      "schema": "adaos.webui.v1",
+      "preview_state": "ok"
+    },
+    "semantic_patch_stream": {
+      "schema": "adaos.builder.webui_patch_stream.v1",
+      "base_hash": "bba83117199f98730f38eff6576b08d72a02d85c",
+      "operation_count": 4,
+      "patches": [
+        {
+          "seq": 1,
+          "op": "add",
+          "path": "/ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/imageKey",
+          "value": "image"
+        },
+        {
+          "seq": 2,
+          "op": "add",
+          "path": "/ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/imageAltKey",
+          "value": "imageAlt"
+        },
+        {
+          "seq": 3,
+          "op": "replace",
+          "path": "/ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/fields",
+          "value": [
+            {
+              "id": "name",
+              "key": "title",
+              "label": "Название"
+            },
+            {
+              "id": "meta",
+              "label": "Категория и время",
+              "value": "{category} • {time}"
+            },
+            {
+              "id": "section-ingredients",
+              "label": "Ингредиенты"
+            },
+            {
+              "id": "ingredients",
+              "key": "ingredients",
+              "label": "Состав"
+            },
+            {
+              "id": "section-steps",
+              "label": "Шаги приготовления"
+            },
+            {
+              "id": "steps",
+              "key": "steps",
+              "label": "Шаги"
+            }
+          ]
+        },
+        {
+          "seq": 4,
+          "op": "replace",
+          "path": "/ui/application/desktop/pageSchema/widgets/@detail-actions/actions/0/params",
+          "value": {
+            "isFavorite": true
+          }
+        }
+      ],
+      "syntax_repairs": []
+    },
+    "raw_response": "{\"schema\":\"adaos.builder.webui_patch_stream.v1\",\"type\":\"meta\",\"base_hash\":\"bba83117199f98730f38eff6576b08d72a02d85c\"}\n{\"type\":\"patch\",\"seq\":1,\"op\":\"add\",\"path\":\"/ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/imageKey\",\"value\":\"image\"}\n{\"type\":\"patch\",\"seq\":2,\"op\":\"add\",\"path\":\"/ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/imageAltKey\",\"value\":\"imageAlt\"}\n{\"type\":\"patch\",\"seq\":3,\"op\":\"replace\",\"path\":\"/ui/application/desktop/pageSchema/widgets/@recipe-details/inputs/fields\",\"value\":[{\"id\":\"name\",\"key\":\"title\",\"label\":\"Название\"},{\"id\":\"meta\",\"label\":\"Категория и время\",\"value\":\"{category} • {time}\"},{\"id\":\"section-ingredients\",\"label\":\"Ингредиенты\"},{\"id\":\"ingredients\",\"key\":\"ingredients\",\"label\":\"Состав\"},{\"id\":\"section-steps\",\"label\":\"Шаги приготовления\"},{\"id\":\"steps\",\"key\":\"steps\",\"label\":\"Шаги\"}]}\n{\"type\":\"patch\",\"seq\":4,\"op\":\"replace\",\"path\":\"/ui/application/desktop/pageSchema/widgets/@detail-actions/actions/0/params\",\"value\":{\"isFavorite\":true}}\n{\"type\":\"complete\",\"comment\":\"Фото в деталях теперь выводится крупно сверху через imageKey, ниже — название, мета, ингредиенты и шаги; кнопка избранного пишет простое булево значение.\",\"unable_reason\":null}"
+  },
+  "before_webui": {
+    "schema": "adaos.webui.v1",
+    "generated_by": "builder_skill",
+    "ui": {
+      "application": {
+        "desktop": {
+          "pageSchema": {
+            "id": "streaming_recipe_book_eval",
+            "title": "Домашняя книга рецептов",
+            "layout": {
+              "type": "split",
+              "pattern": "focus-detail",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "details",
+                  "role": "aux"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "recipe-filters",
+                "type": "input.commandBar",
+                "area": "main",
+                "inputs": {
+                  "variant": "segmented",
+                  "selectedStateKey": "activeCategory",
+                  "buttons": [
+                    {
+                      "id": "all",
+                      "label": "Все"
+                    },
+                    {
+                      "id": "breakfast",
+                      "label": "Завтраки"
+                    },
+                    {
+                      "id": "soup",
+                      "label": "Супы"
+                    },
+                    {
+                      "id": "main",
+                      "label": "Основные"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "type": "updateState",
+                    "on": "click",
+                    "params": {
+                      "activeCategory": "$event.id"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "recipe-catalog",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Каталог",
+                "actions": [
+                  {
+                    "type": "updateState",
+                    "on": "select",
+                    "params": {
+                      "selectedRecipeId": "$event.id"
+                    }
+                  }
+                ],
+                "dataSource": {
+                  "kind": "static",
+                  "value": [
+                    {
+                      "id": "bfk1",
+                      "title": "Овсянка с ягодами",
+                      "category": "breakfast",
+                      "time": "10 мин",
+                      "image": "https://picsum.photos/seed/recipe-breakfast-ovsx/640/420",
+                      "imageAlt": "Овсяная каша с ягодами",
+                      "preview": "Овсяные хлопья, молоко, ягоды, мед",
+                      "meta": "Завтрак • 10 мин"
+                    },
+                    {
+                      "id": "soup1",
+                      "title": "Томатный суп с базиликом",
+                      "category": "soup",
+                      "time": "25 мин",
+                      "image": "https://picsum.photos/seed/recipe-soup-tomat/640/420",
+                      "imageAlt": "Томатный суп с зеленью",
+                      "preview": "Томаты, лук, чеснок, бульон, базилик",
+                      "meta": "Суп • 25 мин"
+                    },
+                    {
+                      "id": "main1",
+                      "title": "Куриная грудка с овощами",
+                      "category": "main",
+                      "time": "30 мин",
+                      "image": "https://picsum.photos/seed/recipe-main-chicken/640/420",
+                      "imageAlt": "Куриная грудка и запечённые овощи",
+                      "preview": "Курица, перец, цукини, оливковое масло",
+                      "meta": "Основное • 30 мин"
+                    }
+                  ]
+                },
+                "inputs": {
+                  "variant": "cards",
+                  "cardMinWidth": 220,
+                  "cardImageRatio": "4 / 3",
+                  "imageKey": "image",
+                  "imageAltKey": "imageAlt",
+                  "titleKey": "title",
+                  "subtitleKey": "time",
+                  "previewKey": "preview",
+                  "meta": [
+                    {
+                      "key": "meta",
+                      "label": "Категория/время",
+                      "kind": "badge"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "key": "category",
+                      "stateKey": "activeCategory",
+                      "operator": "equals"
+                    },
+                    {
+                      "key": "title",
+                      "stateKey": "searchQuery",
+                      "operator": "contains"
+                    },
+                    {
+                      "key": "preview",
+                      "stateKey": "searchQuery",
+                      "operator": "contains"
+                    }
+                  ],
+                  "search": true,
+                  "searchEnabled": true,
+                  "searchPlaceholder": "Поиск по каталогу"
+                }
+              },
+              {
+                "id": "recipe-details",
+                "type": "item.details",
+                "area": "details",
+                "title": "Детали рецепта",
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "bfk1": {
+                      "id": "bfk1",
+                      "title": "Овсянка с ягодами",
+                      "category": "Завтрак",
+                      "time": "10 мин",
+                      "image": "https://picsum.photos/seed/recipe-breakfast-ovsx/960/640",
+                      "imageAlt": "Овсяная каша с ягодами крупным планом",
+                      "ingredients": [
+                        "Овсяные хлопья — 60 г",
+                        "Молоко или вода — 200 мл",
+                        "Микс ягод — 80 г",
+                        "Мед — 1 ч. л.",
+                        "Щепотка соли"
+                      ],
+                      "steps": [
+                        "Доведите жидкость до кипения.",
+                        "Добавьте хлопья и варите 3–5 минут, помешивая.",
+                        "Снимите с огня, вмешайте мед и щепотку соли.",
+                        "Подавайте с ягодами."
+                      ],
+                      "favoriteKey": "bfk1"
+                    },
+                    "soup1": {
+                      "id": "soup1",
+                      "title": "Томатный суп с базиликом",
+                      "category": "Суп",
+                      "time": "25 мин",
+                      "image": "https://picsum.photos/seed/recipe-soup-tomat/960/640",
+                      "imageAlt": "Томатный суп с базиликом крупным планом",
+                      "ingredients": [
+                        "Томаты — 500 г",
+                        "Лук — 1 шт",
+                        "Чеснок — 2 зубчика",
+                        "Овощной бульон — 700 мл",
+                        "Оливковое масло — 1 ст. л.",
+                        "Базилик, соль, перец"
+                      ],
+                      "steps": [
+                        "Обжарьте лук и чеснок на оливковом масле.",
+                        "Добавьте томаты, тушите 5 минут.",
+                        "Влейте бульон, варите 10–12 минут.",
+                        "Пюрируйте, приправьте, подавайте с базиликом."
+                      ],
+                      "favoriteKey": "soup1"
+                    },
+                    "main1": {
+                      "id": "main1",
+                      "title": "Куриная грудка с овощами",
+                      "category": "Основное",
+                      "time": "30 мин",
+                      "image": "https://picsum.photos/seed/recipe-main-chicken/960/640",
+                      "imageAlt": "Куриная грудка с овощами крупным планом",
+                      "ingredients": [
+                        "Куриная грудка — 2 шт",
+                        "Перец — 1 шт",
+                        "Цукини — 1 шт",
+                        "Оливковое масло — 1 ст. л.",
+                        "Соль, перец, травы"
+                      ],
+                      "steps": [
+                        "Нарежьте овощи, курицу посолите и поперчите.",
+                        "Обжарьте курицу до золотистой корочки.",
+                        "Добавьте овощи и травы, доведите до готовности.",
+                        "Подавайте горячим."
+                      ],
+                      "favoriteKey": "main1"
+                    }
+                  }
+                },
+                "inputs": {
+                  "selectedStateKey": "selectedRecipeId",
+                  "fields": [
+                    {
+                      "id": "hero",
+                      "label": "Фото блюда",
+                      "key": "image"
+                    },
+                    {
+                      "id": "name",
+                      "key": "title",
+                      "label": "Название"
+                    },
+                    {
+                      "id": "meta",
+                      "label": "Категория и время",
+                      "value": "{category} • {time}"
+                    },
+                    {
+                      "id": "section-ingredients",
+                      "label": "Ингредиенты"
+                    },
+                    {
+                      "id": "ingredients",
+                      "key": "ingredients",
+                      "label": "Состав"
+                    },
+                    {
+                      "id": "section-steps",
+                      "label": "Шаги приготовления"
+                    },
+                    {
+                      "id": "steps",
+                      "key": "steps",
+                      "label": "Шаги"
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "detail-actions",
+                "type": "ui.actions",
+                "area": "details",
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "toggle-fav",
+                      "label": "В избранное/убрать"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click",
+                    "type": "updateState",
+                    "params": {
+                      "isFavorite": true
+                    }
+                  }
+                ],
+                "visibleIf": "$state.selectedRecipeId"
+              }
+            ],
+            "meta": {
+              "builder": {
+                "proto": "001",
+                "ui_revision": "001"
+              }
+            },
+            "title_i18n": {
+              "key": "scenario.streaming_recipe_book_eval.title",
+              "fallback": "Streaming Recipe Book Eval"
+            },
+            "initialState": {
+              "activeCategory": "all",
+              "selectedRecipeId": "bfk1",
+              "isFavorite": {
+                "bfk1": false,
+                "soup1": false,
+                "main1": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "nlu": {
+      "llm_hints": {
+        "aliases": [
+          "Streaming Recipe Book Eval"
+        ],
+        "primary_actions": [
+          {
+            "intent": "builder.chat",
+            "notes": "Prototype UI is edited through builder_skill.chat.",
+            "supported_operations": [
+              "add_field",
+              "remove_field",
+              "update_mock_data",
+              "change_view_representation",
+              "move_form_action",
+              "set_checkbox_column"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "after_webui": {
+    "schema": "adaos.webui.v1",
+    "generated_by": "builder_skill",
+    "ui": {
+      "application": {
+        "desktop": {
+          "pageSchema": {
+            "id": "streaming_recipe_book_eval",
+            "title": "Домашняя книга рецептов",
+            "layout": {
+              "type": "split",
+              "pattern": "focus-detail",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "details",
+                  "role": "aux"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "recipe-filters",
+                "type": "input.commandBar",
+                "area": "main",
+                "inputs": {
+                  "variant": "segmented",
+                  "selectedStateKey": "activeCategory",
+                  "buttons": [
+                    {
+                      "id": "all",
+                      "label": "Все"
+                    },
+                    {
+                      "id": "breakfast",
+                      "label": "Завтраки"
+                    },
+                    {
+                      "id": "soup",
+                      "label": "Супы"
+                    },
+                    {
+                      "id": "main",
+                      "label": "Основные"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "type": "updateState",
+                    "on": "click",
+                    "params": {
+                      "activeCategory": "$event.id"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "recipe-catalog",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Каталог",
+                "actions": [
+                  {
+                    "type": "updateState",
+                    "on": "select",
+                    "params": {
+                      "selectedRecipeId": "$event.id"
+                    }
+                  }
+                ],
+                "dataSource": {
+                  "kind": "static",
+                  "value": [
+                    {
+                      "id": "bfk1",
+                      "title": "Овсянка с ягодами",
+                      "category": "breakfast",
+                      "time": "10 мин",
+                      "image": "https://picsum.photos/seed/recipe-breakfast-ovsx/640/420",
+                      "imageAlt": "Овсяная каша с ягодами",
+                      "preview": "Овсяные хлопья, молоко, ягоды, мед",
+                      "meta": "Завтрак • 10 мин"
+                    },
+                    {
+                      "id": "soup1",
+                      "title": "Томатный суп с базиликом",
+                      "category": "soup",
+                      "time": "25 мин",
+                      "image": "https://picsum.photos/seed/recipe-soup-tomat/640/420",
+                      "imageAlt": "Томатный суп с зеленью",
+                      "preview": "Томаты, лук, чеснок, бульон, базилик",
+                      "meta": "Суп • 25 мин"
+                    },
+                    {
+                      "id": "main1",
+                      "title": "Куриная грудка с овощами",
+                      "category": "main",
+                      "time": "30 мин",
+                      "image": "https://picsum.photos/seed/recipe-main-chicken/640/420",
+                      "imageAlt": "Куриная грудка и запечённые овощи",
+                      "preview": "Курица, перец, цукини, оливковое масло",
+                      "meta": "Основное • 30 мин"
+                    }
+                  ]
+                },
+                "inputs": {
+                  "variant": "cards",
+                  "cardMinWidth": 220,
+                  "cardImageRatio": "4 / 3",
+                  "imageKey": "image",
+                  "imageAltKey": "imageAlt",
+                  "titleKey": "title",
+                  "subtitleKey": "time",
+                  "previewKey": "preview",
+                  "meta": [
+                    {
+                      "key": "meta",
+                      "label": "Категория/время",
+                      "kind": "badge"
+                    }
+                  ],
+                  "filters": [
+                    {
+                      "key": "category",
+                      "stateKey": "activeCategory",
+                      "operator": "equals"
+                    },
+                    {
+                      "key": "title",
+                      "stateKey": "searchQuery",
+                      "operator": "contains"
+                    },
+                    {
+                      "key": "preview",
+                      "stateKey": "searchQuery",
+                      "operator": "contains"
+                    }
+                  ],
+                  "search": true,
+                  "searchEnabled": true,
+                  "searchPlaceholder": "Поиск по каталогу"
+                }
+              },
+              {
+                "id": "recipe-details",
+                "type": "item.details",
+                "area": "details",
+                "title": "Детали рецепта",
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "bfk1": {
+                      "id": "bfk1",
+                      "title": "Овсянка с ягодами",
+                      "category": "Завтрак",
+                      "time": "10 мин",
+                      "image": "https://picsum.photos/seed/recipe-breakfast-ovsx/960/640",
+                      "imageAlt": "Овсяная каша с ягодами крупным планом",
+                      "ingredients": [
+                        "Овсяные хлопья — 60 г",
+                        "Молоко или вода — 200 мл",
+                        "Микс ягод — 80 г",
+                        "Мед — 1 ч. л.",
+                        "Щепотка соли"
+                      ],
+                      "steps": [
+                        "Доведите жидкость до кипения.",
+                        "Добавьте хлопья и варите 3–5 минут, помешивая.",
+                        "Снимите с огня, вмешайте мед и щепотку соли.",
+                        "Подавайте с ягодами."
+                      ],
+                      "favoriteKey": "bfk1"
+                    },
+                    "soup1": {
+                      "id": "soup1",
+                      "title": "Томатный суп с базиликом",
+                      "category": "Суп",
+                      "time": "25 мин",
+                      "image": "https://picsum.photos/seed/recipe-soup-tomat/960/640",
+                      "imageAlt": "Томатный суп с базиликом крупным планом",
+                      "ingredients": [
+                        "Томаты — 500 г",
+                        "Лук — 1 шт",
+                        "Чеснок — 2 зубчика",
+                        "Овощной бульон — 700 мл",
+                        "Оливковое масло — 1 ст. л.",
+                        "Базилик, соль, перец"
+                      ],
+                      "steps": [
+                        "Обжарьте лук и чеснок на оливковом масле.",
+                        "Добавьте томаты, тушите 5 минут.",
+                        "Влейте бульон, варите 10–12 минут.",
+                        "Пюрируйте, приправьте, подавайте с базиликом."
+                      ],
+                      "favoriteKey": "soup1"
+                    },
+                    "main1": {
+                      "id": "main1",
+                      "title": "Куриная грудка с овощами",
+                      "category": "Основное",
+                      "time": "30 мин",
+                      "image": "https://picsum.photos/seed/recipe-main-chicken/960/640",
+                      "imageAlt": "Куриная грудка с овощами крупным планом",
+                      "ingredients": [
+                        "Куриная грудка — 2 шт",
+                        "Перец — 1 шт",
+                        "Цукини — 1 шт",
+                        "Оливковое масло — 1 ст. л.",
+                        "Соль, перец, травы"
+                      ],
+                      "steps": [
+                        "Нарежьте овощи, курицу посолите и поперчите.",
+                        "Обжарьте курицу до золотистой корочки.",
+                        "Добавьте овощи и травы, доведите до готовности.",
+                        "Подавайте горячим."
+                      ],
+                      "favoriteKey": "main1"
+                    }
+                  }
+                },
+                "inputs": {
+                  "selectedStateKey": "selectedRecipeId",
+                  "fields": [
+                    {
+                      "id": "name",
+                      "key": "title",
+                      "label": "Название"
+                    },
+                    {
+                      "id": "meta",
+                      "label": "Категория и время",
+                      "value": "{category} • {time}"
+                    },
+                    {
+                      "id": "section-ingredients",
+                      "label": "Ингредиенты"
+                    },
+                    {
+                      "id": "ingredients",
+                      "key": "ingredients",
+                      "label": "Состав"
+                    },
+                    {
+                      "id": "section-steps",
+                      "label": "Шаги приготовления"
+                    },
+                    {
+                      "id": "steps",
+                      "key": "steps",
+                      "label": "Шаги"
+                    }
+                  ],
+                  "imageKey": "image",
+                  "imageAltKey": "imageAlt"
+                }
+              },
+              {
+                "id": "detail-actions",
+                "type": "ui.actions",
+                "area": "details",
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "toggle-fav",
+                      "label": "В избранное/убрать"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click",
+                    "type": "updateState",
+                    "params": {
+                      "isFavorite": true
+                    }
+                  }
+                ],
+                "visibleIf": "$state.selectedRecipeId"
+              }
+            ],
+            "meta": {
+              "builder": {
+                "proto": "001",
+                "ui_revision": "001"
+              }
+            },
+            "title_i18n": {
+              "key": "scenario.streaming_recipe_book_eval.title",
+              "fallback": "Streaming Recipe Book Eval"
+            },
+            "initialState": {
+              "activeCategory": "all",
+              "selectedRecipeId": "bfk1",
+              "isFavorite": {
+                "bfk1": false,
+                "soup1": false,
+                "main1": false
+              }
+            }
+          }
+        }
+      }
+    },
+    "nlu": {
+      "llm_hints": {
+        "aliases": [
+          "Streaming Recipe Book Eval"
+        ],
+        "primary_actions": [
+          {
+            "intent": "builder.chat",
+            "notes": "Prototype UI is edited through builder_skill.chat.",
+            "supported_operations": [
+              "add_field",
+              "remove_field",
+              "update_mock_data",
+              "change_view_representation",
+              "move_form_action",
+              "set_checkbox_column"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "preview_state": {
+    "session_id": "builder_session_9b6782f0",
+    "title": "Домашняя книга рецептов",
+    "datasources": [
+      {
+        "id": "prototype_items",
+        "type": "internal_crud",
+        "entity": "item",
+        "fields": [
+          {
+            "id": "title",
+            "type": "string",
+            "label": "Название",
+            "required": true
+          },
+          {
+            "id": "notes",
+            "type": "string",
+            "label": "Заметки",
+            "required": false
+          },
+          {
+            "id": "status",
+            "type": "string",
+            "label": "Статус",
+            "required": false
+          }
+        ],
+        "operations": [
+          "create",
+          "read",
+          "update",
+          "delete"
+        ]
+      }
+    ],
+    "mock_data": {
+      "prototype_items": [
+        {
+          "title": "Название 1",
+          "notes": "Заметки 1",
+          "status": "Статус 1"
+        },
+        {
+          "title": "Название 2",
+          "notes": "Заметки 2",
+          "status": "Статус 2"
+        },
+        {
+          "title": "Название 3",
+          "notes": "Заметки 3",
+          "status": "Статус 3"
+        }
+      ]
+    },
+    "filters": [],
+    "form_action_position": "bottom",
+    "layout_order": "input_first",
+    "card_preview_key": "status",
+    "pending_patches": [],
+    "user_summary": {
+      "assumptions": [
+        "The initial scaffold started with fields: Название, Заметки, Статус; this list is not a fixed product contract"
+      ],
+      "preview": [
+        "Scenario streaming_recipe_book_eval has a form, table, mock data, and declarative webui.json",
+        "Data is stored in an internal CRUD datasource named prototype_items"
+      ],
+      "risks": [
+        "No external network, device-control, or credential access is requested",
+        "Validation and human review are still required before activation"
+      ],
+      "expected_behavior": [
+        "The user can add records through the form and inspect them in the list",
+        "Follow-up Builder turns patch the current draft and refresh the preview"
+      ]
+    },
+    "version": "006",
+    "scenario_id": "streaming_recipe_book_eval",
+    "page_schema": {
+      "id": "streaming_recipe_book_eval",
+      "title": "Домашняя книга рецептов",
+      "layout": {
+        "type": "split",
+        "pattern": "focus-detail",
+        "areas": [
+          {
+            "id": "main",
+            "role": "main"
+          },
+          {
+            "id": "details",
+            "role": "aux"
+          }
+        ]
+      },
+      "widgets": [
+        {
+          "id": "recipe-filters",
+          "type": "input.commandBar",
+          "area": "main",
+          "inputs": {
+            "variant": "segmented",
+            "selectedStateKey": "activeCategory",
+            "buttons": [
+              {
+                "id": "all",
+                "label": "Все"
+              },
+              {
+                "id": "breakfast",
+                "label": "Завтраки"
+              },
+              {
+                "id": "soup",
+                "label": "Супы"
+              },
+              {
+                "id": "main",
+                "label": "Основные"
+              }
+            ]
+          },
+          "actions": [
+            {
+              "type": "updateState",
+              "on": "click",
+              "params": {
+                "activeCategory": "$event.id"
+              }
+            }
+          ]
+        },
+        {
+          "id": "recipe-catalog",
+          "type": "ui.list",
+          "area": "main",
+          "title": "Каталог",
+          "actions": [
+            {
+              "type": "updateState",
+              "on": "select",
+              "params": {
+                "selectedRecipeId": "$event.id"
+              }
+            }
+          ],
+          "dataSource": {
+            "kind": "static",
+            "value": [
+              {
+                "id": "bfk1",
+                "title": "Овсянка с ягодами",
+                "category": "breakfast",
+                "time": "10 мин",
+                "image": "https://picsum.photos/seed/recipe-breakfast-ovsx/640/420",
+                "imageAlt": "Овсяная каша с ягодами",
+                "preview": "Овсяные хлопья, молоко, ягоды, мед",
+                "meta": "Завтрак • 10 мин"
+              },
+              {
+                "id": "soup1",
+                "title": "Томатный суп с базиликом",
+                "category": "soup",
+                "time": "25 мин",
+                "image": "https://picsum.photos/seed/recipe-soup-tomat/640/420",
+                "imageAlt": "Томатный суп с зеленью",
+                "preview": "Томаты, лук, чеснок, бульон, базилик",
+                "meta": "Суп • 25 мин"
+              },
+              {
+                "id": "main1",
+                "title": "Куриная грудка с овощами",
+                "category": "main",
+                "time": "30 мин",
+                "image": "https://picsum.photos/seed/recipe-main-chicken/640/420",
+                "imageAlt": "Куриная грудка и запечённые овощи",
+                "preview": "Курица, перец, цукини, оливковое масло",
+                "meta": "Основное • 30 мин"
+              }
+            ]
+          },
+          "inputs": {
+            "variant": "cards",
+            "cardMinWidth": 220,
+            "cardImageRatio": "4 / 3",
+            "imageKey": "image",
+            "imageAltKey": "imageAlt",
+            "titleKey": "title",
+            "subtitleKey": "time",
+            "previewKey": "preview",
+            "meta": [
+              {
+                "key": "meta",
+                "label": "Категория/время",
+                "kind": "badge"
+              }
+            ],
+            "filters": [
+              {
+                "key": "category",
+                "stateKey": "activeCategory",
+                "operator": "equals"
+              },
+              {
+                "key": "title",
+                "stateKey": "searchQuery",
+                "operator": "contains"
+              },
+              {
+                "key": "preview",
+                "stateKey": "searchQuery",
+                "operator": "contains"
+              }
+            ],
+            "search": true,
+            "searchEnabled": true,
+            "searchPlaceholder": "Поиск по каталогу"
+          }
+        },
+        {
+          "id": "recipe-details",
+          "type": "item.details",
+          "area": "details",
+          "title": "Детали рецепта",
+          "dataSource": {
+            "kind": "static",
+            "value": {
+              "bfk1": {
+                "id": "bfk1",
+                "title": "Овсянка с ягодами",
+                "category": "Завтрак",
+                "time": "10 мин",
+                "image": "https://picsum.photos/seed/recipe-breakfast-ovsx/960/640",
+                "imageAlt": "Овсяная каша с ягодами крупным планом",
+                "ingredients": [
+                  "Овсяные хлопья — 60 г",
+                  "Молоко или вода — 200 мл",
+                  "Микс ягод — 80 г",
+                  "Мед — 1 ч. л.",
+                  "Щепотка соли"
+                ],
+                "steps": [
+                  "Доведите жидкость до кипения.",
+                  "Добавьте хлопья и варите 3–5 минут, помешивая.",
+                  "Снимите с огня, вмешайте мед и щепотку соли.",
+                  "Подавайте с ягодами."
+                ],
+                "favoriteKey": "bfk1"
+              },
+              "soup1": {
+                "id": "soup1",
+                "title": "Томатный суп с базиликом",
+                "category": "Суп",
+                "time": "25 мин",
+                "image": "https://picsum.photos/seed/recipe-soup-tomat/960/640",
+                "imageAlt": "Томатный суп с базиликом крупным планом",
+                "ingredients": [
+                  "Томаты — 500 г",
+                  "Лук — 1 шт",
+                  "Чеснок — 2 зубчика",
+                  "Овощной бульон — 700 мл",
+                  "Оливковое масло — 1 ст. л.",
+                  "Базилик, соль, перец"
+                ],
+                "steps": [
+                  "Обжарьте лук и чеснок на оливковом масле.",
+                  "Добавьте томаты, тушите 5 минут.",
+                  "Влейте бульон, варите 10–12 минут.",
+                  "Пюрируйте, приправьте, подавайте с базиликом."
+                ],
+                "favoriteKey": "soup1"
+              },
+              "main1": {
+                "id": "main1",
+                "title": "Куриная грудка с овощами",
+                "category": "Основное",
+                "time": "30 мин",
+                "image": "https://picsum.photos/seed/recipe-main-chicken/960/640",
+                "imageAlt": "Куриная грудка с овощами крупным планом",
+                "ingredients": [
+                  "Куриная грудка — 2 шт",
+                  "Перец — 1 шт",
+                  "Цукини — 1 шт",
+                  "Оливковое масло — 1 ст. л.",
+                  "Соль, перец, травы"
+                ],
+                "steps": [
+                  "Нарежьте овощи, курицу посолите и поперчите.",
+                  "Обжарьте курицу до золотистой корочки.",
+                  "Добавьте овощи и травы, доведите до готовности.",
+                  "Подавайте горячим."
+                ],
+                "favoriteKey": "main1"
+              }
+            }
+          },
+          "inputs": {
+            "selectedStateKey": "selectedRecipeId",
+            "fields": [
+              {
+                "id": "name",
+                "key": "title",
+                "label": "Название"
+              },
+              {
+                "id": "meta",
+                "label": "Категория и время",
+                "value": "{category} • {time}"
+              },
+              {
+                "id": "section-ingredients",
+                "label": "Ингредиенты"
+              },
+              {
+                "id": "ingredients",
+                "key": "ingredients",
+                "label": "Состав"
+              },
+              {
+                "id": "section-steps",
+                "label": "Шаги приготовления"
+              },
+              {
+                "id": "steps",
+                "key": "steps",
+                "label": "Шаги"
+              }
+            ],
+            "imageKey": "image",
+            "imageAltKey": "imageAlt"
+          }
+        },
+        {
+          "id": "detail-actions",
+          "type": "ui.actions",
+          "area": "details",
+          "inputs": {
+            "variant": "toolbar",
+            "buttons": [
+              {
+                "id": "toggle-fav",
+                "label": "В избранное/убрать"
+              }
+            ]
+          },
+          "actions": [
+            {
+              "on": "click",
+              "type": "updateState",
+              "params": {
+                "isFavorite": true
+              }
+            }
+          ],
+          "visibleIf": "$state.selectedRecipeId"
+        }
+      ],
+      "meta": {
+        "builder": {
+          "proto": "001",
+          "ui_revision": "001"
+        }
+      },
+      "title_i18n": {
+        "key": "scenario.streaming_recipe_book_eval.title",
+        "fallback": "Streaming Recipe Book Eval"
+      },
+      "initialState": {
+        "activeCategory": "all",
+        "selectedRecipeId": "bfk1",
+        "isFavorite": {
+          "bfk1": false,
+          "soup1": false,
+          "main1": false
+        }
+      }
+    }
+  },
+  "prompt_files": {
+    "tz/base_tz.md": {
+      "exists": true,
+      "content": "# Streaming Recipe Book Eval\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n\n## Assumptions\n- The initial scaffold started with fields: Название, Заметки, Статус; this list is not a fixed product contract\n\n## Expected behavior\n- The user can add records through the form and inspect them in the list\n- Follow-up Builder turns patch the current draft and refresh the preview\n\n## Preview notes\n- Scenario streaming_recipe_book_eval has a form, table, mock data, and declarative webui.json\n- Data is stored in an internal CRUD datasource named prototype_items\n\n## Risks\n- No external network, device-control, or credential access is requested\n- Validation and human review are still required before activation\n"
+    },
+    "builder_memory.md": {
+      "exists": true,
+      "content": "# Streaming Recipe Book Eval\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n\n## Assumptions\n- The initial scaffold started with fields: Название, Заметки, Статус; this list is not a fixed product contract\n\n## Expected behavior\n- The user can add records through the form and inspect them in the list\n- Follow-up Builder turns patch the current draft and refresh the preview\n\n## Preview notes\n- Scenario streaming_recipe_book_eval has a form, table, mock data, and declarative webui.json\n- Data is stored in an internal CRUD datasource named prototype_items\n\n## Risks\n- No external network, device-control, or credential access is requested\n- Validation and human review are still required before activation\n"
+    },
+    "builder_system_prompt.md": {
+      "exists": true,
+      "content": ""
+    },
+    "prepare/general_prompt.md": {
+      "exists": false,
+      "content": ""
+    },
+    "generate/general_prompt.md": {
+      "exists": false,
+      "content": ""
+    }
+  }
+}

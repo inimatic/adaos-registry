@@ -1,0 +1,384 @@
+{
+  "schema": "adaos.builder.ui_revision.v1",
+  "revision": "001",
+  "created_at": 1784195660.054724,
+  "session_id": "builder_session_9b6782f0",
+  "scenario_id": "streaming_recipe_book_eval",
+  "draft_id": "draft.streaming_recipe_book_eval.20260716095419744747",
+  "inference": {
+    "provider": "root-default",
+    "model": "root-default",
+    "profile_id": "default",
+    "temperature": 0.2
+  },
+  "request": {
+    "text": "Создай новую книгу домашних рецептов с каталогом карточек, фотографиями блюд, категориями, поиском и просмотром подробного рецепта. На телефоне каталог должен быть удобным для одной руки, а на широком экране список и выбранный рецепт можно видеть рядом. Используй реалистичные примеры завтраков, супов и основных блюд."
+  },
+  "patch": {
+    "id": "patch_initial_f7c406cd",
+    "target": "ui",
+    "operation": "create_scenario_draft",
+    "status": "applied",
+    "created_by": "builder_skill",
+    "created_at": 1784195660.0206966,
+    "summary": "Создай новую книгу домашних рецептов с каталогом карточек, фотографиями блюд, категориями, поиском и просмотром подробного рецепта. На телефоне каталог должен быть удобным для одной руки, а на широком экране список и выбранный рецепт можно видеть рядом. Используй реалистичные примеры завтраков, супов и основных блюд.",
+    "diff": {
+      "scenario_id": "streaming_recipe_book_eval",
+      "fields": [
+        {
+          "id": "title",
+          "type": "string",
+          "label": "Название",
+          "required": true
+        },
+        {
+          "id": "notes",
+          "type": "string",
+          "label": "Заметки",
+          "required": false
+        },
+        {
+          "id": "status",
+          "type": "string",
+          "label": "Статус",
+          "required": false
+        }
+      ]
+    }
+  },
+  "llm": null,
+  "before_webui": {},
+  "after_webui": {
+    "schema": "adaos.webui.v1",
+    "generated_by": "builder_skill",
+    "ui": {
+      "application": {
+        "desktop": {
+          "pageSchema": {
+            "id": "streaming_recipe_book_eval",
+            "title": "Streaming Recipe Book Eval",
+            "layout": {
+              "type": "split",
+              "pattern": "split",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "prototype-form",
+                "type": "ui.form",
+                "area": "main",
+                "title": "Input",
+                "inputs": {
+                  "fields": [
+                    {
+                      "id": "title",
+                      "type": "text",
+                      "label": "Название"
+                    },
+                    {
+                      "id": "notes",
+                      "type": "text",
+                      "label": "Заметки"
+                    },
+                    {
+                      "id": "status",
+                      "type": "text",
+                      "label": "Статус"
+                    },
+                    {
+                      "id": "items_table",
+                      "type": "text",
+                      "label": "Список"
+                    }
+                  ],
+                  "submitLabel": "Add"
+                },
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "updateState",
+                    "params": {
+                      "lastPrototypeSubmit": "$event.values"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "prototype-table",
+                "type": "ui.table",
+                "area": "main",
+                "title": "List",
+                "dataSource": {
+                  "kind": "static",
+                  "value": [
+                    {
+                      "title": "Название 1",
+                      "notes": "Заметки 1",
+                      "status": "Статус 1"
+                    },
+                    {
+                      "title": "Название 2",
+                      "notes": "Заметки 2",
+                      "status": "Статус 2"
+                    },
+                    {
+                      "title": "Название 3",
+                      "notes": "Заметки 3",
+                      "status": "Статус 3"
+                    }
+                  ]
+                },
+                "inputs": {
+                  "columns": [
+                    {
+                      "key": "title",
+                      "label": "Название"
+                    },
+                    {
+                      "key": "notes",
+                      "label": "Заметки"
+                    },
+                    {
+                      "key": "status",
+                      "label": "Статус"
+                    },
+                    {
+                      "key": "items_table",
+                      "label": "Список"
+                    }
+                  ],
+                  "filters": [],
+                  "emptyText": "No items yet"
+                }
+              },
+              {
+                "id": "prototype-summary",
+                "type": "item.details",
+                "area": "right",
+                "title": "Prototype",
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "title": "Streaming Recipe Book Eval",
+                    "fields": [
+                      "Название",
+                      "Заметки",
+                      "Статус",
+                      "Список"
+                    ]
+                  }
+                }
+              }
+            ],
+            "meta": {
+              "builder": {
+                "proto": "001",
+                "ui_revision": "001"
+              }
+            },
+            "title_i18n": {
+              "key": "scenario.streaming_recipe_book_eval.title",
+              "fallback": "Streaming Recipe Book Eval"
+            }
+          }
+        }
+      }
+    },
+    "nlu": {
+      "llm_hints": {
+        "aliases": [
+          "Streaming Recipe Book Eval"
+        ],
+        "primary_actions": [
+          {
+            "intent": "builder.chat",
+            "notes": "Prototype UI is edited through builder_skill.chat.",
+            "supported_operations": [
+              "add_field",
+              "remove_field",
+              "update_mock_data",
+              "change_view_representation",
+              "move_form_action",
+              "set_checkbox_column"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "preview_state": {
+    "session_id": "builder_session_9b6782f0",
+    "title": "Streaming Recipe Book Eval",
+    "current_ui": {
+      "schema": "adaos.declarative_ui.v1",
+      "id": "streaming_recipe_book_eval",
+      "type": "page",
+      "title": "Streaming Recipe Book Eval",
+      "children": [
+        {
+          "id": "editor",
+          "type": "section",
+          "label": "Ввод",
+          "children": [
+            {
+              "id": "input_title",
+              "type": "text_input",
+              "label": "Название",
+              "binding": "draft.title",
+              "visible": true
+            },
+            {
+              "id": "input_notes",
+              "type": "text_input",
+              "label": "Заметки",
+              "binding": "draft.notes",
+              "visible": true
+            },
+            {
+              "id": "input_status",
+              "type": "text_input",
+              "label": "Статус",
+              "binding": "draft.status",
+              "visible": true
+            }
+          ],
+          "action_position": "bottom",
+          "actions": [
+            {
+              "id": "add_item",
+              "type": "button",
+              "label": "Добавить"
+            }
+          ]
+        },
+        {
+          "id": "items_table",
+          "type": "table",
+          "label": "Список",
+          "binding": "prototype_items",
+          "columns": [
+            {
+              "field": "title",
+              "label": "Название"
+            },
+            {
+              "field": "notes",
+              "label": "Заметки"
+            },
+            {
+              "field": "status",
+              "label": "Статус"
+            }
+          ],
+          "visible": true
+        }
+      ]
+    },
+    "datasources": [
+      {
+        "id": "prototype_items",
+        "type": "internal_crud",
+        "entity": "item",
+        "fields": [
+          {
+            "id": "title",
+            "type": "string",
+            "label": "Название",
+            "required": true
+          },
+          {
+            "id": "notes",
+            "type": "string",
+            "label": "Заметки",
+            "required": false
+          },
+          {
+            "id": "status",
+            "type": "string",
+            "label": "Статус",
+            "required": false
+          }
+        ],
+        "operations": [
+          "create",
+          "read",
+          "update",
+          "delete"
+        ]
+      }
+    ],
+    "mock_data": {
+      "prototype_items": [
+        {
+          "title": "Название 1",
+          "notes": "Заметки 1",
+          "status": "Статус 1"
+        },
+        {
+          "title": "Название 2",
+          "notes": "Заметки 2",
+          "status": "Статус 2"
+        },
+        {
+          "title": "Название 3",
+          "notes": "Заметки 3",
+          "status": "Статус 3"
+        }
+      ]
+    },
+    "filters": [],
+    "form_action_position": "bottom",
+    "layout_order": "input_first",
+    "card_preview_key": "status",
+    "pending_patches": [],
+    "user_summary": {
+      "assumptions": [
+        "The initial scaffold started with fields: Название, Заметки, Статус; this list is not a fixed product contract"
+      ],
+      "preview": [
+        "Scenario streaming_recipe_book_eval has a form, table, mock data, and declarative webui.json",
+        "Data is stored in an internal CRUD datasource named prototype_items"
+      ],
+      "risks": [
+        "No external network, device-control, or credential access is requested",
+        "Validation and human review are still required before activation"
+      ],
+      "expected_behavior": [
+        "The user can add records through the form and inspect them in the list",
+        "Follow-up Builder turns patch the current draft and refresh the preview"
+      ]
+    },
+    "version": "001"
+  },
+  "prompt_files": {
+    "tz/base_tz.md": {
+      "exists": true,
+      "content": "# Streaming Recipe Book Eval\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n\n## Assumptions\n- The initial scaffold started with fields: Название, Заметки, Статус; this list is not a fixed product contract\n\n## Expected behavior\n- The user can add records through the form and inspect them in the list\n- Follow-up Builder turns patch the current draft and refresh the preview\n\n## Preview notes\n- Scenario streaming_recipe_book_eval has a form, table, mock data, and declarative webui.json\n- Data is stored in an internal CRUD datasource named prototype_items\n\n## Risks\n- No external network, device-control, or credential access is requested\n- Validation and human review are still required before activation\n"
+    },
+    "builder_memory.md": {
+      "exists": true,
+      "content": "# Streaming Recipe Book Eval\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n\n## Assumptions\n- The initial scaffold started with fields: Название, Заметки, Статус; this list is not a fixed product contract\n\n## Expected behavior\n- The user can add records through the form and inspect them in the list\n- Follow-up Builder turns patch the current draft and refresh the preview\n\n## Preview notes\n- Scenario streaming_recipe_book_eval has a form, table, mock data, and declarative webui.json\n- Data is stored in an internal CRUD datasource named prototype_items\n\n## Risks\n- No external network, device-control, or credential access is requested\n- Validation and human review are still required before activation\n"
+    },
+    "builder_system_prompt.md": {
+      "exists": true,
+      "content": ""
+    },
+    "prepare/general_prompt.md": {
+      "exists": false,
+      "content": ""
+    },
+    "generate/general_prompt.md": {
+      "exists": false,
+      "content": ""
+    }
+  }
+}
