@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-20T20:13:25+00:00",
+  "updated_at": "2026-07-20T20:14:08+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -771,8 +771,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.0.1",
-      "updated_at": "2026-07-20T19:39:50+00:00",
+      "version": "0.0.2",
+      "updated_at": "2026-07-20T20:14:08+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.json",
       "source": {

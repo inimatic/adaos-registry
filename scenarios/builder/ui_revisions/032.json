@@ -1,7 +1,7 @@
 {
   "schema": "adaos.builder.ui_revision.v1",
   "revision": "032",
-  "created_at": 1784406040.928377,
+  "created_at": 1784577005.395364,
   "session_id": "scenario.builder",
   "scenario_id": "builder",
   "draft_id": "draft.builder.20260717081846695264",
@@ -2061,7 +2061,12 @@
                     "path": "$state.selectedFilePath",
                     "object_type": "$state.selectedObjectKind",
                     "object_id": "$state.selectedObjectId"
-                  }
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "builder.project.files"
+                  ],
+                  "preserveLastValue": true
                 },
                 "inputs": {
                   "bindField": "content",
@@ -2083,7 +2088,10 @@
                       "text": "$event.content",
                       "object_type": "$state.selectedObjectKind",
                       "object_id": "$state.selectedObjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.files"
+                    ]
                   }
                 ],
                 "title_i18n": {
@@ -2103,7 +2111,12 @@
                     "path": "$state.selectedFilePath",
                     "object_type": "$state.selectedObjectKind",
                     "object_id": "$state.selectedObjectId"
-                  }
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "builder.project.files"
+                  ],
+                  "preserveLastValue": true
                 },
                 "inputs": {
                   "mode": "markdown",
@@ -2244,7 +2257,11 @@
                       "description": "$event.values.description",
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.metadata",
+                      "builder.project.lifecycle"
+                    ]
                   }
                 ],
                 "title_i18n": {
@@ -2263,7 +2280,14 @@
                   "params": {
                     "object_type": "$state.selectedProjectKind",
                     "object_id": "$state.selectedProjectId"
-                  }
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "builder.project.metadata",
+                    "builder.project.lifecycle",
+                    "builder.project.publication"
+                  ],
+                  "preserveLastValue": true
                 },
                 "inputs": {
                   "fields": [
@@ -2337,7 +2361,12 @@
                   "params": {
                     "object_type": "$state.selectedProjectKind",
                     "object_id": "$state.selectedProjectId"
-                  }
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "builder.project.lifecycle"
+                  ],
+                  "preserveLastValue": true
                 },
                 "inputs": {
                   "hideRoot": true,
@@ -2405,7 +2434,11 @@
                       "message": "Builder prototype stabilization",
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.publication",
+                      "builder.project.lifecycle"
+                    ]
                   },
                   {
                     "on": "click:stabilize",
@@ -2415,7 +2448,11 @@
                       "state": "prototype_stable",
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.metadata",
+                      "builder.project.lifecycle"
+                    ]
                   },
                   {
                     "on": "click:go-automation",
@@ -2432,7 +2469,11 @@
                       "state": "automation",
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.metadata",
+                      "builder.project.lifecycle"
+                    ]
                   },
                   {
                     "on": "click:go-publication",
@@ -2449,7 +2490,11 @@
                       "state": "publication",
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.metadata",
+                      "builder.project.lifecycle"
+                    ]
                   }
                 ],
                 "title_i18n": {
@@ -2465,7 +2510,12 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "builder_sdk_control_skill.get_preview",
-                  "params": {}
+                  "params": {},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "builder.project.preview"
+                  ],
+                  "preserveLastValue": true
                 },
                 "inputs": {
                   "fields": [
@@ -2634,7 +2684,12 @@
                   "params": {
                     "object_type": "$state.selectedProjectKind",
                     "object_id": "$state.selectedProjectId"
-                  }
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "builder.project.llm"
+                  ],
+                  "preserveLastValue": true
                 },
                 "actions": [
                   {
@@ -2645,7 +2700,10 @@
                       "model": "$event.values.llmModel",
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.llm"
+                    ]
                   }
                 ],
                 "title_i18n": {
@@ -2714,7 +2772,12 @@
                       "archived": false,
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.catalog",
+                      "builder.project.metadata",
+                      "builder.project.lifecycle"
+                    ]
                   },
                   {
                     "on": "click:restore",
@@ -2786,7 +2849,10 @@
                     "params": {
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.preview"
+                    ]
                   }
                 ],
                 "title_i18n": {
@@ -2805,7 +2871,12 @@
                   "params": {
                     "object_type": "$state.selectedProjectKind",
                     "object_id": "$state.selectedProjectId"
-                  }
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "builder.project.prompt"
+                  ],
+                  "preserveLastValue": true
                 },
                 "inputs": {
                   "bindField": "base_tz",
@@ -2822,7 +2893,10 @@
                       "text": "$event.content",
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "invalidates": [
+                      "builder.project.prompt"
+                    ]
                   }
                 ],
                 "title_i18n": {
@@ -2873,7 +2947,12 @@
                   "params": {
                     "object_type": "$state.selectedProjectKind",
                     "object_id": "$state.selectedProjectId"
-                  }
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "builder.project.prompt"
+                  ],
+                  "preserveLastValue": true
                 },
                 "inputs": {
                   "fields": [
@@ -2902,7 +2981,12 @@
                   "params": {
                     "object_type": "$state.selectedProjectKind",
                     "object_id": "$state.selectedProjectId"
-                  }
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "builder.project.prompt"
+                  ],
+                  "preserveLastValue": true
                 },
                 "inputs": {
                   "fields": [
@@ -3030,7 +3114,12 @@
                         "archived": true,
                         "object_type": "$state.selectedProjectKind",
                         "object_id": "$state.selectedProjectId"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.catalog",
+                        "builder.project.metadata",
+                        "builder.project.lifecycle"
+                      ]
                     },
                     {
                       "on": "click:confirm",
@@ -3090,7 +3179,12 @@
                     "params": {
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "cacheTtlMs": 0,
+                    "invalidationTags": [
+                      "builder.project.files"
+                    ],
+                    "preserveLastValue": true
                   },
                   "inputs": {
                     "variant": "list",
@@ -3125,7 +3219,12 @@
                       "object_type": "$state.selectedObjectKind",
                       "object_id": "$state.selectedObjectId",
                       "limit": 1000
-                    }
+                    },
+                    "cacheTtlMs": 0,
+                    "invalidationTags": [
+                      "builder.project.files"
+                    ],
+                    "preserveLastValue": true
                   },
                   "inputs": {
                     "hideRoot": true,
@@ -3187,7 +3286,12 @@
                   "dataSource": {
                     "kind": "skill",
                     "name": "builder_sdk_control_skill.get_preview",
-                    "params": {}
+                    "params": {},
+                    "cacheTtlMs": 0,
+                    "invalidationTags": [
+                      "builder.project.preview"
+                    ],
+                    "preserveLastValue": true
                   },
                   "inputs": {
                     "bindField": "qr_text",
@@ -3269,7 +3373,12 @@
                       "limit": 200,
                       "selected_object_type": "$state.selectedProjectKind",
                       "selected_object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "cacheTtlMs": 0,
+                    "invalidationTags": [
+                      "builder.project.catalog"
+                    ],
+                    "preserveLastValue": true
                   },
                   "inputs": {
                     "variant": "list",
@@ -3354,7 +3463,10 @@
                       "params": {
                         "object_type": "$event.object_type",
                         "object_id": "$event.object_id"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.preview"
+                      ]
                     },
                     {
                       "on": "select",
@@ -3482,7 +3594,12 @@
                         "object_type": "$event.values.object_type",
                         "object_id": "$event.values.object_id",
                         "template": "$state.selectedTemplate"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.catalog",
+                        "builder.project.metadata",
+                        "builder.project.lifecycle"
+                      ]
                     },
                     {
                       "on": "submit",
@@ -3514,7 +3631,12 @@
                     "name": "builder_sdk_control_skill.list_templates",
                     "params": {
                       "object_type": "scenario"
-                    }
+                    },
+                    "cacheTtlMs": 0,
+                    "invalidationTags": [
+                      "builder.project.templates"
+                    ],
+                    "preserveLastValue": true
                   },
                   "inputs": {
                     "variant": "list",
@@ -3629,7 +3751,10 @@
                         "iteration_ref": "$event.values.iteration_ref",
                         "object_type": "$state.selectedProjectKind",
                         "object_id": "$state.selectedProjectId"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.prompt"
+                      ]
                     },
                     {
                       "on": "submit",
@@ -3698,7 +3823,11 @@
                         "implementation_brief": "$event.values.implementation_brief",
                         "object_type": "$state.selectedProjectKind",
                         "object_id": "$state.selectedProjectId"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.automation",
+                        "builder.project.lifecycle"
+                      ]
                     }
                   ],
                   "title_i18n": {
@@ -3736,7 +3865,11 @@
                         "text": "$event.values.text",
                         "object_type": "$state.selectedProjectKind",
                         "object_id": "$state.selectedProjectId"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.automation",
+                        "builder.project.lifecycle"
+                      ]
                     }
                   ],
                   "title_i18n": {
@@ -3754,7 +3887,12 @@
                     "params": {
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "cacheTtlMs": 0,
+                    "invalidationTags": [
+                      "builder.project.automation"
+                    ],
+                    "preserveLastValue": true
                   },
                   "inputs": {
                     "fields": [
@@ -3879,7 +4017,14 @@
                     "params": {
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "cacheTtlMs": 0,
+                    "invalidationTags": [
+                      "builder.project.metadata",
+                      "builder.project.lifecycle",
+                      "builder.project.publication"
+                    ],
+                    "preserveLastValue": true
                   },
                   "inputs": {
                     "fields": [
@@ -3969,7 +4114,11 @@
                       "params": {
                         "object_type": "$state.selectedProjectKind",
                         "object_id": "$state.selectedProjectId"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.publication",
+                        "builder.project.lifecycle"
+                      ]
                     },
                     {
                       "on": "click:update",
@@ -3978,7 +4127,12 @@
                       "params": {
                         "object_type": "$state.selectedProjectKind",
                         "object_id": "$state.selectedProjectId"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.publication",
+                        "builder.project.metadata",
+                        "builder.project.lifecycle"
+                      ]
                     },
                     {
                       "on": "click:dry-run",
@@ -3989,7 +4143,12 @@
                         "dry_run": true,
                         "object_type": "$state.selectedProjectKind",
                         "object_id": "$state.selectedProjectId"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.publication",
+                        "builder.project.metadata",
+                        "builder.project.lifecycle"
+                      ]
                     },
                     {
                       "on": "click:publish",
@@ -4022,7 +4181,12 @@
                       "limit": 100,
                       "object_type": "$state.selectedProjectKind",
                       "object_id": "$state.selectedProjectId"
-                    }
+                    },
+                    "cacheTtlMs": 0,
+                    "invalidationTags": [
+                      "builder.project.publication"
+                    ],
+                    "preserveLastValue": true
                   },
                   "inputs": {
                     "variant": "list",
@@ -4118,7 +4282,12 @@
                         "dry_run": false,
                         "object_type": "$state.selectedProjectKind",
                         "object_id": "$state.selectedProjectId"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.publication",
+                        "builder.project.metadata",
+                        "builder.project.lifecycle"
+                      ]
                     },
                     {
                       "on": "click:confirm",
@@ -4214,7 +4383,12 @@
                         "remove_local": false,
                         "object_type": "$state.selectedProjectKind",
                         "object_id": "$state.selectedProjectId"
-                      }
+                      },
+                      "invalidates": [
+                        "builder.project.catalog",
+                        "builder.project.metadata",
+                        "builder.project.lifecycle"
+                      ]
                     },
                     {
                       "on": "click:confirm",
@@ -4464,7 +4638,12 @@
               "path": "$state.selectedFilePath",
               "object_type": "$state.selectedObjectKind",
               "object_id": "$state.selectedObjectId"
-            }
+            },
+            "cacheTtlMs": 0,
+            "invalidationTags": [
+              "builder.project.files"
+            ],
+            "preserveLastValue": true
           },
           "inputs": {
             "bindField": "content",
@@ -4486,7 +4665,10 @@
                 "text": "$event.content",
                 "object_type": "$state.selectedObjectKind",
                 "object_id": "$state.selectedObjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.files"
+              ]
             }
           ],
           "title_i18n": {
@@ -4506,7 +4688,12 @@
               "path": "$state.selectedFilePath",
               "object_type": "$state.selectedObjectKind",
               "object_id": "$state.selectedObjectId"
-            }
+            },
+            "cacheTtlMs": 0,
+            "invalidationTags": [
+              "builder.project.files"
+            ],
+            "preserveLastValue": true
           },
           "inputs": {
             "mode": "markdown",
@@ -4647,7 +4834,11 @@
                 "description": "$event.values.description",
                 "object_type": "$state.selectedProjectKind",
                 "object_id": "$state.selectedProjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.metadata",
+                "builder.project.lifecycle"
+              ]
             }
           ],
           "title_i18n": {
@@ -4666,7 +4857,14 @@
             "params": {
               "object_type": "$state.selectedProjectKind",
               "object_id": "$state.selectedProjectId"
-            }
+            },
+            "cacheTtlMs": 0,
+            "invalidationTags": [
+              "builder.project.metadata",
+              "builder.project.lifecycle",
+              "builder.project.publication"
+            ],
+            "preserveLastValue": true
           },
           "inputs": {
             "fields": [
@@ -4740,7 +4938,12 @@
             "params": {
               "object_type": "$state.selectedProjectKind",
               "object_id": "$state.selectedProjectId"
-            }
+            },
+            "cacheTtlMs": 0,
+            "invalidationTags": [
+              "builder.project.lifecycle"
+            ],
+            "preserveLastValue": true
           },
           "inputs": {
             "hideRoot": true,
@@ -4808,7 +5011,11 @@
                 "message": "Builder prototype stabilization",
                 "object_type": "$state.selectedProjectKind",
                 "object_id": "$state.selectedProjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.publication",
+                "builder.project.lifecycle"
+              ]
             },
             {
               "on": "click:stabilize",
@@ -4818,7 +5025,11 @@
                 "state": "prototype_stable",
                 "object_type": "$state.selectedProjectKind",
                 "object_id": "$state.selectedProjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.metadata",
+                "builder.project.lifecycle"
+              ]
             },
             {
               "on": "click:go-automation",
@@ -4835,7 +5046,11 @@
                 "state": "automation",
                 "object_type": "$state.selectedProjectKind",
                 "object_id": "$state.selectedProjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.metadata",
+                "builder.project.lifecycle"
+              ]
             },
             {
               "on": "click:go-publication",
@@ -4852,7 +5067,11 @@
                 "state": "publication",
                 "object_type": "$state.selectedProjectKind",
                 "object_id": "$state.selectedProjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.metadata",
+                "builder.project.lifecycle"
+              ]
             }
           ],
           "title_i18n": {
@@ -4868,7 +5087,12 @@
           "dataSource": {
             "kind": "skill",
             "name": "builder_sdk_control_skill.get_preview",
-            "params": {}
+            "params": {},
+            "cacheTtlMs": 0,
+            "invalidationTags": [
+              "builder.project.preview"
+            ],
+            "preserveLastValue": true
           },
           "inputs": {
             "fields": [
@@ -5037,7 +5261,12 @@
             "params": {
               "object_type": "$state.selectedProjectKind",
               "object_id": "$state.selectedProjectId"
-            }
+            },
+            "cacheTtlMs": 0,
+            "invalidationTags": [
+              "builder.project.llm"
+            ],
+            "preserveLastValue": true
           },
           "actions": [
             {
@@ -5048,7 +5277,10 @@
                 "model": "$event.values.llmModel",
                 "object_type": "$state.selectedProjectKind",
                 "object_id": "$state.selectedProjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.llm"
+              ]
             }
           ],
           "title_i18n": {
@@ -5117,7 +5349,12 @@
                 "archived": false,
                 "object_type": "$state.selectedProjectKind",
                 "object_id": "$state.selectedProjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.catalog",
+                "builder.project.metadata",
+                "builder.project.lifecycle"
+              ]
             },
             {
               "on": "click:restore",
@@ -5189,7 +5426,10 @@
               "params": {
                 "object_type": "$state.selectedProjectKind",
                 "object_id": "$state.selectedProjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.preview"
+              ]
             }
           ],
           "title_i18n": {
@@ -5208,7 +5448,12 @@
             "params": {
               "object_type": "$state.selectedProjectKind",
               "object_id": "$state.selectedProjectId"
-            }
+            },
+            "cacheTtlMs": 0,
+            "invalidationTags": [
+              "builder.project.prompt"
+            ],
+            "preserveLastValue": true
           },
           "inputs": {
             "bindField": "base_tz",
@@ -5225,7 +5470,10 @@
                 "text": "$event.content",
                 "object_type": "$state.selectedProjectKind",
                 "object_id": "$state.selectedProjectId"
-              }
+              },
+              "invalidates": [
+                "builder.project.prompt"
+              ]
             }
           ],
           "title_i18n": {
@@ -5276,7 +5524,12 @@
             "params": {
               "object_type": "$state.selectedProjectKind",
               "object_id": "$state.selectedProjectId"
-            }
+            },
+            "cacheTtlMs": 0,
+            "invalidationTags": [
+              "builder.project.prompt"
+            ],
+            "preserveLastValue": true
           },
           "inputs": {
             "fields": [
@@ -5305,7 +5558,12 @@
             "params": {
               "object_type": "$state.selectedProjectKind",
               "object_id": "$state.selectedProjectId"
-            }
+            },
+            "cacheTtlMs": 0,
+            "invalidationTags": [
+              "builder.project.prompt"
+            ],
+            "preserveLastValue": true
           },
           "inputs": {
             "fields": [

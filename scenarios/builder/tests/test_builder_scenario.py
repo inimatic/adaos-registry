@@ -146,6 +146,7 @@ def test_file_editing_and_project_selection_use_runtime_event_values() -> None:
             "type": "callSkill",
             "target": "builder_sdk_control_skill.select_preview",
             "params": {"object_type": "$event.object_type", "object_id": "$event.object_id"},
+            "invalidates": ["builder.project.preview"],
         }
     ]
 
