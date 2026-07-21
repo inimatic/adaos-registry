@@ -670,6 +670,47 @@ def test_browsers_skill_identify_device_uses_sdk_device_access(monkeypatch) -> N
     assert seen == [("browser:dev-phone", "desktop")]
 
 
+def test_browsers_skill_set_browser_media_control_uses_sdk_device_access(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    seen: list[dict[str, object]] = []
+
+    monkeypatch.setattr(mod, "_refresh_snapshot_sync", lambda webspace_id=None: {"ok": True, "webspace_id": webspace_id})
+
+    def _fake_set(device_ref: str, **kwargs):
+        seen.append({"device_ref": str(device_ref or "").strip(), **kwargs})
+        return {"ok": True, "device_ref": device_ref}
+
+    monkeypatch.setattr(mod.sdk_device_access, "set_browser_media_control", _fake_set)
+
+    result = mod.set_browser_media_control(
+        device_ref="browser:dev-phone",
+        volume=0,
+        muted=False,
+        audio_output_device_id="speaker-1",
+        webspace_id="desktop",
+    )
+
+    assert result == {"ok": True, "device_ref": "browser:dev-phone"}
+    assert seen == [
+        {
+            "device_ref": "browser:dev-phone",
+            "audio_input_device_id": None,
+            "audio_input_label": None,
+            "audio_output_device_id": "speaker-1",
+            "audio_output_label": None,
+            "volume": 0,
+            "muted": False,
+            "media_audio_input_device_id": None,
+            "media_audio_input_label": None,
+            "media_audio_output_device_id": None,
+            "media_audio_output_label": None,
+            "media_audio_output_volume": None,
+            "media_audio_output_muted": None,
+            "webspace_id": "desktop",
+        }
+    ]
+
+
 def test_browsers_skill_adopt_link_uses_sdk_device_access(monkeypatch) -> None:
     mod = _load_browsers_skill_module()
     seen: list[tuple[str, str | None, str]] = []

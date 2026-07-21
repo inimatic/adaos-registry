@@ -844,6 +844,53 @@ def identify_device(
 
 
 @tool
+def set_browser_media_control(
+    device_ref: str | None = None,
+    browser_device_id: str | None = None,
+    device_id: str | None = None,
+    audio_input_device_id: str | None = None,
+    audio_input_label: str | None = None,
+    audio_output_device_id: str | None = None,
+    audio_output_label: str | None = None,
+    volume: float | int | str | None = None,
+    muted: bool | str | None = None,
+    media_audio_input_device_id: str | None = None,
+    media_audio_input_label: str | None = None,
+    media_audio_output_device_id: str | None = None,
+    media_audio_output_label: str | None = None,
+    media_audio_output_volume: float | int | str | None = None,
+    media_audio_output_muted: bool | str | None = None,
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    resolved = _coerce_device_ref(
+        device_ref=device_ref,
+        browser_device_id=browser_device_id,
+        device_id=device_id,
+        webspace_id=webspace_id,
+    )
+    if not resolved:
+        return {"ok": False, "error": "device_ref_required"}
+    result = sdk_device_access.set_browser_media_control(
+        resolved,
+        audio_input_device_id=audio_input_device_id,
+        audio_input_label=audio_input_label,
+        audio_output_device_id=audio_output_device_id,
+        audio_output_label=audio_output_label,
+        volume=volume,
+        muted=muted,
+        media_audio_input_device_id=media_audio_input_device_id,
+        media_audio_input_label=media_audio_input_label,
+        media_audio_output_device_id=media_audio_output_device_id,
+        media_audio_output_label=media_audio_output_label,
+        media_audio_output_volume=media_audio_output_volume,
+        media_audio_output_muted=media_audio_output_muted,
+        webspace_id=webspace_id,
+    )
+    _refresh_snapshot_sync(webspace_id)
+    return result
+
+
+@tool
 def set_device_lifetime(
     preset: str,
     device_ref: str | None = None,

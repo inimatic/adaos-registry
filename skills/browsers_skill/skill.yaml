@@ -1,5 +1,5 @@
 name: browsers_skill
-version: 0.15.18
+version: 0.15.19
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -331,6 +331,55 @@ tools:
         type: string
   output_schema:
     type: object
+- name: set_browser_media_control
+  description: Request audio input/output selection, browser output volume, or mute
+    changes for an active browser endpoint.
+  entry: handlers.main:set_browser_media_control
+  input_schema:
+    type: object
+    properties:
+      device_ref:
+        type: string
+      browser_device_id:
+        type: string
+      device_id:
+        type: string
+      audio_input_device_id:
+        type: string
+      audio_input_label:
+        type: string
+      audio_output_device_id:
+        type: string
+      audio_output_label:
+        type: string
+      volume:
+        type:
+        - number
+        - string
+      muted:
+        type:
+        - boolean
+        - string
+      media_audio_input_device_id:
+        type: string
+      media_audio_input_label:
+        type: string
+      media_audio_output_device_id:
+        type: string
+      media_audio_output_label:
+        type: string
+      media_audio_output_volume:
+        type:
+        - number
+        - string
+      media_audio_output_muted:
+        type:
+        - boolean
+        - string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
 - name: adopt_device
   description: Adopt a temporary browser, member, or device link into a stable access
     profile.
@@ -359,13 +408,13 @@ tools:
   output_schema:
     type: object
 exports: {}
-updated_at: '2026-07-09T21:39:35+00:00'
+updated_at: '2026-07-21T13:35:21+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3599.4f7bfed0
-    recorded_at: '2026-07-09T21:39:36+00:00'
+    min_version: 0.1.0+3814.4b44ab90
+    recorded_at: '2026-07-21T13:35:21+00:00'
     source: skill_push
-    min_commit: 4f7bfed09275be79d6af3198950e2895cf60f50a
-    min_short_commit: 4f7bfed0
-    build_date: '2026-07-09T21:16:37+00:00'
+    min_commit: 4b44ab90ec8d1a16d4c34f3866db7178620f0ef7
+    min_short_commit: 4b44ab90
+    build_date: '2026-07-21T13:05:04+03:00'
 

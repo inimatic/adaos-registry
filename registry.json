@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-20T22:50:10+00:00",
+  "updated_at": "2026-07-21T13:35:21+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -49,8 +49,8 @@
       "kind": "skill",
       "id": "browsers_skill",
       "name": "browsers_skill",
-      "version": "0.15.18",
-      "updated_at": "2026-07-09T21:39:35+00:00",
+      "version": "0.15.19",
+      "updated_at": "2026-07-21T13:35:21+00:00",
       "path": "skills/browsers_skill",
       "manifest": "skills/browsers_skill/skill.yaml",
       "source": {
@@ -64,7 +64,7 @@
       },
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 10
+      "tools_count": 11
     },
     {
       "kind": "skill",
