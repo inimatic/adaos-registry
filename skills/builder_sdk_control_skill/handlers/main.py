@@ -23,7 +23,20 @@ def _webspace_id(value: str | None, meta: Mapping[str, Any] | None) -> str:
 
 
 def _preview_source_webspace_id(value: str | None, meta: Mapping[str, Any] | None) -> str:
-    return preview.canonical_source_webspace_id(_webspace_id(value, meta))
+    candidate = _webspace_id(value, meta)
+    try:
+        return preview.canonical_source_webspace_id(candidate)
+    except RuntimeError:
+        # Read-only collection tools also run in isolated validation without an AgentContext.
+        return candidate
+
+
+def _preview_dev_webspace_id(source: str) -> str:
+    try:
+        return preview.dev_webspace_id(source)
+    except RuntimeError:
+        token = str(source or "desktop").strip() or "desktop"
+        return token if token.endswith("-dev") else f"{token}-dev"
 
 
 def _identity(object_type: str | None, object_id: str | None) -> tuple[str, str]:
@@ -75,7 +88,7 @@ def _record_project_change(
     topic = conversation.ensure_builder_topic(
         webspace_id=webspace_id,
         scenario_id=project_id if kind == "scenario" else None,
-        dev_webspace_id=preview.dev_webspace_id(webspace_id),
+        dev_webspace_id=_preview_dev_webspace_id(webspace_id),
         project_id=project_id,
         title=f"Builder: {project_id}",
         meta={"artifact_kind": kind, "artifact_id": project_id},
@@ -102,7 +115,16 @@ def _record_project_change(
     return dict(evidence or {"change_id": change_id, "status": "recorded"})
 
 
-def _automation_children(projection: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _version_title(value: Any) -> str:
+    token = str(value or "DEV").strip() or "DEV"
+    return token if token.lower().startswith("v") else f"v {token}"
+
+
+def _automation_children(
+    projection: Mapping[str, Any],
+    *,
+    project_version: str | None = None,
+) -> list[dict[str, Any]]:
     """Build one bounded, browser-ready node for the current automation task."""
     status = str(projection.get("status") or "idle")
     task = projection.get("task") if isinstance(projection.get("task"), Mapping) else {}
@@ -129,6 +151,15 @@ def _automation_children(projection: Mapping[str, Any]) -> list[dict[str, Any]]:
         or result.get("result_branch")
         or result.get("branch")
     )
+    version = (
+        result.get("version")
+        or task.get("version")
+        or projection.get("version")
+        or project_version
+        or "DEV"
+    )
+    source_prototype_version = projection.get("source_prototype_version") or project_version
+    updated_at = projection.get("updated_at") or task.get("updated_at") or result.get("updated_at")
     if isinstance(raw_evidence, Mapping):
         evidence_items = [
             {"kind": str(key).removesuffix("_path"), "path": value}
@@ -147,7 +178,10 @@ def _automation_children(projection: Mapping[str, Any]) -> list[dict[str, Any]]:
             "id": f"automation-task-{task_id or 'current'}",
             "kind": "automation_result",
             "lifecycleState": "failed" if error else ("current" if status not in {"completed", "succeeded"} else "complete"),
-            "title": str(summary or error or task_id or status),
+            "title": _version_title(version),
+            "version": str(version),
+            "updated_at": updated_at,
+            "source_prototype_version": source_prototype_version,
             "status": status,
             "phase": phase,
             "summary": summary,
@@ -180,15 +214,16 @@ def _publication_children(kind: str, project_id: str) -> list[dict[str, Any]]:
         ):
             continue
         change_id = str(change.get("change_id") or change.get("id") or "publication")
+        version = meta.get("version") or meta.get("release") or "DEV"
         children.append(
             {
                 "id": f"publication-{change_id}",
                 "kind": "publication_release",
                 "lifecycleState": "complete",
-                "title": str(change.get("summary") or f"Published {project_id}"),
+                "title": _version_title(version),
                 "status": str(change.get("status") or "accepted"),
                 "change_id": change_id,
-                "version": meta.get("version"),
+                "version": version,
                 "release": meta.get("release"),
                 "created_at": change.get("updated_at") or change.get("created_at"),
                 "evidence": dict(change),
@@ -207,6 +242,7 @@ def list_projects(
     selected_object_type: str | None = None,
     selected_object_id: str | None = None,
     webspace_id: str | None = None,
+    include_archived: bool = False,
     _meta: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     needle = str(query or "").strip().casefold()
@@ -224,6 +260,8 @@ def list_projects(
         if needle and needle not in f"{object_id} {title} {description}".casefold():
             continue
         state = _context(object_type, object_id)
+        if state.get("archived") and not include_archived:
+            continue
         current = object_type == selected_kind and object_id == selected_id
         items.append(
             {
@@ -247,7 +285,7 @@ def list_projects(
                 },
                 "version": str(item.get("version") or "DEV"),
                 "stable": str(item.get("version") or "—"),
-                "space": preview.dev_webspace_id(source),
+                "space": _preview_dev_webspace_id(source),
                 "sync": "Текущий" if current else "Доступен в DEV",
                 "sync_i18n": {
                     "key": "builder.project_sync.current"
@@ -280,13 +318,14 @@ def get_project(
         "object_id": project_id,
         "project_ref": f"{kind}:{project_id}",
         "project_type": str(item.get("project_type") or kind),
-        "dev_webspace_id": preview.dev_webspace_id(source),
+        "dev_webspace_id": _preview_dev_webspace_id(source),
         "source_webspace_id": source,
         "stage": "DEV prototype",
         "archived": bool(state.get("archived")),
         "workflow_state": str(state.get("workflow_state") or "tz"),
         "builder_llm_model": state.get("builder_llm_model"),
         "llm_provider": state.get("llm_provider"),
+        "updated_at": state.get("updated_at"),
     }
 
 
@@ -613,9 +652,9 @@ def get_preview(
         **binding,
         "ok": bool(binding.get("ok", True)),
         "source_webspace_id": source,
-        "dev_webspace_id": str(binding.get("dev_webspace_id") or preview.dev_webspace_id(source)),
-        "preview_url": str(opened.get("url") or f"/?webspace={preview.dev_webspace_id(source)}"),
-        "qr_text": str(opened.get("url") or f"/?webspace={preview.dev_webspace_id(source)}"),
+        "dev_webspace_id": str(binding.get("dev_webspace_id") or _preview_dev_webspace_id(source)),
+        "preview_url": str(opened.get("url") or f"/?webspace={_preview_dev_webspace_id(source)}"),
+        "qr_text": str(opened.get("url") or f"/?webspace={_preview_dev_webspace_id(source)}"),
         "status": "ready" if binding.get("runtime_scenario_id") else "not_selected",
     }
 
@@ -690,11 +729,13 @@ def get_lifecycle(
     state = _context(kind, project_id)
     current_revision = ""
     revisions: list[str] = []
+    file_updated_at: dict[str, Any] = {}
+    for item in projects.list_files(kind, project_id, limit=1000):
+        path = PurePosixPath(str(item.get("path") or ""))
+        file_updated_at[path.as_posix()] = item.get("updated_at")
+        if kind == "scenario" and len(path.parts) == 2 and path.parts[0] == "ui_revisions" and path.suffix == ".json":
+            revisions.append(path.stem)
     if kind == "scenario":
-        for item in projects.list_files(kind, project_id, limit=1000):
-            path = PurePosixPath(str(item.get("path") or ""))
-            if len(path.parts) == 2 and path.parts[0] == "ui_revisions" and path.suffix == ".json":
-                revisions.append(path.stem)
         try:
             current_revision = str(projects.read_file(kind, project_id, "ui_revisions/current.txt", max_bytes=64)["content"]).strip()
         except projects.DeveloperProjectError:
@@ -715,6 +756,8 @@ def get_lifecycle(
                     else "builder.lifecycle.status.previous"
                 },
                 "title": f"UI {revision}" + (f" · v {project.get('version')}" if current and project.get("version") else ""),
+                "version": f"UI {revision}",
+                "updated_at": file_updated_at.get(f"ui_revisions/{revision}.json"),
                 "badges": ["текущая"] if current else [],
                 "canMakeCurrent": not current,
                 "canStabilize": current,
@@ -729,6 +772,8 @@ def get_lifecycle(
                 "status": "текущая",
                 "status_i18n": {"key": "builder.lifecycle.status.current"},
                 "title": f"v {project.get('version') or 'DEV'}",
+                "version": str(project.get("version") or "DEV"),
+                "updated_at": file_updated_at.get(str(project.get("manifest") or "scenario.yaml")),
                 "badges": ["текущая"],
                 "canStabilize": True,
             }
@@ -736,9 +781,17 @@ def get_lifecycle(
     automation_state = get_automation(kind, project_id, webspace_id, _meta)
     automation_projection = automation_state.get("automation") if isinstance(automation_state.get("automation"), Mapping) else {}
     automation_status = str(automation_projection.get("status") or "idle")
-    automation_children = _automation_children(automation_projection)
+    project_version = str(project.get("version") or "DEV")
+    automation_children = _automation_children(automation_projection, project_version=project_version)
     publication_children = _publication_children(kind, project_id)
     publication_active = bool(publication_children) or str(state.get("workflow_state") or "") == "publication"
+    prototype_updated_at = next(
+        (item.get("updated_at") for item in revision_nodes if item.get("updated_at")),
+        file_updated_at.get(str(project.get("manifest") or ("scenario.yaml" if kind == "scenario" else "skill.yaml"))),
+    )
+    automation_updated_at = automation_projection.get("updated_at") or state.get("updated_at")
+    publication_version = publication_children[0].get("version") if publication_children else project_version
+    publication_updated_at = publication_children[0].get("created_at") if publication_children else state.get("updated_at")
     return [
         {
             "id": "stage-proto",
@@ -750,6 +803,8 @@ def get_lifecycle(
             "title_i18n": {"key": "builder.lifecycle.stage.prototype"},
             "badges": ["текущая"],
             "canStabilize": True,
+            "version": project_version,
+            "updated_at": prototype_updated_at,
             "children": revision_nodes,
         },
         {
@@ -765,6 +820,9 @@ def get_lifecycle(
                 else None
             ),
             "canOpenAutomation": True,
+            "version": project_version,
+            "updated_at": automation_updated_at,
+            "source_prototype_version": automation_projection.get("source_prototype_version") or project_version,
             "children": automation_children,
         },
         {
@@ -780,6 +838,8 @@ def get_lifecycle(
                 else "builder.lifecycle.status.not_started"
             },
             "canOpenPublication": True,
+            "version": publication_version,
+            "updated_at": publication_updated_at,
             "children": publication_children,
         },
     ]

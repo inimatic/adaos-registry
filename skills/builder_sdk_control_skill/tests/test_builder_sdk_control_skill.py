@@ -166,6 +166,9 @@ def test_lifecycle_exposes_bounded_automation_result_children(monkeypatch) -> No
     child = automation_stage["children"][0]
 
     assert child["kind"] == "automation_result"
+    assert child["title"] == "v 0.2.0"
+    assert child["version"] == "0.2.0"
+    assert child["source_prototype_version"] == "0.2.0"
     assert child["status"] == "succeeded"
     assert child["phase"] == "verification"
     assert child["summary"] == "Implementation and checks completed"
@@ -209,6 +212,7 @@ def test_publication_release_children_exclude_dry_runs_and_are_bounded(monkeypat
     assert publication_stage["lifecycleState"] == "active"
     assert len(publication_stage["children"]) == module.MAX_LIFECYCLE_CHILDREN
     assert all(child["kind"] == "publication_release" for child in publication_stage["children"])
+    assert all(child["title"].startswith("v ") for child in publication_stage["children"])
     assert {child["change_id"] for child in publication_stage["children"]} == {
         "release-0", "release-1", "release-2", "release-3", "release-4"
     }
@@ -288,6 +292,29 @@ def test_project_collections_are_browser_ready(monkeypatch) -> None:
     assert files[0]["protected"] is False
     assert files[1]["protected"] is True
     assert len(files) == 2
+
+
+def test_project_collection_hides_archived_projects_by_default(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module.projects,
+        "list_projects",
+        lambda **kwargs: [
+            {"kind": "scenario", "id": "active", "version": "1.0.0"},
+            {"kind": "scenario", "id": "archived", "version": "0.9.0"},
+        ],
+    )
+    monkeypatch.setattr(
+        module,
+        "_context",
+        lambda _kind, project_id: {"archived": project_id == "archived"},
+    )
+
+    assert [item["object_id"] for item in module.list_projects()] == ["active"]
+    assert [item["object_id"] for item in module.list_projects(include_archived=True)] == [
+        "active",
+        "archived",
+    ]
 
 
 def test_preview_selection_waits_until_materialized(monkeypatch) -> None:
