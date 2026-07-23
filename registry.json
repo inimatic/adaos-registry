@@ -609,8 +609,8 @@
       "kind": "skill",
       "id": "release_validation_skill",
       "name": "release_validation_skill",
-      "version": "0.1.0",
-      "updated_at": "2026-07-23T00:00:00+00:00",
+      "version": "0.1.1",
+      "updated_at": "2026-07-23T14:01:00+00:00",
       "path": "skills/release_validation_skill",
       "manifest": "skills/release_validation_skill/skill.yaml",
       "source": {
@@ -637,7 +637,7 @@
         "startup_allowed": true,
         "background_refresh": false
       },
-      "tools_count": 7
+      "tools_count": 8
     },
     {
       "kind": "skill",

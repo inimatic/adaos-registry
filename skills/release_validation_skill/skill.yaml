@@ -1,5 +1,5 @@
 name: release_validation_skill
-version: 0.1.0
+version: 0.1.1
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -48,6 +48,16 @@ events:
   - ui.notify
 default_tool: get_snapshot
 tools:
+- name: rehydrate
+  description: Restore the release validation projection from durable state after activation.
+  entry: handlers.main:rehydrate
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: [string, 'null']
+  output_schema:
+    type: object
 - name: get_snapshot
   description: Return the current release validation operator snapshot.
   entry: handlers.main:get_snapshot
@@ -131,5 +141,5 @@ tools:
     required: [target_build]
   output_schema:
     type: object
-updated_at: '2026-07-23T00:00:00+00:00'
+updated_at: '2026-07-23T14:01:00+00:00'
 

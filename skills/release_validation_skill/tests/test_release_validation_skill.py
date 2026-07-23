@@ -99,3 +99,17 @@ def test_skill_reports_no_pending_campaign(monkeypatch) -> None:
 
     assert result["ok"] is False
     assert result["error"] == "no_pending_campaign"
+
+
+def test_skill_rehydrate_projects_durable_snapshot(monkeypatch) -> None:
+    module = _load_module()
+    service = _Service()
+    projection = _Projection()
+    monkeypatch.setattr(module, "_service", lambda: service)
+    monkeypatch.setattr(module, "ctx_subnet", projection)
+
+    result = module.rehydrate({"webspace_id": "ops"})
+
+    assert result["ok"] is True
+    assert projection.values[-1][0] == "release_validation.snapshot"
+    assert projection.values[-1][2]["webspace_id"] == "ops"

@@ -271,6 +271,7 @@ def on_runtime_refresh(evt: Any) -> None:
     _refresh(webspace_id=_webspace_id(webspace_id))
 
 
+@tool("rehydrate")
 def rehydrate(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
     webspace_id = payload.get("webspace_id") if isinstance(payload, Mapping) else None
     return {"ok": True, "snapshot": _refresh(webspace_id=_webspace_id(webspace_id))}
