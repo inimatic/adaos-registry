@@ -43,7 +43,9 @@
             "builderTopicId": "prompt-project:scenario:builder",
             "builderThreadId": "prompt-project:scenario:builder",
             "projectPickerArchived": false,
-            "projectArchived": false
+            "projectArchived": false,
+            "selectedLifecycleStage": "prototype",
+            "lifecycleConversationLabel": "Prototype conversation"
           },
           "layout": {
             "type": "split",
@@ -102,20 +104,9 @@
                     }
                   },
                   {
-                    "id": "prototype-chat",
-                    "label": "Разговор — Prototype",
-                    "icon": "chatbubbles-outline",
-                    "label_i18n": {
-                      "key": "builder.text.prototype.conversation"
-                    }
-                  },
-                  {
-                    "id": "automation-chat",
-                    "label": "Разговор — Automation",
-                    "icon": "construct-outline",
-                    "label_i18n": {
-                      "key": "builder.text.automation.conversation"
-                    }
+                    "id": "conversation",
+                    "label": "$state.lifecycleConversationLabel",
+                    "icon": "chatbubbles-outline"
                   },
                   {
                     "id": "files",
@@ -267,7 +258,7 @@
               "id": "builder-chat",
               "type": "ui.chat",
               "title": "Разговор — Prototype",
-              "visibleIf": "$state.activeView === 'prototype-chat'",
+              "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'prototype'",
               "dataSource": {
                 "kind": "stream",
                 "receiver": "voice_chat.messages",
@@ -355,7 +346,7 @@
               "title_i18n": {
                 "key": "builder.text.start.autonomous.development"
               },
-              "visibleIf": "$state.activeView === 'automation-chat'"
+              "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'automation'"
             },
             {
               "area": "center",
@@ -398,10 +389,10 @@
               "title_i18n": {
                 "key": "builder.text.clarification.or.retry.after.an.error"
               },
-              "visibleIf": "$state.activeView === 'automation-chat'"
+              "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'automation'"
             },
             {
-              "area": "center",
+              "area": "right",
               "id": "automation-conversation-state",
               "type": "item.details",
               "title": "Состояние",
@@ -420,6 +411,19 @@
               },
               "inputs": {
                 "fields": [
+                  {
+                    "key": "version",
+                    "label": "Version"
+                  },
+                  {
+                    "key": "source_prototype_version",
+                    "label": "Source Prototype version"
+                  },
+                  {
+                    "key": "updated_at",
+                    "label": "Modified",
+                    "format": "datetime"
+                  },
                   {
                     "key": "status",
                     "label": "Статус",
@@ -502,7 +506,202 @@
               "title_i18n": {
                 "key": "builder.text.state"
               },
-              "visibleIf": "$state.activeView === 'automation-chat'"
+              "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'automation'"
+            },
+            {
+              "area": "right",
+              "id": "publication-workspace-status",
+              "type": "item.details",
+              "title": "Проект",
+              "dataSource": {
+                "kind": "skill",
+                "name": "builder_sdk_control_skill.get_project",
+                "params": {
+                  "object_type": "$state.selectedProjectKind",
+                  "object_id": "$state.selectedProjectId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "builder.project.metadata",
+                  "builder.project.lifecycle",
+                  "builder.project.publication"
+                ],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "fields": [
+                  {
+                    "key": "project_ref",
+                    "label": "Проект",
+                    "label_i18n": {
+                      "key": "builder.text.project"
+                    }
+                  },
+                  {
+                    "key": "version",
+                    "label": "Версия",
+                    "label_i18n": {
+                      "key": "builder.text.version"
+                    }
+                  },
+                  {
+                    "key": "workflow_state",
+                    "label": "Этап",
+                    "label_i18n": {
+                      "key": "builder.text.stage"
+                    }
+                  }
+                ]
+              },
+              "title_i18n": {
+                "key": "builder.text.project"
+              },
+              "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'publication'"
+            },
+            {
+              "area": "center",
+              "id": "publication-workspace-actions",
+              "type": "ui.actions",
+              "title": "Forge и публикация",
+              "inputs": {
+                "variant": "toolbar",
+                "buttons": [
+                  {
+                    "id": "checkpoint",
+                    "label": "Checkpoint",
+                    "icon": "git-commit-outline",
+                    "label_i18n": {
+                      "key": "builder.text.checkpoint"
+                    }
+                  },
+                  {
+                    "id": "update",
+                    "label": "Обновить",
+                    "icon": "sync-outline",
+                    "label_i18n": {
+                      "key": "builder.text.update"
+                    }
+                  },
+                  {
+                    "id": "dry-run",
+                    "label": "Проверить релиз",
+                    "icon": "checkmark-circle-outline",
+                    "label_i18n": {
+                      "key": "builder.text.validate.release"
+                    }
+                  },
+                  {
+                    "id": "publish",
+                    "label": "Опубликовать",
+                    "icon": "rocket-outline",
+                    "label_i18n": {
+                      "key": "builder.text.publish"
+                    }
+                  },
+                  {
+                    "id": "delete",
+                    "label": "Удалить",
+                    "icon": "trash-outline",
+                    "kind": "danger",
+                    "label_i18n": {
+                      "key": "builder.text.delete"
+                    }
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:checkpoint",
+                  "type": "callSkill",
+                  "target": "builder_sdk_control_skill.push_project",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  },
+                  "invalidates": [
+                    "builder.project.publication",
+                    "builder.project.lifecycle"
+                  ]
+                },
+                {
+                  "on": "click:update",
+                  "type": "callSkill",
+                  "target": "builder_sdk_control_skill.update_project",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  },
+                  "invalidates": [
+                    "builder.project.publication",
+                    "builder.project.metadata",
+                    "builder.project.lifecycle"
+                  ]
+                },
+                {
+                  "on": "click:dry-run",
+                  "type": "callSkill",
+                  "target": "builder_sdk_control_skill.publish_project",
+                  "params": {
+                    "bump": "$state.releaseBump",
+                    "dry_run": true,
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  },
+                  "invalidates": [
+                    "builder.project.publication",
+                    "builder.project.metadata",
+                    "builder.project.lifecycle"
+                  ]
+                },
+                {
+                  "on": "click:publish",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "confirm-publish"
+                  }
+                },
+                {
+                  "on": "click:delete",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "confirm-delete"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "builder.text.forge.and.publication"
+              },
+              "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'publication'"
+            },
+            {
+              "area": "center",
+              "id": "publication-workspace-history",
+              "type": "ui.list",
+              "title": "История изменений",
+              "dataSource": {
+                "kind": "skill",
+                "name": "builder_sdk_control_skill.list_changes",
+                "params": {
+                  "limit": 100,
+                  "object_type": "$state.selectedProjectKind",
+                  "object_id": "$state.selectedProjectId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "builder.project.publication"
+                ],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "variant": "list",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "previewKey": "created_at"
+              },
+              "title_i18n": {
+                "key": "builder.text.change.history"
+              },
+              "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'publication'"
             },
             {
               "area": "center",
@@ -612,7 +811,8 @@
                     "label": "Изменено",
                     "label_i18n": {
                       "key": "builder.text.modified"
-                    }
+                    },
+                    "format": "datetime"
                   },
                   {
                     "key": "source_prototype_version",
@@ -860,7 +1060,9 @@
                   "on": "select",
                   "type": "updateState",
                   "params": {
-                    "selectedNodeId": "$event.id"
+                    "selectedNodeId": "$event.id",
+                    "selectedLifecycleStage": "$event.lifecycleStage",
+                    "lifecycleConversationLabel": "$event.conversationLabel"
                   }
                 },
                 {
@@ -1010,7 +1212,7 @@
               "id": "chat-side-settings",
               "type": "ui.form",
               "title": "Настройки разработки",
-              "visibleIf": "$state.activeView === 'chat'",
+              "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'prototype'",
               "inputs": {
                 "layout": "responsiveGrid",
                 "minFieldWidth": 220,
@@ -1214,7 +1416,11 @@
                     "object_type": "$state.selectedProjectKind",
                     "object_id": "$state.selectedProjectId"
                   },
-                  "background": true
+                  "background": true,
+                  "invalidates": [
+                    "builder.project.preview",
+                    "builder.project.lifecycle"
+                  ]
                 }
               ],
               "title_i18n": {
@@ -1390,9 +1596,9 @@
           "meta": {
             "builder": {
               "scenario_id": "builder",
-              "ui_revision": "036",
+              "ui_revision": "037",
               "prototype_base_revision": "029",
-              "previous_revision": "035",
+              "previous_revision": "036",
               "functional": true
             }
           },
@@ -1840,7 +2046,11 @@
                       "object_type": "$event.object_type",
                       "object_id": "$event.object_id"
                     },
-                    "background": true
+                    "background": true,
+                    "invalidates": [
+                      "builder.project.preview",
+                      "builder.project.lifecycle"
+                    ]
                   },
                   {
                     "on": "select",
@@ -1858,7 +2068,10 @@
                       "project.type": "$event.object_type",
                       "builderTopicId": "prompt-project:$event.object_type:$event.object_id",
                       "builderThreadId": "prompt-project:$event.object_type:$event.object_id",
-                      "projectArchived": "$event.archived"
+                      "projectArchived": "$event.archived",
+                      "selectedNodeId": "stage-proto",
+                      "selectedLifecycleStage": "prototype",
+                      "lifecycleConversationLabel": "Prototype conversation"
                     }
                   },
                   {
