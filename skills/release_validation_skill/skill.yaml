@@ -1,0 +1,135 @@
+name: release_validation_skill
+version: 0.1.0
+entry: handlers/main.py
+runtime:
+  python: '3.11'
+  activation:
+    mode: lazy
+    startup_allowed: true
+    background_refresh: false
+    when:
+      scenarios_active:
+      - release_validation_ops
+      client_presence: true
+      webspace_scope: active
+description: Private observe-only release validation registry, campaign runner, evidence log, and operator projection.
+webui_owner: shared
+dependencies: []
+data_projections:
+- scope: subnet
+  slot: release_validation.snapshot
+  targets:
+  - backend: yjs
+    path: data/release_validation
+data_routes:
+- surface: widget:release_validation_widget
+  route: yjs
+  projection_slot: release_validation.snapshot
+  first_paint: idle observe-only status from webui defaults
+  recovery: persisted validation state is projected on refresh or rehydrate
+  update_source:
+  - explicit tool call
+  - sys.ready
+  budget:
+    max_payload_bytes: 65536
+    max_publish_hz: 1
+  guard_visibility:
+    degraded_state: widget keeps the last projected validation status
+    log: service.release_validation_skill.runtime.log
+    quarantine: false
+lifecycle:
+  rehydrate: rehydrate
+events:
+  subscribe:
+  - sys.ready
+  - desktop.webspace.refresh
+  - desktop.webspace.reload
+  publish:
+  - ui.notify
+default_tool: get_snapshot
+tools:
+- name: get_snapshot
+  description: Return the current release validation operator snapshot.
+  entry: handlers.main:get_snapshot
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: [string, 'null']
+  output_schema:
+    type: object
+- name: refresh_snapshot
+  description: Refresh the release validation Yjs projection.
+  entry: handlers.main:refresh_snapshot
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: [string, 'null']
+  output_schema:
+    type: object
+- name: register_default_observe_contracts
+  description: Register the allowlisted Linux test node and observe-only smoke suite.
+  entry: handlers.main:register_default_observe_contracts
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: [string, 'null']
+  output_schema:
+    type: object
+- name: prepare_campaign
+  description: Create one pending observe-only campaign for an exact AdaOS build.
+  entry: handlers.main:prepare_campaign
+  input_schema:
+    type: object
+    properties:
+      target_build:
+        type: string
+      campaign_id:
+        type: [string, 'null']
+      webspace_id:
+        type: [string, 'null']
+    required: [target_build]
+  output_schema:
+    type: object
+- name: run_campaign
+  description: Run one pending validation campaign and publish its terminal status.
+  entry: handlers.main:run_campaign
+  input_schema:
+    type: object
+    properties:
+      campaign_id:
+        type: string
+      webspace_id:
+        type: [string, 'null']
+    required: [campaign_id]
+  output_schema:
+    type: object
+- name: run_latest_campaign
+  description: Run the newest pending validation campaign.
+  entry: handlers.main:run_latest_campaign
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: [string, 'null']
+  output_schema:
+    type: object
+- name: run_default_observe
+  description: Register defaults, create a campaign, run it, and project the terminal result.
+  entry: handlers.main:run_default_observe
+  input_schema:
+    type: object
+    properties:
+      target_build:
+        type: string
+      campaign_id:
+        type: [string, 'null']
+      webspace_id:
+        type: [string, 'null']
+    required: [target_build]
+  output_schema:
+    type: object
+updated_at: '2026-07-23T00:00:00+00:00'
+

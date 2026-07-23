@@ -1,0 +1,22 @@
+id: release_validation_ops
+name: release_validation_ops
+version: 0.1.0
+title: Release Validation Operations
+description: Private Root operator workspace for infrastructure context and observe-only AdaOS release validation campaigns.
+type: desktop
+depends:
+- root_mgmnt
+- release_validation_skill
+runtime:
+  skills:
+    required:
+    - root_mgmnt
+    - release_validation_skill
+data_projections:
+- scope: subnet
+  slot: release_validation.snapshot
+  targets:
+  - backend: yjs
+    path: data/release_validation
+updated_at: '2026-07-23T00:00:00+00:00'
+

@@ -1,0 +1,262 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "apps": [
+    {
+      "id": "release_validation_app",
+      "title": "Release Validation",
+      "icon": "shield-checkmark-outline",
+      "launchModal": "release_validation_modal"
+    }
+  ],
+  "widgets": [
+    {
+      "id": "release_validation_widget",
+      "type": "visual.metricTile",
+      "title": "Release Validation",
+      "icon": "shield-checkmark-outline",
+      "dataSource": {
+        "kind": "y",
+        "path": "data/release_validation/summary"
+      },
+      "inputs": {
+        "valuePath": "value",
+        "labelPath": "label",
+        "subtitlePath": "subtitle",
+        "descriptionPath": "description",
+        "colorPath": "color",
+        "emptyText": "IDLE"
+      },
+      "actions": [
+        {
+          "on": "click:open",
+          "type": "openModal",
+          "params": {
+            "modalId": "release_validation_modal"
+          }
+        },
+        {
+          "on": "click:refresh",
+          "type": "callSkill",
+          "target": "release_validation_skill.refresh_snapshot",
+          "params": {
+            "webspace_id": "$runtime.webspace_id"
+          }
+        }
+      ]
+    }
+  ],
+  "registry": {
+    "modals": {
+      "release_validation_modal": {
+        "title": "Release Validation",
+        "schema": {
+          "id": "release_validation_modal",
+          "layout": {
+            "type": "split",
+            "pattern": "split",
+            "areas": [
+              { "id": "main", "role": "main" },
+              { "id": "right", "role": "aux" },
+              { "id": "bottom", "role": "footer" }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "release-validation-summary",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Latest campaign",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/summary"
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "IDLE"
+              }
+            },
+            {
+              "id": "release-validation-actions",
+              "type": "input.commandBar",
+              "area": "right",
+              "title": "Manual controls",
+              "inputs": {
+                "size": "small",
+                "variant": "stack",
+                "buttons": [
+                  { "id": "refresh", "label": "Refresh" },
+                  { "id": "register", "label": "Register contracts" },
+                  { "id": "run-latest", "label": "Run latest pending" }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:refresh",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.refresh_snapshot",
+                  "params": { "webspace_id": "$runtime.webspace_id" }
+                },
+                {
+                  "on": "click:register",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.register_default_observe_contracts",
+                  "params": { "webspace_id": "$runtime.webspace_id" }
+                },
+                {
+                  "on": "click:run-latest",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.run_latest_campaign",
+                  "params": { "webspace_id": "$runtime.webspace_id" }
+                }
+              ]
+            },
+            {
+              "id": "release-validation-create",
+              "type": "ui.form",
+              "area": "main",
+              "title": "Prepare observe-only campaign",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "minFieldWidth": 240,
+                "submitLabel": "Prepare campaign",
+                "fields": [
+                  {
+                    "id": "target_build",
+                    "type": "shortText",
+                    "label": "Exact build or commit",
+                    "required": true
+                  },
+                  {
+                    "id": "campaign_id",
+                    "type": "shortText",
+                    "label": "Campaign ID",
+                    "placeholder": "Generated when empty"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.prepare_campaign",
+                  "params": {
+                    "target_build": "$event.values.target_build",
+                    "campaign_id": "$event.values.campaign_id",
+                    "webspace_id": "$runtime.webspace_id"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "release-validation-nodes",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Test nodes",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/nodes"
+              },
+              "inputs": {
+                "emptyText": "No test nodes registered",
+                "columns": [
+                  { "key": "display_name", "label": "Node" },
+                  { "key": "host", "label": "Host", "width": "150px", "mono": true },
+                  { "key": "profile", "label": "Profile", "width": "100px" },
+                  { "key": "enabled_label", "label": "Enabled", "width": "90px" }
+                ]
+              }
+            },
+            {
+              "id": "release-validation-campaigns",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Campaigns",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/campaigns"
+              },
+              "inputs": {
+                "emptyText": "No validation campaigns",
+                "columns": [
+                  { "key": "campaign_id", "label": "Campaign", "mono": true },
+                  { "key": "state", "label": "State", "width": "110px" },
+                  { "key": "target_build", "label": "Target", "width": "210px", "mono": true },
+                  { "key": "nodes", "label": "Nodes", "width": "150px" },
+                  { "key": "finished_at", "label": "Finished", "width": "185px", "mono": true }
+                ]
+              }
+            },
+            {
+              "id": "release-validation-assignments",
+              "type": "ui.table",
+              "area": "right",
+              "title": "Assignments",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/assignments"
+              },
+              "inputs": {
+                "emptyText": "No assignments",
+                "columns": [
+                  { "key": "node_id", "label": "Node" },
+                  { "key": "state", "label": "State", "width": "105px" },
+                  { "key": "checks_text", "label": "Checks", "width": "75px", "mono": true },
+                  { "key": "reason", "label": "Reason" }
+                ]
+              }
+            },
+            {
+              "id": "release-validation-detail",
+              "type": "ui.jsonViewer",
+              "area": "right",
+              "title": "Latest evidence",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/detail"
+              },
+              "inputs": {
+                "emptyText": "No campaign evidence"
+              }
+            },
+            {
+              "id": "release-validation-events",
+              "type": "ui.list",
+              "area": "bottom",
+              "title": "Validation journal",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/events"
+              },
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "description",
+                "showDetails": false,
+                "emptyText": "No validation events"
+              }
+            }
+          ]
+        }
+      }
+    },
+    "widgets": {}
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "release_validation_app",
+      "autoInstall": true
+    },
+    {
+      "extensionPoint": "desktop.widgets",
+      "type": "widget",
+      "id": "release_validation_widget",
+      "autoInstall": true
+    }
+  ]
+}
+

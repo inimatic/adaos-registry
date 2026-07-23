@@ -1,0 +1,254 @@
+{
+  "id": "release_validation_ops",
+  "version": "0.1.0",
+  "name": "Release Validation Operations",
+  "type": "desktop",
+  "title": "Release Validation Operations",
+  "description": "Private Root operator workspace for infrastructure context and observe-only AdaOS release validation campaigns.",
+  "depends": [
+    "root_mgmnt",
+    "release_validation_skill"
+  ],
+  "ui": {
+    "application": {
+      "version": "1",
+      "desktop": {
+        "pageSchema": {
+          "id": "release_validation_ops",
+          "title": "Release Validation Operations",
+          "layout": {
+            "type": "split",
+            "pattern": "split",
+            "areas": [
+              { "id": "main", "role": "main" },
+              { "id": "right", "role": "aux" },
+              { "id": "bottom", "role": "footer" }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "release-ops-summary",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Validation status",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/summary"
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "IDLE"
+              }
+            },
+            {
+              "id": "release-ops-root-fleet-metric",
+              "type": "visual.metricTile",
+              "area": "right",
+              "title": "Root fleet",
+              "dataSource": {
+                "kind": "skill",
+                "name": "root_mgmnt.get_metric_tile",
+                "params": { "metric_id": "fleet_total" },
+                "cacheTtlMs": 5000,
+                "invalidationTags": ["root.snapshot"],
+                "preserveLastValue": true
+              }
+            },
+            {
+              "id": "release-ops-actions",
+              "type": "input.commandBar",
+              "area": "right",
+              "title": "Manual controls",
+              "inputs": {
+                "size": "small",
+                "variant": "stack",
+                "buttons": [
+                  { "id": "refresh", "label": "Refresh validation" },
+                  { "id": "register", "label": "Register contracts" },
+                  { "id": "run", "label": "Run latest pending" },
+                  { "id": "refresh-root", "label": "Refresh Root context" }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:refresh",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.refresh_snapshot",
+                  "params": { "webspace_id": "$runtime.webspace_id" }
+                },
+                {
+                  "on": "click:register",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.register_default_observe_contracts",
+                  "params": { "webspace_id": "$runtime.webspace_id" }
+                },
+                {
+                  "on": "click:run",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.run_latest_campaign",
+                  "params": { "webspace_id": "$runtime.webspace_id" }
+                },
+                {
+                  "on": "click:refresh-root",
+                  "type": "callSkill",
+                  "target": "root_mgmnt.refresh_snapshot",
+                  "invalidates": ["root.snapshot"]
+                }
+              ]
+            },
+            {
+              "id": "release-ops-prepare",
+              "type": "ui.form",
+              "area": "main",
+              "title": "Prepare observe-only campaign",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "minFieldWidth": 240,
+                "submitLabel": "Prepare campaign",
+                "fields": [
+                  {
+                    "id": "target_build",
+                    "type": "shortText",
+                    "label": "Exact build or commit",
+                    "required": true
+                  },
+                  {
+                    "id": "campaign_id",
+                    "type": "shortText",
+                    "label": "Campaign ID",
+                    "placeholder": "Generated when empty"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.prepare_campaign",
+                  "params": {
+                    "target_build": "$event.values.target_build",
+                    "campaign_id": "$event.values.campaign_id",
+                    "webspace_id": "$runtime.webspace_id"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "release-ops-nodes",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Test nodes",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/nodes"
+              },
+              "inputs": {
+                "emptyText": "No test nodes registered",
+                "columns": [
+                  { "key": "display_name", "label": "Node" },
+                  { "key": "host", "label": "Host", "width": "150px", "mono": true },
+                  { "key": "profile", "label": "Profile", "width": "100px" },
+                  { "key": "enabled_label", "label": "Enabled", "width": "90px" }
+                ]
+              }
+            },
+            {
+              "id": "release-ops-campaigns",
+              "type": "ui.table",
+              "area": "main",
+              "title": "Validation campaigns",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/campaigns"
+              },
+              "inputs": {
+                "emptyText": "No validation campaigns",
+                "columns": [
+                  { "key": "campaign_id", "label": "Campaign", "mono": true },
+                  { "key": "state", "label": "State", "width": "110px" },
+                  { "key": "target_build", "label": "Target", "width": "210px", "mono": true },
+                  { "key": "nodes", "label": "Nodes", "width": "145px" },
+                  { "key": "finished_at", "label": "Finished", "width": "185px", "mono": true }
+                ]
+              }
+            },
+            {
+              "id": "release-ops-assignments",
+              "type": "ui.table",
+              "area": "right",
+              "title": "Assignments",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/assignments"
+              },
+              "inputs": {
+                "emptyText": "No assignments",
+                "columns": [
+                  { "key": "node_id", "label": "Node" },
+                  { "key": "state", "label": "State", "width": "105px" },
+                  { "key": "checks_text", "label": "Checks", "width": "75px", "mono": true },
+                  { "key": "reason", "label": "Reason" }
+                ]
+              }
+            },
+            {
+              "id": "release-ops-evidence",
+              "type": "ui.jsonViewer",
+              "area": "right",
+              "title": "Latest evidence",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/detail"
+              },
+              "inputs": { "emptyText": "No campaign evidence" }
+            },
+            {
+              "id": "release-ops-root-fleet",
+              "type": "ui.table",
+              "area": "bottom",
+              "title": "Root infrastructure context",
+              "dataSource": {
+                "kind": "skill",
+                "name": "root_mgmnt.get_fleet",
+                "cacheTtlMs": 5000,
+                "invalidationTags": ["root.snapshot"],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "emptyText": "Root fleet snapshot is unavailable",
+                "columns": [
+                  { "key": "subnet_id", "label": "Subnet", "mono": true },
+                  { "key": "display_name", "label": "Name" },
+                  { "key": "live_now", "label": "Live", "width": "75px" },
+                  { "key": "lifecycle_state", "label": "Lifecycle", "width": "120px" },
+                  { "key": "activity_score", "label": "Activity", "width": "90px", "mono": true }
+                ]
+              }
+            },
+            {
+              "id": "release-ops-journal",
+              "type": "ui.list",
+              "area": "bottom",
+              "title": "Validation journal",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/release_validation/events"
+              },
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "description",
+                "showDetails": false,
+                "emptyText": "No validation events"
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+
