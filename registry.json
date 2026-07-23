@@ -607,6 +607,40 @@
     },
     {
       "kind": "skill",
+      "id": "release_validation_skill",
+      "name": "release_validation_skill",
+      "version": "0.1.0",
+      "updated_at": "2026-07-23T00:00:00+00:00",
+      "path": "skills/release_validation_skill",
+      "manifest": "skills/release_validation_skill/skill.yaml",
+      "source": {
+        "path": "skills/release_validation_skill",
+        "manifest": "skills/release_validation_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "release_validation_skill",
+        "id": "release_validation_skill"
+      },
+      "description": "Private observe-only release validation registry, campaign runner, evidence log, and operator projection.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "release_validation_ops"
+          ],
+          "client_presence": true,
+          "webspace_scope": "active"
+        },
+        "startup_allowed": true,
+        "background_refresh": false
+      },
+      "tools_count": 7
+    },
+    {
+      "kind": "skill",
       "id": "root_mgmnt",
       "name": "root_mgmnt",
       "version": "0.4.1",
@@ -941,6 +975,32 @@
         ],
         "optional": [
           "redevice_list"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "release_validation_ops",
+      "name": "release_validation_ops",
+      "version": "0.1.0",
+      "updated_at": "2026-07-23T00:00:00+00:00",
+      "path": "scenarios/release_validation_ops",
+      "manifest": "scenarios/release_validation_ops/scenario.yaml",
+      "source": {
+        "path": "scenarios/release_validation_ops",
+        "manifest": "scenarios/release_validation_ops/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "release_validation_ops",
+        "id": "release_validation_ops"
+      },
+      "title": "Release Validation Operations",
+      "description": "Private Root operator workspace for infrastructure context and observe-only AdaOS release validation campaigns.",
+      "skills": {
+        "required": [
+          "root_mgmnt",
+          "release_validation_skill"
         ]
       }
     },
