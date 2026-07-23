@@ -1,0 +1,781 @@
+{
+  "schema": "adaos.builder.ui_revision.v1",
+  "revision": "002",
+  "created_at": 1784143334.5284688,
+  "session_id": "builder_session_6dbad406",
+  "scenario_id": "shopping_list_14504c40",
+  "draft_id": "draft.shopping_list_14504c40.20260715192118040405",
+  "inference": {
+    "provider": "root-default",
+    "model": "root-default",
+    "profile_id": "default",
+    "temperature": 0.2
+  },
+  "request": {
+    "text": "Разработай этот прототип как мобильное приложение «Книга рецептов» для домашних кулинаров. Нужны три основных раздела: Рецепты, Избранное и Советы, с удобной навигацией между ними. В рецептах сделай поиск и фильтры по категории, времени приготовления и сложности. Покажи реалистичные примеры рецептов на русском языке с фотографиями, названием, категорией, временем, сложностью и возможностью отметить любимые. При выборе рецепта показывай подробности: большое фото, описание, ингредиенты, шаги приготовления, время и порции, а также действия «В избранное» и «Добавить ингредиенты в список покупок». В Избранном сгруппируй рецепты по категориям. Добавь форму создания рецепта с названием, категорией, временем, сложностью, порциями, ингредиентами, шагами и фотографией. Интерфейс должен быть компактным на телефоне и хорошо использовать ширину большого экрана."
+  },
+  "patch": {
+    "id": "patch_740af83e",
+    "target": "ui",
+    "operation": "llm_webui_transform",
+    "status": "applied",
+    "created_by": "llm_agent",
+    "created_at": 1784143306.3597322,
+    "summary": "Разработай этот прототип как мобильное приложение «Книга рецептов» для домашних кулинаров. Нужны три основных раздела: Рецепты, Избранное и Советы, с удобной навигацией между ними. В рецептах сделай поиск и фильтры по категории, времени приготовления и сложности. Покажи реалистичные примеры рецептов на русском языке с фотографиями, названием, категорией, временем, сложностью и возможностью отметить любимые. При выборе рецепта показывай подробности: большое фото, описание, ингредиенты, шаги приготовления, время и порции, а также действия «В избранное» и «Добавить ингредиенты в список покупок». В Избранном сгруппируй рецепты по категориям. Добавь форму создания рецепта с названием, категорией, временем, сложностью, порциями, ингредиентами, шагами и фотографией. Интерфейс должен быть компактным на телефоне и хорошо использовать ширину большого экрана.",
+    "diff": {
+      "schema_valid": true,
+      "comment": "",
+      "unable_reason": "",
+      "validation": {
+        "ok": true,
+        "schema": "adaos.webui.v1",
+        "preview_state": "ok"
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "request_id": "builder-ui-1d1e3bbac1c8dc7e90b7a0c7dd99f43a-job-83f1cc61",
+          "job_id": "llm_job_74c506ae1b7e426d810caa98",
+          "validation": {
+            "ok": true,
+            "schema": "adaos.webui.v1",
+            "preview_state": "ok"
+          }
+        }
+      ]
+    }
+  },
+  "llm": {
+    "ok": true,
+    "comment": "",
+    "unable_reason": "",
+    "attempts": [
+      {
+        "attempt": 1,
+        "ok": true,
+        "request_id": "builder-ui-1d1e3bbac1c8dc7e90b7a0c7dd99f43a-job-83f1cc61",
+        "job_id": "llm_job_74c506ae1b7e426d810caa98",
+        "validation": {
+          "ok": true,
+          "schema": "adaos.webui.v1",
+          "preview_state": "ok"
+        }
+      }
+    ],
+    "profile": {
+      "schema": "adaos.builder.llm_prompt_profile.v1",
+      "id": "default",
+      "provider": "root-default",
+      "model": "root-default",
+      "temperature": 0.2,
+      "strategy": "compact_abi_plus_affordance_map",
+      "variant_policy": "Prompt profiles may vary by provider/model, but the output contract remains adaos.webui.v1."
+    },
+    "validation": {
+      "ok": true,
+      "schema": "adaos.webui.v1",
+      "preview_state": "ok"
+    },
+    "raw_response": "{\n  \"schema\": \"adaos.webui.v1\",\n  \"ui\": {\n    \"application\": {\n      \"desktop\": {\n        \"pageSchema\": {\n          \"id\": \"recipe_book_14504c40\",\n          \"layout\": {\n            \"areas\": [\n              {\n                \"id\": \"main\",\n                \"role\": \"main\"\n              },\n              {\n                \"id\": \"right\",\n                \"role\": \"aux\"\n              }\n            ],\n            \"pattern\": \"split\",\n            \"type\": \"split\"\n          },\n          \"meta\": {\n            \"builder\": {\n              \"proto\": \"001\",\n              \"ui_revision\": \"001\"\n            }\n          },\n          \"title\": \"Книга рецептов\",\n          \"title_i18n\": {\n            \"fallback\": \"Книга рецептов\",\n            \"key\": \"scenario.recipe_book_14504c40.title\"\n          },\n          \"widgets\": [\n            {\n              \"area\": \"main\",\n              \"id\": \"recipe-tabs\",\n              \"inputs\": {\n                \"buttons\": [\n                  {\n                    \"id\": \"recipes\",\n                    \"label\": \"Рецепты\"\n                  },\n                  {\n                    \"id\": \"favorites\",\n                    \"label\": \"Избранное\"\n                  },\n                  {\n                    \"id\": \"tips\",\n                    \"label\": \"Советы\"\n                  }\n                ],\n                \"selectedStateKey\": \"activeTab\",\n                \"variant\": \"segmented\"\n              },\n              \"type\": \"input.commandBar\"\n            },\n            {\n              \"area\": \"main\",\n              \"id\": \"recipe-list\",\n              \"dataSource\": {\n                \"kind\": \"static\",\n                \"value\": [\n                  {\n                    \"title\": \"Салат Цезарь\",\n                    \"category\": \"Салаты\",\n                    \"time\": \"30 минут\",\n                    \"difficulty\": \"Легко\",\n                    \"isFavorite\": false,\n                    \"image\": \"https://picsum.photos/seed/caesar-salad/640/420\"\n                  },\n                  {\n                    \"title\": \"Борщ\",\n                    \"category\": \"Супы\",\n                    \"time\": \"1 час\",\n                    \"difficulty\": \"Средне\",\n                    \"isFavorite\": true,\n                    \"image\": \"https://picsum.photos/seed/borscht/640/420\"\n                  },\n                  {\n                    \"title\": \"Пирог с яблоками\",\n                    \"category\": \"Десерты\",\n                    \"time\": \"45 минут\",\n                    \"difficulty\": \"Легко\",\n                    \"isFavorite\": false,\n                    \"image\": \"https://picsum.photos/seed/apple-pie/640/420\"\n                  }\n                ]\n              },\n              \"inputs\": {\n                \"columns\": [\n                  {\n                    \"key\": \"image\",\n                    \"label\": \"Фото\",\n                    \"kind\": \"image\"\n                  },\n                  {\n                    \"key\": \"title\",\n                    \"label\": \"Название\"\n                  },\n                  {\n                    \"key\": \"category\",\n                    \"label\": \"Категория\"\n                  },\n                  {\n                    \"key\": \"time\",\n                    \"label\": \"Время\"\n                  },\n                  {\n                    \"key\": \"difficulty\",\n                    \"label\": \"Сложность\"\n                  },\n                  {\n                    \"key\": \"isFavorite\",\n                    \"kind\": \"boolean\",\n                    \"label\": \"Избранное\"\n                  }\n                ],\n                \"emptyText\": \"Нет рецептов\",\n                \"filters\": []\n              },\n              \"title\": \"Список рецептов\",\n              \"type\": \"ui.table\"\n            },\n            {\n              \"area\": \"right\",\n              \"id\": \"recipe-detail\",\n              \"dataSource\": {\n                \"kind\": \"static\",\n                \"value\": {\n                  \"title\": \"Салат Цезарь\",\n                  \"description\": \"Классический салат с курицей и пармезаном.\",\n                  \"ingredients\": [\n                    \"Курица\",\n                    \"Салат Романо\",\n                    \"Пармезан\",\n                    \"Гренки\",\n                    \"Соус Цезарь\"\n                  ],\n                  \"steps\": [\n                    \"Приготовьте курицу.\",\n                    \"Смешайте все ингредиенты.\",\n                    \"Подавайте с соусом.\"\n                  ],\n                  \"time\": \"30 минут\",\n                  \"servings\": \"2 порции\"\n                }\n              },\n              \"title\": \"Детали рецепта\",\n              \"type\": \"item.details\"\n            },\n            {\n              \"area\": \"main\",\n              \"id\": \"recipe-form\",\n              \"inputs\": {\n                \"fields\": [\n                  {\n                    \"id\": \"title\",\n                    \"label\": \"Название\",\n                    \"type\": \"text\"\n                  },\n                  {\n                    \"id\": \"category\",\n                    \"label\": \"Категория\",\n                    \"type\": \"text\"\n                  },\n                  {\n                    \"id\": \"time\",\n                    \"label\": \"Время приготовления\",\n                    \"type\": \"text\"\n                  },\n                  {\n                    \"id\": \"difficulty\",\n                    \"label\": \"Сложность\",\n                    \"type\": \"text\"\n                  },\n                  {\n                    \"id\": \"servings\",\n                    \"label\": \"Порции\",\n                    \"type\": \"number\"\n                  },\n                  {\n                    \"id\": \"ingredients\",\n                    \"label\": \"Ингредиенты\",\n                    \"type\": \"textarea\"\n                  },\n                  {\n                    \"id\": \"steps\",\n                    \"label\": \"Шаги приготовления\",\n                    \"type\": \"textarea\"\n                  },\n                  {\n                    \"id\": \"image\",\n                    \"label\": \"Фото\",\n                    \"type\": \"fileUpload\"\n                  }\n                ],\n                \"submitLabel\": \"Добавить рецепт\"\n              },\n              \"title\": \"Создание рецепта\",\n              \"type\": \"ui.form\"\n            }\n          ]\n        }\n      }\n    }\n  }\n}"
+  },
+  "before_webui": {
+    "schema": "adaos.webui.v1",
+    "generated_by": "builder_skill",
+    "ui": {
+      "application": {
+        "desktop": {
+          "pageSchema": {
+            "id": "shopping_list_14504c40",
+            "title": "Список покупок",
+            "layout": {
+              "type": "split",
+              "pattern": "split",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "prototype-form",
+                "type": "ui.form",
+                "area": "main",
+                "title": "Input",
+                "inputs": {
+                  "fields": [
+                    {
+                      "id": "item",
+                      "type": "text",
+                      "label": "Товар"
+                    },
+                    {
+                      "id": "quantity",
+                      "type": "text",
+                      "label": "Кол-во"
+                    },
+                    {
+                      "id": "category",
+                      "type": "text",
+                      "label": "Категория"
+                    },
+                    {
+                      "id": "done",
+                      "type": "toggle",
+                      "label": "Куплено"
+                    },
+                    {
+                      "id": "items_table",
+                      "type": "text",
+                      "label": "Список"
+                    }
+                  ],
+                  "submitLabel": "Add"
+                },
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "updateState",
+                    "params": {
+                      "lastPrototypeSubmit": "$event.values"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "prototype-table",
+                "type": "ui.table",
+                "area": "main",
+                "title": "List",
+                "dataSource": {
+                  "kind": "static",
+                  "value": [
+                    {
+                      "item": "Товар 1",
+                      "quantity": 1,
+                      "category": "Категория 1",
+                      "done": true
+                    },
+                    {
+                      "item": "Товар 2",
+                      "quantity": 2,
+                      "category": "Категория 2",
+                      "done": false
+                    },
+                    {
+                      "item": "Товар 3",
+                      "quantity": 3,
+                      "category": "Категория 3",
+                      "done": false
+                    }
+                  ]
+                },
+                "inputs": {
+                  "columns": [
+                    {
+                      "key": "item",
+                      "label": "Товар"
+                    },
+                    {
+                      "key": "quantity",
+                      "label": "Кол-во"
+                    },
+                    {
+                      "key": "category",
+                      "label": "Категория"
+                    },
+                    {
+                      "key": "done",
+                      "label": "Куплено",
+                      "kind": "boolean",
+                      "width": "72px"
+                    },
+                    {
+                      "key": "items_table",
+                      "label": "Список"
+                    }
+                  ],
+                  "filters": [],
+                  "emptyText": "No items yet"
+                }
+              },
+              {
+                "id": "prototype-summary",
+                "type": "item.details",
+                "area": "right",
+                "title": "Prototype",
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "title": "Список покупок",
+                    "fields": [
+                      "Товар",
+                      "Кол-во",
+                      "Категория",
+                      "Куплено",
+                      "Список"
+                    ]
+                  }
+                }
+              }
+            ],
+            "meta": {
+              "builder": {
+                "proto": "001",
+                "ui_revision": "001"
+              }
+            },
+            "title_i18n": {
+              "key": "scenario.shopping_list_14504c40.title",
+              "fallback": "Список покупок"
+            }
+          }
+        }
+      }
+    },
+    "nlu": {
+      "llm_hints": {
+        "aliases": [
+          "Список покупок"
+        ],
+        "primary_actions": [
+          {
+            "intent": "builder.chat",
+            "notes": "Prototype UI is edited through builder_skill.chat.",
+            "supported_operations": [
+              "add_field",
+              "remove_field",
+              "update_mock_data",
+              "change_view_representation",
+              "move_form_action",
+              "set_checkbox_column"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "after_webui": {
+    "schema": "adaos.webui.v1",
+    "ui": {
+      "application": {
+        "desktop": {
+          "pageSchema": {
+            "id": "recipe_book_14504c40",
+            "layout": {
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                }
+              ],
+              "pattern": "split",
+              "type": "split"
+            },
+            "meta": {
+              "builder": {
+                "proto": "001",
+                "ui_revision": "001"
+              }
+            },
+            "title": "Книга рецептов",
+            "title_i18n": {
+              "fallback": "Книга рецептов",
+              "key": "scenario.recipe_book_14504c40.title"
+            },
+            "widgets": [
+              {
+                "area": "main",
+                "id": "recipe-tabs",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "recipes",
+                      "label": "Рецепты"
+                    },
+                    {
+                      "id": "favorites",
+                      "label": "Избранное"
+                    },
+                    {
+                      "id": "tips",
+                      "label": "Советы"
+                    }
+                  ],
+                  "selectedStateKey": "activeTab",
+                  "variant": "segmented"
+                },
+                "type": "input.commandBar"
+              },
+              {
+                "area": "main",
+                "id": "recipe-list",
+                "dataSource": {
+                  "kind": "static",
+                  "value": [
+                    {
+                      "title": "Салат Цезарь",
+                      "category": "Салаты",
+                      "time": "30 минут",
+                      "difficulty": "Легко",
+                      "isFavorite": false,
+                      "image": "https://picsum.photos/seed/caesar-salad/640/420"
+                    },
+                    {
+                      "title": "Борщ",
+                      "category": "Супы",
+                      "time": "1 час",
+                      "difficulty": "Средне",
+                      "isFavorite": true,
+                      "image": "https://picsum.photos/seed/borscht/640/420"
+                    },
+                    {
+                      "title": "Пирог с яблоками",
+                      "category": "Десерты",
+                      "time": "45 минут",
+                      "difficulty": "Легко",
+                      "isFavorite": false,
+                      "image": "https://picsum.photos/seed/apple-pie/640/420"
+                    }
+                  ]
+                },
+                "inputs": {
+                  "columns": [
+                    {
+                      "key": "image",
+                      "label": "Фото",
+                      "kind": "image"
+                    },
+                    {
+                      "key": "title",
+                      "label": "Название"
+                    },
+                    {
+                      "key": "category",
+                      "label": "Категория"
+                    },
+                    {
+                      "key": "time",
+                      "label": "Время"
+                    },
+                    {
+                      "key": "difficulty",
+                      "label": "Сложность"
+                    },
+                    {
+                      "key": "isFavorite",
+                      "kind": "boolean",
+                      "label": "Избранное"
+                    }
+                  ],
+                  "emptyText": "Нет рецептов",
+                  "filters": []
+                },
+                "title": "Список рецептов",
+                "type": "ui.table"
+              },
+              {
+                "area": "right",
+                "id": "recipe-detail",
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "title": "Салат Цезарь",
+                    "description": "Классический салат с курицей и пармезаном.",
+                    "ingredients": [
+                      "Курица",
+                      "Салат Романо",
+                      "Пармезан",
+                      "Гренки",
+                      "Соус Цезарь"
+                    ],
+                    "steps": [
+                      "Приготовьте курицу.",
+                      "Смешайте все ингредиенты.",
+                      "Подавайте с соусом."
+                    ],
+                    "time": "30 минут",
+                    "servings": "2 порции"
+                  }
+                },
+                "title": "Детали рецепта",
+                "type": "item.details"
+              },
+              {
+                "area": "main",
+                "id": "recipe-form",
+                "inputs": {
+                  "fields": [
+                    {
+                      "id": "title",
+                      "label": "Название",
+                      "type": "text"
+                    },
+                    {
+                      "id": "category",
+                      "label": "Категория",
+                      "type": "text"
+                    },
+                    {
+                      "id": "time",
+                      "label": "Время приготовления",
+                      "type": "text"
+                    },
+                    {
+                      "id": "difficulty",
+                      "label": "Сложность",
+                      "type": "text"
+                    },
+                    {
+                      "id": "servings",
+                      "label": "Порции",
+                      "type": "number"
+                    },
+                    {
+                      "id": "ingredients",
+                      "label": "Ингредиенты",
+                      "type": "textarea"
+                    },
+                    {
+                      "id": "steps",
+                      "label": "Шаги приготовления",
+                      "type": "textarea"
+                    },
+                    {
+                      "id": "image",
+                      "label": "Фото",
+                      "type": "fileUpload"
+                    }
+                  ],
+                  "submitLabel": "Добавить рецепт"
+                },
+                "title": "Создание рецепта",
+                "type": "ui.form"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "generated_by": "builder_skill"
+  },
+  "preview_state": {
+    "session_id": "builder_session_6dbad406",
+    "title": "Книга рецептов",
+    "datasources": [
+      {
+        "id": "shopping_items",
+        "type": "internal_crud",
+        "entity": "item",
+        "fields": [
+          {
+            "id": "item",
+            "type": "string",
+            "label": "Товар",
+            "required": true
+          },
+          {
+            "id": "quantity",
+            "type": "number",
+            "label": "Кол-во",
+            "required": false
+          },
+          {
+            "id": "category",
+            "type": "string",
+            "label": "Категория",
+            "required": false
+          },
+          {
+            "id": "done",
+            "type": "boolean",
+            "label": "Куплено",
+            "required": false
+          }
+        ],
+        "operations": [
+          "create",
+          "read",
+          "update",
+          "delete"
+        ]
+      }
+    ],
+    "mock_data": {
+      "shopping_items": [
+        {
+          "item": "Товар 1",
+          "quantity": 1,
+          "category": "Категория 1",
+          "done": true
+        },
+        {
+          "item": "Товар 2",
+          "quantity": 2,
+          "category": "Категория 2",
+          "done": false
+        },
+        {
+          "item": "Товар 3",
+          "quantity": 3,
+          "category": "Категория 3",
+          "done": false
+        }
+      ]
+    },
+    "filters": [],
+    "form_action_position": "bottom",
+    "layout_order": "input_first",
+    "card_preview_key": "category",
+    "pending_patches": [],
+    "user_summary": {
+      "assumptions": [
+        "The initial scaffold started with fields: Товар, Кол-во, Категория, Куплено; this list is not a fixed product contract"
+      ],
+      "preview": [
+        "Scenario shopping_list_14504c40 has a form, table, mock data, and declarative webui.json",
+        "Data is stored in an internal CRUD datasource named shopping_items"
+      ],
+      "risks": [
+        "No external network, device-control, or credential access is requested",
+        "Validation and human review are still required before activation"
+      ],
+      "expected_behavior": [
+        "The user can add records through the form and inspect them in the list",
+        "Follow-up Builder turns patch the current draft and refresh the preview"
+      ]
+    },
+    "version": "002",
+    "scenario_id": "shopping_list_14504c40",
+    "page_schema": {
+      "id": "recipe_book_14504c40",
+      "layout": {
+        "areas": [
+          {
+            "id": "main",
+            "role": "main"
+          },
+          {
+            "id": "right",
+            "role": "aux"
+          }
+        ],
+        "pattern": "split",
+        "type": "split"
+      },
+      "meta": {
+        "builder": {
+          "proto": "001",
+          "ui_revision": "001"
+        }
+      },
+      "title": "Книга рецептов",
+      "title_i18n": {
+        "fallback": "Книга рецептов",
+        "key": "scenario.recipe_book_14504c40.title"
+      },
+      "widgets": [
+        {
+          "area": "main",
+          "id": "recipe-tabs",
+          "inputs": {
+            "buttons": [
+              {
+                "id": "recipes",
+                "label": "Рецепты"
+              },
+              {
+                "id": "favorites",
+                "label": "Избранное"
+              },
+              {
+                "id": "tips",
+                "label": "Советы"
+              }
+            ],
+            "selectedStateKey": "activeTab",
+            "variant": "segmented"
+          },
+          "type": "input.commandBar"
+        },
+        {
+          "area": "main",
+          "id": "recipe-list",
+          "dataSource": {
+            "kind": "static",
+            "value": [
+              {
+                "title": "Салат Цезарь",
+                "category": "Салаты",
+                "time": "30 минут",
+                "difficulty": "Легко",
+                "isFavorite": false,
+                "image": "https://picsum.photos/seed/caesar-salad/640/420"
+              },
+              {
+                "title": "Борщ",
+                "category": "Супы",
+                "time": "1 час",
+                "difficulty": "Средне",
+                "isFavorite": true,
+                "image": "https://picsum.photos/seed/borscht/640/420"
+              },
+              {
+                "title": "Пирог с яблоками",
+                "category": "Десерты",
+                "time": "45 минут",
+                "difficulty": "Легко",
+                "isFavorite": false,
+                "image": "https://picsum.photos/seed/apple-pie/640/420"
+              }
+            ]
+          },
+          "inputs": {
+            "columns": [
+              {
+                "key": "image",
+                "label": "Фото",
+                "kind": "image"
+              },
+              {
+                "key": "title",
+                "label": "Название"
+              },
+              {
+                "key": "category",
+                "label": "Категория"
+              },
+              {
+                "key": "time",
+                "label": "Время"
+              },
+              {
+                "key": "difficulty",
+                "label": "Сложность"
+              },
+              {
+                "key": "isFavorite",
+                "kind": "boolean",
+                "label": "Избранное"
+              }
+            ],
+            "emptyText": "Нет рецептов",
+            "filters": []
+          },
+          "title": "Список рецептов",
+          "type": "ui.table"
+        },
+        {
+          "area": "right",
+          "id": "recipe-detail",
+          "dataSource": {
+            "kind": "static",
+            "value": {
+              "title": "Салат Цезарь",
+              "description": "Классический салат с курицей и пармезаном.",
+              "ingredients": [
+                "Курица",
+                "Салат Романо",
+                "Пармезан",
+                "Гренки",
+                "Соус Цезарь"
+              ],
+              "steps": [
+                "Приготовьте курицу.",
+                "Смешайте все ингредиенты.",
+                "Подавайте с соусом."
+              ],
+              "time": "30 минут",
+              "servings": "2 порции"
+            }
+          },
+          "title": "Детали рецепта",
+          "type": "item.details"
+        },
+        {
+          "area": "main",
+          "id": "recipe-form",
+          "inputs": {
+            "fields": [
+              {
+                "id": "title",
+                "label": "Название",
+                "type": "text"
+              },
+              {
+                "id": "category",
+                "label": "Категория",
+                "type": "text"
+              },
+              {
+                "id": "time",
+                "label": "Время приготовления",
+                "type": "text"
+              },
+              {
+                "id": "difficulty",
+                "label": "Сложность",
+                "type": "text"
+              },
+              {
+                "id": "servings",
+                "label": "Порции",
+                "type": "number"
+              },
+              {
+                "id": "ingredients",
+                "label": "Ингредиенты",
+                "type": "textarea"
+              },
+              {
+                "id": "steps",
+                "label": "Шаги приготовления",
+                "type": "textarea"
+              },
+              {
+                "id": "image",
+                "label": "Фото",
+                "type": "fileUpload"
+              }
+            ],
+            "submitLabel": "Добавить рецепт"
+          },
+          "title": "Создание рецепта",
+          "type": "ui.form"
+        }
+      ]
+    }
+  },
+  "prompt_files": {
+    "tz/base_tz.md": {
+      "exists": true,
+      "content": "# Список покупок\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n\n## Assumptions\n- The initial scaffold started with fields: Товар, Кол-во, Категория, Куплено; this list is not a fixed product contract\n\n## Expected behavior\n- The user can add records through the form and inspect them in the list\n- Follow-up Builder turns patch the current draft and refresh the preview\n\n## Preview notes\n- Scenario shopping_list_14504c40 has a form, table, mock data, and declarative webui.json\n- Data is stored in an internal CRUD datasource named shopping_items\n\n## Risks\n- No external network, device-control, or credential access is requested\n- Validation and human review are still required before activation\n"
+    },
+    "builder_memory.md": {
+      "exists": true,
+      "content": "# Список покупок\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n\n## Assumptions\n- The initial scaffold started with fields: Товар, Кол-во, Категория, Куплено; this list is not a fixed product contract\n\n## Expected behavior\n- The user can add records through the form and inspect them in the list\n- Follow-up Builder turns patch the current draft and refresh the preview\n\n## Preview notes\n- Scenario shopping_list_14504c40 has a form, table, mock data, and declarative webui.json\n- Data is stored in an internal CRUD datasource named shopping_items\n\n## Risks\n- No external network, device-control, or credential access is requested\n- Validation and human review are still required before activation\n"
+    },
+    "builder_system_prompt.md": {
+      "exists": true,
+      "content": ""
+    },
+    "prepare/general_prompt.md": {
+      "exists": false,
+      "content": ""
+    },
+    "generate/general_prompt.md": {
+      "exists": false,
+      "content": ""
+    }
+  }
+}

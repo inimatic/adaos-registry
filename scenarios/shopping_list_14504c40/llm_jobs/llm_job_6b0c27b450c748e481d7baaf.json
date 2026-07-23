@@ -1,0 +1,17 @@
+{
+  "schema": "adaos.builder.llm_job_result.v1",
+  "job_id": "llm_job_6b0c27b450c748e481d7baaf",
+  "local_job_id": "builder_llm_submit_954fba23",
+  "root_job_id": "llm_job_6b0c27b450c748e481d7baaf",
+  "related_ids": [
+    "builder_llm_submit_954fba23",
+    "llm_job_6b0c27b450c748e481d7baaf"
+  ],
+  "session_id": "builder_session_6dbad406",
+  "scenario_id": "shopping_list_14504c40",
+  "request_id": "builder-ui-4d30d056001df9c1e9a670fd3b23e5a6-job-b556218b",
+  "patch_id": "patch_6f999bf8",
+  "status": "failed",
+  "detail": "widgets[5].actions[0] has no label and cannot render a visible item.details command; add a label or move the action to an explicit ui.actions widget",
+  "finished_at": 1784817556.3323615
+}

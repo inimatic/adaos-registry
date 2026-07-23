@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-23T15:01:48+00:00",
+  "updated_at": "2026-07-23T15:02:07+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1023,6 +1023,31 @@
         "required": [
           "root_mgmnt",
           "release_validation_skill"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "shopping_list_14504c40",
+      "name": "shopping_list_14504c40",
+      "version": "0.0.1",
+      "updated_at": "2026-07-23T15:02:07+00:00",
+      "path": "scenarios/shopping_list_14504c40",
+      "manifest": "scenarios/shopping_list_14504c40/scenario.yaml",
+      "source": {
+        "path": "scenarios/shopping_list_14504c40",
+        "manifest": "scenarios/shopping_list_14504c40/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "shopping_list_14504c40",
+        "id": "shopping_list_14504c40"
+      },
+      "title": "Книга рецептов",
+      "description": "Локальная книга рецептов со списком покупок.",
+      "skills": {
+        "required": [
+          "shopping_list_14504c40_skill"
         ]
       }
     },

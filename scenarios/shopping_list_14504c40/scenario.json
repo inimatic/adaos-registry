@@ -1,0 +1,715 @@
+{
+    "id": "shopping_list_14504c40",
+    "version": "0.1.0",
+    "name": "shopping_list_14504c40",
+    "description": "Builder-created rapid prototype scenario.",
+    "triggers": [],
+    "depends": [],
+    "runtime": {
+        "skills": {
+            "required": []
+        }
+    },
+    "slots": {},
+    "params": {},
+    "llm_hints": {
+        "description": "Конструктор, создай прототип мобильного приложения «Книга рецептов» для домашних кулинаров. Нужны три основных раздела: Рецепты, Избранное и Советы, с удобной навигацией между ними. В рецептах сделай поиск и фильтры по категории, времени приготовления и сложности. Покажи реалистичные примеры рецептов на русском языке с фотографиями, названием, категорией, временем, сложностью и возможностью отметить любимые. При выборе рецепта показывай подробности: большое фото, описание, ингредиенты, шаги приготовления, время и порции, а также действия «В избранное» и «Добавить ингредиенты в список покупок». В Избранном сгруппируй рецепты по категориям. Добавь форму создания рецепта с названием, категорией, временем, сложностью, порциями, ингредиентами, шагами и фотографией. Интерфейс должен быть компактным на телефоне и хорошо использовать ширину большого экрана.",
+        "aliases": [
+            "builder prototype",
+            "rapid prototype"
+        ],
+        "primary_actions": [
+            {
+                "id": "builder.prototype.edit",
+                "intent": "builder.chat",
+                "skill": "builder_skill",
+                "tool": "chat",
+                "side_effect_class": "local_write"
+            }
+        ],
+        "examples": [
+            "Builder, change this prototype",
+            "Строитель, измени этот прототип"
+        ],
+        "owner_hints": [
+            "skill:builder_skill"
+        ]
+    },
+    "nlu": {
+        "nlu_hints": {
+            "aliases": [
+                "prototype",
+                "прототип"
+            ],
+            "examples": [
+                {
+                    "text": "Строитель, измени этот прототип",
+                    "locale": "ru",
+                    "intent": "builder.chat"
+                }
+            ],
+            "slot_schemas": {},
+            "entities": []
+        }
+    },
+    "io": {
+        "input": [
+            "voice",
+            "text"
+        ],
+        "output": [
+            "voice",
+            "text",
+            "web"
+        ],
+        "settings": {
+            "output.active": "voice"
+        }
+    },
+    "steps": [],
+    "type": "desktop",
+    "title": "Книга рецептов",
+    "title_i18n": {
+        "fallback": "Книга рецептов",
+        "key": "scenario.recipe_book_14504c40.title"
+    },
+    "supported_locales": [
+        "en",
+        "ru"
+    ],
+    "ui": {
+        "application": {
+            "desktop": {
+                "pageSchema": {
+                    "id": "recipe_book_14504c40",
+                    "layout": {
+                        "type": "split",
+                        "pattern": "split",
+                        "areas": [
+                            {
+                                "id": "main",
+                                "role": "main"
+                            },
+                            {
+                                "id": "right",
+                                "role": "aux"
+                            }
+                        ],
+                        "auxWidth": 320
+                    },
+                    "meta": {
+                        "builder": {
+                            "proto": "003",
+                            "ui_revision": "003",
+                            "scenario_id": "shopping_list_14504c40"
+                        }
+                    },
+                    "title": "Книга рецептов",
+                    "title_i18n": {
+                        "fallback": "Книга рецептов",
+                        "key": "scenario.recipe_book_14504c40.title"
+                    },
+                    "widgets": [
+                        {
+                            "area": "main",
+                            "id": "recipe-tabs",
+                            "inputs": {
+                                "buttons": [
+                                    {
+                                        "id": "recipes",
+                                        "label": "Рецепты"
+                                    },
+                                    {
+                                        "id": "favorites",
+                                        "label": "Избранное"
+                                    },
+                                    {
+                                        "id": "tips",
+                                        "label": "Советы"
+                                    }
+                                ],
+                                "selectedStateKey": "activeTab",
+                                "variant": "segmented"
+                            },
+                            "type": "input.commandBar",
+                            "actions": [
+                                {
+                                    "on": "click",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeTab": "$event.id"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "main",
+                            "id": "recipe-list",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": [
+                                    {
+                                        "id": "r1",
+                                        "category": "Салаты",
+                                        "difficulty": "Легко",
+                                        "image": "https://picsum.photos/seed/caesar-salad/640/420",
+                                        "isFavorite": false,
+                                        "time": "30 минут",
+                                        "timeMinutes": 30,
+                                        "title": "Салат Цезарь",
+                                        "summary": "Классический салат с курицей и пармезаном."
+                                    },
+                                    {
+                                        "id": "r2",
+                                        "category": "Супы",
+                                        "difficulty": "Средне",
+                                        "image": "https://picsum.photos/seed/borscht/640/420",
+                                        "isFavorite": true,
+                                        "time": "60 минут",
+                                        "timeMinutes": 60,
+                                        "title": "Борщ",
+                                        "summary": "Свекольный суп на наваристом бульоне."
+                                    },
+                                    {
+                                        "id": "r3",
+                                        "category": "Десерты",
+                                        "difficulty": "Легко",
+                                        "image": "https://picsum.photos/seed/apple-pie/640/420",
+                                        "isFavorite": false,
+                                        "time": "45 минут",
+                                        "timeMinutes": 45,
+                                        "title": "Пирог с яблоками",
+                                        "summary": "Домашняя выпечка с корицей и яблоками."
+                                    }
+                                ]
+                            },
+                            "inputs": {
+                                "variant": "cards",
+                                "cardMinWidth": 220,
+                                "cardImageRatio": "4 / 3",
+                                "search": true,
+                                "searchPlaceholder": "Поиск рецептов",
+                                "titleKey": "title",
+                                "subtitleKey": "category",
+                                "previewKey": "summary",
+                                "imageKey": "image",
+                                "imageAltKey": "title",
+                                "meta": [
+                                    {
+                                        "key": "time",
+                                        "label": "Время"
+                                    },
+                                    {
+                                        "key": "difficulty",
+                                        "label": "Сложность"
+                                    },
+                                    {
+                                        "key": "isFavorite",
+                                        "label": "Избранное",
+                                        "kind": "boolean"
+                                    }
+                                ],
+                                "filters": [
+                                    {
+                                        "key": "title",
+                                        "stateKey": "searchQuery",
+                                        "operator": "contains"
+                                    },
+                                    {
+                                        "key": "category",
+                                        "stateKey": "filterCategory",
+                                        "operator": "equals"
+                                    },
+                                    {
+                                        "key": "difficulty",
+                                        "stateKey": "filterDifficulty",
+                                        "operator": "equals"
+                                    },
+                                    {
+                                        "key": "timeMinutes",
+                                        "stateKey": "filterMaxTime",
+                                        "operator": "lte"
+                                    }
+                                ],
+                                "sort": {
+                                    "key": "title",
+                                    "direction": "asc"
+                                },
+                                "addButton": true,
+                                "addButtonLabel": "Добавить рецепт"
+                            },
+                            "title": "Рецепты",
+                            "type": "ui.list",
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedRecipeId": "$event.id"
+                                    }
+                                },
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeTab": "recipes"
+                                    }
+                                },
+                                {
+                                    "on": "click:add",
+                                    "type": "updateState",
+                                    "params": {
+                                        "activeTab": "recipes"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "right",
+                            "id": "recipe-detail",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": {
+                                    "r1": {
+                                        "id": "r1",
+                                        "title": "Салат Цезарь",
+                                        "image": "https://picsum.photos/seed/caesar-salad/960/640",
+                                        "description": "Классический салат с курицей и пармезаном.",
+                                        "ingredients": [
+                                            "Курица — 200 г",
+                                            "Салат Романо — 150 г",
+                                            "Пармезан — 40 г",
+                                            "Гренки — 50 г",
+                                            "Соус Цезарь — 3 ст. л."
+                                        ],
+                                        "steps": [
+                                            "Обжарьте курицу до готовности.",
+                                            "Порвите салат, добавьте гренки и тертый пармезан.",
+                                            "Смешайте с соусом и подайте."
+                                        ],
+                                        "time": "30 минут",
+                                        "servings": "2 порции",
+                                        "isFavorite": false
+                                    },
+                                    "r2": {
+                                        "id": "r2",
+                                        "title": "Борщ",
+                                        "image": "https://picsum.photos/seed/borscht/960/640",
+                                        "description": "Свекольный суп на наваристом бульоне.",
+                                        "ingredients": [
+                                            "Говядина — 400 г",
+                                            "Свекла — 2 шт.",
+                                            "Капуста — 200 г",
+                                            "Картофель — 3 шт.",
+                                            "Морковь, лук — по 1 шт."
+                                        ],
+                                        "steps": [
+                                            "Сварите бульон.",
+                                            "Добавьте овощи по очереди.",
+                                            "Доведите до готовности и дайте настояться."
+                                        ],
+                                        "time": "60 минут",
+                                        "servings": "4 порции",
+                                        "isFavorite": true
+                                    },
+                                    "r3": {
+                                        "id": "r3",
+                                        "title": "Пирог с яблоками",
+                                        "image": "https://picsum.photos/seed/apple-pie/960/640",
+                                        "description": "Домашняя выпечка с ароматом корицы.",
+                                        "ingredients": [
+                                            "Яблоки — 4 шт.",
+                                            "Мука — 300 г",
+                                            "Сахар — 120 г",
+                                            "Яйца — 2 шт.",
+                                            "Корица — по вкусу"
+                                        ],
+                                        "steps": [
+                                            "Замесите тесто.",
+                                            "Выложите яблоки и залейте тестом.",
+                                            "Выпекайте 45 минут при 180°C."
+                                        ],
+                                        "time": "45 минут",
+                                        "servings": "6 порций",
+                                        "isFavorite": false
+                                    }
+                                }
+                            },
+                            "title": "Детали рецепта",
+                            "type": "item.details",
+                            "inputs": {
+                                "selectedStateKey": "selectedRecipeId",
+                                "imageKey": "image",
+                                "imageAltKey": "title",
+                                "fields": [
+                                    {
+                                        "label": "Описание",
+                                        "key": "description"
+                                    },
+                                    {
+                                        "label": "Ингредиенты",
+                                        "key": "ingredients"
+                                    },
+                                    {
+                                        "label": "Шаги приготовления",
+                                        "key": "steps"
+                                    },
+                                    {
+                                        "label": "Время",
+                                        "key": "time"
+                                    },
+                                    {
+                                        "label": "Порции",
+                                        "key": "servings"
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "area": "main",
+                            "id": "recipe-form",
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "id": "title",
+                                        "label": "Название",
+                                        "type": "shortText",
+                                        "required": true
+                                    },
+                                    {
+                                        "id": "category",
+                                        "label": "Категория",
+                                        "type": "select",
+                                        "options": [
+                                            {
+                                                "label": "Салаты",
+                                                "value": "Салаты"
+                                            },
+                                            {
+                                                "label": "Супы",
+                                                "value": "Супы"
+                                            },
+                                            {
+                                                "label": "Десерты",
+                                                "value": "Десерты"
+                                            }
+                                        ],
+                                        "required": true
+                                    },
+                                    {
+                                        "id": "time",
+                                        "label": "Время приготовления (мин)",
+                                        "type": "number",
+                                        "min": 1,
+                                        "required": true
+                                    },
+                                    {
+                                        "id": "difficulty",
+                                        "label": "Сложность",
+                                        "type": "select",
+                                        "options": [
+                                            {
+                                                "label": "Легко",
+                                                "value": "Легко"
+                                            },
+                                            {
+                                                "label": "Средне",
+                                                "value": "Средне"
+                                            },
+                                            {
+                                                "label": "Сложно",
+                                                "value": "Сложно"
+                                            }
+                                        ],
+                                        "required": true
+                                    },
+                                    {
+                                        "id": "servings",
+                                        "label": "Порции",
+                                        "type": "number",
+                                        "min": 1,
+                                        "default": 2
+                                    },
+                                    {
+                                        "id": "ingredients",
+                                        "label": "Ингредиенты (по одному на строке)",
+                                        "type": "textarea"
+                                    },
+                                    {
+                                        "id": "steps",
+                                        "label": "Шаги приготовления",
+                                        "type": "textarea"
+                                    },
+                                    {
+                                        "id": "image",
+                                        "label": "Фото",
+                                        "type": "fileUpload"
+                                    }
+                                ],
+                                "submitLabel": "Добавить рецепт"
+                            },
+                            "title": "Создание рецепта",
+                            "type": "ui.form",
+                            "actions": [
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "addConfirm": "Рецепт добавлен"
+                                    }
+                                },
+                                {
+                                    "on": "submit",
+                                    "type": "updateState",
+                                    "params": {
+                                        "status": "ready"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "detail-actions",
+                            "type": "ui.actions",
+                            "area": "right",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "buttons": [
+                                    {
+                                        "id": "toggle-fav",
+                                        "label": "В избранное",
+                                        "icon": "star-outline",
+                                        "kind": "secondary"
+                                    },
+                                    {
+                                        "id": "add-ingredients",
+                                        "label": "Добавить ингредиенты в список",
+                                        "icon": "add-outline",
+                                        "kind": "primary"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:toggle-fav",
+                                    "type": "toggleArrayItem",
+                                    "target": "state",
+                                    "params": {
+                                        "path": "favorites",
+                                        "value": "$state.selectedRecipeId"
+                                    }
+                                },
+                                {
+                                    "on": "click:add-ingredients",
+                                    "type": "updateState",
+                                    "params": {
+                                        "addConfirm": "Ингредиенты добавлены: {count} позиций"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "recipes-toolbar",
+                            "type": "ui.actions",
+                            "area": "main",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "buttons": [
+                                    {
+                                        "id": "filter",
+                                        "label": "Фильтры",
+                                        "icon": "funnel-outline",
+                                        "kind": "secondary"
+                                    },
+                                    {
+                                        "id": "reset",
+                                        "label": "Сбросить",
+                                        "icon": "close-outline",
+                                        "kind": "secondary"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:reset",
+                                    "type": "updateState",
+                                    "params": {
+                                        "searchQuery": "",
+                                        "filterCategory": "",
+                                        "filterDifficulty": "",
+                                        "filterMaxTime": ""
+                                    }
+                                },
+                                {
+                                    "on": "click:filter",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "filters_modal"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "id": "feedback-bar",
+                            "type": "feedback.statusBar",
+                            "area": "main",
+                            "dataSource": {
+                                "kind": "static",
+                                "value": {
+                                    "status": "$state.status",
+                                    "message": {
+                                        "kind": "expression",
+                                        "op": "if",
+                                        "args": [
+                                            {
+                                                "kind": "expression",
+                                                "op": "equals",
+                                                "args": [
+                                                    "$state.status",
+                                                    "loading"
+                                                ]
+                                            },
+                                            "Загрузка... ",
+                                            {
+                                                "kind": "expression",
+                                                "op": "if",
+                                                "args": [
+                                                    {
+                                                        "kind": "expression",
+                                                        "op": "equals",
+                                                        "args": [
+                                                            "$state.status",
+                                                            "error"
+                                                        ]
+                                                    },
+                                                    "Ошибка загрузки",
+                                                    ""
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    "detail": "$state.addConfirm"
+                                }
+                            }
+                        }
+                    ],
+                    "initialState": {
+                        "activeTab": "recipes",
+                        "searchQuery": "",
+                        "filterCategory": "",
+                        "filterDifficulty": "",
+                        "filterMaxTime": "",
+                        "selectedRecipeId": "r1",
+                        "status": "ready",
+                        "addConfirm": ""
+                    }
+                }
+            },
+            "modals": {
+                "filters_modal": {
+                    "title": "Фильтры рецептов",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "filters_modal_schema",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [
+                                {
+                                    "id": "main",
+                                    "role": "main"
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "id": "filters-form",
+                                "type": "ui.form",
+                                "area": "main",
+                                "inputs": {
+                                    "submitLabel": "Применить",
+                                    "layout": "responsiveGrid",
+                                    "minFieldWidth": 220,
+                                    "fields": [
+                                        {
+                                            "id": "searchQuery",
+                                            "type": "shortText",
+                                            "label": "Поиск по названию",
+                                            "stateKey": "searchQuery"
+                                        },
+                                        {
+                                            "id": "filterCategory",
+                                            "type": "select",
+                                            "label": "Категория",
+                                            "options": [
+                                                {
+                                                    "label": "Любая",
+                                                    "value": ""
+                                                },
+                                                {
+                                                    "label": "Салаты",
+                                                    "value": "Салаты"
+                                                },
+                                                {
+                                                    "label": "Супы",
+                                                    "value": "Супы"
+                                                },
+                                                {
+                                                    "label": "Десерты",
+                                                    "value": "Десерты"
+                                                }
+                                            ],
+                                            "stateKey": "filterCategory"
+                                        },
+                                        {
+                                            "id": "filterDifficulty",
+                                            "type": "select",
+                                            "label": "Сложность",
+                                            "options": [
+                                                {
+                                                    "label": "Любая",
+                                                    "value": ""
+                                                },
+                                                {
+                                                    "label": "Легко",
+                                                    "value": "Легко"
+                                                },
+                                                {
+                                                    "label": "Средне",
+                                                    "value": "Средне"
+                                                },
+                                                {
+                                                    "label": "Сложно",
+                                                    "value": "Сложно"
+                                                }
+                                            ],
+                                            "stateKey": "filterDifficulty"
+                                        },
+                                        {
+                                            "id": "filterMaxTime",
+                                            "type": "number",
+                                            "label": "Макс. время (мин)",
+                                            "placeholder": "Напр. 45",
+                                            "stateKey": "filterMaxTime"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "submit",
+                                        "type": "closeModal"
+                                    },
+                                    {
+                                        "on": "cancel",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            },
+            "version": "0.1"
+        }
+    }
+}

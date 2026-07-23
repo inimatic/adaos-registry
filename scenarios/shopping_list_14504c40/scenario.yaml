@@ -1,0 +1,18 @@
+id: shopping_list_14504c40
+name: shopping_list_14504c40
+type: desktop
+title: Книга рецептов
+description: Локальная книга рецептов со списком покупок.
+version: 0.0.1
+supported_locales:
+- en
+- ru
+depends:
+- shopping_list_14504c40_skill
+runtime:
+  skills:
+    required:
+    - shopping_list_14504c40_skill
+ui:
+  manifest: webui.json
+updated_at: '2026-07-23T15:02:07+00:00'
