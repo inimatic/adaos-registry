@@ -1,0 +1,755 @@
+{
+  "$schema": "../../../src/adaos/abi/builder.draft.v1.schema.json",
+  "draft_id": "draft.shopping_list_14504c40_skill.20260723144150361164",
+  "task_id": "btask.bb91a5f165",
+  "status": "draft",
+  "source": {
+    "type": "human_idea",
+    "text": "Реализуй выбранный прототип «Книга рецептов» UI 003 как рабочий AdaOS-сценарий и companion skill. Используй только локальное skill-хранилище или внутренний CRUD datasource, без внешних API, сети и учетных данных. Нужны типизированные tools для списка, поиска и чтения рецептов, создания рецепта, избранного и добавления ингредиентов в список покупок; подключи к ним декларативный webui, сохрани безопасные состояния empty/loading/error и подтверждение количества ингредиентов. Добавь содержательные тесты handler tools и проверь scenario/skill manifests и webui."
+  },
+  "artifact": {
+    "kind": "skill",
+    "id": "shopping_list_14504c40_skill",
+    "template_id": "skill_default",
+    "draft_root": "D:\\git\\inimatic\\adaos\\.adaos\\dev\\sn_6acf0c01\\skills\\shopping_list_14504c40_skill",
+    "files": [
+      {
+        "path": "builder.draft.json",
+        "role": "other",
+        "required": false
+      },
+      {
+        "path": "config.json",
+        "role": "other",
+        "required": false
+      },
+      {
+        "path": "handlers/main.py",
+        "role": "handler",
+        "required": false
+      },
+      {
+        "path": "i18n/en.json",
+        "role": "other",
+        "required": false
+      },
+      {
+        "path": "intents/set.intent",
+        "role": "nlu",
+        "required": false
+      },
+      {
+        "path": "interpreter/intents.yml",
+        "role": "nlu",
+        "required": false
+      },
+      {
+        "path": "prep/prep_prompt.md",
+        "role": "doc",
+        "required": false
+      },
+      {
+        "path": "prep/prepare.py",
+        "role": "other",
+        "required": false
+      },
+      {
+        "path": "prep_prompt.md",
+        "role": "doc",
+        "required": false
+      },
+      {
+        "path": "prep_result.json",
+        "role": "other",
+        "required": false
+      },
+      {
+        "path": "skill.yaml",
+        "role": "manifest",
+        "required": true
+      },
+      {
+        "path": "skill_prompt.md",
+        "role": "doc",
+        "required": false
+      },
+      {
+        "path": "tests/test_module_integrity.py",
+        "role": "test",
+        "required": false
+      }
+    ]
+  },
+  "metadata": {
+    "source_idea": "Реализуй выбранный прототип «Книга рецептов» UI 003 как рабочий AdaOS-сценарий и companion skill. Используй только локальное skill-хранилище или внутренний CRUD datasource, без внешних API, сети и учетных данных. Нужны типизированные tools для списка, поиска и чтения рецептов, создания рецепта, избранного и добавления ингредиентов в список покупок; подключи к ним декларативный webui, сохрани безопасные состояния empty/loading/error и подтверждение количества ингредиентов. Добавь содержательные тесты handler tools и проверь scenario/skill manifests и webui.",
+    "assumptions": [
+      "Draft workspace is isolated from active runtime state.",
+      "Apply/activation requires a separate approval and lifecycle step."
+    ],
+    "risk_notes": [
+      "Generated behavior and permissions must be reviewed before runtime apply."
+    ],
+    "expected_tests": [
+      "schema validation",
+      "Builder preview bundle"
+    ],
+    "route_plan_required": true,
+    "human_review_required": false,
+    "webspace_id": "default",
+    "context_packet": {
+      "schema": "adaos.context.packet.v1",
+      "conversation_id": "conv.skill.builder_skill.default",
+      "requester_owner": "skill:builder_skill",
+      "channel_id": "builder",
+      "thread_id": null,
+      "topic": null,
+      "agent_id": null,
+      "budgets": {
+        "max_tokens": 2000,
+        "max_messages": 12,
+        "max_segments": 4,
+        "max_memory_items": 8,
+        "timeout_ms": 250
+      },
+      "messages": [
+        {
+          "id": "m.6ba433b4194d4cefa925d420a7678359",
+          "seq": 3040,
+          "role": "hub",
+          "text": "Локальный Codex завершил работу над streaming_recipe_book_eval. Проверки пройдены. Implemented the deterministic validation repair.\n\n- Added exact `tool` references for all `tool/details` routes.\n- Added bounded causal `read_policy` declarations with refresh triggers, throttling, cache behavior, and invalidation tags.\n- Added regression coverage for browser tool-route contracts.\n- Preserved existing recipe CRUD, persistence, filters, favorites, detail UI, and mutation refresh behavior.\n\nVerification:\n\n- Skill tests: **8 passed**\n- Scenario WebUI tests: **6 passed**\n- Python handler/preparation compilation: passed\n- `git diff --check`: passed\n- Validated using the worker’s current AdaOS source tree.",
+          "ts": 1784585242.685186,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 177,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.6ba433b4194d4cefa925d420a7678359",
+            "seq": 3040
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.6ba433b4194d4cefa925d420a7678359",
+              "seq": 3040
+            }
+          }
+        },
+        {
+          "id": "m.77975042ef054c3492925d78e22513d4",
+          "seq": 3041,
+          "role": "hub",
+          "text": "Локальный Codex завершил работу над streaming_recipe_book_eval. Проверки пройдены. Implemented and verified the release-quality repair.\n\nKey fixes:\n\n- Added bounded atomic-write retries for transient Windows `PermissionError`.\n- Durable replace failures still raise, preserve existing `recipes.json`, and clean temporary files.\n- Added regression tests for transient success and durable denial.\n- Corrected tool data routes with exact `tool` references and schema-supported causal `read_policy` values.\n- Retained semver-alignment testing without release-number pinning.\n- Preserved scenario UI behavior and skill routing.\n\nVerification:\n\n- Skill suite: `10 passed`\n- Scenario suite: `6 passed`\n- Strict install-mode skill validation: passed, zero issues\n- `webui.v1` schema validation: passed\n- Python compilation: passed\n- Scenario JSON parsing: passed\n- `git diff --check`: passed\n- No publishing performed; changes remain within the permitted project paths.",
+          "ts": 1784586324.8817227,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 241,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.77975042ef054c3492925d78e22513d4",
+            "seq": 3041
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.77975042ef054c3492925d78e22513d4",
+              "seq": 3041
+            }
+          }
+        },
+        {
+          "id": "m.bfc7954f48754919befdb3ea48649b8a",
+          "seq": 3042,
+          "role": "hub",
+          "text": "Локальный Codex завершил работу над streaming_recipe_book_eval. Проверки пройдены. Implemented the release correction without publishing.\n\n- Removed the brittle `>= 1.0.1` assertion; versions now require exact three-component, nonnegative SemVer and explicitly accept published `0.0.1`.\n- Preserved strict discovery, exports, decorators, dependencies, routes, and side-effect assertions.\n- Restored exact `tool` and causal `read_policy` route metadata.\n- Added bounded compatibility validation for older local AdaOS schemas.\n- Finalized the skill DEV checkpoint at `1.0.6`.\n- Audited both suites; no remaining publish-normalization assumptions found.\n\nVerification:\n\n- Skill suite: **11 passed**\n- Scenario suite: **6 passed**\n- Python compilation: passed\n- JSON/YAML descriptor parsing: passed\n- `git diff --check`: passed\n- Changes remain within the permitted skill envelope.\n\nKey files: [skill.yaml](D:/git/inimatic/adaos/.adaos/state/skill_factory/local_runs/task.01KY0TYSMFCNYT9R20J4892H28/workspace/skills/streaming_recipe_book_eval_skill/skill.yaml), [test_runtime_discovery.py](D:/git/inimatic/adaos/.adaos/state/skill_factory/local_runs/task.01KY0TYSMFCNYT9R20J4892H28/workspace/skills/streaming_recipe_book_eval_skill/tests/test_runtime_discovery.py), [validation_compat.py](D:/git/inimatic/adaos/.adaos/state/skill_factory/local_runs/task.01KY0TYSMFCNYT9R20J4892H28/workspace/skills/streaming_recipe_book_eval_skill/tests/validation_compat.py).",
+          "ts": 1784587635.9247184,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 364,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.bfc7954f48754919befdb3ea48649b8a",
+            "seq": 3042
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.bfc7954f48754919befdb3ea48649b8a",
+              "seq": 3042
+            }
+          }
+        },
+        {
+          "id": "m.1784627269560",
+          "seq": 3043,
+          "role": "hub",
+          "text": "Я Арсений. Могу спокойно разложить ситуацию и помочь выбрать следующий шаг.\n\nМожно начать с готового персонажа и поправить его по ходу. Доступны: Арсений (Надёжный советник без лишнего пафоса.), Ника (Скептик, который помогает усилить решение.), Мира (Тёплый собеседник без искусственной сладости.). Для первого теста лучше выбрать одного и сразу задать живой вопрос.",
+          "ts": 1784627269.5581615,
+          "actor_id": "agent:conversation_companions:arseni",
+          "actor_label": "Арсений",
+          "token_estimate": 92,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.1784627269560",
+            "seq": 3043
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.1784627269560",
+              "seq": 3043
+            }
+          }
+        },
+        {
+          "id": "m.builder.builder_change_addf8c67.request",
+          "seq": 3044,
+          "role": "api",
+          "text": "Доработай текущий прототип «Книга рецептов» через встроенную LLM: сохрани существующие разделы и сценарии, добавь понятные состояния пустого результата поиска, загрузки и ошибки, а перед добавлением ингредиентов в список покупок покажи подтверждение с количеством позиций. Это остается безопасным декларативным прототипом: не добавляй реальные сервисы, сеть, учетные данные или production-данные.",
+          "ts": 1784817476.0612636,
+          "actor_id": "api",
+          "actor_label": "API",
+          "token_estimate": 99,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_addf8c67.request",
+            "seq": 3044
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.builder.builder_change_addf8c67.request",
+              "seq": 3044
+            }
+          }
+        },
+        {
+          "id": "m.builder.builder_change_addf8c67.accepted",
+          "seq": 3045,
+          "role": "hub",
+          "text": "Конструктор: отправил LLM-задачу для shopping_list_14504c40. Job: llm_job_6b0c27b450c748e481d7baaf.",
+          "ts": 1784817479.1291747,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 25,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_addf8c67.accepted",
+            "seq": 3045
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.builder.builder_change_addf8c67.accepted",
+              "seq": 3045
+            }
+          }
+        },
+        {
+          "id": "m.builder.builder_change_addf8c67.generating",
+          "seq": 3046,
+          "role": "hub",
+          "text": "Конструктор: формирует изменение для shopping_list_14504c40 (2 символов).",
+          "ts": 1784817481.2343721,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 19,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_addf8c67.generating",
+            "seq": 3046
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.builder.builder_change_addf8c67.generating",
+              "seq": 3046
+            }
+          }
+        },
+        {
+          "id": "m.builder.builder_change_addf8c67.result",
+          "seq": 3047,
+          "role": "hub",
+          "text": "Конструктор: LLM-задача llm_job_6b0c27b450c748e481d7baaf для shopping_list_14504c40 не завершилась. widgets[5].actions[0] has no label and cannot render a visible item.details command; add a label or move the action to an explicit ui.actions widget Полная диагностика: llm_jobs/llm_job_6b0c27b450c748e481d7baaf.json.",
+          "ts": 1784817556.5989854,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 79,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_addf8c67.result",
+            "seq": 3047
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.builder.builder_change_addf8c67.result",
+              "seq": 3047
+            }
+          }
+        },
+        {
+          "id": "m.builder.builder_change_36ed486e.request",
+          "seq": 3048,
+          "role": "api",
+          "text": "Повтори доработку текущего прототипа «Книга рецептов» и исправь отклонение валидатора: widgets[5].actions[0] has no label and cannot render a visible item.details command. У каждой видимой команды item.details должен быть непустой label; если это не команда, перенеси действие в явный ui.actions. Сохрани состояния пустого поиска, загрузки и ошибки и подтверждение добавления ингредиентов с количеством позиций. Не добавляй реальные сервисы, сеть или production-данные.",
+          "ts": 1784817606.2292008,
+          "actor_id": "api",
+          "actor_label": "API",
+          "token_estimate": 118,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_36ed486e.request",
+            "seq": 3048
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.builder.builder_change_36ed486e.request",
+              "seq": 3048
+            }
+          }
+        },
+        {
+          "id": "m.builder.builder_change_36ed486e.accepted",
+          "seq": 3049,
+          "role": "hub",
+          "text": "Конструктор: отправил LLM-задачу для shopping_list_14504c40. Job: llm_job_3f182a1d697847eba842a912.",
+          "ts": 1784817609.1574423,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 25,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_36ed486e.accepted",
+            "seq": 3049
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.builder.builder_change_36ed486e.accepted",
+              "seq": 3049
+            }
+          }
+        },
+        {
+          "id": "m.builder.builder_change_36ed486e.generating",
+          "seq": 3050,
+          "role": "hub",
+          "text": "Конструктор: формирует изменение для shopping_list_14504c40 (1 операций).",
+          "ts": 1784817611.2313204,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 19,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_36ed486e.generating",
+            "seq": 3050
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.builder.builder_change_36ed486e.generating",
+              "seq": 3050
+            }
+          }
+        },
+        {
+          "id": "m.builder.builder_change_36ed486e.result",
+          "seq": 3051,
+          "role": "hub",
+          "text": "Конструктор: обновил прототип shopping_list_14504c40. Операция: llm_webui_transform. Исправлен прототип: список рецептов переведён на карточки ui.list с поиском и фильтрами, детальное отображение привязано к выбранному элементу и вынесены действия в отдельный ui.actions с явными label, устранена ошибка валидатора об item.details командах и image-колонке у таблицы. Добавлены модальное окно фильтров, подтверждение добавления ингредиентов, состояния пустого поиска/загрузки/ошибки через статус-бар. Сохранены разделы и форма создания рецепта. Ревизия UI: 003.",
+          "ts": 1784817643.7295203,
+          "actor_id": "agent:builder_skill:builder",
+          "actor_label": "Конструктор",
+          "token_estimate": 140,
+          "trust_boundary": "retrieved_untrusted_evidence",
+          "source_ref": {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_36ed486e.result",
+            "seq": 3051
+          },
+          "safety": {
+            "schema": "adaos.conversation.retrieved_evidence_safety.v1",
+            "trust_boundary": "retrieved_untrusted_evidence",
+            "risk_level": "none",
+            "flags": [],
+            "source_ref": {
+              "type": "conversation_message",
+              "kind": "message",
+              "conversation_id": "conv.skill.builder_skill.default",
+              "message_id": "m.builder.builder_change_36ed486e.result",
+              "seq": 3051
+            }
+          }
+        }
+      ],
+      "segments": [],
+      "memory": [],
+      "evidence_refs": [
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.builder.builder_change_36ed486e.result",
+          "seq": 3051
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.builder.builder_change_36ed486e.generating",
+          "seq": 3050
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.builder.builder_change_36ed486e.accepted",
+          "seq": 3049
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.builder.builder_change_36ed486e.request",
+          "seq": 3048
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.builder.builder_change_addf8c67.result",
+          "seq": 3047
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.builder.builder_change_addf8c67.generating",
+          "seq": 3046
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.builder.builder_change_addf8c67.accepted",
+          "seq": 3045
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.builder.builder_change_addf8c67.request",
+          "seq": 3044
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.1784627269560",
+          "seq": 3043
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.bfc7954f48754919befdb3ea48649b8a",
+          "seq": 3042
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.77975042ef054c3492925d78e22513d4",
+          "seq": 3041
+        },
+        {
+          "type": "conversation_message",
+          "kind": "message",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "message_id": "m.6ba433b4194d4cefa925d420a7678359",
+          "seq": 3040
+        }
+      ],
+      "token_estimate": 1398,
+      "diagnostics": {
+        "schema": "adaos.context.diagnostics.v1",
+        "selected_sources": [
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_36ed486e.result",
+            "seq": 3051
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_36ed486e.generating",
+            "seq": 3050
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_36ed486e.accepted",
+            "seq": 3049
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_36ed486e.request",
+            "seq": 3048
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_addf8c67.result",
+            "seq": 3047
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_addf8c67.generating",
+            "seq": 3046
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_addf8c67.accepted",
+            "seq": 3045
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.builder.builder_change_addf8c67.request",
+            "seq": 3044
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.1784627269560",
+            "seq": 3043
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.bfc7954f48754919befdb3ea48649b8a",
+            "seq": 3042
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.77975042ef054c3492925d78e22513d4",
+            "seq": 3041
+          },
+          {
+            "type": "conversation_message",
+            "kind": "message",
+            "conversation_id": "conv.skill.builder_skill.default",
+            "message_id": "m.6ba433b4194d4cefa925d420a7678359",
+            "seq": 3040
+          }
+        ],
+        "skipped_sources": [],
+        "policy_denials": [],
+        "fallbacks": [
+          "summaries_unavailable",
+          "semantic_retrieval_unavailable"
+        ],
+        "search_index": {
+          "schema": "adaos.conversation.search_index_health.v1",
+          "status": "stale",
+          "fts_available": true,
+          "counts": {
+            "messages": {
+              "base": 3161,
+              "indexed": 3139
+            },
+            "memory": {
+              "base": 0,
+              "indexed": 0
+            },
+            "segments": {
+              "base": 0,
+              "indexed": 0
+            }
+          }
+        },
+        "segment_summary": {
+          "schema": "adaos.conversation.segment_summary_health.v1",
+          "status": "missing",
+          "conversation_id": "conv.skill.builder_skill.default",
+          "thread_id": null,
+          "message_count": 3051,
+          "segment_count": 0,
+          "summarized_message_count": 0,
+          "summarized_until_seq": 0,
+          "latest_seq": 3051
+        },
+        "safety_flags": [],
+        "budget_exhausted": false,
+        "latency_ms": 141,
+        "selected_message_count": 12,
+        "selected_segment_count": 0,
+        "selected_memory_count": 0
+      },
+      "conversation_ref": {
+        "conversation_id": "conv.skill.builder_skill.default",
+        "webspace_id": "default",
+        "channel_id": "builder",
+        "owner": "skill:builder_skill",
+        "kind": "builder"
+      }
+    }
+  },
+  "quality_gates": {
+    "schemas": [
+      "skill.schema.json",
+      "webui.v1.schema.json"
+    ],
+    "tests": [
+      "skill validation",
+      "handler import smoke",
+      "Builder static checks"
+    ],
+    "previews": [
+      "diff",
+      "route plan",
+      "NLU probe",
+      "action preview",
+      "UI preview"
+    ],
+    "requires_human_approval": [
+      "new permissions",
+      "external IO",
+      "service runtime",
+      "high-rate streams",
+      "destructive actions"
+    ]
+  },
+  "links": {
+    "builder_task_id": "btask.bb91a5f165",
+    "conversation": {
+      "conversation_id": "conv.skill.builder_skill.default",
+      "webspace_id": "default",
+      "channel_id": "builder",
+      "owner": "skill:builder_skill",
+      "kind": "builder"
+    }
+  },
+  "created_by": "adaos.builder",
+  "created_at": "2026-07-23T14:41:50.992021Z",
+  "updated_at": "2026-07-23T14:41:50.992021Z"
+}

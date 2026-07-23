@@ -1,0 +1,255 @@
+name: shopping_list_14504c40_skill
+version: 0.0.1
+description: Локальная книга рецептов и список покупок.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: list_recipes
+runtime:
+  python: '3.11'
+dependencies: []
+exports:
+  tools:
+  - list_recipes
+  - search_recipes
+  - get_recipe
+  - create_recipe
+  - set_favorite
+  - add_ingredients_to_shopping_list
+  - get_shopping_list
+tools:
+- name: list_recipes
+  description: List and filter recipes.
+  entry: handlers.main:list_recipes
+  side_effects: read_only
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      category:
+        type: string
+      difficulty:
+        type: string
+      max_time_minutes:
+        type: integer
+        minimum: 1
+      favorites_only:
+        type: boolean
+    additionalProperties: false
+  output_schema:
+    $ref: '#/$defs/recipe_list'
+- name: search_recipes
+  description: Search recipes by text.
+  entry: handlers.main:search_recipes
+  side_effects: read_only
+  input_schema:
+    type: object
+    required:
+    - query
+    properties:
+      query:
+        type: string
+    additionalProperties: false
+  output_schema:
+    $ref: '#/$defs/recipe_list'
+- name: get_recipe
+  description: Read a recipe.
+  entry: handlers.main:get_recipe
+  side_effects: read_only
+  input_schema:
+    type: object
+    required:
+    - recipe_id
+    properties:
+      recipe_id:
+        type: string
+        minLength: 1
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - recipe
+- name: create_recipe
+  description: Create a local recipe.
+  entry: handlers.main:create_recipe
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - title
+    - category
+    - time_minutes
+    - difficulty
+    - servings
+    - ingredients
+    - steps
+    properties:
+      title:
+        type: string
+        minLength: 1
+      category:
+        type: string
+        minLength: 1
+      time_minutes:
+        type: integer
+        minimum: 1
+      difficulty:
+        type: string
+        enum:
+        - Легко
+        - Средне
+        - Сложно
+      servings:
+        type: integer
+        minimum: 1
+      description:
+        type: string
+      ingredients:
+        type: string
+        minLength: 1
+      steps:
+        type: string
+        minLength: 1
+      favorite:
+        type: boolean
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+- name: set_favorite
+  description: Set the favorite flag.
+  entry: handlers.main:set_favorite
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - recipe_id
+    - favorite
+    properties:
+      recipe_id:
+        type: string
+        minLength: 1
+      favorite:
+        type: boolean
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+- name: add_ingredients_to_shopping_list
+  description: Add ingredients with a confirmed quantity multiplier.
+  entry: handlers.main:add_ingredients_to_shopping_list
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - recipe_id
+    - quantity_multiplier
+    properties:
+      recipe_id:
+        type: string
+        minLength: 1
+      quantity_multiplier:
+        type: number
+        exclusiveMinimum: 0
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - added_count
+- name: get_shopping_list
+  description: Read the shopping list.
+  entry: handlers.main:get_shopping_list
+  side_effects: read_only
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - items
+    - count
+    - empty
+data_routes:
+- surface: recipes
+  route: skill-local
+  tool: list_recipes
+  first_paint: loading
+  recovery: retry or empty
+  guard_visibility: local-only
+  budget:
+    max_items: 500
+    max_payload_bytes: 524288
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 5
+    preserve_last_value: true
+    invalidation_tags:
+    - recipes
+- surface: recipe
+  route: tool/details
+  tool: get_recipe
+  first_paint: empty
+  recovery: not-found error
+  guard_visibility: local-only
+  budget:
+    max_items: 1
+    max_payload_bytes: 131072
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - targeted_invalidation
+    - state_dependency_changed
+    max_request_hz: 5
+    preserve_last_value: true
+    invalidation_tags:
+    - recipes
+- surface: shopping-list
+  route: skill-local
+  tool: get_shopping_list
+  first_paint: empty
+  recovery: retry
+  guard_visibility: local-only
+  budget:
+    max_items: 1000
+    max_payload_bytes: 524288
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - targeted_invalidation
+    max_request_hz: 5
+    preserve_last_value: true
+    invalidation_tags:
+    - shopping-list
+$defs:
+  recipe_list:
+    type: object
+    required:
+    - ok
+    - items
+    - count
+    - empty
+    properties:
+      ok:
+        type: boolean
+      items:
+        type: array
+        items:
+          type: object
+      count:
+        type: integer
+      empty:
+        type: boolean
+updated_at: '2026-07-23T15:01:48+00:00'

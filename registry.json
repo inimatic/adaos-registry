@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-23T14:30:16+00:00",
+  "updated_at": "2026-07-23T15:01:48+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -666,7 +666,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-07-23T14:19:17+00:00",
+      "updated_at": "2026-07-23T14:34:03+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
@@ -680,6 +680,28 @@
       },
       "description": "Consumes skill.service.doctor.request and emits a stub doctor report (no LLM yet).",
       "runtime_python": "3.11"
+    },
+    {
+      "kind": "skill",
+      "id": "shopping_list_14504c40_skill",
+      "name": "shopping_list_14504c40_skill",
+      "version": "0.0.1",
+      "updated_at": "2026-07-23T15:01:48+00:00",
+      "path": "skills/shopping_list_14504c40_skill",
+      "manifest": "skills/shopping_list_14504c40_skill/skill.yaml",
+      "source": {
+        "path": "skills/shopping_list_14504c40_skill",
+        "manifest": "skills/shopping_list_14504c40_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "shopping_list_14504c40_skill",
+        "id": "shopping_list_14504c40_skill"
+      },
+      "description": "Локальная книга рецептов и список покупок.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 7
     },
     {
       "kind": "skill",
