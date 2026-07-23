@@ -1,6 +1,6 @@
 {
   "id": "release_validation_ops",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "Release Validation Operations",
   "type": "desktop",
   "title": "Release Validation Operations",
@@ -188,10 +188,10 @@
               "inputs": {
                 "emptyText": "No assignments",
                 "columns": [
-                  { "key": "node_id", "label": "Node" },
-                  { "key": "state", "label": "State", "width": "105px" },
-                  { "key": "checks_text", "label": "Checks", "width": "75px", "mono": true },
-                  { "key": "reason", "label": "Reason" }
+                  { "key": "node_id", "label": "Node", "width": "110px" },
+                  { "key": "state", "label": "State", "width": "75px" },
+                  { "key": "checks_text", "label": "Checks", "width": "65px", "mono": true },
+                  { "key": "reason_label", "label": "Reason" }
                 ]
               }
             },

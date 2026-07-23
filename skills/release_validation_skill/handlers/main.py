@@ -125,6 +125,7 @@ def _ui_snapshot(snapshot: Mapping[str, Any]) -> dict[str, Any]:
                         f"{(item.get('result') or {}).get('checks_total', 0)}"
                     ),
                     "reason": str((item.get("result") or {}).get("reason") or ""),
+                    "reason_label": str((item.get("result") or {}).get("reason") or "").replace("_", " "),
                 }
                 for item in assignments[:100]
             ]

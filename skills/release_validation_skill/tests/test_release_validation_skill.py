@@ -113,3 +113,26 @@ def test_skill_rehydrate_projects_durable_snapshot(monkeypatch) -> None:
     assert result["ok"] is True
     assert projection.values[-1][0] == "release_validation.snapshot"
     assert projection.values[-1][2]["webspace_id"] == "ops"
+
+
+def test_ui_snapshot_makes_machine_reason_readable(monkeypatch) -> None:
+    module = _load_module()
+    service = _Service()
+    monkeypatch.setattr(module, "_service", lambda: service)
+    raw = service.snapshot()
+    raw["assignments"] = [
+        {
+            "assignment_id": "assignment-1",
+            "node_id": "linux-exp-01",
+            "state": "passed",
+            "result": {
+                "checks_passed": 5,
+                "checks_total": 5,
+                "reason": "all_observe_checks_passed",
+            },
+        }
+    ]
+
+    snapshot = module._ui_snapshot(raw)
+
+    assert snapshot["assignments"]["items"][0]["reason_label"] == "all observe checks passed"

@@ -1,5 +1,5 @@
 name: release_validation_skill
-version: 0.1.1
+version: 0.1.2
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -141,5 +141,5 @@ tools:
     required: [target_build]
   output_schema:
     type: object
-updated_at: '2026-07-23T14:01:00+00:00'
+updated_at: '2026-07-23T14:09:00+00:00'
 
