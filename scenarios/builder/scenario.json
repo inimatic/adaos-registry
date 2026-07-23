@@ -1021,6 +1021,13 @@
                             "actions": [
                                 {
                                     "on": "click",
+                                    "type": "updateState",
+                                    "params": {
+                                        "projectPickerArchived": false
+                                    }
+                                },
+                                {
+                                    "on": "click",
                                     "type": "openModal",
                                     "params": {
                                         "modalId": "project-picker"
@@ -1634,9 +1641,9 @@
                     "meta": {
                         "builder": {
                             "scenario_id": "builder",
-                            "ui_revision": "037",
+                            "ui_revision": "038",
                             "prototype_base_revision": "029",
-                            "previous_revision": "036",
+                            "previous_revision": "037",
                             "functional": true
                         }
                     },

@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-23T11:22:54+00:00",
+  "updated_at": "2026-07-23T11:37:30+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -632,7 +632,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-07-15T06:30:52+00:00",
+      "updated_at": "2026-07-23T11:25:00+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
@@ -793,8 +793,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.16",
-      "updated_at": "2026-07-23T11:22:54+00:00",
+      "version": "0.2.17",
+      "updated_at": "2026-07-23T11:37:30+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
@@ -817,6 +817,25 @@
           "builder_sdk_control_skill"
         ]
       }
+    },
+    {
+      "kind": "scenario",
+      "id": "builder_pipeline_smoke_1784408500",
+      "name": "builder_pipeline_smoke_1784408500",
+      "version": "0.0.2",
+      "updated_at": "2026-07-18T21:36:06+00:00",
+      "path": "scenarios/builder_pipeline_smoke_1784408500",
+      "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.yaml",
+      "source": {
+        "path": "scenarios/builder_pipeline_smoke_1784408500",
+        "manifest": "scenarios/builder_pipeline_smoke_1784408500/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "builder_pipeline_smoke_1784408500",
+        "id": "builder_pipeline_smoke_1784408500"
+      },
+      "trigger": "manual"
     },
     {
       "kind": "scenario",
@@ -890,7 +909,8 @@
       "description": "Prompt engineering IDE workspace for dev skills and scenarios.",
       "skills": {
         "required": [
-          "prompt_engineer_skill"
+          "prompt_engineer_skill",
+          "builder_automation_skill"
         ]
       }
     },
@@ -921,6 +941,31 @@
         ],
         "optional": [
           "redevice_list"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "streaming_recipe_book_eval",
+      "name": "streaming_recipe_book_eval",
+      "version": "0.0.2",
+      "updated_at": "2026-07-20T22:50:10+00:00",
+      "path": "scenarios/streaming_recipe_book_eval",
+      "manifest": "scenarios/streaming_recipe_book_eval/scenario.yaml",
+      "source": {
+        "path": "scenarios/streaming_recipe_book_eval",
+        "manifest": "scenarios/streaming_recipe_book_eval/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "streaming_recipe_book_eval",
+        "id": "streaming_recipe_book_eval"
+      },
+      "title": "Домашняя книга рецептов",
+      "description": "Responsive persistent recipe catalog.",
+      "skills": {
+        "required": [
+          "streaming_recipe_book_eval_skill"
         ]
       }
     },
