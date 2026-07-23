@@ -361,6 +361,34 @@ def test_browsers_skill_snapshot_request_uses_fingerprint_guard(monkeypatch) -> 
     assert streams[0][2]["webspace_id"] == "desktop"
 
 
+def test_browsers_skill_refresh_event_schedules_without_inline_snapshot(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    scheduled: list[dict[str, object]] = []
+
+    def _unexpected_build(_target_ws=None):
+        raise AssertionError("background refresh event must not build snapshot inline")
+
+    monkeypatch.setattr(mod, "_build_snapshot", _unexpected_build)
+    monkeypatch.setattr(
+        mod,
+        "_schedule_publish_snapshot",
+        lambda target_ws=None, *, fanout=False, force=False: scheduled.append(
+            {"target_ws": target_ws, "fanout": fanout, "force": force}
+        ),
+    )
+
+    async def _run() -> None:
+        mod._on_refresh({"type": "browser.session.changed", "webspace_id": "dev1"})
+
+    mod._on_refresh({"type": "browser.session.changed", "webspace_id": "dev1"})
+    asyncio.run(_run())
+
+    assert scheduled == [
+        {"target_ws": "dev1", "fanout": False, "force": False},
+        {"target_ws": "dev1", "fanout": False, "force": False},
+    ]
+
+
 def test_browsers_skill_yjs_projection_requires_active_demand(monkeypatch) -> None:
     mod = _load_browsers_skill_module()
     mod._SELECTED_BROWSER_BY_WS.clear()

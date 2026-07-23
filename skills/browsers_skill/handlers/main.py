@@ -234,12 +234,8 @@ async def _set_projection_if_changed(slot: str, value: Any, *, webspace_id: str,
 
 
 def _run_coro(coro: Any, *, wait: bool = True, key: str | None = None) -> Any:
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    future = _projection_executor().submit(lambda: asyncio.run(coro))
     if not wait:
+        future = _projection_executor().submit(lambda: asyncio.run(coro))
         if key:
             _PENDING_REFRESH_BY_WS[key] = future
 
@@ -253,6 +249,11 @@ def _run_coro(coro: Any, *, wait: bool = True, key: str | None = None) -> Any:
 
         future.add_done_callback(_done)
         return future
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(coro)
+    future = _projection_executor().submit(lambda: asyncio.run(coro))
     return future.result()
 
 
@@ -632,8 +633,17 @@ def _publish_stream_snapshot(receiver: str, webspace_id: str | None = None) -> N
         _LOG.debug("browsers stream snapshot failed receiver=%s error=%s", receiver, result.error)
 
 
-def _refresh_snapshot_sync(target_ws: str | None = None, *, fanout: bool = False, force: bool = False) -> dict[str, Any]:
+def _refresh_snapshot_sync(
+    target_ws: str | None = None,
+    *,
+    fanout: bool = False,
+    force: bool = False,
+    return_payload: bool = True,
+) -> dict[str, Any]:
     _clear_snapshot_cache(None if fanout else target_ws)
+    if not return_payload:
+        _schedule_publish_snapshot(target_ws, fanout=fanout, force=force)
+        return {}
     if _has_running_loop():
         payload, _ = _build_snapshot(target_ws)
         _schedule_publish_snapshot(target_ws, fanout=fanout, force=force)
@@ -1084,6 +1094,7 @@ def _on_refresh(evt: Any) -> None:
         target_ws,
         fanout=_should_fanout_projection_refresh(topic, target_ws),
         force=_should_force_projection_refresh(topic),
+        return_payload=False,
     )
 
 
