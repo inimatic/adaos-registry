@@ -215,6 +215,7 @@ def _publication_children(kind: str, project_id: str) -> list[dict[str, Any]]:
             continue
         change_id = str(change.get("change_id") or change.get("id") or "publication")
         version = meta.get("version") or meta.get("release") or "DEV"
+        changed_at = change.get("updated_at") or change.get("created_at")
         children.append(
             {
                 "id": f"publication-{change_id}",
@@ -225,7 +226,8 @@ def _publication_children(kind: str, project_id: str) -> list[dict[str, Any]]:
                 "change_id": change_id,
                 "version": version,
                 "release": meta.get("release"),
-                "created_at": change.get("updated_at") or change.get("created_at"),
+                "created_at": changed_at,
+                "updated_at": changed_at,
                 "evidence": dict(change),
             }
         )

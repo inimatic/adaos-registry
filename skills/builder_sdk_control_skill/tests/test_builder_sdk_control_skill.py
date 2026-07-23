@@ -198,6 +198,7 @@ def test_publication_release_children_exclude_dry_runs_and_are_bounded(monkeypat
                 "change_id": f"release-{index}",
                 "status": "accepted",
                 "summary": f"Published v0.2.{index}",
+                "updated_at": f"2026-07-23T10:0{index}:00+00:00",
                 "source_refs": {"action": "publication"},
                 "meta": {"dry_run": False, "version": f"0.2.{index}"},
             }
@@ -213,6 +214,7 @@ def test_publication_release_children_exclude_dry_runs_and_are_bounded(monkeypat
     assert len(publication_stage["children"]) == module.MAX_LIFECYCLE_CHILDREN
     assert all(child["kind"] == "publication_release" for child in publication_stage["children"])
     assert all(child["title"].startswith("v ") for child in publication_stage["children"])
+    assert all(child["updated_at"] == child["created_at"] for child in publication_stage["children"])
     assert {child["change_id"] for child in publication_stage["children"]} == {
         "release-0", "release-1", "release-2", "release-3", "release-4"
     }
