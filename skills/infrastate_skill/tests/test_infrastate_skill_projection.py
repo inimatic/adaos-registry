@@ -1005,9 +1005,13 @@ def test_infrastate_get_snapshot_ignores_legacy_full_snapshot_crashes(monkeypatc
         raise UnboundLocalError("cannot access local variable 'sync_runtime' where it is not associated with a value")
 
     monkeypatch.setattr(mod, "_snapshot", _boom)
+    monkeypatch.setattr(mod, "read_core_update_status", lambda: {"state": "idle"})
+    monkeypatch.setattr(mod, "read_core_update_last_result", lambda: {})
+    monkeypatch.setattr(mod, "slot_status", lambda: {})
     monkeypatch.setattr(mod, "runtime_lifecycle_snapshot", lambda: {"node_state": "ready"})
     monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(role="hub", node_id="hub-1"))
     monkeypatch.setattr(mod, "_should_project_snapshot_result", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(mod, "_highlight_summary_changes", lambda summary, **_kwargs: summary)
     monkeypatch.setattr(mod, "_event_state", lambda: [])
 
     snapshot = mod.get_snapshot(webspace_id="default", project=True)
@@ -2251,7 +2255,7 @@ def test_infrastate_project_async_skips_snapshot_with_only_timestamp_changes(mon
     async def _fake_set_async(slot, value, *, user_id=None, webspace_id=None):
         applied.append((webspace_id, slot, value))
 
-    monkeypatch.setattr(mod, "ctx_subnet", SimpleNamespace(set_async=_fake_set_async))
+    monkeypatch.setattr(mod._WEBSPACE_PROJECTION_CTX, "set_async", _fake_set_async)
     monkeypatch.setattr(mod, "_projection_webspace_ids", lambda webspace_id=None: ["default"])
     monkeypatch.setattr(mod, "_publish_snapshot_streams", lambda snapshot, webspace_id=None: None)
 
@@ -2299,7 +2303,7 @@ def test_infrastate_project_async_uses_throttled_interval_when_yjs_policy_requir
     async def _fake_set_async(slot, value, *, user_id=None, webspace_id=None):
         applied.append((webspace_id, slot, value))
 
-    monkeypatch.setattr(mod, "ctx_subnet", SimpleNamespace(set_async=_fake_set_async))
+    monkeypatch.setattr(mod._WEBSPACE_PROJECTION_CTX, "set_async", _fake_set_async)
     monkeypatch.setattr(mod, "_projection_webspace_ids", lambda webspace_id=None: ["default"])
     monkeypatch.setattr(mod, "_publish_snapshot_streams", lambda snapshot, webspace_id=None: None)
     monkeypatch.setattr(
@@ -2348,7 +2352,7 @@ def test_infrastate_project_async_blocks_primary_yjs_projection_but_keeps_stream
     async def _fake_set_async(slot, value, *, user_id=None, webspace_id=None):
         applied.append((webspace_id, str(value.get("summary", {}).get("value") or "")))
 
-    monkeypatch.setattr(mod, "ctx_subnet", SimpleNamespace(set_async=_fake_set_async))
+    monkeypatch.setattr(mod._WEBSPACE_PROJECTION_CTX, "set_async", _fake_set_async)
     monkeypatch.setattr(mod, "_projection_webspace_ids", lambda webspace_id=None: ["default"])
     monkeypatch.setattr(
         mod,
@@ -2492,7 +2496,7 @@ def test_infrastate_project_async_excludes_stream_sections_from_yjs(monkeypatch)
     async def _fake_set_async(slot, value, *, user_id=None, webspace_id=None):
         projected.append((slot, value))
 
-    monkeypatch.setattr(mod, "ctx_subnet", SimpleNamespace(set_async=_fake_set_async))
+    monkeypatch.setattr(mod._WEBSPACE_PROJECTION_CTX, "set_async", _fake_set_async)
     monkeypatch.setattr(mod, "_projection_webspace_ids", lambda webspace_id=None: ["default"])
     monkeypatch.setattr(
         mod,
@@ -3310,9 +3314,15 @@ def test_infrastate_manifest_includes_handler_projection_slots():
         for entry in list(entries or [])
         if isinstance(entry, dict)
     }
+    manifest_scopes = {
+        str(entry.get("slot") or ""): str(entry.get("scope") or "")
+        for entry in list(entries or [])
+        if isinstance(entry, dict)
+    }
 
     for slot, path in mod._PROJECTION_SLOT_PATHS.items():
         assert manifest_paths.get(slot) == path
+        assert manifest_scopes.get(slot) == "webspace"
 
 
 def test_infrastate_inventory_and_marketplace_use_stream_data_sources():

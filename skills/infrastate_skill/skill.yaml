@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.52
+version: 0.75.53
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -446,77 +446,77 @@ data_routes:
     log: service.infrastate_skill.runtime.log
     quarantine: true
 data_projections:
-- scope: subnet
+- scope: webspace
   slot: infrastate.summary
   targets:
   - backend: yjs
     path: data/infrastate/summary
-- scope: subnet
+- scope: webspace
   slot: infrastate.actions
   targets:
   - backend: yjs
     path: data/infrastate/actions
-- scope: subnet
+- scope: webspace
   slot: infrastate.core_actions
   targets:
   - backend: yjs
     path: data/infrastate/core_actions
-- scope: subnet
+- scope: webspace
   slot: infrastate.yjs_actions
   targets:
   - backend: yjs
     path: data/infrastate/yjs_actions
-- scope: subnet
+- scope: webspace
   slot: infrastate.update_actions
   targets:
   - backend: yjs
     path: data/infrastate/update_actions
-- scope: subnet
+- scope: webspace
   slot: infrastate.core_update_diag_actions
   targets:
   - backend: yjs
     path: data/infrastate/core_update_diag_actions
-- scope: subnet
+- scope: webspace
   slot: infrastate.nodes
   targets:
   - backend: yjs
     path: data/infrastate/nodes
-- scope: subnet
+- scope: webspace
   slot: infrastate.yjs_webspaces
   targets:
   - backend: yjs
     path: data/infrastate/yjs_webspaces
-- scope: subnet
+- scope: webspace
   slot: infrastate.node_editor
   targets:
   - backend: yjs
     path: data/infrastate/node_editor
-- scope: subnet
+- scope: webspace
   slot: infrastate.operations.active
   targets:
   - backend: yjs
     path: data/infrastate/operations/active
-- scope: subnet
+- scope: webspace
   slot: infrastate.ui_state
   targets:
   - backend: yjs
     path: data/infrastate/ui_state
-- scope: subnet
+- scope: webspace
   slot: infrastate.fallback
   targets:
   - backend: yjs
     path: data/infrastate/fallback
-- scope: subnet
+- scope: webspace
   slot: infrastate.errors
   targets:
   - backend: yjs
     path: data/infrastate/errors
-- scope: subnet
+- scope: webspace
   slot: infrastate.projection_diag
   targets:
   - backend: yjs
     path: data/infrastate/projection_diag
-- scope: subnet
+- scope: webspace
   slot: infrastate.yjs_balancer
   targets:
   - backend: yjs
@@ -645,13 +645,13 @@ tools:
   output_schema:
     type: object
     properties: {}
-updated_at: '2026-07-09T21:40:13+00:00'
+updated_at: '2026-07-23T09:49:08+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3599.4f7bfed0
-    recorded_at: '2026-07-09T21:40:13+00:00'
+    min_version: 0.1.0+3880.c8e5b26c
+    recorded_at: '2026-07-23T09:49:08+00:00'
     source: skill_push
-    min_commit: 4f7bfed09275be79d6af3198950e2895cf60f50a
-    min_short_commit: 4f7bfed0
-    build_date: '2026-07-09T21:16:37+00:00'
+    min_commit: c8e5b26c281d1e0ced4ac689ad4744ad35e0caef
+    min_short_commit: c8e5b26c
+    build_date: '2026-07-23T12:45:01+03:00'
 

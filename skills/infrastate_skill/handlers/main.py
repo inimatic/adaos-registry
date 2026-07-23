@@ -113,7 +113,7 @@ _PROJECTION_SLOT_PATHS: dict[str, str] = {
 }
 _DATA_PROJECTION_ENTRIES = [
     {
-        "scope": "subnet",
+        "scope": "webspace",
         "slot": slot,
         "targets": [{"backend": "yjs", "path": path}],
     }
@@ -138,9 +138,20 @@ _PROJECTION_SECTION_TO_SLOT = {
     "projection_diag": "infrastate.projection_diag",
     "yjs_balancer": "infrastate.yjs_balancer",
 }
+
+
+class _WebspaceProjectionContext:
+    async def set_async(self, slot: str, value: Any, *, webspace_id: str | None = None) -> None:
+        from adaos.services.scenario import ProjectionService
+
+        svc = ProjectionService.from_ctx(get_ctx())
+        await svc.apply("webspace", slot, value, webspace_id=webspace_id)
+
+
+_WEBSPACE_PROJECTION_CTX = _WebspaceProjectionContext()
 _PROJECTION_RUNTIME = ProjectionRuntime(
     "infrastate_skill",
-    ctx_subnet=ctx_subnet,
+    ctx_subnet=_WEBSPACE_PROJECTION_CTX,
     projections=_PROJECTION_SLOTS,
 )
 _background_refresh_task: asyncio.Task[Any] | None = None
@@ -8879,7 +8890,7 @@ async def _project_async(snapshot: dict[str, Any], webspace_id: str | None = Non
         applied = False
         errored = False
         try:
-            _PROJECTION_RUNTIME.bind_ctx_subnet(ctx_subnet)
+            _PROJECTION_RUNTIME.bind_ctx_subnet(_WEBSPACE_PROJECTION_CTX)
             for slot_name, value in sections.items():
                 slot_pressure_policy = _projection_pressure_policy(target_ws)
                 slot_pressure_state = str(slot_pressure_policy.get("policy_state") or "").strip().lower()
@@ -8961,7 +8972,7 @@ async def _project_sections_async(
         applied = False
         errored = False
         try:
-            _PROJECTION_RUNTIME.bind_ctx_subnet(ctx_subnet)
+            _PROJECTION_RUNTIME.bind_ctx_subnet(_WEBSPACE_PROJECTION_CTX)
             for slot_name, value in compact_sections.items():
                 slot_pressure_policy = _projection_pressure_policy(target_ws)
                 slot_pressure_state = str(slot_pressure_policy.get("policy_state") or "").strip().lower()
