@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-23T10:13:08+00:00",
+  "updated_at": "2026-07-23T11:22:35+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -114,8 +114,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.0.3",
-      "updated_at": "2026-07-23T10:13:08+00:00",
+      "version": "0.0.4",
+      "updated_at": "2026-07-23T11:22:35+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {

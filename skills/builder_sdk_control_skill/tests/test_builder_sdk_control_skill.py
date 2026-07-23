@@ -134,6 +134,29 @@ def test_get_automation_exposes_missing_session_as_idle(monkeypatch) -> None:
     assert "error" not in result
 
 
+def test_get_automation_exposes_source_prototype_metadata(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module.automation,
+        "get_state",
+        lambda **kwargs: {
+            "ok": True,
+            "automation": {
+                "status": "running",
+                "version": "0.4.0",
+                "source_prototype_version": "UI 037",
+                "updated_at": 1784790000,
+            },
+        },
+    )
+
+    result = module.get_automation(webspace_id="builder-dev")
+
+    assert result["version"] == "0.4.0"
+    assert result["source_prototype_version"] == "UI 037"
+    assert result["updated_at"].endswith("Z")
+
+
 def test_lifecycle_exposes_bounded_automation_result_children(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.2.0"})
@@ -175,6 +198,8 @@ def test_lifecycle_exposes_bounded_automation_result_children(monkeypatch) -> No
     assert child["task_id"] == "task-42"
     assert child["result_branch"] == "builder/task-42"
     assert len(child["evidence"]) == module.MAX_LIFECYCLE_CHILDREN
+    assert child["lifecycleStage"] == "automation"
+    assert child["conversationLabel"] == "Automation conversation"
 
 
 def test_publication_release_children_exclude_dry_runs_and_are_bounded(monkeypatch) -> None:
@@ -218,6 +243,36 @@ def test_publication_release_children_exclude_dry_runs_and_are_bounded(monkeypat
     assert {child["change_id"] for child in publication_stage["children"]} == {
         "release-0", "release-1", "release-2", "release-3", "release-4"
     }
+    assert all(child["updated_at"].endswith("Z") for child in publication_stage["children"])
+
+
+def test_lifecycle_uses_one_stage_contract_and_timestamp_format(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(module.projects, "describe", lambda *args: {"version": "0.2.0"})
+    monkeypatch.setattr(
+        module.projects,
+        "list_files",
+        lambda *args, **kwargs: [
+            {"path": "skill.yaml", "updated_at": 1784790000},
+        ],
+    )
+    monkeypatch.setattr(
+        module.automation,
+        "get_state",
+        lambda **kwargs: {"ok": True, "automation": {"status": "idle", "updated_at": 1784790001}},
+    )
+    monkeypatch.setattr(module.conversation, "list_development_changes", lambda **kwargs: [])
+    monkeypatch.setattr(module, "_context", lambda *args: {"updated_at": 1784790002})
+
+    lifecycle = module.get_lifecycle("skill", "builder")
+
+    assert [item["lifecycleStage"] for item in lifecycle] == ["prototype", "automation", "publication"]
+    assert [item["conversationLabel"] for item in lifecycle] == [
+        "Prototype conversation",
+        "Automation conversation",
+        "Publication",
+    ]
+    assert all(str(item["updated_at"]).endswith("Z") for item in lifecycle)
 
 
 def test_publish_records_only_successful_non_dry_run_releases(monkeypatch) -> None:

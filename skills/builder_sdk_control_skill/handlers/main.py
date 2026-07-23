@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import Any
 from uuid import uuid4
@@ -120,6 +121,30 @@ def _version_title(value: Any) -> str:
     return token if token.lower().startswith("v") else f"v {token}"
 
 
+def _datetime_value(value: Any) -> str | None:
+    """Return one UTC ISO representation for every Lifecycle timestamp."""
+
+    if value in (None, ""):
+        return None
+    parsed: datetime | None = None
+    if isinstance(value, (int, float)):
+        parsed = datetime.fromtimestamp(float(value), tz=timezone.utc)
+    else:
+        token = str(value).strip()
+        if not token:
+            return None
+        try:
+            parsed = datetime.fromtimestamp(float(token), tz=timezone.utc)
+        except (TypeError, ValueError, OverflowError):
+            try:
+                parsed = datetime.fromisoformat(token.replace("Z", "+00:00"))
+            except ValueError:
+                return token
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
 def _automation_children(
     projection: Mapping[str, Any],
     *,
@@ -180,8 +205,10 @@ def _automation_children(
             "lifecycleState": "failed" if error else ("current" if status not in {"completed", "succeeded"} else "complete"),
             "title": _version_title(version),
             "version": str(version),
-            "updated_at": updated_at,
+            "updated_at": _datetime_value(updated_at),
             "source_prototype_version": source_prototype_version,
+            "lifecycleStage": "automation",
+            "conversationLabel": "Automation conversation",
             "status": status,
             "phase": phase,
             "summary": summary,
@@ -226,8 +253,10 @@ def _publication_children(kind: str, project_id: str) -> list[dict[str, Any]]:
                 "change_id": change_id,
                 "version": version,
                 "release": meta.get("release"),
-                "created_at": changed_at,
-                "updated_at": changed_at,
+                "created_at": _datetime_value(changed_at),
+                "updated_at": _datetime_value(changed_at),
+                "lifecycleStage": "publication",
+                "conversationLabel": "Publication",
                 "evidence": dict(change),
             }
         )
@@ -711,6 +740,9 @@ def get_automation(
         "failure_message": projection.get("error"),
         "failure_id": projection.get("failure_id"),
         "failure_stage": projection.get("failure_stage"),
+        "version": projection.get("version"),
+        "updated_at": _datetime_value(projection.get("updated_at")),
+        "source_prototype_version": projection.get("source_prototype_version"),
         "retryable": projection.get("retryable"),
         "diagnostic_hint": projection.get("diagnostic_hint"),
         "events_path": evidence.get("events_path"),
@@ -759,7 +791,9 @@ def get_lifecycle(
                 },
                 "title": f"UI {revision}" + (f" · v {project.get('version')}" if current and project.get("version") else ""),
                 "version": f"UI {revision}",
-                "updated_at": file_updated_at.get(f"ui_revisions/{revision}.json"),
+                "updated_at": _datetime_value(file_updated_at.get(f"ui_revisions/{revision}.json")),
+                "lifecycleStage": "prototype",
+                "conversationLabel": "Prototype conversation",
                 "badges": ["текущая"] if current else [],
                 "canMakeCurrent": not current,
                 "canStabilize": current,
@@ -775,7 +809,9 @@ def get_lifecycle(
                 "status_i18n": {"key": "builder.lifecycle.status.current"},
                 "title": f"v {project.get('version') or 'DEV'}",
                 "version": str(project.get("version") or "DEV"),
-                "updated_at": file_updated_at.get(str(project.get("manifest") or "scenario.yaml")),
+                "updated_at": _datetime_value(file_updated_at.get(str(project.get("manifest") or "scenario.yaml"))),
+                "lifecycleStage": "prototype",
+                "conversationLabel": "Prototype conversation",
                 "badges": ["текущая"],
                 "canStabilize": True,
             }
@@ -787,13 +823,15 @@ def get_lifecycle(
     automation_children = _automation_children(automation_projection, project_version=project_version)
     publication_children = _publication_children(kind, project_id)
     publication_active = bool(publication_children) or str(state.get("workflow_state") or "") == "publication"
-    prototype_updated_at = next(
+    prototype_updated_at = _datetime_value(next(
         (item.get("updated_at") for item in revision_nodes if item.get("updated_at")),
         file_updated_at.get(str(project.get("manifest") or ("scenario.yaml" if kind == "scenario" else "skill.yaml"))),
-    )
-    automation_updated_at = automation_projection.get("updated_at") or state.get("updated_at")
+    ))
+    automation_updated_at = _datetime_value(automation_projection.get("updated_at") or state.get("updated_at"))
     publication_version = publication_children[0].get("version") if publication_children else project_version
-    publication_updated_at = publication_children[0].get("created_at") if publication_children else state.get("updated_at")
+    publication_updated_at = _datetime_value(
+        publication_children[0].get("created_at") if publication_children else state.get("updated_at")
+    )
     return [
         {
             "id": "stage-proto",
@@ -807,6 +845,8 @@ def get_lifecycle(
             "canStabilize": True,
             "version": project_version,
             "updated_at": prototype_updated_at,
+            "lifecycleStage": "prototype",
+            "conversationLabel": "Prototype conversation",
             "children": revision_nodes,
         },
         {
@@ -825,6 +865,8 @@ def get_lifecycle(
             "version": project_version,
             "updated_at": automation_updated_at,
             "source_prototype_version": automation_projection.get("source_prototype_version") or project_version,
+            "lifecycleStage": "automation",
+            "conversationLabel": "Automation conversation",
             "children": automation_children,
         },
         {
@@ -842,6 +884,8 @@ def get_lifecycle(
             "canOpenPublication": True,
             "version": publication_version,
             "updated_at": publication_updated_at,
+            "lifecycleStage": "publication",
+            "conversationLabel": "Publication",
             "children": publication_children,
         },
     ]
