@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.0.5
+version: 0.0.6
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -1070,4 +1070,4 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-07-23T14:30:02+00:00'
+updated_at: '2026-07-23T15:05:15+00:00'
