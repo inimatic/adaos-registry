@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.0.4
+version: 0.0.5
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -331,7 +331,7 @@ tools:
   output_schema:
     type: object
 - name: set_workflow_state
-  description: Persist the selected Builder workflow state.
+  description: Compatibility adapter for explicit Builder workflow transitions.
   entry: handlers.main:set_workflow_state
   side_effects: local_write
   input_schema:
@@ -342,6 +342,46 @@ tools:
       state:
         type: string
         minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: get_workflow
+  description: Read the authoritative Builder workflow state and capabilities.
+  entry: handlers.main:get_workflow
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: transition_workflow
+  description: Apply one validated Builder workflow transition.
+  entry: handlers.main:transition_workflow
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - action
+    properties:
+      action:
+        type: string
+        enum:
+        - stabilize_prototype
+        - handoff_to_automation
       object_type:
         type: string
         enum:
@@ -397,6 +437,39 @@ tools:
   input_schema:
     type: object
     properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: select_preview_target
+  description: Show one explicit Prototype, Automation, or Publication snapshot in
+    Preview.
+  entry: handlers.main:select_preview_target
+  side_effects: ui_navigation
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    required:
+    - stage
+    properties:
+      stage:
+        type: string
+        enum:
+        - prototype
+        - automation
+        - publication
+      revision:
+        type: string
+      follow_active:
+        type: boolean
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
       webspace_id:
         type: string
   output_schema:
@@ -519,6 +592,26 @@ tools:
       text:
         type: string
         minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: return_to_prototype
+  description: Use the built-in LLM to derive a safe disconnected Prototype from Automation.
+  entry: handlers.main:return_to_prototype
+  side_effects: local_write
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    properties:
       object_type:
         type: string
         enum:
@@ -977,4 +1070,4 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-07-23T11:22:35+00:00'
+updated_at: '2026-07-23T14:30:02+00:00'

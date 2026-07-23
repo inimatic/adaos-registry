@@ -7,7 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 from adaos.sdk import conversation
-from adaos.sdk.builder import automation, preview
+from adaos.sdk.builder import automation, preview, workflow
 from adaos.sdk.core.decorators import tool
 from adaos.sdk.developer import projects, prompt_context
 from adaos.sdk.llm.llm_client import list_llm_models
@@ -60,6 +60,33 @@ def _context(kind: str, project_id: str) -> dict[str, Any]:
             "object_id": project_id,
             "workflow_state": "tz",
             "archived": False,
+        }
+
+
+def _workflow_projection(kind: str, project_id: str, state: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    try:
+        return workflow.get_state(kind, project_id)
+    except Exception:
+        legacy = state if isinstance(state, Mapping) else _context(kind, project_id)
+        token = str(legacy.get("workflow_state") or "prototype").strip().lower()
+        active = "automation" if token in {"automation", "publication"} else "prototype"
+        automation_status = "completed" if token == "publication" else ("working" if active == "automation" else "not_started")
+        return {
+            "active_phase": active,
+            "prototype": {"status": "working" if active == "prototype" else "frozen"},
+            "automation": {"status": automation_status},
+            "publication": {"status": "published" if token == "publication" else "not_started"},
+            "capabilities": {
+                "can_edit_prototype": active == "prototype",
+                "can_stabilize_prototype": active == "prototype",
+                "can_handoff_to_automation": active == "prototype",
+                "can_edit_automation": active == "automation",
+                "can_return_to_prototype": active == "automation" and automation_status == "completed",
+                "can_publish": active == "automation" and automation_status == "completed",
+                "can_preview_prototype": kind == "scenario",
+                "can_preview_automation": kind == "scenario" and automation_status == "completed",
+                "can_preview_publication": kind == "scenario" and token == "publication",
+            },
         }
 
 
@@ -342,7 +369,51 @@ def get_project(
     kind, project_id = _identity(object_type, object_id)
     item = projects.describe(kind, project_id)
     state = _context(kind, project_id)
+    workflow_projection = _workflow_projection(kind, project_id, state)
+    capabilities = (
+        workflow_projection.get("capabilities")
+        if isinstance(workflow_projection.get("capabilities"), Mapping)
+        else {}
+    )
     source = _preview_source_webspace_id(webspace_id, _meta)
+    prototype_projection = (
+        workflow_projection.get("prototype")
+        if isinstance(workflow_projection.get("prototype"), Mapping)
+        else {}
+    )
+    automation_projection = (
+        workflow_projection.get("automation")
+        if isinstance(workflow_projection.get("automation"), Mapping)
+        else {}
+    )
+    active_phase = str(workflow_projection.get("active_phase") or "prototype")
+    working_ref = (
+        prototype_projection.get("head_revision")
+        if active_phase == "prototype"
+        else automation_projection.get("result_version") or automation_projection.get("head_task_id")
+    )
+    working_label = f"WORKING: {active_phase.title()}"
+    if working_ref:
+        working_label += f" · {working_ref}"
+    try:
+        preview_binding = preview.get_binding(source)
+    except Exception:
+        preview_binding = {}
+    preview_target = (
+        preview_binding.get("preview_target")
+        if isinstance(preview_binding.get("preview_target"), Mapping)
+        else {}
+    )
+    viewing_label = str(preview_target.get("label") or "Preview: not selected")
+    viewing_stage = str(preview_target.get("stage") or "")
+    viewing_revision = str(preview_target.get("revision") or "")
+    active_ref = str(working_ref or "")
+    viewing_read_only = bool(
+        viewing_stage
+        and (viewing_stage != active_phase or (viewing_revision and active_ref and viewing_revision != active_ref))
+    )
+    if viewing_read_only:
+        viewing_label += " · READ ONLY"
     return {
         **item,
         "object_type": kind,
@@ -353,7 +424,17 @@ def get_project(
         "source_webspace_id": source,
         "stage": "DEV prototype",
         "archived": bool(state.get("archived")),
-        "workflow_state": str(state.get("workflow_state") or "tz"),
+        "workflow_state": str(workflow_projection.get("active_phase") or "prototype"),
+        "workflow": workflow_projection,
+        "workflow_active_phase": str(workflow_projection.get("active_phase") or "prototype"),
+        "workflow_generation": workflow_projection.get("generation"),
+        "working_label": working_label,
+        "viewing_label": viewing_label,
+        "viewing_read_only": viewing_read_only,
+        "can_edit_prototype": bool(capabilities.get("can_edit_prototype")),
+        "can_edit_automation": bool(capabilities.get("can_edit_automation")),
+        "can_return_to_prototype": bool(capabilities.get("can_return_to_prototype")),
+        "can_publish": bool(capabilities.get("can_publish")),
         "builder_llm_model": state.get("builder_llm_model"),
         "llm_provider": state.get("llm_provider"),
         "updated_at": state.get("updated_at"),
@@ -640,7 +721,33 @@ def set_workflow_state(
     object_id: str = DEFAULT_PROJECT_ID,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
-    return prompt_context.set_preferences(kind, project_id, workflow_state=state)
+    token = str(state or "").strip().lower()
+    if token == "prototype_stable":
+        return workflow.transition(kind, project_id, "stabilize_prototype", actor="builder.ui.compat")
+    if token == "automation":
+        return workflow.transition(kind, project_id, "handoff_to_automation", actor="builder.ui.compat")
+    if token == "publication":
+        raise ValueError("Publication is an immutable snapshot, not an active workflow phase")
+    raise ValueError("use an explicit Builder workflow transition")
+
+
+@tool("get_workflow", summary="Read the authoritative Builder workflow state.", side_effects="none")
+def get_workflow(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    return workflow.get_state(kind, project_id)
+
+
+@tool("transition_workflow", summary="Apply one validated Builder workflow transition.", side_effects="local_write")
+def transition_workflow(
+    action: str,
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    return workflow.transition(kind, project_id, action, actor="builder.ui")
 
 
 @tool("archive_project", summary="Archive or restore a DEV project in Builder.", side_effects="local_write")
@@ -661,6 +768,14 @@ def select_preview(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if kind == "scenario":
+        return preview.select_target(
+            kind,
+            project_id,
+            stage="prototype",
+            source_webspace_id=_preview_source_webspace_id(webspace_id, _meta),
+            follow_active=True,
+        )
     return preview.select_project(
         kind,
         project_id,
@@ -668,6 +783,27 @@ def select_preview(
         ensure_ready=True,
         wait_for_rebuild=True,
         publish_event=True,
+    )
+
+
+@tool("select_preview_target", summary="Show one explicit Lifecycle snapshot in Preview.", side_effects="ui_navigation")
+def select_preview_target(
+    stage: str,
+    revision: str | None = None,
+    follow_active: bool = False,
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    return preview.select_target(
+        kind,
+        project_id,
+        stage=stage,
+        revision=revision,
+        source_webspace_id=_preview_source_webspace_id(webspace_id, _meta),
+        follow_active=follow_active,
     )
 
 
@@ -679,6 +815,7 @@ def get_preview(
     source = _preview_source_webspace_id(webspace_id, _meta)
     binding = preview.get_binding(source)
     opened = preview.open_workspace(source)
+    target = binding.get("preview_target") if isinstance(binding.get("preview_target"), Mapping) else {}
     return {
         **binding,
         "ok": bool(binding.get("ok", True)),
@@ -687,6 +824,11 @@ def get_preview(
         "preview_url": str(opened.get("url") or f"/?webspace={_preview_dev_webspace_id(source)}"),
         "qr_text": str(opened.get("url") or f"/?webspace={_preview_dev_webspace_id(source)}"),
         "status": "ready" if binding.get("runtime_scenario_id") else "not_selected",
+        "preview_target": dict(target),
+        "viewing": target.get("label"),
+        "viewing_stage": target.get("stage"),
+        "viewing_revision": target.get("revision"),
+        "preview_follows_active": bool(target.get("follow_active")),
     }
 
 
@@ -761,6 +903,13 @@ def get_lifecycle(
     kind, project_id = _identity(object_type, object_id)
     project = projects.describe(kind, project_id)
     state = _context(kind, project_id)
+    workflow_projection = _workflow_projection(kind, project_id, state)
+    workflow_capabilities = (
+        workflow_projection.get("capabilities")
+        if isinstance(workflow_projection.get("capabilities"), Mapping)
+        else {}
+    )
+    active_phase = str(workflow_projection.get("active_phase") or "prototype")
     current_revision = ""
     revisions: list[str] = []
     file_updated_at: dict[str, Any] = {}
@@ -795,8 +944,9 @@ def get_lifecycle(
                 "lifecycleStage": "prototype",
                 "conversationLabel": "Prototype conversation",
                 "badges": ["текущая"] if current else [],
-                "canMakeCurrent": not current,
-                "canStabilize": current,
+                "canMakeCurrent": not current and active_phase == "prototype",
+                "canStabilize": current and bool(workflow_capabilities.get("can_stabilize_prototype")),
+                "canPreview": kind == "scenario",
             }
         )
     if not revision_nodes:
@@ -813,36 +963,54 @@ def get_lifecycle(
                 "lifecycleStage": "prototype",
                 "conversationLabel": "Prototype conversation",
                 "badges": ["текущая"],
-                "canStabilize": True,
+                "canStabilize": bool(workflow_capabilities.get("can_stabilize_prototype")),
+                "canPreview": kind == "scenario",
             }
         )
     automation_state = get_automation(kind, project_id, webspace_id, _meta)
     automation_projection = automation_state.get("automation") if isinstance(automation_state.get("automation"), Mapping) else {}
-    automation_status = str(automation_projection.get("status") or "idle")
+    workflow_automation = (
+        workflow_projection.get("automation")
+        if isinstance(workflow_projection.get("automation"), Mapping)
+        else {}
+    )
+    automation_status = str(workflow_automation.get("status") or "not_started")
     project_version = str(project.get("version") or "DEV")
     automation_children = _automation_children(automation_projection, project_version=project_version)
     publication_children = _publication_children(kind, project_id)
-    publication_active = bool(publication_children) or str(state.get("workflow_state") or "") == "publication"
+    publication_projection = (
+        workflow_projection.get("publication")
+        if isinstance(workflow_projection.get("publication"), Mapping)
+        else {}
+    )
+    publication_active = str(publication_projection.get("status") or "") == "published" or bool(publication_children)
     prototype_updated_at = _datetime_value(next(
         (item.get("updated_at") for item in revision_nodes if item.get("updated_at")),
         file_updated_at.get(str(project.get("manifest") or ("scenario.yaml" if kind == "scenario" else "skill.yaml"))),
     ))
-    automation_updated_at = _datetime_value(automation_projection.get("updated_at") or state.get("updated_at"))
+    automation_updated_at = _datetime_value(
+        workflow_automation.get("completed_at")
+        or workflow_automation.get("started_at")
+        or automation_projection.get("updated_at")
+        or state.get("updated_at")
+    )
     publication_version = publication_children[0].get("version") if publication_children else project_version
     publication_updated_at = _datetime_value(
-        publication_children[0].get("created_at") if publication_children else state.get("updated_at")
+        publication_projection.get("published_at")
+        or (publication_children[0].get("created_at") if publication_children else state.get("updated_at"))
     )
     return [
         {
             "id": "stage-proto",
             "kind": "stage",
-            "lifecycleState": "active",
-            "status": "активна",
-            "status_i18n": {"key": "builder.lifecycle.status.active"},
+            "lifecycleState": "working" if active_phase == "prototype" else "frozen",
             "title": "Прототип",
             "title_i18n": {"key": "builder.lifecycle.stage.prototype"},
+            "status": "WORKING" if active_phase == "prototype" else "FROZEN",
+            "status_i18n": None,
             "badges": ["текущая"],
-            "canStabilize": True,
+            "canStabilize": bool(workflow_capabilities.get("can_stabilize_prototype")),
+            "canPreview": kind == "scenario",
             "version": project_version,
             "updated_at": prototype_updated_at,
             "lifecycleStage": "prototype",
@@ -852,19 +1020,21 @@ def get_lifecycle(
         {
             "id": "stage-auto",
             "kind": "stage",
-            "lifecycleState": "not_started" if automation_status == "idle" else "active",
-            "status": "не начата" if automation_status == "idle" else automation_status,
+            "lifecycleState": "working" if active_phase == "automation" else ("frozen" if automation_status != "not_started" else "not_started"),
             "title": "Автоматизация",
             "title_i18n": {"key": "builder.lifecycle.stage.automation"},
-            "status_i18n": (
-                {"key": "builder.lifecycle.status.not_started"}
-                if automation_status == "idle"
-                else None
-            ),
+            "status": "WORKING" if active_phase == "automation" else ("FROZEN" if automation_status != "not_started" else "NOT STARTED"),
+            "status_i18n": None,
             "canOpenAutomation": True,
+            "canPreview": bool(workflow_capabilities.get("can_preview_automation")),
+            "canReturnToPrototype": bool(workflow_capabilities.get("can_return_to_prototype")),
             "version": project_version,
             "updated_at": automation_updated_at,
-            "source_prototype_version": automation_projection.get("source_prototype_version") or project_version,
+            "source_prototype_version": (
+                workflow_automation.get("source_prototype_revision")
+                or automation_projection.get("source_prototype_version")
+                or project_version
+            ),
             "lifecycleStage": "automation",
             "conversationLabel": "Automation conversation",
             "children": automation_children,
@@ -872,17 +1042,15 @@ def get_lifecycle(
         {
             "id": "stage-pub",
             "kind": "stage",
-            "lifecycleState": "active" if publication_active else "not_started",
-            "status": "активна" if publication_active else "не начата",
+            "lifecycleState": "published" if publication_active else "not_started",
             "title": "Публикация",
             "title_i18n": {"key": "builder.lifecycle.stage.publication"},
-            "status_i18n": {
-                "key": "builder.lifecycle.status.active"
-                if publication_active
-                else "builder.lifecycle.status.not_started"
-            },
+            "status": "PUBLISHED" if publication_active else "NOT STARTED",
+            "status_i18n": None,
             "canOpenPublication": True,
-            "version": publication_version,
+            "canPreview": bool(workflow_capabilities.get("can_preview_publication")),
+            "canPublish": bool(workflow_capabilities.get("can_publish")),
+            "version": publication_projection.get("current_version") or publication_version,
             "updated_at": publication_updated_at,
             "lifecycleStage": "publication",
             "conversationLabel": "Publication",
@@ -923,6 +1091,21 @@ def submit_automation(
     kind, project_id = _identity(object_type, object_id)
     return automation.submit(
         text,
+        object_type=kind,
+        object_id=project_id,
+        webspace_id=_webspace_id(webspace_id, _meta),
+    )
+
+
+@tool("return_to_prototype", summary="Use the built-in LLM to derive a safe Prototype from Automation.", side_effects="local_write")
+def return_to_prototype(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    return automation.return_to_prototype(
         object_type=kind,
         object_id=project_id,
         webspace_id=_webspace_id(webspace_id, _meta),
@@ -993,6 +1176,15 @@ def publish_project(
     kind, project_id = _identity(object_type, object_id)
     if bump not in {"major", "minor", "patch"}:
         raise ValueError("bump must be major, minor, or patch")
+    if not dry_run:
+        workflow_before = workflow.get_state(kind, project_id)
+        capabilities = (
+            workflow_before.get("capabilities")
+            if isinstance(workflow_before.get("capabilities"), Mapping)
+            else {}
+        )
+        if not bool(capabilities.get("can_publish")):
+            raise ValueError("Publication requires the current completed Automation result")
     result = projects.publish(kind, project_id, bump=bump, force=force, dry_run=dry_run)  # type: ignore[arg-type]
     if dry_run or result.get("dry_run") is True or not bool(result.get("ok", True)) or result.get("error"):
         return result
@@ -1008,7 +1200,29 @@ def publish_project(
         commit=str(result.get("commit") or result.get("commit_sha") or "").strip() or None,
         meta={"dry_run": False, "version": version, "release": release, "bump": bump},
     )
-    return {**result, "change_id": evidence.get("change_id"), "evidence": evidence}
+    current_workflow = workflow.get_state(kind, project_id)
+    automation_workflow = (
+        current_workflow.get("automation")
+        if isinstance(current_workflow.get("automation"), Mapping)
+        else {}
+    )
+    workflow_result = workflow.transition(
+        kind,
+        project_id,
+        "publish",
+        actor="builder.publication",
+        metadata={
+            "version": version,
+            "release": release,
+            "task_id": automation_workflow.get("head_task_id"),
+        },
+    )
+    return {
+        **result,
+        "change_id": evidence.get("change_id"),
+        "evidence": evidence,
+        "workflow": workflow_result.get("workflow"),
+    }
 
 
 @tool("get_state", summary="Verify the complete Builder SDK capability set.", side_effects="none")
@@ -1025,6 +1239,7 @@ def get_state(
         "project_objects": _probe(lambda: list_project_objects(kind, project_id)),
         "files": _probe(lambda: list_project_files(kind, project_id, limit=300)),
         "prompt_context": _probe(lambda: get_prompt_context(kind, project_id)),
+        "workflow": _probe(lambda: get_workflow(kind, project_id)),
         "lifecycle": _probe(lambda: get_lifecycle(kind, project_id, source)),
         "preview_binding": _probe(lambda: get_preview(source)),
         "automation": _probe(lambda: get_automation(kind, project_id, source)),
@@ -1048,6 +1263,7 @@ __all__ = [
     "get_automation",
     "get_lifecycle",
     "get_llm_options",
+    "get_workflow",
     "get_preview",
     "get_prompt_context",
     "get_project",
@@ -1064,10 +1280,13 @@ __all__ = [
     "save_prompt_context",
     "save_project_file",
     "select_preview",
+    "select_preview_target",
     "set_llm_profile",
     "set_workflow_state",
     "start_automation",
     "submit_automation",
+    "return_to_prototype",
+    "transition_workflow",
     "update_project",
     "update_project_metadata",
 ]

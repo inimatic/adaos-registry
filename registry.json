@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-23T11:37:30+00:00",
+  "updated_at": "2026-07-23T14:30:02+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -114,8 +114,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.0.4",
-      "updated_at": "2026-07-23T11:22:35+00:00",
+      "version": "0.0.5",
+      "updated_at": "2026-07-23T14:30:02+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -130,7 +130,7 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 29
+      "tools_count": 33
     },
     {
       "kind": "skill",
@@ -666,7 +666,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-07-23T11:25:00+00:00",
+      "updated_at": "2026-07-23T14:19:17+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {

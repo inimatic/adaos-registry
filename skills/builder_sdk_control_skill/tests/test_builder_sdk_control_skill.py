@@ -47,6 +47,9 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["archive_project"]["side_effects"] == "local_write"
     assert tools["update_project"]["side_effects"] == "local_write"
     assert tools["select_preview"]["side_effects"] == "ui_navigation"
+    assert tools["select_preview_target"]["side_effects"] == "ui_navigation"
+    assert tools["transition_workflow"]["side_effects"] == "local_write"
+    assert tools["return_to_prototype"]["side_effects"] == "local_write"
     assert "side_effects" not in tools["push_project"]
     assert "side_effects" not in tools["publish_project"]
     assert "side_effects" not in tools["delete_project"]
@@ -235,7 +238,8 @@ def test_publication_release_children_exclude_dry_runs_and_are_bounded(monkeypat
 
     publication_stage = module.get_lifecycle("skill", "builder")[2]
 
-    assert publication_stage["lifecycleState"] == "active"
+    assert publication_stage["lifecycleState"] == "published"
+    assert publication_stage["status"] == "PUBLISHED"
     assert len(publication_stage["children"]) == module.MAX_LIFECYCLE_CHILDREN
     assert all(child["kind"] == "publication_release" for child in publication_stage["children"])
     assert all(child["title"].startswith("v ") for child in publication_stage["children"])
@@ -290,6 +294,19 @@ def test_publish_records_only_successful_non_dry_run_releases(monkeypatch) -> No
         module,
         "_record_project_change",
         lambda **kwargs: recorded.append(kwargs) or {"change_id": "publication-change", "status": "accepted"},
+    )
+    monkeypatch.setattr(
+        module.workflow,
+        "get_state",
+        lambda *args: {
+            "capabilities": {"can_publish": True},
+            "automation": {"head_task_id": "task.21"},
+        },
+    )
+    monkeypatch.setattr(
+        module.workflow,
+        "transition",
+        lambda *args, **kwargs: {"ok": True, "workflow": {"publication": {"status": "published"}}},
     )
 
     dry_run = module.publish_project(dry_run=True)
@@ -382,7 +399,7 @@ def test_preview_selection_waits_until_materialized(monkeypatch) -> None:
         captured.update({"args": args, **kwargs})
         return {"ok": True, "selected": True}
 
-    monkeypatch.setattr(module.preview, "select_project", _select)
+    monkeypatch.setattr(module.preview, "select_target", _select)
     monkeypatch.setattr(
         module.preview,
         "canonical_source_webspace_id",
@@ -394,8 +411,8 @@ def test_preview_selection_waits_until_materialized(monkeypatch) -> None:
     assert result["selected"] is True
     assert captured["args"] == ("scenario", "builder")
     assert captured["source_webspace_id"] == "builder-smoke"
-    assert captured["ensure_ready"] is True
-    assert captured["wait_for_rebuild"] is True
+    assert captured["stage"] == "prototype"
+    assert captured["follow_active"] is True
 
 
 def test_preview_state_exposes_open_and_qr_targets(monkeypatch) -> None:
@@ -514,7 +531,8 @@ def test_prompt_ide_compatibility_projections_are_browser_ready(monkeypatch) -> 
     }
     assert lifecycle[1]["lifecycleState"] == "not_started"
     assert lifecycle[1]["title_i18n"] == {"key": "builder.lifecycle.stage.automation"}
-    assert lifecycle[1]["status_i18n"] == {"key": "builder.lifecycle.status.not_started"}
+    assert lifecycle[1]["status"] == "NOT STARTED"
+    assert lifecycle[1]["status_i18n"] is None
     assert lifecycle[2]["lifecycleState"] == "not_started"
     assert lifecycle[2]["title_i18n"] == {"key": "builder.lifecycle.stage.publication"}
 
