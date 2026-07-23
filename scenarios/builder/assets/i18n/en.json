@@ -142,5 +142,10 @@
   "builder.lifecycle.status.not_started": "not started",
   "builder.lifecycle.stage.prototype": "Prototype",
   "builder.lifecycle.stage.automation": "Automation",
-  "builder.lifecycle.stage.publication": "Publication"
+  "builder.lifecycle.stage.publication": "Publication",
+  "builder.text.prototype.conversation": "Prototype conversation",
+  "builder.text.automation.conversation": "Automation conversation",
+  "builder.text.modified": "Modified",
+  "builder.text.source.prototype.version": "Source Prototype version",
+  "builder.text.selected.lifecycle.item": "Selected Lifecycle item"
 }

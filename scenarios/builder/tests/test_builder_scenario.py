@@ -43,10 +43,10 @@ def test_scenario_and_standalone_webui_are_identical() -> None:
     assert scenario["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]["functional"] is True
 
 
-def test_revision_032_preserves_the_approved_029_structure() -> None:
+def test_revision_035_preserves_the_approved_029_structure() -> None:
     prototype = _load("ui_revisions/029.json")["after_webui"]
     current = _load("webui.json")
-    revision = _load("ui_revisions/032.json")
+    revision = _load("ui_revisions/035.json")
     prototype_page = prototype["ui"]["application"]["desktop"]["pageSchema"]
     current_page = current["ui"]["application"]["desktop"]["pageSchema"]
     prototype_widgets = {item["id"]: item for item in prototype_page["widgets"]}
@@ -59,9 +59,9 @@ def test_revision_032_preserves_the_approved_029_structure() -> None:
         assert current_widgets[widget_id]["type"] == prototype_widget["type"]
         assert current_widgets[widget_id]["area"] == prototype_widget["area"]
     assert set(prototype["ui"]["application"]["modals"]) <= set(current["ui"]["application"]["modals"])
-    assert revision["patch"] == {"operation": "runtime_binding_corrections", "base_revision": "031"}
+    assert revision["patch"] == {"operation": "builder_phase_ux", "base_revision": "034"}
     assert revision["after_webui"] == current
-    assert (ROOT / "ui_revisions" / "current.txt").read_text(encoding="utf-8").strip() == "032"
+    assert (ROOT / "ui_revisions" / "current.txt").read_text(encoding="utf-8").strip() == "035"
 
 
 def test_builder_static_and_dynamic_i18n_contract_is_complete() -> None:
@@ -85,7 +85,7 @@ def test_builder_static_and_dynamic_i18n_contract_is_complete() -> None:
     assert resources["builder.i18n.ru"]["locale"] == "ru"
     assert resources["builder.i18n.en"]["role"] == resources["builder.i18n.ru"]["role"] == "i18n"
     assert set(ru) == set(en)
-    assert len(ru) == 144
+    assert len(ru) >= 149
     assert referenced <= set(ru)
     assert "scenario.builder.title" in referenced
     assert ru["scenario.builder.title"] == "Builder — рабочее место разработки"
@@ -108,7 +108,6 @@ def test_builder_uses_live_skill_data_instead_of_mock_project_data() -> None:
         "builder_sdk_control_skill.list_changes",
         "builder_sdk_control_skill.list_project_file_tree",
         "builder_sdk_control_skill.list_project_objects",
-        "builder_sdk_control_skill.list_projects",
         "builder_sdk_control_skill.list_templates",
         "builder_sdk_control_skill.read_project_file",
     }
@@ -146,8 +145,71 @@ def test_file_editing_and_project_selection_use_runtime_event_values() -> None:
             "type": "callSkill",
             "target": "builder_sdk_control_skill.select_preview",
             "params": {"object_type": "$event.object_type", "object_id": "$event.object_id"},
-            "invalidates": ["builder.project.preview"],
+            "background": True,
         }
+    ]
+
+
+def test_lifecycle_project_picker_and_overview_are_phase_aware() -> None:
+    webui = _load("webui.json")
+    application = webui["ui"]["application"]
+    page = application["desktop"]["pageSchema"]
+    widgets = {item["id"]: item for item in page["widgets"]}
+
+    assert widgets["project-header"]["inputs"]["stretch"] is True
+    assert widgets["project-tree"]["inputs"]["compactIndent"] is True
+    assert widgets["project-tree"]["inputs"]["wrapTitles"] is True
+
+    view_ids = [item["id"] for item in widgets["node-views"]["inputs"]["buttons"]]
+    assert view_ids == ["overview", "prototype-chat", "automation-chat", "files", "context"]
+    assert widgets["builder-chat"]["visibleIf"] == "$state.activeView === 'prototype-chat'"
+    assert {
+        "automation-conversation-start",
+        "automation-conversation-followup",
+        "automation-conversation-state",
+    } <= set(widgets)
+    assert all(
+        widgets[widget_id]["visibleIf"] == "$state.activeView === 'automation-chat'"
+        for widget_id in (
+            "automation-conversation-start",
+            "automation-conversation-followup",
+            "automation-conversation-state",
+        )
+    )
+
+    overview_fields = [item["id"] for item in widgets["node-overview"]["inputs"]["fields"]]
+    assert overview_fields == ["project_type", "description", "title"]
+    overview_index = [item["id"] for item in page["widgets"]].index("node-overview")
+    assert [item["id"] for item in page["widgets"]][overview_index : overview_index + 5] == [
+        "node-overview",
+        "overview-lifecycle-node",
+        "overview-project-state",
+        "overview-archive",
+        "overview-restore",
+    ]
+    details = widgets["overview-lifecycle-node"]
+    assert details["inputs"]["selectedStateKey"] == "selectedNodeId"
+    assert [item["key"] for item in details["inputs"]["fields"]] == [
+        "version",
+        "updated_at",
+        "source_prototype_version",
+    ]
+
+    restore = next(action for action in widgets["overview-restore"]["actions"] if action["type"] == "callSkill")
+    assert restore["target"] == "builder_sdk_control_skill.archive_project"
+    assert restore["params"]["archived"] is False
+
+    picker_schema = application["modals"]["project-picker"]["schema"]
+    picker_widgets = {item["id"]: item for item in picker_schema["widgets"]}
+    picker = picker_widgets["project-picker-list"]
+    assert picker_schema["interaction"]["initialFocus"] == "widget:project-picker-list"
+    assert picker_schema["initialState"]["projectPickerArchived"] is False
+    assert "project-picker-actions" not in picker_widgets
+    assert picker["dataSource"]["params"]["include_archived"] == "$state.projectPickerArchived"
+    assert picker["inputs"]["subtitleKey"] == "description"
+    assert picker["inputs"]["addButtonFirst"] is True
+    assert picker["inputs"]["toolbarToggles"] == [
+        {"id": "archived", "label": "Архивные", "stateKey": "projectPickerArchived"}
     ]
 
 
@@ -176,7 +238,6 @@ def test_prompt_ide_capability_surface_is_not_lost() -> None:
 
     # Prompt IDE git-log presentation is replaced by the auditable Builder Change timeline.
     assert {
-        "builder_sdk_control_skill.list_projects",
         "builder_sdk_control_skill.list_project_objects",
         "builder_sdk_control_skill.list_project_file_tree",
         "builder_sdk_control_skill.read_project_file",

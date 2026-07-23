@@ -142,5 +142,10 @@
   "builder.lifecycle.status.not_started": "не начата",
   "builder.lifecycle.stage.prototype": "Прототип",
   "builder.lifecycle.stage.automation": "Автоматизация",
-  "builder.lifecycle.stage.publication": "Публикация"
+  "builder.lifecycle.stage.publication": "Публикация",
+  "builder.text.prototype.conversation": "Разговор — Prototype",
+  "builder.text.automation.conversation": "Разговор — Automation",
+  "builder.text.modified": "Изменено",
+  "builder.text.source.prototype.version": "Версия исходного Prototype",
+  "builder.text.selected.lifecycle.item": "Выбранный элемент Lifecycle"
 }
