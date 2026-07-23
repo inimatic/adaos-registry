@@ -43,10 +43,10 @@ def test_scenario_and_standalone_webui_are_identical() -> None:
     assert scenario["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]["functional"] is True
 
 
-def test_revision_035_preserves_the_approved_029_structure() -> None:
+def test_revision_036_preserves_the_approved_029_structure() -> None:
     prototype = _load("ui_revisions/029.json")["after_webui"]
     current = _load("webui.json")
-    revision = _load("ui_revisions/035.json")
+    revision = _load("ui_revisions/036.json")
     prototype_page = prototype["ui"]["application"]["desktop"]["pageSchema"]
     current_page = current["ui"]["application"]["desktop"]["pageSchema"]
     prototype_widgets = {item["id"]: item for item in prototype_page["widgets"]}
@@ -59,9 +59,9 @@ def test_revision_035_preserves_the_approved_029_structure() -> None:
         assert current_widgets[widget_id]["type"] == prototype_widget["type"]
         assert current_widgets[widget_id]["area"] == prototype_widget["area"]
     assert set(prototype["ui"]["application"]["modals"]) <= set(current["ui"]["application"]["modals"])
-    assert revision["patch"] == {"operation": "builder_phase_ux", "base_revision": "034"}
+    assert revision["patch"] == {"operation": "bind_project_archive_state", "base_revision": "035"}
     assert revision["after_webui"] == current
-    assert (ROOT / "ui_revisions" / "current.txt").read_text(encoding="utf-8").strip() == "035"
+    assert (ROOT / "ui_revisions" / "current.txt").read_text(encoding="utf-8").strip() == "036"
 
 
 def test_builder_static_and_dynamic_i18n_contract_is_complete() -> None:
@@ -198,6 +198,13 @@ def test_lifecycle_project_picker_and_overview_are_phase_aware() -> None:
     restore = next(action for action in widgets["overview-restore"]["actions"] if action["type"] == "callSkill")
     assert restore["target"] == "builder_sdk_control_skill.archive_project"
     assert restore["params"]["archived"] is False
+    assert widgets["overview-restore"]["visibleIf"].endswith("$state.projectArchived === true")
+    assert widgets["overview-archive"]["visibleIf"].endswith("$state.projectArchived !== true")
+    assert widgets["overview-project-state"]["inputs"]["stateBindings"] == {
+        "projectArchived": "archived"
+    }
+    restore_state = next(action for action in widgets["overview-restore"]["actions"] if action["type"] == "updateState")
+    assert restore_state["params"] == {"projectArchived": False}
 
     picker_schema = application["modals"]["project-picker"]["schema"]
     picker_widgets = {item["id"]: item for item in picker_schema["widgets"]}

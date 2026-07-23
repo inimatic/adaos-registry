@@ -1,6 +1,6 @@
 {
   "id": "builder",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "name": "builder",
   "title": "Builder — рабочее место разработки",
   "description": "Functional SDK-backed Builder workbench for DEV project development, automation, and publication.",
@@ -80,7 +80,8 @@
             "builderConversationId": "conv.skill.builder_skill.default",
             "builderTopicId": "prompt-project:scenario:builder",
             "builderThreadId": "prompt-project:scenario:builder",
-            "projectPickerArchived": false
+            "projectPickerArchived": false,
+            "projectArchived": false
           },
           "layout": {
             "type": "split",
@@ -708,7 +709,10 @@
                       "key": "builder.text.dev.workspace"
                     }
                   }
-                ]
+                ],
+                "stateBindings": {
+                  "projectArchived": "archived"
+                }
               },
               "title_i18n": {
                 "key": "builder.text.version.and.environment"
@@ -719,7 +723,7 @@
               "id": "overview-archive",
               "type": "ui.actions",
               "title": "Архивирование",
-              "visibleIf": "$state.activeView === 'overview' && $state.project.archived !== true",
+              "visibleIf": "$state.activeView === 'overview' && $state.projectArchived !== true",
               "inputs": {
                 "buttons": [
                   {
@@ -736,7 +740,7 @@
               },
               "actions": [
                 {
-                  "enabledIf": "$state.project.archived !== true",
+                  "enabledIf": "$state.projectArchived !== true",
                   "on": "click:archive",
                   "type": "openModal",
                   "params": {
@@ -753,7 +757,7 @@
               "id": "overview-restore",
               "type": "ui.actions",
               "title": "Восстановление",
-              "visibleIf": "$state.activeView === 'overview' && $state.project.archived === true",
+              "visibleIf": "$state.activeView === 'overview' && $state.projectArchived === true",
               "inputs": {
                 "buttons": [
                   {
@@ -787,7 +791,7 @@
                   "on": "click:restore",
                   "type": "updateState",
                   "params": {
-                    "project.archived": false
+                    "projectArchived": false
                   }
                 }
               ],
@@ -1424,9 +1428,9 @@
           "meta": {
             "builder": {
               "scenario_id": "builder",
-              "ui_revision": "035",
+              "ui_revision": "036",
               "prototype_base_revision": "029",
-              "previous_revision": "034",
+              "previous_revision": "035",
               "functional": true
             }
           },
@@ -1538,7 +1542,7 @@
                     "on": "click:confirm",
                     "type": "updateState",
                     "params": {
-                      "project.archived": true
+                      "projectArchived": true
                     }
                   },
                   {
@@ -1887,12 +1891,12 @@
                       "selectedObjectKind": "$event.object_type",
                       "selectedObjectId": "$event.object_id",
                       "selectedFilePath": null,
-                      "project.archived": "$event.archived",
                       "project.title": "$event.title",
                       "project.description": "$event.description",
                       "project.type": "$event.object_type",
                       "builderTopicId": "prompt-project:$event.object_type:$event.object_id",
-                      "builderThreadId": "prompt-project:$event.object_type:$event.object_id"
+                      "builderThreadId": "prompt-project:$event.object_type:$event.object_id",
+                      "projectArchived": "$event.archived"
                     }
                   },
                   {
@@ -2848,5 +2852,5 @@
     "en",
     "ru"
   ],
-  "updated_at": "2026-07-23T10:02:50+00:00"
+  "updated_at": "2026-07-23T10:10:45+00:00"
 }
