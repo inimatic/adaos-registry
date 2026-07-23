@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-23T09:59:27+00:00",
+  "updated_at": "2026-07-23T10:02:50+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -793,8 +793,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.13",
-      "updated_at": "2026-07-23T09:59:27+00:00",
+      "version": "0.2.14",
+      "updated_at": "2026-07-23T10:02:50+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
