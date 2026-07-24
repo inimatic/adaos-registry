@@ -609,8 +609,8 @@
       "kind": "skill",
       "id": "release_validation_skill",
       "name": "release_validation_skill",
-      "version": "0.1.3",
-      "updated_at": "2026-07-24T07:00:00+00:00",
+      "version": "0.1.5",
+      "updated_at": "2026-07-24T09:15:00+00:00",
       "path": "skills/release_validation_skill",
       "manifest": "skills/release_validation_skill/skill.yaml",
       "source": {
@@ -643,8 +643,8 @@
       "kind": "skill",
       "id": "root_mgmnt",
       "name": "root_mgmnt",
-      "version": "0.4.1",
-      "updated_at": "2026-05-17T09:21:21+00:00",
+      "version": "0.5.1",
+      "updated_at": "2026-07-24T09:15:00+00:00",
       "path": "skills/root_mgmnt",
       "manifest": "skills/root_mgmnt/skill.yaml",
       "source": {
@@ -659,7 +659,19 @@
       "description": "Private root operator skill for LLM policy, fleet activity, and subnet lifecycle hygiene.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 18
+      "activation": {
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "release_validation_ops"
+          ],
+          "client_presence": true,
+          "webspace_scope": "active"
+        },
+        "startup_allowed": true,
+        "background_refresh": false
+      },
+      "tools_count": 20
     },
     {
       "kind": "skill",
@@ -1004,8 +1016,8 @@
       "kind": "scenario",
       "id": "release_validation_ops",
       "name": "release_validation_ops",
-      "version": "0.1.2",
-      "updated_at": "2026-07-24T07:00:00+00:00",
+      "version": "0.1.5",
+      "updated_at": "2026-07-24T09:15:00+00:00",
       "path": "scenarios/release_validation_ops",
       "manifest": "scenarios/release_validation_ops/scenario.yaml",
       "source": {
