@@ -675,7 +675,7 @@
               "area": "center",
               "id": "publication-workspace-actions",
               "type": "ui.actions",
-              "title": "Forge и публикация",
+              "title": "Версионирование и публикация",
               "inputs": {
                 "variant": "toolbar",
                 "buttons": [
@@ -685,14 +685,6 @@
                     "icon": "git-commit-outline",
                     "label_i18n": {
                       "key": "builder.text.checkpoint"
-                    }
-                  },
-                  {
-                    "id": "update",
-                    "label": "Обновить",
-                    "icon": "sync-outline",
-                    "label_i18n": {
-                      "key": "builder.text.update"
                     }
                   },
                   {
@@ -733,20 +725,6 @@
                   },
                   "invalidates": [
                     "builder.project.publication",
-                    "builder.project.lifecycle"
-                  ]
-                },
-                {
-                  "on": "click:update",
-                  "type": "callSkill",
-                  "target": "builder_sdk_control_skill.update_project",
-                  "params": {
-                    "object_type": "$state.selectedProjectKind",
-                    "object_id": "$state.selectedProjectId"
-                  },
-                  "invalidates": [
-                    "builder.project.publication",
-                    "builder.project.metadata",
                     "builder.project.lifecycle"
                   ]
                 },
@@ -1728,9 +1706,9 @@
           "meta": {
             "builder": {
               "scenario_id": "builder",
-              "ui_revision": "039",
+              "ui_revision": "040",
               "prototype_base_revision": "029",
-              "previous_revision": "038",
+              "previous_revision": "039",
               "functional": true,
               "workflow_contract": "adaos.builder.workflow.v1"
             }
@@ -2783,7 +2761,7 @@
                 "area": "main",
                 "id": "publication-actions",
                 "type": "ui.actions",
-                "title": "Forge и публикация",
+                "title": "Версионирование и публикация",
                 "inputs": {
                   "variant": "toolbar",
                   "buttons": [
@@ -2793,14 +2771,6 @@
                       "icon": "git-commit-outline",
                       "label_i18n": {
                         "key": "builder.text.checkpoint"
-                      }
-                    },
-                    {
-                      "id": "update",
-                      "label": "Обновить",
-                      "icon": "sync-outline",
-                      "label_i18n": {
-                        "key": "builder.text.update"
                       }
                     },
                     {
@@ -2841,20 +2811,6 @@
                     },
                     "invalidates": [
                       "builder.project.publication",
-                      "builder.project.lifecycle"
-                    ]
-                  },
-                  {
-                    "on": "click:update",
-                    "type": "callSkill",
-                    "target": "builder_sdk_control_skill.update_project",
-                    "params": {
-                      "object_type": "$state.selectedProjectKind",
-                      "object_id": "$state.selectedProjectId"
-                    },
-                    "invalidates": [
-                      "builder.project.publication",
-                      "builder.project.metadata",
                       "builder.project.lifecycle"
                     ]
                   },
@@ -3153,15 +3109,17 @@
         }
       }
     },
-    "version": "039",
+    "version": "040",
     "user_summary": {
       "assumptions": [
-        "Lifecycle selection is navigation only; it never changes the editable process or Preview target."
+        "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
+        "Central-draft synchronization is intentionally unavailable until divergence signaling is implemented."
       ],
       "expected_behavior": [
         "Exactly one of Prototype or Automation is WORKING; the other is FROZEN.",
         "Publication is an immutable PUBLISHED snapshot and never the mutable process.",
-        "Show in Preview explicitly chooses a supported Lifecycle snapshot."
+        "Show in Preview explicitly chooses a supported Lifecycle snapshot.",
+        "Publication exposes checkpoint, release validation, publish, and delete; it never overwrites DEV from Root."
       ],
       "preview": [
         "Preview headings use proto:, active:, or public: prefixes."

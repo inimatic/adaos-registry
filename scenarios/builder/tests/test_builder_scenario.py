@@ -43,10 +43,10 @@ def test_scenario_and_standalone_webui_are_identical() -> None:
     assert scenario["ui"]["application"]["desktop"]["pageSchema"]["meta"]["builder"]["functional"] is True
 
 
-def test_revision_036_preserves_the_approved_029_structure() -> None:
+def test_current_revision_preserves_the_approved_029_structure() -> None:
     prototype = _load("ui_revisions/029.json")["after_webui"]
     current = _load("webui.json")
-    revision = _load("ui_revisions/036.json")
+    revision = _load("ui_revisions/040.json")
     prototype_page = prototype["ui"]["application"]["desktop"]["pageSchema"]
     current_page = current["ui"]["application"]["desktop"]["pageSchema"]
     prototype_widgets = {item["id"]: item for item in prototype_page["widgets"]}
@@ -59,9 +59,14 @@ def test_revision_036_preserves_the_approved_029_structure() -> None:
         assert current_widgets[widget_id]["type"] == prototype_widget["type"]
         assert current_widgets[widget_id]["area"] == prototype_widget["area"]
     assert set(prototype["ui"]["application"]["modals"]) <= set(current["ui"]["application"]["modals"])
-    assert revision["patch"] == {"operation": "bind_project_archive_state", "base_revision": "035"}
+    assert revision["patch"] == {
+        "id": "builder-remove-update-040",
+        "target": "ui",
+        "operation": "remove_central_draft_update",
+        "status": "applied",
+    }
     assert revision["after_webui"] == current
-    assert (ROOT / "ui_revisions" / "current.txt").read_text(encoding="utf-8").strip() == "036"
+    assert (ROOT / "ui_revisions" / "current.txt").read_text(encoding="utf-8").strip() == "040"
 
 
 def test_builder_static_and_dynamic_i18n_contract_is_complete() -> None:
@@ -139,15 +144,15 @@ def test_file_editing_and_project_selection_use_runtime_event_values() -> None:
     assert save["params"]["text"] == "$event.content"
 
     project_calls = [action for action in nodes["project-picker-list"]["actions"] if action["type"] == "callSkill"]
-    assert project_calls == [
-        {
-            "on": "select",
-            "type": "callSkill",
-            "target": "builder_sdk_control_skill.select_preview",
-            "params": {"object_type": "$event.object_type", "object_id": "$event.object_id"},
-            "background": True,
-        }
-    ]
+    assert len(project_calls) == 1
+    project_call = project_calls[0]
+    assert project_call["on"] == "select"
+    assert project_call["target"] == "builder_sdk_control_skill.select_preview"
+    assert project_call["params"] == {
+        "object_type": "$event.object_type",
+        "object_id": "$event.object_id",
+    }
+    assert project_call["background"] is True
 
 
 def test_lifecycle_project_picker_and_overview_are_phase_aware() -> None:
@@ -161,20 +166,31 @@ def test_lifecycle_project_picker_and_overview_are_phase_aware() -> None:
     assert widgets["project-tree"]["inputs"]["wrapTitles"] is True
 
     view_ids = [item["id"] for item in widgets["node-views"]["inputs"]["buttons"]]
-    assert view_ids == ["overview", "prototype-chat", "automation-chat", "files", "context"]
-    assert widgets["builder-chat"]["visibleIf"] == "$state.activeView === 'prototype-chat'"
+    assert view_ids == ["overview", "conversation", "files", "context"]
+    conversation = widgets["node-views"]["inputs"]["buttons"][1]
+    assert conversation["label"] == "$state.lifecycleConversationLabel"
+    assert widgets["builder-chat"]["visibleIf"] == (
+        "$state.activeView === 'conversation' && "
+        "$state.selectedLifecycleStage === 'prototype' && "
+        "$state.workflowActivePhase === 'prototype'"
+    )
     assert {
         "automation-conversation-start",
         "automation-conversation-followup",
         "automation-conversation-state",
     } <= set(widgets)
-    assert all(
-        widgets[widget_id]["visibleIf"] == "$state.activeView === 'automation-chat'"
-        for widget_id in (
-            "automation-conversation-start",
-            "automation-conversation-followup",
-            "automation-conversation-state",
-        )
+    assert widgets["automation-conversation-start"]["visibleIf"] == (
+        "$state.activeView === 'conversation' && "
+        "$state.selectedLifecycleStage === 'automation' && "
+        "$state.workflowActivePhase === 'prototype'"
+    )
+    assert widgets["automation-conversation-followup"]["visibleIf"] == (
+        "$state.activeView === 'conversation' && "
+        "$state.selectedLifecycleStage === 'automation' && "
+        "$state.workflowActivePhase === 'automation'"
+    )
+    assert widgets["automation-conversation-state"]["visibleIf"] == (
+        "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'automation'"
     )
 
     overview_fields = [item["id"] for item in widgets["node-overview"]["inputs"]["fields"]]
@@ -200,9 +216,7 @@ def test_lifecycle_project_picker_and_overview_are_phase_aware() -> None:
     assert restore["params"]["archived"] is False
     assert widgets["overview-restore"]["visibleIf"].endswith("$state.projectArchived === true")
     assert widgets["overview-archive"]["visibleIf"].endswith("$state.projectArchived !== true")
-    assert widgets["overview-project-state"]["inputs"]["stateBindings"] == {
-        "projectArchived": "archived"
-    }
+    assert widgets["overview-project-state"]["inputs"]["stateBindings"]["projectArchived"] == "archived"
     restore_state = next(action for action in widgets["overview-restore"]["actions"] if action["type"] == "updateState")
     assert restore_state["params"] == {"projectArchived": False}
 
@@ -231,7 +245,7 @@ def test_automation_and_publication_are_end_to_end_wired() -> None:
     assert by_target["builder_sdk_control_skill.submit_automation"][0]["params"]["text"] == "$event.values.text"
     publish_calls = by_target["builder_sdk_control_skill.publish_project"]
     assert {action["params"]["dry_run"] for action in publish_calls} == {True, False}
-    assert len(by_target["builder_sdk_control_skill.push_project"]) == 2
+    assert len(by_target["builder_sdk_control_skill.push_project"]) == 3
 
 
 def test_prompt_ide_capability_surface_is_not_lost() -> None:
@@ -262,15 +276,15 @@ def test_prompt_ide_capability_surface_is_not_lost() -> None:
         "builder_sdk_control_skill.select_preview",
         "builder_sdk_control_skill.set_llm_profile",
         "builder_sdk_control_skill.update_project_metadata",
-        "builder_sdk_control_skill.set_workflow_state",
+        "builder_sdk_control_skill.transition_workflow",
         "builder_sdk_control_skill.archive_project",
-        "builder_sdk_control_skill.update_project",
         "builder_sdk_control_skill.push_project",
         "builder_sdk_control_skill.publish_project",
         "builder_sdk_control_skill.delete_project",
         "builder_sdk_control_skill.start_automation",
         "builder_sdk_control_skill.submit_automation",
     } <= targets
+    assert "builder_sdk_control_skill.update_project" not in targets
 
 
 def test_builder_chat_remains_bound_to_builder_agent() -> None:

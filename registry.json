@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updated_at": "2026-07-23T15:05:15+00:00",
+  "updated_at": "2026-07-24T08:41:02+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -666,7 +666,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-07-23T14:34:03+00:00",
+      "updated_at": "2026-07-24T07:37:59+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
@@ -849,8 +849,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.18",
-      "updated_at": "2026-07-23T14:30:16+00:00",
+      "version": "0.2.19",
+      "updated_at": "2026-07-24T08:41:02+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {

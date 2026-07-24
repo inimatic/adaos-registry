@@ -4,7 +4,7 @@ type: desktop
 title: Builder — рабочее место разработки
 description: Functional SDK-backed Builder workbench for DEV project development,
   automation, and publication.
-version: 0.2.18
+version: 0.2.19
 title_i18n:
   fallback: Builder
   key: scenario.builder.title
@@ -17,4 +17,4 @@ runtime:
   skills:
     required:
     - builder_sdk_control_skill
-updated_at: '2026-07-23T14:30:16+00:00'
+updated_at: '2026-07-24T08:41:02+00:00'

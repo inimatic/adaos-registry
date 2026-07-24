@@ -1,6 +1,6 @@
 {
     "id": "builder",
-    "version": "0.2.12",
+    "version": "0.2.14",
     "name": "builder",
     "title": "Builder — рабочее место разработки",
     "description": "Functional SDK-backed Builder workbench for DEV project development, automation, and publication.",
@@ -83,7 +83,15 @@
                         "projectPickerArchived": false,
                         "projectArchived": false,
                         "selectedLifecycleStage": "prototype",
-                        "lifecycleConversationLabel": "Prototype conversation"
+                        "lifecycleConversationLabel": "Prototype conversation",
+                        "workflowActivePhase": "prototype",
+                        "workflowWorkingLabel": "WORKING: Prototype",
+                        "previewViewingLabel": "Preview: not selected",
+                        "previewViewingReadOnly": false,
+                        "canEditPrototype": true,
+                        "canEditAutomation": false,
+                        "canReturnToPrototype": false,
+                        "canPublish": false
                     },
                     "layout": {
                         "type": "split",
@@ -116,6 +124,16 @@
                                     {
                                         "id": "project-label",
                                         "label": "$state.selectedProjectTitle"
+                                    },
+                                    {
+                                        "id": "workflow-label",
+                                        "label": "$state.workflowWorkingLabel",
+                                        "icon": "git-branch-outline"
+                                    },
+                                    {
+                                        "id": "preview-label",
+                                        "label": "$state.previewViewingLabel",
+                                        "icon": "eye-outline"
                                     }
                                 ],
                                 "size": "medium",
@@ -124,6 +142,51 @@
                             },
                             "title_i18n": {
                                 "key": "builder.text.project"
+                            }
+                        },
+                        {
+                            "area": "center",
+                            "id": "workflow-status",
+                            "type": "item.details",
+                            "title": "Workflow and Preview",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "builder_sdk_control_skill.get_project",
+                                "params": {
+                                    "object_type": "$state.selectedProjectKind",
+                                    "object_id": "$state.selectedProjectId"
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "builder.project.metadata",
+                                    "builder.project.lifecycle",
+                                    "builder.project.preview",
+                                    "builder.project.automation",
+                                    "builder.project.publication"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "key": "working_label",
+                                        "label": "Editable process"
+                                    },
+                                    {
+                                        "key": "viewing_label",
+                                        "label": "Preview"
+                                    }
+                                ],
+                                "stateBindings": {
+                                    "workflowActivePhase": "workflow_active_phase",
+                                    "workflowWorkingLabel": "working_label",
+                                    "previewViewingLabel": "viewing_label",
+                                    "previewViewingReadOnly": "viewing_read_only",
+                                    "canEditPrototype": "can_edit_prototype",
+                                    "canEditAutomation": "can_edit_automation",
+                                    "canReturnToPrototype": "can_return_to_prototype",
+                                    "canPublish": "can_publish"
+                                }
                             }
                         },
                         {
@@ -296,7 +359,7 @@
                             "id": "builder-chat",
                             "type": "ui.chat",
                             "title": "Разговор — Prototype",
-                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'prototype'",
+                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'prototype' && $state.workflowActivePhase === 'prototype'",
                             "dataSource": {
                                 "kind": "stream",
                                 "receiver": "voice_chat.messages",
@@ -344,9 +407,27 @@
                         },
                         {
                             "area": "center",
+                            "id": "prototype-frozen-notice",
+                            "type": "ui.actions",
+                            "title": "Prototype is frozen",
+                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'prototype' && $state.workflowActivePhase !== 'prototype'",
+                            "inputs": {
+                                "variant": "stack",
+                                "buttons": [
+                                    {
+                                        "id": "prototype-frozen",
+                                        "label": "Automation is the current editable process. This Prototype snapshot is read-only.",
+                                        "icon": "lock-closed-outline",
+                                        "disabled": true
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "area": "center",
                             "id": "automation-conversation-start",
                             "type": "ui.form",
-                            "title": "Запуск автономной разработки",
+                            "title": "Hand off the selected Prototype to Automation",
                             "inputs": {
                                 "submitLabel": "Запустить",
                                 "fields": [
@@ -384,7 +465,7 @@
                             "title_i18n": {
                                 "key": "builder.text.start.autonomous.development"
                             },
-                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'automation'"
+                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'automation' && $state.workflowActivePhase === 'prototype'"
                         },
                         {
                             "area": "center",
@@ -427,7 +508,39 @@
                             "title_i18n": {
                                 "key": "builder.text.clarification.or.retry.after.an.error"
                             },
-                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'automation'"
+                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'automation' && $state.workflowActivePhase === 'automation'"
+                        },
+                        {
+                            "area": "center",
+                            "id": "automation-return-to-prototype",
+                            "type": "ui.actions",
+                            "title": "Return the Automation result to Prototype",
+                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'automation' && $state.canReturnToPrototype === true",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "buttons": [
+                                    {
+                                        "id": "return-to-prototype",
+                                        "label": "Derive safe Prototype",
+                                        "icon": "return-down-back-outline"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:return-to-prototype",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.return_to_prototype",
+                                    "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId"
+                                    },
+                                    "invalidates": [
+                                        "builder.project.automation",
+                                        "builder.project.lifecycle"
+                                    ]
+                                }
+                            ]
                         },
                         {
                             "area": "right",
@@ -600,7 +713,7 @@
                             "area": "center",
                             "id": "publication-workspace-actions",
                             "type": "ui.actions",
-                            "title": "Forge и публикация",
+                            "title": "Версионирование и публикация",
                             "inputs": {
                                 "variant": "toolbar",
                                 "buttons": [
@@ -610,14 +723,6 @@
                                         "icon": "git-commit-outline",
                                         "label_i18n": {
                                             "key": "builder.text.checkpoint"
-                                        }
-                                    },
-                                    {
-                                        "id": "update",
-                                        "label": "Обновить",
-                                        "icon": "sync-outline",
-                                        "label_i18n": {
-                                            "key": "builder.text.update"
                                         }
                                     },
                                     {
@@ -662,20 +767,6 @@
                                     ]
                                 },
                                 {
-                                    "on": "click:update",
-                                    "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.update_project",
-                                    "params": {
-                                        "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
-                                    },
-                                    "invalidates": [
-                                        "builder.project.publication",
-                                        "builder.project.metadata",
-                                        "builder.project.lifecycle"
-                                    ]
-                                },
-                                {
                                     "on": "click:dry-run",
                                     "type": "callSkill",
                                     "target": "builder_sdk_control_skill.publish_project",
@@ -689,14 +780,16 @@
                                         "builder.project.publication",
                                         "builder.project.metadata",
                                         "builder.project.lifecycle"
-                                    ]
+                                    ],
+                                    "enabledIf": "$state.canPublish === true"
                                 },
                                 {
                                     "on": "click:publish",
                                     "type": "openModal",
                                     "params": {
                                         "modalId": "confirm-publish"
-                                    }
+                                    },
+                                    "enabledIf": "$state.canPublish === true"
                                 },
                                 {
                                     "on": "click:delete",
@@ -911,7 +1004,15 @@
                                     }
                                 ],
                                 "stateBindings": {
-                                    "projectArchived": "archived"
+                                    "projectArchived": "archived",
+                                    "workflowActivePhase": "workflow_active_phase",
+                                    "workflowWorkingLabel": "working_label",
+                                    "previewViewingLabel": "viewing_label",
+                                    "previewViewingReadOnly": "viewing_read_only",
+                                    "canEditPrototype": "can_edit_prototype",
+                                    "canEditAutomation": "can_edit_automation",
+                                    "canReturnToPrototype": "can_return_to_prototype",
+                                    "canPublish": "can_publish"
                                 }
                             },
                             "title_i18n": {
@@ -1061,6 +1162,12 @@
                                 "selectedStateKey": "selectedNodeId",
                                 "buttons": [
                                     {
+                                        "id": "show-preview",
+                                        "label": "Show in Preview",
+                                        "icon": "eye-outline",
+                                        "whenKey": "canPreview"
+                                    },
+                                    {
                                         "id": "make-current",
                                         "label": "Сделать текущей",
                                         "icon": "flash-outline",
@@ -1135,9 +1242,9 @@
                                 {
                                     "on": "click:stabilize",
                                     "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.set_workflow_state",
+                                    "target": "builder_sdk_control_skill.transition_workflow",
                                     "params": {
-                                        "state": "prototype_stable",
+                                        "action": "stabilize_prototype",
                                         "object_type": "$state.selectedProjectKind",
                                         "object_id": "$state.selectedProjectId"
                                     },
@@ -1154,20 +1261,6 @@
                                     }
                                 },
                                 {
-                                    "on": "click:go-automation",
-                                    "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.set_workflow_state",
-                                    "params": {
-                                        "state": "automation",
-                                        "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
-                                    },
-                                    "invalidates": [
-                                        "builder.project.metadata",
-                                        "builder.project.lifecycle"
-                                    ]
-                                },
-                                {
                                     "on": "click:go-publication",
                                     "type": "openModal",
                                     "params": {
@@ -1175,17 +1268,19 @@
                                     }
                                 },
                                 {
-                                    "on": "click:go-publication",
+                                    "on": "click:show-preview",
                                     "type": "callSkill",
-                                    "target": "builder_sdk_control_skill.set_workflow_state",
+                                    "target": "builder_sdk_control_skill.select_preview_target",
                                     "params": {
-                                        "state": "publication",
+                                        "stage": "$event.item.lifecycleStage",
+                                        "revision": "$event.item.revision",
                                         "object_type": "$state.selectedProjectKind",
                                         "object_id": "$state.selectedProjectId"
                                     },
                                     "invalidates": [
-                                        "builder.project.metadata",
-                                        "builder.project.lifecycle"
+                                        "builder.project.preview",
+                                        "builder.project.lifecycle",
+                                        "builder.project.metadata"
                                     ]
                                 }
                             ],
@@ -1211,6 +1306,14 @@
                             },
                             "inputs": {
                                 "fields": [
+                                    {
+                                        "key": "viewing",
+                                        "label": "VIEWING"
+                                    },
+                                    {
+                                        "key": "preview_follows_active",
+                                        "label": "Follows active process"
+                                    },
                                     {
                                         "key": "source_webspace_id",
                                         "label": "Исходное пространство",
@@ -1257,7 +1360,7 @@
                             "id": "chat-side-settings",
                             "type": "ui.form",
                             "title": "Настройки разработки",
-                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'prototype'",
+                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'prototype' && $state.workflowActivePhase === 'prototype'",
                             "inputs": {
                                 "layout": "responsiveGrid",
                                 "minFieldWidth": 220,
@@ -1641,10 +1744,11 @@
                     "meta": {
                         "builder": {
                             "scenario_id": "builder",
-                            "ui_revision": "038",
+                            "ui_revision": "040",
                             "prototype_base_revision": "029",
-                            "previous_revision": "037",
-                            "functional": true
+                            "previous_revision": "039",
+                            "functional": true,
+                            "workflow_contract": "adaos.builder.workflow.v1"
                         }
                     },
                     "title_i18n": {
@@ -1664,7 +1768,10 @@
                             "project.description": "description",
                             "project.type": "object_type",
                             "builderTopicId": "topic_id",
-                            "builderThreadId": "thread_id"
+                            "builderThreadId": "thread_id",
+                            "workflowActivePhase": "workflow_active_phase",
+                            "workflowWorkingLabel": "working_label",
+                            "previewViewingLabel": "viewing_label"
                         }
                     }
                 }
@@ -2692,7 +2799,7 @@
                                 "area": "main",
                                 "id": "publication-actions",
                                 "type": "ui.actions",
-                                "title": "Forge и публикация",
+                                "title": "Версионирование и публикация",
                                 "inputs": {
                                     "variant": "toolbar",
                                     "buttons": [
@@ -2702,14 +2809,6 @@
                                             "icon": "git-commit-outline",
                                             "label_i18n": {
                                                 "key": "builder.text.checkpoint"
-                                            }
-                                        },
-                                        {
-                                            "id": "update",
-                                            "label": "Обновить",
-                                            "icon": "sync-outline",
-                                            "label_i18n": {
-                                                "key": "builder.text.update"
                                             }
                                         },
                                         {
@@ -2750,20 +2849,6 @@
                                         },
                                         "invalidates": [
                                             "builder.project.publication",
-                                            "builder.project.lifecycle"
-                                        ]
-                                    },
-                                    {
-                                        "on": "click:update",
-                                        "type": "callSkill",
-                                        "target": "builder_sdk_control_skill.update_project",
-                                        "params": {
-                                            "object_type": "$state.selectedProjectKind",
-                                            "object_id": "$state.selectedProjectId"
-                                        },
-                                        "invalidates": [
-                                            "builder.project.publication",
-                                            "builder.project.metadata",
                                             "builder.project.lifecycle"
                                         ]
                                     },
@@ -3061,6 +3146,25 @@
                     "delivery": "core"
                 }
             }
+        },
+        "version": "040",
+        "user_summary": {
+            "assumptions": [
+                "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
+                "Central-draft synchronization is intentionally unavailable until divergence signaling is implemented."
+            ],
+            "expected_behavior": [
+                "Exactly one of Prototype or Automation is WORKING; the other is FROZEN.",
+                "Publication is an immutable PUBLISHED snapshot and never the mutable process.",
+                "Show in Preview explicitly chooses a supported Lifecycle snapshot.",
+                "Publication exposes checkpoint, release validation, publish, and delete; it never overwrites DEV from Root."
+            ],
+            "preview": [
+                "Preview headings use proto:, active:, or public: prefixes."
+            ],
+            "risks": [
+                "Returning to Prototype runs a guarded LLM adaptation and is asynchronous."
+            ]
         }
     },
     "type": "desktop",
@@ -3072,5 +3176,5 @@
         "en",
         "ru"
     ],
-    "updated_at": "2026-07-20T20:09:48+00:00"
+    "updated_at": "2026-07-24T07:20:00+00:00"
 }
