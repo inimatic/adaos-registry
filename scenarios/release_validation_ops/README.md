@@ -48,7 +48,7 @@ Assignment:
 
 `assigned -> running -> uploading -> passed | failed | inconclusive | timed_out`
 
-A product invariant failure or product-check timeout makes the campaign `failed`. An unavailable runner, missing key, disabled node, missing capability, SSH transport failure, or SSH-connect timeout is `inconclusive`; it does not mark the tested build defective. All assignments must avoid product failures and quorum must pass.
+A product invariant failure or product-check timeout makes the campaign `failed`. An unavailable runner, missing key, disabled node, missing capability, or exhausted SSH transport timeout is `inconclusive`; it does not mark the tested build defective. Each fixed check gets one bounded retry after a transport timeout or SSH exit `255`. All assignments must avoid product failures and quorum must pass.
 
 ## Observe-only boundary
 
