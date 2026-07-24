@@ -1,14 +1,74 @@
 name: root_mgmnt
-version: 0.4.1
+version: 0.5.0
 entry: handlers/main.py
 runtime:
   python: '3.11'
+  activation:
+    mode: lazy
+    startup_allowed: true
+    background_refresh: false
+    when:
+      scenarios_active:
+      - release_validation_ops
+      client_presence: true
+      webspace_scope: active
 description: Private root operator skill for LLM policy, fleet activity, and subnet
   lifecycle hygiene.
-dependencies: []
-events: {}
+dependencies:
+- requests>=2.31
+data_projections:
+- scope: subnet
+  slot: root_mgmnt.snapshot
+  targets:
+  - backend: yjs
+    path: data/root_mgmnt
+data_routes:
+- surface: scenario:release_validation_ops
+  route: yjs
+  projection_slot: root_mgmnt.snapshot
+  first_paint: empty fleet state from scenario defaults
+  recovery: Root snapshot is fetched during rehydrate or explicit refresh
+  update_source:
+  - Root SSE snapshot.changed
+  - material subnet member events
+  - explicit tool call
+  budget:
+    max_payload_bytes: 131072
+    max_publish_hz: 1
+lifecycle:
+  rehydrate: rehydrate
+  dispose: dispose
+events:
+  subscribe:
+  - root.mgmnt.snapshot.changed
+  - subnet.member.snapshot.changed
+  - subnet.member.status.changed
+  - subnet.member.meta.changed
+  - subnet.member.link.up
+  - subnet.member.link.down
+  - sys.ready
+  - desktop.webspace.refresh
+  - desktop.webspace.reload
 default_tool: get_snapshot
 tools:
+- name: rehydrate
+  description: Start the Root change subscription and restore the fleet projection.
+  entry: handlers.main:rehydrate
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: [string, 'null']
+  output_schema:
+    type: object
+- name: dispose
+  description: Stop the Root change subscription during skill deactivation.
+  entry: handlers.main:dispose
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
 - name: get_snapshot
   description: Fetch the latest root management snapshot from the root backend.
   entry: handlers.main:get_snapshot
@@ -21,11 +81,13 @@ tools:
     type: object
     properties: {}
 - name: refresh_snapshot
-  description: Force-refresh the cached root management snapshot.
+  description: Force-refresh the root snapshot and update its Yjs projection only when data changed.
   entry: handlers.main:refresh_snapshot
   input_schema:
     type: object
-    properties: {}
+    properties:
+      webspace_id:
+        type: [string, 'null']
   output_schema:
     type: object
     properties: {}
@@ -231,5 +293,5 @@ tools:
   output_schema:
     type: object
     properties: {}
-updated_at: '2026-05-17T09:21:21+00:00'
+updated_at: '2026-07-24T08:45:00+00:00'
 

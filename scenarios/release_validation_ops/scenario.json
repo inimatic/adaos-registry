@@ -1,6 +1,6 @@
 {
   "id": "release_validation_ops",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "name": "Release Validation Operations",
   "type": "desktop",
   "title": "Release Validation Operations",
@@ -50,12 +50,8 @@
               "area": "right",
               "title": "Root fleet",
               "dataSource": {
-                "kind": "skill",
-                "name": "root_mgmnt.get_metric_tile",
-                "params": { "metric_id": "fleet_total" },
-                "cacheTtlMs": 5000,
-                "invalidationTags": ["root.snapshot"],
-                "preserveLastValue": true
+                "kind": "y",
+                "path": "data/root_mgmnt/metrics/fleet_total"
               }
             },
             {
@@ -103,7 +99,7 @@
                   "on": "click:refresh-root",
                   "type": "callSkill",
                   "target": "root_mgmnt.refresh_snapshot",
-                  "invalidates": ["root.snapshot"]
+                  "params": { "webspace_id": "$runtime.webspace_id" }
                 }
               ]
             },
@@ -219,11 +215,8 @@
               "area": "bottom",
               "title": "Root infrastructure context",
               "dataSource": {
-                "kind": "skill",
-                "name": "root_mgmnt.get_fleet",
-                "cacheTtlMs": 5000,
-                "invalidationTags": ["root.snapshot"],
-                "preserveLastValue": true
+                "kind": "y",
+                "path": "data/root_mgmnt/fleet"
               },
               "inputs": {
                 "emptyText": "Root fleet snapshot is unavailable",

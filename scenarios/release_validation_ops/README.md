@@ -9,6 +9,8 @@ The scenario combines two skills:
 - `root_mgmnt` supplies Root fleet, policy, lifecycle, and audit context.
 - `release_validation_skill` owns the test registry view, manual campaign controls, evidence projection, and terminal notifications.
 
+Root fleet widgets consume `data/root_mgmnt` from Yjs. The private skill subscribes to the Root backend SSE change stream and material local subnet events, then replaces the projection only when its semantic digest changes. SSE keepalives and timestamp-only snapshot rebuilds therefore do not redraw the fleet. **Refresh Root context** is a recovery control, not the normal update mechanism.
+
 The AdaOS core service `adaos.services.release_validation` owns the durable schemas, state transitions, classification rules, and allowlisted SSH runner. Keeping those rules in core prevents a UI or LLM tool call from turning test observation into arbitrary remote execution.
 
 ## First topology

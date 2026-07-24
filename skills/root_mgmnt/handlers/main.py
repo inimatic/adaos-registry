@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import os
 import threading
@@ -7,7 +9,11 @@ import time
 from typing import Any, Dict, Mapping, Optional
 from urllib.parse import quote
 
-from adaos.sdk.core.decorators import tool
+import requests
+
+from adaos.domain.types import Event
+from adaos.sdk.core.decorators import subscribe, tool
+from adaos.sdk.data import ctx_subnet
 from adaos.services.agent_context import get_ctx
 from adaos.services.root.client import RootHttpClient
 
@@ -17,6 +23,12 @@ _STALE_MAX_AGE_S = float(str(os.getenv("ADAOS_ROOT_MGMNT_STALE_MAX_AGE") or "120
 _REQUEST_TIMEOUT_S = float(str(os.getenv("ADAOS_ROOT_MGMNT_TIMEOUT") or "4.5").strip() or "4.5")
 _SNAPSHOT_CACHE: dict[str, Any] = {"ts": 0.0, "value": None}
 _SNAPSHOT_FETCH_LOCK = threading.Lock()
+_PROJECTION_LOCK = threading.Lock()
+_PROJECTION_DIGESTS: dict[str, str] = {}
+_ACTIVE_WEBSPACES: set[str] = set()
+_EVENT_STREAM_STOP = threading.Event()
+_EVENT_STREAM_THREAD: threading.Thread | None = None
+_EVENT_STREAM_LOCK = threading.Lock()
 
 
 def lang_res() -> Dict[str, str]:
@@ -234,6 +246,161 @@ def _metric_value(snapshot: Mapping[str, Any], metric_id: str) -> dict[str, Any]
     }
 
 
+def _webspace_id(value: str | None) -> str:
+    token = str(value or "").strip()
+    return token if token and not token.startswith("$") else "desktop"
+
+
+def _sorted_fleet(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
+    return sorted(
+        _fleet(snapshot),
+        key=lambda item: (
+            0 if str(item.get("live_now") or "") == "yes" else 1,
+            -(int(item.get("activity_score") or 0)),
+            str(item.get("subnet_id") or ""),
+        ),
+    )
+
+
+def _projection_payload(snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    meta = _snapshot_meta(snapshot)
+    return {
+        "metrics": {
+            metric_id: {**_metric_value(snapshot, metric_id), **meta}
+            for metric_id in ("fleet_total", "retire_candidates", "llm_requests_24h", "llm_policy")
+        },
+        "fleet": {"items": _sorted_fleet(snapshot), **meta},
+        "policy": {**_policy_summary(snapshot), **meta},
+        "lifecycle_candidates": {"items": _lifecycle_candidates(snapshot), **meta},
+        "audit": {"items": _audit(snapshot), **meta},
+    }
+
+
+def _semantic_projection_digest(payload: Mapping[str, Any]) -> str:
+    def stable(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {
+                str(key): stable(item)
+                for key, item in value.items()
+                if str(key) not in {"generated_at", "stale_age_s"}
+            }
+        if isinstance(value, list):
+            return [stable(item) for item in value]
+        return value
+
+    encoded = json.dumps(stable(payload), ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
+
+def _project_snapshot(snapshot: Mapping[str, Any], *, webspace_id: str, force_emit: bool = False) -> bool:
+    target = _webspace_id(webspace_id)
+    payload = _projection_payload(snapshot)
+    digest = _semantic_projection_digest(payload)
+    with _PROJECTION_LOCK:
+        if not force_emit and _PROJECTION_DIGESTS.get(target) == digest:
+            return False
+        ctx_subnet.set("root_mgmnt.snapshot", payload, webspace_id=target)
+        _PROJECTION_DIGESTS[target] = digest
+        _ACTIVE_WEBSPACES.add(target)
+    return True
+
+
+def _refresh_projection(*, webspace_id: str = "desktop", force: bool = False, force_emit: bool = False) -> dict[str, Any]:
+    target = _webspace_id(webspace_id)
+    with _PROJECTION_LOCK:
+        _ACTIVE_WEBSPACES.add(target)
+    snapshot = _snapshot_or_fallback(force=force)
+    changed = _project_snapshot(snapshot, webspace_id=target, force_emit=force_emit)
+    return {"snapshot": snapshot, "projection_changed": changed, "webspace_id": target}
+
+
+def _refresh_active_projections(*, force: bool = True) -> None:
+    with _PROJECTION_LOCK:
+        webspaces = tuple(_ACTIVE_WEBSPACES) or ("desktop",)
+    for webspace_id in webspaces:
+        try:
+            _refresh_projection(webspace_id=webspace_id, force=force)
+        except Exception:
+            _log.warning("root_mgmnt event projection failed webspace_id=%s", webspace_id, exc_info=True)
+
+
+def _publish_snapshot_changed(payload: Mapping[str, Any]) -> None:
+    try:
+        get_ctx().bus.publish(
+            Event(
+                type="root.mgmnt.snapshot.changed",
+                payload=dict(payload),
+                source="root_mgmnt.sse",
+                ts=time.time(),
+            )
+        )
+    except Exception:
+        _log.warning("root_mgmnt could not publish snapshot change event", exc_info=True)
+
+
+def _event_stream_loop() -> None:
+    backoff_s = 1.0
+    while not _EVENT_STREAM_STOP.is_set():
+        try:
+            base_url = _root_base_url()
+            response = requests.get(
+                f"{base_url}/v1/root_mgmnt/events",
+                headers={
+                    "X-Root-Mgmnt-Token": _root_token(),
+                    "X-Root-Mgmnt-Actor": "root_mgmnt.skill",
+                    "Accept": "text/event-stream",
+                },
+                verify=_root_verify(base_url),
+                timeout=(_REQUEST_TIMEOUT_S, 45.0),
+                stream=True,
+            )
+            response.raise_for_status()
+            backoff_s = 1.0
+            event_name = ""
+            event_data = ""
+            with response:
+                for raw_line in response.iter_lines(decode_unicode=True):
+                    if _EVENT_STREAM_STOP.is_set():
+                        break
+                    line = str(raw_line or "")
+                    if line.startswith("event:"):
+                        event_name = line.split(":", 1)[1].strip()
+                    elif line.startswith("data:"):
+                        event_data = line.split(":", 1)[1].strip()
+                    elif not line:
+                        if event_name in {"snapshot.changed", "subscribed"}:
+                            try:
+                                payload = json.loads(event_data) if event_data else {}
+                            except json.JSONDecodeError:
+                                payload = {"reason": "invalid_event_payload"}
+                            if event_name == "subscribed" and isinstance(payload, dict):
+                                payload.setdefault("reason", "stream.subscribed")
+                            _publish_snapshot_changed(payload if isinstance(payload, Mapping) else {})
+                        event_name = ""
+                        event_data = ""
+        except Exception as exc:
+            if not _EVENT_STREAM_STOP.is_set():
+                _log.info("root_mgmnt event stream reconnecting error=%s", type(exc).__name__)
+        if _EVENT_STREAM_STOP.wait(backoff_s):
+            break
+        backoff_s = min(30.0, backoff_s * 2.0)
+
+
+def _start_event_subscription() -> bool:
+    global _EVENT_STREAM_THREAD
+    with _EVENT_STREAM_LOCK:
+        if _EVENT_STREAM_THREAD is not None and _EVENT_STREAM_THREAD.is_alive():
+            return False
+        _EVENT_STREAM_STOP.clear()
+        _EVENT_STREAM_THREAD = threading.Thread(
+            target=_event_stream_loop,
+            name="root-mgmnt-events",
+            daemon=True,
+        )
+        _EVENT_STREAM_THREAD.start()
+        return True
+
+
 def _policy_summary(snapshot: Mapping[str, Any]) -> dict[str, Any]:
     policy = _policy(snapshot)
     overview = _overview(snapshot)
@@ -297,12 +464,14 @@ def _subnet_action(subnet_id: str, action: str, note: str | None = None) -> dict
         payload["note"] = note
     result = _client().request("POST", f"/v1/root_mgmnt/subnets/{quote(subnet_id.strip(), safe='')}/action", json=payload)
     _invalidate_cache()
+    _refresh_active_projections(force=True)
     return dict(result) if isinstance(result, Mapping) else {"ok": True, "action": action, "subnet_id": subnet_id}
 
 
 def _policy_update(**payload: Any) -> dict[str, Any]:
     result = _client().request("POST", "/v1/root_mgmnt/policy", json=payload)
     _invalidate_cache()
+    _refresh_active_projections(force=True)
     return dict(result) if isinstance(result, Mapping) else {"ok": True, "policy": payload}
 
 
@@ -312,8 +481,14 @@ def get_snapshot(force: bool = False) -> dict[str, Any]:
 
 
 @tool("refresh_snapshot")
-def refresh_snapshot() -> dict[str, Any]:
-    return _snapshot_or_fallback(force=True)
+def refresh_snapshot(webspace_id: str | None = None) -> dict[str, Any]:
+    _start_event_subscription()
+    result = _refresh_projection(webspace_id=_webspace_id(webspace_id), force=True)
+    return {
+        **result["snapshot"],
+        "projection_changed": result["projection_changed"],
+        "webspace_id": result["webspace_id"],
+    }
 
 
 @tool("get_metric_tile")
@@ -340,14 +515,7 @@ def get_policy_summary(refresh_nonce: Any | None = None) -> dict[str, Any]:
 def get_fleet(refresh_nonce: Any | None = None) -> dict[str, Any]:
     _ = refresh_nonce
     snapshot = _snapshot_or_fallback(force=False)
-    items = sorted(
-        _fleet(snapshot),
-        key=lambda item: (
-            0 if str(item.get("live_now") or "") == "yes" else 1,
-            -(int(item.get("activity_score") or 0)),
-            str(item.get("subnet_id") or ""),
-        ),
-    )
+    items = _sorted_fleet(snapshot)
     return {
         "items": items,
         **_snapshot_meta(snapshot),
@@ -447,3 +615,43 @@ def remove_allowed_subnet(subnet_id: str) -> dict[str, Any]:
     allowed = [str(item).strip() for item in policy.get("allowed_subnets") or [] if str(item).strip()]
     filtered = [item for item in allowed if item != str(subnet_id or "").strip()]
     return _policy_update(allowed_subnets=filtered)
+
+
+@subscribe("root.mgmnt.snapshot.changed")
+@subscribe("subnet.member.snapshot.changed")
+@subscribe("subnet.member.status.changed")
+@subscribe("subnet.member.meta.changed")
+@subscribe("subnet.member.link.up")
+@subscribe("subnet.member.link.down")
+def on_root_context_changed(evt: Any) -> None:
+    _ = evt
+    _refresh_active_projections(force=True)
+
+
+@subscribe("sys.ready")
+@subscribe("desktop.webspace.refresh")
+@subscribe("desktop.webspace.reload")
+def on_runtime_refresh(evt: Any) -> None:
+    payload = getattr(evt, "payload", evt)
+    webspace_id = payload.get("webspace_id") if isinstance(payload, Mapping) else None
+    _start_event_subscription()
+    _refresh_projection(webspace_id=_webspace_id(webspace_id), force=True)
+
+
+@tool("rehydrate")
+def rehydrate(payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    webspace_id = payload.get("webspace_id") if isinstance(payload, Mapping) else None
+    started = _start_event_subscription()
+    result = _refresh_projection(webspace_id=_webspace_id(webspace_id), force=True)
+    return {
+        "ok": True,
+        "subscription_started": started,
+        "projection_changed": result["projection_changed"],
+        "webspace_id": result["webspace_id"],
+    }
+
+
+@tool("dispose")
+def dispose() -> dict[str, Any]:
+    _EVENT_STREAM_STOP.set()
+    return {"ok": True}
