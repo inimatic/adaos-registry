@@ -609,8 +609,8 @@
       "kind": "skill",
       "id": "release_validation_skill",
       "name": "release_validation_skill",
-      "version": "0.1.2",
-      "updated_at": "2026-07-23T14:09:00+00:00",
+      "version": "0.1.3",
+      "updated_at": "2026-07-24T07:00:00+00:00",
       "path": "skills/release_validation_skill",
       "manifest": "skills/release_validation_skill/skill.yaml",
       "source": {
@@ -637,7 +637,7 @@
         "startup_allowed": true,
         "background_refresh": false
       },
-      "tools_count": 8
+      "tools_count": 9
     },
     {
       "kind": "skill",
@@ -1004,8 +1004,8 @@
       "kind": "scenario",
       "id": "release_validation_ops",
       "name": "release_validation_ops",
-      "version": "0.1.1",
-      "updated_at": "2026-07-23T14:09:00+00:00",
+      "version": "0.1.2",
+      "updated_at": "2026-07-24T07:00:00+00:00",
       "path": "scenarios/release_validation_ops",
       "manifest": "scenarios/release_validation_ops/scenario.yaml",
       "source": {
