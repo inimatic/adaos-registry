@@ -32,7 +32,7 @@ DEFAULT_NODE = {
     "runtime_port": 8778,
     "supervisor_port": 8776,
     "base_dir": "/root/.adaos",
-    "capabilities": ("adaos.runtime.observe",),
+    "capabilities": ("adaos.runtime.observe", "adaos.release_validation.autorun"),
     "allowed_profiles": ("observe",),
 }
 

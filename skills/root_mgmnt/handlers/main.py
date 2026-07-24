@@ -179,6 +179,11 @@ def _audit(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
     return [dict(item) for item in items] if isinstance(items, list) else []
 
 
+def _validations(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
+    items = snapshot.get("validations")
+    return [dict(item) for item in items] if isinstance(items, list) else []
+
+
 def _policy(snapshot: Mapping[str, Any]) -> dict[str, Any]:
     policy = snapshot.get("policy")
     return dict(policy) if isinstance(policy, Mapping) else {}
@@ -262,6 +267,35 @@ def _sorted_fleet(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
     )
 
 
+def _validation_summary(snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    overview = _overview(snapshot)
+    items = _validations(snapshot)
+    failed = int(overview.get("validation_failed") or 0)
+    inconclusive = int(overview.get("validation_inconclusive") or 0)
+    passed = int(overview.get("validation_passed") or 0)
+    if failed:
+        state, color = "FAILED", "danger"
+    elif inconclusive:
+        state, color = "INCONCLUSIVE", "warning"
+    elif passed:
+        state, color = "PASSED", "success"
+    else:
+        state, color = "IDLE", "neutral"
+    latest = items[0] if items else {}
+    build = str(latest.get("build_identity") or "").strip()
+    return {
+        "value": state,
+        "label": "Automated validation",
+        "subtitle": f"{passed} passed / {failed} failed / {inconclusive} inconclusive",
+        "description": (
+            f"Latest: {build[:12]} on {latest.get('node_id') or latest.get('subnet_id') or 'unknown node'}"
+            if latest
+            else "No autonomous test-node report received."
+        ),
+        "color": color,
+    }
+
+
 def _projection_payload(snapshot: Mapping[str, Any]) -> dict[str, Any]:
     meta = _snapshot_meta(snapshot)
     return {
@@ -270,6 +304,8 @@ def _projection_payload(snapshot: Mapping[str, Any]) -> dict[str, Any]:
             for metric_id in ("fleet_total", "retire_candidates", "llm_requests_24h", "llm_policy")
         },
         "fleet": {"items": _sorted_fleet(snapshot), **meta},
+        "validation_summary": {**_validation_summary(snapshot), **meta},
+        "validations": {"items": _validations(snapshot), **meta},
         "policy": {**_policy_summary(snapshot), **meta},
         "lifecycle_candidates": {"items": _lifecycle_candidates(snapshot), **meta},
         "audit": {"items": _audit(snapshot), **meta},

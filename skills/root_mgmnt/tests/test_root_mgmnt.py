@@ -93,3 +93,30 @@ def test_sse_change_is_forwarded_to_local_event_bus(monkeypatch) -> None:
     assert len(events) == 1
     assert events[0].type == "root.mgmnt.snapshot.changed"
     assert events[0].payload["revision"] == 3
+
+
+def test_projection_exposes_autonomous_validation_summary() -> None:
+    module = _load_module()
+    snapshot = _snapshot(generated_at="2026-07-24T09:00:00Z")
+    snapshot["overview"].update(
+        {
+            "validation_reports": 1,
+            "validation_passed": 1,
+            "validation_failed": 0,
+            "validation_inconclusive": 0,
+        }
+    )
+    snapshot["validations"] = [
+        {
+            "node_id": "linux-exp-01",
+            "state": "passed",
+            "build_identity": "90048f0123456789",
+            "finished_at": "2026-07-24T09:00:00Z",
+        }
+    ]
+
+    payload = module._projection_payload(snapshot)
+
+    assert payload["validation_summary"]["value"] == "PASSED"
+    assert "90048f012345" in payload["validation_summary"]["description"]
+    assert payload["validations"]["items"][0]["node_id"] == "linux-exp-01"

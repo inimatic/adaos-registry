@@ -23,6 +23,7 @@ The initial registry contains one local assignment target:
 | Address | `root@192.168.0.30:22` |
 | Identity | `d:/git/inimatic/adaos/.ssh/adaos_linux_exp` |
 | Profile | `observe` |
+| Capabilities | `adaos.runtime.observe`, `adaos.release_validation.autorun` |
 | Runtime API | `127.0.0.1:8778` on the target |
 | Supervisor API | `127.0.0.1:8776` on the target |
 
@@ -80,6 +81,16 @@ The current manual observe-only runner neither updates the target node nor waits
 
 The local authenticated HTTP surface is under `/api/release-validation`: register nodes/suites, create a campaign, then call `POST /campaigns/{campaign_id}/run`. CI integration is intentionally not wired in this phase.
 
+## Autonomous test-node flow
+
+Set `ADAOS_RELEASE_VALIDATION_AUTORUN=1` only on a registered test hub. After `sys.ready`, the runtime waits five seconds by default (`ADAOS_RELEASE_VALIDATION_AUTORUN_DELAY_S`) and runs the versioned `adaos-post-update-smoke` suite against its active slot, local runtime API, core-update terminal state, and local supervisor API.
+
+The build identity is taken from the active-slot manifest installed by the standard GitHub/Root updater. The agent does not request an update and does not resolve GitHub independently. A report ID is deterministic for node, suite version, slot, and build identity, so a restart of the same build reuses the immutable report instead of generating duplicate evidence.
+
+Reports are stored under `.adaos/state/release_validation/autonomous/reports`; `latest.json` is the local pointer. A hub attaches the latest report to its existing mTLS core-update report. Root stores it with the canonical hub report, includes a compact validation view in the Root management snapshot, and emits `snapshot.changed` only when the material report changes. The operator scenario consumes that view from Yjs; it does not poll the test node or Root.
+
+The initial autonomous suite is intentionally small. It does not run arbitrary commands, update, restart, or roll back the node. A failed report alerts the current node's Telegram route, but automatic rollback and build blocking remain disabled until promotion policy and independent confirmation are implemented.
+
 ## Notifications
 
 At terminal campaign state, the API and skill publish `ui.notify`. The current node router forwards that event through its configured Telegram route, so the existing administration channel receives the result. No Telegram token or channel ID is stored in this scenario or skill.
@@ -88,7 +99,7 @@ At terminal campaign state, the API and skill publish `ui.notify`. The current n
 
 ## Future CI and Root orchestration
 
-The planned CI adapter should authenticate to Root and submit an exact build plus suite ID. Root creates assignments only for registered nodes with compatible capabilities and an active lease. Nodes wait for or attest the exact installed build, run a reviewed suite, upload bounded evidence, and report terminal state. Root aggregates quorum and exposes one campaign result to CI.
+The CI adapter should authenticate to Root and wait for autonomous reports matching the release identity already distributed by the standard updater. Root should create assignments only for registered nodes with compatible capabilities and an active lease, aggregate quorum, and expose one promotion result to CI. Exact-build manual campaigns remain a diagnostic tool rather than the primary deployment trigger.
 
 Automatic rollback must remain a separate policy decision. Recommended first integration:
 

@@ -1,6 +1,6 @@
 {
   "id": "release_validation_ops",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "name": "Release Validation Operations",
   "type": "desktop",
   "title": "Release Validation Operations",
@@ -30,10 +30,28 @@
               "id": "release-ops-summary",
               "type": "visual.metricTile",
               "area": "main",
-              "title": "Validation status",
+              "title": "Manual campaign",
               "dataSource": {
                 "kind": "y",
                 "path": "data/release_validation/summary"
+              },
+              "inputs": {
+                "valuePath": "value",
+                "labelPath": "label",
+                "subtitlePath": "subtitle",
+                "descriptionPath": "description",
+                "colorPath": "color",
+                "emptyText": "IDLE"
+              }
+            },
+            {
+              "id": "release-ops-autonomous-summary",
+              "type": "visual.metricTile",
+              "area": "main",
+              "title": "Test-node validation",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/root_mgmnt/validation_summary"
               },
               "inputs": {
                 "valuePath": "value",
@@ -225,7 +243,29 @@
                   { "key": "display_name", "label": "Name" },
                   { "key": "live_now", "label": "Live", "width": "75px" },
                   { "key": "lifecycle_state", "label": "Lifecycle", "width": "120px" },
+                  { "key": "validation_state", "label": "Validation", "width": "105px" },
                   { "key": "activity_score", "label": "Activity", "width": "90px", "mono": true }
+                ]
+              }
+            },
+            {
+              "id": "release-ops-autonomous-reports",
+              "type": "ui.table",
+              "area": "bottom",
+              "title": "Automated test reports",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/root_mgmnt/validations"
+              },
+              "inputs": {
+                "emptyText": "No autonomous test-node report received",
+                "columns": [
+                  { "key": "node_id", "label": "Node", "width": "130px" },
+                  { "key": "state", "label": "State", "width": "105px" },
+                  { "key": "build_identity", "label": "Build", "width": "190px", "mono": true },
+                  { "key": "checks_passed", "label": "Passed", "width": "75px", "mono": true },
+                  { "key": "reason", "label": "Result" },
+                  { "key": "finished_at", "label": "Finished", "width": "185px", "mono": true }
                 ]
               }
             },
