@@ -85,20 +85,46 @@ def test_skill_prepares_runs_notifies_and_projects(monkeypatch) -> None:
     assert result["campaign"]["state"] == "passed"
     assert service.nodes[0].allowed_profiles == ("observe",)
     assert service.suites[0].checks == module.OBSERVE_CHECKS
+    assert service.suites[0].timeout_s == module.DEFAULT_SUITE_TIMEOUT_S
     assert projection.values[-1][0] == "release_validation.snapshot"
     assert projection.values[-1][1]["summary"]["value"] == "PASSED"
     assert notifications[0][0][0] == "ui.notify"
 
 
-def test_skill_reports_no_pending_campaign(monkeypatch) -> None:
+def test_skill_treats_no_pending_campaign_as_idempotent_noop(monkeypatch) -> None:
     module = _load_module()
     service = _Service()
+    projection = _Projection()
     monkeypatch.setattr(module, "_service", lambda: service)
+    monkeypatch.setattr(module, "ctx_subnet", projection)
 
     result = module.run_latest_campaign()
 
-    assert result["ok"] is False
-    assert result["error"] == "no_pending_campaign"
+    assert result["ok"] is True
+    assert result["noop"] is True
+    assert result["status"] == "no_pending_campaign"
+    assert projection.values[-1][1]["summary"]["value"] == "IDLE"
+
+
+def test_skill_retries_latest_terminal_campaign_without_rewriting_it(monkeypatch) -> None:
+    module = _load_module()
+    service = _Service()
+    projection = _Projection()
+    notifications = []
+    monkeypatch.setattr(module, "_service", lambda: service)
+    monkeypatch.setattr(module, "ctx_subnet", projection)
+    monkeypatch.setattr(module, "publish_event", lambda *args, **kwargs: notifications.append((args, kwargs)))
+    module.prepare_campaign("build-123", campaign_id="manual-original")
+    module.run_campaign("manual-original")
+
+    result = module.retry_latest_campaign(webspace_id="ops")
+
+    assert result["ok"] is True
+    assert result["campaign"]["state"] == "passed"
+    assert result["campaign"]["target_build"] == "build-123"
+    assert result["campaign"]["campaign_id"] != "manual-original"
+    assert len(service.campaigns) == 2
+    assert notifications[-1][0][0] == "ui.notify"
 
 
 def test_skill_rehydrate_projects_durable_snapshot(monkeypatch) -> None:

@@ -90,7 +90,8 @@
                 "buttons": [
                   { "id": "refresh", "label": "Refresh" },
                   { "id": "register", "label": "Register contracts" },
-                  { "id": "run-latest", "label": "Run latest pending" }
+                  { "id": "run-latest", "label": "Run latest pending" },
+                  { "id": "retry-latest", "label": "Retry latest" }
                 ]
               },
               "actions": [
@@ -110,6 +111,12 @@
                   "on": "click:run-latest",
                   "type": "callSkill",
                   "target": "release_validation_skill.run_latest_campaign",
+                  "params": { "webspace_id": "$runtime.webspace_id" }
+                },
+                {
+                  "on": "click:retry-latest",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.retry_latest_campaign",
                   "params": { "webspace_id": "$runtime.webspace_id" }
                 }
               ]

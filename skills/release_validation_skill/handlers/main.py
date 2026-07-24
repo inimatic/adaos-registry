@@ -21,6 +21,7 @@ from adaos.services.release_validation import (
 _log = logging.getLogger("skills.release_validation_skill")
 DEFAULT_NODE_ID = "linux-exp-01"
 DEFAULT_SUITE_ID = "adaos-observe-smoke"
+DEFAULT_SUITE_TIMEOUT_S = 90.0
 DEFAULT_NODE = {
     "node_id": DEFAULT_NODE_ID,
     "display_name": "AdaOS Linux experimental node",
@@ -188,9 +189,10 @@ def _register_defaults() -> None:
     _service().register_suite(
         TestSuite(
             suite_id=DEFAULT_SUITE_ID,
-            version="1.0.0",
+            version="1.0.1",
             display_name="AdaOS observe-only runtime smoke",
             checks=OBSERVE_CHECKS,
+            timeout_s=DEFAULT_SUITE_TIMEOUT_S,
         )
     )
 
@@ -249,8 +251,43 @@ def run_latest_campaign(webspace_id: str | None = None) -> dict[str, Any]:
     snapshot = _service().snapshot()
     pending = [item for item in snapshot.get("campaigns") or [] if item.get("state") == "pending"]
     if not pending:
-        return {"ok": False, "error": "no_pending_campaign", "snapshot": _ui_snapshot(snapshot)}
+        latest = next(iter(snapshot.get("campaigns") or []), None)
+        return {
+            "ok": True,
+            "noop": True,
+            "status": "no_pending_campaign",
+            "message": "No pending campaign. Prepare a new campaign or retry the latest terminal campaign.",
+            "campaign": latest,
+            "snapshot": _refresh(webspace_id=_webspace_id(webspace_id)),
+        }
     return run_campaign(str(pending[0]["campaign_id"]), webspace_id=webspace_id)
+
+
+@tool("retry_latest_campaign")
+def retry_latest_campaign(webspace_id: str | None = None) -> dict[str, Any]:
+    _register_defaults()
+    snapshot = _service().snapshot()
+    latest = next(iter(snapshot.get("campaigns") or []), None)
+    if not isinstance(latest, Mapping):
+        return {
+            "ok": True,
+            "noop": True,
+            "status": "no_campaign_to_retry",
+            "message": "No campaign is available to retry.",
+            "snapshot": _refresh(webspace_id=_webspace_id(webspace_id)),
+        }
+    if latest.get("state") == "pending":
+        return run_campaign(str(latest["campaign_id"]), webspace_id=webspace_id)
+    campaign = _service().create_campaign(
+        ValidationCampaign(
+            campaign_id=_manual_campaign_id(),
+            suite_id=str(latest.get("suite_id") or DEFAULT_SUITE_ID),
+            target_build=str(latest.get("target_build") or ""),
+            node_ids=tuple(latest.get("node_ids") or (DEFAULT_NODE_ID,)),
+            quorum=int(latest.get("quorum") or 1),
+        )
+    )
+    return run_campaign(str(campaign["campaign_id"]), webspace_id=webspace_id)
 
 
 @tool("run_default_observe")

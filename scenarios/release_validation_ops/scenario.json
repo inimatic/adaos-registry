@@ -1,6 +1,6 @@
 {
   "id": "release_validation_ops",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "name": "Release Validation Operations",
   "type": "desktop",
   "title": "Release Validation Operations",
@@ -70,6 +70,7 @@
                   { "id": "refresh", "label": "Refresh validation" },
                   { "id": "register", "label": "Register contracts" },
                   { "id": "run", "label": "Run latest pending" },
+                  { "id": "retry", "label": "Retry latest" },
                   { "id": "refresh-root", "label": "Refresh Root context" }
                 ]
               },
@@ -90,6 +91,12 @@
                   "on": "click:run",
                   "type": "callSkill",
                   "target": "release_validation_skill.run_latest_campaign",
+                  "params": { "webspace_id": "$runtime.webspace_id" }
+                },
+                {
+                  "on": "click:retry",
+                  "type": "callSkill",
+                  "target": "release_validation_skill.retry_latest_campaign",
                   "params": { "webspace_id": "$runtime.webspace_id" }
                 },
                 {

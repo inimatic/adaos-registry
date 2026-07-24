@@ -1,5 +1,5 @@
 name: release_validation_skill
-version: 0.1.2
+version: 0.1.3
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -117,8 +117,18 @@ tools:
   output_schema:
     type: object
 - name: run_latest_campaign
-  description: Run the newest pending validation campaign.
+  description: Run the newest pending validation campaign or return the latest terminal snapshot as a no-op.
   entry: handlers.main:run_latest_campaign
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: [string, 'null']
+  output_schema:
+    type: object
+- name: retry_latest_campaign
+  description: Create and run a new campaign from the latest campaign target without rewriting history.
+  entry: handlers.main:retry_latest_campaign
   input_schema:
     type: object
     properties:
@@ -141,5 +151,5 @@ tools:
     required: [target_build]
   output_schema:
     type: object
-updated_at: '2026-07-23T14:09:00+00:00'
+updated_at: '2026-07-24T07:00:00+00:00'
 
