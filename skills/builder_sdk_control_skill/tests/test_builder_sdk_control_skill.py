@@ -45,7 +45,7 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["set_llm_profile"]["side_effects"] == "local_write"
     assert tools["update_project_metadata"]["side_effects"] == "local_write"
     assert tools["archive_project"]["side_effects"] == "local_write"
-    assert tools["update_project"]["side_effects"] == "local_write"
+    assert "update_project" not in tools
     assert tools["select_preview"]["side_effects"] == "ui_navigation"
     assert tools["select_preview_target"]["side_effects"] == "ui_navigation"
     assert tools["transition_workflow"]["side_effects"] == "local_write"
@@ -469,7 +469,7 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
     pushed = module.push_project("scenario", "builder", message="checkpoint", webspace_id="desktop")
     result = module.publish_project("scenario", "builder", dry_run=True)
 
-    assert calls[0] == ("create", ("skill", "demo_skill"), {"template": "default"})
+    assert calls[0] == ("create", ("skill", "demo_skill"), {"template": "skill_default"})
     assert calls[1] == ("push", ("scenario", "builder"), {"message": "checkpoint"})
     assert calls[2][2]["dry_run"] is True
     assert pushed["evidence"]["status"] == "pushed"

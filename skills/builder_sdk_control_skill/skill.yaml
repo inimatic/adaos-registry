@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.0.6
+version: 0.0.7
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -696,24 +696,6 @@ tools:
         type: string
   output_schema:
     type: object
-- name: update_project
-  description: Update one DEV project from Forge through the governed SDK lifecycle.
-  entry: handlers.main:update_project
-  side_effects: local_write
-  timeout_seconds: 120
-  input_schema:
-    type: object
-    properties:
-      object_type:
-        type: string
-        enum:
-        - scenario
-        - skill
-      object_id:
-        type: string
-        minLength: 1
-  output_schema:
-    type: object
 - name: delete_project
   description: Plan or execute governed DEV project deletion with explicit confirmation.
   entry: handlers.main:delete_project
@@ -771,7 +753,6 @@ data_routes:
   - set_workflow_state
   - archive_project
   - create_project
-  - update_project
   - delete_project
   - publish_project
   budget:
@@ -805,7 +786,6 @@ data_routes:
   update_source:
   - set_workflow_state
   - archive_project
-  - update_project
   - push_project
   - publish_project
   budget:
@@ -1070,4 +1050,4 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-07-23T15:05:15+00:00'
+updated_at: '2026-07-24T09:20:27+00:00'

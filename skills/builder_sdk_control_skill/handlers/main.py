@@ -1115,16 +1115,10 @@ def return_to_prototype(
 @tool("create_project", summary="Create a DEV skill or scenario project.", side_effects="local_write")
 def create_project(object_type: str, object_id: str, template: str | None = None) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
-    return projects.create(kind, project_id, template=template)
-
-
-@tool("update_project", summary="Update a DEV project from Forge.", side_effects="local_write")
-def update_project(
-    object_type: str = DEFAULT_PROJECT_KIND,
-    object_id: str = DEFAULT_PROJECT_ID,
-) -> dict[str, Any]:
-    kind, project_id = _identity(object_type, object_id)
-    return projects.update(kind, project_id)
+    template_id = str(template or "").strip()
+    if not template_id or template_id.lower() == "default":
+        template_id = "scenario_default" if kind == "scenario" else "skill_default"
+    return projects.create(kind, project_id, template=template_id)
 
 
 @tool("delete_project", summary="Delete a project through the governed developer lifecycle.", side_effects="external_write")
@@ -1287,6 +1281,5 @@ __all__ = [
     "submit_automation",
     "return_to_prototype",
     "transition_workflow",
-    "update_project",
     "update_project_metadata",
 ]
