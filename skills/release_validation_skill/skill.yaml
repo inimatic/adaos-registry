@@ -1,5 +1,5 @@
 name: release_validation_skill
-version: 0.1.3
+version: 0.1.4
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -89,18 +89,17 @@ tools:
   output_schema:
     type: object
 - name: prepare_campaign
-  description: Create one pending observe-only campaign for an exact AdaOS build.
+  description: Create one pending observe-only campaign for the latest installed or an exact AdaOS build.
   entry: handlers.main:prepare_campaign
   input_schema:
     type: object
     properties:
       target_build:
-        type: string
+        type: [string, 'null']
       campaign_id:
         type: [string, 'null']
       webspace_id:
         type: [string, 'null']
-    required: [target_build]
   output_schema:
     type: object
 - name: run_campaign
@@ -143,13 +142,12 @@ tools:
     type: object
     properties:
       target_build:
-        type: string
+        type: [string, 'null']
       campaign_id:
         type: [string, 'null']
       webspace_id:
         type: [string, 'null']
-    required: [target_build]
   output_schema:
     type: object
-updated_at: '2026-07-24T07:00:00+00:00'
+updated_at: '2026-07-24T08:30:00+00:00'
 

@@ -32,7 +32,7 @@ The identity path is stored in the private state but is redacted from API, skill
 
 `TestSuite` is versioned and contains only named checks from the core allowlist. The first suite is `adaos-observe-smoke` version `1.0.1`.
 
-`ValidationCampaign` binds an exact expected build to a suite, node set, and quorum. A new campaign starts as `pending`.
+`ValidationCampaign` binds a suite, node set, quorum, and target policy. The default `latest_installed` policy attests the build already selected and installed by the standard updater. Supplying a build or commit selects the backward-compatible `exact` policy. A new campaign starts as `pending`.
 
 `ValidationAssignment` is the immutable attempt identity for one campaign/node pair. It stores state timestamps, bounded check evidence, and a terminal classification.
 
@@ -58,7 +58,7 @@ The runner does not accept shell text from a campaign, suite, API request, skill
 2. `systemctl is-active adaos.service`.
 3. Local runtime `/api/ping`.
 4. Local supervisor `/api/supervisor/public/update-status`.
-5. Active-slot manifest identity matched to the exact campaign build.
+5. Active-slot manifest identity. An exact campaign also matches it to the requested build.
 
 There is no update, rollback, restart, package install, test upload, or arbitrary command capability in this profile. A future execution profile must use a separate capability, runner, and review path.
 
@@ -66,15 +66,15 @@ There is no update, rollback, restart, package install, test upload, or arbitrar
 
 1. Activate `release_validation_ops` on the development node.
 2. Select **Register contracts** once. Registration is idempotent.
-3. Enter the exact commit or build identity in **Prepare observe-only campaign**. A Git commit may be abbreviated to an unambiguous hexadecimal prefix of at least seven characters.
+3. Leave **Build or commit** empty to validate the latest installed build. Enter an exact identity only for a diagnostic comparison; a Git commit may be abbreviated to at least seven hexadecimal characters.
 4. Select **Run latest pending**.
 5. Read terminal status in the metric widget, assignment table, evidence viewer, and validation journal.
 
 **Run latest pending** is idempotent when no pending campaign exists: it refreshes the latest terminal result without raising an action error. **Retry latest** creates a new campaign for the same target and preserves the previous attempt as evidence.
 
-The equivalent one-call skill tool is `release_validation_skill.run_default_observe(target_build=...)`. Keep the target exact; do not use branch names such as `rev2026` as release identities.
+The equivalent one-call skill tool is `release_validation_skill.run_default_observe()`. Its optional `target_build` argument enables exact comparison; do not use branch names such as `rev2026` as release identities.
 
-The current manual observe-only runner neither updates the target node nor waits for an update. If the active slot does not contain the requested target, the campaign terminates with `target_build_mismatch`. Waiting for an exact build belongs to the future Root/test-agent assignment protocol described below.
+The current manual observe-only runner neither updates the target node nor waits for an update. In default mode it validates the active slot selected by the standard GitHub/Root update flow. An optional exact target remains a diagnostic assertion and terminates with `target_build_mismatch` when it differs.
 
 The local authenticated HTTP surface is under `/api/release-validation`: register nodes/suites, create a campaign, then call `POST /campaigns/{campaign_id}/run`. CI integration is intentionally not wired in this phase.
 

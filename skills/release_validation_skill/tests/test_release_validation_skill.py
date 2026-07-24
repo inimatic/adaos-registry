@@ -91,6 +91,20 @@ def test_skill_prepares_runs_notifies_and_projects(monkeypatch) -> None:
     assert notifications[0][0][0] == "ui.notify"
 
 
+def test_skill_prepares_latest_installed_when_target_is_empty(monkeypatch) -> None:
+    module = _load_module()
+    service = _Service()
+    projection = _Projection()
+    monkeypatch.setattr(module, "_service", lambda: service)
+    monkeypatch.setattr(module, "ctx_subnet", projection)
+
+    prepared = module.prepare_campaign(webspace_id="ops")
+
+    assert prepared["campaign"]["target_build"] == ""
+    assert prepared["campaign"]["target_policy"] == "latest_installed"
+    assert projection.values[-1][1]["campaigns"]["items"][0]["target_build"] == "latest installed"
+
+
 def test_skill_treats_no_pending_campaign_as_idempotent_noop(monkeypatch) -> None:
     module = _load_module()
     service = _Service()

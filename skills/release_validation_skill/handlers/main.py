@@ -48,8 +48,9 @@ def _webspace_id(value: str | None) -> str:
 
 def _campaign_description(campaign: Mapping[str, Any]) -> str:
     result = campaign.get("result") if isinstance(campaign.get("result"), Mapping) else {}
+    target = campaign.get("target_build") or "latest installed"
     return (
-        f"target={campaign.get('target_build') or '-'}; "
+        f"target={target}; "
         f"passed={result.get('passed', 0)}; failed={result.get('failed', 0)}; "
         f"inconclusive={result.get('inconclusive', 0)}; timed_out={result.get('timed_out', 0)}"
     )
@@ -111,6 +112,7 @@ def _ui_snapshot(snapshot: Mapping[str, Any]) -> dict[str, Any]:
             "items": [
                 {
                     **item,
+                    "target_build": item.get("target_build") or "latest installed",
                     "nodes": ", ".join(item.get("node_ids") or []),
                     "result_text": _campaign_description(item),
                 }
@@ -220,7 +222,7 @@ def register_default_observe_contracts(webspace_id: str | None = None) -> dict[s
 
 @tool("prepare_campaign")
 def prepare_campaign(
-    target_build: str,
+    target_build: str | None = None,
     campaign_id: str | None = None,
     webspace_id: str | None = None,
 ) -> dict[str, Any]:
@@ -229,7 +231,7 @@ def prepare_campaign(
         ValidationCampaign(
             campaign_id=str(campaign_id or "").strip() or _manual_campaign_id(),
             suite_id=DEFAULT_SUITE_ID,
-            target_build=target_build,
+            target_build=str(target_build or "").strip(),
             node_ids=(DEFAULT_NODE_ID,),
             quorum=1,
         )
@@ -283,6 +285,7 @@ def retry_latest_campaign(webspace_id: str | None = None) -> dict[str, Any]:
             campaign_id=_manual_campaign_id(),
             suite_id=str(latest.get("suite_id") or DEFAULT_SUITE_ID),
             target_build=str(latest.get("target_build") or ""),
+            target_policy=str(latest.get("target_policy") or "auto"),
             node_ids=tuple(latest.get("node_ids") or (DEFAULT_NODE_ID,)),
             quorum=int(latest.get("quorum") or 1),
         )
@@ -292,7 +295,7 @@ def retry_latest_campaign(webspace_id: str | None = None) -> dict[str, Any]:
 
 @tool("run_default_observe")
 def run_default_observe(
-    target_build: str,
+    target_build: str | None = None,
     campaign_id: str | None = None,
     webspace_id: str | None = None,
 ) -> dict[str, Any]:

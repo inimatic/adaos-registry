@@ -1,6 +1,6 @@
 {
   "id": "release_validation_ops",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "name": "Release Validation Operations",
   "type": "desktop",
   "title": "Release Validation Operations",
@@ -111,7 +111,7 @@
               "id": "release-ops-prepare",
               "type": "ui.form",
               "area": "main",
-              "title": "Prepare observe-only campaign",
+              "title": "Prepare diagnostic campaign",
               "inputs": {
                 "layout": "responsiveGrid",
                 "minFieldWidth": 240,
@@ -120,8 +120,8 @@
                   {
                     "id": "target_build",
                     "type": "shortText",
-                    "label": "Exact build or commit",
-                    "required": true
+                    "label": "Build or commit (optional)",
+                    "placeholder": "Latest installed build"
                   },
                   {
                     "id": "campaign_id",
