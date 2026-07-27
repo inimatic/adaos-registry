@@ -71,6 +71,55 @@ def _run_stream_snapshots_inline(mod, monkeypatch) -> None:
     )
 
 
+def test_infrastate_summary_projection_stays_current_without_browser_demand():
+    mod = _load_infrastate_module()
+
+    writes: list[tuple[str, object, str | None]] = []
+
+    class _ProjectionContext:
+        async def set_async(self, slot: str, value: object, *, webspace_id: str | None = None) -> None:
+            writes.append((slot, value, webspace_id))
+
+    summary_slot = mod._PROJECTION_SLOT_BY_NAME["infrastate.summary"]
+    actions_slot = mod._PROJECTION_SLOT_BY_NAME["infrastate.actions"]
+    mod._PROJECTION_RUNTIME.reset()
+    mod._PROJECTION_RUNTIME.bind_ctx_subnet(_ProjectionContext())
+
+    summary_result = asyncio.run(
+        mod._PROJECTION_RUNTIME.set_if_changed(
+            summary_slot,
+            {"value": "succeeded", "subtitle": "slot B"},
+            webspace_id="desktop",
+        )
+    )
+    actions_result = asyncio.run(
+        mod._PROJECTION_RUNTIME.set_if_changed(
+            actions_slot,
+            [],
+            webspace_id="desktop",
+        )
+    )
+
+    assert summary_slot.demand == "always"
+    assert summary_result.written is True
+    assert writes == [("infrastate.summary", {"value": "succeeded", "subtitle": "slot B"}, "desktop")]
+    assert actions_result.reason == "no_active_projection_demand"
+
+
+def test_infrastate_local_version_skips_sparse_placeholder(monkeypatch, tmp_path: Path):
+    mod = _load_infrastate_module()
+    placeholder = tmp_path / "scenarios" / "sparse_scene"
+    placeholder.mkdir(parents=True)
+    (placeholder / ".gitignore").write_text("*/impl/\n", encoding="utf-8")
+    monkeypatch.setattr(
+        mod,
+        "build_registry_entry",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("strict parser must not run")),
+    )
+
+    assert mod._read_local_artifact_version(tmp_path, "scenarios", "sparse_scene") is None
+
+
 def test_infrastate_yjs_tabs_do_not_self_reference_sync_runtime():
     mod = _load_infrastate_module()
 

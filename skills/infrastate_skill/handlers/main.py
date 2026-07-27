@@ -120,7 +120,14 @@ _DATA_PROJECTION_ENTRIES = [
     for slot, path in _PROJECTION_SLOT_PATHS.items()
 ]
 _PROJECTION_SLOTS = [
-    ProjectionSlot(slot, path)
+    ProjectionSlot(
+        slot,
+        path,
+        # The compact homepoint widget is first-paint operational state.  Keep
+        # it current even between browser subscriptions; detail/modal slots
+        # remain demand-driven to preserve the Yjs pressure budget.
+        demand="always" if slot == "infrastate.summary" else "active",
+    )
     for slot, path in _PROJECTION_SLOT_PATHS.items()
 ]
 _PROJECTION_SLOT_BY_NAME = {slot.name: slot for slot in _PROJECTION_SLOTS}
@@ -2590,6 +2597,15 @@ def _capacity_scenario_entry_map() -> dict[str, dict[str, Any]]:
 
 def _read_local_artifact_version(workspace_root: Path, kind_plural: str, name: str) -> str | None:
     artifact_dir = Path(workspace_root) / kind_plural / str(name)
+    manifest_name = {
+        "skills": "skill.yaml",
+        "scenarios": "scenario.yaml",
+    }.get(str(kind_plural or "").strip())
+    if not manifest_name or not (artifact_dir / manifest_name).is_file():
+        # Sparse placeholders and capacity-only installed artifacts are not
+        # workspace sources.  Avoid invoking the strict registry parser only
+        # to emit a misleading missing-manifest error for them.
+        return None
     try:
         entry = build_registry_entry(kind_plural, artifact_dir)
     except Exception:
