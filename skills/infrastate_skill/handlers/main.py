@@ -9530,17 +9530,40 @@ def on_webspace_reload(evt: Any) -> None:
 @subscribe("node.names.changed")
 async def on_runtime_event(evt: Any) -> None:
     payload = getattr(evt, "payload", evt)
+    event_type = str(
+        getattr(evt, "type", "")
+        or (payload.get("type") if isinstance(payload, dict) else "")
+        or "runtime.event"
+    )
+    webspace_id = _webspace_id_from_payload(payload)
     try:
-        event_type = str(getattr(evt, "type", "") or (payload.get("type") if isinstance(payload, dict) else "") or "runtime.event")
-        webspace_id = _webspace_id_from_payload(payload)
         _invalidate_runtime_caches(webspace_id=webspace_id)
-        _append_event(event_type, payload)
-        state = str(payload.get("state") or "").strip().lower() if isinstance(payload, dict) else ""
-        phase = str(payload.get("phase") or "").strip().lower() if isinstance(payload, dict) else ""
-        terminal_core_update = event_type in {"core.update.status", "hub.core_update.status"} and (
-            state in {"failed", "cancelled", "canceled", "rolled_back"}
-            or (state == "succeeded" and phase == "validate")
+    except Exception:
+        _log.debug(
+            "failed to invalidate infrastate caches for runtime event type=%s webspace=%s",
+            event_type,
+            webspace_id or "-",
+            exc_info=True,
         )
+    try:
+        _append_event(event_type, payload)
+    except Exception:
+        # Event history is diagnostic state. It must never prevent the compact
+        # first-paint control projection from being brought up to date.
+        _log.warning(
+            "failed to append infrastate runtime event history type=%s webspace=%s; projection continues",
+            event_type,
+            webspace_id or "-",
+            exc_info=True,
+        )
+
+    state = str(payload.get("state") or "").strip().lower() if isinstance(payload, dict) else ""
+    phase = str(payload.get("phase") or "").strip().lower() if isinstance(payload, dict) else ""
+    terminal_core_update = event_type in {"core.update.status", "hub.core_update.status"} and (
+        state in {"failed", "cancelled", "canceled", "rolled_back"}
+        or (state == "succeeded" and phase == "validate")
+    )
+    try:
         if event_type == "sys.ready" or terminal_core_update:
             # First paint and supervisor-finalized root restarts must be
             # materialized before the lifecycle event completes. A detached
@@ -9553,4 +9576,10 @@ async def on_runtime_event(evt: Any) -> None:
             reason=event_type,
         )
     except Exception:
-        _log.debug("failed to refresh infrastate snapshot from runtime event", exc_info=True)
+        log = _log.warning if event_type == "sys.ready" or terminal_core_update else _log.debug
+        log(
+            "failed to refresh infrastate snapshot from runtime event type=%s webspace=%s",
+            event_type,
+            webspace_id or "-",
+            exc_info=True,
+        )
