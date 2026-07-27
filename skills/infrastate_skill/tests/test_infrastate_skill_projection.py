@@ -3633,6 +3633,37 @@ def test_infrastate_sys_ready_materializes_first_paint_inline(monkeypatch):
     assert refreshed == [(None, False)]
 
 
+def test_infrastate_sys_ready_uses_sdk_envelope_metadata(monkeypatch):
+    mod = _load_infrastate_module()
+    refreshed: list[tuple[str | None, bool]] = []
+
+    async def _refresh(*, webspace_id=None, allow_cache=True):
+        refreshed.append((webspace_id, allow_cache))
+
+    monkeypatch.setattr(mod, "_invalidate_runtime_caches", lambda **_kwargs: None)
+    monkeypatch.setattr(mod, "_append_event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "_refresh_snapshot_async", _refresh)
+    monkeypatch.setattr(
+        mod,
+        "_schedule_snapshot_refresh",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("sys.ready must refresh inline")),
+    )
+
+    asyncio.run(
+        mod.on_runtime_event(
+            {
+                "ts": 1.0,
+                "_meta": {
+                    "event_type": "sys.ready",
+                    "event_source": "lifecycle",
+                },
+            }
+        )
+    )
+
+    assert refreshed == [(None, False)]
+
+
 def test_infrastate_sys_ready_materializes_when_event_history_is_unavailable(monkeypatch):
     mod = _load_infrastate_module()
     refreshed: list[tuple[str | None, bool]] = []

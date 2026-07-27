@@ -9530,8 +9530,10 @@ def on_webspace_reload(evt: Any) -> None:
 @subscribe("node.names.changed")
 async def on_runtime_event(evt: Any) -> None:
     payload = getattr(evt, "payload", evt)
+    payload_meta = payload.get("_meta") if isinstance(payload, dict) else None
     event_type = str(
         getattr(evt, "type", "")
+        or (payload_meta.get("event_type") if isinstance(payload_meta, dict) else "")
         or (payload.get("type") if isinstance(payload, dict) else "")
         or "runtime.event"
     )
