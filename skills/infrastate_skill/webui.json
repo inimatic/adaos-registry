@@ -833,15 +833,16 @@
 								"columns": [
 									{ "key": "status_icon", "label": "", "kind": "icon", "tooltipKey": "status_tooltip", "width": "44px" },
 									{ "key": "name", "label": "Name" },
-									{ "key": "catalog_display", "label": "Catalog", "mono": true, "width": "120px" },
-									{ "key": "workspace_display", "label": "Runtime", "mono": true, "width": "120px" },
+									{ "key": "catalog_display", "label": "Catalog", "mono": true, "width": "105px" },
+									{ "key": "workspace_display", "label": "Workspace", "mono": true, "width": "105px" },
+									{ "key": "runtime_display", "label": "Runtime", "mono": true, "width": "105px" },
 									{
 										"key": "_runtime_actions",
 										"label": "Actions",
 										"kind": "buttons",
 										"width": "140px",
 										"buttons": [
-											{ "id": "hard_pull", "icon": "cloud-download-outline", "tooltip": "Update scenario from catalog", "whenKey": "can_hard_pull", "whenEquals": true, "disabledKey": "pending" },
+											{ "id": "hard_pull", "icon": "cloud-download-outline", "tooltip": "Restore or update Workspace source from catalog", "whenKey": "can_hard_pull", "whenEquals": true, "disabledKey": "pending" },
 											{ "id": "uninstall", "icon": "trash-outline", "tooltip": "Uninstall scenario", "disabledKey": "uninstall_disabled" }
 										]
 									}
@@ -854,7 +855,7 @@
 									"target": "infrastate.action",
 									"params": { "id": "scenario_hard_pull", "name": "$event.name", "request_id": "$client.requestId" },
                   "feedback": {
-                    "pending": { "disable": true, "icon": "sync-outline", "label": "Updating" },
+                    "pending": { "disable": true, "icon": "sync-outline", "label": "Syncing source" },
                     "observe": {
                       "kind": "stream",
                       "receiver": "infrastate.scenarios",

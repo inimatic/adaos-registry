@@ -1556,8 +1556,10 @@ def test_infrastate_scenario_items_reconcile_sql_registry_to_local_runtime(monke
     assert [(item["name"], item["workspace_display"]) for item in all_items] == [
         ("alpha", "1.2.3"),
         ("beta", "2.0.0"),
-        ("delta", "4.0.0"),
+        ("delta", "missing"),
     ]
+    assert all_items[2]["runtime_display"] == "4.0.0"
+    assert all_items[2]["workspace_source_missing"] is True
 
     default_items = mod._scenario_items()
     assert reconcile_calls == [workspace, workspace]
@@ -3418,7 +3420,8 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
     assert by_id["infrastate-scenarios"]["title"] == "Scenarios"
     scenario_columns = by_id["infrastate-scenarios"]["inputs"]["columns"]
     assert any(column.get("key") == "catalog_display" and column.get("label") == "Catalog" for column in scenario_columns)
-    assert any(column.get("key") == "workspace_display" and column.get("label") == "Runtime" for column in scenario_columns)
+    assert any(column.get("key") == "workspace_display" and column.get("label") == "Workspace" for column in scenario_columns)
+    assert any(column.get("key") == "runtime_display" and column.get("label") == "Runtime" for column in scenario_columns)
     assert not any(
         column.get("label") in {"Local source", "Registry", "Active registry", "Installed"}
         for column in scenario_columns
@@ -3430,6 +3433,7 @@ def test_infrastate_inventory_and_marketplace_use_stream_data_sources():
         button.get("id") == "hard_pull"
         and button.get("icon") == "cloud-download-outline"
         and button.get("whenKey") == "can_hard_pull"
+        and "Workspace source" in str(button.get("tooltip") or "")
         for button in scenario_buttons
     )
     scenario_actions = by_id["infrastate-scenarios"].get("actions") or []
