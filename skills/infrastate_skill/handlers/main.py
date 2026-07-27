@@ -9532,12 +9532,24 @@ async def on_runtime_event(evt: Any) -> None:
     payload = getattr(evt, "payload", evt)
     try:
         event_type = str(getattr(evt, "type", "") or (payload.get("type") if isinstance(payload, dict) else "") or "runtime.event")
-        if event_type == "sys.ready":
-            return
-        _invalidate_runtime_caches(webspace_id=_webspace_id_from_payload(payload))
+        webspace_id = _webspace_id_from_payload(payload)
+        _invalidate_runtime_caches(webspace_id=webspace_id)
         _append_event(event_type, payload)
+        state = str(payload.get("state") or "").strip().lower() if isinstance(payload, dict) else ""
+        phase = str(payload.get("phase") or "").strip().lower() if isinstance(payload, dict) else ""
+        terminal_core_update = event_type in {"core.update.status", "hub.core_update.status"} and (
+            state in {"failed", "cancelled", "canceled", "rolled_back"}
+            or (state == "succeeded" and phase == "validate")
+        )
+        if event_type == "sys.ready" or terminal_core_update:
+            # First paint and supervisor-finalized root restarts must be
+            # materialized before the lifecycle event completes. A detached
+            # debounce task can otherwise be cancelled with the dispatch loop,
+            # leaving the persisted Yjs card on its pre-restart value.
+            await _refresh_snapshot_async(webspace_id=webspace_id, allow_cache=False)
+            return
         _schedule_snapshot_refresh(
-            webspace_id=_webspace_id_from_payload(payload),
+            webspace_id=webspace_id,
             reason=event_type,
         )
     except Exception:

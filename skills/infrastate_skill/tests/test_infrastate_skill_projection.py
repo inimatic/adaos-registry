@@ -3545,8 +3545,11 @@ def test_infrastate_inventory_row_patch_is_compact(monkeypatch):
 def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
     mod = _load_infrastate_module()
     invalidated: list[str | None] = []
-    refreshed: list[tuple[str | None, str]] = []
+    refreshed: list[tuple[str | None, bool]] = []
     appended: list[str] = []
+
+    async def _refresh(*, webspace_id=None, allow_cache=True):
+        refreshed.append((webspace_id, allow_cache))
 
     monkeypatch.setattr(
         mod,
@@ -3556,8 +3559,13 @@ def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
     monkeypatch.setattr(mod, "_append_event", lambda event_type, payload: appended.append(event_type))
     monkeypatch.setattr(
         mod,
+        "_refresh_snapshot_async",
+        _refresh,
+    )
+    monkeypatch.setattr(
+        mod,
         "_schedule_snapshot_refresh",
-        lambda *, webspace_id=None, reason="runtime.event": refreshed.append((webspace_id, reason)),
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("terminal status must refresh inline")),
     )
 
     asyncio.run(
@@ -3566,6 +3574,7 @@ def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
                 type="core.update.status",
                 payload={
                     "state": "succeeded",
+                    "phase": "validate",
                     "webspace_id": "default",
                 },
             )
@@ -3574,7 +3583,28 @@ def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
 
     assert invalidated == ["default"]
     assert appended == ["core.update.status"]
-    assert refreshed == [("default", "core.update.status")]
+    assert refreshed == [("default", False)]
+
+
+def test_infrastate_sys_ready_materializes_first_paint_inline(monkeypatch):
+    mod = _load_infrastate_module()
+    refreshed: list[tuple[str | None, bool]] = []
+
+    async def _refresh(*, webspace_id=None, allow_cache=True):
+        refreshed.append((webspace_id, allow_cache))
+
+    monkeypatch.setattr(mod, "_invalidate_runtime_caches", lambda **_kwargs: None)
+    monkeypatch.setattr(mod, "_append_event", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "_refresh_snapshot_async", _refresh)
+    monkeypatch.setattr(
+        mod,
+        "_schedule_snapshot_refresh",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("sys.ready must refresh inline")),
+    )
+
+    asyncio.run(mod.on_runtime_event(SimpleNamespace(type="sys.ready", payload={"ts": 1.0})))
+
+    assert refreshed == [(None, False)]
 
 
 def test_infrastate_marketplace_hides_skills_installed_via_scenario_dependencies(monkeypatch):
