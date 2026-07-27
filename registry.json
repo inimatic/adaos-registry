@@ -311,7 +311,7 @@
       "kind": "skill",
       "id": "infrastate_skill",
       "name": "infrastate_skill",
-      "version": "0.75.56",
+      "version": "0.75.57",
       "updated_at": "2026-07-23T09:49:36+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
@@ -328,15 +328,8 @@
       "runtime_python": "3.11",
       "activation": {
         "mode": "lazy",
-        "when": {
-          "scenarios_active": [
-            "web_desktop"
-          ],
-          "client_presence": true,
-          "webspace_scope": "active"
-        },
-        "startup_allowed": false,
-        "background_refresh": false
+        "startup_allowed": true,
+        "background_refresh": true
       },
       "tools_count": 7
     },

@@ -1,18 +1,13 @@
 name: infrastate_skill
-version: 0.75.56
+version: 0.75.57
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
   python: '3.11'
   activation:
     mode: lazy
-    startup_allowed: false
-    background_refresh: false
-    when:
-      scenarios_active:
-      - web_desktop
-      client_presence: true
-      webspace_scope: active
+    startup_allowed: true
+    background_refresh: true
 dependencies: []
 events:
   subscribe:

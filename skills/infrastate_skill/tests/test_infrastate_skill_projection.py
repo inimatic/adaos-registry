@@ -3306,6 +3306,28 @@ def test_infrastate_manifest_wakes_on_webio_stream_controls():
     assert "\n  - webio.stream.subscription.changed\n" in manifest
 
 
+def test_infrastate_manifest_admits_boot_and_background_status_events():
+    mod = _load_infrastate_module()
+    skill_dir = Path(__file__).resolve().parents[1]
+    manifest = mod.yaml.safe_load((skill_dir / "skill.yaml").read_text(encoding="utf-8"))
+    activation = ((manifest.get("runtime") or {}).get("activation") or {})
+
+    assert activation.get("mode") == "lazy"
+    assert activation.get("startup_allowed") is True
+    assert activation.get("background_refresh") is True
+    assert not activation.get("when")
+
+    from adaos.services.skill.activation import load_skill_activation_policy, subscription_event_admission
+
+    policy = load_skill_activation_policy(skill_dir.parent, "infrastate_skill")
+    admitted = subscription_event_admission(
+        policy,
+        SimpleNamespace(type="sys.ready", payload={"ts": 1.0}),
+        "sys.ready",
+    )
+    assert admitted["allowed"] is True
+
+
 def test_infrastate_marketplace_action_opens_modal_without_host_roundtrip():
     webui = json.loads((Path(__file__).resolve().parents[1] / "webui.json").read_text(encoding="utf-8"))
     widgets = webui["registry"]["modals"]["infrastate_modal"]["schema"]["widgets"]
