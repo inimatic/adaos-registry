@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.0.7
+version: 0.1.37
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -392,6 +392,191 @@ tools:
         minLength: 1
   output_schema:
     type: object
+- name: plan_change_set
+  description: Project one user request into a bounded executable Builder change set.
+  entry: handlers.main:plan_change_set
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - request
+    - issues
+    properties:
+      request:
+        type: string
+        minLength: 1
+        maxLength: 4000
+      issues:
+        type: array
+        minItems: 1
+        maxItems: 50
+        items:
+          type: object
+          required:
+          - title
+          - lane
+          - acceptance_criteria
+          properties:
+            issue_id:
+              type: string
+              minLength: 1
+              maxLength: 80
+            title:
+              type: string
+              minLength: 1
+              maxLength: 240
+            lane:
+              type: string
+              enum:
+              - prototype
+              - automation
+            acceptance_criteria:
+              type: array
+              minItems: 1
+              maxItems: 20
+              items:
+                type: string
+                minLength: 1
+                maxLength: 500
+      change_set_id:
+        type: string
+      supersedes_change_set_id:
+        type: string
+      source_message_ids:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: add_change_issues
+  description: Add follow-up issues to the active Builder change set without replacing
+    its history.
+  entry: handlers.main:add_change_issues
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - request
+    - issues
+    properties:
+      request:
+        type: string
+        minLength: 1
+        maxLength: 4000
+      issues:
+        type: array
+        minItems: 1
+        maxItems: 50
+        items:
+          type: object
+          required:
+          - title
+          - lane
+          - acceptance_criteria
+          properties:
+            issue_id:
+              type: string
+              minLength: 1
+              maxLength: 80
+            title:
+              type: string
+              minLength: 1
+              maxLength: 240
+            lane:
+              type: string
+              enum:
+              - prototype
+              - automation
+            acceptance_criteria:
+              type: array
+              minItems: 1
+              maxItems: 20
+              items:
+                type: string
+                minLength: 1
+                maxLength: 500
+      change_set_id:
+        type: string
+      change_id:
+        type: string
+      source_message_ids:
+        type: array
+        maxItems: 100
+        items:
+          type: string
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+- name: get_change_set
+  description: Read the active Builder change set and its durable evidence.
+  entry: handlers.main:get_change_set
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: update_change_issue
+  description: Update one local issue item in the active Builder change set.
+  entry: handlers.main:update_change_issue
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - issue_id
+    - status
+    properties:
+      issue_id:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        enum:
+        - open
+        - in_progress
+        - resolved
+        - deferred
+      change_set_id:
+        type: string
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
 - name: archive_project
   description: Archive or restore a DEV project in Builder.
   entry: handlers.main:archive_project
@@ -515,8 +700,7 @@ tools:
   output_schema:
     type: object
 - name: get_lifecycle
-  description: Project Builder lifecycle with bounded automation results and durable
-    publication releases.
+  description: Project dependent Prototype to Automation to Publication lineage.
   entry: handlers.main:get_lifecycle
   input_schema:
     type: object
@@ -533,7 +717,7 @@ tools:
         type: string
   output_schema:
     type: array
-    maxItems: 3
+    maxItems: 1
     items:
       type: object
       required:
@@ -624,6 +808,93 @@ tools:
         type: string
   output_schema:
     type: object
+- name: recover_validated_automation
+  description: Activate a preserved, committed, and validated Automation result after
+    a retryable post-commit failure without assigning Codex again.
+  entry: handlers.main:recover_validated_automation
+  side_effects: local_write
+  timeout_seconds: 180
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: reconcile_automation_checkpoint
+  description: Reconcile failed paired Forge checkpoints with the original change
+    identity when a partial commit already exists, without assigning Codex again.
+  entry: handlers.main:reconcile_automation_checkpoint
+  side_effects: external_write
+  timeout_seconds: 180
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: get_subscription_update
+  description: Inspect the selected project's stable subscription and deterministic
+    update plan.
+  entry: handlers.main:get_subscription_update
+  input_schema:
+    type: object
+    properties:
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: apply_subscription_update
+  description: Apply exactly one reviewed package update with transactional runtime
+    verification.
+  entry: handlers.main:apply_subscription_update
+  side_effects: external_write
+  timeout_seconds: 180
+  input_schema:
+    type: object
+    required:
+    - expected_plan_digest
+    properties:
+      expected_plan_digest:
+        type: string
+        minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+      approve_permissions:
+        type: boolean
+        default: false
+      webspace_id:
+        type: string
+      idempotency_key:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
 - name: create_project
   description: Create a new DEV skill or scenario from a template.
   entry: handlers.main:create_project
@@ -647,11 +918,13 @@ tools:
   output_schema:
     type: object
 - name: push_project
-  description: Checkpoint a DEV project in Forge.
+  description: Checkpoint a DEV project as an exact Forge revision and immutable package.
   entry: handlers.main:push_project
   timeout_seconds: 120
   input_schema:
     type: object
+    required:
+    - checkpoint_id
     properties:
       object_type:
         type: string
@@ -663,12 +936,17 @@ tools:
         minLength: 1
       message:
         type: string
+      checkpoint_id:
+        type: string
+        minLength: 1
+        description: Caller-assigned immutable identity for this checkpoint operation.
       webspace_id:
         type: string
   output_schema:
     type: object
 - name: publish_project
-  description: Validate or publish a DEV project release.
+  description: Prepare an isolated candidate trial or explicitly accept and promote
+    it.
   entry: handlers.main:publish_project
   timeout_seconds: 180
   input_schema:
@@ -741,6 +1019,74 @@ tools:
     - project
     - checks
 data_routes:
+- surface: widget:builder.change_set
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_change_set
+  first_paint: active bounded change set or an explicit not-planned state
+  recovery: preserve the last projection while durable Builder Change evidence is
+    reconciled
+  update_source:
+  - plan_change_set
+  - add_change_issues
+  - update_change_issue
+  - start_automation
+  - submit_automation
+  - return_to_prototype
+  - push_project
+  - publish_project
+  budget:
+    max_payload_bytes: 65536
+    max_items: 50
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.2
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.change_set
+    - builder.project.lifecycle
+  guard_visibility:
+    degraded_state: change set evidence is stale; execution controls remain gated
+      by workflow state
+    log: service.builder_sdk_control_skill.runtime.log
+    quarantine: false
+    metric: data_route.builder_change_set_read
+- surface: widget:builder.subscription_update_plan
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_subscription_update
+  first_paint: stable subscription status or an explicit unavailable state
+  recovery: preserve the reviewed plan while a refresh is retried; activation always
+    revalidates its digest
+  update_source:
+  - apply_subscription_update
+  budget:
+    max_payload_bytes: 65536
+    max_items: 100
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 0.1
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.subscription
+    - builder.project.publication
+  guard_visibility:
+    degraded_state: update plan is unavailable; no activation action is enabled
+    log: service.builder_sdk_control_skill.runtime.log
+    quarantine: false
+    metric: data_route.builder_subscription_update
 - surface: widget:builder.overview.project_state
   route: tool/details
   owner: skill:builder_sdk_control_skill
@@ -1050,4 +1396,13 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-07-24T09:20:27+00:00'
+updated_at: '2026-07-28T15:47:41+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.0+4143.008765a8
+    recorded_at: '2026-07-28T15:47:41+00:00'
+    source: skill_push
+    min_commit: 008765a860d6e3baa6d741f5b3a2913674dbfc0c
+    min_short_commit: 008765a8
+    build_date: '2026-07-28T18:38:51+03:00'
+
