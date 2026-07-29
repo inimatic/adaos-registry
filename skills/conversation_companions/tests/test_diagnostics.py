@@ -5,6 +5,7 @@ import json
 import pathlib
 import re
 import sys
+from importlib import resources
 
 import yaml
 from jsonschema import Draft202012Validator
@@ -29,11 +30,13 @@ def _find_repo_root() -> pathlib.Path:
     raise FileNotFoundError(f"Cannot find repo root containing {marker}")
 
 
-REPO_ROOT = _find_repo_root()
-
-
 def _load_webui_schema() -> dict:
-    path = REPO_ROOT / "src" / "adaos" / "abi" / "webui.v1.schema.json"
+    try:
+        return json.loads(resources.files("adaos.abi").joinpath("webui.v1.schema.json").read_text(encoding="utf-8"))
+    except (FileNotFoundError, ModuleNotFoundError):
+        pass
+    repo_root = _find_repo_root()
+    path = repo_root / "src" / "adaos" / "abi" / "webui.v1.schema.json"
     return json.loads(path.read_text(encoding="utf-8"))
 
 
