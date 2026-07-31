@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-07-28T15:47:41+00:00",
+  "updated_at": "2026-07-31T12:21:52+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -114,8 +114,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.1.37",
-      "updated_at": "2026-07-28T15:47:41+00:00",
+      "version": "0.1.58",
+      "updated_at": "2026-07-30T05:55:23+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -130,14 +130,14 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 40
+      "tools_count": 49
     },
     {
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.3.13",
-      "updated_at": "2026-07-28T10:20:54+00:00",
+      "version": "0.3.25",
+      "updated_at": "2026-07-31T12:21:52+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -152,7 +152,7 @@
       "description": "Rapid prototyping Builder skill for creating and editing scenario UI drafts from voice or text dialog.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 14
+      "tools_count": 15
     },
     {
       "kind": "skill",
@@ -671,7 +671,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-07-28T15:30:20+00:00",
+      "updated_at": "2026-07-31T05:02:24+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
@@ -808,6 +808,28 @@
     },
     {
       "kind": "skill",
+      "id": "test05_recipes_skill",
+      "name": "test05_recipes_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-07-29T17:25:33+00:00",
+      "path": "skills/test05_recipes_skill",
+      "manifest": "skills/test05_recipes_skill/skill.yaml",
+      "source": {
+        "path": "skills/test05_recipes_skill",
+        "manifest": "skills/test05_recipes_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "test05_recipes_skill",
+        "id": "test05_recipes_skill"
+      },
+      "description": "Локальная книга рецептов с поиском и избранным.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 4
+    },
+    {
+      "kind": "skill",
       "id": "voice_chat_skill",
       "name": "voice_chat_skill",
       "version": "0.6.17",
@@ -876,8 +898,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.28",
-      "updated_at": "2026-07-28T10:20:58+00:00",
+      "version": "0.2.55",
+      "updated_at": "2026-07-30T05:55:56+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
@@ -894,11 +916,12 @@
         "fallback": "Builder",
         "key": "scenario.builder.title"
       },
-      "description": "Functional Builder workspace for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
+      "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
       "skills": {
         "required": [
           "builder_skill",
-          "builder_sdk_control_skill"
+          "builder_sdk_control_skill",
+          "voice_chat_skill"
         ]
       }
     },
@@ -1156,6 +1179,36 @@
       "skills": {
         "required": [
           "test03_recipes_skill"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "test05_recipes",
+      "name": "test05_recipes",
+      "version": "0.1.4",
+      "updated_at": "2026-07-29T17:25:37+00:00",
+      "path": "scenarios/test05_recipes",
+      "manifest": "scenarios/test05_recipes/scenario.yaml",
+      "source": {
+        "path": "scenarios/test05_recipes",
+        "manifest": "scenarios/test05_recipes/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "test05_recipes",
+        "id": "test05_recipes"
+      },
+      "title": "Домашняя книга рецептов",
+      "title_i18n": {
+        "fallback": "Домашняя книга рецептов",
+        "key": "scenario.test05_recipes.title"
+      },
+      "description": "Локальная книга рецептов с поиском, добавлением и избранным.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "test05_recipes_skill"
         ]
       }
     },

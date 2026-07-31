@@ -1,8 +1,10 @@
 name: builder_skill
-version: 0.2.114
+version: 0.3.25
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
+workflow:
+  manifest: workflow.json
 runtime:
   python: '3.11'
   sdk_only: true
@@ -17,6 +19,7 @@ exports:
   tools:
   - start
   - chat
+  - handle_interaction_response
   - create_scenario_draft
   - update_current_scenario
   - get_session
@@ -40,6 +43,10 @@ tools:
         type: string
       webspace_id:
         type: string
+      conversation_context:
+        type: object
+        description: Bounded AdaOS conversation context supplied by the canonical
+          Router.
     additionalProperties: true
   output_schema:
     type: object
@@ -60,6 +67,10 @@ tools:
         type: string
       auto_apply:
         type: boolean
+      conversation_context:
+        type: object
+        description: Bounded AdaOS conversation context supplied by the canonical
+          Router.
     additionalProperties: true
   output_schema:
     type: object
@@ -67,6 +78,26 @@ tools:
     - ok
     - message
     - dialog
+- name: handle_interaction_response
+  description: Handle one validated semantic Builder interaction response routed by
+    AdaOS core.
+  entry: handlers.main:handle_interaction_response
+  timeout_seconds: 30
+  input_schema:
+    type: object
+    required:
+    - event
+    properties:
+      event:
+        type: object
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
 - name: create_scenario_draft
   description: Create a new dev-space scenario draft with a declarative web UI prototype.
   entry: handlers.main:create_scenario_draft
@@ -105,6 +136,10 @@ tools:
         type: string
       webspace_id:
         type: string
+      conversation_context:
+        type: object
+        description: Bounded AdaOS conversation context supplied by the canonical
+          Router.
     additionalProperties: true
   output_schema:
     type: object
@@ -286,14 +321,29 @@ data_routes:
   recovery: get_preview_state rebuilds preview from skill-local session and dev scenario
     files
   guard_visibility: Builder reports degraded preview state in tool response
+  budget:
+    max_items: 25
+    max_payload_bytes: 524288
 - surface: builder workbench state
   route: yjs
   path: data.builder
   owner: skill:builder_skill
+  projection_slot: builder
   first_paint: empty workbench binding with embedded Voice Chat widget config
   recovery: get_workspace_binding and get_preview_state republish data.builder from
     state/builder/workbench
   guard_visibility: Builder reports projection publication status in tool response
+  budget:
+    max_payload_bytes: 131072
+    max_publish_hz: 2
+    coalesce_ms: 250
+    snapshot_policy: none
+data_projections:
+- scope: subnet
+  slot: builder
+  targets:
+  - backend: yjs
+    path: data/builder
 llm_hints:
   description: Builder rapid prototyping agent. Use when the user asks Builder/Строитель
     to create or change an application, scenario, form, list, table, card view, or
@@ -357,7 +407,7 @@ conversation:
     - builder
     - buikder
     - билдер
-updated_at: '2026-07-18T21:00:18+00:00'
+updated_at: '2026-07-31T12:21:52+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3777.6c9842b9
@@ -366,4 +416,4 @@ compatibility:
     min_commit: 6c9842b91344923f5fa57860e1ef636eddac864f
     min_short_commit: 6c9842b9
     build_date: '2026-07-18T23:48:21+03:00'
-
+prototype: builder_skill

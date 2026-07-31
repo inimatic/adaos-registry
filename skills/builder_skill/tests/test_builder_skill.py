@@ -54,6 +54,28 @@ def _load_module():
     return module
 
 
+def _stub_development_context(skill, monkeypatch) -> dict:
+    packet = {
+        "schema": "adaos.builder.context_packet.v1",
+        "project": {"object_type": "scenario", "object_id": "test"},
+        "change": {"change_id": "builder_change_test"},
+        "conversation": None,
+        "pending_actions": [],
+        "digest": "sha256:" + ("1" * 64),
+    }
+    monkeypatch.setattr(
+        skill,
+        "_builder_development_context_packet",
+        lambda **_kwargs: {
+            "ok": True,
+            "packet": copy.deepcopy(packet),
+            "digest": packet["digest"],
+            "change_id": "builder_change_test",
+        },
+    )
+    return packet
+
+
 def test_manifest_declares_builder_dialog_agent() -> None:
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
 
@@ -62,9 +84,219 @@ def test_manifest_declares_builder_dialog_agent() -> None:
     assert {"start", "chat", "create_scenario_draft", "update_current_scenario", "get_preview_state"}.issubset(tools)
     assert tools_by_name["chat"]["timeout_seconds"] >= 120
     assert tools_by_name["update_current_scenario"]["timeout_seconds"] >= 120
+    for tool_name in ("start", "chat", "update_current_scenario"):
+        assert tools_by_name[tool_name]["input_schema"]["properties"]["conversation_context"]["type"] == "object"
+    assert "conversation_context" not in tools_by_name["create_scenario_draft"]["input_schema"]["properties"]
     assert manifest["default_tool"] == "chat"
     assert manifest["conversation"]["dialog_channel"]["id"] == "builder"
     assert manifest["conversation"]["agents"][0]["id"] == "agent:builder_skill:builder"
+
+
+def test_builder_development_context_uses_project_pending_refs_and_conversation(monkeypatch) -> None:
+    skill = _load_module()
+    calls: list[dict] = []
+    conversation_context = {
+        "schema": "adaos.context.packet.v1",
+        "conversation_id": "conv.builder.recipes",
+        "messages": [{"id": "message-1", "role": "user", "text": "Keep it compact."}],
+    }
+    monkeypatch.setattr(
+        skill.sdk_pending_actions,
+        "list_pending_actions",
+        lambda **_kwargs: {
+            "active_items": [
+                {
+                    "id": "pending-recipes",
+                    "kind": "builder.prototype.review",
+                    "status": "pending",
+                    "domain_ref": {"object_type": "scenario", "object_id": "recipes"},
+                    "allowed_actions": ["approve", "reject"],
+                    "payload": {"secret": "must not be forwarded"},
+                },
+                {
+                    "id": "pending-other",
+                    "kind": "builder.prototype.review",
+                    "status": "pending",
+                    "domain_ref": {"object_type": "scenario", "object_id": "other"},
+                },
+            ]
+        },
+    )
+
+    def _build_context_packet(*args, **kwargs):
+        calls.append({"args": args, "kwargs": kwargs})
+        return {
+            "schema": "adaos.builder.context_packet.v1",
+            "change": {"change_id": "CH-recipes"},
+            "conversation": kwargs["conversation_context"],
+            "pending_actions": kwargs["pending_action_refs"],
+            "digest": "sha256:" + ("2" * 64),
+        }
+
+    monkeypatch.setattr(skill.sdk_builder_workflow, "build_context_packet", _build_context_packet)
+
+    result = skill._builder_development_context_packet(
+        webspace_id="desktop-dev",
+        session={"artifact_kind": "scenario", "scenario_id": "recipes"},
+        conversation_context=conversation_context,
+        _meta={"message_id": "message-1", "thread_id": "thread-recipes"},
+    )
+
+    assert result["ok"] is True
+    assert result["change_id"] == "CH-recipes"
+    assert calls[0]["args"] == ("scenario", "recipes")
+    assert calls[0]["kwargs"]["conversation_context"] == conversation_context
+    assert calls[0]["kwargs"]["instruction_refs"] == ["message-1", "thread-recipes"]
+    assert calls[0]["kwargs"]["persist"] is True
+    assert calls[0]["kwargs"]["pending_action_refs"] == [
+        {
+            "id": "pending-recipes",
+            "kind": "builder.prototype.review",
+            "status": "pending",
+            "webspace_id": None,
+            "domain_ref": {"object_type": "scenario", "object_id": "recipes"},
+            "allowed_actions": ["approve", "reject"],
+            "expires_at": None,
+        }
+    ]
+
+
+def test_builder_llm_request_carries_bounded_development_context() -> None:
+    skill = _load_module()
+    session = {
+        "scenario_id": "recipes",
+        "title": "Recipes",
+        "fields": [{"id": "title", "type": "string", "label": "Title"}],
+        "patches": [],
+    }
+    packet = {
+        "schema": "adaos.builder.context_packet.v1",
+        "project": {"object_type": "scenario", "object_id": "recipes"},
+        "change": {"change_id": "CH-recipes"},
+        "conversation": {
+            "schema": "adaos.context.packet.v1",
+            "messages": [{"id": "message-1", "role": "user", "text": "Keep it compact."}],
+        },
+        "pending_actions": [],
+        "digest": "sha256:" + ("3" * 64),
+    }
+
+    request = skill._builder_llm_webui_transform_request(
+        session=session,
+        instruction="Move the search field above the list.",
+        preview_state=skill._preview_state(session=session),
+        _meta={"builder_context_packet": packet},
+    )
+
+    assert request["dynamic_request"]["development_context"] == packet
+    assert "development_context" not in json.loads(request["stable_user_prompt"])["stable_builder_context"]
+    assert "retrieved untrusted evidence" in request["system_prompt"]
+
+
+def test_chat_forwards_router_conversation_context_to_prototype(monkeypatch) -> None:
+    skill = _load_module()
+    calls: list[dict] = []
+    conversation_context = {"schema": "adaos.context.packet.v1", "messages": []}
+    session = {"id": "session-recipes", "scenario_id": "recipes", "artifact_kind": "scenario"}
+    binding = {"dev_webspace_id": "desktop-dev", "runtime_scenario_id": "recipes"}
+    topic = {"thread_id": "prompt-project:scenario:recipes"}
+    monkeypatch.setattr(skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (session, binding))
+    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: topic)
+    monkeypatch.setattr(skill, "_route_automation_chat", lambda **_kwargs: None)
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(skill, "_dialog_state", lambda *_args, **_kwargs: {"thread_id": topic["thread_id"]})
+    monkeypatch.setattr(
+        skill,
+        "update_current_scenario",
+        lambda **kwargs: calls.append(kwargs)
+        or {"ok": True, "status": "updated", "message": "Updated.", "topic": topic},
+    )
+
+    result = skill.chat(
+        "Move the search field.",
+        webspace_id="desktop",
+        conversation_context=conversation_context,
+    )
+
+    assert result["ok"] is True
+    assert calls[0]["conversation_context"] is conversation_context
+
+
+def test_prototype_revision_evaluates_durable_review_constraints(monkeypatch) -> None:
+    skill = _load_module()
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        skill.sdk_builder_review,
+        "evaluate_current",
+        lambda *args, **kwargs: calls.append({"args": args, "kwargs": kwargs})
+        or {"ok": True, "revision": kwargs["revision"], "evaluations": []},
+    )
+
+    result = skill._evaluate_review_constraints(
+        {"scenario_id": "recipes"},
+        revision="007",
+    )
+
+    assert result["ok"] is True
+    assert calls == [
+        {
+            "args": ("scenario", "recipes"),
+            "kwargs": {"revision": "007"},
+        }
+    ]
+
+
+def test_change_intake_splits_user_remarks_and_routes_each_lane() -> None:
+    skill = _load_module()
+    issues = skill._builder_change_issues(
+        "Добавь панель избранного.\n2. Синхронизируй избранное с API магазина.",
+        change_id="builder_change_test",
+    )
+
+    assert [item["lane"] for item in issues] == ["prototype", "automation"]
+    assert issues[0]["title"] == "Добавь панель избранного."
+    assert issues[1]["title"] == "Синхронизируй избранное с API магазина."
+    assert all(item["acceptance_criteria"] for item in issues)
+
+
+def test_change_intake_appends_followup_to_active_change_set(monkeypatch) -> None:
+    skill = _load_module()
+    transitions: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_state",
+        lambda *args: {
+            "change_set": {
+                "change_set_id": "CS-active",
+                "status": "in_progress",
+                "member_change_ids": ["CS-active"],
+            }
+        },
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "transition",
+        lambda *args, **kwargs: transitions.append((args[2], kwargs["metadata"]))
+        or {"ok": True, "workflow": {"change_set": {"change_set_id": "CS-active"}}},
+    )
+
+    result = skill._register_builder_change_set(
+        session={
+            "id": "session-1",
+            "artifact_kind": "scenario",
+            "scenario_id": "recipes",
+        },
+        patch={"id": "patch-followup"},
+        request_text="Добавь поле статуса.",
+        _meta={"message_id": "message-followup"},
+    )
+
+    assert result["ok"] is True
+    assert transitions[0][0] == "change_issues_added"
+    assert transitions[0][1]["change_set_id"] == "CS-active"
+    assert transitions[0][1]["issues"][0]["lane"] == "prototype"
+    assert transitions[0][1]["source_message_ids"] == ["message-followup"]
 
 
 def test_explicit_app_title_wins_over_incidental_shopping_list_mention() -> None:
@@ -310,10 +542,11 @@ def test_sync_session_from_artifacts_refreshes_stale_current_revision(tmp_path) 
     changed = skill._sync_session_from_artifacts(session)
 
     assert changed is True
-    assert session["version"] == "024"
+    assert session["version"] == session["ui_revision"]
+    assert len(session["version"]) == 3 and session["version"].isdigit()
     assert session["ui_revision"] == "024"
     assert session["title"] == "Updated Prototype"
-    assert session["preview_state"]["version"] == "024"
+    assert session["preview_state"]["version"] == session["ui_revision"]
     assert session["preview_state"]["title"] == "Updated Prototype"
     assert session["preview_state"]["page_schema"]["widgets"][0]["type"] == "ui.form"
     assert session["ui_revisions"][-1]["revision"] == "024"
@@ -451,6 +684,68 @@ def test_update_current_scenario_adds_card_view(monkeypatch, tmp_path) -> None:
     assert any(item["type"] == "card_list" for item in result["preview_state"]["current_ui"]["children"])
 
 
+def test_functional_request_is_planned_for_automation_without_mutating_prototype(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "shopping_list"
+
+    class _Service:
+        @classmethod
+        def from_context(cls):
+            return cls()
+
+        def create_draft(self, **_kwargs):
+            artifact_root.mkdir(parents=True, exist_ok=True)
+            return {
+                "ok": True,
+                "draft": {"draft_id": "draft.shopping"},
+                "artifact_root": str(artifact_root),
+            }
+
+    import adaos.services.builder.workspace as workspace
+
+    monkeypatch.setattr(workspace, "BuilderWorkspaceService", _Service)
+    skill.create_scenario_draft("создай список покупок", webspace_id="builder-functional")
+    before = (artifact_root / "webui.json").read_bytes()
+    monkeypatch.setattr(skill.sdk_builder_workflow, "get_state", lambda *args: {"change_set": None})
+
+    def _transition(*args, **kwargs):
+        metadata = kwargs["metadata"]
+        return {
+            "ok": True,
+            "workflow": {
+                "change_set": {
+                    "change_set_id": metadata["change_set_id"],
+                    "status": "planned",
+                    "route": "automation_direct",
+                    "gate": "automation",
+                    "issues": metadata["issues"],
+                    "member_change_ids": [metadata["change_set_id"]],
+                }
+            },
+        }
+
+    monkeypatch.setattr(skill.sdk_builder_workflow, "transition", _transition)
+    monkeypatch.setattr(
+        skill,
+        "_builder_llm_primary_enabled",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("functional request must not mutate the Prototype")
+        ),
+    )
+
+    result = skill.update_current_scenario(
+        "Синхронизируй данные с API магазина.",
+        webspace_id="builder-functional",
+    )
+
+    assert result["status"] == "automation_handoff_required"
+    assert result["change_set"]["route"] == "automation_direct"
+    assert (artifact_root / "webui.json").read_bytes() == before
+
+
 def test_card_view_hides_table_in_generated_page_schema(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "todo_cards"
@@ -579,6 +874,7 @@ def test_update_current_scenario_swaps_input_and_cards_with_lost_cyrillic(monkey
 
 def test_update_current_scenario_prefers_llm_for_ui_changes_when_enabled(monkeypatch, tmp_path) -> None:
     skill = _load_module()
+    _stub_development_context(skill, monkeypatch)
     artifact_root = tmp_path / "todo_swap_no_llm"
     monkeypatch.setenv("ADAOS_BUILDER_LLM_IN_TESTS", "1")
     llm_calls: list[dict] = []
@@ -770,6 +1066,7 @@ def test_update_current_scenario_adds_execution_checkbox(monkeypatch, tmp_path) 
 
 def test_update_current_scenario_uses_llm_webui_fallback(monkeypatch, tmp_path) -> None:
     skill = _load_module()
+    _stub_development_context(skill, monkeypatch)
     artifact_root = tmp_path / "llm_fallback"
     monkeypatch.setenv("ADAOS_BUILDER_LLM_IN_TESTS", "1")
 
@@ -944,8 +1241,19 @@ def test_builder_llm_job_submit_timeout_default_allows_root_fallback(monkeypatch
     assert skill._builder_llm_job_submit_timeout_s() == 15.0
 
 
+def test_one_shot_dev_tool_disables_async_builder_llm(monkeypatch) -> None:
+    skill = _load_module()
+
+    monkeypatch.setenv("ADAOS_DEV_TOOL_EXECUTION_MODE", "oneshot")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_ASYNC", "1")
+    monkeypatch.setenv("ADAOS_BUILDER_LLM_ASYNC_IN_TESTS", "1")
+
+    assert skill._builder_llm_async_enabled() is False
+
+
 def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> None:
     skill = _load_module()
+    _stub_development_context(skill, monkeypatch)
     import adaos.sdk.llm.llm_client as llm_client
 
     artifact_root = tmp_path / "async_llm"
@@ -1083,6 +1391,7 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
     )
 
     assert result["status"] == "llm_pending"
+    assert result["context_packet_digest"] == "sha256:" + ("1" * 64)
     assert result["llm_job"]["job_id"] == "llm_job_async_test"
     assert result["llm_job"]["local_job_id"].startswith("builder_llm_submit_")
     assert result["message_meta"]["progress_group_id"] == "llm_job_async_test"
@@ -1127,6 +1436,7 @@ def test_update_current_scenario_uses_async_llm_job(monkeypatch, tmp_path) -> No
 
 def test_update_current_scenario_blocks_parallel_llm_jobs(monkeypatch) -> None:
     skill = _load_module()
+    _stub_development_context(skill, monkeypatch)
 
     monkeypatch.setenv("ADAOS_BUILDER_LLM_IN_TESTS", "1")
     monkeypatch.setenv("ADAOS_BUILDER_LLM_ASYNC_IN_TESTS", "1")
@@ -1388,7 +1698,7 @@ def test_save_session_merges_pending_llm_jobs_without_downgrading_terminal_state
     assert pending["llm_job_merge"]["local_job_id"] == "builder_llm_submit_merge"
 
 
-def test_submit_llm_webui_transform_job_retries_request_id_conflict(monkeypatch, tmp_path) -> None:
+def test_submit_llm_webui_transform_job_does_not_retry_request_id_conflict(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     import adaos.sdk.llm.llm_client as llm_client
     from adaos.services.root.client import RootHttpError
@@ -1408,21 +1718,12 @@ def test_submit_llm_webui_transform_job_retries_request_id_conflict(monkeypatch,
     def _submit_response_job(_messages, **kwargs):
         request_id = str(kwargs.get("request_id") or "")
         calls.append(request_id)
-        if len(calls) == 1:
-            raise RootHttpError(
-                "llm_request_id_conflict",
-                status_code=409,
-                error_code="llm_request_id_conflict",
-                payload={"code": "llm_request_id_conflict"},
-            )
-        return {
-            "ok": True,
-            "schema": "adaos.root.llm.job.v1",
-            "job_id": "llm_job_conflict_retry",
-            "request_id": request_id,
-            "status": "queued",
-            "_client": {"base_url": "https://ru.api.inimatic.com"},
-        }
+        raise RootHttpError(
+            "llm_request_id_conflict",
+            status_code=409,
+            error_code="llm_request_id_conflict",
+            payload={"code": "llm_request_id_conflict"},
+        )
 
     monkeypatch.setattr(llm_client, "submit_response_job", _submit_response_job)
 
@@ -1433,17 +1734,31 @@ def test_submit_llm_webui_transform_job_retries_request_id_conflict(monkeypatch,
         job_nonce="builder_llm_submit_deadbeef",
     )
 
-    assert result["ok"] is True
-    assert result["pending"] is True
-    assert result["job_id"] == "llm_job_conflict_retry"
-    assert result["request_id"] == calls[1]
-    assert len(calls) == 2
-    assert calls[0] != calls[1]
+    assert result["ok"] is False
+    assert result["error"] == "llm_job_submit_failed"
+    assert result["request_id"] == calls[0]
+    assert len(calls) == 1
     assert all(item.startswith("builder-ui-") and "-job-" in item for item in calls)
     attempts = result["timing"]["submit_attempts"]
     assert attempts[0]["ok"] is False
     assert attempts[0]["error"] == "llm_request_id_conflict"
-    assert attempts[1]["ok"] is True
+
+
+def test_new_transport_corrupted_text_is_rejected_before_writes(monkeypatch) -> None:
+    skill = _load_module()
+    writes: list[object] = []
+    monkeypatch.setattr(skill, "_mem_set_many", lambda values: writes.append(values))
+
+    skill._reject_transport_corrupted_text(
+        "Создай рабочее место для русскоязычной команды",
+        field="text",
+    )
+    with pytest.raises(ValueError, match="transport-corrupted"):
+        skill.create_scenario_draft("????")
+    with pytest.raises(ValueError, match="transport-corrupted"):
+        skill.chat("broken \ufffd text")
+
+    assert writes == []
 
 
 def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_path) -> None:
@@ -3735,6 +4050,7 @@ def test_repair_mojibake_text_handles_common_cyrillic_and_keeps_other_languages(
 
 def test_update_current_scenario_sample_data_uses_llm_payload_and_refreshes_files(monkeypatch, tmp_path) -> None:
     skill = _load_module()
+    _stub_development_context(skill, monkeypatch)
     artifact_root = tmp_path / "llm_sample_data"
     artifact_root.mkdir(parents=True)
     (artifact_root / "scenario.json").write_text(
@@ -3996,6 +4312,7 @@ def test_update_current_scenario_does_not_generate_domain_mock_data_without_llm(
 
 def test_update_current_scenario_translate_data_timeout_does_not_apply_ui_only_fallback(monkeypatch, tmp_path) -> None:
     skill = _load_module()
+    _stub_development_context(skill, monkeypatch)
     artifact_root = tmp_path / "translate_data_timeout"
     artifact_root.mkdir(parents=True)
     (artifact_root / "scenario.json").write_text(
@@ -4109,7 +4426,7 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
     created = skill.create_scenario_draft("create todo list", webspace_id="builder-revision")
     assert created["ui_revision"]["revision"] == "001"
     created_revision = json.loads((artifact_root / "ui_revisions" / "001.json").read_text(encoding="utf-8"))
-    assert created_revision["preview_state"]["version"] == "001"
+    assert created_revision["preview_state"]["version"] == created["ui_revision"]["revision"]
     assert "preview_state" not in created_revision["after_webui"]
     assert created_revision["prompt_files"]["tz/base_tz.md"]["exists"] is True
     first_tz = created_revision["prompt_files"]["tz/base_tz.md"]["content"]
@@ -4121,7 +4438,7 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
     updated = skill.update_current_scenario("show cards", webspace_id="builder-revision")
     assert updated["ui_revision"]["revision"] == "002"
     updated_revision = json.loads((artifact_root / "ui_revisions" / "002.json").read_text(encoding="utf-8"))
-    assert updated_revision["preview_state"]["version"] == "002"
+    assert updated_revision["preview_state"]["version"] == updated["ui_revision"]["revision"]
     assert "preview_state" not in updated_revision["after_webui"]
     assert updated_revision["prompt_files"]["tz/base_tz.md"]["content"] == "spec revision 002"
     assert any(item["type"] == "card_list" for item in updated["preview_state"]["current_ui"]["children"])
@@ -4132,11 +4449,22 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
         raise AssertionError("successful Set current must not append a persistent chat message")
 
     monkeypatch.setattr(skill, "_schedule_safe_emit_chat", _unexpected_revision_chat_emit)
+    review_calls: list[dict[str, object]] = []
+    monkeypatch.setattr(
+        skill,
+        "_evaluate_review_constraints",
+        lambda session, *, revision: review_calls.append(
+            {"scenario_id": session.get("scenario_id"), "revision": revision}
+        )
+        or {"ok": True, "status": "satisfied", "revision": revision},
+    )
 
     restored = skill.set_ui_revision_current("001", webspace_id="builder-revision")
 
     assert restored["ok"] is True
     assert restored["revision"] == "001"
+    assert restored["review_constraints"] == {"ok": True, "status": "satisfied", "revision": "001"}
+    assert review_calls == [{"scenario_id": created["scenario_id"], "revision": "001"}]
     assert emitted == []
     assert restored["chat_emit"]["mode"] == "receipt_only"
     assert restored["chat_emit"]["persisted"] is False
@@ -4156,6 +4484,86 @@ def test_set_ui_revision_current_restores_stored_webui(monkeypatch, tmp_path) ->
     assert (artifact_root / "tz" / "base_tz.md").read_text(encoding="utf-8") == first_tz
     state = json.loads((artifact_root / "prompt_state.json").read_text(encoding="utf-8"))
     assert state["base_tz"] == first_tz
+
+
+def test_follow_active_preview_moves_to_the_new_prototype_revision(monkeypatch) -> None:
+    skill = _load_module()
+    calls: list[dict[str, object]] = []
+
+    def _refresh_target(object_type, object_id, **kwargs):
+        calls.append({"object_type": object_type, "object_id": object_id, **kwargs})
+        return {
+            "ok": True,
+            "target": {
+                "object_type": "scenario",
+                "object_id": object_id,
+                "stage": "prototype",
+                "revision": kwargs["revision"],
+                "label": f"proto: {object_id} · UI {kwargs['revision']}",
+                "follow_active": True,
+            },
+            "binding": {
+                "selection": {"object_id": object_id, "title": "Кулинарные рецепты"},
+                "preview_target": {"revision": kwargs["revision"], "follow_active": True},
+            },
+            "materialization": {"ok": True, "revision": kwargs["revision"]},
+        }
+
+    monkeypatch.setattr(skill.builder_preview, "refresh_follow_active_target", _refresh_target)
+
+    result = skill._refresh_follow_active_preview(
+        "desktop",
+        session={"scenario_id": "test03_recipes", "ui_revision": "005"},
+        binding={
+            "preview_target": {
+                "object_type": "scenario",
+                "object_id": "test03_recipes",
+                "stage": "prototype",
+                "revision": "003",
+                "follow_active": True,
+            }
+        },
+        revision="005",
+    )
+
+    assert result["ok"] is True
+    assert result["binding"]["selection"]["title"] == "Кулинарные рецепты"
+    assert result["binding"]["preview_target"]["revision"] == "005"
+    assert calls == [
+        {
+            "object_type": "scenario",
+            "object_id": "test03_recipes",
+            "revision": "005",
+            "source_webspace_id": "desktop",
+            "title": None,
+            "description": None,
+        }
+    ]
+
+
+def test_follow_active_preview_does_not_override_an_explicit_snapshot(monkeypatch) -> None:
+    skill = _load_module()
+    monkeypatch.setattr(
+        skill.builder_preview,
+        "refresh_follow_active_target",
+        lambda *_args, **_kwargs: pytest.fail("explicit preview snapshots must not move"),
+    )
+
+    result = skill._refresh_follow_active_preview(
+        "desktop",
+        session={"scenario_id": "test03_recipes", "ui_revision": "005"},
+        binding={
+            "preview_target": {
+                "object_type": "scenario",
+                "object_id": "test03_recipes",
+                "revision": "003",
+                "follow_active": False,
+            }
+        },
+        revision="005",
+    )
+
+    assert result == {"ok": True, "skipped": "preview_target_not_following_active"}
 
 
 def test_set_ui_revision_current_migrates_legacy_root_modals(monkeypatch, tmp_path) -> None:
@@ -4406,6 +4814,76 @@ def test_write_webui_keeps_builder_skill_out_of_runtime_dependencies(tmp_path) -
     assert "voice_chat_skill" in scenario["depends"]
     assert "voice_chat_skill" in manifest
     assert "builder_skill" not in manifest
+
+
+def test_safe_prototype_write_uses_yaml_truth_and_drops_stale_automation_dependencies(tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "safe_prototype"
+    artifact_root.mkdir(parents=True)
+    (artifact_root / "scenario.yaml").write_text(
+        "\n".join(
+            [
+                "id: safe_prototype",
+                "name: safe_prototype",
+                "type: desktop",
+                "title: Safe prototype",
+                "version: 0.2.5",
+                "supported_locales:",
+                "- en",
+                "- ru",
+                "depends:",
+                "- stale_automation_skill",
+                "runtime:",
+                "  skills:",
+                "    required:",
+                "    - stale_automation_skill",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    (artifact_root / "scenario.json").write_text(
+        json.dumps(
+            {
+                "id": "safe_prototype",
+                "version": "9.9.9",
+                "depends": ["stale_automation_skill"],
+                "runtime": {"skills": {"required": ["stale_automation_skill"]}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    page_schema = {
+        "id": "safe_prototype",
+        "title": "Безопасный прототип",
+        "layout": {"type": "stack"},
+        "widgets": [],
+        "meta": {
+            "builder": {
+                "lifecycle": "prototype",
+                "data_mode": "bounded_local_mock",
+                "production_bindings": False,
+            }
+        },
+    }
+
+    checkpoint_owned_version = yaml.safe_load(
+        (artifact_root / "scenario.yaml").read_text(encoding="utf-8")
+    )["version"]
+
+    skill._write_scenario_application_value(
+        artifact_root,
+        {"desktop": {"pageSchema": page_schema}},
+        {"scenario_id": "safe_prototype", "title": "Безопасный прототип", "version": "001"},
+    )
+
+    scenario = json.loads((artifact_root / "scenario.json").read_text(encoding="utf-8"))
+    manifest = (artifact_root / "scenario.yaml").read_text(encoding="utf-8")
+    assert scenario["version"] == checkpoint_owned_version
+    assert len(scenario["version"].split(".")) == 3
+    assert scenario["depends"] == []
+    assert scenario["runtime"]["skills"]["required"] == []
+    assert "stale_automation_skill" not in manifest
 
 
 def test_chat_meta_uses_prompt_project_topic_for_selected_scenario() -> None:
@@ -4937,6 +5415,7 @@ def test_builder_pending_action_approve_marks_patch_and_emits_chat(monkeypatch, 
 
 def test_chat_from_dev_webspace_updates_source_session_and_mirrors_response(monkeypatch, tmp_path) -> None:
     skill = _load_module()
+    _stub_development_context(skill, monkeypatch)
     artifact_root = tmp_path / "shopping_list"
     artifact_root.mkdir(parents=True, exist_ok=True)
     (artifact_root / "scenario.json").write_text(
@@ -5026,7 +5505,8 @@ def test_chat_from_dev_webspace_updates_source_session_and_mirrors_response(monk
     assert result["patch"]["operation"] == "llm_webui_transform"
     rows = result["preview_state"]["mock_data"]["shopping_items"]
     assert rows[0]["item"] == "Milk"
-    assert {item["meta"]["webspace_id"] for item in emitted} == {"desktop", "desktop-dev"}
+    assert len(emitted) == 1
+    assert {item["meta"]["webspace_id"] for item in emitted} == {"desktop"}
 
 
 def test_chat_requires_selected_builder_target(monkeypatch) -> None:
@@ -5228,6 +5708,7 @@ def test_chat_handles_builder_project_commands(monkeypatch, tmp_path) -> None:
     import adaos.sdk.data.pending_actions as pending_actions
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
+    monkeypatch.setattr(skill.developer_projects, "list_projects", lambda **kwargs: [])
     monkeypatch.setattr(skill, "_request_workbench_refresh", lambda payload: {"ok": True, "payload": dict(payload)})
     monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}))
     monkeypatch.setattr(
@@ -5288,6 +5769,334 @@ def test_chat_handles_builder_project_commands(monkeypatch, tmp_path) -> None:
     assert published[0]["domain_ref"]["draft_id"] == "draft.alpha"
     assert emitted[-1]["kwargs"]["topic_ref"]["thread_id"] == delete["topic"]["thread_id"]
     assert any(item["method"] == "set_active_draft" and item["active_draft_id"] == "draft.alpha" for item in calls)
+
+
+def test_current_project_presents_contextual_workflow_controls(monkeypatch) -> None:
+    skill = _load_module()
+    emitted: list[str] = []
+    presented: list[dict] = []
+    session = {
+        "id": "session.builder",
+        "draft_id": "draft.builder",
+        "scenario_id": "builder",
+        "title": "Builder",
+    }
+    binding = {"runtime_scenario_id": "builder", "active_draft_id": "draft.builder"}
+    topic = {"thread_id": "prompt-project:scenario:builder", "topic_id": "prompt-project:scenario:builder"}
+
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append(text))
+    monkeypatch.setattr(
+        skill,
+        "_present_project_workflow_interaction",
+        lambda **kwargs: presented.append(dict(kwargs)) or {
+            "handle": {"interaction_id": "interaction.builder.current"},
+            "presentation": {
+                "mode": "buttons",
+                "actions": [
+                    {
+                        "label": "Show process",
+                        "command": "builder.process.inspect",
+                        "token": "ia:0:abc",
+                    }
+                ],
+            },
+        },
+    )
+
+    result = skill._handle_project_current_command(
+        webspace_id="dev1-dev",
+        session=session,
+        binding=binding,
+        topic=topic,
+        command={"intent": "project.current"},
+        _meta={"io_type": "web"},
+    )
+
+    assert result["status"] == "project_current"
+    assert result["conversation_interaction"]["presentation"]["mode"] == "buttons"
+    assert result["chat_emit"] == {
+        "mode": "receipt_only",
+        "persisted": True,
+        "reason": "interaction_materialized",
+    }
+    assert presented[0]["object_id"] == "builder"
+    assert emitted == []
+
+
+def test_current_project_router_fallback_is_materialized_once_by_router(monkeypatch) -> None:
+    skill = _load_module()
+    emitted: list[str] = []
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append(text))
+    monkeypatch.setattr(
+        skill,
+        "_present_project_workflow_interaction",
+        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("definition unavailable")),
+    )
+
+    result = skill._handle_project_current_command(
+        webspace_id="dev1",
+        session={
+            "id": "session.recipes",
+            "draft_id": "draft.recipes",
+            "scenario_id": "recipes",
+            "title": "Recipes",
+        },
+        binding={"runtime_scenario_id": "recipes"},
+        topic={"thread_id": "prompt-project:scenario:recipes"},
+        command={"intent": "project.current"},
+        _meta={
+            "io_type": "telegram",
+            "webspace_id": "default",
+            "_router_tool_scheduled_at": 1.0,
+        },
+    )
+
+    assert result["status"] == "project_current"
+    assert result["conversation_interaction"] is None
+    assert result["message"] == "Конструктор: сейчас выбран Recipes (recipes)."
+    assert emitted == []
+
+
+def test_builder_topic_keeps_matching_project_thread_stable() -> None:
+    skill = _load_module()
+    session = {"scenario_id": "recipes", "draft_id": "draft.recipes"}
+    binding = {"runtime_scenario_id": "recipes", "active_draft_id": "draft.recipes"}
+    origin = {
+        "webspace_id": "dev1-dev",
+        "thread_id": "prompt-project:scenario:recipes",
+        "topic_id": "prompt-project:scenario:recipes",
+    }
+
+    preserved = skill._builder_topic_ref(
+        "dev1",
+        session=session,
+        binding=binding,
+        _meta=origin,
+    )
+    assert preserved["thread_id"] == "prompt-project:scenario:recipes"
+
+
+def test_project_workflow_interaction_exposes_only_executable_localized_controls(monkeypatch) -> None:
+    skill = _load_module()
+    captured: dict = {}
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_interaction_frame",
+        lambda *_args: {
+            "generation": 7,
+            "actions": [
+                {
+                    "command": "builder.change.plan",
+                    "label": "Plan change",
+                    "risk": "local_reversible",
+                    "expected_generation": 7,
+                    "risk_policy": {"confirmation_required": False},
+                },
+                {
+                    "command": "builder.implementation.start",
+                    "label": "Start implementation",
+                    "workflow_command": "start_automation",
+                    "workflow_generation": 3,
+                    "risk": "isolated_write",
+                    "expected_generation": 7,
+                    "risk_policy": {"confirmation_required": True},
+                },
+            ],
+        },
+    )
+
+    def _request(specification, **kwargs):
+        captured["specification"] = dict(specification)
+        captured["kwargs"] = dict(kwargs)
+        return {"handle": {"interaction_id": "interaction.builder"}, "presentation": {"mode": "buttons"}}
+
+    monkeypatch.setattr(skill.sdk_chat, "request", _request)
+
+    result = skill._present_project_workflow_interaction(
+        webspace_id="dev1-dev",
+        object_type="scenario",
+        object_id="builder",
+        prompt="Строитель: сейчас выбран Builder (builder).",
+        session={"id": "session.builder", "scenario_id": "builder", "title": "Builder"},
+        binding={"runtime_scenario_id": "builder"},
+        topic={"thread_id": "prompt-project:scenario:builder"},
+        _meta={"io_type": "telegram", "route_id": "telegram", "chat_id": "42", "bot_id": "main-bot"},
+    )
+
+    assert result["presentation"]["mode"] == "buttons"
+    actions = captured["specification"]["actions"]
+    assert [(item["command"], item["label"]) for item in actions] == [
+        ("builder.change.plan", "Описать изменение")
+    ]
+    assert captured["kwargs"]["route_id"] == "telegram"
+
+
+def test_project_workflow_interaction_returns_to_exact_dev_surface(monkeypatch) -> None:
+    skill = _load_module()
+    captured: dict = {}
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_interaction_frame",
+        lambda *_args: {
+            "generation": 4,
+            "actions": [
+                {
+                    "command": "builder.process.inspect",
+                    "label": "Show process",
+                    "risk": "read",
+                    "expected_generation": 4,
+                    "risk_policy": {"confirmation_required": False},
+                }
+            ],
+        },
+    )
+
+    def _request(specification, **kwargs):
+        captured["specification"] = dict(specification)
+        captured["kwargs"] = dict(kwargs)
+        return {
+            "handle": {"interaction_id": "interaction.builder.dev"},
+            "presentation": {"mode": "buttons", "actions": specification["actions"]},
+        }
+
+    monkeypatch.setattr(skill.sdk_chat, "request", _request)
+
+    skill._present_project_workflow_interaction(
+        webspace_id="dev1",
+        object_type="scenario",
+        object_id="recipes",
+        prompt="Current project",
+        session={"id": "session.recipes", "scenario_id": "recipes"},
+        binding={"runtime_scenario_id": "recipes"},
+        topic={"thread_id": "prompt-project:scenario:recipes"},
+        _meta={
+            "io_type": "web",
+            "webspace_id": "dev1-dev",
+            "source_webspace_id": "dev1",
+            "thread_id": "prompt-project:scenario:recipes",
+        },
+    )
+
+    assert captured["kwargs"]["webspace_id"] == "dev1-dev"
+    assert captured["kwargs"]["thread_id"] == "prompt-project:scenario:recipes"
+    assert captured["specification"]["metadata"]["execution_webspace_id"] == "dev1"
+    assert captured["specification"]["metadata"]["reply_webspace_id"] == "dev1-dev"
+
+
+def test_conversation_interaction_response_returns_builder_prompt_to_origin_channel(monkeypatch) -> None:
+    skill = _load_module()
+    emitted: list[dict] = []
+    session = {"id": "session.builder", "scenario_id": "builder", "title": "Builder"}
+    monkeypatch.setattr(skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id)
+    monkeypatch.setattr(
+        skill,
+        "_resolve_project_session",
+        lambda *_args, **_kwargs: {"status": "found", "session": dict(session)},
+    )
+    monkeypatch.setattr(skill, "_workbench_binding", lambda _webspace_id: {"runtime_scenario_id": "builder"})
+    monkeypatch.setattr(
+        skill,
+        "_builder_topic_ref",
+        lambda *_args, **_kwargs: {"thread_id": "prompt-project:scenario:builder"},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}),
+    )
+
+    result = skill.handle_interaction_response(
+        event={
+                    "interaction": {
+                        "interaction_id": "interaction.builder",
+                        "metadata": {
+                            "domain": "builder",
+                            "project_ref": "scenario:builder",
+                            "source_webspace_id": "dev1-dev",
+                            "topic_ref": {"thread_id": "prompt-project:scenario:builder"},
+                        },
+                    },
+                    "response": {
+                        "response_id": "response.builder.plan",
+                        "consumed_command": {"command": "builder.change.plan"},
+                        "metadata": {
+                            "io_type": "telegram",
+                            "route_id": "telegram",
+                            "bot_id": "main-bot",
+                            "chat_id": "42",
+                        },
+                    },
+                    "duplicate": False,
+                },
+        webspace_id="dev1-dev",
+    )
+
+    assert result["status"] == "handled"
+    assert len(emitted) == 1
+    assert "Опишите, что нужно изменить" in emitted[0]["text"]
+    assert emitted[0]["kwargs"]["_meta"]["route_id"] == "telegram"
+    assert emitted[0]["kwargs"]["topic_ref"]["thread_id"] == "prompt-project:scenario:builder"
+
+
+def test_limited_channel_can_select_existing_dev_scenario_without_local_session(monkeypatch, tmp_path) -> None:
+    skill = _load_module()
+    emitted: list[dict] = []
+    binding = {
+        "source_webspace_id": "default",
+        "dev_webspace_id": "default-dev",
+        "active_draft_id": None,
+        "runtime_scenario_id": None,
+    }
+
+    class _Workbench:
+        def get_workspace_binding(self, webspace_id):
+            return dict(binding)
+
+    monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
+    monkeypatch.setattr(
+        skill.developer_projects,
+        "list_projects",
+        lambda **kwargs: [
+            {
+                "kind": "scenario",
+                "id": "test05_recipes",
+                "name": "test05_recipes",
+                "title": "Домашняя книга рецептов",
+            }
+        ],
+    )
+    monkeypatch.setattr(skill.developer_projects, "find_scenario_root", lambda project_id: tmp_path)
+
+    monkeypatch.setattr(
+        skill,
+        "_ensure_workbench",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("limited channel must not materialize Preview")),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_publish_prompt_project_selection",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("limited channel must not publish Preview selection")),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": kwargs}),
+    )
+
+    result = skill.chat(
+        "переключись на сценарий test05_recipes",
+        webspace_id="default",
+        _meta={"io_type": "telegram", "chat_id": "42"},
+    )
+
+    assert result["status"] == "project_switched"
+    assert result["scenario_id"] == "test05_recipes"
+    assert result["topic"]["thread_id"] == "prompt-project:scenario:test05_recipes"
+    assert result["preview_changed"] is False
+    assert result["workbench"]["skipped"] == "limited_channel_focus_only"
+    assert result["prompt_selection"]["skipped"] == "limited_channel_focus_only"
+    assert binding["runtime_scenario_id"] is None
+    assert emitted[-1]["kwargs"]["_meta"]["io_type"] == "telegram"
 
 
 def test_builder_delete_pending_action_approve_deletes_draft(monkeypatch, tmp_path) -> None:
@@ -5756,6 +6565,103 @@ def test_safe_emit_chat_does_not_wait_for_stuck_append(monkeypatch) -> None:
 
     assert elapsed < 0.5
     assert calls
+
+
+def test_chat_aligns_incoming_project_before_target_session_resolution(monkeypatch) -> None:
+    skill = _load_module()
+    order: list[str] = []
+
+    monkeypatch.setattr(
+        skill,
+        "_align_workbench_binding_to_meta",
+        lambda webspace_id, meta: order.append("align") or {"runtime_scenario_id": "test04_recipes"},
+    )
+
+    def _target(_webspace_id):
+        assert order == ["align"]
+        order.append("target")
+        return None, {"runtime_scenario_id": "test04_recipes"}
+
+    monkeypatch.setattr(skill, "_target_session", _target)
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda *args, **kwargs: None)
+
+    result = skill.chat(
+        "i have an idea",
+        webspace_id="desktop",
+        _meta={"thread_id": "prompt-project:scenario:test04_recipes"},
+    )
+
+    assert order == ["align", "target"]
+    assert result["status"] == "clarification_required"
+    assert result["topic"]["scenario_id"] == "test04_recipes"
+
+
+def test_natural_russian_selected_project_question_is_deterministic() -> None:
+    skill = _load_module()
+
+    assert skill._is_current_project_command("Какой проект выбран?") is True
+    assert skill._parse_builder_command("Какой проект выбран?", has_session=True)["intent"] == "project.current"
+    assert skill._is_current_project_command("Какой проект сейчас выбран?") is True
+    assert skill._parse_builder_command("Какой проект сейчас выбран?", has_session=True)["intent"] == "project.current"
+
+
+def test_mutating_builder_text_guard_preserves_russian_and_rejects_loss(monkeypatch) -> None:
+    skill = _load_module()
+    russian = "Добавь поле «Название блюда»"
+    assert skill._reject_transport_corrupted_text(russian, field="text") is None
+
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: pytest.fail("corrupt text must fail before target or LLM resolution"))
+    with pytest.raises(ValueError, match="transport-corrupted"):
+        skill.chat("Добавь ??? поле", webspace_id="desktop")
+
+
+def test_repeated_checkpoint_preserves_complete_yaml_manifest_and_cyrillic(tmp_path) -> None:
+    skill = _load_module()
+    artifact_root = tmp_path / "test04_recipes"
+    artifact_root.mkdir()
+    title = "Рецепты моей семьи"
+    original = {
+        "id": "test04_recipes",
+        "name": "test04_recipes",
+        "type": "desktop",
+        "title": title,
+        "version": "1.2.3",
+        "updated_at": "2026-07-28T12:00:00+00:00",
+        "depends": [],
+        "runtime": {"skills": {"required": []}, "custom": {"keep": True}},
+        "ui": {"manifest": "webui.json", "theme": "family"},
+        "triggers": [{"id": "open", "phrase": "Открой рецепты"}],
+        "nlu": {"examples": ["Покажи борщ"]},
+        "slots": {"dish": {"type": "string"}},
+        "params": {"greeting": "Добро пожаловать"},
+        "extensions": {"family": {"owner": "Алёна"}},
+        "future_valid_field": {"keep": ["кириллица", 7]},
+    }
+    (artifact_root / "scenario.yaml").write_text(
+        yaml.safe_dump(original, allow_unicode=True, sort_keys=False), encoding="utf-8"
+    )
+    (artifact_root / "scenario.json").write_text(
+        json.dumps(original, ensure_ascii=False), encoding="utf-8"
+    )
+    page = {"id": "test04_recipes", "title": title, "layout": {"type": "stack"}, "widgets": []}
+
+    for _ in range(2):
+        skill._write_scenario_application_value(
+            artifact_root,
+            {"desktop": {"pageSchema": page}},
+            {"scenario_id": "test04_recipes", "title": title, "version": "047"},
+        )
+
+    saved_bytes = (artifact_root / "scenario.yaml").read_bytes()
+    saved = yaml.safe_load(saved_bytes.decode("utf-8"))
+    for key in ("triggers", "nlu", "slots", "params", "extensions", "future_valid_field"):
+        assert saved[key] == original[key]
+    assert saved["runtime"]["custom"] == {"keep": True}
+    assert saved["ui"] == {"manifest": "webui.json", "theme": "family"}
+    assert saved["version"] == original["version"]
+    assert saved["updated_at"] == original["updated_at"]
+    assert title.encode("utf-8") in saved_bytes
+    assert "Открой рецепты".encode("utf-8") in saved_bytes
 
 
 def test_workbench_tool_wrappers_use_voice_widget_and_active_draft(monkeypatch) -> None:

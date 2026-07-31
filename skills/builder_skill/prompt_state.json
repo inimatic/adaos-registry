@@ -13,5 +13,9 @@
   },
   "llm_profile_id": null,
   "target_node_id": null,
-  "workflow_state": "tz"
+  "workflow_state": "tz",
+  "builder_llm_model": null,
+  "llm_provider": null,
+  "llm_profile": null,
+  "llm_profile_updated_at": null
 }
