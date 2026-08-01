@@ -8222,6 +8222,29 @@ def _parse_builder_command(text: str, *, allow_create: bool = True, has_session:
     if _is_current_project_command(lowered):
         return {"intent": "project.current", "confidence": 1.0, "source": "deterministic"}
 
+    help_commands = {
+        "помощь",
+        "помоги",
+        "справка",
+        "что ты умеешь",
+        "help",
+        "show help",
+    }
+    if lowered in help_commands:
+        return {"intent": "help", "confidence": 1.0, "source": "deterministic"}
+
+    preview_link_commands = {
+        "ссылка на preview",
+        "покажи ссылку на preview",
+        "дай ссылку на preview",
+        "открыть preview",
+        "preview link",
+        "show preview link",
+        "open preview",
+    }
+    if lowered in preview_link_commands:
+        return {"intent": "preview.link", "confidence": 1.0, "source": "deterministic"}
+
     workflow_commands = {
         "показать процесс": {"intent": "workflow.inspect"},
         "покажи процесс": {"intent": "workflow.inspect"},
@@ -8355,7 +8378,15 @@ def _development_sessions(webspace_id: str) -> list[dict[str, Any]]:
         sessions.append(item)
         if scenario_id:
             known_scenarios.add(scenario_id)
-    return sorted(sessions, key=lambda item: float(item.get("updated_at") or 0), reverse=True)
+    # Old workbench revisions can retain more than one session record for the
+    # same scenario.  A project list is an aggregate view, not a session dump:
+    # expose each stable project identity once and keep its newest projection.
+    deduplicated: dict[str, dict[str, Any]] = {}
+    for item in sorted(sessions, key=lambda value: float(value.get("updated_at") or 0), reverse=True):
+        project_key = str(item.get("scenario_id") or item.get("draft_id") or item.get("id") or "").strip()
+        if project_key and project_key not in deduplicated:
+            deduplicated[project_key] = item
+    return list(deduplicated.values())
 
 
 def _resolve_project_session(webspace_id: str, project_ref: str, *, current: Mapping[str, Any] | None = None) -> dict[str, Any]:
@@ -8515,6 +8546,31 @@ def _present_project_workflow_interaction(
                 },
             }
         )
+    supplemental = (
+        ("builder.project.list", "Показать проекты"),
+        ("builder.preview.link", "Ссылка на Preview"),
+        ("builder.help", "Помощь"),
+    )
+    for command, label in supplemental:
+        if len(actions) >= 8:
+            break
+        actions.append(
+            {
+                "action_id": f"builder-navigation-{command}",
+                "label": label,
+                "command": command,
+                "value": command,
+                "risk": "read",
+                "confirmation_required": False,
+                "target_ref": {"kind": object_type, "id": object_id},
+                "expected_generation": int(frame.get("generation") or 0),
+                "principal_scope": ["user", "transport"],
+                "command_context_ref": {
+                    "kind": "view",
+                    "id": thread_id or f"webspace:{webspace_id}",
+                },
+            }
+        )
     return sdk_chat.request(
         {
             "prompt": prompt,
@@ -8563,18 +8619,114 @@ def _limited_channel_focus_only(_meta: Mapping[str, Any] | None) -> bool:
     return io_type == "telegram"
 
 
-def _format_project_list(items: list[dict[str, Any]], active_session_id: str | None) -> str:
+def _project_identity(item: Mapping[str, Any] | None) -> str:
+    value = item if isinstance(item, Mapping) else {}
+    return str(value.get("scenario_id") or value.get("draft_id") or value.get("id") or "").strip()
+
+
+def _format_project_list(items: list[dict[str, Any]], current_project_id: str | None) -> str:
     if not items:
         return _command_hint_message()
-    lines = []
+    current_id = str(current_project_id or "").strip()
+    lines = [
+        (
+            f"Текущий проект этого диалога: {current_id}."
+            if current_id
+            else "В этом диалоге проект пока не выбран."
+        )
+    ]
     for item in items[:8]:
-        mark = "* " if active_session_id and item.get("session_id") == active_session_id else "- "
         title = str(item.get("title") or item.get("scenario_id") or item.get("draft_id") or "prototype")
-        scenario_id = str(item.get("scenario_id") or "")
-        draft_id = str(item.get("draft_id") or "")
-        ref = scenario_id or draft_id
-        lines.append(f"{mark}{title} ({ref})")
-    return f"{AGENT_LABEL}: \u043f\u0440\u043e\u0435\u043a\u0442\u044b \u0432 \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0435:\n" + "\n".join(lines)
+        ref = _project_identity(item)
+        state = "текущий в этом диалоге" if current_id and ref == current_id else "доступен в DEV"
+        lines.append(f"- {title} — id: {ref} [{state}]")
+    lines.append("Переключение меняет контекст этого диалога; Preview в Telegram не переключается автоматически.")
+    lines.append("Нажмите кнопку проекта или напишите: «Строитель, выбери <id>».")
+    return f"{AGENT_LABEL}: проекты в разработке:\n" + "\n".join(lines)
+
+
+def _present_project_selection_interaction(
+    *,
+    webspace_id: str,
+    items: Sequence[Mapping[str, Any]],
+    prompt: str,
+    session: Mapping[str, Any] | None,
+    binding: Mapping[str, Any],
+    topic: Mapping[str, Any],
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    selectable = [dict(item) for item in items if _project_identity(item)][:8]
+    if not selectable:
+        return None
+    reply_webspace_id = _reply_webspace_id(webspace_id, _meta)
+    chat_meta = _chat_meta(
+        _meta,
+        webspace_id=reply_webspace_id,
+        session=session,
+        binding=binding,
+        topic_ref=topic,
+    )
+    conversation_id = str(chat_meta.get("conversation_id") or _conversation_id(webspace_id)).strip()
+    thread_id = str(chat_meta.get("thread_id") or topic.get("thread_id") or "").strip()
+    actions = []
+    for index, item in enumerate(selectable):
+        project_id = _project_identity(item)
+        title = str(item.get("title") or project_id).strip()
+        label = f"Выбрать {project_id}"
+        actions.append(
+            {
+                "action_id": f"builder-project-select-{index}-{_safe_ref_token(project_id)}",
+                "label": label[:64],
+                "command": "builder.project.select",
+                "value": project_id,
+                "risk": "local_reversible",
+                "confirmation_required": False,
+                "target_ref": {"kind": "scenario", "id": project_id, "title": title},
+                "expected_generation": 0,
+                "principal_scope": ["user", "transport"],
+                "command_context_ref": {"kind": "view", "id": thread_id or f"webspace:{webspace_id}"},
+            }
+        )
+    return sdk_chat.request(
+        {
+            "prompt": prompt,
+            "input_spec": {
+                "kind": "choice",
+                "required_fields": [],
+                "choices": [
+                    {"value": item["value"], "label": item["label"], "description": None}
+                    for item in actions
+                ],
+                "sensitive": False,
+            },
+            "actions": actions,
+            "optional_capabilities": ["buttons", "pagination"],
+            "fallbacks": ["numbered_text", "plain_text", "unsupported"],
+            "metadata": {
+                "domain": "builder",
+                "interaction_kind": "project_selection",
+                "project_ref": (
+                    f"scenario:{_project_identity(session)}" if _project_identity(session) else None
+                ),
+                "execution_webspace_id": webspace_id,
+                "source_webspace_id": webspace_id,
+                "reply_webspace_id": reply_webspace_id,
+                "dialog_channel_id": DIALOG_CHANNEL_ID,
+                "topic_ref": {k: v for k, v in dict(topic).items() if k != "stored"},
+            },
+        },
+        conversation_id=conversation_id,
+        owner=f"skill:{SKILL_ID}",
+        webspace_id=reply_webspace_id,
+        channel_id=DIALOG_CHANNEL_ID,
+        route_id=str(chat_meta.get("route_id") or "voice_chat"),
+        thread_id=thread_id or None,
+        actor_id=AGENT_ID,
+        actor_label=AGENT_LABEL,
+        request_id=str(chat_meta.get("request_id") or "").strip() or None,
+        turn_trace_id=str(chat_meta.get("turn_trace_id") or "").strip() or None,
+        meta=chat_meta,
+    )
 
 
 def _handle_project_list_command(
@@ -8587,7 +8739,20 @@ def _handle_project_list_command(
     _meta: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     items = [_session_summary(item) for item in _development_sessions(webspace_id)]
-    message = _format_project_list(items, str((session or {}).get("id") or ""))
+    message = _format_project_list(items, _project_identity(session))
+    interaction_result: dict[str, Any] | None = None
+    try:
+        interaction_result = _present_project_selection_interaction(
+            webspace_id=webspace_id,
+            items=items,
+            prompt=message,
+            session=session,
+            binding=binding,
+            topic=topic,
+            _meta=_meta,
+        )
+    except Exception:
+        _LOG.warning("failed to present Builder project selection", exc_info=True)
     return _builder_command_response(
         webspace_id=webspace_id,
         message=message,
@@ -8597,7 +8762,19 @@ def _handle_project_list_command(
         binding=binding,
         topic_ref=topic,
         _meta=_meta,
-        extra={"items": items},
+        emit_chat=interaction_result is None,
+        extra={
+            "items": items,
+            "current_project_id": _project_identity(session) or None,
+            "conversation_interaction": (
+                {
+                    "handle": interaction_result.get("handle"),
+                    "presentation": interaction_result.get("presentation"),
+                }
+                if interaction_result is not None
+                else None
+            ),
+        },
     )
 
 
@@ -8672,6 +8849,178 @@ def _handle_project_current_command(
                 if interaction_result is not None
                 else None
             ),
+        },
+    )
+
+
+def _preview_link_payload(webspace_id: str) -> dict[str, Any]:
+    source = builder_preview.canonical_source_webspace_id(webspace_id)
+    binding = builder_preview.get_binding(source)
+    app_base_resolver = getattr(builder_preview, "public_app_base", None)
+    app_base = str(app_base_resolver() if callable(app_base_resolver) else "https://inimatic.com").strip().rstrip("/")
+    app_base = app_base or "https://inimatic.com"
+    opened = builder_preview.open_workspace(source, base_url=app_base)
+    url = str(opened.get("url") or "").strip()
+    if url.startswith("/"):
+        url = f"{app_base}{url}"
+    target = binding.get("preview_target") if isinstance(binding.get("preview_target"), Mapping) else {}
+    label = str(target.get("label") or "").strip()
+    preview_webspace_id = str(
+        binding.get("preview_webspace_id")
+        or binding.get("dev_webspace_id")
+        or opened.get("webspace_id")
+        or ""
+    ).strip()
+    return {
+        "url": url,
+        "label": label or f"preview: {preview_webspace_id}",
+        "preview_webspace_id": preview_webspace_id,
+        "target": dict(target),
+        "source_webspace_id": source,
+    }
+
+
+def _handle_preview_link_command(
+    *,
+    webspace_id: str,
+    session: Mapping[str, Any] | None,
+    binding: Mapping[str, Any],
+    topic: Mapping[str, Any],
+    command: Mapping[str, Any],
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    if not isinstance(session, Mapping):
+        return _builder_command_response(
+            webspace_id=webspace_id,
+            message=_command_hint_message(),
+            status="target_required",
+            command=command,
+            binding=binding,
+            topic_ref=topic,
+            _meta=_meta,
+            extra={"needs_selection": True},
+        )
+    preview_link = _preview_link_payload(webspace_id)
+    url = str(preview_link.get("url") or "").strip()
+    if not url:
+        return _builder_command_response(
+            webspace_id=webspace_id,
+            message=f"{AGENT_LABEL}: ссылка на Preview пока недоступна.",
+            status="preview_link_unavailable",
+            command=command,
+            session=session,
+            binding=binding,
+            topic_ref=topic,
+            _meta=_meta,
+        )
+    message = (
+        f"{AGENT_LABEL}: {preview_link['label']}\n"
+        f"{url}\n"
+        "Ссылка открывает текущее Preview и не изменяет состояние процесса."
+    )
+    open_action = {
+        "id": "builder-open-preview",
+        "label": "Открыть Preview",
+        "title": str(preview_link["label"]),
+        "action": {
+            "type": "openUrl",
+            "params": {"url": url, "target": "_blank", "withAuth": False},
+        },
+    }
+    _safe_emit_chat(
+        message,
+        webspace_id=webspace_id,
+        _meta=_meta,
+        session=session,
+        binding=binding,
+        topic_ref=topic,
+        actions=[open_action],
+    )
+    return _builder_command_response(
+        webspace_id=webspace_id,
+        message=message,
+        status="preview_link",
+        command=command,
+        session=session,
+        binding=binding,
+        topic_ref=topic,
+        _meta=_meta,
+        emit_chat=False,
+        extra={"preview_link": preview_link, "message_actions": [open_action]},
+    )
+
+
+def _handle_help_command(
+    *,
+    webspace_id: str,
+    session: Mapping[str, Any] | None,
+    binding: Mapping[str, Any],
+    topic: Mapping[str, Any],
+    command: Mapping[str, Any],
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    current_id = _project_identity(session)
+    current_line = (
+        f"Текущий проект этого диалога: {current_id}."
+        if current_id
+        else "Текущий проект этого диалога не выбран."
+    )
+    message = (
+        f"{AGENT_LABEL}: помощь\n"
+        f"{current_line}\n"
+        "Наблюдение и навигация выполняются без LLM/Codex:\n"
+        "- «Строитель, что выбрано?»\n"
+        "- «Строитель, покажи проекты»\n"
+        "- «Строитель, покажи процесс»\n"
+        "- «Строитель, покажи прототип/реализацию/публикацию»\n"
+        "- «Строитель, ссылка на Preview»\n"
+        "Изменение: опишите требование обычным сообщением после выбора проекта."
+    )
+    interaction_result: dict[str, Any] | None = None
+    try:
+        if current_id and isinstance(session, Mapping):
+            interaction_result = _present_project_workflow_interaction(
+                webspace_id=webspace_id,
+                object_type="scenario",
+                object_id=current_id,
+                prompt=message,
+                session=session,
+                binding=binding,
+                topic=topic,
+                _meta=_meta,
+            )
+        else:
+            items = [_session_summary(item) for item in _development_sessions(webspace_id)]
+            interaction_result = _present_project_selection_interaction(
+                webspace_id=webspace_id,
+                items=items,
+                prompt=message,
+                session=session,
+                binding=binding,
+                topic=topic,
+                _meta=_meta,
+            )
+    except Exception:
+        _LOG.warning("failed to present Builder help actions", exc_info=True)
+    return _builder_command_response(
+        webspace_id=webspace_id,
+        message=message,
+        status="help",
+        command=command,
+        session=session,
+        binding=binding,
+        topic_ref=topic,
+        _meta=_meta,
+        emit_chat=interaction_result is None,
+        extra={
+            "conversation_interaction": (
+                {
+                    "handle": interaction_result.get("handle"),
+                    "presentation": interaction_result.get("presentation"),
+                }
+                if interaction_result is not None
+                else None
+            )
         },
     )
 
@@ -8858,6 +9207,22 @@ def _handle_project_switch_command(
         )
     else:
         message = f"{AGENT_LABEL}: \u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f \u043d\u0430 {summary.get('title')} ({summary.get('scenario_id') or summary.get('draft_id')})."
+    interaction_result: dict[str, Any] | None = None
+    object_id = str(summary.get("scenario_id") or "").strip()
+    if object_id:
+        try:
+            interaction_result = _present_project_workflow_interaction(
+                webspace_id=webspace_id,
+                object_type="scenario",
+                object_id=object_id,
+                prompt=message,
+                session=selected,
+                binding=binding,
+                topic=topic,
+                _meta=_meta,
+            )
+        except Exception:
+            _LOG.warning("failed to present actions after Builder project switch", exc_info=True)
     return _builder_command_response(
         webspace_id=webspace_id,
         message=message,
@@ -8867,11 +9232,20 @@ def _handle_project_switch_command(
         binding=binding,
         topic_ref=topic,
         _meta=_meta,
+        emit_chat=interaction_result is None,
         extra={
             "project": summary,
             "workbench": workbench,
             "prompt_selection": prompt_selection,
             "preview_changed": not focus_only,
+            "conversation_interaction": (
+                {
+                    "handle": interaction_result.get("handle"),
+                    "presentation": interaction_result.get("presentation"),
+                }
+                if interaction_result is not None
+                else None
+            ),
         },
     )
 
@@ -9475,9 +9849,8 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
     match = re.fullmatch(r"(scenario|skill):([A-Za-z0-9][A-Za-z0-9_.-]{0,127})", project_ref)
     consumed = response.get("consumed_command") if isinstance(response.get("consumed_command"), Mapping) else {}
     command = str(consumed.get("command") or "").strip()
-    if match is None or not command:
+    if not command:
         return
-    object_type, object_id = match.groups()
     response_meta = response.get("metadata") if isinstance(response.get("metadata"), Mapping) else {}
     source_webspace_id = str(
         response_meta.get("source_webspace_id")
@@ -9486,6 +9859,54 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
         or "desktop"
     ).strip() or "desktop"
     webspace_id = _source_webspace_id(source_webspace_id, response_meta)
+
+    if command == "builder.project.select":
+        target_ref = consumed.get("target_ref") if isinstance(consumed.get("target_ref"), Mapping) else {}
+        project_id = str(target_ref.get("id") or consumed.get("value") or "").strip()
+        if project_id:
+            _handle_project_switch_command(
+                webspace_id=webspace_id,
+                command={
+                    "intent": "project.switch",
+                    "project_ref": project_id,
+                    "source": "interaction",
+                    "confidence": 1.0,
+                },
+                _meta=response_meta,
+            )
+        return
+
+    if command in {"builder.project.list", "builder.help"}:
+        current_session, current_binding = _target_session(webspace_id)
+        current_topic = _builder_topic_ref(
+            webspace_id,
+            session=current_session,
+            binding=current_binding,
+            _meta=response_meta,
+        )
+        if command == "builder.project.list":
+            _handle_project_list_command(
+                webspace_id=webspace_id,
+                session=current_session,
+                binding=current_binding,
+                topic=current_topic,
+                command={"intent": "project.list", "source": "interaction"},
+                _meta=response_meta,
+            )
+        else:
+            _handle_help_command(
+                webspace_id=webspace_id,
+                session=current_session,
+                binding=current_binding,
+                topic=current_topic,
+                command={"intent": "help", "source": "interaction"},
+                _meta=response_meta,
+            )
+        return
+
+    if match is None:
+        return
+    object_type, object_id = match.groups()
     resolution = _resolve_project_session(webspace_id, object_id)
     session = dict(resolution.get("session") or {}) if resolution.get("status") == "found" else {
         "id": f"{object_type}.{object_id}",
@@ -9501,6 +9922,17 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
         _meta={**dict(response_meta), "builder_topic": dict(stored_topic)},
     )
     reply_meta = {**dict(response_meta), "webspace_id": webspace_id}
+
+    if command == "builder.preview.link":
+        _handle_preview_link_command(
+            webspace_id=webspace_id,
+            session=session,
+            binding=binding,
+            topic=topic,
+            command={"intent": "preview.link", "source": "interaction"},
+            _meta=reply_meta,
+        )
+        return
 
     prompt_by_command = {
         "builder.change.plan": "Опишите, что нужно изменить. Строитель разложит запрос на Issues и Change.",
@@ -9522,14 +9954,26 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
     if command == "builder.process.inspect":
         frame = sdk_builder_workflow.get_interaction_frame(object_type, object_id)
         message = f"{AGENT_LABEL}: {str(frame.get('message') or 'Состояние процесса доступно в панели Process.')}"
-        _safe_emit_chat(
-            message,
-            webspace_id=webspace_id,
-            _meta=reply_meta,
-            session=session,
-            binding=binding,
-            topic_ref=topic,
-        )
+        try:
+            _present_project_workflow_interaction(
+                webspace_id=webspace_id,
+                object_type=object_type,
+                object_id=object_id,
+                prompt=message,
+                session=session,
+                binding=binding,
+                topic=topic,
+                _meta=reply_meta,
+            )
+        except Exception:
+            _safe_emit_chat(
+                message,
+                webspace_id=webspace_id,
+                _meta=reply_meta,
+                session=session,
+                binding=binding,
+                topic_ref=topic,
+            )
         return
 
     preview_stage = {
@@ -9549,14 +9993,26 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
             message = f"{AGENT_LABEL}: Preview переключён на {label}."
         except Exception as exc:
             message = f"{AGENT_LABEL}: не удалось переключить Preview: {type(exc).__name__}: {exc}"
-        _safe_emit_chat(
-            message,
-            webspace_id=webspace_id,
-            _meta=reply_meta,
-            session=session,
-            binding=binding,
-            topic_ref=topic,
-        )
+        try:
+            _present_project_workflow_interaction(
+                webspace_id=webspace_id,
+                object_type=object_type,
+                object_id=object_id,
+                prompt=message,
+                session=session,
+                binding=binding,
+                topic=topic,
+                _meta=reply_meta,
+            )
+        except Exception:
+            _safe_emit_chat(
+                message,
+                webspace_id=webspace_id,
+                _meta=reply_meta,
+                session=session,
+                binding=binding,
+                topic_ref=topic,
+            )
         return
 
     try:
@@ -9663,6 +10119,24 @@ def chat(
         return _handle_project_switch_command(webspace_id=ws, command=command, _meta=_meta)
     if intent == "project.delete":
         return _handle_project_delete_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
+    if intent == "help":
+        return _handle_help_command(
+            webspace_id=ws,
+            session=session,
+            binding=binding,
+            topic=topic,
+            command=command,
+            _meta=_meta,
+        )
+    if intent == "preview.link":
+        return _handle_preview_link_command(
+            webspace_id=ws,
+            session=session,
+            binding=binding,
+            topic=topic,
+            command=command,
+            _meta=_meta,
+        )
     if intent in {"workflow.inspect", "preview.select"}:
         return _handle_project_context_command(
             webspace_id=ws,

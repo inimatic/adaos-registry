@@ -5614,6 +5614,8 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     show_prototype = skill._parse_builder_command("Показать прототип", has_session=True)
     show_implementation = skill._parse_builder_command("Показать реализацию", has_session=True)
     show_publication = skill._parse_builder_command("Показать публикацию", has_session=True)
+    help_command = skill._parse_builder_command("Строитель, помощь", has_session=True)
+    preview_link = skill._parse_builder_command("Строитель, ссылка на Preview", has_session=True)
     design_request = skill._parse_builder_command(
         "Redesign the workspace and show the current project identity in the header.",
         has_session=True,
@@ -5646,6 +5648,8 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     }
     assert show_implementation["stage"] == "automation"
     assert show_publication["stage"] == "publication"
+    assert help_command["intent"] == "help"
+    assert preview_link["intent"] == "preview.link"
     assert design_request["intent"] == "none"
     assert delete_current == {
         "intent": "project.delete",
@@ -5862,6 +5866,94 @@ def test_current_project_presents_contextual_workflow_controls(monkeypatch) -> N
     assert emitted == []
 
 
+def test_project_list_has_one_explicit_dialog_current_and_selection_buttons(monkeypatch) -> None:
+    skill = _load_module()
+    captured: dict = {}
+    items = [
+        {"session_id": "shared", "scenario_id": "test04_recipes", "title": "Список покупок"},
+        {"session_id": "shared", "scenario_id": "test05_recipes", "title": "Home Recipe Book"},
+    ]
+
+    def _request(specification, **kwargs):
+        captured["specification"] = dict(specification)
+        captured["kwargs"] = dict(kwargs)
+        return {"handle": {"interaction_id": "interaction.projects"}, "presentation": {"mode": "buttons"}}
+
+    monkeypatch.setattr(skill.sdk_chat, "request", _request)
+    message = skill._format_project_list(items, "test04_recipes")
+    result = skill._present_project_selection_interaction(
+        webspace_id="dev1",
+        items=items,
+        prompt=message,
+        session={"id": "shared", "scenario_id": "test04_recipes", "title": "Список покупок"},
+        binding={"runtime_scenario_id": "test04_recipes"},
+        topic={"thread_id": "prompt-project:scenario:test04_recipes"},
+        _meta={"io_type": "telegram", "route_id": "telegram", "chat_id": "42"},
+    )
+
+    assert result["presentation"]["mode"] == "buttons"
+    assert message.count("[текущий в этом диалоге]") == 1
+    assert "test04_recipes [текущий в этом диалоге]" in message
+    assert "test05_recipes [доступен в DEV]" in message
+    assert [item["target_ref"]["id"] for item in captured["specification"]["actions"]] == [
+        "test04_recipes",
+        "test05_recipes",
+    ]
+    assert [item["label"] for item in captured["specification"]["actions"]] == [
+        "Выбрать test04_recipes",
+        "Выбрать test05_recipes",
+    ]
+
+
+def test_help_and_preview_link_never_route_to_automation(monkeypatch) -> None:
+    skill = _load_module()
+    session = {"id": "session.recipes", "scenario_id": "recipes", "title": "Recipes"}
+    binding = {"runtime_scenario_id": "recipes", "dev_webspace_id": "dev1-dev"}
+    emitted: list[dict] = []
+    monkeypatch.setattr(skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (dict(session), dict(binding)))
+    monkeypatch.setattr(
+        skill,
+        "_builder_topic_ref",
+        lambda *_args, **_kwargs: {"thread_id": "prompt-project:scenario:recipes"},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_present_project_workflow_interaction",
+        lambda **_kwargs: {"handle": {"interaction_id": "interaction.help"}, "presentation": {"mode": "buttons"}},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_preview_link_payload",
+        lambda _ws: {
+            "url": "https://inimatic.com/?webspace=dev1-dev",
+            "label": "proto: recipes · current",
+            "preview_webspace_id": "dev1-dev",
+            "target": {"stage": "prototype"},
+            "source_webspace_id": "dev1",
+        },
+    )
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}),
+    )
+    monkeypatch.setattr(
+        skill,
+        "_route_automation_chat",
+        lambda **_kwargs: pytest.fail("read-only Builder command must not route to Automation"),
+    )
+
+    help_result = skill.chat("Строитель, помощь", webspace_id="dev1")
+    link_result = skill.chat("Строитель, ссылка на Preview", webspace_id="dev1")
+
+    assert help_result["status"] == "help"
+    assert link_result["status"] == "preview_link"
+    assert link_result["preview_link"]["preview_webspace_id"] == "dev1-dev"
+    assert emitted[0]["kwargs"]["actions"][0]["action"]["type"] == "openUrl"
+    assert emitted[0]["kwargs"]["actions"][0]["action"]["params"]["withAuth"] is False
+
+
 def test_workflow_text_commands_bypass_automation_and_llm_routing(monkeypatch) -> None:
     skill = _load_module()
     session = {
@@ -6006,7 +6098,10 @@ def test_project_workflow_interaction_exposes_only_executable_localized_controls
     assert result["presentation"]["mode"] == "buttons"
     actions = captured["specification"]["actions"]
     assert [(item["command"], item["label"]) for item in actions] == [
-        ("builder.change.plan", "Описать изменение")
+        ("builder.change.plan", "Описать изменение"),
+        ("builder.project.list", "Показать проекты"),
+        ("builder.preview.link", "Ссылка на Preview"),
+        ("builder.help", "Помощь"),
     ]
     assert captured["kwargs"]["route_id"] == "telegram"
 
@@ -6116,6 +6211,49 @@ def test_conversation_interaction_response_returns_builder_prompt_to_origin_chan
     assert "Опишите, что нужно изменить" in emitted[0]["text"]
     assert emitted[0]["kwargs"]["_meta"]["route_id"] == "telegram"
     assert emitted[0]["kwargs"]["topic_ref"]["thread_id"] == "prompt-project:scenario:builder"
+
+
+def test_project_selection_interaction_switches_by_stable_target_id(monkeypatch) -> None:
+    skill = _load_module()
+    switched: list[dict] = []
+    monkeypatch.setattr(
+        skill,
+        "_handle_project_switch_command",
+        lambda **kwargs: switched.append(dict(kwargs)) or {"ok": True, "status": "project_switched"},
+    )
+
+    result = skill.handle_interaction_response(
+        event={
+            "interaction": {
+                "interaction_id": "interaction.projects",
+                "metadata": {
+                    "domain": "builder",
+                    "interaction_kind": "project_selection",
+                    "source_webspace_id": "dev1",
+                },
+            },
+            "response": {
+                "response_id": "response.projects.test05",
+                "consumed_command": {
+                    "command": "builder.project.select",
+                    "value": "test05_recipes",
+                    "target_ref": {"kind": "scenario", "id": "test05_recipes"},
+                },
+                "metadata": {
+                    "io_type": "telegram",
+                    "route_id": "telegram",
+                    "chat_id": "42",
+                },
+            },
+            "duplicate": False,
+        },
+        webspace_id="dev1",
+    )
+
+    assert result["status"] == "handled"
+    assert len(switched) == 1
+    assert switched[0]["command"]["project_ref"] == "test05_recipes"
+    assert switched[0]["_meta"]["route_id"] == "telegram"
 
 
 def test_limited_channel_can_select_existing_dev_scenario_without_local_session(monkeypatch, tmp_path) -> None:
