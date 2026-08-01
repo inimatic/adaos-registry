@@ -5584,6 +5584,10 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
         has_session=False,
     )
     current = skill._parse_builder_command("What is the current project?", has_session=True)
+    inspect_process = skill._parse_builder_command("Показать процесс", has_session=True)
+    show_prototype = skill._parse_builder_command("Показать прототип", has_session=True)
+    show_implementation = skill._parse_builder_command("Показать реализацию", has_session=True)
+    show_publication = skill._parse_builder_command("Показать публикацию", has_session=True)
     design_request = skill._parse_builder_command(
         "Redesign the workspace and show the current project identity in the header.",
         has_session=True,
@@ -5607,6 +5611,15 @@ def test_builder_command_parser_prioritises_project_commands() -> None:
     assert create_new["intent"] == "project.create"
     assert edit_like_without_session["intent"] == "none"
     assert current["intent"] == "project.current"
+    assert inspect_process["intent"] == "workflow.inspect"
+    assert show_prototype == {
+        "intent": "preview.select",
+        "stage": "prototype",
+        "confidence": 1.0,
+        "source": "deterministic",
+    }
+    assert show_implementation["stage"] == "automation"
+    assert show_publication["stage"] == "publication"
     assert design_request["intent"] == "none"
     assert delete_current == {
         "intent": "project.delete",
@@ -5821,6 +5834,47 @@ def test_current_project_presents_contextual_workflow_controls(monkeypatch) -> N
     }
     assert presented[0]["object_id"] == "builder"
     assert emitted == []
+
+
+def test_workflow_text_commands_bypass_automation_and_llm_routing(monkeypatch) -> None:
+    skill = _load_module()
+    session = {
+        "id": "session.recipes",
+        "draft_id": "draft.recipes",
+        "scenario_id": "recipes",
+        "title": "Recipes",
+    }
+    binding = {"runtime_scenario_id": "recipes", "active_draft_id": "draft.recipes"}
+    captured: list[dict] = []
+
+    monkeypatch.setattr(skill, "_align_workbench_binding_to_meta", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(skill, "_target_session", lambda _ws: (dict(session), dict(binding)))
+    monkeypatch.setattr(
+        skill,
+        "_builder_topic_ref",
+        lambda *_args, **_kwargs: {"thread_id": "prompt-project:scenario:recipes"},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_handle_project_context_command",
+        lambda **kwargs: captured.append(dict(kwargs))
+        or {"ok": True, "status": "workflow_inspected", "command": kwargs["command"]},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_route_automation_chat",
+        lambda **_kwargs: pytest.fail("workflow control must not route to Automation"),
+    )
+    monkeypatch.setattr(
+        skill,
+        "update_current_scenario",
+        lambda **_kwargs: pytest.fail("workflow control must not start LLM/Codex work"),
+    )
+
+    result = skill.chat("Показать процесс", webspace_id="dev1")
+
+    assert result["status"] == "workflow_inspected"
+    assert captured[0]["command"]["intent"] == "workflow.inspect"
 
 
 def test_current_project_router_fallback_is_materialized_once_by_router(monkeypatch) -> None:

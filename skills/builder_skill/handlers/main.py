@@ -8196,6 +8196,30 @@ def _parse_builder_command(text: str, *, allow_create: bool = True, has_session:
     if _is_current_project_command(lowered):
         return {"intent": "project.current", "confidence": 1.0, "source": "deterministic"}
 
+    workflow_commands = {
+        "показать процесс": {"intent": "workflow.inspect"},
+        "покажи процесс": {"intent": "workflow.inspect"},
+        "показать workflow": {"intent": "workflow.inspect"},
+        "show process": {"intent": "workflow.inspect"},
+        "show workflow": {"intent": "workflow.inspect"},
+        "показать прототип": {"intent": "preview.select", "stage": "prototype"},
+        "покажи прототип": {"intent": "preview.select", "stage": "prototype"},
+        "show prototype": {"intent": "preview.select", "stage": "prototype"},
+        "показать реализацию": {"intent": "preview.select", "stage": "automation"},
+        "покажи реализацию": {"intent": "preview.select", "stage": "automation"},
+        "показать автоматизацию": {"intent": "preview.select", "stage": "automation"},
+        "show implementation": {"intent": "preview.select", "stage": "automation"},
+        "показать публикацию": {"intent": "preview.select", "stage": "publication"},
+        "покажи публикацию": {"intent": "preview.select", "stage": "publication"},
+        "show publication": {"intent": "preview.select", "stage": "publication"},
+    }
+    if lowered in workflow_commands:
+        return {
+            **workflow_commands[lowered],
+            "confidence": 1.0,
+            "source": "deterministic",
+        }
+
     delete_command = _parse_project_delete_command(lowered)
     if delete_command is not None:
         return delete_command
@@ -8626,6 +8650,119 @@ def _handle_project_current_command(
     )
 
 
+def _handle_project_context_command(
+    *,
+    webspace_id: str,
+    session: Mapping[str, Any] | None,
+    binding: Mapping[str, Any],
+    topic: Mapping[str, Any],
+    command: Mapping[str, Any],
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Execute read-only workflow/preview commands before Automation or LLM routing."""
+
+    if not isinstance(session, Mapping):
+        return _builder_command_response(
+            webspace_id=webspace_id,
+            message=_command_hint_message(),
+            status="target_required",
+            command=command,
+            binding=binding,
+            topic_ref=topic,
+            _meta=_meta,
+            extra={"needs_selection": True},
+        )
+    summary = _session_summary(session)
+    object_id = str(summary.get("scenario_id") or "").strip()
+    if not object_id:
+        return _builder_command_response(
+            webspace_id=webspace_id,
+            message=f"{AGENT_LABEL}: у выбранного проекта нет scenario id.",
+            status="target_unavailable",
+            command=command,
+            session=session,
+            binding=binding,
+            topic_ref=topic,
+            _meta=_meta,
+        )
+
+    intent = str(command.get("intent") or "")
+    extra: dict[str, Any] = {}
+    if intent == "workflow.inspect":
+        frame = sdk_builder_workflow.get_interaction_frame("scenario", object_id)
+        message = f"{AGENT_LABEL}: {str(frame.get('message') or 'Состояние процесса доступно.') }"
+        status = "workflow_inspected"
+        extra["workflow_frame"] = frame
+    else:
+        stage = str(command.get("stage") or "prototype").strip()
+        try:
+            selected = builder_preview.select_target(
+                "scenario",
+                object_id,
+                stage=stage,
+                source_webspace_id=webspace_id,
+            )
+        except Exception as exc:
+            return _builder_command_response(
+                webspace_id=webspace_id,
+                message=(
+                    f"{AGENT_LABEL}: Preview для {stage} недоступен: "
+                    f"{type(exc).__name__}: {exc}"
+                ),
+                status="preview_unavailable",
+                command=command,
+                session=session,
+                binding=binding,
+                topic_ref=topic,
+                _meta=_meta,
+                extra={"stage": stage},
+            )
+        label = str((selected.get("target") or {}).get("label") or stage)
+        message = f"{AGENT_LABEL}: Preview переключён на {label}."
+        status = "preview_selected"
+        extra.update({"stage": stage, "preview_selection": selected})
+
+    interaction_result: dict[str, Any] | None = None
+    try:
+        interaction_result = _present_project_workflow_interaction(
+            webspace_id=webspace_id,
+            object_type="scenario",
+            object_id=object_id,
+            prompt=message,
+            session=session,
+            binding=binding,
+            topic=topic,
+            _meta=_meta,
+        )
+    except Exception:
+        _LOG.warning(
+            "failed to refresh Builder workflow interaction project=%s webspace=%s",
+            object_id,
+            webspace_id,
+            exc_info=True,
+        )
+    return _builder_command_response(
+        webspace_id=webspace_id,
+        message=message,
+        status=status,
+        command=command,
+        session=session,
+        binding=binding,
+        topic_ref=topic,
+        _meta=_meta,
+        emit_chat=interaction_result is None,
+        extra={
+            **extra,
+            "conversation_interaction": (
+                {
+                    "handle": interaction_result.get("handle"),
+                    "presentation": interaction_result.get("presentation"),
+                }
+                if interaction_result is not None
+                else None
+            ),
+        },
+    )
 def _handle_project_switch_command(
     *,
     webspace_id: str,
@@ -9500,6 +9637,15 @@ def chat(
         return _handle_project_switch_command(webspace_id=ws, command=command, _meta=_meta)
     if intent == "project.delete":
         return _handle_project_delete_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
+    if intent in {"workflow.inspect", "preview.select"}:
+        return _handle_project_context_command(
+            webspace_id=ws,
+            session=session,
+            binding=binding,
+            topic=topic,
+            command=command,
+            _meta=_meta,
+        )
     if _is_guided_clarification_request(utterance):
         clarification = _builder_clarification_payload(text=utterance, webspace_id=ws, topic=topic)
         message = _guided_clarification_message(clarification)
