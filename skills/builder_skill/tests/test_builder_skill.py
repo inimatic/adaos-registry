@@ -746,6 +746,32 @@ def test_functional_request_is_planned_for_automation_without_mutating_prototype
     assert (artifact_root / "webui.json").read_bytes() == before
 
 
+def test_workflow_definition_correction_uses_automation_lane() -> None:
+    skill = _load_module()
+
+    requests = (
+        "Correct workflow.json transition guards and validate the statechart.",
+        "\u0418\u0441\u043f\u0440\u0430\u0432\u044c \u0433\u0440\u0430\u0444 \u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0439 \u0438 \u043f\u0435\u0440\u0435\u0445\u043e\u0434 \u043c\u0435\u0436\u0434\u0443 \u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u044f\u043c\u0438.",
+    )
+
+    for request in requests:
+        issues = skill._builder_change_issues(request, change_id="change.workflow")
+        assert issues
+        assert {item["lane"] for item in issues} == {"automation"}
+
+
+def test_visual_process_request_remains_in_prototype_lane() -> None:
+    skill = _load_module()
+
+    issues = skill._builder_change_issues(
+        "\u041f\u0435\u0440\u0435\u0441\u0442\u0430\u0432\u044c \u043a\u043d\u043e\u043f\u043a\u0438 \u043f\u0440\u043e\u0446\u0435\u0441\u0441\u0430 \u0432 \u043f\u0440\u0430\u0432\u0443\u044e \u043f\u0430\u043d\u0435\u043b\u044c.",
+        change_id="change.visual",
+    )
+
+    assert issues
+    assert {item["lane"] for item in issues} == {"prototype"}
+
+
 def test_card_view_hides_table_in_generated_page_schema(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "todo_cards"

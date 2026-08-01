@@ -6136,6 +6136,25 @@ _AUTOMATION_REQUEST_MARKERS = (
 )
 
 
+_WORKFLOW_DEFINITION_REQUEST_MARKERS = (
+    "workflow.json",
+    "workflow definition",
+    "transitiondescriptor",
+    "statechart",
+    "state machine",
+    "guard",
+    "invariant",
+    "effect adapter",
+    "activity adapter",
+    "\u043e\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 workflow",
+    "\u0433\u0440\u0430\u0444 \u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0439",
+    "\u043c\u0430\u0448\u0438\u043d\u0430 \u0441\u043e\u0441\u0442\u043e\u044f\u043d\u0438\u0439",
+    "\u043f\u0435\u0440\u0435\u0445\u043e\u0434 \u043c\u0435\u0436\u0434\u0443 \u0441\u043e\u0441\u0442\u043e\u044f\u043d",
+    "\u0433\u0430\u0440\u0434 workflow",
+    "\u0438\u043d\u0432\u0430\u0440\u0438\u0430\u043d\u0442 workflow",
+)
+
+
 def _builder_change_issue_clauses(request_text: str) -> list[str]:
     normalized = str(request_text or "").strip()
     if not normalized:
@@ -6155,6 +6174,13 @@ def _builder_change_issue_clauses(request_text: str) -> list[str]:
 
 def _builder_change_issue_lane(clause: str) -> str:
     lowered = str(clause or "").casefold()
+    # A governed workflow definition is executable control-plane data.  Its
+    # structure is safer to validate than handwritten orchestration code, but
+    # changing it still belongs to the isolated Automation/Codex lane.  The UI
+    # prototype transformer is intentionally limited to webui.json and must not
+    # reinterpret a definition correction as a visible workflow mock-up.
+    if any(marker in lowered for marker in _WORKFLOW_DEFINITION_REQUEST_MARKERS):
+        return "automation"
     if any(marker in lowered for marker in _PROTOTYPE_REQUEST_MARKERS):
         return "prototype"
     if any(marker in lowered for marker in _AUTOMATION_REQUEST_MARKERS):
