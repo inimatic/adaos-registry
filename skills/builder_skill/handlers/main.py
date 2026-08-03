@@ -33,6 +33,7 @@ AGENT_ID = "agent:builder_skill:builder"
 AGENT_LABEL = "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440"
 SESSIONS_KEY = "builder_skill.sessions"
 CURRENT_KEY = "builder_skill.current_session"
+BUILDER_CONTEXT_KEY = "builder_skill.builder_context"
 MAX_SESSIONS = 50
 WORKBENCH_REFRESH_TOPIC = "builder.workbench.ensure_requested"
 PROMPT_IDE_SCENARIO_ID = "prompt_engineer_scenario"
@@ -139,9 +140,10 @@ def _source_webspace_id(value: str | None = None, _meta: Mapping[str, Any] | Non
             if isinstance(raw, str) and raw.strip():
                 return raw.strip()
     token = _webspace_id(value, _meta)
-    if token.endswith("-dev") and len(token) > 4:
-        return token[:-4]
-    return token
+    try:
+        return builder_preview.canonical_source_webspace_id(token)
+    except Exception:
+        return token
 
 
 def _reply_webspace_id(value: str | None = None, _meta: Mapping[str, Any] | None = None) -> str:
@@ -242,6 +244,100 @@ def _mem_set(key: str, value: Any) -> None:
         skill_memory.set(key, value)
     except Exception:
         _FALLBACK_MEMORY[key] = copy.deepcopy(value)
+
+
+def _transport_kind(_meta: Mapping[str, Any] | None) -> str:
+    meta = dict(_meta) if isinstance(_meta, Mapping) else {}
+    return str(meta.get("io_type") or meta.get("transport") or meta.get("route_id") or "").strip().lower()
+
+
+def _builder_context_scope(_meta: Mapping[str, Any] | None) -> str:
+    """Return a stable conversation/transport scope for Builder host focus."""
+
+    meta = dict(_meta) if isinstance(_meta, Mapping) else {}
+    route = meta.get("transport_route") if isinstance(meta.get("transport_route"), Mapping) else {}
+    transport = _transport_kind(meta) or "dialog"
+    chat_id = str(meta.get("chat_id") or route.get("chat_id") or route.get("conversation_id") or "").strip()
+    thread_id = str(meta.get("thread_id") or route.get("thread_id") or "").strip()
+    # A skill-level conversation id can intentionally be shared by all
+    # Telegram users. Transport identity is therefore the narrower authority
+    # for user focus and must win when available.
+    if transport == "telegram" and chat_id:
+        return f"{transport}:chat:{chat_id}:thread:{thread_id or '-'}"
+    conversation_id = str(meta.get("conversation_id") or "").strip()
+    if conversation_id:
+        return f"conversation:{conversation_id}"
+    if chat_id:
+        return f"{transport}:chat:{chat_id}:thread:{thread_id or '-'}"
+    return f"{transport}:default"
+
+
+def _builder_context_memory_key(scope: str) -> str:
+    digest = hashlib.sha256(str(scope or "default").encode("utf-8")).hexdigest()[:24]
+    return f"{BUILDER_CONTEXT_KEY}.{digest}"
+
+
+def _remember_builder_context(scope: str, context: Mapping[str, Any] | None) -> None:
+    _mem_set(
+        _builder_context_memory_key(scope),
+        dict(context) if isinstance(context, Mapping) else None,
+    )
+
+
+def _builder_context_candidates() -> list[dict[str, Any]]:
+    try:
+        return [dict(item) for item in builder_preview.list_builder_hosts() if isinstance(item, Mapping)]
+    except Exception:
+        _LOG.warning("failed to discover active Builder Webspaces", exc_info=True)
+        return []
+
+
+def _resolve_builder_context_for_turn(
+    value: str | None,
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Resolve Web surfaces directly and Telegram from conversation focus."""
+
+    transport = _transport_kind(_meta)
+    if transport != "telegram":
+        exact = _webspace_id(value, _meta)
+        candidates = [exact]
+        try:
+            canonical = builder_preview.canonical_source_webspace_id(exact)
+        except Exception:
+            canonical = exact
+        if canonical not in candidates:
+            candidates.append(canonical)
+        for candidate in candidates:
+            try:
+                return builder_preview.resolve_builder_context(candidate)
+            except Exception:
+                continue
+        # API/unit callers historically supplied a synthetic Builder host. The
+        # runtime route already authorizes that surface; retain compatibility
+        # without fabricating a Telegram/global focus.
+        return {
+            "schema": "adaos.builder.context_ref.v1",
+            "builder_webspace_id": canonical,
+            "preview_webspace_id": None,
+            "status": "unverified_request_surface",
+            "selectable": True,
+        }
+
+    scope = _builder_context_scope(_meta)
+    stored = _mem_get(_builder_context_memory_key(scope), None)
+    selected_id = str((stored or {}).get("builder_webspace_id") or "").strip() if isinstance(stored, Mapping) else ""
+    if not selected_id:
+        return None
+    try:
+        context = builder_preview.resolve_builder_context(selected_id)
+    except Exception:
+        # A removed/deactivated Builder must not leave a stale conversation
+        # silently writing into its former project namespace.
+        _remember_builder_context(scope, None)
+        return None
+    _remember_builder_context(scope, context)
+    return context
 
 
 def _mem_set_many(values: Mapping[str, Any]) -> None:
@@ -8610,6 +8706,140 @@ def _present_project_workflow_interaction(
     )
 
 
+def _format_builder_context_choices(contexts: Sequence[Mapping[str, Any]]) -> str:
+    if not contexts:
+        return (
+            f"{AGENT_LABEL}: не найден ни один Webspace с активным Builder. "
+            "Откройте сценарий Builder в нужном Webspace и повторите команду."
+        )
+    ready = [item for item in contexts if bool(item.get("selectable"))]
+    visible = ready or list(contexts)
+    lines = [f"{AGENT_LABEL}: выберите экземпляр Builder для этого диалога:"]
+    for item in visible[:8]:
+        builder_id = str(item.get("builder_webspace_id") or "—").strip() or "—"
+        title = str(item.get("builder_title") or builder_id).strip() or builder_id
+        preview_id = str(item.get("preview_webspace_id") or "—").strip() or "—"
+        kind = "DEV" if str(item.get("builder_space_kind") or "") == "dev" else "Workspace"
+        status = str(item.get("status") or "unavailable").strip()
+        availability = "доступен" if bool(item.get("selectable")) else f"недоступен: {status}"
+        lines.append(f"- {title} — Builder {builder_id} [{kind}] → Preview {preview_id} [{availability}]")
+    unavailable_count = len(contexts) - len(ready)
+    if ready and unavailable_count:
+        lines.append(f"Ещё {unavailable_count} Builder Webspace не показаны: их Preview не готов.")
+    lines.append("Выбор Builder задаёт область проектов этого диалога; выбор проекта выполняется следующим шагом.")
+    return "\n".join(lines)
+
+
+def _present_builder_context_selection(
+    *,
+    contexts: Sequence[Mapping[str, Any]],
+    prompt: str,
+    webspace_id: str | None,
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    selectable = [dict(item) for item in contexts if bool(item.get("selectable"))][:8]
+    if not selectable:
+        return None
+    reply_webspace_id = _reply_webspace_id(webspace_id, _meta)
+    meta = dict(_meta) if isinstance(_meta, Mapping) else {}
+    scope = _builder_context_scope(meta)
+    conversation_id = str(meta.get("conversation_id") or _conversation_id(reply_webspace_id)).strip()
+    thread_id = str(meta.get("thread_id") or meta.get("conversation_thread_id") or "").strip()
+    actions: list[dict[str, Any]] = []
+    for index, item in enumerate(selectable):
+        builder_id = str(item.get("builder_webspace_id") or "").strip()
+        title = str(item.get("builder_title") or builder_id).strip() or builder_id
+        kind = "DEV" if str(item.get("builder_space_kind") or "") == "dev" else "Workspace"
+        actions.append(
+            {
+                "action_id": f"builder-context-select-{index}-{_safe_ref_token(builder_id)}",
+                "label": f"{title} · {kind}"[:64],
+                "command": "builder.context.select",
+                "value": builder_id,
+                "risk": "local_reversible",
+                "confirmation_required": False,
+                "target_ref": {"kind": "webspace", "id": builder_id, "title": title},
+                "expected_generation": int(item.get("preview_relation_generation") or 0),
+                "principal_scope": ["user", "transport"],
+                "command_context_ref": {"kind": "conversation", "id": scope},
+            }
+        )
+    return sdk_chat.request(
+        {
+            "prompt": prompt,
+            "input_spec": {
+                "kind": "choice",
+                "required_fields": [],
+                "choices": [
+                    {"value": item["value"], "label": item["label"], "description": None}
+                    for item in actions
+                ],
+                "sensitive": False,
+            },
+            "actions": actions,
+            "optional_capabilities": ["buttons"],
+            "fallbacks": ["numbered_text", "plain_text", "unsupported"],
+            "metadata": {
+                "domain": "builder",
+                "interaction_kind": "builder_context_selection",
+                "builder_context_scope": scope,
+                "reply_webspace_id": reply_webspace_id,
+                "dialog_channel_id": DIALOG_CHANNEL_ID,
+            },
+        },
+        conversation_id=conversation_id,
+        owner=f"skill:{SKILL_ID}",
+        webspace_id=reply_webspace_id,
+        channel_id=DIALOG_CHANNEL_ID,
+        route_id=str(meta.get("route_id") or "voice_chat"),
+        thread_id=thread_id or None,
+        actor_id=AGENT_ID,
+        actor_label=AGENT_LABEL,
+        request_id=str(meta.get("request_id") or "").strip() or None,
+        turn_trace_id=str(meta.get("turn_trace_id") or "").strip() or None,
+        meta={**meta, "webspace_id": reply_webspace_id},
+    )
+
+
+def _handle_builder_context_required(
+    *,
+    webspace_id: str | None,
+    command: Mapping[str, Any],
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    contexts = _builder_context_candidates()
+    message = _format_builder_context_choices(contexts)
+    interaction_result: dict[str, Any] | None = None
+    try:
+        interaction_result = _present_builder_context_selection(
+            contexts=contexts,
+            prompt=message,
+            webspace_id=webspace_id,
+            _meta=_meta,
+        )
+    except Exception:
+        _LOG.warning("failed to present Builder context selection", exc_info=True)
+    if interaction_result is None:
+        _safe_emit_chat(message, webspace_id=_reply_webspace_id(webspace_id, _meta), _meta=_meta)
+    return {
+        "ok": True,
+        "status": "builder_context_required",
+        "needs_selection": True,
+        "message": message,
+        "command": dict(command),
+        "builder_contexts": contexts,
+        "builder_context_scope": _builder_context_scope(_meta),
+        "conversation_interaction": (
+            {
+                "handle": interaction_result.get("handle"),
+                "presentation": interaction_result.get("presentation"),
+            }
+            if interaction_result is not None
+            else None
+        ),
+    }
+
+
 def _limited_channel_focus_only(_meta: Mapping[str, Any] | None) -> bool:
     if not isinstance(_meta, Mapping):
         return False
@@ -8624,13 +8854,7 @@ def _webspace_context(
     binding: Mapping[str, Any] | None,
     _meta: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    """Explain which Webspace owns this dialog and its Preview.
-
-    Telegram can reach a hub through an old binding that has no explicit
-    Webspace. Core then gives the turn its durable dialog scope (historically
-    ``default``). That scope is valid, but it must never look like the current
-    browser Webspace or an explicitly bound transport destination.
-    """
+    """Explain the explicitly selected Builder host and its Preview."""
 
     source = str(webspace_id or "").strip()
     current_binding = dict(binding) if isinstance(binding, Mapping) else {}
@@ -8640,30 +8864,21 @@ def _webspace_context(
         or ""
     ).strip()
     meta = dict(_meta) if isinstance(_meta, Mapping) else {}
-    transport_route = meta.get("transport_route") if isinstance(meta.get("transport_route"), Mapping) else {}
-    routed_webspace = str(transport_route.get("webspace_id") or "").strip()
     transport = str(meta.get("io_type") or meta.get("transport") or "").strip().lower()
-    explicit = bool(routed_webspace) if transport == "telegram" else bool(source)
-    provenance = "transport_binding" if explicit else ("dialog_scope" if transport == "telegram" else "request")
     return {
+        "builder_webspace_id": source or None,
         "source_webspace_id": source or None,
         "preview_webspace_id": preview or None,
         "transport": transport or None,
-        "explicit_transport_binding": explicit,
-        "provenance": provenance,
+        "explicit_transport_binding": True,
+        "provenance": "builder_context",
     }
 
 
 def _format_webspace_context(context: Mapping[str, Any]) -> str:
-    source = str(context.get("source_webspace_id") or "—").strip() or "—"
+    source = str(context.get("builder_webspace_id") or context.get("source_webspace_id") or "—").strip() or "—"
     preview = str(context.get("preview_webspace_id") or "—").strip() or "—"
-    suffix = ""
-    if context.get("transport") == "telegram" and not bool(context.get("explicit_transport_binding")):
-        suffix = (
-            " (явная Webspace-привязка Telegram отсутствует; это сохранённый контекст данного "
-            "диалога, а выбор проекта её не меняет)"
-        )
-    return f"Webspace контекста: {source} → Preview {preview}{suffix}."
+    return f"Builder: {source} → Preview {preview}."
 
 
 def _project_identity(item: Mapping[str, Any] | None) -> str:
@@ -9905,6 +10120,44 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
     if not command:
         return
     response_meta = response.get("metadata") if isinstance(response.get("metadata"), Mapping) else {}
+
+    if command == "builder.context.select":
+        target_ref = consumed.get("target_ref") if isinstance(consumed.get("target_ref"), Mapping) else {}
+        builder_webspace_id = str(target_ref.get("id") or consumed.get("value") or "").strip()
+        scope = str(interaction_meta.get("builder_context_scope") or _builder_context_scope(response_meta)).strip()
+        if not builder_webspace_id:
+            return
+        try:
+            context = builder_preview.resolve_builder_context(builder_webspace_id)
+        except Exception as exc:
+            _safe_emit_chat(
+                f"{AGENT_LABEL}: Builder {builder_webspace_id} больше недоступен: {type(exc).__name__}: {exc}",
+                webspace_id=_reply_webspace_id(None, response_meta),
+                _meta=response_meta,
+            )
+            return
+        _remember_builder_context(scope, context)
+        selected_meta = {
+            **dict(response_meta),
+            "builder_source_webspace_id": builder_webspace_id,
+        }
+        current_session, current_binding = _target_session(builder_webspace_id)
+        current_topic = _builder_topic_ref(
+            builder_webspace_id,
+            session=current_session,
+            binding=current_binding,
+            _meta=selected_meta,
+        )
+        _handle_project_list_command(
+            webspace_id=builder_webspace_id,
+            session=current_session,
+            binding=current_binding,
+            topic=current_topic,
+            command={"intent": "project.list", "source": "builder_context_selection"},
+            _meta=selected_meta,
+        )
+        return
+
     source_webspace_id = str(
         response_meta.get("source_webspace_id")
         or response_meta.get("webspace_id")
@@ -10152,26 +10405,40 @@ def chat(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     _reject_transport_corrupted_text(text, field="text")
-    ws = _source_webspace_id(webspace_id, _meta)
     utterance = str(text or "").strip()
+    context = _resolve_builder_context_for_turn(webspace_id, _meta)
+    if context is None:
+        command = _parse_builder_command(utterance, has_session=False)
+        command["raw"] = utterance
+        return _handle_builder_context_required(
+            webspace_id=webspace_id,
+            command=command,
+            _meta=_meta,
+        )
+    ws = str(context.get("builder_webspace_id") or _source_webspace_id(webspace_id, _meta)).strip()
+    turn_meta = {
+        **(dict(_meta) if isinstance(_meta, Mapping) else {}),
+        "builder_source_webspace_id": ws,
+        "builder_context": dict(context),
+    }
     # Incoming project topic/thread is authoritative.  Align selection before
     # resolving the target session so a stale workbench cannot route this turn.
-    requested_binding = _align_workbench_binding_to_meta(ws, _meta)
+    requested_binding = _align_workbench_binding_to_meta(ws, turn_meta)
     session, binding = _target_session(ws)
     if requested_binding is not None:
         binding.update(requested_binding)
-    topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=_meta)
+    topic = _builder_topic_ref(ws, session=session, binding=binding, _meta=turn_meta)
     command = _parse_builder_command(utterance, has_session=bool(session))
     command["raw"] = utterance
     intent = str(command.get("intent") or "")
     if intent == "project.list":
-        return _handle_project_list_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
+        return _handle_project_list_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=turn_meta)
     if intent == "project.current":
-        return _handle_project_current_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
+        return _handle_project_current_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=turn_meta)
     if intent == "project.switch":
-        return _handle_project_switch_command(webspace_id=ws, command=command, _meta=_meta)
+        return _handle_project_switch_command(webspace_id=ws, command=command, _meta=turn_meta)
     if intent == "project.delete":
-        return _handle_project_delete_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=_meta)
+        return _handle_project_delete_command(webspace_id=ws, session=session, binding=binding, topic=topic, command=command, _meta=turn_meta)
     if intent == "help":
         return _handle_help_command(
             webspace_id=ws,
@@ -10179,7 +10446,7 @@ def chat(
             binding=binding,
             topic=topic,
             command=command,
-            _meta=_meta,
+            _meta=turn_meta,
         )
     if intent == "preview.link":
         return _handle_preview_link_command(
@@ -10188,7 +10455,7 @@ def chat(
             binding=binding,
             topic=topic,
             command=command,
-            _meta=_meta,
+            _meta=turn_meta,
         )
     if intent in {"workflow.inspect", "preview.select"}:
         return _handle_project_context_command(
@@ -10197,12 +10464,12 @@ def chat(
             binding=binding,
             topic=topic,
             command=command,
-            _meta=_meta,
+            _meta=turn_meta,
         )
     if _is_guided_clarification_request(utterance):
         clarification = _builder_clarification_payload(text=utterance, webspace_id=ws, topic=topic)
         message = _guided_clarification_message(clarification)
-        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, binding=binding, topic_ref=topic)
+        _safe_emit_chat(message, webspace_id=ws, _meta=turn_meta, binding=binding, topic_ref=topic)
         return {
             "ok": True,
             "status": "clarification_required",
@@ -10214,14 +10481,14 @@ def chat(
             "dialog": _dialog_state(ws, topic_ref=topic),
         }
     if intent == "project.create":
-        result = create_scenario_draft(idea=utterance or "prototype app", webspace_id=ws, _meta=_meta)
+        result = create_scenario_draft(idea=utterance or "prototype app", webspace_id=ws, _meta=turn_meta)
         if result.get("ok"):
             message = str(result.get("message") or "")
             actions = result.get("message_actions") if isinstance(result.get("message_actions"), list) else None
             _safe_emit_chat(
                 message,
                 webspace_id=ws,
-                _meta=_meta,
+                _meta=turn_meta,
                 topic_ref=result.get("topic") if isinstance(result.get("topic"), Mapping) else None,
                 actions=actions,
             )
@@ -10233,13 +10500,13 @@ def chat(
         session=session,
         binding=binding,
         topic=topic,
-        _meta=_meta,
+        _meta=turn_meta,
     )
     if automation_result is not None:
         return automation_result
     if not session:
         message = _target_required_message(binding)
-        _safe_emit_chat(message, webspace_id=ws, _meta=_meta, binding=binding, topic_ref=topic)
+        _safe_emit_chat(message, webspace_id=ws, _meta=turn_meta, binding=binding, topic_ref=topic)
         return {
             "ok": True,
             "status": "target_required",
@@ -10254,11 +10521,18 @@ def chat(
         webspace_id=ws,
         auto_apply=auto_apply,
         conversation_context=conversation_context,
-        _meta=_meta,
+        _meta=turn_meta,
     )
     if result.get("ok"):
         actions = result.get("message_actions") if isinstance(result.get("message_actions"), list) else None
-        result_message_meta = result.get("message_meta") if isinstance(result.get("message_meta"), Mapping) else _meta
+        result_message_meta = {
+            **turn_meta,
+            **(
+                dict(result.get("message_meta"))
+                if isinstance(result.get("message_meta"), Mapping)
+                else {}
+            ),
+        }
         emit_kwargs = {
             "webspace_id": ws,
             "_meta": result_message_meta,

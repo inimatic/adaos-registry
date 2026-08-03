@@ -5441,6 +5441,16 @@ def test_builder_pending_action_approve_marks_patch_and_emits_chat(monkeypatch, 
 
 def test_chat_from_dev_webspace_updates_source_session_and_mirrors_response(monkeypatch, tmp_path) -> None:
     skill = _load_module()
+    monkeypatch.setattr(
+        skill,
+        "_resolve_builder_context_for_turn",
+        lambda *_args, **_kwargs: {
+            "builder_webspace_id": "desktop",
+            "preview_webspace_id": "desktop-dev",
+            "status": "ready",
+            "selectable": True,
+        },
+    )
     _stub_development_context(skill, monkeypatch)
     artifact_root = tmp_path / "shopping_list"
     artifact_root.mkdir(parents=True, exist_ok=True)
@@ -5905,7 +5915,7 @@ def test_project_list_has_one_explicit_dialog_current_and_selection_buttons(monk
     ]
 
 
-def test_telegram_webspace_context_distinguishes_dialog_scope_from_explicit_binding() -> None:
+def test_telegram_webspace_context_reports_selected_builder_host() -> None:
     skill = _load_module()
     binding = {
         "source_webspace_id": "default",
@@ -5924,23 +5934,24 @@ def test_telegram_webspace_context_distinguishes_dialog_scope_from_explicit_bind
     )
 
     assert fallback == {
+        "builder_webspace_id": "default",
         "source_webspace_id": "default",
         "preview_webspace_id": "default-dev",
         "transport": "telegram",
-        "explicit_transport_binding": False,
-        "provenance": "dialog_scope",
+        "explicit_transport_binding": True,
+        "provenance": "builder_context",
     }
-    assert "явная Webspace-привязка Telegram отсутствует" in skill._format_webspace_context(fallback)
-    assert "выбор проекта её не меняет" in skill._format_webspace_context(fallback)
+    assert skill._format_webspace_context(fallback) == "Builder: default → Preview default-dev."
     assert explicit["explicit_transport_binding"] is True
-    assert explicit["provenance"] == "transport_binding"
+    assert explicit["provenance"] == "builder_context"
+    assert explicit["builder_webspace_id"] == "dev1"
 
     message = skill._format_project_list(
         [{"scenario_id": "test05_recipes", "title": "Home Recipe Book"}],
         "test05_recipes",
         webspace_context=fallback,
     )
-    assert "Webspace контекста: default → Preview default-dev" in message
+    assert "Builder: default → Preview default-dev" in message
     assert "Текущий проект этого диалога: test05_recipes" in message
 
 
@@ -6065,8 +6076,8 @@ def test_current_project_router_fallback_is_materialized_once_by_router(monkeypa
     assert result["status"] == "project_current"
     assert result["conversation_interaction"] is None
     assert result["message"].startswith("Конструктор: сейчас выбран Recipes (recipes).")
-    assert "Webspace контекста: dev1" in result["message"]
-    assert result["webspace_context"]["provenance"] == "dialog_scope"
+    assert "Builder: dev1 → Preview —." in result["message"]
+    assert result["webspace_context"]["provenance"] == "builder_context"
     assert emitted == []
 
 
@@ -6313,6 +6324,17 @@ def test_limited_channel_can_select_existing_dev_scenario_without_local_session(
 
     monkeypatch.setattr(skill, "_workbench_service", lambda: _Workbench())
     monkeypatch.setattr(
+        skill,
+        "_resolve_builder_context_for_turn",
+        lambda *_args, **_kwargs: {
+            "schema": "adaos.builder.context_ref.v1",
+            "builder_webspace_id": "default",
+            "preview_webspace_id": "default-dev",
+            "status": "ready",
+            "selectable": True,
+        },
+    )
+    monkeypatch.setattr(
         skill.developer_projects,
         "list_projects",
         lambda **kwargs: [
@@ -6356,6 +6378,106 @@ def test_limited_channel_can_select_existing_dev_scenario_without_local_session(
     assert result["prompt_selection"]["skipped"] == "limited_channel_focus_only"
     assert binding["runtime_scenario_id"] is None
     assert emitted[-1]["kwargs"]["_meta"]["io_type"] == "telegram"
+
+
+def test_telegram_requires_explicit_builder_context_before_project_focus(monkeypatch) -> None:
+    skill = _load_module()
+    captured: dict = {}
+    contexts = [
+        {
+            "schema": "adaos.builder.context_ref.v1",
+            "builder_webspace_id": "dev1",
+            "builder_title": "Builder",
+            "builder_space_kind": "workspace",
+            "preview_webspace_id": "dev1-dev",
+            "preview_relation_generation": 2,
+            "status": "ready",
+            "selectable": True,
+        },
+        {
+            "schema": "adaos.builder.context_ref.v1",
+            "builder_webspace_id": "dev1-dev",
+            "builder_title": "Builder DEV",
+            "builder_space_kind": "dev",
+            "preview_webspace_id": "dev1-dev-dev",
+            "preview_relation_generation": 1,
+            "status": "ready",
+            "selectable": True,
+        },
+    ]
+    monkeypatch.setattr(skill, "_builder_context_candidates", lambda: list(contexts))
+    monkeypatch.setattr(skill, "_resolve_builder_context_for_turn", lambda *_args, **_kwargs: None)
+
+    def _request(specification, **kwargs):
+        captured["specification"] = specification
+        captured["kwargs"] = kwargs
+        return {"handle": {"interaction_id": "interaction.builder.context"}, "presentation": {"mode": "buttons"}}
+
+    monkeypatch.setattr(skill.sdk_chat, "request", _request)
+
+    result = skill.chat(
+        "Строитель, покажи проекты",
+        webspace_id="default",
+        _meta={"io_type": "telegram", "chat_id": "42", "conversation_id": "conv.telegram.42"},
+    )
+
+    assert result["status"] == "builder_context_required"
+    assert [item["command"] for item in captured["specification"]["actions"]] == [
+        "builder.context.select",
+        "builder.context.select",
+    ]
+    assert [item["value"] for item in captured["specification"]["actions"]] == ["dev1", "dev1-dev"]
+    assert captured["kwargs"]["webspace_id"] == "default"
+    assert captured["specification"]["metadata"]["builder_context_scope"] == "telegram:chat:42:thread:-"
+
+
+def test_builder_context_interaction_selects_host_before_listing_projects(monkeypatch) -> None:
+    skill = _load_module()
+    stored: list[tuple[str, dict]] = []
+    listed: list[dict] = []
+    context = {
+        "schema": "adaos.builder.context_ref.v1",
+        "builder_webspace_id": "dev1-dev",
+        "builder_title": "Builder DEV",
+        "builder_space_kind": "dev",
+        "preview_webspace_id": "dev1-dev-dev",
+        "status": "ready",
+        "selectable": True,
+    }
+    monkeypatch.setattr(skill.builder_preview, "resolve_builder_context", lambda _value: dict(context))
+    monkeypatch.setattr(skill, "_remember_builder_context", lambda scope, value: stored.append((scope, dict(value))))
+    monkeypatch.setattr(skill, "_target_session", lambda _webspace_id: (None, {"runtime_scenario_id": None}))
+    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: {"thread_id": "builder:dev1-dev"})
+    monkeypatch.setattr(skill, "_handle_project_list_command", lambda **kwargs: listed.append(dict(kwargs)) or {})
+
+    result = skill.handle_interaction_response(
+        event={
+            "interaction": {
+                "interaction_id": "interaction.builder.context",
+                "metadata": {
+                    "domain": "builder",
+                    "interaction_kind": "builder_context_selection",
+                    "builder_context_scope": "telegram:chat:42:thread:-",
+                },
+            },
+            "response": {
+                "response_id": "response.builder.context.dev1-dev",
+                "consumed_command": {
+                    "command": "builder.context.select",
+                    "value": "dev1-dev",
+                    "target_ref": {"kind": "webspace", "id": "dev1-dev"},
+                },
+                "metadata": {"io_type": "telegram", "chat_id": "42"},
+            },
+            "duplicate": False,
+        },
+        webspace_id="default",
+    )
+
+    assert result["status"] == "handled"
+    assert stored == [("telegram:chat:42:thread:-", context)]
+    assert listed[0]["webspace_id"] == "dev1-dev"
+    assert listed[0]["_meta"]["builder_source_webspace_id"] == "dev1-dev"
 
 
 def test_builder_delete_pending_action_approve_deletes_draft(monkeypatch, tmp_path) -> None:
