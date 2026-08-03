@@ -5905,6 +5905,45 @@ def test_project_list_has_one_explicit_dialog_current_and_selection_buttons(monk
     ]
 
 
+def test_telegram_webspace_context_distinguishes_dialog_scope_from_explicit_binding() -> None:
+    skill = _load_module()
+    binding = {
+        "source_webspace_id": "default",
+        "preview_webspace_id": "default-dev",
+    }
+
+    fallback = skill._webspace_context(
+        "default",
+        binding,
+        {"io_type": "telegram", "transport_route": {"via": "session", "alias": "hub-8"}},
+    )
+    explicit = skill._webspace_context(
+        "dev1",
+        {"preview_webspace_id": "dev1-dev"},
+        {"io_type": "telegram", "transport_route": {"via": "session", "webspace_id": "dev1"}},
+    )
+
+    assert fallback == {
+        "source_webspace_id": "default",
+        "preview_webspace_id": "default-dev",
+        "transport": "telegram",
+        "explicit_transport_binding": False,
+        "provenance": "dialog_scope",
+    }
+    assert "явная Webspace-привязка Telegram отсутствует" in skill._format_webspace_context(fallback)
+    assert "выбор проекта её не меняет" in skill._format_webspace_context(fallback)
+    assert explicit["explicit_transport_binding"] is True
+    assert explicit["provenance"] == "transport_binding"
+
+    message = skill._format_project_list(
+        [{"scenario_id": "test05_recipes", "title": "Home Recipe Book"}],
+        "test05_recipes",
+        webspace_context=fallback,
+    )
+    assert "Webspace контекста: default → Preview default-dev" in message
+    assert "Текущий проект этого диалога: test05_recipes" in message
+
+
 def test_help_and_preview_link_never_route_to_automation(monkeypatch) -> None:
     skill = _load_module()
     session = {"id": "session.recipes", "scenario_id": "recipes", "title": "Recipes"}
@@ -6025,7 +6064,9 @@ def test_current_project_router_fallback_is_materialized_once_by_router(monkeypa
 
     assert result["status"] == "project_current"
     assert result["conversation_interaction"] is None
-    assert result["message"] == "Конструктор: сейчас выбран Recipes (recipes)."
+    assert result["message"].startswith("Конструктор: сейчас выбран Recipes (recipes).")
+    assert "Webspace контекста: dev1" in result["message"]
+    assert result["webspace_context"]["provenance"] == "dialog_scope"
     assert emitted == []
 
 

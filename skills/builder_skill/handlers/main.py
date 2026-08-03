@@ -8619,16 +8619,73 @@ def _limited_channel_focus_only(_meta: Mapping[str, Any] | None) -> bool:
     return io_type == "telegram"
 
 
+def _webspace_context(
+    webspace_id: str,
+    binding: Mapping[str, Any] | None,
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Explain which Webspace owns this dialog and its Preview.
+
+    Telegram can reach a hub through an old binding that has no explicit
+    Webspace. Core then gives the turn its durable dialog scope (historically
+    ``default``). That scope is valid, but it must never look like the current
+    browser Webspace or an explicitly bound transport destination.
+    """
+
+    source = str(webspace_id or "").strip()
+    current_binding = dict(binding) if isinstance(binding, Mapping) else {}
+    preview = str(
+        current_binding.get("preview_webspace_id")
+        or current_binding.get("dev_webspace_id")
+        or ""
+    ).strip()
+    meta = dict(_meta) if isinstance(_meta, Mapping) else {}
+    transport_route = meta.get("transport_route") if isinstance(meta.get("transport_route"), Mapping) else {}
+    routed_webspace = str(transport_route.get("webspace_id") or "").strip()
+    transport = str(meta.get("io_type") or meta.get("transport") or "").strip().lower()
+    explicit = bool(routed_webspace) if transport == "telegram" else bool(source)
+    provenance = "transport_binding" if explicit else ("dialog_scope" if transport == "telegram" else "request")
+    return {
+        "source_webspace_id": source or None,
+        "preview_webspace_id": preview or None,
+        "transport": transport or None,
+        "explicit_transport_binding": explicit,
+        "provenance": provenance,
+    }
+
+
+def _format_webspace_context(context: Mapping[str, Any]) -> str:
+    source = str(context.get("source_webspace_id") or "—").strip() or "—"
+    preview = str(context.get("preview_webspace_id") or "—").strip() or "—"
+    suffix = ""
+    if context.get("transport") == "telegram" and not bool(context.get("explicit_transport_binding")):
+        suffix = (
+            " (явная Webspace-привязка Telegram отсутствует; это сохранённый контекст данного "
+            "диалога, а выбор проекта её не меняет)"
+        )
+    return f"Webspace контекста: {source} → Preview {preview}{suffix}."
+
+
 def _project_identity(item: Mapping[str, Any] | None) -> str:
     value = item if isinstance(item, Mapping) else {}
     return str(value.get("scenario_id") or value.get("draft_id") or value.get("id") or "").strip()
 
 
-def _format_project_list(items: list[dict[str, Any]], current_project_id: str | None) -> str:
+def _format_project_list(
+    items: list[dict[str, Any]],
+    current_project_id: str | None,
+    *,
+    webspace_context: Mapping[str, Any] | None = None,
+) -> str:
     if not items:
         return _command_hint_message()
     current_id = str(current_project_id or "").strip()
     lines = [
+        *(
+            [_format_webspace_context(webspace_context)]
+            if isinstance(webspace_context, Mapping)
+            else []
+        ),
         (
             f"Текущий проект этого диалога: {current_id}."
             if current_id
@@ -8739,7 +8796,12 @@ def _handle_project_list_command(
     _meta: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     items = [_session_summary(item) for item in _development_sessions(webspace_id)]
-    message = _format_project_list(items, _project_identity(session))
+    webspace_context = _webspace_context(webspace_id, binding, _meta)
+    message = _format_project_list(
+        items,
+        _project_identity(session),
+        webspace_context=webspace_context,
+    )
     interaction_result: dict[str, Any] | None = None
     try:
         interaction_result = _present_project_selection_interaction(
@@ -8766,6 +8828,7 @@ def _handle_project_list_command(
         extra={
             "items": items,
             "current_project_id": _project_identity(session) or None,
+            "webspace_context": webspace_context,
             "conversation_interaction": (
                 {
                     "handle": interaction_result.get("handle"),
@@ -8799,9 +8862,11 @@ def _handle_project_current_command(
             extra={"needs_selection": True},
         )
     summary = _session_summary(session)
+    webspace_context = _webspace_context(webspace_id, binding, _meta)
     message = (
         f"{AGENT_LABEL}: \u0441\u0435\u0439\u0447\u0430\u0441 \u0432\u044b\u0431\u0440\u0430\u043d "
-        f"{summary.get('title')} ({summary.get('scenario_id') or summary.get('draft_id')})."
+        f"{summary.get('title')} ({summary.get('scenario_id') or summary.get('draft_id')}).\n"
+        f"{_format_webspace_context(webspace_context)}"
     )
     interaction_result: dict[str, Any] | None = None
     object_id = str(summary.get("scenario_id") or "").strip()
@@ -8836,6 +8901,7 @@ def _handle_project_current_command(
         emit_chat=interaction_result is None,
         extra={
             "project": summary,
+            "webspace_context": webspace_context,
             "chat_emit": (
                 {"mode": "receipt_only", "persisted": True, "reason": "interaction_materialized"}
                 if interaction_result is not None
@@ -8882,6 +8948,7 @@ def _handle_preview_link_command(
             extra={"needs_selection": True},
         )
     preview_link = _preview_link_payload(webspace_id)
+    webspace_context = _webspace_context(webspace_id, binding, _meta)
     url = str(preview_link.get("url") or "").strip()
     if not url:
         return _builder_command_response(
@@ -8896,6 +8963,7 @@ def _handle_preview_link_command(
         )
     message = (
         f"{AGENT_LABEL}: {preview_link['label']}\n"
+        f"{_format_webspace_context(webspace_context)}\n"
         f"{url}\n"
         "Ссылка открывает текущее Preview и не изменяет состояние процесса."
     )
@@ -8927,7 +8995,11 @@ def _handle_preview_link_command(
         topic_ref=topic,
         _meta=_meta,
         emit_chat=False,
-        extra={"preview_link": preview_link, "message_actions": [open_action]},
+        extra={
+            "preview_link": preview_link,
+            "webspace_context": webspace_context,
+            "message_actions": [open_action],
+        },
     )
 
 
