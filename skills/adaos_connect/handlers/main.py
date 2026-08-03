@@ -13,6 +13,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import yaml
 
+from adaos.sdk import navigation as sdk_navigation
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import ctx_subnet
 from adaos.sdk.data.context import clear_current_skill, set_current_skill
@@ -324,31 +325,19 @@ def _browser_link(*, app_base_url: str, code: str, zone_id: str | None) -> str:
 def _browser_registration_link(
     *,
     app_base_url: str,
-    verification_uri_complete: str | None,
-    verification_uri: str | None,
     user_code: str,
     zone_id: str | None,
-) -> str:
-    complete = str(verification_uri_complete or "").strip()
-    if complete:
-        parsed = urlsplit(complete)
-        app_parsed = urlsplit(app_base_url or _APP_BASE_DEFAULT)
-        app_path = app_parsed.path.rstrip("/")
-        path = app_path or parsed.path.rstrip("/") or "/"
-        return urlunsplit((app_parsed.scheme, app_parsed.netloc, path, parsed.query, parsed.fragment))
-    base = str(verification_uri or "").strip()
-    if not base:
-        raise RuntimeError("browser registration link is empty")
-    parsed = urlsplit(base)
-    query = dict(parse_qsl(parsed.query, keep_blank_values=True))
-    if user_code and not str(query.get("user_code") or "").strip():
-        query["user_code"] = user_code
-    if zone_id and not str(query.get("zone") or "").strip():
-        query["zone"] = zone_id
-    app_parsed = urlsplit(app_base_url or _APP_BASE_DEFAULT)
-    app_path = app_parsed.path.rstrip("/")
-    path = app_path or parsed.path.rstrip("/") or "/"
-    return urlunsplit((app_parsed.scheme, app_parsed.netloc, path, urlencode(query), ""))
+    subnet_id: str | None,
+) -> tuple[str, Dict[str, Any]]:
+    destination = sdk_navigation.registration_destination(
+        user_code,
+        zone=zone_id,
+        subnet_id=subnet_id,
+    )
+    return sdk_navigation.build_url(
+        destination,
+        base_url=app_base_url or _APP_BASE_DEFAULT,
+    ), destination
 
 
 def _linux_bootstrap_command(*, code: str, root_base_url: str, zone_id: str | None) -> str:
@@ -524,12 +513,11 @@ def _browser_current(context: Dict[str, Any], *, request_id: str) -> Dict[str, A
         expires_at=(data or {}).get("expires_at"),
         fallback_ttl_seconds=(data or {}).get("expires_in") or _BROWSER_PAIR_TTL_S,
     )
-    link = _browser_registration_link(
+    link, navigation_destination = _browser_registration_link(
         app_base_url=str(context.get("app_base_url") or _APP_BASE_DEFAULT),
-        verification_uri_complete=(data or {}).get("verification_uri_complete"),
-        verification_uri=(data or {}).get("verify_uri") or (data or {}).get("verification_uri"),
         user_code=code,
         zone_id=effective_zone_id,
+        subnet_id=str(context.get("hub_id") or "").strip() or None,
     )
     subnet_text = f" for subnet {payload['owner_id']}" if payload["owner_id"] else ""
     zone_text = f" in zone {_zone_label(effective_zone_id)}" if effective_zone_id else ""
@@ -539,6 +527,7 @@ def _browser_current(context: Dict[str, Any], *, request_id: str) -> Dict[str, A
     )
     current["qr_text"] = link
     current["link"] = link
+    current["navigation_destination"] = navigation_destination
     current["code"] = code
     return current
 

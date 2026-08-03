@@ -1,13 +1,13 @@
 {
   "version": 2,
-  "updated_at": "2026-08-01T13:06:39+00:00",
+  "updated_at": "2026-08-03T09:42:26+00:00",
   "skills": [
     {
       "kind": "skill",
       "id": "adaos_connect",
       "name": "adaos_connect",
-      "version": "0.16.4",
-      "updated_at": "2026-07-05T04:52:42+00:00",
+      "version": "0.16.5",
+      "updated_at": "2026-08-03T09:42:26+00:00",
       "path": "skills/adaos_connect",
       "manifest": "skills/adaos_connect/skill.yaml",
       "source": {
@@ -671,7 +671,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-08-01T06:46:03+00:00",
+      "updated_at": "2026-08-02T19:48:26+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
