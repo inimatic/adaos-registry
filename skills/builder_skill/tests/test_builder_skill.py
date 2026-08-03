@@ -6431,6 +6431,59 @@ def test_telegram_requires_explicit_builder_context_before_project_focus(monkeyp
     assert captured["specification"]["metadata"]["builder_context_scope"] == "telegram:chat:42:thread:-"
 
 
+def test_builder_context_discovery_failure_is_not_reported_as_no_builder(monkeypatch) -> None:
+    skill = _load_module()
+    emitted: list[str] = []
+
+    def _fail_discovery():
+        raise AttributeError("list_builder_hosts")
+
+    monkeypatch.setattr(skill.builder_preview, "list_builder_hosts", _fail_discovery)
+    monkeypatch.setattr(skill, "_resolve_builder_context_for_turn", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda message, **_kwargs: emitted.append(message) or {"ok": True},
+    )
+
+    result = skill.chat(
+        "Строитель, покажи проекты",
+        webspace_id="default",
+        _meta={"io_type": "telegram", "chat_id": "42"},
+    )
+
+    assert result["status"] == "builder_context_discovery_unavailable"
+    assert result["needs_selection"] is False
+    assert result["reason_code"] == "builder_context_discovery_unavailable"
+    assert "не удалось проверить" in result["message"]
+    assert "не найден ни один" not in result["message"]
+    assert emitted == [result["message"]]
+
+
+def test_builder_context_empty_inventory_is_reported_as_not_found(monkeypatch) -> None:
+    skill = _load_module()
+    emitted: list[str] = []
+    monkeypatch.setattr(skill, "_builder_context_candidates", lambda: [])
+    monkeypatch.setattr(skill, "_resolve_builder_context_for_turn", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        skill,
+        "_safe_emit_chat",
+        lambda message, **_kwargs: emitted.append(message) or {"ok": True},
+    )
+
+    result = skill.chat(
+        "Строитель, покажи проекты",
+        webspace_id="default",
+        _meta={"io_type": "telegram", "chat_id": "42"},
+    )
+
+    assert result["status"] == "builder_context_not_found"
+    assert result["needs_selection"] is False
+    assert result["reason_code"] == "builder_context_not_found"
+    assert "не найден ни один Webspace" in result["message"]
+    assert emitted == [result["message"]]
+
+
 def test_builder_context_interaction_selects_host_before_listing_projects(monkeypatch) -> None:
     skill = _load_module()
     stored: list[tuple[str, dict]] = []

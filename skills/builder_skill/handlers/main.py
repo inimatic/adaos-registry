@@ -284,12 +284,16 @@ def _remember_builder_context(scope: str, context: Mapping[str, Any] | None) -> 
     )
 
 
+class _BuilderContextDiscoveryUnavailable(RuntimeError):
+    """Builder host discovery could not be evaluated by the active runtime."""
+
+
 def _builder_context_candidates() -> list[dict[str, Any]]:
     try:
         return [dict(item) for item in builder_preview.list_builder_hosts() if isinstance(item, Mapping)]
-    except Exception:
+    except Exception as exc:
         _LOG.warning("failed to discover active Builder Webspaces", exc_info=True)
-        return []
+        raise _BuilderContextDiscoveryUnavailable("builder_context_discovery_unavailable") from exc
 
 
 def _resolve_builder_context_for_turn(
@@ -8807,8 +8811,40 @@ def _handle_builder_context_required(
     command: Mapping[str, Any],
     _meta: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
-    contexts = _builder_context_candidates()
+    try:
+        contexts = _builder_context_candidates()
+    except _BuilderContextDiscoveryUnavailable:
+        message = (
+            f"{AGENT_LABEL}: не удалось проверить активные Builder Webspace. "
+            "Текущий AdaOS runtime не поддерживает Builder discovery или временно недоступен. "
+            "Обновите либо перезапустите runtime и повторите команду."
+        )
+        _safe_emit_chat(message, webspace_id=_reply_webspace_id(webspace_id, _meta), _meta=_meta)
+        return {
+            "ok": True,
+            "status": "builder_context_discovery_unavailable",
+            "needs_selection": False,
+            "reason_code": "builder_context_discovery_unavailable",
+            "message": message,
+            "command": dict(command),
+            "builder_contexts": [],
+            "builder_context_scope": _builder_context_scope(_meta),
+            "conversation_interaction": None,
+        }
     message = _format_builder_context_choices(contexts)
+    if not contexts:
+        _safe_emit_chat(message, webspace_id=_reply_webspace_id(webspace_id, _meta), _meta=_meta)
+        return {
+            "ok": True,
+            "status": "builder_context_not_found",
+            "needs_selection": False,
+            "reason_code": "builder_context_not_found",
+            "message": message,
+            "command": dict(command),
+            "builder_contexts": [],
+            "builder_context_scope": _builder_context_scope(_meta),
+            "conversation_interaction": None,
+        }
     interaction_result: dict[str, Any] | None = None
     try:
         interaction_result = _present_builder_context_selection(
