@@ -5951,7 +5951,7 @@ def test_help_and_preview_link_never_route_to_automation(monkeypatch) -> None:
     assert link_result["status"] == "preview_link"
     assert link_result["preview_link"]["preview_webspace_id"] == "dev1-dev"
     assert emitted[0]["kwargs"]["actions"][0]["action"]["type"] == "openUrl"
-    assert emitted[0]["kwargs"]["actions"][0]["action"]["params"]["withAuth"] is False
+    assert emitted[0]["kwargs"]["actions"][0]["action"]["params"]["withAuth"] is True
 
 
 def test_workflow_text_commands_bypass_automation_and_llm_routing(monkeypatch) -> None:

@@ -8855,29 +8855,10 @@ def _handle_project_current_command(
 
 def _preview_link_payload(webspace_id: str) -> dict[str, Any]:
     source = builder_preview.canonical_source_webspace_id(webspace_id)
-    binding = builder_preview.get_binding(source)
     app_base_resolver = getattr(builder_preview, "public_app_base", None)
     app_base = str(app_base_resolver() if callable(app_base_resolver) else "https://inimatic.com").strip().rstrip("/")
     app_base = app_base or "https://inimatic.com"
-    opened = builder_preview.open_workspace(source, base_url=app_base)
-    url = str(opened.get("url") or "").strip()
-    if url.startswith("/"):
-        url = f"{app_base}{url}"
-    target = binding.get("preview_target") if isinstance(binding.get("preview_target"), Mapping) else {}
-    label = str(target.get("label") or "").strip()
-    preview_webspace_id = str(
-        binding.get("preview_webspace_id")
-        or binding.get("dev_webspace_id")
-        or opened.get("webspace_id")
-        or ""
-    ).strip()
-    return {
-        "url": url,
-        "label": label or f"preview: {preview_webspace_id}",
-        "preview_webspace_id": preview_webspace_id,
-        "target": dict(target),
-        "source_webspace_id": source,
-    }
+    return dict(builder_preview.navigation_link(source, base_url=app_base))
 
 
 def _handle_preview_link_command(
@@ -8924,7 +8905,7 @@ def _handle_preview_link_command(
         "title": str(preview_link["label"]),
         "action": {
             "type": "openUrl",
-            "params": {"url": url, "target": "_blank", "withAuth": False},
+            "params": {"url": url, "target": "_blank", "withAuth": True},
         },
     }
     _safe_emit_chat(
