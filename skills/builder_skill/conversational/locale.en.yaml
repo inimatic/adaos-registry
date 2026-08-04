@@ -1,0 +1,8 @@
+schema: adaos.conversational.locale.v1
+package_id: builder_skill
+locale: en
+messages:
+  prototype_started: Prototype change started.
+  prototype_review_ready: Prototype is ready for review.
+  prototype_accepted: Prototype accepted for implementation.
+  repair_no_match: Clarify the requested Builder action.

@@ -1,0 +1,57 @@
+schema: adaos.conversational.output.v1
+package_id: builder_skill
+outputs:
+- id: prototype_started
+  kind: accepted
+  audience: developer
+  risk_level: low
+  reason_code: prototype_change_started
+  explanation: The governed workflow admitted a bounded Prototype Change.
+  summary: Prototype change started.
+  content_parts: []
+  details: []
+  actions:
+  - action_id: request_review
+    label: Review Prototype
+    affordance_id: request_prototype_review
+  next_expected_input: action
+  handoff_target: null
+- id: prototype_review_ready
+  kind: result
+  audience: developer
+  risk_level: medium
+  reason_code: prototype_review_ready
+  explanation: The current Prototype is ready for an explicit acceptance decision.
+  summary: Prototype is ready for review.
+  content_parts: []
+  details: []
+  actions:
+  - action_id: accept_prototype
+    label: Accept Prototype
+    affordance_id: accept_prototype
+  next_expected_input: action
+  handoff_target: null
+- id: prototype_accepted
+  kind: result
+  audience: developer
+  risk_level: medium
+  reason_code: prototype_accepted
+  explanation: The reviewed Prototype was accepted for governed Automation.
+  summary: Prototype accepted for implementation.
+  content_parts: []
+  details: []
+  actions: []
+  next_expected_input: none
+  handoff_target: null
+- id: repair_no_match
+  kind: repair
+  audience: developer
+  risk_level: none
+  reason_code: no_match
+  explanation: The request did not match an available Builder workflow command.
+  summary: Clarify the requested Builder action.
+  content_parts: []
+  details: []
+  actions: []
+  next_expected_input: text
+  handoff_target: null

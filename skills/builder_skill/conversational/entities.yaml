@@ -1,0 +1,3 @@
+schema: adaos.conversational.entities.v1
+package_id: builder_skill
+entities: []

@@ -1,0 +1,52 @@
+schema: adaos.conversational.examples.v1
+package_id: builder_skill
+examples:
+- id: plan_prototype.en.1
+  intent_id: plan_prototype
+  text: Start a prototype change for this scenario
+  locale: en
+  source: authored
+  entities: []
+- id: plan_prototype.ru.1
+  intent_id: plan_prototype
+  text: Начни изменение прототипа для этого сценария
+  locale: ru
+  source: authored
+  entities: []
+- id: request_prototype_review.en.1
+  intent_id: request_prototype_review
+  text: Show this prototype for review
+  locale: en
+  source: authored
+  entities: []
+- id: request_prototype_review.ru.1
+  intent_id: request_prototype_review
+  text: Покажи этот прототип для проверки
+  locale: ru
+  source: authored
+  entities: []
+- id: accept_prototype.en.1
+  intent_id: accept_prototype
+  text: Accept this prototype and start implementation
+  locale: en
+  source: authored
+  entities: []
+- id: accept_prototype.ru.1
+  intent_id: accept_prototype
+  text: Прими этот прототип и переходи к реализации
+  locale: ru
+  source: authored
+  entities: []
+hard_negatives:
+- id: plan_prototype.negative.status
+  text: Show the current development status
+  locale: en
+  reason: A read-only status request must not create a Change.
+- id: accept_prototype.negative.preview
+  text: Покажи текущий прототип
+  locale: ru
+  reason: Previewing a Prototype must not accept it.
+- id: accept_prototype.negative.publish
+  text: Publish the current release
+  locale: en
+  reason: Publication must not be interpreted as Prototype acceptance.

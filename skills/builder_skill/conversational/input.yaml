@@ -1,0 +1,46 @@
+schema: adaos.conversational.input.v1
+package_id: builder_skill
+intents:
+- id: plan_prototype
+  description: Start a bounded Prototype change for the selected Builder project.
+  kind: workflow_command
+  affordance_id: plan_prototype
+  workflow:
+    workflow_type: builder.change
+    command_id: plan_prototype_change
+    transition_id: plan_prototype
+  skill_invocation: null
+  example_ids:
+  - plan_prototype.en.1
+  - plan_prototype.ru.1
+  slots: []
+- id: request_prototype_review
+  description: Request review of the current declarative Prototype revision.
+  kind: workflow_command
+  affordance_id: request_prototype_review
+  workflow:
+    workflow_type: builder.change
+    command_id: request_prototype_review
+    transition_id: request_prototype_review
+  skill_invocation: null
+  example_ids:
+  - request_prototype_review.en.1
+  - request_prototype_review.ru.1
+  slots: []
+- id: accept_prototype
+  description: Accept the reviewed Prototype and admit the Change for Automation.
+  kind: workflow_command
+  affordance_id: accept_prototype
+  workflow:
+    workflow_type: builder.change
+    command_id: accept_prototype
+    transition_id: accept_prototype
+  skill_invocation: null
+  example_ids:
+  - accept_prototype.en.1
+  - accept_prototype.ru.1
+  slots: []
+policy:
+  default_confidence: 0.8
+  abstain_below: 0.55
+  protected_action_confirmation: true

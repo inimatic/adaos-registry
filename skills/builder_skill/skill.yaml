@@ -5,6 +5,8 @@ description: Rapid prototyping Builder skill for creating and editing scenario U
 entry: handlers/main.py
 workflow:
   manifest: workflow.json
+conversational:
+  manifest: conversational/manifest.yaml
 runtime:
   python: '3.11'
   sdk_only: true

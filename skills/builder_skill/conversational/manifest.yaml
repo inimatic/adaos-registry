@@ -1,0 +1,37 @@
+schema: adaos.conversational.package_manifest.v1
+package_id: builder_skill
+package_kind: skill
+owner_ref:
+  kind: skill
+  id: builder_skill
+version: 0.3.32
+workflow_refs:
+- workflow_type: builder.change
+  definition_ref: ../workflow.json
+  definition_version: 1.0.0
+  definition_digest: null
+files:
+  input: input.yaml
+  entities: entities.yaml
+  examples: examples.yaml
+  matchers: matchers.yaml
+  affordances: affordances.yaml
+  repair: repair.yaml
+  output: output.yaml
+  stories:
+  - tests/stories/prototype-cycle.ru.yaml
+  - tests/stories/no-match.en.yaml
+  locales:
+  - locale.en.yaml
+  - locale.ru.yaml
+locales:
+- en
+- ru
+privacy_defaults:
+  source_scope: skill
+  runtime_overlay_scope: user
+  public_promotion: requires_review
+compiled_outputs: []
+compatibility_aliases: []
+metadata:
+  purpose: builder_conversational_dogfood
