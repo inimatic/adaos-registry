@@ -130,7 +130,7 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 49
+      "tools_count": 51
     },
     {
       "kind": "skill",

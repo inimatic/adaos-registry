@@ -1,42 +1,52 @@
 {
     "id": "builder",
-    "version": "0.2.14",
     "name": "builder",
+    "type": "desktop",
     "title": "Builder — рабочее место разработки",
-    "description": "Functional SDK-backed Builder workbench for DEV project development, automation, and publication.",
+    "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
+    "version": "0.2.55",
+    "title_i18n": {
+        "fallback": "Builder",
+        "key": "scenario.builder.title"
+    },
+    "supported_locales": [
+        "en",
+        "ru"
+    ],
     "triggers": [],
+    "slots": {},
+    "params": {},
+    "llm_hints": {
+        "description": "Local declarative Builder prototype",
+        "aliases": [
+            "builder",
+            "constructor"
+        ],
+        "primary_actions": [],
+        "examples": [
+            "Open the Builder prototype"
+        ],
+        "owner_hints": [
+            "prototype"
+        ]
+    },
+    "nlu": {
+        "nlu_hints": {},
+        "llm_hints": {}
+    },
     "depends": [
-        "builder_sdk_control_skill"
+        "builder_skill",
+        "builder_sdk_control_skill",
+        "voice_chat_skill"
     ],
     "runtime": {
         "skills": {
             "required": [
-                "builder_sdk_control_skill"
+                "builder_skill",
+                "builder_sdk_control_skill",
+                "voice_chat_skill"
             ]
         }
-    },
-    "slots": {},
-    "params": {},
-    "llm_hints": {
-        "description": "Create a new Builder workbench prototype for three-stage conversational development: prototyping, automation, and publication.",
-        "aliases": [
-            "builder workbench",
-            "???????????"
-        ],
-        "primary_actions": [],
-        "examples": [],
-        "owner_hints": [
-            "skill:builder_skill"
-        ]
-    },
-    "nlu": {
-        "nlu_hints": {
-            "aliases": [
-                "builder",
-                "???????????"
-            ]
-        },
-        "llm_hints": {}
     },
     "ui": {
         "application": {
@@ -49,7 +59,7 @@
                     "surfaceObjectKind": "",
                     "semantic": {},
                     "initialState": {
-                        "activeView": "files",
+                        "activeView": "conversation",
                         "chatSurface": "builder",
                         "selectedProjectKind": "scenario",
                         "selectedProjectId": "builder",
@@ -57,11 +67,11 @@
                         "selectedProjectTitle": "Builder",
                         "selectedObjectKind": "scenario",
                         "selectedObjectId": "builder",
-                        "selectedFilePath": "builder_memory.md",
-                        "selectedFileTitle": "builder_memory.md",
+                        "selectedFilePath": "scenario.yaml",
+                        "selectedFileTitle": "scenario.yaml",
                         "selectedFileProtected": false,
                         "selectedNodeId": "stage-proto",
-                        "selectedTemplate": "default",
+                        "selectedTemplate": null,
                         "releaseBump": "patch",
                         "project": {
                             "archived": false,
@@ -91,7 +101,19 @@
                         "canEditPrototype": true,
                         "canEditAutomation": false,
                         "canReturnToPrototype": false,
-                        "canPublish": false
+                        "canPrepareCandidate": false,
+                        "canAcceptCandidate": false,
+                        "canPublish": false,
+                        "newProjectKind": "scenario",
+                        "workflowGeneration": 0,
+                        "conversationFocus": "scenario:builder",
+                        "inspectedProcessRef": null,
+                        "previewTargetRef": null,
+                        "selectedChangeId": null,
+                        "selectedChangeStatus": "not_planned",
+                        "selectedChangeGate": null,
+                        "canStartImplementation": false,
+                        "processPinned": false
                     },
                     "layout": {
                         "type": "split",
@@ -118,22 +140,13 @@
                             "area": "center",
                             "id": "project-header",
                             "type": "ui.actions",
-                            "title": "Проект",
+                            "title": "Project",
                             "inputs": {
                                 "buttons": [
                                     {
                                         "id": "project-label",
-                                        "label": "$state.selectedProjectTitle"
-                                    },
-                                    {
-                                        "id": "workflow-label",
-                                        "label": "$state.workflowWorkingLabel",
-                                        "icon": "git-branch-outline"
-                                    },
-                                    {
-                                        "id": "preview-label",
-                                        "label": "$state.previewViewingLabel",
-                                        "icon": "eye-outline"
+                                        "label": "$state.selectedProjectTitle",
+                                        "icon": "folder-outline"
                                     }
                                 ],
                                 "size": "medium",
@@ -146,15 +159,196 @@
                         },
                         {
                             "area": "center",
+                            "id": "interaction-status",
+                            "type": "item.details",
+                            "title": "Current change",
+                            "title_i18n": {
+                                "key": "builder.text.current.change"
+                            },
+                            "visibleIf": "$state.activeView === 'conversation'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "builder_sdk_control_skill.get_interaction_frame",
+                                "params": {
+                                    "object_type": "$state.selectedProjectKind",
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "builder.project.change",
+                                    "builder.project.lifecycle",
+                                    "builder.project.preview"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {
+                                "compact": true,
+                                "fields": [
+                                    {
+                                        "key": "message",
+                                        "label": "Next"
+                                    },
+                                    {
+                                        "key": "status.phase",
+                                        "label": "Activity"
+                                    },
+                                    {
+                                        "key": "status.gate",
+                                        "label": "Gate"
+                                    }
+                                ],
+                                "stateBindings": {
+                                    "workflowGeneration": "generation",
+                                    "conversationFocus": "context.conversation_focus",
+                                    "inspectedProcessRef": "context.inspected_ref",
+                                    "previewTargetRef": "context.preview_target"
+                                }
+                            }
+                        },
+                        {
+                            "area": "center",
+                            "id": "context-actions",
+                            "type": "ui.actions",
+                            "title": "Available actions",
+                            "title_i18n": {
+                                "key": "builder.text.available.actions"
+                            },
+                            "visibleIf": "$state.activeView === 'conversation'",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {
+                                        "id": "show-process",
+                                        "label": "Process",
+                                        "icon": "git-branch-outline",
+                                        "label_i18n": {
+                                            "key": "builder.text.process"
+                                        }
+                                    },
+                                    {
+                                        "id": "approve-prototype",
+                                        "label": "Approve prototype",
+                                        "icon": "shield-checkmark-outline",
+                                        "enabledIf": "$state.canEditPrototype === true",
+                                        "label_i18n": {
+                                            "key": "builder.text.approve.prototype"
+                                        }
+                                    },
+                                    {
+                                        "id": "start-implementation",
+                                        "label": "Start implementation",
+                                        "icon": "construct-outline",
+                                        "enabledIf": "$state.canStartImplementation === true",
+                                        "label_i18n": {
+                                            "key": "builder.text.start.implementation"
+                                        }
+                                    },
+                                    {
+                                        "id": "prepare-trial",
+                                        "label": "Prepare trial",
+                                        "icon": "flask-outline",
+                                        "enabledIf": "$state.canPrepareCandidate === true",
+                                        "label_i18n": {
+                                            "key": "builder.text.prepare.trial"
+                                        }
+                                    },
+                                    {
+                                        "id": "publication",
+                                        "label": "Publication",
+                                        "icon": "rocket-outline",
+                                        "enabledIf": "$state.canPublish === true",
+                                        "label_i18n": {
+                                            "key": "builder.text.publication"
+                                        }
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:show-process",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "process"
+                                    }
+                                },
+                                {
+                                    "on": "click:approve-prototype",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.push_project",
+                                    "params": {
+                                        "checkpoint_id": "chat-first-prototype-approval",
+                                        "message": "Builder prototype approval",
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
+                                    },
+                                    "invalidates": [
+                                        "builder.project.change",
+                                        "builder.project.lifecycle"
+                                    ]
+                                },
+                                {
+                                    "on": "click:approve-prototype",
+                                    "type": "callSkill",
+                                    "target": "builder_sdk_control_skill.transition_workflow",
+                                    "params": {
+                                        "action": "stabilize_prototype",
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "expected_generation": "$state.workflowGeneration",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
+                                    },
+                                    "invalidates": [
+                                        "builder.project.change",
+                                        "builder.project.metadata",
+                                        "builder.project.lifecycle"
+                                    ]
+                                },
+                                {
+                                    "on": "click:start-implementation",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "automation"
+                                    }
+                                },
+                                {
+                                    "on": "click:prepare-trial",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "publication"
+                                    }
+                                },
+                                {
+                                    "on": "click:publication",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "publication"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "area": "center",
                             "id": "workflow-status",
                             "type": "item.details",
-                            "title": "Workflow and Preview",
+                            "title": "Current context",
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "builder_sdk_control_skill.get_project",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -170,7 +364,11 @@
                                 "fields": [
                                     {
                                         "key": "working_label",
-                                        "label": "Editable process"
+                                        "label": "Editable activity"
+                                    },
+                                    {
+                                        "key": "change_label",
+                                        "label": "Change"
                                     },
                                     {
                                         "key": "viewing_label",
@@ -185,7 +383,12 @@
                                     "canEditPrototype": "can_edit_prototype",
                                     "canEditAutomation": "can_edit_automation",
                                     "canReturnToPrototype": "can_return_to_prototype",
-                                    "canPublish": "can_publish"
+                                    "canPrepareCandidate": "can_prepare_candidate",
+                                    "canAcceptCandidate": "can_decide_candidate",
+                                    "canPublish": "can_publish",
+                                    "workflowGeneration": "workflow_generation",
+                                    "changeLabel": "change_label",
+                                    "canStartImplementation": "can_start_implementation"
                                 }
                             }
                         },
@@ -206,8 +409,11 @@
                                     },
                                     {
                                         "id": "conversation",
-                                        "label": "$state.lifecycleConversationLabel",
-                                        "icon": "chatbubbles-outline"
+                                        "label": "Conversation",
+                                        "icon": "chatbubbles-outline",
+                                        "label_i18n": {
+                                            "key": "builder.text.conversation"
+                                        }
                                     },
                                     {
                                         "id": "files",
@@ -287,7 +493,10 @@
                                 "params": {
                                     "path": "$state.selectedFilePath",
                                     "object_type": "$state.selectedObjectKind",
-                                    "object_id": "$state.selectedObjectId"
+                                    "object_id": "$state.selectedObjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -314,7 +523,10 @@
                                         "path": "$state.selectedFilePath",
                                         "text": "$event.content",
                                         "object_type": "$state.selectedObjectKind",
-                                        "object_id": "$state.selectedObjectId"
+                                        "object_id": "$state.selectedObjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.files"
@@ -337,7 +549,10 @@
                                 "params": {
                                     "path": "$state.selectedFilePath",
                                     "object_type": "$state.selectedObjectKind",
-                                    "object_id": "$state.selectedObjectId"
+                                    "object_id": "$state.selectedObjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -358,8 +573,8 @@
                             "area": "center",
                             "id": "builder-chat",
                             "type": "ui.chat",
-                            "title": "Разговор — Prototype",
-                            "visibleIf": "$state.activeView === 'conversation' && $state.selectedLifecycleStage === 'prototype' && $state.workflowActivePhase === 'prototype'",
+                            "title": "Development conversation",
+                            "visibleIf": "$state.activeView === 'conversation'",
                             "dataSource": {
                                 "kind": "stream",
                                 "receiver": "voice_chat.messages",
@@ -402,8 +617,9 @@
                                 }
                             },
                             "title_i18n": {
-                                "key": "builder.text.prototype.conversation"
-                            }
+                                "key": "builder.text.development.conversation"
+                            },
+                            "actions": []
                         },
                         {
                             "area": "center",
@@ -454,7 +670,10 @@
                                         "implementation_brief": "$event.values.implementation_brief",
                                         "object_type": "$state.selectedProjectKind",
                                         "object_id": "$state.selectedProjectId",
-                                        "conversation_id": "$state.builderConversationId"
+                                        "conversation_id": "$state.builderConversationId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.automation",
@@ -497,7 +716,10 @@
                                     "params": {
                                         "text": "$event.values.text",
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.automation",
@@ -533,7 +755,10 @@
                                     "target": "builder_sdk_control_skill.return_to_prototype",
                                     "params": {
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.automation",
@@ -552,7 +777,10 @@
                                 "name": "builder_sdk_control_skill.get_automation",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -669,7 +897,10 @@
                                 "name": "builder_sdk_control_skill.get_project",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -758,8 +989,12 @@
                                     "type": "callSkill",
                                     "target": "builder_sdk_control_skill.push_project",
                                     "params": {
+                                        "checkpoint_id": "$event.id",
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.publication",
@@ -774,14 +1009,17 @@
                                         "bump": "$state.releaseBump",
                                         "dry_run": true,
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.publication",
                                         "builder.project.metadata",
                                         "builder.project.lifecycle"
                                     ],
-                                    "enabledIf": "$state.canPublish === true"
+                                    "enabledIf": "$state.canPrepareCandidate === true"
                                 },
                                 {
                                     "on": "click:publish",
@@ -789,7 +1027,7 @@
                                     "params": {
                                         "modalId": "confirm-publish"
                                     },
-                                    "enabledIf": "$state.canPublish === true"
+                                    "enabledIf": "$state.canAcceptCandidate === true"
                                 },
                                 {
                                     "on": "click:delete",
@@ -815,7 +1053,10 @@
                                 "params": {
                                     "limit": 100,
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -896,7 +1137,10 @@
                                         "title": "$event.values.title",
                                         "description": "$event.values.description",
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.metadata",
@@ -919,7 +1163,10 @@
                                 "name": "builder_sdk_control_skill.get_lifecycle",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -969,7 +1216,10 @@
                                 "name": "builder_sdk_control_skill.get_project",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -1012,12 +1262,148 @@
                                     "canEditPrototype": "can_edit_prototype",
                                     "canEditAutomation": "can_edit_automation",
                                     "canReturnToPrototype": "can_return_to_prototype",
+                                    "canPrepareCandidate": "can_prepare_candidate",
+                                    "canAcceptCandidate": "can_decide_candidate",
                                     "canPublish": "can_publish"
                                 }
                             },
                             "title_i18n": {
                                 "key": "builder.text.version.and.environment"
                             }
+                        },
+                        {
+                            "area": "center",
+                            "id": "overview-subscription-update",
+                            "type": "item.details",
+                            "title": "Stable update plan",
+                            "visibleIf": "$state.activeView === 'overview'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "builder_sdk_control_skill.get_subscription_update",
+                                "params": {
+                                    "object_type": "$state.selectedProjectKind",
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "builder.project.subscription",
+                                    "builder.project.publication"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "key": "status",
+                                        "label": "Status",
+                                        "label_i18n": {
+                                            "key": "builder.text.update.status"
+                                        }
+                                    },
+                                    {
+                                        "key": "current_release",
+                                        "label": "Current release",
+                                        "label_i18n": {
+                                            "key": "builder.text.current.release"
+                                        }
+                                    },
+                                    {
+                                        "key": "target_release",
+                                        "label": "Target release",
+                                        "label_i18n": {
+                                            "key": "builder.text.target.release"
+                                        }
+                                    },
+                                    {
+                                        "key": "components",
+                                        "label": "Components",
+                                        "label_i18n": {
+                                            "key": "builder.text.components"
+                                        }
+                                    },
+                                    {
+                                        "key": "dependencies",
+                                        "label": "Dependencies",
+                                        "label_i18n": {
+                                            "key": "builder.text.dependencies"
+                                        }
+                                    },
+                                    {
+                                        "key": "permissions",
+                                        "label": "New permissions",
+                                        "label_i18n": {
+                                            "key": "builder.text.new.permissions"
+                                        }
+                                    },
+                                    {
+                                        "key": "schemas",
+                                        "label": "Schemas",
+                                        "label_i18n": {
+                                            "key": "builder.text.schemas"
+                                        }
+                                    },
+                                    {
+                                        "key": "migrations",
+                                        "label": "Migrations",
+                                        "label_i18n": {
+                                            "key": "builder.text.migrations"
+                                        }
+                                    },
+                                    {
+                                        "key": "rollback_available",
+                                        "label": "Rollback available",
+                                        "label_i18n": {
+                                            "key": "builder.text.rollback.available"
+                                        }
+                                    },
+                                    {
+                                        "key": "warnings",
+                                        "label": "Warnings",
+                                        "label_i18n": {
+                                            "key": "builder.text.warnings"
+                                        }
+                                    }
+                                ],
+                                "stateBindings": {
+                                    "subscriptionUpdateAvailable": "available",
+                                    "subscriptionUpdateAllowed": "activation_allowed",
+                                    "subscriptionUpdatePlanDigest": "plan_digest"
+                                }
+                            },
+                            "title_i18n": {
+                                "key": "builder.text.stable.update.plan"
+                            }
+                        },
+                        {
+                            "area": "center",
+                            "id": "overview-subscription-update-actions",
+                            "type": "ui.actions",
+                            "visibleIf": "$state.activeView === 'overview' && $state.subscriptionUpdateAvailable === true && $state.subscriptionUpdateAllowed === true",
+                            "inputs": {
+                                "buttons": [
+                                    {
+                                        "id": "review-update",
+                                        "label": "Review and apply update",
+                                        "icon": "download-outline",
+                                        "label_i18n": {
+                                            "key": "builder.text.review.and.apply.update"
+                                        }
+                                    }
+                                ],
+                                "variant": "stack"
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:review-update",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "confirm-subscription-update"
+                                    }
+                                }
+                            ]
                         },
                         {
                             "area": "center",
@@ -1080,7 +1466,10 @@
                                     "params": {
                                         "archived": false,
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.catalog",
@@ -1114,6 +1503,26 @@
                                         "label_i18n": {
                                             "key": "builder.text.choose.project"
                                         }
+                                    },
+                                    {
+                                        "id": "show-process",
+                                        "label": "Process",
+                                        "icon": "git-branch-outline",
+                                        "label_i18n": {
+                                            "key": "builder.text.process"
+                                        }
+                                    },
+                                    {
+                                        "id": "change-context",
+                                        "label": "$state.changeLabel",
+                                        "icon": "git-branch-outline",
+                                        "disabled": true
+                                    },
+                                    {
+                                        "id": "preview-context",
+                                        "label": "$state.previewViewingLabel",
+                                        "icon": "eye-outline",
+                                        "disabled": true
                                     }
                                 ],
                                 "size": "small",
@@ -1121,17 +1530,24 @@
                             },
                             "actions": [
                                 {
-                                    "on": "click",
+                                    "on": "click:choose-project",
                                     "type": "updateState",
                                     "params": {
                                         "projectPickerArchived": false
                                     }
                                 },
                                 {
-                                    "on": "click",
+                                    "on": "click:choose-project",
                                     "type": "openModal",
                                     "params": {
                                         "modalId": "project-picker"
+                                    }
+                                },
+                                {
+                                    "on": "click:show-process",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "process"
                                     }
                                 }
                             ],
@@ -1141,15 +1557,66 @@
                         },
                         {
                             "area": "left",
+                            "id": "change-summary",
+                            "type": "item.details",
+                            "title": "Change",
+                            "title_i18n": {
+                                "key": "builder.text.change"
+                            },
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "builder_sdk_control_skill.get_change_set",
+                                "params": {
+                                    "object_type": "$state.selectedProjectKind",
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
+                                },
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "builder.project.change",
+                                    "builder.project.lifecycle"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {
+                                "compact": true,
+                                "fields": [
+                                    {
+                                        "key": "request",
+                                        "label": "Intent"
+                                    },
+                                    {
+                                        "key": "status",
+                                        "label": "Status"
+                                    },
+                                    {
+                                        "key": "gate",
+                                        "label": "Next gate"
+                                    }
+                                ],
+                                "stateBindings": {
+                                    "selectedChangeId": "change_id",
+                                    "selectedChangeStatus": "status",
+                                    "selectedChangeGate": "gate"
+                                }
+                            }
+                        },
+                        {
+                            "area": "left",
                             "id": "project-tree",
                             "type": "collection.tree",
-                            "title": "Жизненный цикл",
+                            "title": "Lifecycle (compatibility)",
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "builder_sdk_control_skill.get_lifecycle",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -1222,7 +1689,10 @@
                                     "type": "callSkill",
                                     "target": "builder_skill.set_ui_revision_current",
                                     "params": {
-                                        "revision": "$event.item.revision"
+                                        "revision": "$event.item.revision",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     }
                                 },
                                 {
@@ -1230,9 +1700,13 @@
                                     "type": "callSkill",
                                     "target": "builder_sdk_control_skill.push_project",
                                     "params": {
+                                        "checkpoint_id": "$event.id",
                                         "message": "Builder prototype stabilization",
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.publication",
@@ -1246,7 +1720,10 @@
                                     "params": {
                                         "action": "stabilize_prototype",
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.metadata",
@@ -1275,7 +1752,10 @@
                                         "stage": "$event.item.lifecycleStage",
                                         "revision": "$event.item.revision",
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.preview",
@@ -1286,7 +1766,8 @@
                             ],
                             "title_i18n": {
                                 "key": "builder.text.lifecycle"
-                            }
+                            },
+                            "visibleIf": "$state.processPinned === true"
                         },
                         {
                             "area": "right",
@@ -1297,7 +1778,11 @@
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "builder_sdk_control_skill.get_preview",
-                                "params": {},
+                                "params": {
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
+                                },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
                                     "builder.project.preview"
@@ -1478,7 +1963,10 @@
                                 "name": "builder_sdk_control_skill.get_llm_options",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -1494,7 +1982,10 @@
                                     "params": {
                                         "model": "$event.values.llmModel",
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.llm"
@@ -1562,7 +2053,10 @@
                                     "target": "builder_sdk_control_skill.select_preview",
                                     "params": {
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "background": true,
                                     "invalidates": [
@@ -1586,7 +2080,10 @@
                                 "name": "builder_sdk_control_skill.get_prompt_context",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -1608,7 +2105,10 @@
                                     "params": {
                                         "text": "$event.content",
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "invalidates": [
                                         "builder.project.prompt"
@@ -1662,7 +2162,10 @@
                                 "name": "builder_sdk_control_skill.get_prompt_context",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -1696,7 +2199,10 @@
                                 "name": "builder_sdk_control_skill.get_prompt_context",
                                 "params": {
                                     "object_type": "$state.selectedProjectKind",
-                                    "object_id": "$state.selectedProjectId"
+                                    "object_id": "$state.selectedProjectId",
+                                    "_meta": {
+                                        "current_scenario": "builder"
+                                    }
                                 },
                                 "cacheTtlMs": 0,
                                 "invalidationTags": [
@@ -1744,11 +2250,36 @@
                     "meta": {
                         "builder": {
                             "scenario_id": "builder",
-                            "ui_revision": "040",
+                            "ui_revision": "058",
                             "prototype_base_revision": "029",
-                            "previous_revision": "039",
+                            "previous_revision": "057",
                             "functional": true,
-                            "workflow_contract": "adaos.builder.workflow.v1"
+                            "workflow_contract": "adaos.builder.workflow.v1",
+                            "functional_base_revision": "042",
+                            "functional_parity_contract": "adaos.builder.functional_parity.v1",
+                            "binding_mode": "skill",
+                            "typed_contracts": {
+                                "project": "builder_sdk_control_skill.get_project",
+                                "lifecycle": "builder_sdk_control_skill.get_lifecycle",
+                                "file": "builder_sdk_control_skill.read_project_file",
+                                "templates": "builder_sdk_control_skill.list_templates",
+                                "projects": "builder_sdk_control_skill.list_projects",
+                                "changes": "builder_sdk_control_skill.list_changes",
+                                "preview": "builder_sdk_control_skill.get_preview",
+                                "automation": "builder_sdk_control_skill.get_automation",
+                                "publication": "builder_sdk_control_skill.publish_project"
+                            },
+                            "proto": "proto:058",
+                            "active": "active:current",
+                            "public": "public:current",
+                            "lifecycle": [
+                                "prototype",
+                                "automation",
+                                "trial",
+                                "publication"
+                            ],
+                            "surface_identity": "builder",
+                            "surface_identity_field": "current_scenario"
                         }
                     },
                     "title_i18n": {
@@ -1757,7 +2288,7 @@
                     "initialStateSource": {
                         "kind": "y",
                         "path": "data/builder/selection",
-                        "map": {
+                        "mapping": {
                             "selectedProjectKind": "object_type",
                             "selectedProjectId": "object_id",
                             "selectedProjectRef": "ref",
@@ -1768,10 +2299,7 @@
                             "project.description": "description",
                             "project.type": "object_type",
                             "builderTopicId": "topic_id",
-                            "builderThreadId": "thread_id",
-                            "workflowActivePhase": "workflow_active_phase",
-                            "workflowWorkingLabel": "working_label",
-                            "previewViewingLabel": "viewing_label"
+                            "builderThreadId": "thread_id"
                         }
                     }
                 }
@@ -1850,7 +2378,10 @@
                                         "params": {
                                             "archived": true,
                                             "object_type": "$state.selectedProjectKind",
-                                            "object_id": "$state.selectedProjectId"
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "invalidates": [
                                             "builder.project.catalog",
@@ -1915,7 +2446,10 @@
                                     "name": "builder_sdk_control_skill.list_project_objects",
                                     "params": {
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "cacheTtlMs": 0,
                                     "invalidationTags": [
@@ -1955,7 +2489,10 @@
                                     "params": {
                                         "object_type": "$state.selectedObjectKind",
                                         "object_id": "$state.selectedObjectId",
-                                        "limit": 1000
+                                        "limit": 1000,
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "cacheTtlMs": 0,
                                     "invalidationTags": [
@@ -2023,7 +2560,11 @@
                                 "dataSource": {
                                     "kind": "skill",
                                     "name": "builder_sdk_control_skill.get_preview",
-                                    "params": {},
+                                    "params": {
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
+                                    },
                                     "cacheTtlMs": 0,
                                     "invalidationTags": [
                                         "builder.project.preview"
@@ -2104,18 +2645,17 @@
                                 "type": "ui.list",
                                 "title": "Проекты",
                                 "dataSource": {
-                                    "kind": "api",
-                                    "url": "/api/builder/workbench/projects",
-                                    "method": "GET",
+                                    "kind": "skill",
+                                    "name": "builder_sdk_control_skill.list_projects",
                                     "params": {
                                         "limit": 200,
                                         "selected_object_type": "$state.selectedProjectKind",
                                         "selected_object_id": "$state.selectedProjectId",
-                                        "include_archived": "$state.projectPickerArchived"
+                                        "include_archived": "$state.projectPickerArchived",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
-                                    "prefetch": true,
-                                    "scope": "workspace",
-                                    "includeWebspaceContext": true,
                                     "cacheTtlMs": 0,
                                     "invalidationTags": [
                                         "builder.project.catalog"
@@ -2196,7 +2736,10 @@
                                         "target": "builder_sdk_control_skill.select_preview",
                                         "params": {
                                             "object_type": "$event.object_type",
-                                            "object_id": "$event.object_id"
+                                            "object_id": "$event.object_id",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "background": true,
                                         "invalidates": [
@@ -2309,7 +2852,8 @@
                                             ],
                                             "label_i18n": {
                                                 "key": "builder.text.type"
-                                            }
+                                            },
+                                            "stateKey": "newProjectKind"
                                         },
                                         {
                                             "id": "object_id",
@@ -2323,9 +2867,17 @@
                                     ],
                                     "submitLabel_i18n": {
                                         "key": "builder.text.create"
-                                    }
+                                    },
+                                    "autoCommit": true
                                 },
                                 "actions": [
+                                    {
+                                        "on": "change:object_type",
+                                        "type": "updateState",
+                                        "params": {
+                                            "selectedTemplate": null
+                                        }
+                                    },
                                     {
                                         "on": "submit",
                                         "type": "callSkill",
@@ -2333,7 +2885,10 @@
                                         "params": {
                                             "object_type": "$event.values.object_type",
                                             "object_id": "$event.values.object_id",
-                                            "template": "$state.selectedTemplate"
+                                            "template": "$state.selectedTemplate",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "invalidates": [
                                             "builder.project.catalog",
@@ -2370,7 +2925,10 @@
                                     "kind": "skill",
                                     "name": "builder_sdk_control_skill.list_templates",
                                     "params": {
-                                        "object_type": "scenario"
+                                        "object_type": "$state.newProjectKind",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "cacheTtlMs": 0,
                                     "invalidationTags": [
@@ -2490,7 +3048,10 @@
                                             "text": "$event.values.text",
                                             "iteration_ref": "$event.values.iteration_ref",
                                             "object_type": "$state.selectedProjectKind",
-                                            "object_id": "$state.selectedProjectId"
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "invalidates": [
                                             "builder.project.prompt"
@@ -2562,7 +3123,10 @@
                                         "params": {
                                             "implementation_brief": "$event.values.implementation_brief",
                                             "object_type": "$state.selectedProjectKind",
-                                            "object_id": "$state.selectedProjectId"
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "invalidates": [
                                             "builder.project.automation",
@@ -2604,7 +3168,10 @@
                                         "params": {
                                             "text": "$event.values.text",
                                             "object_type": "$state.selectedProjectKind",
-                                            "object_id": "$state.selectedProjectId"
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "invalidates": [
                                             "builder.project.automation",
@@ -2626,7 +3193,10 @@
                                     "name": "builder_sdk_control_skill.get_automation",
                                     "params": {
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "cacheTtlMs": 0,
                                     "invalidationTags": [
@@ -2756,7 +3326,10 @@
                                     "name": "builder_sdk_control_skill.get_project",
                                     "params": {
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "cacheTtlMs": 0,
                                     "invalidationTags": [
@@ -2844,8 +3417,12 @@
                                         "type": "callSkill",
                                         "target": "builder_sdk_control_skill.push_project",
                                         "params": {
+                                            "checkpoint_id": "$event.id",
                                             "object_type": "$state.selectedProjectKind",
-                                            "object_id": "$state.selectedProjectId"
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "invalidates": [
                                             "builder.project.publication",
@@ -2860,20 +3437,25 @@
                                             "bump": "$state.releaseBump",
                                             "dry_run": true,
                                             "object_type": "$state.selectedProjectKind",
-                                            "object_id": "$state.selectedProjectId"
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "invalidates": [
                                             "builder.project.publication",
                                             "builder.project.metadata",
                                             "builder.project.lifecycle"
-                                        ]
+                                        ],
+                                        "enabledIf": "$state.canPrepareCandidate === true"
                                     },
                                     {
                                         "on": "click:publish",
                                         "type": "openModal",
                                         "params": {
                                             "modalId": "confirm-publish"
-                                        }
+                                        },
+                                        "enabledIf": "$state.canAcceptCandidate === true"
                                     },
                                     {
                                         "on": "click:delete",
@@ -2898,7 +3480,10 @@
                                     "params": {
                                         "limit": 100,
                                         "object_type": "$state.selectedProjectKind",
-                                        "object_id": "$state.selectedProjectId"
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
                                     },
                                     "cacheTtlMs": 0,
                                     "invalidationTags": [
@@ -2923,6 +3508,200 @@
                     },
                     "title_i18n": {
                         "key": "builder.text.publication"
+                    }
+                },
+                "confirm-subscription-update": {
+                    "title": "Review stable update",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "confirm-subscription-update",
+                        "title": "Review stable update",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [
+                                {
+                                    "id": "main",
+                                    "role": "main"
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "area": "main",
+                                "id": "subscription-update-review",
+                                "type": "item.details",
+                                "title": "Reviewed package plan",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "builder_sdk_control_skill.get_subscription_update",
+                                    "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "builder.project.subscription",
+                                        "builder.project.publication"
+                                    ],
+                                    "preserveLastValue": true
+                                },
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "key": "current_release",
+                                            "label": "Current release",
+                                            "label_i18n": {
+                                                "key": "builder.text.current.release"
+                                            }
+                                        },
+                                        {
+                                            "key": "target_release",
+                                            "label": "Target release",
+                                            "label_i18n": {
+                                                "key": "builder.text.target.release"
+                                            }
+                                        },
+                                        {
+                                            "key": "components",
+                                            "label": "Components",
+                                            "label_i18n": {
+                                                "key": "builder.text.components"
+                                            }
+                                        },
+                                        {
+                                            "key": "dependencies",
+                                            "label": "Dependencies",
+                                            "label_i18n": {
+                                                "key": "builder.text.dependencies"
+                                            }
+                                        },
+                                        {
+                                            "key": "permissions",
+                                            "label": "New permissions",
+                                            "label_i18n": {
+                                                "key": "builder.text.new.permissions"
+                                            }
+                                        },
+                                        {
+                                            "key": "schemas",
+                                            "label": "Schemas",
+                                            "label_i18n": {
+                                                "key": "builder.text.schemas"
+                                            }
+                                        },
+                                        {
+                                            "key": "migrations",
+                                            "label": "Migrations",
+                                            "label_i18n": {
+                                                "key": "builder.text.migrations"
+                                            }
+                                        },
+                                        {
+                                            "key": "rollback_reason",
+                                            "label": "Rollback",
+                                            "label_i18n": {
+                                                "key": "builder.text.rollback"
+                                            }
+                                        },
+                                        {
+                                            "key": "runtime_checks",
+                                            "label": "Runtime checks",
+                                            "label_i18n": {
+                                                "key": "builder.text.runtime.checks"
+                                            }
+                                        },
+                                        {
+                                            "key": "warnings",
+                                            "label": "Warnings",
+                                            "label_i18n": {
+                                                "key": "builder.text.warnings"
+                                            }
+                                        },
+                                        {
+                                            "key": "plan_digest",
+                                            "label": "Plan digest",
+                                            "label_i18n": {
+                                                "key": "builder.text.plan.digest"
+                                            }
+                                        }
+                                    ],
+                                    "stateBindings": {
+                                        "subscriptionUpdatePlanDigest": "plan_digest",
+                                        "subscriptionUpdateAvailable": "available",
+                                        "subscriptionUpdateAllowed": "activation_allowed"
+                                    }
+                                },
+                                "title_i18n": {
+                                    "key": "builder.text.reviewed.package.plan"
+                                }
+                            },
+                            {
+                                "area": "main",
+                                "id": "subscription-update-confirm-actions",
+                                "type": "ui.actions",
+                                "inputs": {
+                                    "variant": "stack",
+                                    "buttons": [
+                                        {
+                                            "id": "confirm",
+                                            "label": "Apply reviewed update",
+                                            "icon": "shield-checkmark-outline",
+                                            "kind": "danger",
+                                            "enabledIf": "$state.subscriptionUpdateAvailable === true && $state.subscriptionUpdateAllowed === true && !!$state.subscriptionUpdatePlanDigest",
+                                            "label_i18n": {
+                                                "key": "builder.text.apply.reviewed.update"
+                                            }
+                                        },
+                                        {
+                                            "id": "cancel",
+                                            "label": "Close",
+                                            "icon": "close-outline",
+                                            "label_i18n": {
+                                                "key": "builder.text.close"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "click:confirm",
+                                        "type": "callSkill",
+                                        "target": "builder_sdk_control_skill.apply_subscription_update",
+                                        "params": {
+                                            "expected_plan_digest": "$state.subscriptionUpdatePlanDigest",
+                                            "approve_permissions": true,
+                                            "object_type": "$state.selectedProjectKind",
+                                            "object_id": "$state.selectedProjectId",
+                                            "webspace_id": "$state.sourceWebspaceId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
+                                        },
+                                        "invalidates": [
+                                            "builder.project.subscription",
+                                            "builder.project.publication",
+                                            "builder.project.metadata",
+                                            "builder.project.lifecycle"
+                                        ]
+                                    },
+                                    {
+                                        "on": "click:cancel",
+                                        "type": "closeModal"
+                                    }
+                                ]
+                            }
+                        ],
+                        "title_i18n": {
+                            "key": "builder.text.review.stable.update"
+                        }
+                    },
+                    "title_i18n": {
+                        "key": "builder.text.review.stable.update"
                     }
                 },
                 "confirm-publish": {
@@ -2999,7 +3778,10 @@
                                             "bump": "$state.releaseBump",
                                             "dry_run": false,
                                             "object_type": "$state.selectedProjectKind",
-                                            "object_id": "$state.selectedProjectId"
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "invalidates": [
                                             "builder.project.publication",
@@ -3100,7 +3882,10 @@
                                             "confirm": true,
                                             "remove_local": false,
                                             "object_type": "$state.selectedProjectKind",
-                                            "object_id": "$state.selectedProjectId"
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
                                         },
                                         "invalidates": [
                                             "builder.project.catalog",
@@ -3126,6 +3911,111 @@
                     "title_i18n": {
                         "key": "builder.text.delete.project"
                     }
+                },
+                "process": {
+                    "title": "Development process",
+                    "title_i18n": {
+                        "key": "builder.text.development.process"
+                    },
+                    "presentation": {
+                        "kind": "drawer",
+                        "restoreFocus": true
+                    },
+                    "schema": {
+                        "id": "process",
+                        "title": "Development process",
+                        "layout": {
+                            "type": "stack",
+                            "areas": [
+                                {
+                                    "id": "main",
+                                    "role": "main"
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "area": "main",
+                                "id": "process-tree",
+                                "type": "collection.tree",
+                                "title": "Issue → Change → Prototype → Implementation → Trial → Publication",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "builder_sdk_control_skill.get_process_tree",
+                                    "params": {
+                                        "object_type": "$state.selectedProjectKind",
+                                        "object_id": "$state.selectedProjectId",
+                                        "_meta": {
+                                            "current_scenario": "builder"
+                                        }
+                                    },
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "builder.project.change",
+                                        "builder.project.lifecycle"
+                                    ],
+                                    "preserveLastValue": true
+                                },
+                                "inputs": {
+                                    "selectedStateKey": "inspectedProcessRef",
+                                    "compactIndent": true,
+                                    "wrapTitles": true,
+                                    "buttons": [
+                                        {
+                                            "id": "show-preview",
+                                            "label": "Show in Preview",
+                                            "icon": "eye-outline",
+                                            "whenKey": "canPreview"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "select",
+                                        "type": "updateState",
+                                        "params": {
+                                            "inspectedProcessRef": "$event.id"
+                                        }
+                                    },
+                                    {
+                                        "on": "select",
+                                        "type": "callSkill",
+                                        "target": "builder_sdk_control_skill.inspect_process_ref",
+                                        "params": {
+                                            "inspected_ref": "$event.id",
+                                            "expected_generation": "$state.workflowGeneration",
+                                            "object_type": "$state.selectedProjectKind",
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
+                                        },
+                                        "invalidates": [
+                                            "builder.project.change"
+                                        ]
+                                    },
+                                    {
+                                        "on": "click:show-preview",
+                                        "type": "callSkill",
+                                        "target": "builder_sdk_control_skill.select_preview_target",
+                                        "params": {
+                                            "stage": "$event.item.previewStage",
+                                            "revision": "$event.item.revision",
+                                            "object_type": "$state.selectedProjectKind",
+                                            "object_id": "$state.selectedProjectId",
+                                            "_meta": {
+                                                "current_scenario": "builder"
+                                            }
+                                        },
+                                        "invalidates": [
+                                            "builder.project.preview",
+                                            "builder.project.metadata"
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
                 }
             },
             "resources": {
@@ -3147,7 +4037,7 @@
                 }
             }
         },
-        "version": "040",
+        "version": "0.2.55",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
@@ -3157,7 +4047,13 @@
                 "Exactly one of Prototype or Automation is WORKING; the other is FROZEN.",
                 "Publication is an immutable PUBLISHED snapshot and never the mutable process.",
                 "Show in Preview explicitly chooses a supported Lifecycle snapshot.",
-                "Publication exposes checkpoint, release validation, publish, and delete; it never overwrites DEV from Root."
+                "Publication exposes checkpoint, release validation, publish, and delete; it never overwrites DEV from Root.",
+                "Builder preserves the complete UI 042 control plane.",
+                "Project selection is projected atomically from Yjs state.",
+                "Choose Project uses bounded live project data with search and archived filtering.",
+                "New projects can be based on scenario or skill templates.",
+                "Every skill-backed Builder operation declares the active Builder surface so nested preview actions remain isolated.",
+                "current_scenario identifies the Builder surface; scenario_id and project_id remain reserved for the selected project."
             ],
             "preview": [
                 "Preview headings use proto:, active:, or public: prefixes."
@@ -3165,16 +4061,8 @@
             "risks": [
                 "Returning to Prototype runs a guarded LLM adaptation and is asynchronous."
             ]
-        }
+        },
+        "manifest": "webui.json"
     },
-    "type": "desktop",
-    "title_i18n": {
-        "fallback": "Builder",
-        "key": "scenario.builder.title"
-    },
-    "supported_locales": [
-        "en",
-        "ru"
-    ],
-    "updated_at": "2026-07-24T07:20:00+00:00"
+    "updated_at": "2026-07-30T05:55:56+00:00"
 }

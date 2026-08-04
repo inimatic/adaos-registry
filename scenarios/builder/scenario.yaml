@@ -2,19 +2,41 @@ id: builder
 name: builder
 type: desktop
 title: Builder — рабочее место разработки
-description: Functional SDK-backed Builder workbench for DEV project development,
-  automation, and publication.
-version: 0.2.19
+description: Safe local Builder prototype for the dependent Prototype, Automation,
+  Trial, and Publication lifecycle.
+version: 0.2.55
 title_i18n:
   fallback: Builder
   key: scenario.builder.title
 supported_locales:
 - en
 - ru
+triggers: []
+slots: {}
+params: {}
+llm_hints:
+  description: Local declarative Builder prototype
+  aliases:
+  - builder
+  - constructor
+  primary_actions: []
+  examples:
+  - Open the Builder prototype
+  owner_hints:
+  - prototype
+nlu:
+  nlu_hints: {}
+  llm_hints: {}
 depends:
+- builder_skill
 - builder_sdk_control_skill
+- voice_chat_skill
 runtime:
   skills:
     required:
+    - builder_skill
     - builder_sdk_control_skill
-updated_at: '2026-07-24T08:41:02+00:00'
+    - voice_chat_skill
+ui:
+  manifest: webui.json
+updated_at: '2026-07-30T05:55:56+00:00'

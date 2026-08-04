@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 from typing import Any
 from uuid import uuid4
 
+import yaml
+
 from adaos.sdk import conversation
-from adaos.sdk.builder import automation, preview, workflow
+from adaos.sdk.builder import automation, preview, review, semantic_ui, workflow
 from adaos.sdk.core.decorators import tool
-from adaos.sdk.developer import projects, prompt_context
+from adaos.sdk.developer import conversational, projects, prompt_context
 from adaos.sdk.llm.llm_client import list_llm_models
 
 SKILL_ID = "builder_sdk_control_skill"
@@ -25,7 +28,16 @@ def _webspace_id(value: str | None, meta: Mapping[str, Any] | None) -> str:
 
 def _preview_source_webspace_id(value: str | None, meta: Mapping[str, Any] | None) -> str:
     candidate = _webspace_id(value, meta)
+    metadata = meta if isinstance(meta, Mapping) else {}
+    current_scenario = str(
+        metadata.get("scenario_id") or metadata.get("current_scenario") or ""
+    ).strip()
     try:
+        if current_scenario:
+            return preview.action_source_webspace_id(
+                candidate,
+                current_scenario_id=current_scenario,
+            )
         return preview.canonical_source_webspace_id(candidate)
     except RuntimeError:
         # Read-only collection tools also run in isolated validation without an AgentContext.
@@ -38,6 +50,24 @@ def _preview_dev_webspace_id(source: str) -> str:
     except RuntimeError:
         token = str(source or "desktop").strip() or "desktop"
         return token if token.endswith("-dev") else f"{token}-dev"
+
+
+def _project_topic(
+    kind: str,
+    project_id: str,
+    *,
+    webspace_id: str | None = None,
+    meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    source = _preview_source_webspace_id(webspace_id, meta)
+    return conversation.ensure_builder_topic(
+        webspace_id=source,
+        scenario_id=project_id if kind == "scenario" else None,
+        dev_webspace_id=_preview_dev_webspace_id(source),
+        project_id=project_id,
+        title=f"Builder: {project_id}",
+        meta={"artifact_kind": kind, "artifact_id": project_id},
+    )
 
 
 def _identity(object_type: str | None, object_id: str | None) -> tuple[str, str]:
@@ -94,6 +124,16 @@ def _workflow_projection(kind: str, project_id: str, state: Mapping[str, Any] | 
                 "can_update_change_set": False,
             },
         }
+
+
+def _workflow_execution_identity(projection: Mapping[str, Any] | None) -> tuple[str, str]:
+    value = projection if isinstance(projection, Mapping) else {}
+    change = value.get("change") if isinstance(value.get("change"), Mapping) else {}
+    change_set = value.get("change_set") if isinstance(value.get("change_set"), Mapping) else {}
+    packet = value.get("context_packet") if isinstance(value.get("context_packet"), Mapping) else {}
+    change_id = str(change.get("change_id") or change_set.get("change_set_id") or "").strip()
+    digest = str(packet.get("digest") or change.get("context_packet_digest") or "").strip()
+    return change_id, digest
 
 
 def _probe(operation: Callable[[], Any]) -> dict[str, Any]:
@@ -209,6 +249,43 @@ def _record_project_change(
     thread_id = str(topic.get("thread_id") or topic.get("topic_id") or "").strip() or None
     topic_id = str(topic.get("topic_id") or thread_id or "").strip() or None
     change_id = str(change_id or "").strip() or f"builder-{action}-{uuid4().hex}"
+    selected_meta = {"skill_id": SKILL_ID, **dict(meta or {})}
+    canonical_change_id = ""
+    canonical_change_set: dict[str, Any] = {}
+    context_packet_digest = ""
+    try:
+        projection = workflow.get_state(kind, project_id)
+        change = projection.get("change") if isinstance(projection.get("change"), Mapping) else {}
+        canonical_change_set = (
+            dict(projection.get("change_set"))
+            if isinstance(projection.get("change_set"), Mapping)
+            else {}
+        )
+        context_packet = (
+            projection.get("context_packet")
+            if isinstance(projection.get("context_packet"), Mapping)
+            else {}
+        )
+        canonical_change_id = str(
+            change.get("change_id")
+            or canonical_change_set.get("change_set_id")
+            or ""
+        ).strip()
+        context_packet_digest = str(
+            context_packet.get("digest") or change.get("context_packet_digest") or ""
+        ).strip()
+    except Exception:
+        canonical_change_id = ""
+        canonical_change_set = {}
+        context_packet_digest = ""
+    if canonical_change_id:
+        selected_meta.update(
+            {
+                "canonical_change_id": canonical_change_id,
+                "run_id": change_id,
+                "evidence_role": "builder_run_compatibility",
+            }
+        )
     artifact_ref = {"kind": kind, "id": project_id}
     if path:
         artifact_ref["path"] = path
@@ -223,9 +300,65 @@ def _record_project_change(
         artifact_refs=[artifact_ref],
         commit_refs=[{"commit": commit}] if commit else [],
         summary=summary,
-        meta={"skill_id": SKILL_ID, **dict(meta or {})},
+        meta=selected_meta,
     )
-    return dict(evidence or {"change_id": change_id, "status": "recorded"})
+    result = dict(evidence or {"change_id": change_id, "status": "recorded"})
+    if not canonical_change_id:
+        return result
+
+    run: dict[str, Any] = {}
+    run_error: str | None = None
+    try:
+        if canonical_change_set and not conversation.get_development_change(canonical_change_id):
+            _sync_change_set_record(
+                kind=kind,
+                project_id=project_id,
+                webspace_id=webspace_id,
+                change_set=canonical_change_set,
+            )
+        completed_at = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        output_refs = [
+            value
+            for value in (
+                f"artifact:{kind}:{project_id}:{path}" if path else None,
+                f"commit:{commit}" if commit else None,
+                f"evidence:{change_id}",
+            )
+            if value
+        ]
+        run = dict(
+            conversation.upsert_development_run(
+                run_id=change_id,
+                change_id=canonical_change_id,
+                conversation_id=conversation_id,
+                thread_id=thread_id,
+                topic_id=topic_id,
+                activity=action,
+                executor=f"skill:{SKILL_ID}",
+                status="succeeded",
+                context_packet_digest=context_packet_digest or None,
+                environment_ref=f"webspace:{webspace_id}",
+                input_refs=[f"message:{item}" for item in source_message_ids or [] if str(item).strip()],
+                output_refs=output_refs,
+                evidence_refs=[f"development-change:{change_id}"],
+                started_at=completed_at,
+                completed_at=completed_at,
+            )
+            or {}
+        )
+    except Exception as exc:
+        # Compatibility evidence remains authoritative until all release
+        # consumers read Runs. Surface mirroring failures without rolling back
+        # an already completed artifact operation.
+        run_error = f"{type(exc).__name__}: {exc}"
+    return {
+        **result,
+        "canonical_change_id": canonical_change_id,
+        "run_id": change_id,
+        "run": run or None,
+        "run_synced": run_error is None,
+        "run_error": run_error,
+    }
 
 
 def _sync_change_set_record(
@@ -297,13 +430,94 @@ def _datetime_value(value: Any) -> str | None:
     return parsed.astimezone(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
+def _project_descriptor(
+    kind: str,
+    project_id: str,
+    described: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Describe a project, taking scenario metadata only from scenario.yaml."""
+
+    described = dict(described) if isinstance(described, Mapping) else dict(projects.describe(kind, project_id))
+    if kind != "scenario":
+        return described
+    semantic_fields = {
+        "name", "title", "description", "version", "depends", "metadata", "ui", "actions", "data_routes"
+    }
+    # describe() may include legacy scenario.json values; strip them before any fallback.
+    for field in semantic_fields:
+        described.pop(field, None)
+    try:
+        payload = projects.read_file(kind, project_id, "scenario.yaml", max_bytes=256_000)
+        manifest = yaml.safe_load(str(payload.get("content") or "")) or {}
+    except Exception:
+        # Missing/unreadable canonical metadata remains unknown rather than using scenario.json.
+        return described
+    if not isinstance(manifest, Mapping):
+        return described
+    described.update(dict(manifest))
+    described.setdefault("id", project_id)
+    described.setdefault("kind", kind)
+    described["manifest"] = "scenario.yaml"
+    return described
+
+
+def _declared_skill_dependencies(kind: str, project_id: str) -> set[str]:
+    """Read dependency declarations only from the canonical project manifest."""
+
+    manifest_name = "scenario.yaml" if kind == "scenario" else "skill.yaml"
+    try:
+        payload = projects.read_file(kind, project_id, manifest_name, max_bytes=256_000)
+        manifest = yaml.safe_load(str(payload.get("content") or "")) or {}
+    except Exception as exc:
+        raise ValueError(f"canonical project manifest is unavailable: {manifest_name}") from exc
+    if not isinstance(manifest, Mapping):
+        raise ValueError(f"canonical project manifest must be an object: {manifest_name}")
+    values: list[Any] = []
+    depends = manifest.get("depends") or []
+    values.extend([depends] if isinstance(depends, str) else depends if isinstance(depends, (list, tuple)) else [])
+    runtime = manifest.get("runtime") if isinstance(manifest.get("runtime"), Mapping) else {}
+    skills = runtime.get("skills") if isinstance(runtime.get("skills"), Mapping) else {}
+    required = skills.get("required") or []
+    values.extend([required] if isinstance(required, str) else required if isinstance(required, (list, tuple)) else [])
+    return {str(value).strip() for value in values if str(value).strip()}
+
+
+def _preview_label(stage: Any, revision: Any = None) -> str:
+    token = str(stage or "prototype").strip().lower()
+    prefix = {"prototype": "proto", "automation": "active", "publication": "public"}.get(token, token)
+    ref = str(revision or "current").strip() or "current"
+    return f"{prefix}: {ref}"
+
+
+def _require_transport_integrity(*values: Any) -> None:
+    """Reject likely lossy text transport before a durable or launching mutation."""
+
+    def strings(value: Any):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, Mapping):
+            for key, nested in value.items():
+                yield from strings(key)
+                yield from strings(nested)
+        elif isinstance(value, (list, tuple)):
+            for nested in value:
+                yield from strings(nested)
+
+    for value in values:
+        for text in strings(value):
+            if "\ufffd" in text:
+                raise ValueError("text transport integrity check failed: replacement character U+FFFD")
+            if re.search(r"\?{3,}", text):
+                raise ValueError("text transport integrity check failed: suspicious question-mark run")
+
+
 def _automation_children(
     projection: Mapping[str, Any],
     *,
     project_version: str | None = None,
 ) -> list[dict[str, Any]]:
     """Build one bounded, browser-ready node for the current automation task."""
-    status = str(projection.get("status") or "idle")
+    status = str(projection.get("status") or "idle").strip().lower()
     task = projection.get("task") if isinstance(projection.get("task"), Mapping) else {}
     result = projection.get("result") if isinstance(projection.get("result"), Mapping) else {}
     if not result and isinstance(task.get("result"), Mapping):
@@ -332,7 +546,6 @@ def _automation_children(
         result.get("version")
         or task.get("version")
         or projection.get("version")
-        or project_version
         or "DEV"
     )
     source_prototype_version = projection.get("source_prototype_version") or project_version
@@ -347,8 +560,11 @@ def _automation_children(
         evidence_items = list(raw_evidence[:MAX_LIFECYCLE_CHILDREN])
     else:
         evidence_items = []
-    has_result = any((task_id, phase, summary, error, result_branch, evidence_items))
-    if status == "idle" and not has_result:
+    default_states = {"", "idle", "not_started", "not-started", "default"}
+    meaningful_phase = str(phase or "").strip().lower() not in default_states
+    retained_result = bool(result) or bool(projection.get("result_version")) or bool(projection.get("snapshot_task_id"))
+    has_lineage = any((task_id, meaningful_phase, summary, error, result_branch, evidence_items, retained_result))
+    if status in default_states and not has_lineage:
         return []
     return [
         {
@@ -356,6 +572,7 @@ def _automation_children(
             "kind": "automation_result",
             "lifecycleState": "failed" if error else ("current" if status not in {"completed", "succeeded"} else "complete"),
             "title": _version_title(version),
+            "previewLabel": _preview_label("automation", version),
             "version": str(version),
             "updated_at": _datetime_value(updated_at),
             "source_prototype_version": source_prototype_version,
@@ -448,6 +665,7 @@ def list_projects(
         if not raw_object_id or raw_object_id.startswith((".", "_")):
             continue
         object_type, object_id = _identity(str(item.get("kind") or kind), raw_object_id)
+        item = _project_descriptor(object_type, object_id, item) if object_type == "scenario" else dict(item)
         title = str(item.get("title") or item.get("name") or object_id)
         description = str(item.get("description") or "")
         if needle and needle not in f"{object_id} {title} {description}".casefold():
@@ -502,7 +720,7 @@ def get_project(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
-    item = projects.describe(kind, project_id)
+    item = _project_descriptor(kind, project_id)
     state = _context(kind, project_id)
     workflow_projection = _workflow_projection(kind, project_id, state)
     capabilities = (
@@ -511,6 +729,7 @@ def get_project(
         else {}
     )
     source = _preview_source_webspace_id(webspace_id, _meta)
+    topic = _project_topic(kind, project_id, webspace_id=source)
     prototype_projection = (
         workflow_projection.get("prototype")
         if isinstance(workflow_projection.get("prototype"), Mapping)
@@ -526,6 +745,14 @@ def get_project(
         if isinstance(workflow_projection.get("change_set"), Mapping)
         else {}
     )
+    change_projection = (
+        workflow_projection.get("change")
+        if isinstance(workflow_projection.get("change"), Mapping)
+        else change_set_projection
+    )
+    change_id = str(change_projection.get("change_id") or change_set_projection.get("change_set_id") or "").strip()
+    change_status = str(change_projection.get("status") or change_set_projection.get("status") or "not_planned")
+    change_gate = str(change_projection.get("gate") or change_set_projection.get("gate") or "").strip()
     active_phase = str(workflow_projection.get("active_phase") or "prototype")
     working_ref = (
         prototype_projection.get("head_revision")
@@ -544,16 +771,16 @@ def get_project(
         if isinstance(preview_binding.get("preview_target"), Mapping)
         else {}
     )
-    viewing_label = str(preview_target.get("label") or "Preview: not selected")
     viewing_stage = str(preview_target.get("stage") or "")
     viewing_revision = str(preview_target.get("revision") or "")
+    viewing_label = str(preview_target.get("label") or "").strip()
+    if not viewing_label:
+        viewing_label = _preview_label(viewing_stage, viewing_revision) if viewing_stage else "Preview: not selected"
     active_ref = str(working_ref or "")
     viewing_read_only = bool(
         viewing_stage
         and (viewing_stage != active_phase or (viewing_revision and active_ref and viewing_revision != active_ref))
     )
-    if viewing_read_only:
-        viewing_label += " · READ ONLY"
     return {
         **item,
         "object_type": kind,
@@ -562,6 +789,9 @@ def get_project(
         "project_type": str(item.get("project_type") or kind),
         "dev_webspace_id": _preview_dev_webspace_id(source),
         "source_webspace_id": source,
+        "conversation_id": str(topic.get("conversation_id") or "conv.skill.builder_skill.default"),
+        "topic_id": str(topic.get("topic_id") or f"prompt-project:{kind}:{project_id}"),
+        "thread_id": str(topic.get("thread_id") or topic.get("topic_id") or f"prompt-project:{kind}:{project_id}"),
         "stage": "DEV prototype",
         "archived": bool(state.get("archived")),
         "workflow_state": str(workflow_projection.get("active_phase") or "prototype"),
@@ -577,7 +807,13 @@ def get_project(
         "can_prepare_candidate": bool(capabilities.get("can_prepare_candidate")),
         "can_decide_candidate": bool(capabilities.get("can_decide_candidate")),
         "can_publish": bool(capabilities.get("can_publish")),
+        "can_start_implementation": bool(
+            active_phase == "prototype" and change_gate == "automation" and change_id
+        ),
         "change_set_id": change_set_projection.get("change_set_id"),
+        "change_id": change_id or None,
+        "change_label": f"{change_id} · {change_status}" if change_id else "No active change",
+        "change": dict(change_projection),
         "change_set_status": change_set_projection.get("status") or "not_planned",
         "change_set_gate": change_set_projection.get("gate"),
         "change_set_route": change_set_projection.get("route"),
@@ -707,6 +943,7 @@ def save_project_file(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    _require_transport_integrity(path, text)
     kind, project_id = _identity(object_type, object_id)
     result = projects.write_file(kind, project_id, path, text, max_bytes=max_bytes)
     evidence = _record_project_change(
@@ -737,6 +974,7 @@ def save_prompt_context(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    _require_transport_integrity(text)
     kind, project_id = _identity(object_type, object_id)
     result = prompt_context.save_base(kind, project_id, text)
     evidence = _record_project_change(
@@ -759,6 +997,7 @@ def append_prompt_addendum(
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    _require_transport_integrity(text, iteration_ref)
     kind, project_id = _identity(object_type, object_id)
     result = prompt_context.append_addendum(kind, project_id, text, iteration_ref=iteration_ref)
     evidence = _record_project_change(
@@ -894,9 +1133,67 @@ def transition_workflow(
     action: str,
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
+    expected_generation: int | None = None,
+    metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
-    return workflow.transition(kind, project_id, action, actor="builder.ui")
+    try:
+        return workflow.transition(
+            kind,
+            project_id,
+            action,
+            actor="builder.ui",
+            metadata=dict(metadata or {}),
+            expected_generation=expected_generation,
+        )
+    except Exception as exc:
+        if "stale Builder action generation" not in str(exc):
+            raise
+        current = workflow.get_state(kind, project_id)
+        return {
+            "ok": False,
+            "stale": True,
+            "error": str(exc),
+            "workflow": current,
+            "interaction_frame": workflow.get_interaction_frame(kind, project_id),
+        }
+
+
+@tool("get_interaction_frame", summary="Read deterministic Builder actions for the current context.", side_effects="none")
+def get_interaction_frame(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    frame = workflow.get_interaction_frame(kind, project_id)
+    try:
+        binding = preview.get_binding(_preview_source_webspace_id(webspace_id, _meta))
+    except Exception:
+        binding = {}
+    target = binding.get("preview_target") if isinstance(binding.get("preview_target"), Mapping) else {}
+    if target:
+        stage = str(target.get("stage") or "prototype")
+        revision = str(target.get("revision") or "current")
+        frame["context"]["preview_target"] = f"{stage}:{project_id}:{revision}"
+    return frame
+
+
+@tool("inspect_process_ref", summary="Inspect one Process item without changing Preview.", side_effects="local_write")
+def inspect_process_ref(
+    inspected_ref: str | None,
+    expected_generation: int,
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    return workflow.update_interaction_context(
+        kind,
+        project_id,
+        {"inspected_ref": inspected_ref},
+        expected_generation=expected_generation,
+    )
 
 
 @tool("plan_change_set", summary="Project one user request into an executable Builder change set.", side_effects="local_write")
@@ -910,11 +1207,13 @@ def plan_change_set(
     source_message_ids: list[str] | None = None,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
+    expected_generation: int | None = None,
 ) -> dict[str, Any]:
     """Persist an LLM- or user-structured request without pretending it is a global AdaOS Issue."""
 
+    _require_transport_integrity(request, issues, source_message_ids)
     kind, project_id = _identity(object_type, object_id)
-    selected_change_set_id = str(change_set_id or "").strip() or f"builder-change-set-{uuid4().hex}"
+    selected_change_set_id = str(change_set_id or "").strip() or f"builder-change-{uuid4().hex}"
     source = _webspace_id(webspace_id, _meta)
     result = workflow.transition(
         kind,
@@ -927,10 +1226,14 @@ def plan_change_set(
             "issues": [dict(item) for item in issues if isinstance(item, Mapping)],
             "source_message_ids": list(source_message_ids or []),
             "supersedes_change_set_id": str(supersedes_change_set_id or "").strip() or None,
+            "run_id": f"builder-plan-{uuid4().hex}",
         },
+        expected_generation=expected_generation,
     )
     projection = result.get("workflow") if isinstance(result.get("workflow"), Mapping) else {}
     change_set = projection.get("change_set") if isinstance(projection.get("change_set"), Mapping) else {}
+    change = projection.get("change") if isinstance(projection.get("change"), Mapping) else {}
+    context_packet = workflow.build_context_packet(kind, project_id, persist=True)
     evidence: dict[str, Any] = {}
     evidence_error: str | None = None
     try:
@@ -945,6 +1248,9 @@ def plan_change_set(
     return {
         **result,
         "change_set": dict(change_set),
+        "change": dict(change),
+        "change_id": change.get("change_id") or change_set.get("change_set_id"),
+        "context_packet": context_packet,
         "evidence": evidence or None,
         "evidence_synced": evidence_error is None,
         "evidence_error": evidence_error,
@@ -962,9 +1268,11 @@ def add_change_issues(
     source_message_ids: list[str] | None = None,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
+    expected_generation: int | None = None,
 ) -> dict[str, Any]:
     """Extend one active change set while preserving its prior evidence and identity."""
 
+    _require_transport_integrity(request, issues, source_message_ids)
     kind, project_id = _identity(object_type, object_id)
     source = _webspace_id(webspace_id, _meta)
     current = workflow.get_state(kind, project_id)
@@ -984,10 +1292,14 @@ def add_change_issues(
             "request": request,
             "issues": [dict(item) for item in issues if isinstance(item, Mapping)],
             "source_message_ids": list(source_message_ids or []),
+            "run_id": f"builder-plan-{uuid4().hex}",
         },
+        expected_generation=expected_generation,
     )
     projection = result.get("workflow") if isinstance(result.get("workflow"), Mapping) else {}
     updated = projection.get("change_set") if isinstance(projection.get("change_set"), Mapping) else {}
+    change = projection.get("change") if isinstance(projection.get("change"), Mapping) else {}
+    context_packet = workflow.build_context_packet(kind, project_id, persist=True)
     evidence: dict[str, Any] = {}
     evidence_error: str | None = None
     try:
@@ -1002,6 +1314,9 @@ def add_change_issues(
     return {
         **result,
         "change_set": dict(updated),
+        "change": dict(change),
+        "change_id": change.get("change_id") or updated.get("change_set_id"),
+        "context_packet": context_packet,
         "evidence": evidence or None,
         "evidence_synced": evidence_error is None,
         "evidence_error": evidence_error,
@@ -1016,6 +1331,7 @@ def get_change_set(
     kind, project_id = _identity(object_type, object_id)
     projection = workflow.get_state(kind, project_id)
     change_set = projection.get("change_set") if isinstance(projection.get("change_set"), Mapping) else {}
+    change = projection.get("change") if isinstance(projection.get("change"), Mapping) else {}
     change_set_id = str(change_set.get("change_set_id") or "").strip()
     evidence = conversation.get_development_change(change_set_id) if change_set_id else None
     issues = [
@@ -1035,6 +1351,8 @@ def get_change_set(
         "object_type": kind,
         "object_id": project_id,
         "change_set": dict(change_set),
+        "change": dict(change),
+        "change_id": change.get("change_id") or change_set_id or None,
         "change_set_id": change_set_id or None,
         "status": change_set.get("status") or "not_planned",
         "gate": change_set.get("gate"),
@@ -1043,6 +1361,259 @@ def get_change_set(
         "issues": issues,
         "evidence": dict(evidence) if isinstance(evidence, Mapping) else None,
         "evidence_synced": bool(evidence),
+    }
+
+
+@tool("get_change_context", summary="Inspect the bounded execution context for the active Change.", side_effects="none")
+def get_change_context(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    packet = workflow.build_context_packet(kind, project_id, persist=False)
+    return {
+        "ok": True,
+        "schema": packet.get("schema"),
+        "digest": packet.get("digest"),
+        "built_at": packet.get("built_at"),
+        "project": packet.get("project"),
+        "change": packet.get("change"),
+        "base": packet.get("base"),
+        "artifacts": packet.get("artifacts"),
+        "dependencies": packet.get("dependencies"),
+        "allowed_paths": packet.get("allowed_paths"),
+        "instruction_refs": packet.get("instruction_refs"),
+        "previous_run": packet.get("previous_run"),
+        "conversation": packet.get("conversation"),
+        "pending_actions": packet.get("pending_actions"),
+        "budget": packet.get("budget"),
+        "omitted_categories": ["raw_transcript", "secrets", "unselected_files"],
+    }
+
+
+@tool(
+    "validate_conversational_package",
+    summary="Validate conversational sources and run deterministic stories.",
+    side_effects="none",
+)
+def validate_conversational_package(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    run_stories: bool = True,
+    build_static_report: bool = True,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    return conversational.compile_project(
+        kind,
+        project_id,
+        run_stories=run_stories,
+        build_static_report=build_static_report,
+    )
+
+
+@tool(
+    "scaffold_conversational_package",
+    summary="Create a non-destructive conversational source package for a DEV project.",
+    side_effects="local_write",
+)
+def scaffold_conversational_package(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    locales: list[str] | None = None,
+    include_matchers: bool = True,
+    source_message_ids: list[str] | None = None,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    selected_locales = tuple(
+        str(item).strip() for item in locales or ["en"] if str(item).strip()
+    )
+    result = conversational.scaffold_project(
+        kind,
+        project_id,
+        locales=selected_locales,
+        include_matchers=include_matchers,
+    )
+    evidence = _record_project_change(
+        kind=kind,
+        project_id=project_id,
+        action="conversational_package_scaffolded",
+        summary="Created conversational package source skeleton",
+        webspace_id=_webspace_id(webspace_id, _meta),
+        source_message_ids=source_message_ids,
+        meta={
+            "package_digest": result.get("validation_report", {}).get("package_digest"),
+            "generated_files": list(result.get("generated_files") or []),
+        },
+    )
+    return {**result, "evidence": evidence}
+
+
+@tool("apply_semantic_ui_change", summary="Apply one reversible semantic UI operation.", side_effects="local_write")
+def apply_semantic_ui_change(
+    operation_id: str,
+    change_id: str,
+    target_ref: str,
+    source_revision: str,
+    value: Any,
+    operation: str = "rename",
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    review_id: str | None = None,
+    acceptance: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    return semantic_ui.apply(
+        {
+            "schema": "adaos.builder.semantic_ui_change.v1",
+            "operation_id": operation_id,
+            "change_id": change_id,
+            "project_ref": f"{kind}:{project_id}",
+            "review_id": str(review_id or "").strip() or None,
+            "operation": operation,
+            "target_ref": target_ref,
+            "source_revision": source_revision,
+            "value": value,
+            "risk": "local_reversible",
+            "acceptance": dict(acceptance) if isinstance(acceptance, Mapping) else None,
+        }
+    )
+
+
+@tool("register_review_constraint", summary="Compile one structured Review note into an acceptance constraint.", side_effects="local_write")
+def register_review_constraint(
+    review_id: str,
+    change_id: str,
+    target_ref: str,
+    comment: str,
+    kind: str,
+    expected: Any,
+    source_revision: str,
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    author_ref: str = "user:owner",
+    expected_generation: int | None = None,
+) -> dict[str, Any]:
+    project_kind, project_id = _identity(object_type, object_id)
+    if project_kind != "scenario":
+        raise ValueError("typed Review constraints currently support scenarios only")
+    anchor = {
+        "schema": "adaos.builder.review_anchor.v1",
+        "review_id": str(review_id or "").strip(),
+        "change_id": str(change_id or "").strip(),
+        "artifact_ref": f"scenario:{project_id}@ui_revision:{str(source_revision or '').strip()}",
+        "target_ref": str(target_ref or "").strip(),
+        "comment": str(comment or "").strip(),
+        "status": "accepted",
+        "author_ref": str(author_ref or "user:owner").strip(),
+        "created_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+    }
+    return review.register_constraint(
+        anchor,
+        kind=kind,
+        expected=expected,
+        source_revision=source_revision,
+        expected_generation=expected_generation,
+    )
+
+
+@tool("evaluate_review_constraints", summary="Verify active Review constraints against the current UI revision.", side_effects="local_write")
+def evaluate_review_constraints(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    revision: str | None = None,
+    expected_generation: int | None = None,
+) -> dict[str, Any]:
+    project_kind, project_id = _identity(object_type, object_id)
+    return review.evaluate_current(
+        project_kind,
+        project_id,
+        revision=revision,
+        expected_generation=expected_generation,
+    )
+
+
+@tool(
+    "link_dependency_checkpoint",
+    summary="Link one declared dependency checkpoint into the active Builder change set.",
+    side_effects="local_write",
+)
+def link_dependency_checkpoint(
+    dependency_type: str,
+    dependency_id: str,
+    checkpoint_change_id: str,
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Merge immutable dependency evidence without rebuilding or delivering either project."""
+
+    kind, project_id = _identity(object_type, object_id)
+    dependency_kind, selected_dependency_id = _identity(dependency_type, dependency_id)
+    checkpoint_id = str(checkpoint_change_id or "").strip()
+    if not checkpoint_id:
+        raise ValueError("checkpoint_change_id is required")
+    if (kind, project_id) == (dependency_kind, selected_dependency_id):
+        raise ValueError("a project cannot link its own dependency checkpoint")
+    if dependency_kind != "skill" or selected_dependency_id not in _declared_skill_dependencies(kind, project_id):
+        raise ValueError(f"dependency is not declared by the canonical project manifest: {dependency_kind}:{selected_dependency_id}")
+    if bool(_context(kind, project_id).get("archived")):
+        raise ValueError("archived projects cannot link dependency checkpoints")
+
+    project_workflow = workflow.get_state(kind, project_id)
+    change_set = project_workflow.get("change_set") if isinstance(project_workflow.get("change_set"), Mapping) else {}
+    change_set_id = str(change_set.get("change_set_id") or "").strip()
+    if not change_set_id:
+        raise ValueError("an active change set is required")
+    if str(change_set.get("status") or "").strip().lower() in {"published", "rejected", "superseded"}:
+        raise ValueError("the active change set is already terminal")
+
+    dependency_workflow = workflow.get_state(dependency_kind, selected_dependency_id)
+    delivery = dependency_workflow.get("delivery") if isinstance(dependency_workflow.get("delivery"), Mapping) else {}
+    receipt_change_id = str(delivery.get("checkpoint_change_id") or "").strip()
+    if str(delivery.get("status") or "").strip().lower() != "checkpoint":
+        raise ValueError("dependency workflow delivery is not checkpointed")
+    if receipt_change_id != checkpoint_id:
+        raise ValueError("dependency checkpoint_change_id does not match the requested checkpoint")
+    if not str(delivery.get("package_digest") or "").strip() or not str(delivery.get("source_revision") or "").strip():
+        raise ValueError("dependency checkpoint receipt is incomplete")
+
+    already_linked = checkpoint_id in {
+        str(item).strip() for item in change_set.get("member_change_ids") or [] if str(item).strip()
+    }
+    transitioned = workflow.transition(
+        kind,
+        project_id,
+        "change_evidence_recorded",
+        actor="builder.dependency_checkpoint_linker",
+        metadata={"change_set_id": change_set_id, "change_id": checkpoint_id},
+    )
+    updated_workflow = transitioned.get("workflow") if isinstance(transitioned.get("workflow"), Mapping) else {}
+    updated_change_set = updated_workflow.get("change_set") if isinstance(updated_workflow.get("change_set"), Mapping) else {}
+    evidence = _sync_change_set_record(
+        kind=kind,
+        project_id=project_id,
+        webspace_id=_webspace_id(webspace_id, _meta),
+        change_set=updated_change_set,
+    )
+    receipt = {
+        "object_type": dependency_kind,
+        "object_id": selected_dependency_id,
+        "status": "checkpoint",
+        "checkpoint_change_id": receipt_change_id,
+        "package_digest": str(delivery["package_digest"]),
+        "source_revision": str(delivery["source_revision"]),
+    }
+    return {
+        **transitioned,
+        "linked": not already_linked,
+        "idempotent": already_linked,
+        "dependency_receipt": receipt,
+        "change_set": dict(updated_change_set),
+        "evidence": evidence,
+        "workflow": dict(updated_workflow),
     }
 
 
@@ -1090,6 +1661,54 @@ def archive_project(
     return prompt_context.set_preferences(kind, project_id, archived=archived)
 
 
+def _select_scenario_preview_target(
+    kind: str,
+    project_id: str,
+    *,
+    stage: str,
+    revision: str | None = None,
+    follow_active: bool = False,
+    source_webspace_id: str,
+) -> dict[str, Any]:
+    """Materialize one target through the SDK's atomic selection boundary.
+
+    ``preview.select_target`` publishes the single ``builder.context.selected``
+    projection event after selection succeeds.  It intentionally does not
+    publish ``builder.preview.desired`` because target materialization is
+    synchronous.  Keeping both public tools on this boundary prevents a second
+    control-layer event from duplicating either operation.
+    """
+
+    options: dict[str, Any] = {
+        "stage": stage,
+        "source_webspace_id": source_webspace_id,
+        "follow_active": follow_active,
+    }
+    if revision is not None:
+        options["revision"] = revision
+    result = preview.select_target(kind, project_id, **options)
+    selected = result.get("target") if isinstance(result.get("target"), Mapping) else {}
+    selected_stage = str(selected.get("stage") or stage or "prototype").strip()
+    selected_revision = str(selected.get("revision") or revision or "current").strip()
+    try:
+        current = workflow.get_state(kind, project_id)
+        interaction = workflow.update_interaction_context(
+            kind,
+            project_id,
+            {"preview_target": f"{selected_stage}:{project_id}:{selected_revision}"},
+            expected_generation=int(current.get("generation") or 0),
+        )
+    except Exception as exc:
+        # Preview was already materialized. Report, but never retry, the
+        # independent context projection update.
+        result["interaction_updated"] = False
+        result["interaction_error"] = str(exc)
+        return result
+    result["interaction_updated"] = True
+    result["interaction"] = interaction.get("workflow", {}).get("interaction")
+    return result
+
+
 @tool("select_preview", summary="Select a DEV scenario in its paired preview.", side_effects="ui_navigation")
 def select_preview(
     object_type: str = DEFAULT_PROJECT_KIND,
@@ -1099,7 +1718,7 @@ def select_preview(
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
     if kind == "scenario":
-        return preview.select_target(
+        return _select_scenario_preview_target(
             kind,
             project_id,
             stage="prototype",
@@ -1127,7 +1746,7 @@ def select_preview_target(
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
-    return preview.select_target(
+    return _select_scenario_preview_target(
         kind,
         project_id,
         stage=stage,
@@ -1146,6 +1765,9 @@ def get_preview(
     binding = preview.get_binding(source)
     opened = preview.open_workspace(source)
     target = binding.get("preview_target") if isinstance(binding.get("preview_target"), Mapping) else {}
+    normalized_target = dict(target)
+    if target and not str(normalized_target.get("label") or "").strip():
+        normalized_target["label"] = _preview_label(target.get("stage"), target.get("revision"))
     return {
         **binding,
         "ok": bool(binding.get("ok", True)),
@@ -1154,8 +1776,8 @@ def get_preview(
         "preview_url": str(opened.get("url") or f"/?webspace={_preview_dev_webspace_id(source)}"),
         "qr_text": str(opened.get("url") or f"/?webspace={_preview_dev_webspace_id(source)}"),
         "status": "ready" if binding.get("runtime_scenario_id") else "not_selected",
-        "preview_target": dict(target),
-        "viewing": target.get("label"),
+        "preview_target": normalized_target,
+        "viewing": normalized_target.get("label"),
         "viewing_stage": target.get("stage"),
         "viewing_revision": target.get("revision"),
         "preview_follows_active": bool(target.get("follow_active")),
@@ -1187,13 +1809,17 @@ def get_automation(
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
     webspace_id: str | None = None,
+    conversation_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    source = _webspace_id(webspace_id, _meta)
+    topic = _project_topic(kind, project_id, webspace_id=source)
     result = automation.get_state(
         object_type=kind,
         object_id=project_id,
-        webspace_id=_webspace_id(webspace_id, _meta),
+        webspace_id=source,
+        conversation_id=str(conversation_id or topic.get("conversation_id") or "").strip() or None,
     )
     if result.get("error") == "automation_session_not_found" and isinstance(
         result.get("automation"), Mapping
@@ -1223,6 +1849,177 @@ def get_automation(
     }
 
 
+@tool("get_process", summary="Project dependent Change, Prototype, Implementation, Trial, and Release provenance.", side_effects="none")
+def get_process(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> dict[str, Any]:
+    """Return an on-demand lineage tree; inspecting its nodes never selects Preview."""
+
+    kind, project_id = _identity(object_type, object_id)
+    projection = workflow.get_state(kind, project_id)
+    change = projection.get("change") if isinstance(projection.get("change"), Mapping) else {}
+    prototype = projection.get("prototype") if isinstance(projection.get("prototype"), Mapping) else {}
+    implementation = projection.get("automation") if isinstance(projection.get("automation"), Mapping) else {}
+    delivery = projection.get("delivery") if isinstance(projection.get("delivery"), Mapping) else {}
+    publication = projection.get("publication") if isinstance(projection.get("publication"), Mapping) else {}
+    change_id = str(change.get("change_id") or change.get("change_set_id") or "").strip()
+
+    issues = [
+        {
+            "id": f"issue:{item.get('issue_id')}",
+            "ref": f"issue:{item.get('issue_id')}",
+            "kind": "issue",
+            "title": str(item.get("title") or item.get("issue_id") or "Issue"),
+            "status": str(item.get("status") or "open"),
+            "lane": str(item.get("lane") or "prototype"),
+            "acceptance": list(item.get("acceptance_criteria") or []),
+            "children": [],
+        }
+        for item in change.get("issues") or []
+        if isinstance(item, Mapping)
+    ]
+    runs = [dict(item) for item in change.get("runs") or [] if isinstance(item, Mapping)]
+    revision_ids: list[str] = []
+    if kind == "scenario":
+        for item in projects.list_files(kind, project_id, limit=1000):
+            path = PurePosixPath(str(item.get("path") or ""))
+            if len(path.parts) == 2 and path.parts[0] == "ui_revisions" and path.suffix == ".json" and path.stem.isdigit():
+                revision_ids.append(path.stem)
+    source_revision = str(
+        implementation.get("source_prototype_revision") or prototype.get("head_revision") or ""
+    ).strip()
+    implementation_children: list[dict[str, Any]] = []
+    implementation_status = str(implementation.get("status") or "not_started")
+    if implementation_status != "not_started" or runs:
+        trial_children: list[dict[str, Any]] = []
+        delivery_status = str(delivery.get("status") or "idle")
+        if delivery_status != "idle":
+            publication_children: list[dict[str, Any]] = []
+            publication_status = str(publication.get("status") or "not_started")
+            if publication_status != "not_started":
+                publication_children.append(
+                    {
+                        "id": "publication:current",
+                        "ref": f"publication:{project_id}:{publication.get('current_version') or 'current'}",
+                        "kind": "publication",
+                        "title": f"Publication {publication.get('current_version') or ''}".strip(),
+                        "status": publication_status,
+                        "previewStage": "publication",
+                        "revision": str(publication.get("current_version") or "current"),
+                        "canPreview": publication_status == "published" and kind == "scenario",
+                        "updated_at": publication.get("published_at"),
+                        "children": [],
+                    }
+                )
+            trial_children.append(
+                {
+                    "id": f"trial:{delivery.get('candidate_id') or 'current'}",
+                    "ref": f"trial:{delivery.get('candidate_id') or 'current'}",
+                    "kind": "trial",
+                    "title": "Trial",
+                    "status": delivery_status,
+                    "updated_at": delivery.get("prepared_at") or delivery.get("decided_at"),
+                    "children": publication_children,
+                }
+            )
+        implementation_children.append(
+            {
+                "id": f"implementation:{implementation.get('head_task_id') or 'current'}",
+                "ref": f"implementation:{implementation.get('head_task_id') or 'current'}",
+                "kind": "implementation",
+                "title": "Implementation",
+                "status": implementation_status,
+                "source_prototype_revision": source_revision or None,
+                "previewStage": "automation",
+                "revision": str(
+                    implementation.get("result_version")
+                    or implementation.get("snapshot_task_id")
+                    or implementation.get("head_task_id")
+                    or "current"
+                ),
+                "canPreview": implementation_status in {"completed", "failed", "frozen"} and kind == "scenario",
+                "runs": runs,
+                "children": trial_children,
+            }
+        )
+
+    revision_nodes: list[dict[str, Any]] = []
+    for revision in sorted(set(revision_ids), reverse=True)[:20]:
+        revision_nodes.append(
+            {
+                "id": f"prototype:{project_id}:{revision}",
+                "ref": f"prototype:{project_id}:{revision}",
+                "kind": "prototype_revision",
+                "title": f"Prototype UI {revision}",
+                "status": "current" if revision == str(prototype.get("head_revision") or "") else "previous",
+                "previewStage": "prototype",
+                "revision": revision,
+                "canPreview": kind == "scenario",
+                "children": implementation_children if revision == source_revision else [],
+            }
+        )
+    if implementation_children and not any(item["children"] for item in revision_nodes):
+        revision_nodes.insert(
+            0,
+            {
+                "id": f"prototype:{project_id}:{source_revision or 'current'}",
+                "ref": f"prototype:{project_id}:{source_revision or 'current'}",
+                "kind": "prototype_revision",
+                "title": f"Prototype {source_revision or 'current'}",
+                "status": "source",
+                "previewStage": "prototype",
+                "revision": source_revision or "current",
+                "canPreview": kind == "scenario",
+                "children": implementation_children,
+            },
+        )
+    root_ref = f"change:{change_id}" if change_id else f"{kind}:{project_id}"
+    return {
+        "ok": True,
+        "schema": "adaos.builder.process.v1",
+        "project_ref": f"{kind}:{project_id}",
+        "generation": projection.get("generation"),
+        "interaction": dict(projection.get("interaction") or {}),
+        "change": dict(change),
+        "tree": [
+            {
+                "id": root_ref,
+                "ref": root_ref,
+                "kind": "change" if change_id else "project",
+                "title": str(change.get("request") or project_id),
+                "status": str(change.get("status") or "ready"),
+                "children": [
+                    {
+                        "id": "issues",
+                        "ref": root_ref,
+                        "kind": "issue_group",
+                        "title": "Issues",
+                        "status": f"{len(issues)} items",
+                        "children": issues,
+                    },
+                    {
+                        "id": "prototypes",
+                        "ref": f"prototype:{project_id}",
+                        "kind": "prototype_group",
+                        "title": "Prototypes",
+                        "status": str(prototype.get("status") or "working"),
+                        "children": revision_nodes,
+                    },
+                ],
+            }
+        ],
+    }
+
+
+@tool("get_process_tree", summary="List the dependent Builder Process tree for rich renderers.", side_effects="none")
+def get_process_tree(
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> list[dict[str, Any]]:
+    return list(get_process(object_type, object_id).get("tree") or [])
+
+
 @tool("get_lifecycle", summary="Project the prototype, automation, and publication lifecycle tree.", side_effects="none")
 def get_lifecycle(
     object_type: str = DEFAULT_PROJECT_KIND,
@@ -1231,7 +2028,7 @@ def get_lifecycle(
     _meta: Mapping[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     kind, project_id = _identity(object_type, object_id)
-    project = projects.describe(kind, project_id)
+    project = _project_descriptor(kind, project_id)
     state = _context(kind, project_id)
     workflow_projection = _workflow_projection(kind, project_id, state)
     workflow_capabilities = (
@@ -1270,6 +2067,7 @@ def get_lifecycle(
                 },
                 "title": f"UI {revision}" + (f" · v {project.get('version')}" if current and project.get("version") else ""),
                 "version": f"UI {revision}",
+                "previewLabel": _preview_label("prototype", f"UI {revision}"),
                 "updated_at": _datetime_value(file_updated_at.get(f"ui_revisions/{revision}.json")),
                 "lifecycleStage": "prototype",
                 "conversationLabel": "Prototype conversation",
@@ -1290,6 +2088,7 @@ def get_lifecycle(
                 "status_i18n": {"key": "builder.lifecycle.status.current"},
                 "title": f"v {project.get('version') or 'DEV'}",
                 "version": str(project.get("version") or "DEV"),
+                "previewLabel": _preview_label("prototype", project.get("version") or "DEV"),
                 "updated_at": _datetime_value(file_updated_at.get(str(project.get("manifest") or "scenario.yaml"))),
                 "lifecycleStage": "prototype",
                 "conversationLabel": "Prototype conversation",
@@ -1308,11 +2107,46 @@ def get_lifecycle(
     )
     automation_status = str(workflow_automation.get("status") or "not_started")
     project_version = str(project.get("version") or "DEV")
-    automation_children = _automation_children(automation_projection, project_version=project_version)
+    # Prototype adaptation is transition evidence, not a second Automation
+    # release. Keep the durable workflow result authoritative for that job.
+    pending_transition = str(
+        automation_projection.get("pending_workflow_transition")
+        or automation_projection.get("workflow_transition")
+        or ""
+    ).strip().lower()
+    runtime_task_id = str(
+        automation_projection.get("task_id")
+        or automation_projection.get("current_task_id")
+        or ""
+    ).strip()
+    durable_task_id = str(
+        workflow_automation.get("snapshot_task_id")
+        or workflow_automation.get("head_task_id")
+        or ""
+    ).strip()
+    adaptation_task = pending_transition == "return_to_prototype" or bool(
+        durable_task_id
+        and runtime_task_id
+        and durable_task_id != runtime_task_id
+        and str(workflow_automation.get("status") or "").strip().lower() in {"completed", "frozen"}
+        and active_phase == "prototype"
+    )
+    combined_automation = (
+        dict(workflow_automation)
+        if adaptation_task
+        else {**workflow_automation, **automation_projection}
+    )
+    runtime_status = str(automation_projection.get("status") or "").strip().lower()
+    if runtime_status in {"", "idle", "not_started", "not-started", "default"}:
+        combined_automation["status"] = workflow_automation.get("status") or runtime_status
+    automation_children = _automation_children(combined_automation, project_version=project_version)
     workflow_result_version = str(workflow_automation.get("result_version") or "").strip()
     if automation_children and workflow_result_version:
         automation_children[0]["version"] = workflow_result_version
         automation_children[0]["title"] = _version_title(workflow_result_version)
+        automation_children[0]["previewLabel"] = _preview_label(
+            "automation", workflow_result_version
+        )
     publication_children = _publication_children(kind, project_id)
     publication_projection = (
         workflow_projection.get("publication")
@@ -1328,12 +2162,11 @@ def get_lifecycle(
         workflow_automation.get("completed_at")
         or workflow_automation.get("started_at")
         or automation_projection.get("updated_at")
-        or state.get("updated_at")
-    )
-    publication_version = publication_children[0].get("version") if publication_children else project_version
+    ) if automation_children else None
+    publication_version = publication_children[0].get("version") if publication_children else None
     publication_updated_at = _datetime_value(
         publication_projection.get("published_at")
-        or (publication_children[0].get("created_at") if publication_children else state.get("updated_at"))
+        or (publication_children[0].get("created_at") if publication_children else None)
     )
     source_prototype_revision = str(
         workflow_automation.get("source_prototype_revision")
@@ -1405,7 +2238,6 @@ def get_lifecycle(
             only_automation = automation_nodes[0]
             if source_version == str(only_automation.get("version") or "").strip():
                 automation_node = only_automation
-                release["lineageInferred"] = True
         if automation_node is None:
             lineage_id = source_task or f"release-{release.get('change_id') or source_version}"
             automation_node = {
@@ -1413,6 +2245,7 @@ def get_lifecycle(
                 "kind": "automation_result",
                 "lifecycleState": "past",
                 "title": _version_title(source_version),
+                "previewLabel": _preview_label("automation", source_version),
                 "version": source_version,
                 "revision": source_task or source_version,
                 "updated_at": release.get("updated_at"),
@@ -1423,16 +2256,18 @@ def get_lifecycle(
                 "task_id": source_task or None,
                 "canPreview": False,
                 "children": [],
-                "lineageInferred": True,
-                "lineageWarning": "publication_source_metadata_missing",
             }
-            release["lineageInferred"] = True
+            if not source_task:
+                automation_node["lineageInferred"] = True
+                automation_node["lineageWarning"] = "publication_source_metadata_missing"
+                release["lineageInferred"] = True
             automation_nodes.append(automation_node)
         release["canPreview"] = bool(
             workflow_capabilities.get("can_preview_publication")
             and str(release.get("version") or "").strip() == current_publication_version
         )
         release["canOpenPublication"] = True
+        release["previewLabel"] = _preview_label("publication", release.get("version"))
         automation_node.setdefault("children", []).append(release)
 
     for automation_node in automation_nodes:
@@ -1477,7 +2312,11 @@ def start_automation(
     brief_path: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    _require_transport_integrity(implementation_brief)
     kind, project_id = _identity(object_type, object_id)
+    source = _webspace_id(webspace_id, _meta)
+    topic = _project_topic(kind, project_id, webspace_id=source)
+    bound_conversation_id = str(conversation_id or topic.get("conversation_id") or "").strip() or None
     workflow_state = workflow.get_state(kind, project_id)
     change_set = (
         workflow_state.get("change_set")
@@ -1503,7 +2342,7 @@ def start_automation(
             ],
             object_type=kind,
             object_id=project_id,
-            webspace_id=_webspace_id(webspace_id, _meta),
+            webspace_id=source,
             _meta=_meta,
         )
         workflow_state = (
@@ -1520,8 +2359,8 @@ def start_automation(
         object_type=kind,
         object_id=project_id,
         implementation_brief=implementation_brief,
-        webspace_id=_webspace_id(webspace_id, _meta),
-        conversation_id=conversation_id,
+        webspace_id=source,
+        conversation_id=bound_conversation_id,
         brief_path=brief_path,
         change_set_id=str(change_set.get("change_set_id") or "").strip() or None,
     )
@@ -1533,14 +2372,19 @@ def submit_automation(
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
     webspace_id: str | None = None,
+    conversation_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
+    _require_transport_integrity(text)
     kind, project_id = _identity(object_type, object_id)
+    source = _webspace_id(webspace_id, _meta)
+    topic = _project_topic(kind, project_id, webspace_id=source)
     return automation.submit(
         text,
         object_type=kind,
         object_id=project_id,
-        webspace_id=_webspace_id(webspace_id, _meta),
+        webspace_id=source,
+        conversation_id=str(conversation_id or topic.get("conversation_id") or "").strip() or None,
     )
 
 
@@ -1655,13 +2499,53 @@ async def apply_subscription_update(
     return {**result, "idempotency_key": attempt_id}
 
 
-@tool("create_project", summary="Create a DEV skill or scenario project.", side_effects="local_write")
-def create_project(object_type: str, object_id: str, template: str | None = None) -> dict[str, Any]:
+@tool("create_project", summary="Create and select a DEV skill or scenario project.", side_effects="local_write")
+def create_project(
+    object_type: str,
+    object_id: str,
+    template: str | None = None,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
     template_id = str(template or "").strip()
     if not template_id or template_id.lower() == "default":
         template_id = "scenario_default" if kind == "scenario" else "skill_default"
-    return projects.create(kind, project_id, template=template_id)
+    created = dict(projects.create(kind, project_id, template=template_id) or {})
+    try:
+        selected = dict(
+            select_preview(
+                kind,
+                project_id,
+                webspace_id=webspace_id,
+                _meta=_meta,
+            )
+            or {}
+        )
+    except Exception as exc:
+        # Creation is durable even if the preview transport disappears between
+        # both operations. Return the project instead of inviting a conflicting
+        # second create; selecting it later is the safe recovery path.
+        selected = {
+            "ok": False,
+            "error": f"{type(exc).__name__}: {exc}",
+            "recovery": "select_project",
+        }
+    topic = _project_topic(kind, project_id, webspace_id=webspace_id, meta=_meta)
+    return {
+        **created,
+        "ok": bool(created.get("ok", True)),
+        "object_type": kind,
+        "object_id": project_id,
+        "project_ref": f"{kind}:{project_id}",
+        "title": str(created.get("title") or project_id),
+        "description": str(created.get("description") or ""),
+        "preview": selected,
+        "preview_selected": bool(selected.get("ok", True)),
+        "conversation_id": topic.get("conversation_id"),
+        "topic_id": topic.get("topic_id"),
+        "thread_id": topic.get("thread_id"),
+    }
 
 
 @tool("delete_project", summary="Delete a project through the governed developer lifecycle.", side_effects="external_write")
@@ -1691,7 +2575,14 @@ def push_project(
     if not checkpoint_change_id:
         raise ValueError("checkpoint_id is required")
     checkpoint_message = message or f"chore(builder): checkpoint {kind} {project_id}"
-    checkpoint_metadata: dict[str, Any] = {"change_id": checkpoint_change_id}
+    workflow_before = workflow.get_state(kind, project_id)
+    canonical_change_id, context_packet_digest = _workflow_execution_identity(workflow_before)
+    checkpoint_metadata: dict[str, Any] = {
+        "change_id": checkpoint_change_id,
+        "run_id": checkpoint_change_id,
+        "canonical_change_id": canonical_change_id or None,
+        "context_packet_digest": context_packet_digest or None,
+    }
     checkpoint_results: list[dict[str, Any]] = []
     if kind == "scenario":
         automation_state = get_automation(kind, project_id, webspace_id, _meta)
@@ -1737,6 +2628,8 @@ def push_project(
         commit=commit,
         change_id=checkpoint_change_id,
         meta={
+            "canonical_change_id": canonical_change_id or None,
+            "context_packet_digest": context_packet_digest or None,
             "checkpoint_artifacts": [
                 {
                     "kind": item.get("kind"),
@@ -1763,6 +2656,9 @@ def push_project(
         actor="builder.checkpoint",
         metadata={
             "change_id": change_id,
+            "run_id": change_id,
+            "canonical_change_id": canonical_change_id or None,
+            "context_packet_digest": context_packet_digest or None,
             "package_digest": package_digest,
             "source_revision": source_revision,
         },
@@ -1827,6 +2723,7 @@ def publish_project(
         if isinstance(workflow_before.get("change_set"), Mapping)
         else {}
     )
+    canonical_change_id, context_packet_digest = _workflow_execution_identity(workflow_before)
     if dry_run:
         if not bool(capabilities.get("can_prepare_candidate")):
             raise ValueError(
@@ -1843,6 +2740,8 @@ def publish_project(
             "checkpoint_source_revision": delivery.get("source_revision"),
             "automation_task_id": automation_workflow.get("head_task_id"),
             "change_set_id": change_set_workflow.get("change_set_id"),
+            "canonical_change_id": canonical_change_id or None,
+            "context_packet_digest": context_packet_digest or None,
         }
         candidate_change_ids = list(
             dict.fromkeys(
@@ -1885,6 +2784,9 @@ def publish_project(
             actor="builder.candidate",
             metadata={
                 "candidate_id": candidate_id,
+                "run_id": f"candidate:{candidate_id}:prepare",
+                "canonical_change_id": canonical_change_id or None,
+                "context_packet_digest": context_packet_digest or None,
                 "release": f"{release_data.get('project_id')}@{release_data.get('version')}",
                 "release_digest": release_digest,
                 "package_digest": package_digest,
@@ -1938,6 +2840,9 @@ def publish_project(
             actor="builder.user",
             metadata={
                 "candidate_id": candidate_id,
+                "run_id": f"candidate:{candidate_id}:accept",
+                "canonical_change_id": canonical_change_id or None,
+                "context_packet_digest": context_packet_digest or None,
                 "observations": decided.get("candidate", {}).get("trials", []),
             },
         )
@@ -1971,6 +2876,9 @@ def publish_project(
             actor="builder.publication",
             metadata={
                 "candidate_id": candidate_id,
+                "run_id": f"candidate:{candidate_id}:stale",
+                "canonical_change_id": canonical_change_id or None,
+                "context_packet_digest": context_packet_digest or None,
                 "rebase_plan": result.get("rebase_plan"),
             },
         )
@@ -2047,6 +2955,9 @@ def publish_project(
             "release": release,
             "candidate_id": candidate_id,
             "task_id": automation_workflow.get("head_task_id"),
+            "run_id": evidence.get("run_id") or evidence.get("change_id"),
+            "canonical_change_id": canonical_change_id or None,
+            "context_packet_digest": context_packet_digest or None,
         },
     )
     published_workflow = (
@@ -2107,29 +3018,45 @@ def get_state(
 
 __all__ = [
     "add_change_issues",
+    "apply_semantic_ui_change",
+    "apply_subscription_update",
     "append_prompt_addendum",
     "archive_project",
     "create_project",
     "delete_project",
+    "evaluate_review_constraints",
     "get_automation",
+    "get_change_context",
+    "get_change_set",
+    "get_interaction_frame",
     "get_lifecycle",
     "get_llm_options",
-    "get_workflow",
     "get_preview",
+    "get_process",
+    "get_process_tree",
     "get_prompt_context",
     "get_project",
     "get_state",
+    "get_subscription_update",
+    "get_workflow",
+    "inspect_process_ref",
     "list_changes",
     "list_project_file_tree",
     "list_project_files",
     "list_project_objects",
     "list_projects",
     "list_templates",
+    "link_dependency_checkpoint",
+    "plan_change_set",
     "publish_project",
     "push_project",
     "read_project_file",
+    "reconcile_automation_checkpoint",
+    "recover_validated_automation",
+    "register_review_constraint",
     "save_prompt_context",
     "save_project_file",
+    "scaffold_conversational_package",
     "select_preview",
     "select_preview_target",
     "set_llm_profile",
@@ -2138,5 +3065,7 @@ __all__ = [
     "submit_automation",
     "return_to_prototype",
     "transition_workflow",
+    "update_change_issue",
     "update_project_metadata",
+    "validate_conversational_package",
 ]
