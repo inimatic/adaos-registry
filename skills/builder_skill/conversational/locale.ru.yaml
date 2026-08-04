@@ -2,7 +2,12 @@ schema: adaos.conversational.locale.v1
 package_id: builder_skill
 locale: ru
 messages:
-  prototype_started: Изменение прототипа начато.
-  prototype_review_ready: Прототип готов к проверке.
-  prototype_accepted: Прототип принят для реализации.
-  repair_no_match: Уточните требуемое действие Builder.
+  builder_prototype_planned.summary: Планирование прототипа Builder начато.
+  builder_review_requested.summary: Ревью прототипа Builder запрошено.
+  builder_prototype_accepted.summary: Прототип Builder принят для автоматизации.
+  builder_automation_started.summary: Автоматизация Builder запущена.
+  builder_verification_accepted.summary: Верификация Builder принята.
+  builder_trial_started.summary: Пробный запуск Builder начат.
+  builder_trial_accepted.summary: Пробный запуск Builder принят для публикации.
+  builder_publication_started.summary: Публикация Builder начата.
+  builder_repair_no_match.summary: Переформулируйте workflow-запрос к Builder.

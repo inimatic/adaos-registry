@@ -1,63 +1,163 @@
 schema: adaos.conversational.affordances.v1
 package_id: builder_skill
 affordances:
-- id: plan_prototype
-  kind: workflow_command
-  label: Start Prototype change
-  description: Create a bounded Prototype Change in the governed Builder workflow.
-  workflow:
-    workflow_type: builder.change
-    command_id: plan_prototype_change
-    transition_id: plan_prototype
-  skill_invocation: null
-  action_policy:
-    schema: adaos.conversation.action_policy.v1
-    risk_class: local_reversible
-    side_effect: reversible
-    confirmation: none
-  required_capabilities: []
-  presentation:
-    hint: button
-    priority: 10
-  output_refs:
-  - prototype_started
-- id: request_prototype_review
-  kind: workflow_command
-  label: Review Prototype
-  description: Move the current declarative Prototype into review without changing it.
-  workflow:
-    workflow_type: builder.change
-    command_id: request_prototype_review
-    transition_id: request_prototype_review
-  skill_invocation: null
-  action_policy:
-    schema: adaos.conversation.action_policy.v1
-    risk_class: read
-    side_effect: none
-    confirmation: none
-  required_capabilities: []
-  presentation:
-    hint: button
-    priority: 20
-  output_refs:
-  - prototype_review_ready
-- id: accept_prototype
-  kind: workflow_command
-  label: Accept Prototype
-  description: Accept the reviewed Prototype and hand the Change to Automation.
-  workflow:
-    workflow_type: builder.change
-    command_id: accept_prototype
-    transition_id: accept_prototype
-  skill_invocation: null
-  action_policy:
-    schema: adaos.conversation.action_policy.v1
-    risk_class: isolated_write
-    side_effect: reversible
-    confirmation: none
-  required_capabilities: []
-  presentation:
-    hint: button
-    priority: 30
-  output_refs:
-  - prototype_accepted
+  - id: builder_plan_prototype
+    kind: workflow_command
+    label: Plan prototype
+    description: Start a Builder prototype change from the ready state.
+    workflow:
+      workflow_type: builder.change
+      command_id: plan_prototype_change
+      transition_id: plan_prototype
+    skill_invocation: null
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: local_reversible
+      side_effect: reversible
+      confirmation: none
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 10
+    output_refs:
+      - builder_prototype_planned
+  - id: builder_request_review
+    kind: workflow_command
+    label: Request review
+    description: Request review for the current Builder prototype.
+    workflow:
+      workflow_type: builder.change
+      command_id: request_prototype_review
+      transition_id: request_prototype_review
+    skill_invocation: null
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: read
+      side_effect: none
+      confirmation: none
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 20
+    output_refs:
+      - builder_review_requested
+  - id: builder_accept_prototype
+    kind: workflow_command
+    label: Accept prototype
+    description: Accept the Builder prototype and move it to automation readiness.
+    workflow:
+      workflow_type: builder.change
+      command_id: accept_prototype
+      transition_id: accept_prototype
+    skill_invocation: null
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: isolated_write
+      side_effect: reversible
+      confirmation: none
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 30
+    output_refs:
+      - builder_prototype_accepted
+  - id: builder_start_automation
+    kind: workflow_command
+    label: Start automation
+    description: Start Builder automation for an accepted prototype.
+    workflow:
+      workflow_type: builder.change
+      command_id: start_automation
+      transition_id: start_automation
+    skill_invocation: null
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: isolated_write
+      side_effect: reversible
+      confirmation: none
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 40
+    output_refs:
+      - builder_automation_started
+  - id: builder_accept_verification
+    kind: workflow_command
+    label: Accept verification
+    description: Accept Builder verification and prepare the trial stage.
+    workflow:
+      workflow_type: builder.change
+      command_id: accept_verification
+      transition_id: accept_verification
+    skill_invocation: null
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: isolated_write
+      side_effect: reversible
+      confirmation: none
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 50
+    output_refs:
+      - builder_verification_accepted
+  - id: builder_start_trial
+    kind: workflow_command
+    label: Start trial
+    description: Start a Builder trial for the verified candidate.
+    workflow:
+      workflow_type: builder.change
+      command_id: start_trial
+      transition_id: start_trial
+    skill_invocation: null
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: trial_activation
+      side_effect: external
+      confirmation: none
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 60
+    output_refs:
+      - builder_trial_started
+  - id: builder_accept_trial
+    kind: workflow_command
+    label: Accept trial
+    description: Accept the Builder trial and prepare publication.
+    workflow:
+      workflow_type: builder.change
+      command_id: accept_trial
+      transition_id: accept_trial
+    skill_invocation: null
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: workspace_activation
+      side_effect: external
+      confirmation: required
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 70
+    output_refs:
+      - builder_trial_accepted
+  - id: builder_begin_publication
+    kind: workflow_command
+    label: Begin publication
+    description: Begin governed publication for the Builder candidate.
+    workflow:
+      workflow_type: builder.change
+      command_id: begin_publication
+      transition_id: begin_publication
+    skill_invocation: null
+    action_policy:
+      schema: adaos.conversation.action_policy.v1
+      risk_class: publication
+      side_effect: external
+      confirmation: required
+    required_capabilities: []
+    presentation:
+      hint: button
+      priority: 80
+    output_refs:
+      - builder_publication_started

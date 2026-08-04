@@ -1,0 +1,33 @@
+schema: adaos.conversational.story.v1
+id: builder.accept_verification.en.happy_path
+title: Accept verification
+story_kind: workflow
+workflow_type: builder.change
+locale: en
+channel: web
+actor: {id: user:local, permissions: [], roles: [registered]}
+start: {instance_id: change:accept-verification, state: verification, generation: 0, context: {}}
+steps:
+  - user: Accept verification
+    given:
+      proposal:
+        kind: workflow_command
+        intent_id: builder_accept_verification
+        command: accept_verification
+        skill_id: null
+        operation_id: null
+        arguments: {}
+        confidence: 0.99
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: isolated_write, side_effect: reversible, confirmation: none}
+      event: null
+      skill_result: null
+      output_ref: builder_verification_accepted
+    expect:
+      proposal: {kind: workflow_command, command: accept_verification, confidence_at_least: 0.99}
+      command: accept_verification
+      transition_id: accept_verification
+      state: trial_ready
+      reason_code: null
+      accepted: true
+      generation: 1
+      output: {kind: result, output_ref: builder_verification_accepted, summary: Builder verification accepted., actions: [], next_expected_input: none}

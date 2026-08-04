@@ -1,52 +1,112 @@
 schema: adaos.conversational.examples.v1
 package_id: builder_skill
 examples:
-- id: plan_prototype.en.1
-  intent_id: plan_prototype
-  text: Start a prototype change for this scenario
-  locale: en
-  source: authored
-  entities: []
-- id: plan_prototype.ru.1
-  intent_id: plan_prototype
-  text: Начни изменение прототипа для этого сценария
-  locale: ru
-  source: authored
-  entities: []
-- id: request_prototype_review.en.1
-  intent_id: request_prototype_review
-  text: Show this prototype for review
-  locale: en
-  source: authored
-  entities: []
-- id: request_prototype_review.ru.1
-  intent_id: request_prototype_review
-  text: Покажи этот прототип для проверки
-  locale: ru
-  source: authored
-  entities: []
-- id: accept_prototype.en.1
-  intent_id: accept_prototype
-  text: Accept this prototype and start implementation
-  locale: en
-  source: authored
-  entities: []
-- id: accept_prototype.ru.1
-  intent_id: accept_prototype
-  text: Прими этот прототип и переходи к реализации
-  locale: ru
-  source: authored
-  entities: []
+  - id: builder_plan_prototype.example.en.1
+    intent_id: builder_plan_prototype
+    text: Plan a prototype change
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_plan_prototype.example.ru.1
+    intent_id: builder_plan_prototype
+    text: Запланируй изменение прототипа
+    locale: ru
+    source: authored
+    entities: []
+  - id: builder_request_review.example.en.1
+    intent_id: builder_request_review
+    text: Request prototype review
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_request_review.example.ru.1
+    intent_id: builder_request_review
+    text: Отправь прототип на ревью
+    locale: ru
+    source: authored
+    entities: []
+  - id: builder_accept_prototype.example.en.1
+    intent_id: builder_accept_prototype
+    text: Accept the prototype
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_accept_prototype.example.ru.1
+    intent_id: builder_accept_prototype
+    text: Прими прототип
+    locale: ru
+    source: authored
+    entities: []
+  - id: builder_start_automation.example.en.1
+    intent_id: builder_start_automation
+    text: Start builder automation
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_start_automation.example.ru.1
+    intent_id: builder_start_automation
+    text: Запусти автоматизацию builder
+    locale: ru
+    source: authored
+    entities: []
+  - id: builder_accept_verification.example.en.1
+    intent_id: builder_accept_verification
+    text: Accept verification
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_accept_verification.example.ru.1
+    intent_id: builder_accept_verification
+    text: Прими верификацию
+    locale: ru
+    source: authored
+    entities: []
+  - id: builder_start_trial.example.en.1
+    intent_id: builder_start_trial
+    text: Start the builder trial
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_start_trial.example.ru.1
+    intent_id: builder_start_trial
+    text: Начни пробный запуск builder
+    locale: ru
+    source: authored
+    entities: []
+  - id: builder_accept_trial.example.en.1
+    intent_id: builder_accept_trial
+    text: Accept the builder trial
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_accept_trial.example.ru.1
+    intent_id: builder_accept_trial
+    text: Прими пробный запуск builder
+    locale: ru
+    source: authored
+    entities: []
+  - id: builder_begin_publication.example.en.1
+    intent_id: builder_begin_publication
+    text: Begin builder publication
+    locale: en
+    source: authored
+    entities: []
+  - id: builder_begin_publication.example.ru.1
+    intent_id: builder_begin_publication
+    text: Начни публикацию builder
+    locale: ru
+    source: authored
+    entities: []
 hard_negatives:
-- id: plan_prototype.negative.status
-  text: Show the current development status
-  locale: en
-  reason: A read-only status request must not create a Change.
-- id: accept_prototype.negative.preview
-  text: Покажи текущий прототип
-  locale: ru
-  reason: Previewing a Prototype must not accept it.
-- id: accept_prototype.negative.publish
-  text: Publish the current release
-  locale: en
-  reason: Publication must not be interpreted as Prototype acceptance.
+  - id: builder.negative.status.en
+    text: Show builder status
+    locale: en
+    reason: A read-only status request must not mutate the Builder workflow.
+  - id: builder.negative.status.ru
+    text: Покажи статус builder
+    locale: ru
+    reason: Read-only status request in Russian must not trigger a workflow command.
+  - id: builder.negative.open.en
+    text: Open Builder
+    locale: en
+    reason: Navigation is not a governed Builder workflow transition.

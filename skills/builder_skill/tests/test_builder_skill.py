@@ -5902,9 +5902,9 @@ def test_project_list_has_one_explicit_dialog_current_and_selection_buttons(monk
     )
 
     assert result["presentation"]["mode"] == "buttons"
-    assert message.count("[текущий в этом диалоге]") == 1
-    assert "test04_recipes [текущий в этом диалоге]" in message
-    assert "test05_recipes [доступен в DEV]" in message
+    assert message.count("· рабочий проект") == 1
+    assert "id: test04_recipes · рабочий проект" in message
+    assert "id: test05_recipes · доступен в DEV" in message
     assert [item["target_ref"]["id"] for item in captured["specification"]["actions"]] == [
         "test04_recipes",
         "test05_recipes",
@@ -5937,11 +5937,14 @@ def test_telegram_webspace_context_reports_selected_builder_host() -> None:
         "builder_webspace_id": "default",
         "source_webspace_id": "default",
         "preview_webspace_id": "default-dev",
+        "preview_target": None,
         "transport": "telegram",
         "explicit_transport_binding": True,
         "provenance": "builder_context",
     }
-    assert skill._format_webspace_context(fallback) == "Builder: default → Preview default-dev."
+    assert skill._format_webspace_context(fallback) == (
+        "• Builder Webspace: default\n• Preview Webspace: default-dev"
+    )
     assert explicit["explicit_transport_binding"] is True
     assert explicit["provenance"] == "builder_context"
     assert explicit["builder_webspace_id"] == "dev1"
@@ -5951,8 +5954,9 @@ def test_telegram_webspace_context_reports_selected_builder_host() -> None:
         "test05_recipes",
         webspace_context=fallback,
     )
-    assert "Builder: default → Preview default-dev" in message
-    assert "Текущий проект этого диалога: test05_recipes" in message
+    assert "• Builder Webspace: default" in message
+    assert "• Preview Webspace: default-dev" in message
+    assert "• Рабочий проект Builder: test05_recipes" in message
 
 
 def test_help_and_preview_link_never_route_to_automation(monkeypatch) -> None:
@@ -6075,8 +6079,11 @@ def test_current_project_router_fallback_is_materialized_once_by_router(monkeypa
 
     assert result["status"] == "project_current"
     assert result["conversation_interaction"] is None
-    assert result["message"].startswith("Конструктор: сейчас выбран Recipes (recipes).")
-    assert "Builder: dev1 → Preview —." in result["message"]
+    assert result["message"].startswith("Конструктор: текущий рабочий проект Builder")
+    assert "• Проект: Recipes" in result["message"]
+    assert "• id: recipes" in result["message"]
+    assert "• Builder Webspace: dev1" in result["message"]
+    assert "• Preview Webspace: —" in result["message"]
     assert result["webspace_context"]["provenance"] == "builder_context"
     assert emitted == []
 

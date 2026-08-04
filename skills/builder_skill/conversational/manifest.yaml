@@ -4,7 +4,7 @@ package_kind: skill
 owner_ref:
   kind: skill
   id: builder_skill
-version: 0.3.32
+version: 0.3.39
 workflow_refs:
 - workflow_type: builder.change
   definition_ref: ../workflow.json
@@ -14,16 +14,23 @@ files:
   input: input.yaml
   entities: entities.yaml
   examples: examples.yaml
-  matchers: matchers.yaml
   affordances: affordances.yaml
   repair: repair.yaml
   output: output.yaml
   stories:
-  - tests/stories/prototype-cycle.ru.yaml
-  - tests/stories/no-match.en.yaml
+  - tests/stories/plan-prototype.yaml
+  - tests/stories/request-review.yaml
+  - tests/stories/accept-prototype.yaml
+  - tests/stories/start-automation.yaml
+  - tests/stories/accept-verification.yaml
+  - tests/stories/start-trial.yaml
+  - tests/stories/accept-trial.yaml
+  - tests/stories/begin-publication.yaml
+  - tests/stories/no-match.yaml
   locales:
   - locale.en.yaml
   - locale.ru.yaml
+  matchers: matchers.yaml
 locales:
 - en
 - ru
@@ -34,4 +41,4 @@ privacy_defaults:
 compiled_outputs: []
 compatibility_aliases: []
 metadata:
-  purpose: builder_conversational_dogfood
+  generated_by: adaos.sdk.developer.conversational

@@ -1,0 +1,33 @@
+schema: adaos.conversational.story.v1
+id: builder.accept_trial.en.happy_path
+title: Accept trial
+story_kind: workflow
+workflow_type: builder.change
+locale: en
+channel: web
+actor: {id: user:local, permissions: [], roles: [registered]}
+start: {instance_id: change:accept-trial, state: trial_review, generation: 0, context: {}}
+steps:
+  - user: Accept the builder trial
+    given:
+      proposal:
+        kind: workflow_command
+        intent_id: builder_accept_trial
+        command: accept_trial
+        skill_id: null
+        operation_id: null
+        arguments: {confirmed: true}
+        confidence: 0.99
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: workspace_activation, side_effect: external, confirmation: required}
+      event: null
+      skill_result: null
+      output_ref: builder_trial_accepted
+    expect:
+      proposal: {kind: workflow_command, command: accept_trial, confidence_at_least: 0.99}
+      command: accept_trial
+      transition_id: accept_trial
+      state: publication_ready
+      reason_code: null
+      accepted: true
+      generation: 1
+      output: {kind: result, output_ref: builder_trial_accepted, summary: Builder trial accepted for publication., actions: [], next_expected_input: none}

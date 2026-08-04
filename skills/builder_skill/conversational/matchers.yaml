@@ -1,75 +1,195 @@
 schema: adaos.conversational.matchers.v1
 package_id: builder_skill
 matchers:
-- id: plan_prototype.en.regex
-  kind: regex
-  intent_id: plan_prototype
-  locale: en
-  pattern: '^start (?:a |the )?prototype change(?: for (?:this|the) scenario)?$'
-  flags:
-  - ignore_case
-  - unicode
-  slots: {}
-  source: authored
-  provenance:
-    source: builder_dogfood
-- id: plan_prototype.ru.regex
-  kind: regex
-  intent_id: plan_prototype
-  locale: ru
-  pattern: '^начни изменение прототипа(?: для этого сценария)?$'
-  flags:
-  - ignore_case
-  - unicode
-  slots: {}
-  source: authored
-  provenance:
-    source: builder_dogfood
-- id: request_prototype_review.en.regex
-  kind: regex
-  intent_id: request_prototype_review
-  locale: en
-  pattern: '^show (?:this|the) prototype for review$'
-  flags:
-  - ignore_case
-  - unicode
-  slots: {}
-  source: authored
-  provenance:
-    source: builder_dogfood
-- id: request_prototype_review.ru.regex
-  kind: regex
-  intent_id: request_prototype_review
-  locale: ru
-  pattern: '^покажи (?:этот|текущий) прототип для проверки$'
-  flags:
-  - ignore_case
-  - unicode
-  slots: {}
-  source: authored
-  provenance:
-    source: builder_dogfood
-- id: accept_prototype.en.regex
-  kind: regex
-  intent_id: accept_prototype
-  locale: en
-  pattern: '^accept (?:this|the) prototype(?: and start implementation)?$'
-  flags:
-  - ignore_case
-  - unicode
-  slots: {}
-  source: authored
-  provenance:
-    source: builder_dogfood
-- id: accept_prototype.ru.regex
-  kind: regex
-  intent_id: accept_prototype
-  locale: ru
-  pattern: '^прими (?:этот|текущий) прототип(?: и переходи к реализации)?$'
-  flags:
-  - ignore_case
-  - unicode
-  slots: {}
-  source: authored
-  provenance:
-    source: builder_dogfood
+  - id: builder_plan_prototype.matcher.en.1
+    kind: regex
+    intent_id: builder_plan_prototype
+    locale: en
+    pattern: '^(?:plan|start|create) (?:a |the )?prototype change$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_plan_prototype.matcher.ru.1
+    kind: regex
+    intent_id: builder_plan_prototype
+    locale: ru
+    pattern: '^(?:запланируй|начни|создай) изменение прототипа$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_request_review.matcher.en.1
+    kind: regex
+    intent_id: builder_request_review
+    locale: en
+    pattern: '^(?:request|send) (?:the )?prototype (?:review|for review)$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_request_review.matcher.ru.1
+    kind: regex
+    intent_id: builder_request_review
+    locale: ru
+    pattern: '^(?:отправь|запроси) прототип (?:на ревью|на проверку)$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_accept_prototype.matcher.en.1
+    kind: regex
+    intent_id: builder_accept_prototype
+    locale: en
+    pattern: '^accept (?:the )?prototype$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_accept_prototype.matcher.ru.1
+    kind: regex
+    intent_id: builder_accept_prototype
+    locale: ru
+    pattern: '^(?:прими|одобри) прототип$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_start_automation.matcher.en.1
+    kind: regex
+    intent_id: builder_start_automation
+    locale: en
+    pattern: '^start builder automation$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_start_automation.matcher.ru.1
+    kind: regex
+    intent_id: builder_start_automation
+    locale: ru
+    pattern: '^запусти автоматизацию builder$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_accept_verification.matcher.en.1
+    kind: regex
+    intent_id: builder_accept_verification
+    locale: en
+    pattern: '^accept verification$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_accept_verification.matcher.ru.1
+    kind: regex
+    intent_id: builder_accept_verification
+    locale: ru
+    pattern: '^(?:прими|одобри) верификацию$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_start_trial.matcher.en.1
+    kind: regex
+    intent_id: builder_start_trial
+    locale: en
+    pattern: '^start (?:the )?builder trial$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_start_trial.matcher.ru.1
+    kind: regex
+    intent_id: builder_start_trial
+    locale: ru
+    pattern: '^начни пробный запуск builder$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_accept_trial.matcher.en.1
+    kind: regex
+    intent_id: builder_accept_trial
+    locale: en
+    pattern: '^accept (?:the )?builder trial$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_accept_trial.matcher.ru.1
+    kind: regex
+    intent_id: builder_accept_trial
+    locale: ru
+    pattern: '^(?:прими|одобри) пробный запуск builder$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_begin_publication.matcher.en.1
+    kind: regex
+    intent_id: builder_begin_publication
+    locale: en
+    pattern: '^begin builder publication$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill
+  - id: builder_begin_publication.matcher.ru.1
+    kind: regex
+    intent_id: builder_begin_publication
+    locale: ru
+    pattern: '^начни публикацию builder$'
+    flags:
+      - ignore_case
+      - unicode
+    slots: {}
+    source: authored
+    provenance:
+      source: builder_skill

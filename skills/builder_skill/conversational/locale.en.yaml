@@ -2,7 +2,12 @@ schema: adaos.conversational.locale.v1
 package_id: builder_skill
 locale: en
 messages:
-  prototype_started: Prototype change started.
-  prototype_review_ready: Prototype is ready for review.
-  prototype_accepted: Prototype accepted for implementation.
-  repair_no_match: Clarify the requested Builder action.
+  builder_prototype_planned.summary: Builder prototype planning started.
+  builder_review_requested.summary: Builder prototype review requested.
+  builder_prototype_accepted.summary: Builder prototype accepted for automation.
+  builder_automation_started.summary: Builder automation started.
+  builder_verification_accepted.summary: Builder verification accepted.
+  builder_trial_started.summary: Builder trial started.
+  builder_trial_accepted.summary: Builder trial accepted for publication.
+  builder_publication_started.summary: Builder publication started.
+  builder_repair_no_match.summary: Please rephrase the Builder workflow request.

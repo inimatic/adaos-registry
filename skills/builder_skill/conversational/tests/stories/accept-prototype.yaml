@@ -1,0 +1,33 @@
+schema: adaos.conversational.story.v1
+id: builder.accept_prototype.en.happy_path
+title: Accept prototype
+story_kind: workflow
+workflow_type: builder.change
+locale: en
+channel: web
+actor: {id: user:local, permissions: [], roles: [registered]}
+start: {instance_id: change:accept-prototype, state: prototype_review, generation: 0, context: {}}
+steps:
+  - user: Accept the prototype
+    given:
+      proposal:
+        kind: workflow_command
+        intent_id: builder_accept_prototype
+        command: accept_prototype
+        skill_id: null
+        operation_id: null
+        arguments: {}
+        confidence: 0.99
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: isolated_write, side_effect: reversible, confirmation: none}
+      event: null
+      skill_result: null
+      output_ref: builder_prototype_accepted
+    expect:
+      proposal: {kind: workflow_command, command: accept_prototype, confidence_at_least: 0.99}
+      command: accept_prototype
+      transition_id: accept_prototype
+      state: automation_ready
+      reason_code: null
+      accepted: true
+      generation: 1
+      output: {kind: result, output_ref: builder_prototype_accepted, summary: Builder prototype accepted for automation., actions: [], next_expected_input: none}

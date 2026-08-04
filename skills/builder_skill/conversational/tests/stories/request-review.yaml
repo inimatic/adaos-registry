@@ -1,0 +1,33 @@
+schema: adaos.conversational.story.v1
+id: builder.request_review.en.happy_path
+title: Request prototype review
+story_kind: workflow
+workflow_type: builder.change
+locale: en
+channel: web
+actor: {id: user:local, permissions: [], roles: [registered]}
+start: {instance_id: change:review, state: prototype_editing, generation: 0, context: {}}
+steps:
+  - user: Request prototype review
+    given:
+      proposal:
+        kind: workflow_command
+        intent_id: builder_request_review
+        command: request_prototype_review
+        skill_id: null
+        operation_id: null
+        arguments: {}
+        confidence: 0.99
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: read, side_effect: none, confirmation: none}
+      event: null
+      skill_result: null
+      output_ref: builder_review_requested
+    expect:
+      proposal: {kind: workflow_command, command: request_prototype_review, confidence_at_least: 0.99}
+      command: request_prototype_review
+      transition_id: request_prototype_review
+      state: prototype_review
+      reason_code: null
+      accepted: true
+      generation: 1
+      output: {kind: result, output_ref: builder_review_requested, summary: Builder prototype review requested., actions: [], next_expected_input: none}

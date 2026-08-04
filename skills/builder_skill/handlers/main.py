@@ -8901,10 +8901,16 @@ def _webspace_context(
     ).strip()
     meta = dict(_meta) if isinstance(_meta, Mapping) else {}
     transport = str(meta.get("io_type") or meta.get("transport") or "").strip().lower()
+    preview_target = (
+        dict(current_binding.get("preview_target"))
+        if isinstance(current_binding.get("preview_target"), Mapping)
+        else None
+    )
     return {
         "builder_webspace_id": source or None,
         "source_webspace_id": source or None,
         "preview_webspace_id": preview or None,
+        "preview_target": preview_target,
         "transport": transport or None,
         "explicit_transport_binding": True,
         "provenance": "builder_context",
@@ -8914,7 +8920,26 @@ def _webspace_context(
 def _format_webspace_context(context: Mapping[str, Any]) -> str:
     source = str(context.get("builder_webspace_id") or context.get("source_webspace_id") or "—").strip() or "—"
     preview = str(context.get("preview_webspace_id") or "—").strip() or "—"
-    return f"Builder: {source} → Preview {preview}."
+    return f"• Builder Webspace: {source}\n• Preview Webspace: {preview}"
+
+
+def _format_preview_target(context: Mapping[str, Any] | None) -> str:
+    value = context if isinstance(context, Mapping) else {}
+    target = value.get("preview_target") if isinstance(value.get("preview_target"), Mapping) else {}
+    label = str(target.get("label") or "").strip()
+    if label:
+        return label
+    object_id = str(target.get("object_id") or "").strip()
+    if not object_id:
+        return "не выбран"
+    stage = str(target.get("stage") or "prototype").strip().lower()
+    prefix = {
+        "prototype": "proto",
+        "automation": "active",
+        "publication": "public",
+    }.get(stage, stage or "proto")
+    revision = str(target.get("revision") or "").strip()
+    return f"{prefix}: {object_id}" + (f" · {revision}" if revision else "")
 
 
 def _project_identity(item: Mapping[str, Any] | None) -> str:
@@ -8932,25 +8957,37 @@ def _format_project_list(
         return _command_hint_message()
     current_id = str(current_project_id or "").strip()
     lines = [
+        "",
+        "Контекст",
         *(
             [_format_webspace_context(webspace_context)]
             if isinstance(webspace_context, Mapping)
             else []
         ),
         (
-            f"Текущий проект этого диалога: {current_id}."
+            f"• Рабочий проект Builder: {current_id}"
             if current_id
-            else "В этом диалоге проект пока не выбран."
-        )
+            else "• Рабочий проект Builder: не выбран"
+        ),
+        f"• Выбранная цель Preview: {_format_preview_target(webspace_context)}",
+        "",
+        "Проекты",
     ]
     for item in items[:8]:
         title = str(item.get("title") or item.get("scenario_id") or item.get("draft_id") or "prototype")
         ref = _project_identity(item)
-        state = "текущий в этом диалоге" if current_id and ref == current_id else "доступен в DEV"
-        lines.append(f"- {title} — id: {ref} [{state}]")
-    lines.append("Переключение меняет контекст этого диалога; Preview в Telegram не переключается автоматически.")
-    lines.append("Нажмите кнопку проекта или напишите: «Строитель, выбери <id>».")
-    return f"{AGENT_LABEL}: проекты в разработке:\n" + "\n".join(lines)
+        marker = "✓" if current_id and ref == current_id else "•"
+        state = "рабочий проект" if marker == "✓" else "доступен в DEV"
+        lines.append(f"{marker} {title}\n  id: {ref} · {state}")
+    lines.extend(
+        [
+            "",
+            "Выбор проекта меняет рабочий контекст Builder, но не открытый сценарий Preview.",
+            "Чтобы изменить Preview, затем выберите «Показать прототип», «Показать реализацию» или «Показать публикацию».",
+            "Нажмите кнопку проекта или напишите: «Строитель, выбери <id>».",
+        ]
+    )
+    return f"{AGENT_LABEL}: проекты в разработке" + "\n".join(lines)
 
 
 def _present_project_selection_interaction(
@@ -9115,9 +9152,11 @@ def _handle_project_current_command(
     summary = _session_summary(session)
     webspace_context = _webspace_context(webspace_id, binding, _meta)
     message = (
-        f"{AGENT_LABEL}: \u0441\u0435\u0439\u0447\u0430\u0441 \u0432\u044b\u0431\u0440\u0430\u043d "
-        f"{summary.get('title')} ({summary.get('scenario_id') or summary.get('draft_id')}).\n"
-        f"{_format_webspace_context(webspace_context)}"
+        f"{AGENT_LABEL}: текущий рабочий проект Builder\n\n"
+        f"• Проект: {summary.get('title')}\n"
+        f"• id: {summary.get('scenario_id') or summary.get('draft_id')}\n"
+        f"{_format_webspace_context(webspace_context)}\n"
+        f"• Выбранная цель Preview: {_format_preview_target(webspace_context)}"
     )
     interaction_result: dict[str, Any] | None = None
     object_id = str(summary.get("scenario_id") or "").strip()
@@ -9213,10 +9252,13 @@ def _handle_preview_link_command(
             _meta=_meta,
         )
     message = (
-        f"{AGENT_LABEL}: {preview_link['label']}\n"
-        f"{_format_webspace_context(webspace_context)}\n"
-        f"{url}\n"
-        "Ссылка открывает текущее Preview и не изменяет состояние процесса."
+        f"{AGENT_LABEL}: ссылка на выбранный Preview\n\n"
+        f"• Цель: {preview_link['label']}\n"
+        f"{_format_webspace_context(webspace_context)}\n\n"
+        f"{url}\n\n"
+        "Открытие ссылки переводит браузер в указанный Preview Webspace. "
+        "Если там открыт другой сценарий, клиент предложит перейти к указанной цели. "
+        "Рабочий проект Builder и состояние workflow ссылка не меняет."
     )
     open_action = {
         "id": "builder-open-preview",
@@ -9265,9 +9307,9 @@ def _handle_help_command(
 ) -> dict[str, Any]:
     current_id = _project_identity(session)
     current_line = (
-        f"Текущий проект этого диалога: {current_id}."
+        f"Рабочий проект Builder: {current_id}."
         if current_id
-        else "Текущий проект этого диалога не выбран."
+        else "Рабочий проект Builder не выбран."
     )
     message = (
         f"{AGENT_LABEL}: помощь\n"
@@ -9504,10 +9546,15 @@ def _handle_project_switch_command(
         )
     summary = _session_summary(selected)
     if focus_only:
+        webspace_context = _webspace_context(webspace_id, binding, _meta)
         message = (
-            f"{AGENT_LABEL}: \u0432\u044b\u0431\u0440\u0430\u043b \u0434\u043b\u044f \u0434\u0438\u0430\u043b\u043e\u0433\u0430 "
-            f"{summary.get('title')} ({summary.get('scenario_id') or summary.get('draft_id')}). "
-            "Preview \u043d\u0435 \u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0430\u043b."
+            f"{AGENT_LABEL}: рабочий проект Builder выбран\n\n"
+            f"• Проект: {summary.get('title')}\n"
+            f"• id: {summary.get('scenario_id') or summary.get('draft_id')}\n"
+            f"{_format_webspace_context(webspace_context)}\n"
+            f"• Preview остался на цели: {_format_preview_target(webspace_context)}\n\n"
+            "Чтобы открыть выбранный проект в Preview, выберите следующий шаг: "
+            "«Показать прототип», «Показать реализацию» или «Показать публикацию»."
         )
     else:
         message = f"{AGENT_LABEL}: \u043f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u043b\u0441\u044f \u043d\u0430 {summary.get('title')} ({summary.get('scenario_id') or summary.get('draft_id')})."

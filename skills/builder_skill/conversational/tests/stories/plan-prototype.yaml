@@ -1,0 +1,33 @@
+schema: adaos.conversational.story.v1
+id: builder.plan_prototype.en.happy_path
+title: Plan a prototype change
+story_kind: workflow
+workflow_type: builder.change
+locale: en
+channel: web
+actor: {id: user:local, permissions: [], roles: [registered]}
+start: {instance_id: change:plan, state: ready, generation: 0, context: {}}
+steps:
+  - user: Plan a prototype change
+    given:
+      proposal:
+        kind: workflow_command
+        intent_id: builder_plan_prototype
+        command: plan_prototype_change
+        skill_id: null
+        operation_id: null
+        arguments: {}
+        confidence: 0.99
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: local_reversible, side_effect: reversible, confirmation: none}
+      event: null
+      skill_result: null
+      output_ref: builder_prototype_planned
+    expect:
+      proposal: {kind: workflow_command, command: plan_prototype_change, confidence_at_least: 0.99}
+      command: plan_prototype_change
+      transition_id: plan_prototype
+      state: prototype_editing
+      reason_code: null
+      accepted: true
+      generation: 1
+      output: {kind: result, output_ref: builder_prototype_planned, summary: Builder prototype planning started., actions: [], next_expected_input: none}

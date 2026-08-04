@@ -1,0 +1,33 @@
+schema: adaos.conversational.story.v1
+id: builder.start_automation.en.happy_path
+title: Start automation
+story_kind: workflow
+workflow_type: builder.change
+locale: en
+channel: web
+actor: {id: user:local, permissions: [], roles: [registered]}
+start: {instance_id: change:start-automation, state: automation_ready, generation: 0, context: {}}
+steps:
+  - user: Start builder automation
+    given:
+      proposal:
+        kind: workflow_command
+        intent_id: builder_start_automation
+        command: start_automation
+        skill_id: null
+        operation_id: null
+        arguments: {}
+        confidence: 0.99
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: isolated_write, side_effect: reversible, confirmation: none}
+      event: null
+      skill_result: null
+      output_ref: builder_automation_started
+    expect:
+      proposal: {kind: workflow_command, command: start_automation, confidence_at_least: 0.99}
+      command: start_automation
+      transition_id: start_automation
+      state: automation_waiting
+      reason_code: null
+      accepted: true
+      generation: 1
+      output: {kind: result, output_ref: builder_automation_started, summary: Builder automation started., actions: [], next_expected_input: none}

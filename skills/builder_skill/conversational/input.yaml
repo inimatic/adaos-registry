@@ -1,46 +1,111 @@
 schema: adaos.conversational.input.v1
 package_id: builder_skill
 intents:
-- id: plan_prototype
-  description: Start a bounded Prototype change for the selected Builder project.
-  kind: workflow_command
-  affordance_id: plan_prototype
-  workflow:
-    workflow_type: builder.change
-    command_id: plan_prototype_change
-    transition_id: plan_prototype
-  skill_invocation: null
-  example_ids:
-  - plan_prototype.en.1
-  - plan_prototype.ru.1
-  slots: []
-- id: request_prototype_review
-  description: Request review of the current declarative Prototype revision.
-  kind: workflow_command
-  affordance_id: request_prototype_review
-  workflow:
-    workflow_type: builder.change
-    command_id: request_prototype_review
-    transition_id: request_prototype_review
-  skill_invocation: null
-  example_ids:
-  - request_prototype_review.en.1
-  - request_prototype_review.ru.1
-  slots: []
-- id: accept_prototype
-  description: Accept the reviewed Prototype and admit the Change for Automation.
-  kind: workflow_command
-  affordance_id: accept_prototype
-  workflow:
-    workflow_type: builder.change
-    command_id: accept_prototype
-    transition_id: accept_prototype
-  skill_invocation: null
-  example_ids:
-  - accept_prototype.en.1
-  - accept_prototype.ru.1
-  slots: []
+  - id: builder_plan_prototype
+    description: Start a Builder prototype change from the ready state.
+    kind: workflow_command
+    affordance_id: builder_plan_prototype
+    workflow:
+      workflow_type: builder.change
+      command_id: plan_prototype_change
+      transition_id: plan_prototype
+    skill_invocation: null
+    example_ids:
+      - builder_plan_prototype.example.en.1
+      - builder_plan_prototype.example.ru.1
+    slots: []
+  - id: builder_request_review
+    description: Request review for the current Builder prototype.
+    kind: workflow_command
+    affordance_id: builder_request_review
+    workflow:
+      workflow_type: builder.change
+      command_id: request_prototype_review
+      transition_id: request_prototype_review
+    skill_invocation: null
+    example_ids:
+      - builder_request_review.example.en.1
+      - builder_request_review.example.ru.1
+    slots: []
+  - id: builder_accept_prototype
+    description: Accept the Builder prototype and move it to automation readiness.
+    kind: workflow_command
+    affordance_id: builder_accept_prototype
+    workflow:
+      workflow_type: builder.change
+      command_id: accept_prototype
+      transition_id: accept_prototype
+    skill_invocation: null
+    example_ids:
+      - builder_accept_prototype.example.en.1
+      - builder_accept_prototype.example.ru.1
+    slots: []
+  - id: builder_start_automation
+    description: Start Builder automation for an accepted prototype.
+    kind: workflow_command
+    affordance_id: builder_start_automation
+    workflow:
+      workflow_type: builder.change
+      command_id: start_automation
+      transition_id: start_automation
+    skill_invocation: null
+    example_ids:
+      - builder_start_automation.example.en.1
+      - builder_start_automation.example.ru.1
+    slots: []
+  - id: builder_accept_verification
+    description: Accept Builder verification and prepare the trial stage.
+    kind: workflow_command
+    affordance_id: builder_accept_verification
+    workflow:
+      workflow_type: builder.change
+      command_id: accept_verification
+      transition_id: accept_verification
+    skill_invocation: null
+    example_ids:
+      - builder_accept_verification.example.en.1
+      - builder_accept_verification.example.ru.1
+    slots: []
+  - id: builder_start_trial
+    description: Start a Builder trial for the verified candidate.
+    kind: workflow_command
+    affordance_id: builder_start_trial
+    workflow:
+      workflow_type: builder.change
+      command_id: start_trial
+      transition_id: start_trial
+    skill_invocation: null
+    example_ids:
+      - builder_start_trial.example.en.1
+      - builder_start_trial.example.ru.1
+    slots: []
+  - id: builder_accept_trial
+    description: Accept the Builder trial and prepare publication.
+    kind: workflow_command
+    affordance_id: builder_accept_trial
+    workflow:
+      workflow_type: builder.change
+      command_id: accept_trial
+      transition_id: accept_trial
+    skill_invocation: null
+    example_ids:
+      - builder_accept_trial.example.en.1
+      - builder_accept_trial.example.ru.1
+    slots: []
+  - id: builder_begin_publication
+    description: Begin governed publication for the Builder candidate.
+    kind: workflow_command
+    affordance_id: builder_begin_publication
+    workflow:
+      workflow_type: builder.change
+      command_id: begin_publication
+      transition_id: begin_publication
+    skill_invocation: null
+    example_ids:
+      - builder_begin_publication.example.en.1
+      - builder_begin_publication.example.ru.1
+    slots: []
 policy:
   default_confidence: 0.8
-  abstain_below: 0.55
+  abstain_below: 0.5
   protected_action_confirmation: true

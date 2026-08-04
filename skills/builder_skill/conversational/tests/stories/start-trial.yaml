@@ -1,0 +1,33 @@
+schema: adaos.conversational.story.v1
+id: builder.start_trial.en.happy_path
+title: Start trial
+story_kind: workflow
+workflow_type: builder.change
+locale: en
+channel: web
+actor: {id: user:local, permissions: [], roles: [registered]}
+start: {instance_id: change:start-trial, state: trial_ready, generation: 0, context: {}}
+steps:
+  - user: Start the builder trial
+    given:
+      proposal:
+        kind: workflow_command
+        intent_id: builder_start_trial
+        command: start_trial
+        skill_id: null
+        operation_id: null
+        arguments: {}
+        confidence: 0.99
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: trial_activation, side_effect: external, confirmation: none}
+      event: null
+      skill_result: null
+      output_ref: builder_trial_started
+    expect:
+      proposal: {kind: workflow_command, command: start_trial, confidence_at_least: 0.99}
+      command: start_trial
+      transition_id: start_trial
+      state: trial_review
+      reason_code: null
+      accepted: true
+      generation: 1
+      output: {kind: result, output_ref: builder_trial_started, summary: Builder trial started., actions: [], next_expected_input: none}

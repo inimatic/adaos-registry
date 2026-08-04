@@ -1,0 +1,33 @@
+schema: adaos.conversational.story.v1
+id: builder.begin_publication.en.happy_path
+title: Begin publication
+story_kind: workflow
+workflow_type: builder.change
+locale: en
+channel: web
+actor: {id: user:local, permissions: [], roles: [registered]}
+start: {instance_id: change:begin-publication, state: publication_ready, generation: 0, context: {}}
+steps:
+  - user: Begin builder publication
+    given:
+      proposal:
+        kind: workflow_command
+        intent_id: builder_begin_publication
+        command: begin_publication
+        skill_id: null
+        operation_id: null
+        arguments: {confirmed: true}
+        confidence: 0.99
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: publication, side_effect: external, confirmation: required}
+      event: null
+      skill_result: null
+      output_ref: builder_publication_started
+    expect:
+      proposal: {kind: workflow_command, command: begin_publication, confidence_at_least: 0.99}
+      command: begin_publication
+      transition_id: begin_publication
+      state: publication_waiting
+      reason_code: null
+      accepted: true
+      generation: 1
+      output: {kind: result, output_ref: builder_publication_started, summary: Builder publication started., actions: [], next_expected_input: none}
