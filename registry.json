@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-04T13:59:06+00:00",
+  "updated_at": "2026-08-04T14:11:08+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -136,8 +136,8 @@
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.3.33",
-      "updated_at": "2026-08-04T13:59:06+00:00",
+      "version": "0.3.34",
+      "updated_at": "2026-08-04T14:11:08+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -671,7 +671,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-08-04T13:51:01+00:00",
+      "updated_at": "2026-08-04T14:06:05+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
