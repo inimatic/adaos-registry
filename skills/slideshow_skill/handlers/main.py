@@ -2209,7 +2209,7 @@ def _device_cache_payload(
     error: str | None = None,
 ) -> dict[str, Any]:
     payload = {
-        "ok": status not in {"failed", "unsupported"},
+        "ok": status != "failed",
         "status": status,
         "mode": "device_cache",
         "degraded": bool(skipped),

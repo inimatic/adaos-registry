@@ -1417,7 +1417,7 @@ def test_cache_folder_skips_endpoint_without_cache_protocol(monkeypatch, tmp_pat
 
     result = mod.control_redevice_slideshow("cache_folder", webspace_id="ws-1")
 
-    assert result["ok"] is False
+    assert result["ok"] is True
     assert result["status"] == "unsupported"
     assert result["error"] == "cache_protocol_unsupported"
     assert result["skipped"][0]["code"] == "ABC123"
