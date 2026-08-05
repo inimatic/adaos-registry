@@ -4,7 +4,7 @@ package_kind: skill
 owner_ref:
   kind: skill
   id: conversational_workflow_lab_skill
-version: 0.1.0
+version: 0.1.1
 workflow_refs:
 - workflow_type: conversational_lab.request
   definition_ref: ../workflow.json
