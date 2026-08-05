@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.54
+version: 0.1.55
 description: Slideshow pilot skill that shows photos in the widget and can optionally
   project cached thumbnails to assigned ReDevice endpoints.
 supported_locales:
@@ -338,6 +338,13 @@ tools:
         - send_telegram
         - sync_on
         - sync_off
+        - interval_3000
+        - interval_5000
+        - interval_7000
+        - interval_15000
+        - interval_30000
+        - set_interval
+        - cache_folder
         - random
         - sequential
         - all
@@ -353,6 +360,10 @@ tools:
         type: string
       source_dir:
         type: string
+      interval_ms:
+        oneOf:
+        - type: integer
+        - type: string
   output_schema:
     type: object
     required:
@@ -561,6 +572,10 @@ memory_budget:
   - name: slideshow.stream_fingerprints
     max_items: 64
     cleanup_hook: webio.stream.subscription.changed
+  - name: slideshow.device_cache_jobs
+    max_items: 16
+    ttl_seconds: 3600
+    cleanup_hook: dispose
   - name: slideshow.command_state
     max_items: 1
     storage: skill_memory
@@ -571,8 +586,11 @@ memory_budget:
   - name: slideshow-root-poll
     max_threads: 1
     cleanup_hook: dispose
+  - name: slideshow-device-cache-warm
+    max_threads: 1
+    cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-07-08T17:36:06+00:00'
+updated_at: '2026-08-05T16:04:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3564.55f7b169

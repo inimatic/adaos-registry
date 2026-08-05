@@ -48,6 +48,14 @@ def _env_int(name: str, default: int, minimum: int, maximum: int) -> int:
     return max(minimum, min(maximum, value))
 
 
+def _env_float(name: str, default: float, minimum: float, maximum: float) -> float:
+    try:
+        value = float(str(os.environ.get(name) or "").strip() or default)
+    except Exception:
+        value = default
+    return max(minimum, min(maximum, value))
+
+
 _ENDPOINTS_RECEIVER = "slideshow_skill.endpoints"
 _PREVIEW_RECEIVER = "slideshow_skill.preview"
 _FOLDERS_RECEIVER = "slideshow_skill.folders"
@@ -64,6 +72,9 @@ _MAX_CONTROL_SCAN = 240
 _MAX_ENDPOINT_CURRENT = 4
 _MAX_ENDPOINT_FAVORITES = 20
 _MAX_FOLDER_STREAM_ITEMS = 250
+_MAX_DEVICE_CACHE_ITEMS = _env_int("SLIDESHOW_REDEVICE_DEVICE_CACHE_ITEMS", 1200, 1, 5000)
+_REDEVICE_CACHE_BATCH_ITEMS = _env_int("SLIDESHOW_REDEVICE_CACHE_BATCH_ITEMS", 18, 1, 30)
+_REDEVICE_CACHE_BATCH_DELAY_S = _env_float("SLIDESHOW_REDEVICE_CACHE_BATCH_DELAY_S", 0.25, 0.0, 5.0)
 _INLINE_CONTENT_BUDGET_BYTES = 45_000
 _INDEX_BATCH_SIZE = 500
 _INDEX_PUBLISH_INTERVAL_S = 1.5
@@ -74,11 +85,14 @@ _STATE_KEY = "slideshow_skill.state"
 _INDEX_META_KEY = "slideshow_skill.photo_index"
 _INDEX_STATUS_KEY = "slideshow_skill.index_status"
 _COMMAND_STATE_KEY = "slideshow_skill.command_state"
+_DEVICE_CACHE_STATE_KEY = "slideshow_skill.device_cache_state"
 _LAST_MEDIA_KEY = "slideshow_skill.last_media"
 _POLL_INTERVAL_S = 2.5
 _SNAPSHOT_DEBOUNCE_S = 1.0
 _SURFACE_REASSERT_INTERVAL_S = 20.0
 _REDEVICE_COMMAND_TTL_S = _env_int("SLIDESHOW_REDEVICE_COMMAND_TTL_S", 120, 15, 600)
+_REDEVICE_LIST_TIMEOUT_S = _env_float("SLIDESHOW_REDEVICE_LIST_TIMEOUT_S", 5.0, 1.0, 20.0)
+_REDEVICE_COMMAND_HTTP_TIMEOUT_S = _env_float("SLIDESHOW_REDEVICE_COMMAND_HTTP_TIMEOUT_S", 4.0, 1.0, 12.0)
 _REDEVICE_CACHE_MIN_FREE_FRACTION = 0.20
 _VOLATILE_STREAM_KEYS = {"updated_at"}
 _log = logging.getLogger("skills.slideshow_skill")
@@ -95,6 +109,8 @@ _snapshot_seen_at: dict[tuple[str, str], float] = {}
 _active_receivers_by_webspace: dict[str, set[str]] = {}
 _prewarm_lock = threading.Lock()
 _prewarm_jobs: set[str] = set()
+_device_cache_lock = threading.Lock()
+_device_cache_jobs: dict[str, float] = {}
 _media_lock = threading.Lock()
 
 
@@ -190,6 +206,21 @@ def _count_int(value: Any) -> int:
         return 0
 
 
+def _interval_ms(value: Any, default: int = 7000) -> int:
+    try:
+        raw = str(value or "").strip().lower()
+        if raw.startswith("interval_"):
+            raw = raw.split("_", 1)[1]
+        if raw.endswith("ms"):
+            raw = raw[:-2]
+        elif raw.endswith("s"):
+            raw = str(float(raw[:-1]) * 1000)
+        parsed = int(float(raw or default))
+    except Exception:
+        parsed = int(default)
+    return max(1500, min(60000, parsed))
+
+
 def _memory_get(key: str, default: Any = None) -> Any:
     try:
         return skill_memory.get(key, default)
@@ -245,6 +276,9 @@ def _default_state() -> dict[str, Any]:
         "selected_folder": "",
         "last_event_by_code": {},
         "endpoint_index_by_code": {},
+        "last_device_cache_requested_at": 0,
+        "last_device_cache_source_dir": "",
+        "last_device_cache_selected_folder": "",
     }
 
 
@@ -266,10 +300,7 @@ def _load_state() -> dict[str, Any]:
         state["display_mode"] = "fit"
     state["source_dir"] = str(_source_dir(_text(state.get("source_dir"))))
     state["selected_folder"] = _text(state.get("selected_folder"))
-    try:
-        state["interval_ms"] = max(1500, min(60000, int(state.get("interval_ms") or 7000)))
-    except Exception:
-        state["interval_ms"] = 7000
+    state["interval_ms"] = _interval_ms(state.get("interval_ms"))
     try:
         state["current_index"] = max(0, int(state.get("current_index") or 0))
     except Exception:
@@ -278,6 +309,12 @@ def _load_state() -> dict[str, Any]:
         state["last_service_tick_at"] = max(0.0, float(state.get("last_service_tick_at") or 0))
     except Exception:
         state["last_service_tick_at"] = 0
+    try:
+        state["last_device_cache_requested_at"] = max(0.0, float(state.get("last_device_cache_requested_at") or 0))
+    except Exception:
+        state["last_device_cache_requested_at"] = 0
+    state["last_device_cache_source_dir"] = _text(state.get("last_device_cache_source_dir"))
+    state["last_device_cache_selected_folder"] = _text(state.get("last_device_cache_selected_folder"))
     if not isinstance(state.get("last_event_by_code"), Mapping):
         state["last_event_by_code"] = {}
     if not isinstance(state.get("endpoint_index_by_code"), Mapping):
@@ -800,6 +837,7 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
             ),
             webspace_id,
         )
+        _schedule_pending_device_cache_after_index(root, scan_started, webspace_id)
     return status
 
 
@@ -900,6 +938,8 @@ def dispose(reason: str | None = None, **_: Any) -> dict[str, Any]:
         _active_receivers_by_webspace.clear()
         _last_stream_fingerprints.clear()
         _snapshot_seen_at.clear()
+    with _device_cache_lock:
+        _device_cache_jobs.clear()
     return {
         "ok": True,
         "reason": _text(reason) or "dispose",
@@ -1319,7 +1359,7 @@ def _deferred_session_image(content_ref: str, *, reason: str) -> dict[str, Any]:
     }
 
 
-def _content_item(path: Path) -> dict[str, Any]:
+def _content_item(path: Path, *, include_inline: bool = True) -> dict[str, Any]:
     thumb, cached = _thumbnail(path, _ENDPOINT_SIZE, "endpoint-cache-v6")
     ref = _content_ref(path)
     content_hash = ref.rsplit(":", 1)[-1]
@@ -1329,7 +1369,7 @@ def _content_item(path: Path) -> dict[str, Any]:
     # URLs here; inline data_uri remains the deterministic fallback.
     candidates = [str(item or "").strip() for item in list(media.get("direct_urls") or []) if str(item or "").strip()]
     content_url = candidates[0] if candidates else ""
-    return {
+    item = {
         "content_ref": ref,
         "content_hash": content_hash,
         "cache_key": f"slideshow:v1:{content_hash}",
@@ -1346,8 +1386,10 @@ def _content_item(path: Path) -> dict[str, Any]:
         "browser_content_path": _text(media.get("browser_path")),
         "delivery": _mapping(media.get("delivery")),
         "media": media,
-        "data_uri": _data_uri(thumb),
     }
+    if include_inline:
+        item["data_uri"] = _data_uri(thumb)
+    return item
 
 
 def _preview_item(path: Path) -> dict[str, Any]:
@@ -1420,18 +1462,23 @@ def _endpoint_window(files: list[Path], state: Mapping[str, Any], *, code: str |
     return [selected[(index + offset) % len(selected)] for offset in range(_MAX_ENDPOINT_CURRENT)]
 
 
-def _content_items_for_window(window: list[Path]) -> tuple[list[dict[str, Any]], int, bool]:
+def _content_items_for_window(
+    window: list[Path],
+    *,
+    include_inline: bool = True,
+    inline_budget_bytes: int = _INLINE_CONTENT_BUDGET_BYTES,
+) -> tuple[list[dict[str, Any]], int, bool]:
     items: list[dict[str, Any]] = []
     content_bytes = 0
     budget_limited = False
     for path in window:
         try:
-            item = _content_item(path)
+            item = _content_item(path, include_inline=include_inline)
         except Exception as exc:
             _record_media_failure(path, "endpoint_content", exc)
             continue
         item_bytes = int(item.get("thumbnail_bytes") or 0)
-        if items and content_bytes + item_bytes > _INLINE_CONTENT_BUDGET_BYTES:
+        if include_inline and items and content_bytes + item_bytes > inline_budget_bytes:
             budget_limited = True
             break
         items.append(item)
@@ -1606,6 +1653,8 @@ def _session_payload(
         "selected_codes": selected_codes,
         "sync": bool(state.get("sync")),
         "sync_value": "sync_on" if state.get("sync") else "sync_off",
+        "interval_ms": _interval_ms(state.get("interval_ms")),
+        "interval_value": f"interval_{_interval_ms(state.get('interval_ms'))}",
         "mode": state.get("mode"),
         "scope": state.get("scope"),
         "display_mode": state.get("display_mode"),
@@ -1647,7 +1696,7 @@ def _publish(receiver: str, payload: Mapping[str, Any], webspace_id: str | None 
 
 
 def _load_devices() -> list[dict[str, Any]]:
-    return sdk_list_endpoints(sync_registry=True)
+    return sdk_list_endpoints(sync_registry=True, timeout=_REDEVICE_LIST_TIMEOUT_S)
 
 
 def _select_device(devices: list[Mapping[str, Any]], code: str | None = None) -> Mapping[str, Any] | None:
@@ -1681,6 +1730,7 @@ def _slideshow_endpoint_item(endpoint: Mapping[str, Any], selected_codes: set[st
         "zone_id": _text(compact.get("zone_id")),
         "trust_level": _text(compact.get("trust_level")),
         "selectable": bool(compact.get("selectable")),
+        "cache_supported": _endpoint_supports_slideshow_cache(endpoint),
         "aliases": _unique_texts(compact.get("aliases")),
     }
 
@@ -1693,6 +1743,32 @@ def _endpoint_online_state(endpoint: Mapping[str, Any] | None) -> str:
 
 def _endpoint_accepts_commands(endpoint: Mapping[str, Any] | None) -> bool:
     return _endpoint_online_state(endpoint) == "online"
+
+
+def _capability_available(capabilities: Mapping[str, Any], name: str) -> bool:
+    value = capabilities.get(name)
+    if isinstance(value, bool):
+        return value
+    item = _mapping(value)
+    if not item:
+        return False
+    if "available" in item:
+        return bool(item.get("available"))
+    return True
+
+
+def _endpoint_supports_slideshow_cache(endpoint: Mapping[str, Any] | None) -> bool:
+    data = _mapping(endpoint)
+    manifest = _mapping(data.get("endpoint_manifest"))
+    diagnostic = _mapping(data.get("diagnostic_report"))
+    for container in (
+        _mapping(manifest.get("capabilities")),
+        _mapping(diagnostic.get("capabilities")),
+        _mapping(data.get("capabilities")),
+    ):
+        if _capability_available(container, "display.slideshow.cache"):
+            return True
+    return False
 
 
 def _offline_result(pair_code: str, endpoint: Mapping[str, Any] | None) -> dict[str, Any]:
@@ -1763,6 +1839,7 @@ def _send_endpoint_command(
         command=command,
         requested_by=_owner(),
         constraints=constraints,
+        timeout=_REDEVICE_COMMAND_HTTP_TIMEOUT_S,
     )
 
 
@@ -1822,9 +1899,19 @@ def _healed_pair_codes(devices: list[Mapping[str, Any]], codes: list[str]) -> li
 
 def _command_items(payload: Mapping[str, Any]) -> list[dict[str, Any]]:
     results = list(payload.get("results") or [])
-    if _text(payload.get("playback_mode")) == "widget":
+    if _text(payload.get("mode")) == "device_cache":
+        status = _text(payload.get("status")) or ("queued" if payload.get("ok") else "failed")
+        title = f"Device cache {status}"
+        subtitle = (
+            f"{len(payload.get('sent_codes') or [])} endpoints | "
+            f"{payload.get('photo_count', 0)} photos | {payload.get('batch_count', 0)} batches"
+        )
+    elif _text(payload.get("playback_mode")) == "widget":
         title = "Slideshow active in widget" if payload.get("ok") else "Slideshow widget failed"
         subtitle = f"widget only | {payload.get('item_count', 0)} photos"
+    elif payload.get("degraded") and _text(payload.get("error")) == "device_offline":
+        title = "Slideshow endpoints offline"
+        subtitle = f"{len(results)} endpoints | command skipped"
     else:
         title = "Slideshow command queued" if payload.get("ok") else "Slideshow command failed"
         subtitle = f"{len(results)} endpoints | {payload.get('item_count', 0)} cached photos"
@@ -1859,6 +1946,8 @@ def _compact_result(item: Mapping[str, Any]) -> dict[str, Any]:
         "command_id": _text(item.get("command_id")),
         "state": _text(item.get("state")),
         "online_state": _text(item.get("online_state")),
+        "batch_index": int(item.get("batch_index") or 0),
+        "batch_total": int(item.get("batch_total") or 0),
         "item_count": int(item.get("item_count") or 0),
         "content_bytes": int(item.get("content_bytes") or 0),
         "cache_budget_limited": bool(item.get("cache_budget_limited")),
@@ -1873,11 +1962,18 @@ def _compact_command_payload(payload: Mapping[str, Any] | None, *, include_items
     compact = {
         "ok": bool(data.get("ok")),
         "error": data.get("error"),
+        "degraded": bool(data.get("degraded")),
         "command_id": _text(data.get("command_id")),
         "source_dir": _text(data.get("source_dir")),
+        "selected_folder": _text(data.get("selected_folder")),
         "selected_codes": _unique_texts(data.get("selected_codes")),
         "target_codes": _unique_texts(data.get("target_codes")),
         "sent_codes": _unique_texts(data.get("sent_codes")),
+        "mode": _text(data.get("mode")),
+        "status": _text(data.get("status")),
+        "job_key": _text(data.get("job_key")),
+        "photo_count": int(data.get("photo_count") or 0),
+        "batch_count": int(data.get("batch_count") or 0),
         "item_count": int(data.get("item_count") or 0),
         "cache_target": int(data.get("cache_target") or 0),
         "cache_budget_limited": bool(data.get("cache_budget_limited")),
@@ -1886,6 +1982,7 @@ def _compact_command_payload(payload: Mapping[str, Any] | None, *, include_items
         "direct_media_ready": bool(data.get("direct_media_ready")),
         "transport": _compact_transport(_mapping(data.get("transport"))),
         "results": [_compact_result(_mapping(item)) for item in list(data.get("results") or [])[:16]],
+        "skipped": [_compact_result(_mapping(item)) for item in list(data.get("skipped") or [])[:16]],
         "updated_at": _text(data.get("updated_at")),
     }
     if "endpoint_required" in data:
@@ -1930,6 +2027,21 @@ def _last_command_payload() -> dict[str, Any]:
         payload.setdefault("command_items", _command_items(payload))
         return payload
     return _empty_command_payload()
+
+
+def _slideshow_cache_policy(*, receiver_cache_items: int, inline_budget_bytes: int = _INLINE_CONTENT_BUDGET_BYTES) -> dict[str, Any]:
+    receiver_items = max(1, min(_MAX_DEVICE_CACHE_ITEMS, int(receiver_cache_items or 1)))
+    return {
+        "schema": "redevice.slideshow.cache_policy.v1",
+        "max_current_items": receiver_items,
+        "max_favorite_items": 0,
+        "receiver_cache_items": receiver_items,
+        "target_current_items": receiver_items,
+        "inline_content_budget_bytes": int(inline_budget_bytes),
+        "command_ttl_sec": _REDEVICE_COMMAND_TTL_S,
+        "receiver_disk_cache": True,
+        "receiver_cache_min_free_fraction": _REDEVICE_CACHE_MIN_FREE_FRACTION,
+    }
 
 
 def _build_command(
@@ -1982,7 +2094,7 @@ def _build_command(
             "fullscreen": bool(state.get("fullscreen")),
             "display_mode": _text(state.get("display_mode")) or "fit",
             "autoplay": bool(autoplay),
-            "interval_ms": int(state.get("interval_ms") or 7000),
+            "interval_ms": _interval_ms(state.get("interval_ms")),
             "sync": bool(state.get("sync")),
             "mode": state.get("mode"),
             "scope": state.get("scope"),
@@ -1993,17 +2105,7 @@ def _build_command(
             "current_index": _current_index(state, code=pair_code),
             "transport": transport_payload,
             "media_session": dict(media_session or {}),
-            "cache_policy": {
-                "schema": "redevice.slideshow.cache_policy.v1",
-                "max_current_items": _MAX_ENDPOINT_CURRENT,
-                "max_favorite_items": 0,
-                "receiver_cache_items": _MAX_ENDPOINT_CURRENT,
-                "target_current_items": _MAX_ENDPOINT_CURRENT,
-                "inline_content_budget_bytes": _INLINE_CONTENT_BUDGET_BYTES,
-                "command_ttl_sec": _REDEVICE_COMMAND_TTL_S,
-                "receiver_disk_cache": True,
-                "receiver_cache_min_free_fraction": _REDEVICE_CACHE_MIN_FREE_FRACTION,
-            },
+            "cache_policy": _slideshow_cache_policy(receiver_cache_items=_MAX_ENDPOINT_CURRENT),
             "cache": {
                 "schema": "redevice.image_cache.v1",
                 "namespace": "slideshow_skill",
@@ -2017,6 +2119,349 @@ def _build_command(
             },
         },
     }
+
+
+def _folder_cache_files_for_state(state: Mapping[str, Any], limit: int | None = None) -> list[Path]:
+    query_state = dict(state)
+    query_state["scope"] = "all"
+    return [
+        Path(row["source_path"])
+        for row in _query_photo_records(query_state, limit=limit or _MAX_DEVICE_CACHE_ITEMS, favorites_only=False)
+    ]
+
+
+def _content_batches(items: list[Path], size: int) -> list[list[Path]]:
+    batch_size = max(1, int(size or 1))
+    return [items[index : index + batch_size] for index in range(0, len(items), batch_size)]
+
+
+def _device_cache_batch_size(*, direct_media_ready: bool) -> int:
+    return _REDEVICE_CACHE_BATCH_ITEMS if direct_media_ready else 1
+
+
+def _device_cache_batches(items: list[Path], *, direct_media_ready: bool) -> list[list[Path]]:
+    return _content_batches(items, _device_cache_batch_size(direct_media_ready=direct_media_ready))
+
+
+def _prune_device_cache_jobs(now: float | None = None) -> None:
+    current = float(now or time.time())
+    for key, started_at in list(_device_cache_jobs.items()):
+        try:
+            age_s = current - float(started_at or 0)
+        except Exception:
+            age_s = _REDEVICE_COMMAND_TTL_S + 1
+        if age_s > 3600:
+            _device_cache_jobs.pop(key, None)
+    while len(_device_cache_jobs) > 16:
+        oldest = min(_device_cache_jobs.items(), key=lambda item: item[1])[0]
+        _device_cache_jobs.pop(oldest, None)
+
+
+def _build_cache_command(
+    pair_code: str,
+    items: list[dict[str, Any]],
+    state: Mapping[str, Any],
+    *,
+    playlist_id: str,
+    batch_index: int,
+    batch_total: int,
+    activate_when_complete: bool,
+    transport: Mapping[str, Any] | None = None,
+    media_session: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    command = _build_command(
+        pair_code,
+        items,
+        state,
+        autoplay=bool(activate_when_complete),
+        transport=transport,
+        media_session=media_session,
+    )
+    command["type"] = "display.slideshow.cache"
+    payload = _mapping(command.get("payload"))
+    payload["surface_ref"] = "slideshow.viewer"
+    payload["cache_only"] = True
+    payload["playlist_id"] = playlist_id
+    payload["batch_index"] = max(0, int(batch_index))
+    payload["batch_total"] = max(1, int(batch_total))
+    payload["activate_when_complete"] = bool(activate_when_complete)
+    payload["autoplay"] = bool(activate_when_complete)
+    payload["interval_ms"] = _interval_ms(state.get("interval_ms"))
+    payload["cache_policy"] = _slideshow_cache_policy(
+        receiver_cache_items=max(1, len(items)),
+        inline_budget_bytes=_INLINE_CONTENT_BUDGET_BYTES,
+    )
+    command["payload"] = payload
+    return command
+
+
+def _device_cache_payload(
+    *,
+    status: str,
+    state: Mapping[str, Any],
+    job_key: str,
+    target_codes: list[str],
+    sent_codes: list[str],
+    skipped: list[Mapping[str, Any]] | None = None,
+    results: list[Mapping[str, Any]] | None = None,
+    photo_count: int = 0,
+    batch_count: int = 0,
+    error: str | None = None,
+) -> dict[str, Any]:
+    payload = {
+        "ok": status not in {"failed", "unsupported"},
+        "status": status,
+        "mode": "device_cache",
+        "degraded": bool(skipped),
+        "error": error,
+        "job_key": job_key,
+        "source_dir": state.get("source_dir"),
+        "selected_folder": _text(state.get("selected_folder")),
+        "target_codes": target_codes,
+        "sent_codes": sent_codes,
+        "skipped": [dict(item) for item in list(skipped or [])],
+        "results": [dict(item) for item in list(results or [])],
+        "photo_count": max(0, int(photo_count or 0)),
+        "batch_count": max(0, int(batch_count or 0)),
+        "cache_batch_items": _REDEVICE_CACHE_BATCH_ITEMS,
+        "updated_at": _now(),
+    }
+    payload["command_items"] = _command_items(payload)
+    return payload
+
+
+def _schedule_device_cache_warm(
+    state: Mapping[str, Any],
+    files: list[Path],
+    *,
+    code: str | None = None,
+    webspace_id: str | None = None,
+    activate_when_complete: bool = True,
+) -> dict[str, Any]:
+    direct_media_ready = bool(direct_media_base_urls())
+    batch_count = len(_device_cache_batches(files, direct_media_ready=direct_media_ready))
+    devices = _load_devices()
+    configured_codes = _unique_texts(state.get("selected_codes"))
+    target_codes = _unique_texts([code]) if code else configured_codes
+    if not target_codes:
+        device = _select_device(devices)
+        target_codes = [_text(device.get("code"))] if device else []
+    target_codes = _healed_pair_codes(devices, target_codes)
+    devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
+    skipped: list[dict[str, Any]] = []
+    sent_codes: list[str] = []
+    for pair_code in target_codes:
+        endpoint = devices_by_code.get(pair_code)
+        if not _endpoint_accepts_commands(endpoint):
+            skipped.append({**_offline_result(pair_code, endpoint), "reason": "device_offline"})
+            continue
+        if not _endpoint_supports_slideshow_cache(endpoint):
+            skipped.append(
+                {
+                    "code": pair_code,
+                    "ok": False,
+                    "error": "cache_protocol_unsupported",
+                    "state": "skipped",
+                    "online_state": _endpoint_online_state(endpoint),
+                }
+            )
+            continue
+        sent_codes.append(pair_code)
+    if not files:
+        payload = _device_cache_payload(
+            status="failed",
+            state=state,
+            job_key="",
+            target_codes=target_codes,
+            sent_codes=[],
+            skipped=skipped,
+            photo_count=0,
+            batch_count=0,
+            error="no_supported_photos",
+        )
+        _memory_set(_DEVICE_CACHE_STATE_KEY, payload)
+        _publish(_COMMAND_RECEIVER, _remember_command_payload(payload), webspace_id, force=True)
+        return payload
+    if not sent_codes:
+        payload = _device_cache_payload(
+            status="unsupported" if skipped else "failed",
+            state=state,
+            job_key="",
+            target_codes=target_codes,
+            sent_codes=[],
+            skipped=skipped,
+            photo_count=len(files),
+            batch_count=batch_count,
+            error="cache_protocol_unsupported" if skipped else "no_redevice_endpoint",
+        )
+        _memory_set(_DEVICE_CACHE_STATE_KEY, payload)
+        _publish(_COMMAND_RECEIVER, _remember_command_payload(payload), webspace_id, force=True)
+        return payload
+    source_fingerprint = hashlib.sha256(
+        f"{state.get('source_dir')}\n{_text(state.get('selected_folder'))}\n{len(files)}\n{','.join(_content_ref(path) for path in files[:16])}".encode(
+            "utf-8", errors="replace"
+        )
+    ).hexdigest()[:16]
+    ws = _text(webspace_id) or default_webspace_id()
+    job_key = f"{ws}:{','.join(sent_codes)}:{source_fingerprint}"
+    with _device_cache_lock:
+        _prune_device_cache_jobs()
+        if job_key in _device_cache_jobs:
+            payload = _device_cache_payload(
+                status="already_running",
+                state=state,
+                job_key=job_key,
+                target_codes=target_codes,
+                sent_codes=sent_codes,
+                skipped=skipped,
+                photo_count=len(files),
+                batch_count=batch_count,
+            )
+            _publish(_COMMAND_RECEIVER, _remember_command_payload(payload), webspace_id, force=True)
+            return payload
+        _device_cache_jobs[job_key] = time.time()
+    payload = _device_cache_payload(
+        status="queued",
+        state=state,
+        job_key=job_key,
+        target_codes=target_codes,
+        sent_codes=sent_codes,
+        skipped=skipped,
+        photo_count=len(files),
+        batch_count=batch_count,
+    )
+    _memory_set(_DEVICE_CACHE_STATE_KEY, payload)
+    _publish(_COMMAND_RECEIVER, _remember_command_payload(payload), webspace_id, force=True)
+    thread = threading.Thread(
+        target=_device_cache_warm_worker,
+        args=(job_key, dict(state), list(files), sent_codes, devices_by_code, ws, bool(activate_when_complete)),
+        name="slideshow-device-cache-warm",
+        daemon=True,
+    )
+    thread.start()
+    return payload
+
+
+def _device_cache_warm_worker(
+    job_key: str,
+    state: Mapping[str, Any],
+    files: list[Path],
+    target_codes: list[str],
+    devices_by_code: Mapping[str, Mapping[str, Any]],
+    webspace_id: str,
+    activate_when_complete: bool,
+) -> None:
+    results: list[dict[str, Any]] = []
+    try:
+        direct_media_ready = bool(direct_media_base_urls())
+        batches = _device_cache_batches(files, direct_media_ready=direct_media_ready)
+        playlist_id = "slideshow:playlist:" + hashlib.sha256(
+            f"{state.get('source_dir')}\n{_text(state.get('selected_folder'))}\n{len(files)}\n{job_key}".encode(
+                "utf-8", errors="replace"
+            )
+        ).hexdigest()[:16]
+        for pair_code in target_codes:
+            endpoint = devices_by_code.get(pair_code, {})
+            for batch_index, batch in enumerate(batches):
+                include_inline = not direct_media_ready
+                items, content_bytes, budget_limited = _content_items_for_window(
+                    batch,
+                    include_inline=include_inline,
+                    inline_budget_bytes=_INLINE_CONTENT_BUDGET_BYTES,
+                )
+                if not items:
+                    results.append(
+                        {
+                            "code": pair_code,
+                            "ok": False,
+                            "error": "no_cache_items",
+                            "state": "failed",
+                            "batch_index": batch_index,
+                            "item_count": 0,
+                        }
+                    )
+                    continue
+                direct_candidate_count = sum(len(list(item.get("content_url_candidates") or [])) for item in items)
+                endpoint_for_transport = endpoint
+                if direct_candidate_count or direct_media_ready:
+                    endpoint_for_transport = with_local_content_route(
+                        endpoint_for_transport,
+                        reason="slideshow_cache_media_candidates",
+                    )
+                transport = select_transport(
+                    endpoint_for_transport,
+                    intent="display.slideshow",
+                    content_bytes=content_bytes,
+                    allow_root_relay=True,
+                )
+                media_session = _endpoint_media_session(
+                    endpoint_for_transport,
+                    pair_code,
+                    item_count=len(items),
+                    direct_candidate_count=direct_candidate_count,
+                )
+                command = _build_cache_command(
+                    pair_code,
+                    items,
+                    state,
+                    playlist_id=playlist_id,
+                    batch_index=batch_index,
+                    batch_total=len(batches),
+                    activate_when_complete=activate_when_complete,
+                    transport=transport,
+                    media_session=media_session,
+                )
+                res = _send_endpoint_command(pair_code, command, endpoint=endpoint)
+                queued = _mapping(res.get("command"))
+                results.append(
+                    {
+                        "code": pair_code,
+                        "ok": bool(res.get("ok")),
+                        "error": res.get("error"),
+                        "command_id": queued.get("command_id") or command.get("command_id"),
+                        "state": queued.get("state"),
+                        "batch_index": batch_index,
+                        "batch_total": len(batches),
+                        "item_count": len(items),
+                        "content_bytes": content_bytes,
+                        "cache_budget_limited": budget_limited,
+                        "transport": transport,
+                    }
+                )
+                if _REDEVICE_CACHE_BATCH_DELAY_S > 0:
+                    time.sleep(_REDEVICE_CACHE_BATCH_DELAY_S)
+        delivered = any(bool(item.get("ok")) for item in results)
+        status = "completed" if delivered else "failed"
+        payload = _device_cache_payload(
+            status=status,
+            state=state,
+            job_key=job_key,
+            target_codes=target_codes,
+            sent_codes=target_codes,
+            results=results,
+            photo_count=len(files),
+            batch_count=len(batches),
+            error=None if delivered else "cache_commands_failed",
+        )
+        _memory_set(_DEVICE_CACHE_STATE_KEY, payload)
+        _publish(_COMMAND_RECEIVER, _remember_command_payload(payload), webspace_id, force=True)
+    except Exception as exc:
+        payload = _device_cache_payload(
+            status="failed",
+            state=state,
+            job_key=job_key,
+            target_codes=target_codes,
+            sent_codes=target_codes,
+            results=results,
+            photo_count=len(files),
+            error=str(exc),
+        )
+        _memory_set(_DEVICE_CACHE_STATE_KEY, payload)
+        _publish(_COMMAND_RECEIVER, _remember_command_payload(payload), webspace_id, force=True)
+        _log.debug("failed to warm ReDevice slideshow cache", exc_info=True)
+    finally:
+        with _device_cache_lock:
+            _device_cache_jobs.pop(job_key, None)
 
 
 def _send_to_selected(
@@ -2141,8 +2586,16 @@ def _send_to_selected(
                 "transport": transport,
             }
         )
+    delivered = any(bool(item.get("ok")) for item in results)
+    offline_only = (
+        bool(results)
+        and not target_codes
+        and all(_text(item.get("error")) == "device_offline" for item in results)
+    )
     payload = {
-        "ok": any(bool(item.get("ok")) for item in results),
+        "ok": delivered or offline_only,
+        "degraded": offline_only,
+        "error": "device_offline" if offline_only else None,
         "command_id": first_command_id,
         "source_dir": state.get("source_dir"),
         "selected_codes": configured_codes or requested_target_codes,
@@ -2307,11 +2760,13 @@ def _stop_selected(
     devices_by_code = {_text(item.get("code")): item for item in devices if _text(item.get("code"))}
     results: list[dict[str, Any]] = []
     first_command_id = ""
+    sent_codes: list[str] = []
     for pair_code in selected_codes:
         endpoint = devices_by_code.get(pair_code)
         if not _endpoint_accepts_commands(endpoint):
             results.append(_offline_result(pair_code, endpoint))
             continue
+        sent_codes.append(pair_code)
         command_id = "cmd:slideshow-stop:" + hashlib.sha256(f"{pair_code}:{_now()}".encode("utf-8")).hexdigest()[:16]
         first_command_id = first_command_id or command_id
         expires_at = int(time.time()) + _REDEVICE_COMMAND_TTL_S
@@ -2339,14 +2794,25 @@ def _stop_selected(
                 "error": res.get("error"),
                 "command_id": queued.get("command_id") or command_id,
                 "state": queued.get("state"),
+                "online_state": _endpoint_online_state(endpoint),
             }
         )
     files = _files_for_state(state, _MAX_CONTROL_SCAN)
+    delivered = any(bool(item.get("ok")) for item in results)
+    offline_only = (
+        bool(results)
+        and not sent_codes
+        and all(_text(item.get("error")) == "device_offline" for item in results)
+    )
     payload = {
-        "ok": any(bool(item.get("ok")) for item in results) if results else True,
+        "ok": (delivered or offline_only) if results else True,
+        "degraded": offline_only,
+        "error": "device_offline" if offline_only else None,
         "command_id": first_command_id,
         "source_dir": state.get("source_dir"),
         "selected_codes": selected_codes,
+        "target_codes": selected_codes,
+        "sent_codes": sent_codes,
         "item_count": 0,
         "items": [],
         "results": results,
@@ -2511,6 +2977,32 @@ def on_sys_ready(evt: Any) -> None:
         _ensure_polling(default_webspace_id())
 
 
+def _pending_device_cache_request_matches(state: Mapping[str, Any], root: Path, scan_started: float) -> bool:
+    try:
+        requested_at = float(state.get("last_device_cache_requested_at") or 0)
+    except Exception:
+        requested_at = 0
+    if requested_at <= 0 or requested_at < scan_started - 300 or time.time() - requested_at > 3600:
+        return False
+    requested_root = _text(state.get("last_device_cache_source_dir"))
+    if requested_root and requested_root.casefold() != str(root).casefold():
+        return False
+    requested_folder = _text(state.get("last_device_cache_selected_folder"))
+    return requested_folder == _text(state.get("selected_folder"))
+
+
+def _schedule_pending_device_cache_after_index(root: Path, scan_started: float, webspace_id: str | None) -> None:
+    state = _load_state()
+    if not _pending_device_cache_request_matches(state, root, scan_started):
+        return
+    try:
+        files = _folder_cache_files_for_state(state, _MAX_DEVICE_CACHE_ITEMS)
+        if files:
+            _schedule_device_cache_warm(state, files, webspace_id=webspace_id)
+    except Exception:
+        _log.debug("failed to schedule pending ReDevice slideshow cache", exc_info=True)
+
+
 def _poll_loop() -> None:
     while not _poll_stop.wait(_POLL_INTERVAL_S):
         _poll_once(_poll_webspace_id or None)
@@ -2632,7 +3124,12 @@ def get_slideshow_folders(
     if source_dir:
         state["source_dir"] = str(_source_dir(source_dir))
         state = _save_state(state)
-    payload = _folders_payload(state)
+    root = _source_dir(state.get("source_dir"))
+    status: dict[str, Any] | None = None
+    meta = _ensure_index(root)
+    if _text(meta.get("error")) == "index_missing" and not _active_index_status(root):
+        status = _start_index_job(root, webspace_id=webspace_id)
+    payload = _folders_payload(state, status=status, index_meta=meta)
     _publish(_FOLDERS_RECEIVER, payload, webspace_id, force=True)
     _publish(_INDEX_RECEIVER, payload.get("status") if isinstance(payload.get("status"), Mapping) else _index_status(_source_dir(state.get("source_dir"))), webspace_id)
     return payload
@@ -2644,15 +3141,29 @@ def cancel_slideshow_photo_index(webspace_id: str | None = None) -> dict[str, An
     return status
 
 
-def _folders_payload(state: Mapping[str, Any]) -> dict[str, Any]:
-    meta = _ensure_index(_source_dir(state.get("source_dir")))
-    status = _index_status(_source_dir(state.get("source_dir")))
+def _folders_payload(
+    state: Mapping[str, Any],
+    *,
+    status: Mapping[str, Any] | None = None,
+    index_meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    root = _source_dir(state.get("source_dir"))
+    meta = dict(index_meta or _ensure_index(root))
+    status_payload = dict(status or _index_status(root))
+    if not meta.get("ok") and status_payload.get("ok"):
+        meta = {
+            "ok": True,
+            "root_dir": str(root),
+            "photo_count": _count_int(status_payload.get("photo_count") or status_payload.get("display_count")),
+            "source": "status",
+            "status": _text(status_payload.get("status")) or "running",
+        }
     return {
         "ok": bool(meta.get("ok", True)),
-        "source_dir": str(_source_dir(state.get("source_dir"))),
+        "source_dir": str(root),
         "selected_folder": _text(state.get("selected_folder")),
         "index": meta,
-        "status": status,
+        "status": status_payload,
         "items": _folder_items(state),
         "updated_at": _now(),
     }
@@ -2843,12 +3354,58 @@ def control_redevice_slideshow(
     code: str | None = None,
     webspace_id: str | None = None,
     source_dir: str | None = None,
+    interval_ms: int | str | None = None,
 ) -> dict[str, Any]:
     state = _load_state()
     if source_dir:
         state["source_dir"] = str(_source_dir(source_dir))
-    files = _files_for_state(state, _MAX_CONTROL_SCAN)
     token = _text(action).lower()
+    if interval_ms is not None:
+        state["interval_ms"] = _interval_ms(interval_ms)
+    elif token.startswith("interval_"):
+        state["interval_ms"] = _interval_ms(token)
+    if token in {"cache_folder", "cache", "warm_cache", "device_cache"}:
+        root = _source_dir(state.get("source_dir"))
+        state["last_device_cache_requested_at"] = time.time()
+        state["last_device_cache_source_dir"] = str(root)
+        state["last_device_cache_selected_folder"] = _text(state.get("selected_folder"))
+        state = _save_state(state)
+        meta = _ensure_index(root)
+        active_status = _active_index_status(root)
+        if active_status or _text(meta.get("error")) == "index_missing":
+            status = active_status or _start_index_job(root, webspace_id=webspace_id)
+            payload = _device_cache_payload(
+                status="indexing",
+                state=state,
+                job_key="",
+                target_codes=_unique_texts([code]) if code else _unique_texts(state.get("selected_codes")),
+                sent_codes=[],
+                photo_count=_count_int(status.get("photo_count") or status.get("display_count")),
+                batch_count=0,
+            )
+            _memory_set(_DEVICE_CACHE_STATE_KEY, payload)
+            _publish(_COMMAND_RECEIVER, _remember_command_payload(payload), webspace_id, force=True)
+            _publish(_INDEX_RECEIVER, status, webspace_id)
+            _ensure_polling(webspace_id)
+            return payload
+        if not meta.get("ok"):
+            payload = _device_cache_payload(
+                status="failed",
+                state=state,
+                job_key="",
+                target_codes=_unique_texts([code]) if code else _unique_texts(state.get("selected_codes")),
+                sent_codes=[],
+                photo_count=0,
+                batch_count=0,
+                error=_text(meta.get("error")) or "index_unavailable",
+            )
+            _memory_set(_DEVICE_CACHE_STATE_KEY, payload)
+            _publish(_COMMAND_RECEIVER, _remember_command_payload(payload), webspace_id, force=True)
+            return payload
+        files = _folder_cache_files_for_state(state, _MAX_DEVICE_CACHE_ITEMS)
+        _ensure_polling(webspace_id)
+        return _schedule_device_cache_warm(state, files, code=code, webspace_id=webspace_id)
+    files = _files_for_state(state, _MAX_CONTROL_SCAN)
     if token in {"next", "forward"}:
         _advance(state, files, 1)
     elif token in {"prev", "previous", "back"}:
@@ -2903,6 +3460,8 @@ def control_redevice_slideshow(
         state["display_mode"] = "fit"
     elif token == "crop":
         state["display_mode"] = "crop"
+    elif token.startswith("interval_") or token in {"interval", "set_interval"}:
+        state["interval_ms"] = _interval_ms(state.get("interval_ms"))
     elif token == "start":
         state["running"] = True
         state["last_service_tick_at"] = time.time()
@@ -3006,7 +3565,6 @@ def refresh_redevice_slideshow_state(
     )
     _publish(_ENDPOINTS_RECEIVER, endpoint_payload, webspace_id)
     _publish(_SESSION_RECEIVER, session_payload, webspace_id)
-    _publish(_FOLDERS_RECEIVER, _folders_payload(state), webspace_id)
     _publish(_INDEX_RECEIVER, _index_status(_source_dir(state.get("source_dir"))), webspace_id)
     _ensure_polling(webspace_id)
     return {**endpoint_payload, "session": session_payload}

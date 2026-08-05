@@ -16,8 +16,8 @@
         "accepted_mime": ["image/jpeg"],
         "max_width": 480,
         "max_height": 300,
-        "receiver_cache_items": 1,
-        "max_current_items": 1,
+        "receiver_cache_items": 30,
+        "max_current_items": 30,
         "max_favorite_items": 0
       },
       "state": {
@@ -27,7 +27,9 @@
         "display_mode": ["fit", "crop"],
         "autoplay": false,
         "interval_ms": 7000,
-        "fullscreen": true
+        "fullscreen": true,
+        "receiver_disk_cache": true,
+        "cache_command": "display.slideshow.cache"
       },
       "degraded_fallback": "slideshow.viewer.buttons"
     },

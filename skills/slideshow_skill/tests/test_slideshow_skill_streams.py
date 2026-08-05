@@ -414,6 +414,78 @@ def test_refresh_index_does_not_build_preview_surfaces(monkeypatch, tmp_path):
     assert published == ["slideshow_skill.index"]
 
 
+def test_refresh_redevice_state_does_not_build_folders(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    published: list[str] = []
+    state = {
+        "source_dir": str(tmp_path),
+        "selected_codes": [],
+        "sync": True,
+        "mode": "sequential",
+        "scope": "all",
+        "display_mode": "fit",
+        "fullscreen": True,
+        "running": False,
+        "current_index": 0,
+    }
+    monkeypatch.setattr(mod, "_load_state", lambda: dict(state))
+    monkeypatch.setattr(mod, "_save_state", lambda value: value)
+    monkeypatch.setattr(mod, "_load_devices", lambda: [])
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(mod, "_apply_root_events", lambda state, *_args, **_kwargs: state)
+    monkeypatch.setattr(mod, "_endpoint_payload", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(mod, "_session_payload", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(mod, "_index_status", lambda *_args, **_kwargs: {"ok": True, "value": "12"})
+    monkeypatch.setattr(
+        mod,
+        "_folders_payload",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("refresh must not build folders")),
+    )
+    monkeypatch.setattr(mod, "_ensure_polling", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "_publish", lambda receiver, *_args, **_kwargs: published.append(receiver))
+
+    result = mod.refresh_redevice_slideshow_state(webspace_id="ws-1")
+
+    assert result["ok"] is True
+    assert published == [
+        "slideshow_skill.endpoints",
+        "slideshow_skill.session",
+        "slideshow_skill.index",
+    ]
+
+
+def test_get_folders_starts_missing_index_and_publishes_snapshot(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    published: list[str] = []
+    status = {
+        "ok": True,
+        "status": "running",
+        "source_dir": str(tmp_path),
+        "photo_count": 0,
+        "display_count": 0,
+    }
+    monkeypatch.setattr(mod, "_load_state", lambda: {"source_dir": str(tmp_path), "selected_folder": ""})
+    monkeypatch.setattr(mod, "_save_state", lambda state: state)
+    monkeypatch.setattr(
+        mod,
+        "_ensure_index",
+        lambda _root: {"ok": False, "error": "index_missing", "root_dir": str(tmp_path), "photo_count": 0},
+    )
+    monkeypatch.setattr(mod, "_active_index_status", lambda _root: {})
+    monkeypatch.setattr(mod, "_start_index_job", lambda _root, webspace_id=None: status)
+    monkeypatch.setattr(mod, "_folder_items", lambda _state: [{"id": "", "title": "All photos"}])
+    monkeypatch.setattr(mod, "_publish", lambda receiver, *_args, **_kwargs: published.append(receiver))
+
+    result = mod.get_slideshow_folders(webspace_id="ws-1")
+
+    assert result["ok"] is True
+    assert result["status"]["status"] == "running"
+    assert result["items"] == [{"id": "", "title": "All photos"}]
+    assert published == ["slideshow_skill.folders", "slideshow_skill.index"]
+
+
 def test_endpoint_window_prefetches_from_current_frame(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 
@@ -434,7 +506,7 @@ def test_endpoint_content_items_stop_at_inline_budget(monkeypatch, tmp_path):
     monkeypatch.setattr(
         mod,
         "_content_item",
-        lambda path: {
+        lambda path, **_kwargs: {
             "source_name": path.name,
             "thumbnail_path": str(path),
             "cached": True,
@@ -444,7 +516,7 @@ def test_endpoint_content_items_stop_at_inline_budget(monkeypatch, tmp_path):
     )
 
     photos = [tmp_path / f"photo-{idx}.jpg" for idx in range(3)]
-    items, content_bytes, limited = mod._content_items_for_window(photos)
+    items, content_bytes, limited = mod._content_items_for_window(photos, inline_budget_bytes=10)
 
     assert len(items) == 1
     assert content_bytes == 6
@@ -460,7 +532,7 @@ def test_endpoint_content_items_skip_unreadable_images(monkeypatch, tmp_path):
 
     failures: list[tuple[str, str]] = []
 
-    def _content_item(path: Path) -> dict[str, object]:
+    def _content_item(path: Path, **_kwargs) -> dict[str, object]:
         if path.name == "bad.jpg":
             raise OSError("cannot identify image file")
         return {
@@ -1179,6 +1251,179 @@ def test_endpoint_command_payload_stays_below_redevice_body_budget(tmp_path):
     assert len(raw) < 80_000
 
 
+def test_cache_command_uses_cache_only_protocol():
+    mod = _load_slideshow_module()
+
+    command = mod._build_cache_command(
+        "ABC123",
+        [
+            {
+                "source_name": "one.jpg",
+                "thumbnail_path": "thumb.jpg",
+                "thumbnail_bytes": 1024,
+                "cached": True,
+                "content_url_candidates": ["http://127.0.0.1/media/one.jpg"],
+            }
+        ],
+        {
+            "fullscreen": True,
+            "display_mode": "fit",
+            "interval_ms": 15000,
+            "sync": True,
+            "mode": "sequential",
+            "scope": "all",
+        },
+        playlist_id="playlist-1",
+        batch_index=2,
+        batch_total=5,
+        activate_when_complete=True,
+    )
+
+    assert command["type"] == "display.slideshow.cache"
+    assert command["payload"]["cache_only"] is True
+    assert command["payload"]["playlist_id"] == "playlist-1"
+    assert command["payload"]["batch_index"] == 2
+    assert command["payload"]["batch_total"] == 5
+    assert command["payload"]["activate_when_complete"] is True
+    assert command["payload"]["autoplay"] is True
+    assert command["payload"]["interval_ms"] == 15000
+
+
+def test_device_cache_inline_fallback_sends_single_item_batches(tmp_path):
+    mod = _load_slideshow_module()
+
+    files = [tmp_path / f"photo-{idx}.jpg" for idx in range(3)]
+
+    assert len(mod._device_cache_batches(files, direct_media_ready=False)) == 3
+    assert mod._device_cache_batches(files, direct_media_ready=False)[0] == [files[0]]
+    assert len(mod._device_cache_batches(files, direct_media_ready=True)) == 1
+
+
+def test_control_interval_action_updates_state(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    saved: list[dict[str, object]] = []
+    sent: list[dict[str, object]] = []
+    state = {
+        "source_dir": str(tmp_path),
+        "selected_codes": [],
+        "sync": True,
+        "running": False,
+        "current_index": 0,
+        "mode": "sequential",
+        "scope": "all",
+    }
+    monkeypatch.setattr(mod, "_load_state", lambda: dict(state))
+    monkeypatch.setattr(mod, "_save_state", lambda value: saved.append(dict(value)) or dict(value))
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: [])
+    monkeypatch.setattr(mod, "_ensure_polling", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        mod,
+        "_send_to_selected",
+        lambda value, files, **_kwargs: sent.append(dict(value)) or {"ok": True, "interval_ms": value["interval_ms"]},
+    )
+
+    result = mod.control_redevice_slideshow("interval_15000", webspace_id="ws-1")
+
+    assert result["ok"] is True
+    assert saved[-1]["interval_ms"] == 15000
+    assert sent[-1]["interval_ms"] == 15000
+
+
+def test_cache_folder_waits_for_missing_index(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    saved: list[dict[str, object]] = []
+    published: list[tuple[str, dict[str, object]]] = []
+    status = {
+        "ok": True,
+        "status": "running",
+        "source_dir": str(tmp_path),
+        "photo_count": 12,
+        "display_count": 12,
+    }
+    monkeypatch.setattr(
+        mod,
+        "_load_state",
+        lambda: {"source_dir": str(tmp_path), "selected_folder": "Trips", "selected_codes": ["ABC123"]},
+    )
+    monkeypatch.setattr(mod, "_save_state", lambda value: saved.append(dict(value)) or dict(value))
+    monkeypatch.setattr(
+        mod,
+        "_ensure_index",
+        lambda _root: {"ok": False, "error": "index_missing", "root_dir": str(tmp_path), "photo_count": 0},
+    )
+    monkeypatch.setattr(mod, "_active_index_status", lambda _root: {})
+    monkeypatch.setattr(mod, "_start_index_job", lambda _root, webspace_id=None: status)
+    monkeypatch.setattr(
+        mod,
+        "_folder_cache_files_for_state",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("cache must wait for index")),
+    )
+    monkeypatch.setattr(mod, "_ensure_polling", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "_publish", lambda receiver, payload, *_args, **_kwargs: published.append((receiver, dict(payload))))
+
+    result = mod.control_redevice_slideshow("cache_folder", webspace_id="ws-1")
+
+    assert result["ok"] is True
+    assert result["status"] == "indexing"
+    assert result["photo_count"] == 12
+    assert saved[-1]["last_device_cache_source_dir"] == str(tmp_path)
+    assert saved[-1]["last_device_cache_selected_folder"] == "Trips"
+    assert [item[0] for item in published] == ["slideshow_skill.command", "slideshow_skill.index"]
+
+
+def test_cache_folder_skips_endpoint_without_cache_protocol(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photo = tmp_path / "source.jpg"
+    photo.write_bytes(b"jpeg")
+    sent: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        mod,
+        "_load_state",
+        lambda: {
+            "source_dir": str(tmp_path),
+            "selected_folder": "",
+            "selected_codes": ["ABC123"],
+            "sync": True,
+            "running": False,
+            "current_index": 0,
+            "mode": "sequential",
+            "scope": "all",
+        },
+    )
+    monkeypatch.setattr(mod, "_save_state", lambda value: dict(value))
+    monkeypatch.setattr(mod, "_ensure_index", lambda _root: {"ok": True, "photo_count": 1, "root_dir": str(tmp_path)})
+    monkeypatch.setattr(mod, "_active_index_status", lambda _root: {})
+    monkeypatch.setattr(mod, "_folder_cache_files_for_state", lambda *_args, **_kwargs: [photo])
+    monkeypatch.setattr(
+        mod,
+        "_load_devices",
+        lambda: [
+            {
+                "code": "ABC123",
+                "state": "approved",
+                "online_state": "online",
+                "last_seen_at": time.time(),
+            }
+        ],
+    )
+    monkeypatch.setattr(mod, "_endpoint_accepts_commands", lambda _endpoint: True)
+    monkeypatch.setattr(mod, "_endpoint_supports_slideshow_cache", lambda _endpoint: False)
+    monkeypatch.setattr(mod, "_ensure_polling", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "_publish", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "_send_endpoint_command", lambda *args, **kwargs: sent.append((args, kwargs)))
+
+    result = mod.control_redevice_slideshow("cache_folder", webspace_id="ws-1")
+
+    assert result["ok"] is False
+    assert result["status"] == "unsupported"
+    assert result["error"] == "cache_protocol_unsupported"
+    assert result["skipped"][0]["code"] == "ABC123"
+    assert sent == []
+
+
 def test_send_to_selected_skips_offline_endpoint_without_building_payload(monkeypatch, tmp_path):
     mod = _load_slideshow_module()
 
@@ -1214,7 +1459,47 @@ def test_send_to_selected_skips_offline_endpoint_without_building_payload(monkey
         [photo],
     )
 
-    assert result["ok"] is False
+    assert result["ok"] is True
+    assert result["degraded"] is True
+    assert result["error"] == "device_offline"
     assert result["results"][0]["error"] == "device_offline"
+    assert result["results"][0]["state"] == "skipped"
+    assert sent == []
+
+
+def test_stop_selected_treats_offline_endpoint_as_degraded(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+
+    photo = tmp_path / "source.jpg"
+    photo.write_bytes(b"jpeg")
+
+    sent: list[tuple[str, object]] = []
+    monkeypatch.setattr(
+        mod,
+        "_load_devices",
+        lambda: [{"code": "OFFLINE1", "state": "approved", "display_name": "Tablet", "last_seen_at": 1}],
+    )
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: [photo])
+    monkeypatch.setattr(mod.device_access, "send_endpoint_command", lambda *args, **kwargs: sent.append((args, kwargs)))
+    monkeypatch.setattr(mod, "_session_payload", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(mod, "_publish", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(mod, "_memory_set", lambda *_args, **_kwargs: None)
+
+    result = mod._stop_selected(
+        {
+            "source_dir": str(tmp_path),
+            "selected_codes": ["OFFLINE1"],
+            "sync": True,
+            "running": False,
+            "current_index": 0,
+            "mode": "sequential",
+            "scope": "all",
+        },
+    )
+
+    assert result["ok"] is True
+    assert result["degraded"] is True
+    assert result["error"] == "device_offline"
+    assert result["sent_codes"] == []
     assert result["results"][0]["state"] == "skipped"
     assert sent == []

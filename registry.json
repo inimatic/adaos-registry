@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-04T14:11:08+00:00",
+  "updated_at": "2026-08-05T16:04:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -558,8 +558,8 @@
       "kind": "skill",
       "id": "redevice_settings",
       "name": "redevice_settings",
-      "version": "0.1.18",
-      "updated_at": "2026-07-08T17:35:54+00:00",
+      "version": "0.1.19",
+      "updated_at": "2026-08-05T16:04:00+00:00",
       "path": "skills/redevice_settings",
       "manifest": "skills/redevice_settings/skill.yaml",
       "source": {
@@ -712,8 +712,8 @@
       "kind": "skill",
       "id": "slideshow_skill",
       "name": "slideshow_skill",
-      "version": "0.1.54",
-      "updated_at": "2026-07-08T17:36:06+00:00",
+      "version": "0.1.55",
+      "updated_at": "2026-08-05T16:04:00+00:00",
       "path": "skills/slideshow_skill",
       "manifest": "skills/slideshow_skill/skill.yaml",
       "source": {

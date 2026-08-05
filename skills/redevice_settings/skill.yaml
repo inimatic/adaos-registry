@@ -1,5 +1,5 @@
 name: redevice_settings
-version: 0.1.18
+version: 0.1.19
 description: Service skill for ReDevice endpoint settings, assignment, status, and
   policy-bound device actions.
 runtime:
@@ -219,7 +219,6 @@ data_routes:
     max_publish_hz: 1
     max_items: 32
     max_fanout: 3
-    max_last_command_bytes: 2048
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: keep the last ReDevice settings state
@@ -238,7 +237,6 @@ data_routes:
     max_publish_hz: 1
     max_items: 32
     max_fanout: 3
-    max_last_command_bytes: 2048
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: keep the last ReDevice settings state
@@ -257,7 +255,6 @@ data_routes:
     max_publish_hz: 1
     max_items: 32
     max_fanout: 3
-    max_last_command_bytes: 2048
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: keep the last ReDevice settings state
@@ -276,7 +273,6 @@ data_routes:
     max_publish_hz: 1
     max_items: 32
     max_fanout: 3
-    max_last_command_bytes: 2048
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: keep the last ReDevice settings state
@@ -303,7 +299,7 @@ memory_budget:
     max_items: 32
     cleanup_hook: webio.stream.subscription.changed
   background_workers: []
-updated_at: '2026-07-08T17:35:54+00:00'
+updated_at: '2026-08-05T16:04:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3564.55f7b169

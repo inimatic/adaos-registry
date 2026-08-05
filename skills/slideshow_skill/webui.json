@@ -636,6 +636,13 @@
                     }
                   },
                   {
+                    "id": "cache",
+                    "label": "Cache folder",
+                    "label_i18n": {
+                      "key": "slideshow.cache_folder"
+                    }
+                  },
+                  {
                     "id": "preview",
                     "label": "Preview photos",
                     "label_i18n": {
@@ -709,6 +716,14 @@
                   "type": "openModal",
                   "params": {
                     "modalId": "slideshow_folders_modal"
+                  }
+                },
+                {
+                  "on": "click:cache",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.control_redevice_slideshow",
+                  "params": {
+                    "action": "cache_folder"
                   }
                 },
                 {
@@ -808,6 +823,14 @@
                     "width": "90px",
                     "label_i18n": {
                       "key": "slideshow.online"
+                    }
+                  },
+                  {
+                    "key": "cache_supported",
+                    "label": "Cache",
+                    "width": "80px",
+                    "label_i18n": {
+                      "key": "slideshow.cache"
                     }
                   },
                   {
@@ -1125,6 +1148,56 @@
               ],
               "title_i18n": {
                 "key": "slideshow.endpoint_sync"
+              }
+            },
+            {
+              "id": "slideshow-interval-selector",
+              "type": "input.selector",
+              "area": "right",
+              "title": "Interval",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "slideshow_skill.session"
+              },
+              "inputs": {
+                "bindField": "interval_value",
+                "optionValuePath": "id",
+                "optionLabelPath": "label",
+                "options": [
+                  {
+                    "id": "interval_3000",
+                    "label": "3 s"
+                  },
+                  {
+                    "id": "interval_5000",
+                    "label": "5 s"
+                  },
+                  {
+                    "id": "interval_7000",
+                    "label": "7 s"
+                  },
+                  {
+                    "id": "interval_15000",
+                    "label": "15 s"
+                  },
+                  {
+                    "id": "interval_30000",
+                    "label": "30 s"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "slideshow_skill.control_redevice_slideshow",
+                  "params": {
+                    "action": "$event.value"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "slideshow.interval"
               }
             },
             {
@@ -1446,6 +1519,18 @@
           "initialState": {
             "slideshowFolder": ""
           },
+          "autoActions": [
+            {
+              "id": "slideshow_folders_refresh",
+              "intervalMs": 5000,
+              "action": {
+                "on": "interval",
+                "type": "callSkill",
+                "target": "slideshow_skill.get_slideshow_folders",
+                "params": {}
+              }
+            }
+          ],
           "layout": {
             "type": "single",
             "pattern": "stack",
@@ -1886,6 +1971,8 @@
         "slideshow.refresh_index": "Refresh index",
         "slideshow.cancel_index": "Cancel index",
         "slideshow.folders": "Folders",
+        "slideshow.cache": "Cache",
+        "slideshow.cache_folder": "Cache folder",
         "slideshow.preview_photos": "Preview photos",
         "slideshow.prev": "Prev",
         "slideshow.fav": "Fav",
@@ -1910,6 +1997,7 @@
         "slideshow.endpoint_sync": "Endpoint sync",
         "slideshow.synchronous": "Synchronous",
         "slideshow.independent": "Independent",
+        "slideshow.interval": "Interval",
         "slideshow.display": "Display",
         "slideshow.fit": "Fit",
         "slideshow.crop": "Crop",
@@ -1977,6 +2065,8 @@
         "slideshow.refresh_index": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c \u0438\u043d\u0434\u0435\u043a\u0441",
         "slideshow.cancel_index": "\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c \u0438\u043d\u0434\u0435\u043a\u0441",
         "slideshow.folders": "\u041f\u0430\u043f\u043a\u0438",
+        "slideshow.cache": "\u041a\u0435\u0448",
+        "slideshow.cache_folder": "\u041a\u0435\u0448\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u0430\u043f\u043a\u0443",
         "slideshow.preview_photos": "\u041f\u0440\u0435\u0434\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440 \u0444\u043e\u0442\u043e",
         "slideshow.prev": "\u041d\u0430\u0437\u0430\u0434",
         "slideshow.fav": "\u0418\u0437\u0431\u0440.",
@@ -2001,6 +2091,7 @@
         "slideshow.endpoint_sync": "\u0421\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f endpoints",
         "slideshow.synchronous": "\u0421\u0438\u043d\u0445\u0440\u043e\u043d\u043d\u043e",
         "slideshow.independent": "\u041d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e",
+        "slideshow.interval": "\u0418\u043d\u0442\u0435\u0440\u0432\u0430\u043b",
         "slideshow.display": "\u041e\u0442\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435",
         "slideshow.fit": "\u0412\u043f\u0438\u0441\u0430\u0442\u044c",
         "slideshow.crop": "\u041e\u0431\u0440\u0435\u0437\u0430\u0442\u044c",
