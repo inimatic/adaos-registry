@@ -1,10 +1,11 @@
 name: redevice_settings
-version: 0.1.19
+version: 0.1.20
 description: Service skill for ReDevice endpoint settings, assignment, status, and
   policy-bound device actions.
 runtime:
   python: '3.11'
 entry: handlers/main.py
+webui_owner: shared
 webui:
   file: webui.json
 activation:
@@ -299,7 +300,7 @@ memory_budget:
     max_items: 32
     cleanup_hook: webio.stream.subscription.changed
   background_workers: []
-updated_at: '2026-08-05T16:04:00+00:00'
+updated_at: '2026-08-05T16:42:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.0+3564.55f7b169
