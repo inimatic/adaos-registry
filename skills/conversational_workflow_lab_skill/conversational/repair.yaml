@@ -1,0 +1,8 @@
+schema: adaos.conversational.repair.v1
+package_id: conversational_workflow_lab_skill
+policies:
+- id: no_match
+  kind: no_match
+  max_attempts: 2
+  output_ref: lab_repair_no_match
+  terminal_outcome: clarification

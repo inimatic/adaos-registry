@@ -1,0 +1,20 @@
+schema: adaos.conversational.story.v1
+id: lab.no_match.en
+title: Read-only status does not mutate
+story_kind: workflow
+workflow_type: conversational_lab.request
+locale: en
+channel: text
+actor: {id: 'user:local', permissions: [], roles: [registered]}
+start: {instance_id: 'lab:story:no-match', state: collecting, generation: 0, context: {}}
+steps:
+- user: Show the request status
+  given: {proposal: null, event: null, skill_result: null, output_ref: lab_repair_no_match}
+  expect:
+    proposal: null
+    command: null
+    transition_id: null
+    state: collecting
+    reason_code: null
+    output: {kind: repair, output_ref: lab_repair_no_match, summary: 'Choose an available action or rephrase the request.', actions: [], next_expected_input: text}
+    repair: {reason_code: no_match, next_expected_input: text}

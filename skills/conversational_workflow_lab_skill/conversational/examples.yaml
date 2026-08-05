@@ -1,0 +1,20 @@
+schema: adaos.conversational.examples.v1
+package_id: conversational_workflow_lab_skill
+examples:
+- {id: lab_submit.en, intent_id: lab_submit, text: Submit this request for review, locale: en, source: authored, entities: []}
+- {id: lab_submit.ru, intent_id: lab_submit, text: Передай запрос на проверку, locale: ru, source: authored, entities: []}
+- {id: lab_approve.en, intent_id: lab_approve, text: Approve the request, locale: en, source: authored, entities: []}
+- {id: lab_approve.ru, intent_id: lab_approve, text: Одобри запрос, locale: ru, source: authored, entities: []}
+- {id: lab_revise.en, intent_id: lab_revise, text: Return the request for revision, locale: en, source: authored, entities: []}
+- {id: lab_revise.ru, intent_id: lab_revise, text: Верни запрос на доработку, locale: ru, source: authored, entities: []}
+- {id: lab_cancel.en, intent_id: lab_cancel, text: Cancel this request, locale: en, source: authored, entities: []}
+- {id: lab_cancel.ru, intent_id: lab_cancel, text: Отмени этот запрос, locale: ru, source: authored, entities: []}
+hard_negatives:
+- id: lab.negative.status.en
+  text: Show the request status
+  locale: en
+  reason: A read-only status request must not mutate the workflow.
+- id: lab.negative.status.ru
+  text: Покажи состояние запроса
+  locale: ru
+  reason: Запрос состояния не должен изменять workflow.

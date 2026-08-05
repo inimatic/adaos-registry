@@ -1,0 +1,38 @@
+schema: adaos.conversational.package_manifest.v1
+package_id: conversational_workflow_lab_skill
+package_kind: skill
+owner_ref:
+  kind: skill
+  id: conversational_workflow_lab_skill
+version: 0.1.0
+workflow_refs:
+- workflow_type: conversational_lab.request
+  definition_ref: ../workflow.json
+  definition_version: 1.0.0
+  definition_digest: null
+files:
+  input: input.yaml
+  entities: entities.yaml
+  examples: examples.yaml
+  affordances: affordances.yaml
+  repair: repair.yaml
+  output: output.yaml
+  stories:
+  - tests/stories/submit-review.yaml
+  - tests/stories/no-match.yaml
+  locales:
+  - locale.en.yaml
+  - locale.ru.yaml
+  matchers: matchers.yaml
+locales:
+- en
+- ru
+default_locale: en
+privacy_defaults:
+  source_scope: skill
+  runtime_overlay_scope: user
+  public_promotion: requires_review
+compiled_outputs: []
+compatibility_aliases: []
+metadata:
+  generated_by: adaos.sdk.developer.conversational

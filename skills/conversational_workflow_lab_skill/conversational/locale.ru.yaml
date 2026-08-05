@@ -1,0 +1,13 @@
+schema: adaos.conversational.locale.v1
+package_id: conversational_workflow_lab_skill
+locale: ru
+messages:
+  action.submit.label: Передать на проверку
+  action.approve.label: Одобрить
+  action.revise.label: Вернуть на доработку
+  action.cancel.label: Отменить
+  output.submitted.summary: Запрос передан на проверку.
+  output.approved.summary: Запрос одобрен.
+  output.revise.summary: Запрос возвращён на доработку.
+  output.cancelled.summary: Запрос отменён.
+  output.no_match.summary: Выберите доступное действие или переформулируйте запрос.

@@ -1,0 +1,58 @@
+{
+  "$schema": "../../abi/builder.draft.v1.schema.json",
+  "draft_id": "template.skill_default",
+  "task_id": "template",
+  "status": "draft",
+  "source": {
+    "type": "template",
+    "text": "Default Builder skill template."
+  },
+  "artifact": {
+    "kind": "skill",
+    "id": "new_skill",
+    "template_id": "skill_default",
+    "draft_root": ".",
+    "files": [
+      { "path": "skill.yaml", "role": "manifest", "required": true },
+      { "path": "handlers/main.py", "role": "handler", "required": true },
+      { "path": "tests/test_module_integrity.py", "role": "test", "required": true },
+      { "path": "interpreter/intents.yml", "role": "nlu", "required": false },
+      { "path": "skill_prompt.md", "role": "doc", "required": false }
+    ]
+  },
+  "metadata": {
+    "source_idea": "Replace with the Builder task idea before publishing a draft.",
+    "assumptions": [
+      "Skill id, actions, tools, and data routes must be filled from the Builder task.",
+      "Browser-facing output must use explicit data_routes before activation."
+    ],
+    "risk_notes": [
+      "New permissions, external IO, service runtime, and high-rate streams require human review."
+    ],
+    "expected_tests": [
+      "tests/test_module_integrity.py"
+    ],
+    "route_plan_required": true,
+    "human_review_required": true
+  },
+  "quality_gates": {
+    "schemas": [
+      "skill.schema.json"
+    ],
+    "tests": [
+      "skill template module integrity"
+    ],
+    "previews": [
+      "manifest validation",
+      "route plan review"
+    ],
+    "requires_human_approval": [
+      "new permissions",
+      "external IO",
+      "service runtime",
+      "high-rate streams",
+      "destructive actions"
+    ]
+  },
+  "links": {}
+}

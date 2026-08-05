@@ -1,0 +1,11 @@
+schema: adaos.conversational.matchers.v1
+package_id: conversational_workflow_lab_skill
+matchers:
+- {id: lab_submit.en, kind: regex, intent_id: lab_submit, locale: en, pattern: '^submit (?:this |the )?request(?: for review)?$', flags: [ignore_case, unicode], slots: {}, source: authored, provenance: {source: phase_11_lab}}
+- {id: lab_submit.ru, kind: regex, intent_id: lab_submit, locale: ru, pattern: '^передай (?:этот )?запрос на проверку$', flags: [ignore_case, unicode], slots: {}, source: authored, provenance: {source: phase_11_lab}}
+- {id: lab_approve.en, kind: exact, intent_id: lab_approve, locale: en, pattern: 'Approve the request', flags: [ignore_case, unicode], slots: {}, source: authored, provenance: {source: phase_11_lab}}
+- {id: lab_approve.ru, kind: exact, intent_id: lab_approve, locale: ru, pattern: 'Одобри запрос', flags: [ignore_case, unicode], slots: {}, source: authored, provenance: {source: phase_11_lab}}
+- {id: lab_revise.en, kind: exact, intent_id: lab_revise, locale: en, pattern: 'Return the request for revision', flags: [ignore_case, unicode], slots: {}, source: authored, provenance: {source: phase_11_lab}}
+- {id: lab_revise.ru, kind: exact, intent_id: lab_revise, locale: ru, pattern: 'Верни запрос на доработку', flags: [ignore_case, unicode], slots: {}, source: authored, provenance: {source: phase_11_lab}}
+- {id: lab_cancel.en, kind: exact, intent_id: lab_cancel, locale: en, pattern: 'Cancel this request', flags: [ignore_case, unicode], slots: {}, source: authored, provenance: {source: phase_11_lab}}
+- {id: lab_cancel.ru, kind: exact, intent_id: lab_cancel, locale: ru, pattern: 'Отмени этот запрос', flags: [ignore_case, unicode], slots: {}, source: authored, provenance: {source: phase_11_lab}}

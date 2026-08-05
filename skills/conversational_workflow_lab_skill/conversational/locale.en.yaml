@@ -1,0 +1,13 @@
+schema: adaos.conversational.locale.v1
+package_id: conversational_workflow_lab_skill
+locale: en
+messages:
+  action.submit.label: Submit for review
+  action.approve.label: Approve
+  action.revise.label: Revise
+  action.cancel.label: Cancel
+  output.submitted.summary: Request submitted for review.
+  output.approved.summary: Request approved.
+  output.revise.summary: Request returned for revision.
+  output.cancelled.summary: Request cancelled.
+  output.no_match.summary: Choose an available action or rephrase the request.

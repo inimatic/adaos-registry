@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-05T16:04:00+00:00",
+  "updated_at": "2026-08-05T17:45:48+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -175,6 +175,28 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "tools_count": 9
+    },
+    {
+      "kind": "skill",
+      "id": "conversational_workflow_lab_skill",
+      "name": "conversational_workflow_lab_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-08-05T17:45:48+00:00",
+      "path": "skills/conversational_workflow_lab_skill",
+      "manifest": "skills/conversational_workflow_lab_skill/skill.yaml",
+      "source": {
+        "path": "skills/conversational_workflow_lab_skill",
+        "manifest": "skills/conversational_workflow_lab_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "conversational_workflow_lab_skill",
+        "id": "conversational_workflow_lab_skill"
+      },
+      "description": "A bounded reference skill for conversational, data-defined workflow control.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 3
     },
     {
       "kind": "skill",
@@ -671,7 +693,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-08-04T14:06:05+00:00",
+      "updated_at": "2026-08-05T14:23:05+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {

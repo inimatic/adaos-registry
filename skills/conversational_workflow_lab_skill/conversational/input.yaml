@@ -1,0 +1,51 @@
+schema: adaos.conversational.input.v1
+package_id: conversational_workflow_lab_skill
+intents:
+- id: lab_submit
+  description: Submit the collected request for review.
+  kind: workflow_command
+  affordance_id: lab_submit
+  workflow:
+    workflow_type: conversational_lab.request
+    command_id: submit
+    transition_id: submit
+  skill_invocation: null
+  example_ids: [lab_submit.en, lab_submit.ru]
+  slots: []
+- id: lab_approve
+  description: Approve the reviewed request.
+  kind: workflow_command
+  affordance_id: lab_approve
+  workflow:
+    workflow_type: conversational_lab.request
+    command_id: approve
+    transition_id: approve
+  skill_invocation: null
+  example_ids: [lab_approve.en, lab_approve.ru]
+  slots: []
+- id: lab_revise
+  description: Return the reviewed request for revision.
+  kind: workflow_command
+  affordance_id: lab_revise
+  workflow:
+    workflow_type: conversational_lab.request
+    command_id: revise
+    transition_id: revise
+  skill_invocation: null
+  example_ids: [lab_revise.en, lab_revise.ru]
+  slots: []
+- id: lab_cancel
+  description: Cancel the current request.
+  kind: workflow_command
+  affordance_id: lab_cancel
+  workflow:
+    workflow_type: conversational_lab.request
+    command_id: cancel
+    transition_id: cancel_collecting
+  skill_invocation: null
+  example_ids: [lab_cancel.en, lab_cancel.ru]
+  slots: []
+policy:
+  default_confidence: 0.8
+  abstain_below: 0.55
+  protected_action_confirmation: true

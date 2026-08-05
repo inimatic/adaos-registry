@@ -1,0 +1,193 @@
+name: conversational_workflow_lab_skill
+version: 0.1.1
+description: A bounded reference skill for conversational, data-defined workflow control.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+workflow:
+  manifest: workflow.json
+default_tool: chat
+runtime:
+  python: '3.11'
+dependencies: []
+events:
+  subscribe: []
+  publish:
+  - io.out.chat.append
+  - io.out.say
+exports:
+  tools:
+  - chat
+  - workflow_state
+  - workflow_action
+tools:
+- name: chat
+  description: Handle a skill-owned dialog turn using the canonical conversation ledger.
+  entry: handlers.main:chat
+  input_schema:
+    type: object
+    properties:
+      text:
+        type: string
+      webspace_id:
+        type: string
+      conversation_context:
+        type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - dialog
+- name: workflow_state
+  description: Return the governed workflow state and context-dependent actions.
+  entry: handlers.main:workflow_state
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+      conversation_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - dialog
+- name: workflow_action
+  description: Invoke one command admitted by the package workflow definition.
+  entry: handlers.main:workflow_action
+  input_schema:
+    type: object
+    required:
+    - command
+    properties:
+      command:
+        type: string
+      idempotency_key:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - message
+    - dialog
+    - workflow
+data_routes:
+- surface: skill conversation memory
+  route: skill-local
+  path: node_conversation_store:memory.skill_user.new_skill
+  owner: skill:conversational_workflow_lab_skill
+  first_paint: empty skill memory projection
+  recovery: memory.search/list rebuilds from node-local conversation store
+  guard_visibility: memory writes are proposed through Pending Actions before long-term
+    reuse
+  budget:
+    max_payload_bytes: 65536
+conversation:
+  dialog_channel:
+    id: conversational_workflow_lab_skill
+    label: Workflow Lab
+    owner: skill:conversational_workflow_lab_skill
+    default_tool: conversational_workflow_lab_skill.chat
+    route_id: voice_chat
+    history:
+      store: node
+      visible_tail_messages: 50
+    retrieval:
+      max_messages: 12
+      max_segments: 2
+      max_memory_items: 4
+      max_tokens: 1200
+    repair:
+      no_match: ask_for_details
+      correction: pass_to_tool
+      cancel: close_active_frame
+    response:
+      default_targets:
+      - text_tail
+      - speech_text
+      renderer: dialog.visible_tail
+  history:
+    store: node
+    owner: skill:conversational_workflow_lab_skill
+    retention_class: normal
+  retrieval:
+    strategy: recent_plus_segments_plus_memory
+    cross_owner_memory: deny_by_default
+  memory:
+    scopes:
+    - conversation
+    - skill_user
+    - agent_user
+    consent: required_for_reusable_memory
+    default_visibility: owner
+  response:
+    default_targets:
+    - text_tail
+    - speech_text
+    structured_envelope: true
+  forms:
+  - id: details
+    kind: slot_collection
+    required_slots:
+    - details
+    repair:
+      max_turns: 3
+      on_exhausted: fallback_to_summary
+  agents:
+  - id: agent:conversational_workflow_lab_skill:assistant
+    label: Workflow guide
+    owner: skill:conversational_workflow_lab_skill
+    kind: skill_agent
+    channel_id: conversational_workflow_lab_skill
+    skill: conversational_workflow_lab_skill
+    talk_tool: chat
+    gender: neutral
+    voice: default
+    icon: sparkles-outline
+    aliases:
+    - Workflow Lab
+    - Лаборатория процесса
+llm_hints:
+  description: ''
+  aliases: []
+  primary_actions:
+  - id: conversational_workflow_lab_skill.chat
+    intent: conversational_workflow_lab_skill.chat
+    tool: chat
+    side_effect_class: local_write
+    examples:
+    - Ask the skill for help
+  - id: conversational_workflow_lab_skill.workflow_state
+    intent: conversational_workflow_lab_skill.workflow_state
+    tool: workflow_state
+    side_effect_class: local_write
+    examples:
+    - Show the current workflow state
+    - Покажи текущее состояние процесса
+  examples: []
+  owner_hints:
+  - skill:conversational_workflow_lab_skill
+nlu_hints:
+  aliases: []
+  examples: []
+  slot_schemas: {}
+  entities: []
+conversational:
+  manifest: conversational/manifest.yaml
+updated_at: '2026-08-05T17:45:48+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.676+4481.0a23efa2
+    recorded_at: '2026-08-05T17:45:48+00:00'
+    source: skill_push
+    min_commit: 0a23efa2d9a58b8bd23d8092ee0cf3334145e83c
+    min_short_commit: 0a23efa2
+    build_date: '2026-08-05T20:43:19+03:00'
+

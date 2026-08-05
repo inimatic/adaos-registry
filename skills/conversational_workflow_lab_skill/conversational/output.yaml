@@ -1,0 +1,8 @@
+schema: adaos.conversational.output.v1
+package_id: conversational_workflow_lab_skill
+outputs:
+- {id: lab_submitted, kind: result, audience: user, risk_level: low, reason_code: lab_submitted, explanation: The request entered review., summary: Request submitted for review., summary_ref: output.submitted.summary, content_parts: [], details: [], actions: [], next_expected_input: none, handoff_target: null}
+- {id: lab_approved, kind: result, audience: user, risk_level: high, reason_code: lab_approved, explanation: The reviewed request was approved., summary: Request approved., summary_ref: output.approved.summary, content_parts: [], details: [], actions: [], next_expected_input: none, handoff_target: null}
+- {id: lab_revision_requested, kind: result, audience: user, risk_level: low, reason_code: lab_revision_requested, explanation: The request returned to collection., summary: Request returned for revision., summary_ref: output.revise.summary, content_parts: [], details: [], actions: [], next_expected_input: text, handoff_target: null}
+- {id: lab_cancelled, kind: result, audience: user, risk_level: high, reason_code: lab_cancelled, explanation: The request was cancelled., summary: Request cancelled., summary_ref: output.cancelled.summary, content_parts: [], details: [], actions: [], next_expected_input: none, handoff_target: null}
+- {id: lab_repair_no_match, kind: repair, audience: user, risk_level: none, reason_code: no_match, explanation: The text did not match an available command., summary: Choose an available action or rephrase the request., summary_ref: output.no_match.summary, content_parts: [], details: [], actions: [], next_expected_input: text, handoff_target: null}

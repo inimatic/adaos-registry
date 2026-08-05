@@ -1,0 +1,47 @@
+schema: adaos.conversational.affordances.v1
+package_id: conversational_workflow_lab_skill
+affordances:
+- id: lab_submit
+  kind: workflow_command
+  label: Submit for review
+  label_ref: action.submit.label
+  description: Submit the current request for review.
+  workflow: {workflow_type: conversational_lab.request, command_id: submit, transition_id: submit}
+  skill_invocation: null
+  action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: local_reversible, side_effect: reversible, confirmation: none}
+  required_capabilities: []
+  presentation: {hint: button, priority: 10}
+  output_refs: [lab_submitted]
+- id: lab_approve
+  kind: workflow_command
+  label: Approve
+  label_ref: action.approve.label
+  description: Approve the reviewed request.
+  workflow: {workflow_type: conversational_lab.request, command_id: approve, transition_id: approve}
+  skill_invocation: null
+  action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: workspace_activation, side_effect: external, confirmation: required}
+  required_capabilities: []
+  presentation: {hint: button, priority: 10}
+  output_refs: [lab_approved]
+- id: lab_revise
+  kind: workflow_command
+  label: Revise
+  label_ref: action.revise.label
+  description: Return the request for revision.
+  workflow: {workflow_type: conversational_lab.request, command_id: revise, transition_id: revise}
+  skill_invocation: null
+  action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: local_reversible, side_effect: reversible, confirmation: none}
+  required_capabilities: []
+  presentation: {hint: button, priority: 20}
+  output_refs: [lab_revision_requested]
+- id: lab_cancel
+  kind: workflow_command
+  label: Cancel
+  label_ref: action.cancel.label
+  description: Cancel the current request.
+  workflow: {workflow_type: conversational_lab.request, command_id: cancel, transition_id: cancel_collecting}
+  skill_invocation: null
+  action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: destructive, side_effect: destructive, confirmation: required}
+  required_capabilities: []
+  presentation: {hint: button, priority: 90}
+  output_refs: [lab_cancelled]
