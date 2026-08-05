@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-05T17:45:48+00:00",
+  "updated_at": "2026-08-05T17:57:47+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -180,8 +180,8 @@
       "kind": "skill",
       "id": "conversational_workflow_lab_skill",
       "name": "conversational_workflow_lab_skill",
-      "version": "0.1.1",
-      "updated_at": "2026-08-05T17:45:48+00:00",
+      "version": "0.1.2",
+      "updated_at": "2026-08-05T17:57:47+00:00",
       "path": "skills/conversational_workflow_lab_skill",
       "manifest": "skills/conversational_workflow_lab_skill/skill.yaml",
       "source": {

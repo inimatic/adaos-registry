@@ -4,7 +4,7 @@ package_kind: skill
 owner_ref:
   kind: skill
   id: conversational_workflow_lab_skill
-version: 0.1.1
+version: 0.1.2
 workflow_refs:
 - workflow_type: conversational_lab.request
   definition_ref: ../workflow.json
@@ -36,3 +36,4 @@ compiled_outputs: []
 compatibility_aliases: []
 metadata:
   generated_by: adaos.sdk.developer.conversational
+

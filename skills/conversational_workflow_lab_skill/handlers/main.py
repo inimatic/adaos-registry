@@ -82,17 +82,6 @@ def _present(dialog: Mapping[str, Any]) -> dict[str, Any]:
         dialog["instance_id"],
         actor_id=dialog["actor_id"],
     )
-    interaction = sdk_workflow.create_interaction(
-        _root() / "workflow.json",
-        dialog["instance_id"],
-        actor_id=dialog["actor_id"],
-        conversation_id=dialog["conversation_id"],
-        owner=f"skill:{SKILL_ID}",
-        command_context_id=f"{SKILL_ID}:{dialog['webspace_id']}",
-        prompt=_message(str(description["state"]), str(dialog["locale"])),
-        thread_id=dialog["thread_id"],
-        metadata={"locale": dialog["locale"], "source": "package_workflow"},
-    )
     if description["terminal"]:
         sent = sdk_chat.send(
             _message(str(description["state"]), str(dialog["locale"])),
@@ -108,7 +97,18 @@ def _present(dialog: Mapping[str, Any]) -> dict[str, Any]:
             thread_id=dialog["thread_id"],
             meta={"io_type": dialog["io_type"], "workflow_state": description["state"]},
         )
-        return {"description": description, "interaction": interaction, "materialization": sent}
+        return {"description": description, "interaction": None, "materialization": sent}
+    interaction = sdk_workflow.create_interaction(
+        _root() / "workflow.json",
+        dialog["instance_id"],
+        actor_id=dialog["actor_id"],
+        conversation_id=dialog["conversation_id"],
+        owner=f"skill:{SKILL_ID}",
+        command_context_id=f"{SKILL_ID}:{dialog['webspace_id']}",
+        prompt=_message(str(description["state"]), str(dialog["locale"])),
+        thread_id=dialog["thread_id"],
+        metadata={"locale": dialog["locale"], "source": "package_workflow"},
+    )
     presented = sdk_chat.present(
         interaction,
         conversation_id=dialog["conversation_id"],

@@ -1,5 +1,5 @@
 name: conversational_workflow_lab_skill
-version: 0.1.1
+version: 0.1.2
 description: A bounded reference skill for conversational, data-defined workflow control.
 supported_locales:
 - en
@@ -181,13 +181,13 @@ nlu_hints:
   entities: []
 conversational:
   manifest: conversational/manifest.yaml
-updated_at: '2026-08-05T17:45:48+00:00'
+updated_at: '2026-08-05T17:57:47+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.676+4481.0a23efa2
-    recorded_at: '2026-08-05T17:45:48+00:00'
+    min_version: 0.1.676+4483.4c2a1847
+    recorded_at: '2026-08-05T17:57:47+00:00'
     source: skill_push
-    min_commit: 0a23efa2d9a58b8bd23d8092ee0cf3334145e83c
-    min_short_commit: 0a23efa2
-    build_date: '2026-08-05T20:43:19+03:00'
+    min_commit: 4c2a1847a6e8d671609dc582506eb55901ee1425
+    min_short_commit: 4c2a1847
+    build_date: '2026-08-05T20:57:26+03:00'
 

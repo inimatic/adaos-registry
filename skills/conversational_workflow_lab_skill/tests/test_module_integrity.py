@@ -38,7 +38,8 @@ def test_conversation_projects_only_context_dependent_actions(tmp_path, monkeypa
         webspace_id="lab-test",
         locale="ru",
     )
-    assert duplicate["ok"] is False
+    assert duplicate["ok"] is True
+    assert duplicate["execution"]["status"] == "duplicate"
     assert duplicate["workflow"]["state"] == "review"
 
     approved = module.workflow_action(
