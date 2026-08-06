@@ -6091,10 +6091,52 @@ def test_workflow_text_commands_bypass_automation_and_llm_routing(monkeypatch) -
         lambda **_kwargs: pytest.fail("workflow control must not start LLM/Codex work"),
     )
 
-    result = skill.chat("Показать процесс", webspace_id="dev1")
+    result = skill.chat(
+        "Показать процесс",
+        webspace_id="dev1",
+        conversation_context={"locale": "en"},
+    )
 
     assert result["status"] == "workflow_inspected"
     assert captured[0]["command"]["intent"] == "workflow.inspect"
+    assert captured[0]["_meta"]["locale"] == "en"
+
+
+def test_workflow_inspection_uses_localized_process_projection(monkeypatch) -> None:
+    skill = _load_module()
+    calls: list[tuple[str, str | None]] = []
+    monkeypatch.setattr(skill, "_session_summary", lambda _session: {"scenario_id": "recipes"})
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_interaction_frame",
+        lambda _kind, _project, *, locale=None: calls.append(("frame", locale))
+        or {"message": "compact"},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_workflow,
+        "get_process_explanation",
+        lambda _kind, _project, *, locale=None: calls.append(("process", locale))
+        or {"text": "Проект: Recipes\n✓ Стабильная версия — опубликовано"},
+    )
+    monkeypatch.setattr(
+        skill,
+        "_present_project_workflow_interaction",
+        lambda **_kwargs: {"handle": {"interaction_id": "interaction.process"}, "presentation": {}},
+    )
+    monkeypatch.setattr(skill, "_builder_command_response", lambda **kwargs: kwargs)
+
+    result = skill._handle_project_context_command(
+        webspace_id="dev1",
+        session={"scenario_id": "recipes", "title": "Recipes"},
+        binding={"runtime_scenario_id": "recipes"},
+        topic={"thread_id": "prompt-project:scenario:recipes"},
+        command={"intent": "workflow.inspect"},
+        _meta={"locale": "ru"},
+    )
+
+    assert calls == [("frame", "ru"), ("process", "ru")]
+    assert result["message"].startswith(f"{skill.AGENT_LABEL}:\nПроект: Recipes")
+    assert result["extra"]["process_explanation"]["text"].startswith("Проект: Recipes")
 
 
 def test_current_project_router_fallback_is_materialized_once_by_router(monkeypatch) -> None:

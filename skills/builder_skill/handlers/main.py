@@ -9468,10 +9468,38 @@ def _handle_project_context_command(
     intent = str(command.get("intent") or "")
     extra: dict[str, Any] = {}
     if intent == "workflow.inspect":
-        frame = sdk_builder_workflow.get_interaction_frame("scenario", object_id)
-        message = f"{AGENT_LABEL}: {str(frame.get('message') or 'Состояние процесса доступно.') }"
+        chat_meta = _chat_meta(
+            _meta,
+            webspace_id=webspace_id,
+            session=session,
+            binding=binding,
+            topic_ref=topic,
+        )
+        locale = str(
+            chat_meta.get("locale")
+            or chat_meta.get("language")
+            or chat_meta.get("language_code")
+            or (_meta or {}).get("locale")
+            or (_meta or {}).get("language_code")
+            or "ru"
+        ).strip()
+        frame = sdk_builder_workflow.get_interaction_frame(
+            "scenario",
+            object_id,
+            locale=locale,
+        )
+        process = sdk_builder_workflow.get_process_explanation(
+            "scenario",
+            object_id,
+            locale=locale,
+        )
+        message = (
+            f"{AGENT_LABEL}:\n"
+            f"{str(process.get('text') or frame.get('message') or 'Состояние процесса доступно.')}"
+        )
         status = "workflow_inspected"
         extra["workflow_frame"] = frame
+        extra["process_explanation"] = process
     else:
         stage = str(command.get("stage") or "prototype").strip()
         try:
@@ -10704,6 +10732,15 @@ def chat(
         "builder_source_webspace_id": ws,
         "builder_context": dict(context),
     }
+    # Router metadata remains authoritative, while direct SDK/API callers can
+    # supply the same language preference through their bounded conversation
+    # context. Keep this mapping deliberately narrow: conversation context is
+    # not a generic authority-bearing metadata override.
+    if isinstance(conversation_context, Mapping):
+        for locale_key in ("locale", "language", "language_code"):
+            locale_value = str(conversation_context.get(locale_key) or "").strip()
+            if locale_value and not str(turn_meta.get(locale_key) or "").strip():
+                turn_meta[locale_key] = locale_value
     # Incoming project topic/thread is authoritative.  Align selection before
     # resolving the target session so a stale workbench cannot route this turn.
     requested_binding = _align_workbench_binding_to_meta(ws, turn_meta)
