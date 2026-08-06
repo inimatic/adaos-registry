@@ -69,6 +69,53 @@ def test_snapshot_request_publishes_only_requested_receiver(monkeypatch):
     assert published[0][2] == {"webspace_id": "ws-1"}
 
 
+def test_folder_items_survive_process_cache_reset_without_sqlite_query(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+    root = tmp_path / "photos"
+    root.mkdir()
+    monkeypatch.setenv("SLIDESHOW_DATA_DIR", str(tmp_path / "state"))
+    monkeypatch.setattr(mod, "_ensure_index", lambda _root: {"ok": True})
+
+    with mod._connect_index() as conn:
+        conn.execute(
+            """
+            INSERT INTO photos (
+                content_ref, source_path, root_dir, rel_path, top_folder,
+                source_name, ext, size, mtime, favorite, hidden, indexed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "content:one",
+                str(root / "Trips" / "one.jpg"),
+                str(root),
+                "Trips/one.jpg",
+                "Trips",
+                "one.jpg",
+                ".jpg",
+                10,
+                1,
+                0,
+                0,
+                1.0,
+            ),
+        )
+
+    state = {"source_dir": str(root), "selected_folder": "Trips"}
+    first = mod._folder_items(state)
+    assert [item["id"] for item in first] == ["", "Trips"]
+    assert mod._folder_snapshot_path().exists()
+
+    mod._invalidate_folder_cache(persistent=False)
+    monkeypatch.setattr(
+        mod,
+        "_connect_index",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("persisted folder snapshot must avoid SQLite")),
+    )
+
+    second = mod._folder_items(state)
+    assert second == first
+
+
 def test_subscription_changed_does_not_build_snapshot(monkeypatch):
     mod = _load_slideshow_module()
 

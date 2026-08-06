@@ -263,6 +263,65 @@ def _index_path() -> Path:
     return _internal_data_dir() / "photos.sqlite3"
 
 
+def _folder_snapshot_path() -> Path:
+    return _internal_data_dir() / "folders.v1.json"
+
+
+def _with_folder_selection(items: list[dict[str, Any]], selected: str) -> list[dict[str, Any]]:
+    return [
+        {**dict(item), "selected": _text(item.get("id")) == selected}
+        for item in items
+        if isinstance(item, Mapping)
+    ]
+
+
+def _load_folder_snapshot(root: Path, selected: str) -> list[dict[str, Any]] | None:
+    path = _folder_snapshot_path()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(payload, Mapping) or int(payload.get("schema") or 0) != 1:
+        return None
+    if _text(payload.get("source_dir")).casefold() != str(root).casefold():
+        return None
+    raw_items = payload.get("items")
+    if not isinstance(raw_items, list) or len(raw_items) > _MAX_FOLDER_STREAM_ITEMS + 1:
+        return None
+    items = [dict(item) for item in raw_items if isinstance(item, Mapping)]
+    return _with_folder_selection(items, selected) if items else None
+
+
+def _store_folder_snapshot(root: Path, items: list[dict[str, Any]]) -> None:
+    path = _folder_snapshot_path()
+    temp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    payload = {
+        "schema": 1,
+        "source_dir": str(root),
+        "updated_at": _now(),
+        "items": [{**dict(item), "selected": False} for item in items],
+    }
+    try:
+        temp.write_text(json.dumps(payload, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        os.replace(temp, path)
+    except Exception:
+        _log.debug("failed to persist slideshow folder snapshot path=%s", path, exc_info=True)
+        try:
+            temp.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
+def _invalidate_folder_cache(*, persistent: bool = True) -> None:
+    with _folder_cache_lock:
+        _folder_cache.clear()
+    if persistent:
+        try:
+            _folder_snapshot_path().unlink(missing_ok=True)
+        except Exception:
+            _log.debug("failed to invalidate slideshow folder snapshot", exc_info=True)
+
+
 def _default_state() -> dict[str, Any]:
     return {
         "selected_codes": [],
@@ -849,8 +908,7 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
         "source": "scan",
     }
     _memory_set(_INDEX_META_KEY, meta)
-    with _folder_cache_lock:
-        _folder_cache.clear()
+    _invalidate_folder_cache()
     status = _set_index_status(
         {
             "ok": True,
@@ -985,8 +1043,7 @@ def dispose(reason: str | None = None, **_: Any) -> dict[str, Any]:
         _snapshot_seen_at.clear()
     with _device_cache_lock:
         _device_cache_jobs.clear()
-    with _folder_cache_lock:
-        _folder_cache.clear()
+    _invalidate_folder_cache(persistent=False)
     return {
         "ok": True,
         "reason": _text(reason) or "dispose",
@@ -1099,8 +1156,7 @@ def _set_favorite(root: Path, content_ref: str, favorite: bool) -> None:
                 "UPDATE photos SET favorite = ? WHERE root_dir = ? AND content_ref = ?",
                 (1 if favorite else 0, str(root), content_ref),
             )
-        with _folder_cache_lock:
-            _folder_cache.clear()
+        _invalidate_folder_cache()
     except Exception:
         _log.debug("failed to update slideshow favorite ref=%s", content_ref, exc_info=True)
 
@@ -1112,8 +1168,7 @@ def _set_hidden(root: Path, content_ref: str, hidden: bool) -> None:
                 "UPDATE photos SET hidden = ? WHERE root_dir = ? AND content_ref = ?",
                 (1 if hidden else 0, str(root), content_ref),
             )
-        with _folder_cache_lock:
-            _folder_cache.clear()
+        _invalidate_folder_cache()
     except Exception:
         _log.debug("failed to update slideshow hidden ref=%s", content_ref, exc_info=True)
 
@@ -1143,6 +1198,13 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
                 return [dict(item) for item in cached]
     except Exception:
         cache_key = None
+    persisted = _load_folder_snapshot(root, selected)
+    if persisted is not None:
+        if cache_key is not None:
+            with _folder_cache_lock:
+                _folder_cache.clear()
+                _folder_cache[cache_key] = [dict(item) for item in persisted]
+        return persisted
     items = [{"id": "", "title": "All photos", "subtitle": str(root), "selected": selected == "", "selectable": True}]
     total_folders = 0
     try:
@@ -1203,6 +1265,7 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
         with _folder_cache_lock:
             _folder_cache.clear()
             _folder_cache[cache_key] = [dict(item) for item in items]
+    _store_folder_snapshot(root, items)
     return items
 
 
