@@ -1,0 +1,3782 @@
+{
+  "object_type": "scenario",
+  "object_id": "builder",
+  "base_tz": "# Builder — Рабочее место\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n",
+  "tz_addenda": [],
+  "prepare": {
+    "general_prompt": "",
+    "iterations": []
+  },
+  "generate": {
+    "general_prompt": "",
+    "iterations": []
+  },
+  "llm_profile_id": null,
+  "builder_llm_model": null,
+  "llm_provider": null,
+  "llm_profile": null,
+  "llm_profile_updated_at": null,
+  "target_node_id": null,
+  "workflow_state": "automation",
+  "archived": false,
+  "updated_at": "2026-08-01T06:01:09+00:00",
+  "workflow": {
+    "schema": "adaos.builder.workflow.v1",
+    "generation": 134,
+    "active_phase": "automation",
+    "prototype": {
+      "head_revision": "058",
+      "status": "frozen",
+      "stable": true,
+      "derived_from_automation_task": "builder-conversational-refactor",
+      "resumed_at": "2026-07-29T11:10:03+00:00",
+      "frozen_at": "2026-07-30T05:37:58+00:00",
+      "revised_at": "2026-07-29T11:13:25+00:00",
+      "stabilized_at": "2026-07-30T05:36:33+00:00"
+    },
+    "automation": {
+      "status": "completed",
+      "iteration": 14,
+      "source_prototype_revision": "058",
+      "frozen_at": "2026-07-29T11:10:03+00:00",
+      "head_task_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+      "started_at": "2026-07-30T05:37:58+00:00",
+      "completed_at": "2026-07-30T05:46:17+00:00",
+      "error": null,
+      "snapshot_task_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+      "result_version": "0.2.54",
+      "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+    },
+    "delivery": {
+      "status": "published",
+      "candidate_id": "builder-0-2-55-a3c36bcaf45e",
+      "release": "builder@0.2.55",
+      "release_digest": "sha256:f671756e91dc8540d400e1c1b87443f00bbc67a89ac6b41ce110466ea4e3a007",
+      "package_digest": "sha256:8602a3643ee9b6baec2fbefee97d2b4993b625c7b56cfb8deb77a3c36bcaf45e",
+      "base_release": "builder@0.2.40",
+      "base_release_digest": "sha256:9457a35805940f6de6b12f293b49dd78147caf4d446961eb9cadc60cc38657c8",
+      "trial_workspace": "D:\\git\\inimatic\\adaos\\.adaos\\state\\artifact_pipeline\\trials\\builder-0-2-55-a3c36bcaf45e\\workspace",
+      "prepared_at": "2026-07-30T05:56:41+00:00",
+      "decided_at": "2026-07-30T05:57:48+00:00",
+      "stale_reason": null,
+      "replaces_candidate_id": null,
+      "rebase_plan": null,
+      "decision_observations": [
+        {
+          "schema": "adaos.artifact.trial.v1",
+          "trial_id": "trial-builder-0-2-55-a3c36bcaf45e",
+          "candidate_digest": "sha256:bf96eb05a75bb67b4e4c8ae43b4cf38ee2de2f872dd6ee6e15b8b8a245253bff",
+          "audience": "owner",
+          "data_mode": "empty",
+          "lock_digest": "sha256:eb195cdd8d9e72d03d3c5598b49c7e636026ec13f1237bc62f7052aca98e1fa4",
+          "started_at": "2026-07-30T05:56:41+00:00",
+          "status": "accepted",
+          "observations": [
+            {
+              "actor": "builder.user",
+              "decision": "accepted_for_stable",
+              "source": "publication_confirmation"
+            }
+          ],
+          "ended_at": "2026-07-30T05:57:48+00:00",
+          "isolation_evidence": {
+            "status": "verified",
+            "mode": "empty",
+            "reason": "isolated trial Workspace has no seeded data"
+          },
+          "reload_receipt": {
+            "status": "skipped",
+            "mode": "policy_skip",
+            "approved_by": "artifact_pipeline.isolated_trial",
+            "reason": "isolated trial Workspace is not attached to a live runtime",
+            "recorded_at": "2026-07-30T05:56:41+00:00"
+          },
+          "health_receipt": {
+            "status": "passed",
+            "check": "verified_package_materialization",
+            "lock_digest": "sha256:eb195cdd8d9e72d03d3c5598b49c7e636026ec13f1237bc62f7052aca98e1fa4",
+            "mode": "callback",
+            "recorded_at": "2026-07-30T05:56:41+00:00"
+          },
+          "rollback_receipt": {
+            "status": "not_required",
+            "reason": "trial accepted for promotion",
+            "recorded_at": "2026-07-30T05:57:48+00:00"
+          },
+          "duration_seconds": 67
+        }
+      ],
+      "published_at": "2026-07-30T05:57:53+00:00"
+    },
+    "publication": {
+      "status": "published",
+      "current_version": "0.2.55",
+      "published_at": "2026-07-30T05:57:53+00:00",
+      "source_automation_task": "task.01KYRRF3CS62DM156EXEAWH54Z",
+      "release": "builder@0.2.55"
+    },
+    "change": {
+      "schema": "adaos.builder.change.v1",
+      "change_set_id": "CH-builder-conversational-refactor",
+      "request": "Refactor Builder into a chat-first, state-backed development workbench while preserving the recovered functional control plane.",
+      "request_addenda": [],
+      "route": "prototype_first",
+      "gate": "complete",
+      "status": "published",
+      "issues": [
+        {
+          "issue_id": "canonical-change-run-context",
+          "title": "Use canonical Issue, Change, Run, and bounded context packet contracts",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "One user objective has one Change identity, follow-up executions are Runs, and legacy change_set remains only a compatibility projection."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        },
+        {
+          "issue_id": "risk-aware-actions",
+          "title": "Expose deterministic risk-classified actions with optimistic locking",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "Every projected command carries risk, target, and expected workflow generation; stale commands do not mutate workflow state."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        },
+        {
+          "issue_id": "dependent-process",
+          "title": "Replace permanent Lifecycle navigation with an on-demand dependent Process view",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "Implementation is nested under its exact source Prototype, Trial under Implementation, and Publication under Trial."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        },
+        {
+          "issue_id": "chat-first-workbench",
+          "title": "Make Conversation the primary Builder surface without losing rich Web tools",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "Builder opens in Conversation, shows exact Project, Change, and Preview context, and retains project search, files, specification, automation, publication, and Preview controls."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        },
+        {
+          "issue_id": "semantic-ui-safe-zone",
+          "title": "Provide a transactional reversible semantic UI rename operation",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "Rename checks source revision and ABI, creates a new immutable UI revision with undo and provenance, and rolls back all files on failure."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        }
+      ],
+      "member_change_ids": [
+        "CH-builder-conversational-refactor",
+        "builder_change_automation_54132d406a502909",
+        "builder_change_release_ui058_dependency_lock_20260730"
+      ],
+      "source_message_ids": [
+        "codex-session-2026-07-29-builder-conversational-refactor"
+      ],
+      "created_at": "2026-07-29T11:10:47+00:00",
+      "updated_at": "2026-07-30T05:57:53+00:00",
+      "supersedes_change_set_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3",
+      "change_id": "CH-builder-conversational-refactor",
+      "project_ref": "scenario:builder",
+      "base_ref": null,
+      "base_generation": 0,
+      "affected_refs": [],
+      "runs": [
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "builder-plan-79175799b0bd418d9d168ce50703e0c0",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "plan_change_set",
+          "executor": "builder.change_planner",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "succeeded",
+          "context_packet_digest": null,
+          "environment_ref": null,
+          "input_refs": [
+            "codex-session-2026-07-29-builder-conversational-refactor"
+          ],
+          "output_refs": [],
+          "evidence_refs": [],
+          "started_at": "2026-07-29T11:10:47+00:00",
+          "completed_at": "2026-07-29T11:10:47+00:00",
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "RUN-builder-ui055",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "prototype_revision_recorded",
+          "executor": "codex.local",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "succeeded",
+          "context_packet_digest": "sha256:d17e0f0091d7958ffb152dfd624bde95362553b52687f991b6635396540551c2",
+          "environment_ref": null,
+          "input_refs": [
+            "ui_revision:054",
+            "commit:7308fe5d",
+            "commit:a65ecd92",
+            "commit:a5c29719",
+            "commit:05ba3671",
+            "commit:313fc53b"
+          ],
+          "output_refs": [
+            "ui_revision:055",
+            "skill:builder_sdk_control_skill@0.1.46"
+          ],
+          "evidence_refs": [
+            "test:builder-core",
+            "test:builder-functional-parity",
+            "test:builder-control-skill"
+          ],
+          "started_at": "2026-07-29T11:13:25+00:00",
+          "completed_at": "2026-07-29T11:13:25+00:00",
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "RUN-builder-ui058-approved",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "stabilize_prototype",
+          "executor": "human.review",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "succeeded",
+          "context_packet_digest": "sha256:d17e0f0091d7958ffb152dfd624bde95362553b52687f991b6635396540551c2",
+          "environment_ref": null,
+          "input_refs": [],
+          "output_refs": [],
+          "evidence_refs": [
+            "test:builder-workbench-preview-34-of-34",
+            "test:builder-dialog-runtime-57-of-57",
+            "preview:prototype:builder:058"
+          ],
+          "started_at": "2026-07-30T05:36:33+00:00",
+          "completed_at": "2026-07-30T05:36:33+00:00",
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "builder_change_automation_54132d406a502909",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "automation_started",
+          "executor": "builder.automation",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "running",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "environment_ref": null,
+          "input_refs": [],
+          "output_refs": [],
+          "evidence_refs": [],
+          "started_at": "2026-07-30T05:37:58+00:00",
+          "completed_at": null,
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "checkpoint_recorded",
+          "executor": "builder.automation",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "succeeded",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "environment_ref": null,
+          "input_refs": [],
+          "output_refs": [],
+          "evidence_refs": [],
+          "started_at": "2026-07-30T05:43:21+00:00",
+          "completed_at": "2026-07-30T05:46:17+00:00",
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "candidate:builder-0-2-54-a6362f2d98cd:prepare",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "candidate_prepared",
+          "executor": "builder.candidate",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "succeeded",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "environment_ref": null,
+          "input_refs": [],
+          "output_refs": [],
+          "evidence_refs": [],
+          "started_at": "2026-07-30T05:47:21+00:00",
+          "completed_at": "2026-07-30T05:47:21+00:00",
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "CH-builder-conversational-refactor:run:0119",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "candidate_rejected",
+          "executor": "builder.ui",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "failed",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "environment_ref": null,
+          "input_refs": [],
+          "output_refs": [],
+          "evidence_refs": [],
+          "started_at": "2026-07-30T05:51:44+00:00",
+          "completed_at": "2026-07-30T05:51:44+00:00",
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "builder_change_release_ui058_dependency_lock_20260730",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "checkpoint_recorded",
+          "executor": "builder.checkpoint",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "succeeded",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "environment_ref": null,
+          "input_refs": [],
+          "output_refs": [],
+          "evidence_refs": [],
+          "started_at": "2026-07-30T05:56:00+00:00",
+          "completed_at": "2026-07-30T05:56:00+00:00",
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "candidate:builder-0-2-55-a3c36bcaf45e:prepare",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "candidate_prepared",
+          "executor": "builder.candidate",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "succeeded",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "environment_ref": null,
+          "input_refs": [],
+          "output_refs": [],
+          "evidence_refs": [],
+          "started_at": "2026-07-30T05:56:41+00:00",
+          "completed_at": "2026-07-30T05:56:41+00:00",
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "candidate:builder-0-2-55-a3c36bcaf45e:accept",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "candidate_accepted",
+          "executor": "builder.user",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "succeeded",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "environment_ref": null,
+          "input_refs": [],
+          "output_refs": [],
+          "evidence_refs": [],
+          "started_at": "2026-07-30T05:57:48+00:00",
+          "completed_at": "2026-07-30T05:57:48+00:00",
+          "error": null
+        },
+        {
+          "schema": "adaos.builder.run.v1",
+          "run_id": "builder-publication-fe52827cbda4410eaffe0740593f2ec7",
+          "change_id": "CH-builder-conversational-refactor",
+          "activity": "publish",
+          "executor": "builder.publication",
+          "purpose": "iteration",
+          "adoption_status": "not_applicable",
+          "status": "succeeded",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "environment_ref": null,
+          "input_refs": [],
+          "output_refs": [],
+          "evidence_refs": [],
+          "started_at": "2026-07-30T05:57:53+00:00",
+          "completed_at": "2026-07-30T05:57:53+00:00",
+          "error": null
+        }
+      ],
+      "acceptance_constraints": [],
+      "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+      "supersedes_change_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3"
+    },
+    "change_set": {
+      "schema": "adaos.builder.change_set.v1",
+      "change_set_id": "CH-builder-conversational-refactor",
+      "request": "Refactor Builder into a chat-first, state-backed development workbench while preserving the recovered functional control plane.",
+      "request_addenda": [],
+      "route": "prototype_first",
+      "gate": "complete",
+      "status": "published",
+      "issues": [
+        {
+          "issue_id": "canonical-change-run-context",
+          "title": "Use canonical Issue, Change, Run, and bounded context packet contracts",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "One user objective has one Change identity, follow-up executions are Runs, and legacy change_set remains only a compatibility projection."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        },
+        {
+          "issue_id": "risk-aware-actions",
+          "title": "Expose deterministic risk-classified actions with optimistic locking",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "Every projected command carries risk, target, and expected workflow generation; stale commands do not mutate workflow state."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        },
+        {
+          "issue_id": "dependent-process",
+          "title": "Replace permanent Lifecycle navigation with an on-demand dependent Process view",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "Implementation is nested under its exact source Prototype, Trial under Implementation, and Publication under Trial."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        },
+        {
+          "issue_id": "chat-first-workbench",
+          "title": "Make Conversation the primary Builder surface without losing rich Web tools",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "Builder opens in Conversation, shows exact Project, Change, and Preview context, and retains project search, files, specification, automation, publication, and Preview controls."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        },
+        {
+          "issue_id": "semantic-ui-safe-zone",
+          "title": "Provide a transactional reversible semantic UI rename operation",
+          "lane": "prototype",
+          "status": "resolved",
+          "acceptance_criteria": [
+            "Rename checks source revision and ABI, creates a new immutable UI revision with undo and provenance, and rolls back all files on failure."
+          ],
+          "priority": null,
+          "confidence": null,
+          "semantic_refs": []
+        }
+      ],
+      "member_change_ids": [
+        "CH-builder-conversational-refactor",
+        "builder_change_automation_54132d406a502909",
+        "builder_change_release_ui058_dependency_lock_20260730"
+      ],
+      "source_message_ids": [
+        "codex-session-2026-07-29-builder-conversational-refactor"
+      ],
+      "created_at": "2026-07-29T11:10:47+00:00",
+      "updated_at": "2026-07-30T05:57:53+00:00",
+      "supersedes_change_set_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3"
+    },
+    "context_packet": {
+      "schema": "adaos.builder.context_packet.v1",
+      "project": {
+        "ref": "scenario:builder",
+        "object_type": "scenario",
+        "object_id": "builder",
+        "manifest_ref": "scenario.yaml",
+        "manifest_version": "0.2.53",
+        "manifest_digest": "sha256:0a5df7a60ea7667dce55cd20f6d666c19fc9aa34a79b07f1f7829852c40f7919"
+      },
+      "change": {
+        "change_id": "CH-builder-conversational-refactor",
+        "intent": "Refactor Builder into a chat-first, state-backed development workbench while preserving the recovered functional control plane.",
+        "request_addenda": [],
+        "route": "prototype_first",
+        "gate": "automation",
+        "status": "approved",
+        "issues": [
+          {
+            "issue_id": "canonical-change-run-context",
+            "title": "Use canonical Issue, Change, Run, and bounded context packet contracts",
+            "lane": "prototype",
+            "status": "resolved",
+            "acceptance_criteria": [
+              "One user objective has one Change identity, follow-up executions are Runs, and legacy change_set remains only a compatibility projection."
+            ]
+          },
+          {
+            "issue_id": "risk-aware-actions",
+            "title": "Expose deterministic risk-classified actions with optimistic locking",
+            "lane": "prototype",
+            "status": "resolved",
+            "acceptance_criteria": [
+              "Every projected command carries risk, target, and expected workflow generation; stale commands do not mutate workflow state."
+            ]
+          },
+          {
+            "issue_id": "dependent-process",
+            "title": "Replace permanent Lifecycle navigation with an on-demand dependent Process view",
+            "lane": "prototype",
+            "status": "resolved",
+            "acceptance_criteria": [
+              "Implementation is nested under its exact source Prototype, Trial under Implementation, and Publication under Trial."
+            ]
+          },
+          {
+            "issue_id": "chat-first-workbench",
+            "title": "Make Conversation the primary Builder surface without losing rich Web tools",
+            "lane": "prototype",
+            "status": "resolved",
+            "acceptance_criteria": [
+              "Builder opens in Conversation, shows exact Project, Change, and Preview context, and retains project search, files, specification, automation, publication, and Preview controls."
+            ]
+          },
+          {
+            "issue_id": "semantic-ui-safe-zone",
+            "title": "Provide a transactional reversible semantic UI rename operation",
+            "lane": "prototype",
+            "status": "resolved",
+            "acceptance_criteria": [
+              "Rename checks source revision and ABI, creates a new immutable UI revision with undo and provenance, and rolls back all files on failure."
+            ]
+          }
+        ],
+        "acceptance_constraints": [],
+        "source_message_ids": [
+          "codex-session-2026-07-29-builder-conversational-refactor"
+        ]
+      },
+      "base": {
+        "source": null,
+        "release": null,
+        "release_digest": null
+      },
+      "artifacts": {
+        "prototype": {
+          "head_revision": "058",
+          "status": "working",
+          "stable": true,
+          "derived_from_automation_task": "builder-conversational-refactor",
+          "resumed_at": "2026-07-29T11:10:03+00:00",
+          "frozen_at": "2026-07-28T19:42:49+00:00",
+          "revised_at": "2026-07-29T11:13:25+00:00",
+          "stabilized_at": "2026-07-30T05:36:33+00:00"
+        },
+        "implementation": {
+          "status": "frozen",
+          "iteration": 13,
+          "source_prototype_revision": "053",
+          "frozen_at": "2026-07-29T11:10:03+00:00",
+          "head_task_id": "task.01KYP39F59S9YCCMSXTM2MDZJK",
+          "started_at": "2026-07-29T04:49:25+00:00",
+          "completed_at": "2026-07-29T04:54:36+00:00",
+          "error": null,
+          "snapshot_task_id": "task.01KYP39F59S9YCCMSXTM2MDZJK",
+          "result_version": "0.2.42",
+          "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+        },
+        "trial": {
+          "status": "stale",
+          "checkpoint_change_id": "builder_change_automation_d62792d1607e2e96",
+          "package_digest": "sha256:c8028a27f7eb2054478fe64ed53bc6f79d4c608a9c69f904084e5dbb26d91569",
+          "source_revision": "92f7b8e9ef255e0217449df5eac94e2fe3ad4af5",
+          "checkpoint_at": "2026-07-29T04:54:36+00:00",
+          "candidate_id": null,
+          "release_digest": null,
+          "base_release": null,
+          "trial_workspace": null,
+          "prepared_at": null,
+          "decided_at": null,
+          "replaces_candidate_id": null,
+          "rebase_plan": null,
+          "stale_reason": "returned_to_prototype",
+          "stale_at": "2026-07-29T11:10:03+00:00"
+        },
+        "publication": {
+          "status": "published",
+          "current_version": "0.2.40",
+          "published_at": "2026-07-28T22:05:52+00:00",
+          "source_automation_task": "task.01KYN8MNSWTAT38KA6091ZYKCZ",
+          "release": "builder@0.2.40"
+        }
+      },
+      "dependencies": [
+        "builder_skill",
+        "builder_sdk_control_skill",
+        "voice_chat_skill"
+      ],
+      "allowed_paths": [
+        "scenarios/builder/",
+        "skills/builder_skill/",
+        "skills/builder_sdk_control_skill/",
+        "docs/requirements/builder/",
+        "prompt_state.json"
+      ],
+      "instruction_refs": [
+        "prompt-project:scenario:builder"
+      ],
+      "previous_run": {
+        "schema": "adaos.builder.run.v1",
+        "run_id": "RUN-builder-ui058-approved",
+        "change_id": "CH-builder-conversational-refactor",
+        "activity": "stabilize_prototype",
+        "executor": "human.review",
+        "status": "succeeded",
+        "context_packet_digest": "sha256:d17e0f0091d7958ffb152dfd624bde95362553b52687f991b6635396540551c2",
+        "environment_ref": null,
+        "input_refs": [],
+        "output_refs": [],
+        "evidence_refs": [
+          "test:builder-workbench-preview-34-of-34",
+          "test:builder-dialog-runtime-57-of-57",
+          "preview:prototype:builder:058"
+        ],
+        "started_at": "2026-07-30T05:36:33+00:00",
+        "completed_at": "2026-07-30T05:36:33+00:00",
+        "error": null
+      },
+      "conversation": null,
+      "pending_actions": [],
+      "budget": {
+        "max_state_bytes": 524288,
+        "issue_count": 5,
+        "acceptance_constraint_count": 0,
+        "run_count": 3,
+        "source_message_ref_count": 1,
+        "conversation_message_count": 0,
+        "conversation_segment_count": 0,
+        "memory_item_count": 0,
+        "pending_action_ref_count": 0
+      },
+      "digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+      "built_at": "2026-07-30T05:37:58+00:00"
+    },
+    "reviews": [],
+    "interaction": {
+      "conversation_focus": "change:CH-builder-conversational-refactor",
+      "inspected_ref": null,
+      "preview_target": "publication:builder:0.2.55"
+    },
+    "pending_transition": null,
+    "history": [
+      {
+        "generation": 66,
+        "action": "plan_change_set",
+        "actor": "builder.change_planner",
+        "reason": null,
+        "at": "2026-07-28T18:37:51+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "planned",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "change_set_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3",
+          "request": "Implement one bounded Builder control follow-up for the accepted runtime defect. In builder_sdk_control_skill, selecting any scenario Lifecycle preview target must update the Builder host selection projection as well as materialize the exact preview. After preview.select_target succeeds, publish exactly one builder.context.selected event containing source_webspace_id, object_type/project_kind, object_id/project_id, title, and description from the returned binding selection. Do not publish builder.preview.desired from this follow-up because select_target already materializes the requested snapshot synchronously; avoid duplicate reconciliation. Apply this to select_preview and select_preview_target through one shared helper or one unambiguous boundary. Add focused tests proving the context event is emitted once, no preview-desired event is emitted, and the original target result is preserved. Preserve all scenario UI files and semantic versions manually; Forge owns versions. Run the Builder control tests. Do not push remotes.",
+          "issues": [
+            {
+              "issue_id": "automation-666b4704c69f",
+              "title": "Implement one bounded Builder control follow-up for the accepted runtime defect. In builder_sdk_control_skill, selecting any scenario Lifecycle preview target must update the Builder host selection projection as well as materialize the exac",
+              "lane": "automation",
+              "acceptance_criteria": [
+                "The implementation and its tests satisfy: Implement one bounded Builder control follow-up for the accepted runtime defect. In builder_sdk_control_skill, selecting any scenario Lifecycle preview target must update the Builder host selection projection as well as materialize the exact preview. After preview.select_target succeeds, publish exactly one builder.context.selected event containing source_webspace_id, object_type/project_kind, object_id/project_id, title, and description from the returne"
+              ]
+            }
+          ],
+          "source_message_ids": [],
+          "supersedes_change_set_id": null
+        }
+      },
+      {
+        "generation": 67,
+        "action": "automation_iteration_started",
+        "actor": "builder.automation",
+        "reason": "a new Automation iteration was queued",
+        "at": "2026-07-28T18:38:07+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "planned",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "task_id": "task.01KYN0A4XYANB9EXMRWJ176NJE",
+          "change_id": "builder_change_automation_b9000d3fc3eb5ee1"
+        }
+      },
+      {
+        "generation": 68,
+        "action": "automation_failed",
+        "actor": "builder.automation",
+        "reason": null,
+        "at": "2026-07-28T18:41:57+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "failed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "blocked",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "task_id": "task.01KYN0A4XYANB9EXMRWJ176NJE",
+          "change_id": "builder_change_automation_b9000d3fc3eb5ee1",
+          "error": "RuntimeError: Forge checkpoint failed for skill:builder_sdk_control_skill"
+        }
+      },
+      {
+        "generation": 69,
+        "action": "automation_failed",
+        "actor": "builder.automation",
+        "reason": null,
+        "at": "2026-07-28T18:46:24+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "failed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "blocked",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "failed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "blocked",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "task_id": "task.01KYN0A4XYANB9EXMRWJ176NJE",
+          "change_id": "builder_change_automation_b9000d3fc3eb5ee1",
+          "error": "RuntimeError: Forge checkpoint failed for skill:builder_sdk_control_skill"
+        }
+      },
+      {
+        "generation": 70,
+        "action": "automation_completed",
+        "actor": "builder.automation",
+        "reason": null,
+        "at": "2026-07-28T18:53:02+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "failed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "blocked",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "task_id": "task.01KYN0A4XYANB9EXMRWJ176NJE",
+          "change_id": "builder_change_automation_b9000d3fc3eb5ee1",
+          "version": "0.2.35",
+          "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+        }
+      },
+      {
+        "generation": 71,
+        "action": "checkpoint_recorded",
+        "actor": "builder.automation",
+        "reason": "Automation result checkpointed in Forge",
+        "at": "2026-07-28T18:53:06+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "change_id": "builder_change_automation_b9000d3fc3eb5ee1",
+          "package_digest": "sha256:d476236b99130c3bfbadb7838a99ade8079caf5c01ea970b7885a8bd5ff59083",
+          "source_revision": "0d83e6b5acc5cddb3cfcbd24042296143a83f664",
+          "task_id": "task.01KYN0A4XYANB9EXMRWJ176NJE"
+        }
+      },
+      {
+        "generation": 72,
+        "action": "candidate_prepared",
+        "actor": "builder.candidate",
+        "reason": null,
+        "at": "2026-07-28T19:10:11+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-35-a8bd5ff59083",
+          "release": "builder@0.2.35",
+          "release_digest": "sha256:8d668fe440ff17c521ccebb56826b678197eca19f837c753897ca8a3505e9e4b",
+          "package_digest": "sha256:d476236b99130c3bfbadb7838a99ade8079caf5c01ea970b7885a8bd5ff59083",
+          "base_release": "builder@0.2.34",
+          "base_release_digest": "sha256:a769bfb4ae15d5073cfed90f13d69a1c29dbdcf78410e7afbdfc4f9c55a6554b",
+          "trial_workspace": "D:\\git\\inimatic\\adaos\\.adaos\\state\\artifact_pipeline\\trials\\builder-0-2-35-a8bd5ff59083\\workspace"
+        }
+      },
+      {
+        "generation": 73,
+        "action": "candidate_accepted",
+        "actor": "builder.user",
+        "reason": null,
+        "at": "2026-07-28T19:10:55+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "accepted",
+          "publication_status": "published",
+          "change_set_status": "accepted",
+          "change_set_gate": "publication"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-35-a8bd5ff59083",
+          "observations": [
+            {
+              "schema": "adaos.artifact.trial.v1",
+              "trial_id": "trial-builder-0-2-35-a8bd5ff59083",
+              "candidate_digest": "sha256:2defba9946fe2f6a15bdd59950e9647a636e9b8cf85a2f07b5b0698319870416",
+              "audience": "owner",
+              "data_mode": "empty",
+              "lock_digest": "sha256:847f2d533791e08d13eb5b8d53d7cac79402202678d46a7a10a7c6d152f83174",
+              "started_at": "2026-07-28T19:10:10+00:00",
+              "status": "accepted",
+              "observations": [
+                {
+                  "actor": "builder.user",
+                  "decision": "accepted_for_stable",
+                  "source": "publication_confirmation"
+                }
+              ],
+              "ended_at": "2026-07-28T19:10:55+00:00",
+              "isolation_evidence": {
+                "status": "verified",
+                "mode": "empty",
+                "reason": "isolated trial Workspace has no seeded data"
+              },
+              "reload_receipt": {
+                "status": "skipped",
+                "mode": "policy_skip",
+                "approved_by": "artifact_pipeline.isolated_trial",
+                "reason": "isolated trial Workspace is not attached to a live runtime",
+                "recorded_at": "2026-07-28T19:10:10+00:00"
+              },
+              "health_receipt": {
+                "status": "passed",
+                "check": "verified_package_materialization",
+                "lock_digest": "sha256:847f2d533791e08d13eb5b8d53d7cac79402202678d46a7a10a7c6d152f83174",
+                "mode": "callback",
+                "recorded_at": "2026-07-28T19:10:10+00:00"
+              },
+              "rollback_receipt": {
+                "status": "not_required",
+                "reason": "trial accepted for promotion",
+                "recorded_at": "2026-07-28T19:10:55+00:00"
+              },
+              "duration_seconds": 45
+            }
+          ]
+        }
+      },
+      {
+        "generation": 74,
+        "action": "publish",
+        "actor": "builder.publication",
+        "reason": null,
+        "at": "2026-07-28T19:10:58+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "accepted",
+          "publication_status": "published",
+          "change_set_status": "accepted",
+          "change_set_gate": "publication"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "metadata": {
+          "version": "0.2.35",
+          "release": "builder@0.2.35",
+          "candidate_id": "builder-0-2-35-a8bd5ff59083",
+          "task_id": "task.01KYN0A4XYANB9EXMRWJ176NJE"
+        }
+      },
+      {
+        "generation": 75,
+        "action": "request_return_to_prototype",
+        "actor": "builder.automation",
+        "reason": "Automation result is being adapted into a safe prototype",
+        "at": "2026-07-28T19:25:01+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "adapting",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "metadata": {
+          "task_id": "task.01KYN300R001WC4A887667XKCJ",
+          "change_id": "builder_change_automation_ef1eccda9e4f894b"
+        }
+      },
+      {
+        "generation": 76,
+        "action": "return_to_prototype",
+        "actor": "builder.automation",
+        "reason": "safe prototype adaptation completed",
+        "at": "2026-07-28T19:29:55+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "adapting",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "revision": "050",
+          "task_id": "task.01KYN300R001WC4A887667XKCJ",
+          "change_id": "builder_change_automation_ef1eccda9e4f894b"
+        }
+      },
+      {
+        "generation": 77,
+        "action": "change_issues_added",
+        "actor": "builder.prototype_intake",
+        "reason": null,
+        "at": "2026-07-28T19:31:40+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "changes_requested",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "change_set_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3",
+          "change_id": "builder_change_1a2be59f",
+          "request": "Refine the current Builder Prototype UI 050 for the accepted change-oriented workflow.\n\n1. Replace the static mock `builder-chat` history and local-only submit action with the canonical durable AdaOS conversation binding already supported by the installed client/runtime. The selected project topic/thread are authoritative: use page state `builderTopicId` and `builderThreadId`, and the Builder conversation id. Submitting in the Prototype lane must invoke `builder_skill.chat` exactly once and persist one canonical user message plus one canonical assistant response. This is a narrowly scoped internal development control-plane exception; do not add external network, credential, device, or project production-data bindings.\n2. Display exactly one Conversation section according to the selected dependent Lifecycle node. Prototype: interactive Builder chat plus Development settings. Automation: its durable task/thread, follow-up form, status/evidence, and no Development settings. Publication: read-only publication evidence and no mutation controls. Keep one compact tab label `Conversation`, not three competing toolbar sections.\n3. Preserve the dependent Prototype -> Automation -> Publication information model, exact preview selection, initial Yjs state mapping, current layout, en/ru locales, and valid UTF-8. Do not manually edit version or updated_at; Forge owns them.\n4. Treat a return-to-prototype adaptation task as transition evidence, not as a second Automation release. The visible lifecycle must not show two Automation rows with the same semantic version for one source Prototype. A brand-new template project must still show one Prototype revision and no Automation until a real handoff/task exists.\n5. Add declarative scenario tests for the durable chat binding, lane-dependent single Conversation surface, and absence of duplicate semantic Automation rows. Do not publish, activate, commit, or push repositories. Report any generic client/control ABI gap instead of inventing a scenario-local workaround.",
+          "issues": [
+            {
+              "issue_id": "builder_change_1a2be59f:I01",
+              "title": "Refine the current Builder Prototype UI 050 for the accepted change-oriented workflow.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Refine the current Builder Prototype UI 050 for the accepted change-oriented workflow."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I02",
+              "title": "Replace the static mock `builder-chat` history and local-only submit action with the canonical durable AdaOS conversation binding already supported by the installed client/runtime.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Replace the static mock `builder-chat` history and local-only submit action with the canonical durable AdaOS conversation binding already supported by the installed client/runtime."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I03",
+              "title": "The selected project topic/thread are authoritative: use page state `builderTopicId` and `builderThreadId`, and the Builder conversation id.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: The selected project topic/thread are authoritative: use page state `builderTopicId` and `builderThreadId`, and the Builder conversation id."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I04",
+              "title": "Submitting in the Prototype lane must invoke `builder_skill.chat` exactly once and persist one canonical user message plus one canonical assistant response.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Submitting in the Prototype lane must invoke `builder_skill.chat` exactly once and persist one canonical user message plus one canonical assistant response."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I05",
+              "title": "This is a narrowly scoped internal development control-plane exception",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: This is a narrowly scoped internal development control-plane exception"
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I06",
+              "title": "do not add external network, credential, device, or project production-data bindings.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: do not add external network, credential, device, or project production-data bindings."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I07",
+              "title": "Display exactly one Conversation section according to the selected dependent Lifecycle node.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Display exactly one Conversation section according to the selected dependent Lifecycle node."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I08",
+              "title": "Prototype: interactive Builder chat plus Development settings.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Prototype: interactive Builder chat plus Development settings."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I09",
+              "title": "Automation: its durable task/thread, follow-up form, status/evidence, and no Development settings.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Automation: its durable task/thread, follow-up form, status/evidence, and no Development settings."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I10",
+              "title": "Publication: read-only publication evidence and no mutation controls.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Publication: read-only publication evidence and no mutation controls."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I11",
+              "title": "Keep one compact tab label `Conversation`, not three competing toolbar sections.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Keep one compact tab label `Conversation`, not three competing toolbar sections."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I12",
+              "title": "Preserve the dependent Prototype -> Automation -> Publication information model, exact preview selection, initial Yjs state mapping, current layout, en/ru locales, and valid UTF-8.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Preserve the dependent Prototype -> Automation -> Publication information model, exact preview selection, initial Yjs state mapping, current layout, en/ru locales, and valid UTF-8."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I13",
+              "title": "Do not manually edit version or updated_at",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Do not manually edit version or updated_at"
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I14",
+              "title": "Forge owns them.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Forge owns them."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I15",
+              "title": "Treat a return-to-prototype adaptation task as transition evidence, not as a second Automation release.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Treat a return-to-prototype adaptation task as transition evidence, not as a second Automation release."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I16",
+              "title": "The visible lifecycle must not show two Automation rows with the same semantic version for one source Prototype.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: The visible lifecycle must not show two Automation rows with the same semantic version for one source Prototype."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I17",
+              "title": "A brand-new template project must still show one Prototype revision and no Automation until a real handoff/task exists.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: A brand-new template project must still show one Prototype revision and no Automation until a real handoff/task exists."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I18",
+              "title": "Add declarative scenario tests for the durable chat binding, lane-dependent single Conversation surface, and absence of duplicate semantic Automation rows.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Add declarative scenario tests for the durable chat binding, lane-dependent single Conversation surface, and absence of duplicate semantic Automation rows."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I19",
+              "title": "Do not publish, activate, commit, or push repositories.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Do not publish, activate, commit, or push repositories."
+              ]
+            },
+            {
+              "issue_id": "builder_change_1a2be59f:I20",
+              "title": "Report any generic client/control ABI gap instead of inventing a scenario-local workaround.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Report any generic client/control ABI gap instead of inventing a scenario-local workaround."
+              ]
+            }
+          ],
+          "source_message_ids": [
+            "m.builder.builder_change_1a2be59f.request"
+          ]
+        }
+      },
+      {
+        "generation": 78,
+        "action": "prototype_revision_recorded",
+        "actor": "builder.prototype",
+        "reason": "Builder UI revision became current",
+        "at": "2026-07-28T19:32:04+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "changes_requested",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "object_type": "scenario",
+          "revision": "051",
+          "previous_revision": "050",
+          "change_id": "builder_change_1a2be59f"
+        }
+      },
+      {
+        "generation": 79,
+        "action": "change_issues_added",
+        "actor": "builder.prototype_intake",
+        "reason": null,
+        "at": "2026-07-28T19:33:14+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "changes_requested",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "change_set_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3",
+          "change_id": "builder_change_5e16d148",
+          "request": "Correction addendum for UI 051 after validating the installed client ABI. Do not use a skill dataSource and do not attach any `submit` actions to `builder-chat`; that would duplicate or bypass the chat transport. Use the canonical working `ui.chat` contract from Builder UI revision 042: `dataSource.kind=stream`, `receiver=voice_chat.messages`, `scope=shared`, `transport=hub`; params bind `conversation_id=$state.builderConversationId`, `conversation_topic_id=$state.builderTopicId`, and `dialog_channel_id=builder`. Inputs must use `receiver=voice_chat.messages`, `scope=shared`, `sendCommand=voice.chat.user`, and meta with `active_agent_id=agent:builder_skill:builder`, `conversation_id=$state.builderConversationId`, `conversation_topic_id=$state.builderTopicId`, `thread_id=$state.builderThreadId`, `dialog_channel_id=builder`, `route_id=voice_chat`. Remove both generated submit actions. Preserve the lane visibility changes. Replace invented pageSchema executable tests with actual scenario contract tests only if supported by the existing test harness; do not add declarative test vocabulary unsupported by the WebUI schema. Keep the control-plane dependency on builder_skill explicit, but no external project production binding. Do not edit versions manually.",
+          "issues": [
+            {
+              "issue_id": "builder_change_5e16d148:I01",
+              "title": "Correction addendum for UI 051 after validating the installed client ABI.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Correction addendum for UI 051 after validating the installed client ABI."
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I02",
+              "title": "Do not use a skill dataSource and do not attach any `submit` actions to `builder-chat`",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Do not use a skill dataSource and do not attach any `submit` actions to `builder-chat`"
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I03",
+              "title": "that would duplicate or bypass the chat transport.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: that would duplicate or bypass the chat transport."
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I04",
+              "title": "Use the canonical working `ui.chat` contract from Builder UI revision 042: `dataSource.kind=stream`, `receiver=voice_chat.messages`, `scope=shared`, `transport=hub`",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Use the canonical working `ui.chat` contract from Builder UI revision 042: `dataSource.kind=stream`, `receiver=voice_chat.messages`, `scope=shared`, `transport=hub`"
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I05",
+              "title": "params bind `conversation_id=$state.builderConversationId`, `conversation_topic_id=$state.builderTopicId`, and `dialog_channel_id=builder`.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: params bind `conversation_id=$state.builderConversationId`, `conversation_topic_id=$state.builderTopicId`, and `dialog_channel_id=builder`."
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I06",
+              "title": "Inputs must use `receiver=voice_chat.messages`, `scope=shared`, `sendCommand=voice.chat.user`, and meta with `active_agent_id=agent:builder_skill:builder`, `conversation_id=$state.builderConversationId`, `conversation_topic_id=$state.builde",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Inputs must use `receiver=voice_chat.messages`, `scope=shared`, `sendCommand=voice.chat.user`, and meta with `active_agent_id=agent:builder_skill:builder`, `conversation_id=$state.builderConversationId`, `conversation_topic_id=$state.builderTopicId`, `thread_id=$state.builderThreadId`, `dialog_channel_id=builder`, `route_id=voice_chat`."
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I07",
+              "title": "Remove both generated submit actions.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Remove both generated submit actions."
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I08",
+              "title": "Preserve the lane visibility changes.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Preserve the lane visibility changes."
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I09",
+              "title": "Replace invented pageSchema executable tests with actual scenario contract tests only if supported by the existing test harness",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Replace invented pageSchema executable tests with actual scenario contract tests only if supported by the existing test harness"
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I10",
+              "title": "do not add declarative test vocabulary unsupported by the WebUI schema.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: do not add declarative test vocabulary unsupported by the WebUI schema."
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I11",
+              "title": "Keep the control-plane dependency on builder_skill explicit, but no external project production binding.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Keep the control-plane dependency on builder_skill explicit, but no external project production binding."
+              ]
+            },
+            {
+              "issue_id": "builder_change_5e16d148:I12",
+              "title": "Do not edit versions manually.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Do not edit versions manually."
+              ]
+            }
+          ],
+          "source_message_ids": [
+            "m.builder.builder_change_5e16d148.request"
+          ]
+        }
+      },
+      {
+        "generation": 80,
+        "action": "prototype_revision_recorded",
+        "actor": "builder.prototype",
+        "reason": "Builder UI revision became current",
+        "at": "2026-07-28T19:33:24+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "changes_requested",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "object_type": "scenario",
+          "revision": "052",
+          "previous_revision": "051",
+          "change_id": "builder_change_5e16d148"
+        }
+      },
+      {
+        "generation": 81,
+        "action": "change_issues_added",
+        "actor": "builder.prototype_intake",
+        "reason": null,
+        "at": "2026-07-28T19:34:40+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "changes_requested",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "change_set_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3",
+          "change_id": "builder_change_3a64eced",
+          "request": "Final bounded Prototype correction after contract validation. Add `builderConversationId` to pageSchema.initialState with the canonical default `conv.skill.builder_skill.default`; also add safe fallback values `builderTopicId=prompt-project:scenario:builder` and `builderThreadId=prompt-project:scenario:builder` so the chat is valid before the Yjs selection projection arrives, while keeping the existing projection authoritative afterward. Remove the entire generated `pageSchema.tests` property: executable `skillCalled`, `visibleOnly`, and `countEquals` declarations are not part of the installed WebUI ABI. Do not change the corrected stream/voice.chat.user builder-chat contract, its empty actions, lane visibility, layout, or locales. Do not manually change version or timestamps. Actual contract tests will be implemented in Automation.",
+          "issues": [
+            {
+              "issue_id": "builder_change_3a64eced:I01",
+              "title": "Final bounded Prototype correction after contract validation.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Final bounded Prototype correction after contract validation."
+              ]
+            },
+            {
+              "issue_id": "builder_change_3a64eced:I02",
+              "title": "Add `builderConversationId` to pageSchema.initialState with the canonical default `conv.skill.builder_skill.default`",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Add `builderConversationId` to pageSchema.initialState with the canonical default `conv.skill.builder_skill.default`"
+              ]
+            },
+            {
+              "issue_id": "builder_change_3a64eced:I03",
+              "title": "also add safe fallback values `builderTopicId=prompt-project:scenario:builder` and `builderThreadId=prompt-project:scenario:builder` so the chat is valid before the Yjs selection projection arrives, while keeping the existing projection aut",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: also add safe fallback values `builderTopicId=prompt-project:scenario:builder` and `builderThreadId=prompt-project:scenario:builder` so the chat is valid before the Yjs selection projection arrives, while keeping the existing projection authoritative afterward."
+              ]
+            },
+            {
+              "issue_id": "builder_change_3a64eced:I04",
+              "title": "Remove the entire generated `pageSchema.tests` property: executable `skillCalled`, `visibleOnly`, and `countEquals` declarations are not part of the installed WebUI ABI.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Remove the entire generated `pageSchema.tests` property: executable `skillCalled`, `visibleOnly`, and `countEquals` declarations are not part of the installed WebUI ABI."
+              ]
+            },
+            {
+              "issue_id": "builder_change_3a64eced:I05",
+              "title": "Do not change the corrected stream/voice.chat.user builder-chat contract, its empty actions, lane visibility, layout, or locales.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Do not change the corrected stream/voice.chat.user builder-chat contract, its empty actions, lane visibility, layout, or locales."
+              ]
+            },
+            {
+              "issue_id": "builder_change_3a64eced:I06",
+              "title": "Do not manually change version or timestamps.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Do not manually change version or timestamps."
+              ]
+            },
+            {
+              "issue_id": "builder_change_3a64eced:I07",
+              "title": "Actual contract tests will be implemented in Automation.",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "The Prototype visibly and coherently satisfies: Actual contract tests will be implemented in Automation."
+              ]
+            }
+          ],
+          "source_message_ids": [
+            "m.builder.builder_change_3a64eced.request"
+          ]
+        }
+      },
+      {
+        "generation": 82,
+        "action": "prototype_revision_recorded",
+        "actor": "builder.prototype",
+        "reason": "Builder UI revision became current",
+        "at": "2026-07-28T19:34:47+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "changes_requested",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "object_type": "scenario",
+          "revision": "053",
+          "previous_revision": "052",
+          "change_id": "builder_change_3a64eced"
+        }
+      },
+      {
+        "generation": 83,
+        "action": "stabilize_prototype",
+        "actor": "builder.ui",
+        "reason": null,
+        "at": "2026-07-28T19:41:56+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "approved",
+          "change_set_gate": "automation"
+        },
+        "metadata": {}
+      },
+      {
+        "generation": 84,
+        "action": "automation_started",
+        "actor": "builder.automation",
+        "reason": "approved prototype handed to Automation",
+        "at": "2026-07-28T19:42:49+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "approved",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "source_prototype_revision": "053",
+          "task_id": "task.01KYN40MCW79MEZ4RNH6D5VV1N",
+          "change_id": "builder_change_automation_e21137249c53d203"
+        }
+      },
+      {
+        "generation": 85,
+        "action": "automation_completed",
+        "actor": "builder.automation",
+        "reason": null,
+        "at": "2026-07-28T19:56:56+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "task_id": "task.01KYN40MCW79MEZ4RNH6D5VV1N",
+          "change_id": "builder_change_automation_e21137249c53d203",
+          "version": "0.2.39",
+          "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+        }
+      },
+      {
+        "generation": 86,
+        "action": "checkpoint_recorded",
+        "actor": "builder.automation",
+        "reason": "Automation result checkpointed in Forge",
+        "at": "2026-07-28T19:56:56+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "change_id": "builder_change_automation_e21137249c53d203",
+          "package_digest": "sha256:922ed1e63b473572b7294041d3ce707e23b0129617a7568f055375aea764ec4a",
+          "source_revision": "a6963bc74aefd905ded8642e85af0f1f391b3748",
+          "task_id": "task.01KYN40MCW79MEZ4RNH6D5VV1N"
+        }
+      },
+      {
+        "generation": 87,
+        "action": "candidate_prepared",
+        "actor": "builder.candidate",
+        "reason": null,
+        "at": "2026-07-28T20:09:34+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-39-75aea764ec4a",
+          "release": "builder@0.2.39",
+          "release_digest": "sha256:79bcbd13eb7327cde9993aea1ed0299d5b4a500c4bde89e7686ba068a6277af8",
+          "package_digest": "sha256:922ed1e63b473572b7294041d3ce707e23b0129617a7568f055375aea764ec4a",
+          "base_release": "builder@0.2.35",
+          "base_release_digest": "sha256:8d668fe440ff17c521ccebb56826b678197eca19f837c753897ca8a3505e9e4b",
+          "trial_workspace": "D:\\git\\inimatic\\adaos\\.adaos\\state\\artifact_pipeline\\trials\\builder-0-2-39-75aea764ec4a\\workspace"
+        }
+      },
+      {
+        "generation": 88,
+        "action": "candidate_accepted",
+        "actor": "builder.user",
+        "reason": null,
+        "at": "2026-07-28T20:15:47+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "accepted",
+          "publication_status": "published",
+          "change_set_status": "accepted",
+          "change_set_gate": "publication"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-39-75aea764ec4a",
+          "observations": [
+            {
+              "schema": "adaos.artifact.trial.v1",
+              "trial_id": "trial-builder-0-2-39-75aea764ec4a",
+              "candidate_digest": "sha256:85acfd4c691479eb7d701d0e6439f7dd72e2f23095f530642eb74cd98044807f",
+              "audience": "owner",
+              "data_mode": "empty",
+              "lock_digest": "sha256:bc7927b10625a68a3eb5f54dd766bfacc311395e49d8940927198891376a1b67",
+              "started_at": "2026-07-28T20:09:34+00:00",
+              "status": "accepted",
+              "observations": [
+                {
+                  "actor": "builder.user",
+                  "decision": "accepted_for_stable",
+                  "source": "publication_confirmation"
+                }
+              ],
+              "ended_at": "2026-07-28T20:15:47+00:00",
+              "isolation_evidence": {
+                "status": "verified",
+                "mode": "empty",
+                "reason": "isolated trial Workspace has no seeded data"
+              },
+              "reload_receipt": {
+                "status": "skipped",
+                "mode": "policy_skip",
+                "approved_by": "artifact_pipeline.isolated_trial",
+                "reason": "isolated trial Workspace is not attached to a live runtime",
+                "recorded_at": "2026-07-28T20:09:33+00:00"
+              },
+              "health_receipt": {
+                "status": "passed",
+                "check": "verified_package_materialization",
+                "lock_digest": "sha256:bc7927b10625a68a3eb5f54dd766bfacc311395e49d8940927198891376a1b67",
+                "mode": "callback",
+                "recorded_at": "2026-07-28T20:09:33+00:00"
+              },
+              "rollback_receipt": {
+                "status": "not_required",
+                "reason": "trial accepted for promotion",
+                "recorded_at": "2026-07-28T20:15:47+00:00"
+              },
+              "duration_seconds": 373
+            }
+          ]
+        }
+      },
+      {
+        "generation": 89,
+        "action": "publish",
+        "actor": "builder.publication",
+        "reason": null,
+        "at": "2026-07-28T20:15:49+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "accepted",
+          "publication_status": "published",
+          "change_set_status": "accepted",
+          "change_set_gate": "publication"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "metadata": {
+          "version": "0.2.39",
+          "release": "builder@0.2.39",
+          "candidate_id": "builder-0-2-39-75aea764ec4a",
+          "task_id": "task.01KYN40MCW79MEZ4RNH6D5VV1N"
+        }
+      },
+      {
+        "generation": 90,
+        "action": "automation_iteration_started",
+        "actor": "builder.automation",
+        "reason": "a new Automation iteration was queued",
+        "at": "2026-07-28T21:03:41+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "task_id": "task.01KYN8MNSWTAT38KA6091ZYKCZ",
+          "change_id": "builder_change_automation_965f7aface915ae6"
+        }
+      },
+      {
+        "generation": 91,
+        "action": "automation_completed",
+        "actor": "builder.automation",
+        "reason": null,
+        "at": "2026-07-28T21:12:11+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "task_id": "task.01KYN8MNSWTAT38KA6091ZYKCZ",
+          "change_id": "builder_change_automation_965f7aface915ae6",
+          "version": "0.2.40",
+          "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+        }
+      },
+      {
+        "generation": 92,
+        "action": "checkpoint_recorded",
+        "actor": "builder.automation",
+        "reason": "Automation result checkpointed in Forge",
+        "at": "2026-07-28T21:12:11+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "change_id": "builder_change_automation_965f7aface915ae6",
+          "package_digest": "sha256:196121e253ae700a6f4d832eb04399385c8371d63a01640d00b426af92f3eaef",
+          "source_revision": "eea3624906d5b2b94da8d730a4697b06b68c5608",
+          "task_id": "task.01KYN8MNSWTAT38KA6091ZYKCZ"
+        }
+      },
+      {
+        "generation": 93,
+        "action": "candidate_prepared",
+        "actor": "builder.candidate",
+        "reason": null,
+        "at": "2026-07-28T21:56:00+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-40-26af92f3eaef",
+          "release": "builder@0.2.40",
+          "release_digest": "sha256:9457a35805940f6de6b12f293b49dd78147caf4d446961eb9cadc60cc38657c8",
+          "package_digest": "sha256:196121e253ae700a6f4d832eb04399385c8371d63a01640d00b426af92f3eaef",
+          "base_release": "builder@0.2.39",
+          "base_release_digest": "sha256:79bcbd13eb7327cde9993aea1ed0299d5b4a500c4bde89e7686ba068a6277af8",
+          "trial_workspace": "D:\\git\\inimatic\\adaos\\.adaos\\state\\artifact_pipeline\\trials\\builder-0-2-40-26af92f3eaef\\workspace"
+        }
+      },
+      {
+        "generation": 94,
+        "action": "candidate_accepted",
+        "actor": "builder.user",
+        "reason": null,
+        "at": "2026-07-28T21:56:29+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "accepted",
+          "publication_status": "published",
+          "change_set_status": "accepted",
+          "change_set_gate": "publication"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-40-26af92f3eaef",
+          "observations": [
+            {
+              "schema": "adaos.artifact.trial.v1",
+              "trial_id": "trial-builder-0-2-40-26af92f3eaef",
+              "candidate_digest": "sha256:3d3ab5ebae4cda995b7f6c7268664c082bbd3e49dca175cd66a187be455d9e0d",
+              "audience": "owner",
+              "data_mode": "empty",
+              "lock_digest": "sha256:9c113d9093a54d9241be8c7e9ebfc48bcac911976ae0a25d587a590cabeee1ff",
+              "started_at": "2026-07-28T21:56:00+00:00",
+              "status": "accepted",
+              "observations": [
+                {
+                  "actor": "builder.user",
+                  "decision": "accepted_for_stable",
+                  "source": "publication_confirmation"
+                }
+              ],
+              "ended_at": "2026-07-28T21:56:29+00:00",
+              "isolation_evidence": {
+                "status": "verified",
+                "mode": "empty",
+                "reason": "isolated trial Workspace has no seeded data"
+              },
+              "reload_receipt": {
+                "status": "skipped",
+                "mode": "policy_skip",
+                "approved_by": "artifact_pipeline.isolated_trial",
+                "reason": "isolated trial Workspace is not attached to a live runtime",
+                "recorded_at": "2026-07-28T21:56:00+00:00"
+              },
+              "health_receipt": {
+                "status": "passed",
+                "check": "verified_package_materialization",
+                "lock_digest": "sha256:9c113d9093a54d9241be8c7e9ebfc48bcac911976ae0a25d587a590cabeee1ff",
+                "mode": "callback",
+                "recorded_at": "2026-07-28T21:56:00+00:00"
+              },
+              "rollback_receipt": {
+                "status": "not_required",
+                "reason": "trial accepted for promotion",
+                "recorded_at": "2026-07-28T21:56:29+00:00"
+              },
+              "duration_seconds": 29
+            }
+          ]
+        }
+      },
+      {
+        "generation": 95,
+        "action": "publish",
+        "actor": "builder.publication",
+        "reason": null,
+        "at": "2026-07-28T22:05:52+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "accepted",
+          "publication_status": "published",
+          "change_set_status": "accepted",
+          "change_set_gate": "publication"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "metadata": {
+          "version": "0.2.40",
+          "release": "builder@0.2.40",
+          "candidate_id": "builder-0-2-40-26af92f3eaef",
+          "task_id": "task.01KYN8MNSWTAT38KA6091ZYKCZ"
+        }
+      },
+      {
+        "generation": 96,
+        "action": "automation_iteration_started",
+        "actor": "builder.automation",
+        "reason": "a new Automation iteration was queued",
+        "at": "2026-07-29T03:46:40+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "task_id": "task.01KYNZPJ1RWT2KZXTKDC4WG1ET",
+          "change_id": "builder_change_automation_5773bf45b7a2fcfd"
+        }
+      },
+      {
+        "generation": 97,
+        "action": "automation_completed",
+        "actor": "builder.automation",
+        "reason": null,
+        "at": "2026-07-29T03:51:17+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "task_id": "task.01KYNZPJ1RWT2KZXTKDC4WG1ET",
+          "change_id": "builder_change_automation_5773bf45b7a2fcfd",
+          "version": "0.2.41",
+          "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+        }
+      },
+      {
+        "generation": 98,
+        "action": "checkpoint_recorded",
+        "actor": "builder.automation",
+        "reason": "Automation result checkpointed in Forge",
+        "at": "2026-07-29T03:51:17+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "change_id": "builder_change_automation_5773bf45b7a2fcfd",
+          "package_digest": "sha256:c456c57e1dfdc605bfed85ab87c86a2ec0b76e40fa6e84344fd665ab83af5ee6",
+          "source_revision": "bd3331d688a0dfa18c98f310181b71a4583a8629",
+          "task_id": "task.01KYNZPJ1RWT2KZXTKDC4WG1ET"
+        }
+      },
+      {
+        "generation": 99,
+        "action": "automation_iteration_started",
+        "actor": "builder.automation",
+        "reason": "a new Automation iteration was queued",
+        "at": "2026-07-29T04:49:25+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "task_id": "task.01KYP39F59S9YCCMSXTM2MDZJK",
+          "change_id": "builder_change_automation_d62792d1607e2e96"
+        }
+      },
+      {
+        "generation": 100,
+        "action": "automation_completed",
+        "actor": "builder.automation",
+        "reason": null,
+        "at": "2026-07-29T04:54:36+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "task_id": "task.01KYP39F59S9YCCMSXTM2MDZJK",
+          "change_id": "builder_change_automation_d62792d1607e2e96",
+          "version": "0.2.42",
+          "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+        }
+      },
+      {
+        "generation": 101,
+        "action": "checkpoint_recorded",
+        "actor": "builder.automation",
+        "reason": "Automation result checkpointed in Forge",
+        "at": "2026-07-29T04:54:36+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "change_id": "builder_change_automation_d62792d1607e2e96",
+          "package_digest": "sha256:c8028a27f7eb2054478fe64ed53bc6f79d4c608a9c69f904084e5dbb26d91569",
+          "source_revision": "92f7b8e9ef255e0217449df5eac94e2fe3ad4af5",
+          "task_id": "task.01KYP39F59S9YCCMSXTM2MDZJK"
+        }
+      },
+      {
+        "generation": 102,
+        "action": "return_to_prototype",
+        "actor": "builder.ui",
+        "reason": null,
+        "at": "2026-07-29T11:10:03+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "revision": "055",
+          "task_id": "builder-conversational-refactor"
+        }
+      },
+      {
+        "generation": 103,
+        "action": "plan_change_set",
+        "actor": "builder.change_planner",
+        "reason": null,
+        "at": "2026-07-29T11:10:47+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "planned",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "change_set_id": "CH-builder-conversational-refactor",
+          "request": "Refactor Builder into a chat-first, state-backed development workbench while preserving the recovered functional control plane.",
+          "issues": [
+            {
+              "issue_id": "canonical-change-run-context",
+              "title": "Use canonical Issue, Change, Run, and bounded context packet contracts",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "One user objective has one Change identity, follow-up executions are Runs, and legacy change_set remains only a compatibility projection."
+              ]
+            },
+            {
+              "issue_id": "risk-aware-actions",
+              "title": "Expose deterministic risk-classified actions with optimistic locking",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "Every projected command carries risk, target, and expected workflow generation; stale commands do not mutate workflow state."
+              ]
+            },
+            {
+              "issue_id": "dependent-process",
+              "title": "Replace permanent Lifecycle navigation with an on-demand dependent Process view",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "Implementation is nested under its exact source Prototype, Trial under Implementation, and Publication under Trial."
+              ]
+            },
+            {
+              "issue_id": "chat-first-workbench",
+              "title": "Make Conversation the primary Builder surface without losing rich Web tools",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "Builder opens in Conversation, shows exact Project, Change, and Preview context, and retains project search, files, specification, automation, publication, and Preview controls."
+              ]
+            },
+            {
+              "issue_id": "semantic-ui-safe-zone",
+              "title": "Provide a transactional reversible semantic UI rename operation",
+              "lane": "prototype",
+              "acceptance_criteria": [
+                "Rename checks source revision and ABI, creates a new immutable UI revision with undo and provenance, and rolls back all files on failure."
+              ]
+            }
+          ],
+          "source_message_ids": [
+            "codex-session-2026-07-29-builder-conversational-refactor"
+          ],
+          "supersedes_change_set_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3",
+          "run_id": "builder-plan-79175799b0bd418d9d168ce50703e0c0"
+        }
+      },
+      {
+        "generation": 104,
+        "action": "prototype_revision_recorded",
+        "actor": "builder.ui",
+        "reason": null,
+        "at": "2026-07-29T11:13:25+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "planned",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "metadata": {
+          "object_type": "scenario",
+          "revision": "055",
+          "previous_revision": "054",
+          "change_id": "CH-builder-conversational-refactor",
+          "run_id": "RUN-builder-ui055",
+          "executor": "codex.local",
+          "input_refs": [
+            "ui_revision:054",
+            "commit:7308fe5d",
+            "commit:a65ecd92",
+            "commit:a5c29719",
+            "commit:05ba3671",
+            "commit:313fc53b"
+          ],
+          "output_refs": [
+            "ui_revision:055",
+            "skill:builder_sdk_control_skill@0.1.46"
+          ],
+          "evidence_refs": [
+            "test:builder-core",
+            "test:builder-functional-parity",
+            "test:builder-control-skill"
+          ]
+        }
+      },
+      {
+        "generation": 113,
+        "action": "stabilize_prototype",
+        "actor": "builder.ui",
+        "reason": null,
+        "at": "2026-07-30T05:36:33+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "prototype"
+        },
+        "after": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "approved",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "revision": "058",
+          "run_id": "RUN-builder-ui058-approved",
+          "executor": "human.review",
+          "evidence_refs": [
+            "test:builder-workbench-preview-34-of-34",
+            "test:builder-dialog-runtime-57-of-57",
+            "preview:prototype:builder:058"
+          ]
+        }
+      },
+      {
+        "generation": 114,
+        "action": "automation_started",
+        "actor": "builder.automation",
+        "reason": "approved prototype handed to Automation",
+        "at": "2026-07-30T05:37:58+00:00",
+        "before": {
+          "active_phase": "prototype",
+          "prototype_status": "working",
+          "automation_status": "frozen",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "approved",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "source_prototype_revision": "058",
+          "task_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+          "change_id": "builder_change_automation_54132d406a502909",
+          "run_id": "builder_change_automation_54132d406a502909",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5"
+        }
+      },
+      {
+        "generation": 115,
+        "action": "automation_failed",
+        "actor": "builder.automation",
+        "reason": null,
+        "at": "2026-07-30T05:43:21+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "working",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "in_progress",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "failed",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "blocked",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "task_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+          "change_id": "builder_change_automation_54132d406a502909",
+          "error": "RuntimeError: RuntimeError: scenario_switch_failed"
+        }
+      },
+      {
+        "generation": 116,
+        "action": "automation_completed",
+        "actor": "builder.automation",
+        "reason": null,
+        "at": "2026-07-30T05:46:17+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "failed",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "blocked",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "task_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+          "change_id": "builder_change_automation_54132d406a502909",
+          "version": "0.2.54",
+          "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+        }
+      },
+      {
+        "generation": 117,
+        "action": "checkpoint_recorded",
+        "actor": "builder.automation",
+        "reason": "Automation result checkpointed in Forge",
+        "at": "2026-07-30T05:46:17+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "stale",
+          "publication_status": "published",
+          "change_set_status": "implemented",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "change_id": "builder_change_automation_54132d406a502909",
+          "package_digest": "sha256:b96291a2ab44bc35ae9d7bf77292cd43abcaddcb00ec797306cba6362f2d98cd",
+          "source_revision": "4ad5e3a816bcbd92a1560c161a52efd20309bc5d",
+          "task_id": "task.01KYRRF3CS62DM156EXEAWH54Z"
+        }
+      },
+      {
+        "generation": 118,
+        "action": "candidate_prepared",
+        "actor": "builder.candidate",
+        "reason": null,
+        "at": "2026-07-30T05:47:21+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-54-a6362f2d98cd",
+          "run_id": "candidate:builder-0-2-54-a6362f2d98cd:prepare",
+          "canonical_change_id": "CH-builder-conversational-refactor",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "release": "builder@0.2.54",
+          "release_digest": "sha256:75cfda45aa38c3cfac24d90ca17ecd855d731e93b6e4af32b78c4a2ee43bb431",
+          "package_digest": "sha256:b96291a2ab44bc35ae9d7bf77292cd43abcaddcb00ec797306cba6362f2d98cd",
+          "base_release": "builder@0.2.40",
+          "base_release_digest": "sha256:9457a35805940f6de6b12f293b49dd78147caf4d446961eb9cadc60cc38657c8",
+          "trial_workspace": "D:\\git\\inimatic\\adaos\\.adaos\\state\\artifact_pipeline\\trials\\builder-0-2-54-a6362f2d98cd\\workspace"
+        }
+      },
+      {
+        "generation": 119,
+        "action": "candidate_rejected",
+        "actor": "builder.ui",
+        "reason": null,
+        "at": "2026-07-30T05:51:44+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "rejected",
+          "publication_status": "published",
+          "change_set_status": "changes_requested",
+          "change_set_gate": "automation"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-54-a6362f2d98cd",
+          "observations": [
+            {
+              "actor": "codex.local",
+              "decision": "rejected_dependency_lock",
+              "source": "trial_dependency_audit",
+              "reason": "Candidate resolved builder_sdk_control_skill 0.1.44 and builder_skill 0.3.16 instead of validated DEV 0.1.56 and 0.3.22."
+            }
+          ]
+        }
+      },
+      {
+        "generation": 120,
+        "action": "checkpoint_recorded",
+        "actor": "builder.checkpoint",
+        "reason": null,
+        "at": "2026-07-30T05:56:00+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "rejected",
+          "publication_status": "published",
+          "change_set_status": "changes_requested",
+          "change_set_gate": "automation"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "change_id": "builder_change_release_ui058_dependency_lock_20260730",
+          "run_id": "builder_change_release_ui058_dependency_lock_20260730",
+          "canonical_change_id": "CH-builder-conversational-refactor",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "package_digest": "sha256:8602a3643ee9b6baec2fbefee97d2b4993b625c7b56cfb8deb77a3c36bcaf45e",
+          "source_revision": "bfdeaa35c2f61a5c065866a4fcee9eabda7d782a"
+        }
+      },
+      {
+        "generation": 121,
+        "action": "candidate_prepared",
+        "actor": "builder.candidate",
+        "reason": null,
+        "at": "2026-07-30T05:56:41+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "checkpoint",
+          "publication_status": "published",
+          "change_set_status": "checkpointed",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-55-a3c36bcaf45e",
+          "run_id": "candidate:builder-0-2-55-a3c36bcaf45e:prepare",
+          "canonical_change_id": "CH-builder-conversational-refactor",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "release": "builder@0.2.55",
+          "release_digest": "sha256:f671756e91dc8540d400e1c1b87443f00bbc67a89ac6b41ce110466ea4e3a007",
+          "package_digest": "sha256:8602a3643ee9b6baec2fbefee97d2b4993b625c7b56cfb8deb77a3c36bcaf45e",
+          "base_release": "builder@0.2.40",
+          "base_release_digest": "sha256:9457a35805940f6de6b12f293b49dd78147caf4d446961eb9cadc60cc38657c8",
+          "trial_workspace": "D:\\git\\inimatic\\adaos\\.adaos\\state\\artifact_pipeline\\trials\\builder-0-2-55-a3c36bcaf45e\\workspace"
+        }
+      },
+      {
+        "generation": 122,
+        "action": "candidate_accepted",
+        "actor": "builder.user",
+        "reason": null,
+        "at": "2026-07-30T05:57:48+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "trial",
+          "publication_status": "published",
+          "change_set_status": "trial",
+          "change_set_gate": "trial"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "accepted",
+          "publication_status": "published",
+          "change_set_status": "accepted",
+          "change_set_gate": "publication"
+        },
+        "metadata": {
+          "candidate_id": "builder-0-2-55-a3c36bcaf45e",
+          "run_id": "candidate:builder-0-2-55-a3c36bcaf45e:accept",
+          "canonical_change_id": "CH-builder-conversational-refactor",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "observations": [
+            {
+              "schema": "adaos.artifact.trial.v1",
+              "trial_id": "trial-builder-0-2-55-a3c36bcaf45e",
+              "candidate_digest": "sha256:bf96eb05a75bb67b4e4c8ae43b4cf38ee2de2f872dd6ee6e15b8b8a245253bff",
+              "audience": "owner",
+              "data_mode": "empty",
+              "lock_digest": "sha256:eb195cdd8d9e72d03d3c5598b49c7e636026ec13f1237bc62f7052aca98e1fa4",
+              "started_at": "2026-07-30T05:56:41+00:00",
+              "status": "accepted",
+              "observations": [
+                {
+                  "actor": "builder.user",
+                  "decision": "accepted_for_stable",
+                  "source": "publication_confirmation"
+                }
+              ],
+              "ended_at": "2026-07-30T05:57:48+00:00",
+              "isolation_evidence": {
+                "status": "verified",
+                "mode": "empty",
+                "reason": "isolated trial Workspace has no seeded data"
+              },
+              "reload_receipt": {
+                "status": "skipped",
+                "mode": "policy_skip",
+                "approved_by": "artifact_pipeline.isolated_trial",
+                "reason": "isolated trial Workspace is not attached to a live runtime",
+                "recorded_at": "2026-07-30T05:56:41+00:00"
+              },
+              "health_receipt": {
+                "status": "passed",
+                "check": "verified_package_materialization",
+                "lock_digest": "sha256:eb195cdd8d9e72d03d3c5598b49c7e636026ec13f1237bc62f7052aca98e1fa4",
+                "mode": "callback",
+                "recorded_at": "2026-07-30T05:56:41+00:00"
+              },
+              "rollback_receipt": {
+                "status": "not_required",
+                "reason": "trial accepted for promotion",
+                "recorded_at": "2026-07-30T05:57:48+00:00"
+              },
+              "duration_seconds": 67
+            }
+          ]
+        }
+      },
+      {
+        "generation": 123,
+        "action": "publish",
+        "actor": "builder.publication",
+        "reason": null,
+        "at": "2026-07-30T05:57:53+00:00",
+        "before": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "accepted",
+          "publication_status": "published",
+          "change_set_status": "accepted",
+          "change_set_gate": "publication"
+        },
+        "after": {
+          "active_phase": "automation",
+          "prototype_status": "frozen",
+          "automation_status": "completed",
+          "delivery_status": "published",
+          "publication_status": "published",
+          "change_set_status": "published",
+          "change_set_gate": "complete"
+        },
+        "metadata": {
+          "version": "0.2.55",
+          "release": "builder@0.2.55",
+          "candidate_id": "builder-0-2-55-a3c36bcaf45e",
+          "task_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+          "run_id": "builder-publication-fe52827cbda4410eaffe0740593f2ec7",
+          "canonical_change_id": "CH-builder-conversational-refactor",
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5"
+        }
+      }
+    ],
+    "updated_at": "2026-08-01T06:01:09+00:00",
+    "governed": {
+      "schema": "adaos.workflow.instance.v1",
+      "instance_id": "change:scenario:builder:CH-builder-conversational-refactor",
+      "workflow_type": "builder.change",
+      "definition_version": "1.2.0",
+      "definition_digest": "sha256:d68f723e09b06dda8c230dad3cb06dedf0499aa3028f36e10613fbd401d99f0b",
+      "state": "published",
+      "generation": 2,
+      "context": {
+        "target_ref": {
+          "schema": "adaos.workflow.ref.v1",
+          "kind": "change",
+          "id": "CH-builder-conversational-refactor"
+        },
+        "project_ref": "scenario:builder",
+        "evidence_refs": [
+          "codex-session-2026-07-29-builder-conversational-refactor"
+        ],
+        "activity_callback_contract": "waiting_then_terminal_callback",
+        "compatibility_shortcuts_removed": true,
+        "review_confirmation_contract": "explicit_rich_review",
+        "definition_change_reason": "confirmation_policy_alignment"
+      },
+      "history": [
+        {
+          "generation": 1,
+          "command": "migrate_definition",
+          "transition_id": "definition_migration:builder_change_phase11_1_0_to_1_1",
+          "actor": "builder.migration",
+          "from": "published",
+          "to": "published",
+          "input_digest": "sha256:e70d452a69725b36e4f461f0ae2dea4b5bb0dd3504b47f6b1698185eaa44e036",
+          "at": "2026-08-05T16:48:20+00:00"
+        },
+        {
+          "generation": 2,
+          "command": "migrate_definition",
+          "transition_id": "definition_migration:builder_change_phase11_1_1_to_1_2",
+          "actor": "builder.migration",
+          "from": "published",
+          "to": "published",
+          "input_digest": "sha256:8dafa44cac9ef2f82387755d7fce9c62697ebfc698be91d7381c6d0ca5bf63a3",
+          "at": "2026-08-05T20:07:11+00:00"
+        }
+      ],
+      "idempotency": [
+        {
+          "key": "phase11-builder-1.1.0:builder",
+          "payload_digest": "sha256:24dd2790a060a74a8368d9e363f2c8eed0cc7a05efc78f4e35bda7f482f54576",
+          "transition_id": "definition_migration:builder_change_phase11_1_0_to_1_1",
+          "generation": 1,
+          "async_reply": {
+            "mode": "terminal",
+            "reply_route": "origin"
+          },
+          "explanation": "Introduce Trial waiting callbacks and remove direct Trial/Publication promotion shortcuts.",
+          "at": "2026-08-05T16:48:20+00:00"
+        },
+        {
+          "key": "phase11-builder-1.2.0:builder",
+          "payload_digest": "sha256:0ead59bbe314f4af6b2ad4caa1fa2b97e4c11048e9fc74f7b6ade030c8df86a1",
+          "transition_id": "definition_migration:builder_change_phase11_1_1_to_1_2",
+          "generation": 2,
+          "async_reply": {
+            "mode": "terminal",
+            "reply_route": "origin"
+          },
+          "explanation": "Bind reviewed Builder transitions to the explicit rich-review confirmation policy without changing in-flight business state.",
+          "at": "2026-08-05T20:07:11+00:00"
+        }
+      ],
+      "created_at": "2026-08-01T05:59:41+00:00",
+      "updated_at": "2026-08-05T20:07:11+00:00"
+    },
+    "data_binding": {
+      "schema": "adaos.builder.binding_state.v1",
+      "selected_profile_id": "default-mock",
+      "selected_mode": "mock",
+      "profiles": [
+        {
+          "profile_id": "default-mock",
+          "mode": "mock",
+          "logical_schema_ref": "schema:scenario:builder:prototype",
+          "source_ref": "mock:scenario:builder:generated",
+          "owner": "builder",
+          "schema": "adaos.builder.binding_profile.v1",
+          "capabilities": [],
+          "sensitivity": "internal",
+          "read_policy": "fixture",
+          "write_policy": "none",
+          "expires_at": null,
+          "redaction": "policy",
+          "implementation_mappings": []
+        }
+      ],
+      "generation": 0,
+      "updated_at": "2026-08-01T05:59:41+00:00"
+    },
+    "change_portfolio": {
+      "CH-builder-conversational-refactor": {
+        "change_id": "CH-builder-conversational-refactor",
+        "active_phase": "automation",
+        "prototype": {
+          "head_revision": "058",
+          "status": "frozen",
+          "stable": true,
+          "derived_from_automation_task": "builder-conversational-refactor",
+          "resumed_at": "2026-07-29T11:10:03+00:00",
+          "frozen_at": "2026-07-30T05:37:58+00:00",
+          "revised_at": "2026-07-29T11:13:25+00:00",
+          "stabilized_at": "2026-07-30T05:36:33+00:00"
+        },
+        "automation": {
+          "status": "completed",
+          "iteration": 14,
+          "source_prototype_revision": "058",
+          "frozen_at": "2026-07-29T11:10:03+00:00",
+          "head_task_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+          "started_at": "2026-07-30T05:37:58+00:00",
+          "completed_at": "2026-07-30T05:46:17+00:00",
+          "error": null,
+          "snapshot_task_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+          "result_version": "0.2.54",
+          "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+        },
+        "delivery": {
+          "status": "published",
+          "candidate_id": "builder-0-2-55-a3c36bcaf45e",
+          "release": "builder@0.2.55",
+          "release_digest": "sha256:f671756e91dc8540d400e1c1b87443f00bbc67a89ac6b41ce110466ea4e3a007",
+          "package_digest": "sha256:8602a3643ee9b6baec2fbefee97d2b4993b625c7b56cfb8deb77a3c36bcaf45e",
+          "base_release": "builder@0.2.40",
+          "base_release_digest": "sha256:9457a35805940f6de6b12f293b49dd78147caf4d446961eb9cadc60cc38657c8",
+          "trial_workspace": "D:\\git\\inimatic\\adaos\\.adaos\\state\\artifact_pipeline\\trials\\builder-0-2-55-a3c36bcaf45e\\workspace",
+          "prepared_at": "2026-07-30T05:56:41+00:00",
+          "decided_at": "2026-07-30T05:57:48+00:00",
+          "stale_reason": null,
+          "replaces_candidate_id": null,
+          "rebase_plan": null,
+          "decision_observations": [
+            {
+              "schema": "adaos.artifact.trial.v1",
+              "trial_id": "trial-builder-0-2-55-a3c36bcaf45e",
+              "candidate_digest": "sha256:bf96eb05a75bb67b4e4c8ae43b4cf38ee2de2f872dd6ee6e15b8b8a245253bff",
+              "audience": "owner",
+              "data_mode": "empty",
+              "lock_digest": "sha256:eb195cdd8d9e72d03d3c5598b49c7e636026ec13f1237bc62f7052aca98e1fa4",
+              "started_at": "2026-07-30T05:56:41+00:00",
+              "status": "accepted",
+              "observations": [
+                {
+                  "actor": "builder.user",
+                  "decision": "accepted_for_stable",
+                  "source": "publication_confirmation"
+                }
+              ],
+              "ended_at": "2026-07-30T05:57:48+00:00",
+              "isolation_evidence": {
+                "status": "verified",
+                "mode": "empty",
+                "reason": "isolated trial Workspace has no seeded data"
+              },
+              "reload_receipt": {
+                "status": "skipped",
+                "mode": "policy_skip",
+                "approved_by": "artifact_pipeline.isolated_trial",
+                "reason": "isolated trial Workspace is not attached to a live runtime",
+                "recorded_at": "2026-07-30T05:56:41+00:00"
+              },
+              "health_receipt": {
+                "status": "passed",
+                "check": "verified_package_materialization",
+                "lock_digest": "sha256:eb195cdd8d9e72d03d3c5598b49c7e636026ec13f1237bc62f7052aca98e1fa4",
+                "mode": "callback",
+                "recorded_at": "2026-07-30T05:56:41+00:00"
+              },
+              "rollback_receipt": {
+                "status": "not_required",
+                "reason": "trial accepted for promotion",
+                "recorded_at": "2026-07-30T05:57:48+00:00"
+              },
+              "duration_seconds": 67
+            }
+          ],
+          "published_at": "2026-07-30T05:57:53+00:00"
+        },
+        "publication": {
+          "status": "published",
+          "current_version": "0.2.55",
+          "published_at": "2026-07-30T05:57:53+00:00",
+          "source_automation_task": "task.01KYRRF3CS62DM156EXEAWH54Z",
+          "release": "builder@0.2.55"
+        },
+        "change": {
+          "schema": "adaos.builder.change.v1",
+          "change_set_id": "CH-builder-conversational-refactor",
+          "request": "Refactor Builder into a chat-first, state-backed development workbench while preserving the recovered functional control plane.",
+          "request_addenda": [],
+          "route": "prototype_first",
+          "gate": "complete",
+          "status": "published",
+          "issues": [
+            {
+              "issue_id": "canonical-change-run-context",
+              "title": "Use canonical Issue, Change, Run, and bounded context packet contracts",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "One user objective has one Change identity, follow-up executions are Runs, and legacy change_set remains only a compatibility projection."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            },
+            {
+              "issue_id": "risk-aware-actions",
+              "title": "Expose deterministic risk-classified actions with optimistic locking",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "Every projected command carries risk, target, and expected workflow generation; stale commands do not mutate workflow state."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            },
+            {
+              "issue_id": "dependent-process",
+              "title": "Replace permanent Lifecycle navigation with an on-demand dependent Process view",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "Implementation is nested under its exact source Prototype, Trial under Implementation, and Publication under Trial."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            },
+            {
+              "issue_id": "chat-first-workbench",
+              "title": "Make Conversation the primary Builder surface without losing rich Web tools",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "Builder opens in Conversation, shows exact Project, Change, and Preview context, and retains project search, files, specification, automation, publication, and Preview controls."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            },
+            {
+              "issue_id": "semantic-ui-safe-zone",
+              "title": "Provide a transactional reversible semantic UI rename operation",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "Rename checks source revision and ABI, creates a new immutable UI revision with undo and provenance, and rolls back all files on failure."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            }
+          ],
+          "member_change_ids": [
+            "CH-builder-conversational-refactor",
+            "builder_change_automation_54132d406a502909",
+            "builder_change_release_ui058_dependency_lock_20260730"
+          ],
+          "source_message_ids": [
+            "codex-session-2026-07-29-builder-conversational-refactor"
+          ],
+          "created_at": "2026-07-29T11:10:47+00:00",
+          "updated_at": "2026-07-30T05:57:53+00:00",
+          "supersedes_change_set_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3",
+          "change_id": "CH-builder-conversational-refactor",
+          "project_ref": "scenario:builder",
+          "base_ref": null,
+          "base_generation": 0,
+          "affected_refs": [],
+          "runs": [
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "builder-plan-79175799b0bd418d9d168ce50703e0c0",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "plan_change_set",
+              "executor": "builder.change_planner",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "succeeded",
+              "context_packet_digest": null,
+              "environment_ref": null,
+              "input_refs": [
+                "codex-session-2026-07-29-builder-conversational-refactor"
+              ],
+              "output_refs": [],
+              "evidence_refs": [],
+              "started_at": "2026-07-29T11:10:47+00:00",
+              "completed_at": "2026-07-29T11:10:47+00:00",
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "RUN-builder-ui055",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "prototype_revision_recorded",
+              "executor": "codex.local",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "succeeded",
+              "context_packet_digest": "sha256:d17e0f0091d7958ffb152dfd624bde95362553b52687f991b6635396540551c2",
+              "environment_ref": null,
+              "input_refs": [
+                "ui_revision:054",
+                "commit:7308fe5d",
+                "commit:a65ecd92",
+                "commit:a5c29719",
+                "commit:05ba3671",
+                "commit:313fc53b"
+              ],
+              "output_refs": [
+                "ui_revision:055",
+                "skill:builder_sdk_control_skill@0.1.46"
+              ],
+              "evidence_refs": [
+                "test:builder-core",
+                "test:builder-functional-parity",
+                "test:builder-control-skill"
+              ],
+              "started_at": "2026-07-29T11:13:25+00:00",
+              "completed_at": "2026-07-29T11:13:25+00:00",
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "RUN-builder-ui058-approved",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "stabilize_prototype",
+              "executor": "human.review",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "succeeded",
+              "context_packet_digest": "sha256:d17e0f0091d7958ffb152dfd624bde95362553b52687f991b6635396540551c2",
+              "environment_ref": null,
+              "input_refs": [],
+              "output_refs": [],
+              "evidence_refs": [
+                "test:builder-workbench-preview-34-of-34",
+                "test:builder-dialog-runtime-57-of-57",
+                "preview:prototype:builder:058"
+              ],
+              "started_at": "2026-07-30T05:36:33+00:00",
+              "completed_at": "2026-07-30T05:36:33+00:00",
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "builder_change_automation_54132d406a502909",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "automation_started",
+              "executor": "builder.automation",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "running",
+              "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+              "environment_ref": null,
+              "input_refs": [],
+              "output_refs": [],
+              "evidence_refs": [],
+              "started_at": "2026-07-30T05:37:58+00:00",
+              "completed_at": null,
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "checkpoint_recorded",
+              "executor": "builder.automation",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "succeeded",
+              "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+              "environment_ref": null,
+              "input_refs": [],
+              "output_refs": [],
+              "evidence_refs": [],
+              "started_at": "2026-07-30T05:43:21+00:00",
+              "completed_at": "2026-07-30T05:46:17+00:00",
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "candidate:builder-0-2-54-a6362f2d98cd:prepare",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "candidate_prepared",
+              "executor": "builder.candidate",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "succeeded",
+              "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+              "environment_ref": null,
+              "input_refs": [],
+              "output_refs": [],
+              "evidence_refs": [],
+              "started_at": "2026-07-30T05:47:21+00:00",
+              "completed_at": "2026-07-30T05:47:21+00:00",
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "CH-builder-conversational-refactor:run:0119",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "candidate_rejected",
+              "executor": "builder.ui",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "failed",
+              "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+              "environment_ref": null,
+              "input_refs": [],
+              "output_refs": [],
+              "evidence_refs": [],
+              "started_at": "2026-07-30T05:51:44+00:00",
+              "completed_at": "2026-07-30T05:51:44+00:00",
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "builder_change_release_ui058_dependency_lock_20260730",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "checkpoint_recorded",
+              "executor": "builder.checkpoint",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "succeeded",
+              "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+              "environment_ref": null,
+              "input_refs": [],
+              "output_refs": [],
+              "evidence_refs": [],
+              "started_at": "2026-07-30T05:56:00+00:00",
+              "completed_at": "2026-07-30T05:56:00+00:00",
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "candidate:builder-0-2-55-a3c36bcaf45e:prepare",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "candidate_prepared",
+              "executor": "builder.candidate",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "succeeded",
+              "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+              "environment_ref": null,
+              "input_refs": [],
+              "output_refs": [],
+              "evidence_refs": [],
+              "started_at": "2026-07-30T05:56:41+00:00",
+              "completed_at": "2026-07-30T05:56:41+00:00",
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "candidate:builder-0-2-55-a3c36bcaf45e:accept",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "candidate_accepted",
+              "executor": "builder.user",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "succeeded",
+              "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+              "environment_ref": null,
+              "input_refs": [],
+              "output_refs": [],
+              "evidence_refs": [],
+              "started_at": "2026-07-30T05:57:48+00:00",
+              "completed_at": "2026-07-30T05:57:48+00:00",
+              "error": null
+            },
+            {
+              "schema": "adaos.builder.run.v1",
+              "run_id": "builder-publication-fe52827cbda4410eaffe0740593f2ec7",
+              "change_id": "CH-builder-conversational-refactor",
+              "activity": "publish",
+              "executor": "builder.publication",
+              "purpose": "iteration",
+              "adoption_status": "not_applicable",
+              "status": "succeeded",
+              "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+              "environment_ref": null,
+              "input_refs": [],
+              "output_refs": [],
+              "evidence_refs": [],
+              "started_at": "2026-07-30T05:57:53+00:00",
+              "completed_at": "2026-07-30T05:57:53+00:00",
+              "error": null
+            }
+          ],
+          "acceptance_constraints": [],
+          "context_packet_digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "supersedes_change_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3"
+        },
+        "change_set": {
+          "schema": "adaos.builder.change_set.v1",
+          "change_set_id": "CH-builder-conversational-refactor",
+          "request": "Refactor Builder into a chat-first, state-backed development workbench while preserving the recovered functional control plane.",
+          "request_addenda": [],
+          "route": "prototype_first",
+          "gate": "complete",
+          "status": "published",
+          "issues": [
+            {
+              "issue_id": "canonical-change-run-context",
+              "title": "Use canonical Issue, Change, Run, and bounded context packet contracts",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "One user objective has one Change identity, follow-up executions are Runs, and legacy change_set remains only a compatibility projection."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            },
+            {
+              "issue_id": "risk-aware-actions",
+              "title": "Expose deterministic risk-classified actions with optimistic locking",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "Every projected command carries risk, target, and expected workflow generation; stale commands do not mutate workflow state."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            },
+            {
+              "issue_id": "dependent-process",
+              "title": "Replace permanent Lifecycle navigation with an on-demand dependent Process view",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "Implementation is nested under its exact source Prototype, Trial under Implementation, and Publication under Trial."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            },
+            {
+              "issue_id": "chat-first-workbench",
+              "title": "Make Conversation the primary Builder surface without losing rich Web tools",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "Builder opens in Conversation, shows exact Project, Change, and Preview context, and retains project search, files, specification, automation, publication, and Preview controls."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            },
+            {
+              "issue_id": "semantic-ui-safe-zone",
+              "title": "Provide a transactional reversible semantic UI rename operation",
+              "lane": "prototype",
+              "status": "resolved",
+              "acceptance_criteria": [
+                "Rename checks source revision and ABI, creates a new immutable UI revision with undo and provenance, and rolls back all files on failure."
+              ],
+              "priority": null,
+              "confidence": null,
+              "semantic_refs": []
+            }
+          ],
+          "member_change_ids": [
+            "CH-builder-conversational-refactor",
+            "builder_change_automation_54132d406a502909",
+            "builder_change_release_ui058_dependency_lock_20260730"
+          ],
+          "source_message_ids": [
+            "codex-session-2026-07-29-builder-conversational-refactor"
+          ],
+          "created_at": "2026-07-29T11:10:47+00:00",
+          "updated_at": "2026-07-30T05:57:53+00:00",
+          "supersedes_change_set_id": "builder-change-set-3135b280bb954daabe9bb2d8eed64fe3"
+        },
+        "context_packet": {
+          "schema": "adaos.builder.context_packet.v1",
+          "project": {
+            "ref": "scenario:builder",
+            "object_type": "scenario",
+            "object_id": "builder",
+            "manifest_ref": "scenario.yaml",
+            "manifest_version": "0.2.53",
+            "manifest_digest": "sha256:0a5df7a60ea7667dce55cd20f6d666c19fc9aa34a79b07f1f7829852c40f7919"
+          },
+          "change": {
+            "change_id": "CH-builder-conversational-refactor",
+            "intent": "Refactor Builder into a chat-first, state-backed development workbench while preserving the recovered functional control plane.",
+            "request_addenda": [],
+            "route": "prototype_first",
+            "gate": "automation",
+            "status": "approved",
+            "issues": [
+              {
+                "issue_id": "canonical-change-run-context",
+                "title": "Use canonical Issue, Change, Run, and bounded context packet contracts",
+                "lane": "prototype",
+                "status": "resolved",
+                "acceptance_criteria": [
+                  "One user objective has one Change identity, follow-up executions are Runs, and legacy change_set remains only a compatibility projection."
+                ]
+              },
+              {
+                "issue_id": "risk-aware-actions",
+                "title": "Expose deterministic risk-classified actions with optimistic locking",
+                "lane": "prototype",
+                "status": "resolved",
+                "acceptance_criteria": [
+                  "Every projected command carries risk, target, and expected workflow generation; stale commands do not mutate workflow state."
+                ]
+              },
+              {
+                "issue_id": "dependent-process",
+                "title": "Replace permanent Lifecycle navigation with an on-demand dependent Process view",
+                "lane": "prototype",
+                "status": "resolved",
+                "acceptance_criteria": [
+                  "Implementation is nested under its exact source Prototype, Trial under Implementation, and Publication under Trial."
+                ]
+              },
+              {
+                "issue_id": "chat-first-workbench",
+                "title": "Make Conversation the primary Builder surface without losing rich Web tools",
+                "lane": "prototype",
+                "status": "resolved",
+                "acceptance_criteria": [
+                  "Builder opens in Conversation, shows exact Project, Change, and Preview context, and retains project search, files, specification, automation, publication, and Preview controls."
+                ]
+              },
+              {
+                "issue_id": "semantic-ui-safe-zone",
+                "title": "Provide a transactional reversible semantic UI rename operation",
+                "lane": "prototype",
+                "status": "resolved",
+                "acceptance_criteria": [
+                  "Rename checks source revision and ABI, creates a new immutable UI revision with undo and provenance, and rolls back all files on failure."
+                ]
+              }
+            ],
+            "acceptance_constraints": [],
+            "source_message_ids": [
+              "codex-session-2026-07-29-builder-conversational-refactor"
+            ]
+          },
+          "base": {
+            "source": null,
+            "release": null,
+            "release_digest": null
+          },
+          "artifacts": {
+            "prototype": {
+              "head_revision": "058",
+              "status": "working",
+              "stable": true,
+              "derived_from_automation_task": "builder-conversational-refactor",
+              "resumed_at": "2026-07-29T11:10:03+00:00",
+              "frozen_at": "2026-07-28T19:42:49+00:00",
+              "revised_at": "2026-07-29T11:13:25+00:00",
+              "stabilized_at": "2026-07-30T05:36:33+00:00"
+            },
+            "implementation": {
+              "status": "frozen",
+              "iteration": 13,
+              "source_prototype_revision": "053",
+              "frozen_at": "2026-07-29T11:10:03+00:00",
+              "head_task_id": "task.01KYP39F59S9YCCMSXTM2MDZJK",
+              "started_at": "2026-07-29T04:49:25+00:00",
+              "completed_at": "2026-07-29T04:54:36+00:00",
+              "error": null,
+              "snapshot_task_id": "task.01KYP39F59S9YCCMSXTM2MDZJK",
+              "result_version": "0.2.42",
+              "snapshot_path": "D:\\git\\inimatic\\adaos\\.adaos\\state\\builder\\workflow_snapshots\\scenario\\builder\\automation"
+            },
+            "trial": {
+              "status": "stale",
+              "checkpoint_change_id": "builder_change_automation_d62792d1607e2e96",
+              "package_digest": "sha256:c8028a27f7eb2054478fe64ed53bc6f79d4c608a9c69f904084e5dbb26d91569",
+              "source_revision": "92f7b8e9ef255e0217449df5eac94e2fe3ad4af5",
+              "checkpoint_at": "2026-07-29T04:54:36+00:00",
+              "candidate_id": null,
+              "release_digest": null,
+              "base_release": null,
+              "trial_workspace": null,
+              "prepared_at": null,
+              "decided_at": null,
+              "replaces_candidate_id": null,
+              "rebase_plan": null,
+              "stale_reason": "returned_to_prototype",
+              "stale_at": "2026-07-29T11:10:03+00:00"
+            },
+            "publication": {
+              "status": "published",
+              "current_version": "0.2.40",
+              "published_at": "2026-07-28T22:05:52+00:00",
+              "source_automation_task": "task.01KYN8MNSWTAT38KA6091ZYKCZ",
+              "release": "builder@0.2.40"
+            }
+          },
+          "dependencies": [
+            "builder_skill",
+            "builder_sdk_control_skill",
+            "voice_chat_skill"
+          ],
+          "allowed_paths": [
+            "scenarios/builder/",
+            "skills/builder_skill/",
+            "skills/builder_sdk_control_skill/",
+            "docs/requirements/builder/",
+            "prompt_state.json"
+          ],
+          "instruction_refs": [
+            "prompt-project:scenario:builder"
+          ],
+          "previous_run": {
+            "schema": "adaos.builder.run.v1",
+            "run_id": "RUN-builder-ui058-approved",
+            "change_id": "CH-builder-conversational-refactor",
+            "activity": "stabilize_prototype",
+            "executor": "human.review",
+            "status": "succeeded",
+            "context_packet_digest": "sha256:d17e0f0091d7958ffb152dfd624bde95362553b52687f991b6635396540551c2",
+            "environment_ref": null,
+            "input_refs": [],
+            "output_refs": [],
+            "evidence_refs": [
+              "test:builder-workbench-preview-34-of-34",
+              "test:builder-dialog-runtime-57-of-57",
+              "preview:prototype:builder:058"
+            ],
+            "started_at": "2026-07-30T05:36:33+00:00",
+            "completed_at": "2026-07-30T05:36:33+00:00",
+            "error": null
+          },
+          "conversation": null,
+          "pending_actions": [],
+          "budget": {
+            "max_state_bytes": 524288,
+            "issue_count": 5,
+            "acceptance_constraint_count": 0,
+            "run_count": 3,
+            "source_message_ref_count": 1,
+            "conversation_message_count": 0,
+            "conversation_segment_count": 0,
+            "memory_item_count": 0,
+            "pending_action_ref_count": 0
+          },
+          "digest": "sha256:a2c08533c4ec0d546609290dc7e31a8a9972b3bbc31d9186d93ea83e2d8ce8e5",
+          "built_at": "2026-07-30T05:37:58+00:00"
+        },
+        "governed": {
+          "schema": "adaos.workflow.instance.v1",
+          "instance_id": "change:scenario:builder:CH-builder-conversational-refactor",
+          "workflow_type": "builder.change",
+          "definition_version": "1.0.0",
+          "definition_digest": "sha256:770bf8eedd1ba1c7d8cb08db98f625c581f0c3f05db9f7157eb51d7f7ddc7e67",
+          "state": "published",
+          "generation": 0,
+          "context": {
+            "target_ref": {
+              "schema": "adaos.workflow.ref.v1",
+              "kind": "change",
+              "id": "CH-builder-conversational-refactor"
+            },
+            "project_ref": "scenario:builder",
+            "evidence_refs": [
+              "codex-session-2026-07-29-builder-conversational-refactor"
+            ]
+          },
+          "history": [],
+          "idempotency": [],
+          "created_at": "2026-08-01T05:59:41+00:00",
+          "updated_at": "2026-08-01T05:59:41+00:00"
+        },
+        "pending_transition": null,
+        "reviews": []
+      }
+    },
+    "project": {
+      "schema": "adaos.builder.project.v1",
+      "project_id": "builder",
+      "project_ref": "scenario:builder",
+      "object_type": "scenario",
+      "identity": {
+        "stable_id": "builder",
+        "kind": "scenario",
+        "project_ref": "scenario:builder"
+      },
+      "source_ref": null,
+      "stable_release_ref": {
+        "kind": "release",
+        "id": "scenario:builder",
+        "version": "0.2.55"
+      },
+      "installed_release_ref": null,
+      "dev_ref": {
+        "kind": "dev_artifact",
+        "id": "scenario:builder",
+        "generation": 130
+      },
+      "candidate_ref": {
+        "kind": "candidate",
+        "id": "builder-0-2-55-a3c36bcaf45e",
+        "digest": "sha256:8602a3643ee9b6baec2fbefee97d2b4993b625c7b56cfb8deb77a3c36bcaf45e"
+      },
+      "accepted_prototype_ref": {
+        "kind": "prototype",
+        "id": "scenario:builder",
+        "revision": "058"
+      },
+      "accepted_implementation_ref": {
+        "kind": "implementation",
+        "id": "task.01KYRRF3CS62DM156EXEAWH54Z",
+        "version": "0.2.54",
+        "source_prototype_revision": "058"
+      },
+      "issue_refs": [
+        "issue:canonical-change-run-context",
+        "issue:risk-aware-actions",
+        "issue:dependent-process",
+        "issue:chat-first-workbench",
+        "issue:semantic-ui-safe-zone"
+      ],
+      "policy": {
+        "parallel_changes": true,
+        "unknown_conflict_scope": "project",
+        "prototype_data_modes": [
+          "mock",
+          "fixture"
+        ],
+        "risk_policy": {
+          "default_class": "isolated_write",
+          "fail_closed": true
+        },
+        "approval_policy_refs": [],
+        "allowed_executors": [
+          "builder.llm",
+          "builder.codex",
+          "builder.deterministic"
+        ]
+      },
+      "component_refs": [
+        "scenario:builder"
+      ],
+      "changes": [
+        {
+          "change_id": "CH-builder-conversational-refactor",
+          "change_ref": "change:CH-builder-conversational-refactor",
+          "status": "published",
+          "gate": "complete",
+          "base_generation": 0,
+          "affected_refs": [
+            "scenario:builder"
+          ],
+          "issue_refs": [
+            "issue:canonical-change-run-context",
+            "issue:risk-aware-actions",
+            "issue:dependent-process",
+            "issue:chat-first-workbench",
+            "issue:semantic-ui-safe-zone"
+          ],
+          "depends_on_change_ids": [],
+          "workflow_instance_ref": "change:scenario:builder:CH-builder-conversational-refactor",
+          "workflow_state": "published",
+          "mutation_status": "idle",
+          "updated_at": "2026-07-30T05:57:53+00:00"
+        }
+      ],
+      "conflicts": [],
+      "dependencies": [],
+      "change_edges": [
+        {
+          "from_ref": "change:CH-builder-conversational-refactor",
+          "to_ref": "issue:canonical-change-run-context",
+          "relation": "contains_issue"
+        },
+        {
+          "from_ref": "change:CH-builder-conversational-refactor",
+          "to_ref": "issue:risk-aware-actions",
+          "relation": "contains_issue"
+        },
+        {
+          "from_ref": "change:CH-builder-conversational-refactor",
+          "to_ref": "issue:dependent-process",
+          "relation": "contains_issue"
+        },
+        {
+          "from_ref": "change:CH-builder-conversational-refactor",
+          "to_ref": "issue:chat-first-workbench",
+          "relation": "contains_issue"
+        },
+        {
+          "from_ref": "change:CH-builder-conversational-refactor",
+          "to_ref": "issue:semantic-ui-safe-zone",
+          "relation": "contains_issue"
+        },
+        {
+          "from_ref": "change:CH-builder-conversational-refactor",
+          "to_ref": "change:builder-change-set-3135b280bb954daabe9bb2d8eed64fe3",
+          "relation": "supersedes"
+        }
+      ],
+      "active_candidate_refs": [],
+      "trials": [
+        {
+          "trial_ref": "trial:builder-0-2-55-a3c36bcaf45e",
+          "candidate_ref": {
+            "kind": "candidate",
+            "id": "builder-0-2-55-a3c36bcaf45e",
+            "digest": "sha256:8602a3643ee9b6baec2fbefee97d2b4993b625c7b56cfb8deb77a3c36bcaf45e"
+          },
+          "status": "published",
+          "workspace_ref": "D:\\git\\inimatic\\adaos\\.adaos\\state\\artifact_pipeline\\trials\\builder-0-2-55-a3c36bcaf45e\\workspace",
+          "started_at": "2026-07-30T05:56:41+00:00",
+          "decided_at": "2026-07-30T05:57:48+00:00"
+        }
+      ],
+      "focus_by_context": {
+        "default": "CH-builder-conversational-refactor"
+      },
+      "workflow_versions": {
+        "project": "1.0.0",
+        "change": "1.0.0"
+      },
+      "workflow_definition_version": "1.0.0",
+      "archived": false,
+      "lifecycle": {
+        "status": "active",
+        "archived_at": null,
+        "restored_at": null,
+        "reason": null
+      },
+      "explanation": {
+        "status": "published",
+        "summary": "Project scenario:builder is published; 1 change(s), 0 conflict(s), 1 trial(s).",
+        "blockers": [],
+        "next_commands": [
+          "builder.change.plan"
+        ]
+      },
+      "generation": 0,
+      "artifact_generation": 0,
+      "view_generation": 4,
+      "updated_at": "2026-08-01T06:01:09+00:00"
+    }
+  }
+}

@@ -4,7 +4,7 @@
     "type": "desktop",
     "title": "Builder — рабочее место разработки",
     "description": "Safe local Builder prototype for the dependent Prototype, Automation, Trial, and Publication lifecycle.",
-    "version": "0.2.55",
+    "version": "0.2.56",
     "title_i18n": {
         "fallback": "Builder",
         "key": "scenario.builder.title"
@@ -67,8 +67,8 @@
                         "selectedProjectTitle": "Builder",
                         "selectedObjectKind": "scenario",
                         "selectedObjectId": "builder",
-                        "selectedFilePath": "scenario.yaml",
-                        "selectedFileTitle": "scenario.yaml",
+                        "selectedFilePath": "builder_memory.md",
+                        "selectedFileTitle": "builder_memory.md",
                         "selectedFileProtected": false,
                         "selectedNodeId": "stage-proto",
                         "selectedTemplate": null,
@@ -1008,6 +1008,7 @@
                                     "params": {
                                         "bump": "$state.releaseBump",
                                         "dry_run": true,
+                                        "confirmed": true,
                                         "object_type": "$state.selectedProjectKind",
                                         "object_id": "$state.selectedProjectId",
                                         "_meta": {
@@ -3436,6 +3437,7 @@
                                         "params": {
                                             "bump": "$state.releaseBump",
                                             "dry_run": true,
+                                            "confirmed": true,
                                             "object_type": "$state.selectedProjectKind",
                                             "object_id": "$state.selectedProjectId",
                                             "_meta": {
@@ -3777,6 +3779,7 @@
                                         "params": {
                                             "bump": "$state.releaseBump",
                                             "dry_run": false,
+                                            "confirmed": true,
                                             "object_type": "$state.selectedProjectKind",
                                             "object_id": "$state.selectedProjectId",
                                             "_meta": {
@@ -4037,7 +4040,7 @@
                 }
             }
         },
-        "version": "0.2.55",
+        "version": "0.2.56",
         "user_summary": {
             "assumptions": [
                 "Lifecycle selection is navigation only; it never changes the editable process or Preview target.",
@@ -4064,5 +4067,5 @@
         },
         "manifest": "webui.json"
     },
-    "updated_at": "2026-07-30T05:55:56+00:00"
+    "updated_at": "2026-08-06T09:25:02+00:00"
 }

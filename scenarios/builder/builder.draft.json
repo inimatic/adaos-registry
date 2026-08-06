@@ -1,0 +1,173 @@
+{
+  "$schema": "../../../src/adaos/abi/builder.draft.v1.schema.json",
+  "draft_id": "draft.builder.20260717081846695264",
+  "task_id": "btask.0bfaf2b639",
+  "status": "draft",
+  "source": {
+    "type": "builder_dialog",
+    "utterance": "Create a new Builder workbench prototype for three-stage conversational development: prototyping, automation, and publication.",
+    "side_effect_class": "local_write"
+  },
+  "artifact": {
+    "kind": "scenario",
+    "id": "builder",
+    "template_id": "builder_scenario",
+    "draft_root": "D:\\git\\inimatic\\adaos\\.adaos\\dev\\sn_6acf0c01\\scenarios\\builder",
+    "files": [
+      {
+        "path": ".gitignore",
+        "role": "other",
+        "required": false
+      },
+      {
+        "path": "builder.draft.json",
+        "role": "other",
+        "required": false
+      },
+      {
+        "path": "scenario.json",
+        "role": "manifest",
+        "required": true
+      }
+    ]
+  },
+  "metadata": {
+    "source_idea": "Create a new Builder workbench prototype for three-stage conversational development: prototyping, automation, and publication.",
+    "assumptions": [
+      "Draft workspace is isolated from active runtime state.",
+      "Apply/activation requires a separate approval and lifecycle step."
+    ],
+    "risk_notes": [
+      "Generated behavior and permissions must be reviewed before runtime apply."
+    ],
+    "expected_tests": [
+      "schema validation",
+      "Builder preview bundle"
+    ],
+    "route_plan_required": false,
+    "human_review_required": false,
+    "webspace_id": "desktop",
+    "context_packet": {
+      "schema": "adaos.context.packet.v1",
+      "conversation_id": "conv.skill.builder_skill.default.desktop",
+      "requester_owner": "skill:builder_skill",
+      "channel_id": "builder",
+      "thread_id": null,
+      "topic": null,
+      "agent_id": null,
+      "budgets": {
+        "max_tokens": 2000,
+        "max_messages": 12,
+        "max_segments": 4,
+        "max_memory_items": 8,
+        "timeout_ms": 250
+      },
+      "messages": [],
+      "segments": [],
+      "memory": [],
+      "evidence_refs": [],
+      "token_estimate": 0,
+      "diagnostics": {
+        "schema": "adaos.context.diagnostics.v1",
+        "selected_sources": [],
+        "skipped_sources": [
+          {
+            "type": "message",
+            "reason": "timeout_budget"
+          },
+          {
+            "type": "memory",
+            "reason": "timeout_budget",
+            "scope": "global_user",
+            "owner": "skill:builder_skill",
+            "subject_id": "user:default"
+          }
+        ],
+        "policy_denials": [],
+        "fallbacks": [
+          "summaries_unavailable",
+          "semantic_retrieval_unavailable"
+        ],
+        "search_index": {
+          "schema": "adaos.conversation.search_index_health.v1",
+          "status": "stale",
+          "fts_available": true,
+          "counts": {
+            "messages": {
+              "base": 1822,
+              "indexed": 1748
+            },
+            "memory": {
+              "base": 0,
+              "indexed": 0
+            },
+            "segments": {
+              "base": 0,
+              "indexed": 0
+            }
+          }
+        },
+        "segment_summary": {
+          "schema": "adaos.conversation.segment_summary_health.v1",
+          "status": "missing",
+          "conversation_id": "conv.skill.builder_skill.default.desktop",
+          "thread_id": null,
+          "message_count": 916,
+          "segment_count": 0,
+          "summarized_message_count": 0,
+          "summarized_until_seq": 0,
+          "latest_seq": 916
+        },
+        "safety_flags": [],
+        "budget_exhausted": true,
+        "latency_ms": 282,
+        "selected_message_count": 0,
+        "selected_segment_count": 0,
+        "selected_memory_count": 0
+      },
+      "conversation_ref": {
+        "conversation_id": "conv.skill.builder_skill.default.desktop",
+        "webspace_id": "desktop",
+        "channel_id": "builder",
+        "owner": "skill:builder_skill",
+        "kind": "builder"
+      }
+    }
+  },
+  "quality_gates": {
+    "schemas": [
+      "scenario.schema.json"
+    ],
+    "tests": [
+      "scenario validation",
+      "dependency bootstrap preview"
+    ],
+    "previews": [
+      "diff",
+      "NLU probe",
+      "action preview",
+      "UI preview",
+      "dependency bootstrap"
+    ],
+    "requires_human_approval": [
+      "new skill dependencies",
+      "endpoint control",
+      "broad NLU triggers",
+      "external IO",
+      "destructive actions"
+    ]
+  },
+  "links": {
+    "builder_task_id": "btask.0bfaf2b639",
+    "conversation": {
+      "conversation_id": "conv.skill.builder_skill.default.desktop",
+      "webspace_id": "desktop",
+      "channel_id": "builder",
+      "owner": "skill:builder_skill",
+      "kind": "builder"
+    }
+  },
+  "created_by": "adaos.builder",
+  "created_at": "2026-07-17T08:18:47.030273Z",
+  "updated_at": "2026-07-17T08:18:47.030273Z"
+}

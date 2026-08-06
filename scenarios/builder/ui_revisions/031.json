@@ -1,0 +1,4802 @@
+{
+  "schema": "adaos.builder.ui_revision.v1",
+  "revision": "031",
+  "created_at": 1784401576.2663212,
+  "session_id": "scenario.builder",
+  "scenario_id": "builder",
+  "draft_id": "draft.builder.20260717081846695264",
+  "change_id": "builder_change_634eb97a",
+  "inference": {
+    "provider": "openai",
+    "model": "gpt-5",
+    "profile_id": "default",
+    "response_id": "resp_0055d3acfda111b9006a5bce9da244819896b77ed4cabfedd1",
+    "service_tier": "default"
+  },
+  "request": {
+    "text": "Тип проекта инициализируется при создании и не изменяем\n\nPrototype review notes from the current dev preview. Treat these as concrete feedback for the next UI revision:\nPrototype review notes for builder:030:\nApply these notes when creating the next UI revision. Keep the response within adaos.webui.v1.\n- field field:node-overview:description (longText, \"Описание\"): Move field \"Описание\" before \"Название\".\n- field field:node-overview:project_type (shortText, \"Тип проекта\"): Move field \"Тип проекта\" before \"Описание\"."
+  },
+  "patch": {
+    "id": "patch_48886d37",
+    "target": "ui",
+    "operation": "llm_webui_transform",
+    "status": "applied",
+    "created_by": "llm_agent",
+    "created_at": 1784401563.391583,
+    "summary": "Тип проекта инициализируется при создании и не изменяем\n\nPrototype review notes from the current dev preview. Treat these as concrete feedback for the next UI revision:\nPrototype review notes for builder:030:\nApply these notes when creating the next UI revision. Keep the response within adaos.webui.v1.\n- field field:node-overview:description (longText, \"Описание\"): Move field \"Описание\" before \"Название\".\n- field field:node-overview:project_type (shortText, \"Тип проекта\"): Move field \"Тип проекта\" before \"Описание\".",
+    "diff": {
+      "schema_valid": true,
+      "comment": "Переставлены поля формы «Обзор проекта»: «Тип проекта» теперь перед «Описание», а «Описание» перед «Название». Поле типа проекта оставлено неизменяемым по инициализации в плане структуры данных.",
+      "unable_reason": "",
+      "validation": {
+        "ok": true,
+        "schema": "adaos.webui.v1",
+        "preview_state": "ok"
+      },
+      "attempts": [
+        {
+          "attempt": 1,
+          "ok": true,
+          "request_id": "builder-ui-d8e4139ef4c058793ad0507d8cf9b979-job-eb71af96",
+          "job_id": "llm_job_9757344d5405470fa03d9455",
+          "validation": {
+            "ok": true,
+            "schema": "adaos.webui.v1",
+            "preview_state": "ok"
+          },
+          "output_mode": "jsonl_patch_v1"
+        }
+      ]
+    },
+    "change_id": "builder_change_634eb97a"
+  },
+  "llm": {
+    "ok": true,
+    "comment": "Переставлены поля формы «Обзор проекта»: «Тип проекта» теперь перед «Описание», а «Описание» перед «Название». Поле типа проекта оставлено неизменяемым по инициализации в плане структуры данных.",
+    "unable_reason": "",
+    "attempts": [
+      {
+        "attempt": 1,
+        "ok": true,
+        "request_id": "builder-ui-d8e4139ef4c058793ad0507d8cf9b979-job-eb71af96",
+        "job_id": "llm_job_9757344d5405470fa03d9455",
+        "validation": {
+          "ok": true,
+          "schema": "adaos.webui.v1",
+          "preview_state": "ok"
+        },
+        "output_mode": "jsonl_patch_v1"
+      }
+    ],
+    "model": "gpt-5",
+    "profile": {
+      "schema": "adaos.builder.llm_prompt_profile.v1",
+      "version": "2026-07-16.7",
+      "id": "default",
+      "provider": "openai",
+      "model": "gpt-5",
+      "temperature": null,
+      "reasoning": {
+        "effort": "minimal"
+      },
+      "max_output_tokens": 12000,
+      "strategy": "compact_abi_plus_affordance_map",
+      "variant_policy": "Prompt profiles may vary by provider/model, but the output contract remains adaos.webui.v1."
+    },
+    "telemetry": {
+      "root_job_id": "llm_job_9757344d5405470fa03d9455",
+      "request_id": "builder-ui-d8e4139ef4c058793ad0507d8cf9b979-job-eb71af96",
+      "status": "succeeded",
+      "wait_elapsed_ms": 8223,
+      "timing": {
+        "queue_ms": 23,
+        "ttft_ms": 1476,
+        "execution_ms": 8361,
+        "total_ms": 8384
+      },
+      "provider": {
+        "upstream_request_id": "req_8c93d62257044a2d8b826f3c56483e3f",
+        "upstream_processing_ms": 493,
+        "response_id": "resp_0055d3acfda111b9006a5bce9da244819896b77ed4cabfedd1",
+        "response_status": "completed",
+        "model": "gpt-5-2025-08-07",
+        "service_tier": "default"
+      },
+      "usage": {
+        "input_tokens": 21150,
+        "cached_input_tokens": 0,
+        "cache_write_tokens": 0,
+        "output_tokens": 352,
+        "reasoning_tokens": 0,
+        "total_tokens": 21502
+      },
+      "tools": {
+        "requested_count": 0,
+        "requested": [],
+        "used_count": 0,
+        "used": [],
+        "output_type_counts": {
+          "reasoning": 1,
+          "message": 1
+        }
+      },
+      "mcp": {
+        "used_mcp": false,
+        "item_count": 0,
+        "items": []
+      }
+    },
+    "validation": {
+      "ok": true,
+      "schema": "adaos.webui.v1",
+      "preview_state": "ok"
+    },
+    "semantic_patch_stream": {
+      "schema": "adaos.builder.webui_patch_stream.v1",
+      "base_hash": "03bb762db061c18508aa837dafb55fdf76c1be24",
+      "operation_count": 1,
+      "meaningful_operation_count": 1,
+      "no_op_count": 0,
+      "patches": [
+        {
+          "seq": 1,
+          "op": "replace",
+          "path": "/ui/application/desktop/pageSchema/widgets/@node-overview/inputs/fields",
+          "value": [
+            {
+              "default": "scenario",
+              "id": "project_type",
+              "label": "Тип проекта",
+              "type": "shortText"
+            },
+            {
+              "default": "Рабочее место для сценариев Builder",
+              "id": "description",
+              "label": "Описание",
+              "stateKey": "project.description",
+              "type": "longText"
+            },
+            {
+              "default": "Builder",
+              "id": "title",
+              "label": "Название",
+              "required": true,
+              "stateKey": "project.title",
+              "type": "shortText"
+            },
+            {
+              "content": "$data.version",
+              "id": "ov-version",
+              "title": "Версия",
+              "type": "staticContent"
+            },
+            {
+              "content": "$data.workflow_state",
+              "id": "ov-stage",
+              "title": "Этап",
+              "type": "staticContent"
+            },
+            {
+              "content": "$data.dev_webspace_id",
+              "id": "ov-dev",
+              "title": "Dev‑пространство",
+              "type": "staticContent"
+            },
+            {
+              "id": "ov-archive-section",
+              "title": "Архивирование и восстановление",
+              "type": "section"
+            },
+            {
+              "content": "Архивация скрывает проект из активных и сохраняет его историю.",
+              "id": "ov-archive-info",
+              "type": "staticContent"
+            }
+          ]
+        }
+      ],
+      "syntax_repairs": []
+    },
+    "raw_response": "{\"schema\":\"adaos.builder.webui_patch_stream.v1\",\"type\":\"meta\",\"base_hash\":\"03bb762db061c18508aa837dafb55fdf76c1be24\"}\n{\"type\":\"patch\",\"seq\":1,\"op\":\"replace\",\"path\":\"/ui/application/desktop/pageSchema/widgets/@node-overview/inputs/fields\",\"value\":[{\"default\":\"scenario\",\"id\":\"project_type\",\"label\":\"Тип проекта\",\"type\":\"shortText\"},{\"default\":\"Рабочее место для сценариев Builder\",\"id\":\"description\",\"label\":\"Описание\",\"stateKey\":\"project.description\",\"type\":\"longText\"},{\"default\":\"Builder\",\"id\":\"title\",\"label\":\"Название\",\"required\":true,\"stateKey\":\"project.title\",\"type\":\"shortText\"},{\"content\":\"$data.version\",\"id\":\"ov-version\",\"title\":\"Версия\",\"type\":\"staticContent\"},{\"content\":\"$data.workflow_state\",\"id\":\"ov-stage\",\"title\":\"Этап\",\"type\":\"staticContent\"},{\"content\":\"$data.dev_webspace_id\",\"id\":\"ov-dev\",\"title\":\"Dev‑пространство\",\"type\":\"staticContent\"},{\"id\":\"ov-archive-section\",\"title\":\"Архивирование и восстановление\",\"type\":\"section\"},{\"content\":\"Архивация скрывает проект из активных и сохраняет его историю.\",\"id\":\"ov-archive-info\",\"type\":\"staticContent\"}]}\n{\"type\":\"complete\",\"comment\":\"Переставлены поля формы «Обзор проекта»: «Тип проекта» теперь перед «Описание», а «Описание» перед «Название». Поле типа проекта оставлено неизменяемым по инициализации в плане структуры данных.\",\"unable_reason\":\"\"}"
+  },
+  "before_webui": {
+    "schema": "adaos.webui.v1",
+    "ui": {
+      "application": {
+        "version": "1",
+        "desktop": {
+          "pageSchema": {
+            "id": "builder",
+            "title": "Builder — рабочее место разработки",
+            "surfaceClass": "",
+            "surfaceObjectKind": "",
+            "semantic": {},
+            "initialState": {
+              "activeView": "files",
+              "chatSurface": "builder",
+              "selectedProjectKind": "scenario",
+              "selectedProjectId": "builder",
+              "selectedProjectRef": "scenario:builder",
+              "selectedProjectTitle": "Builder",
+              "selectedObjectKind": "scenario",
+              "selectedObjectId": "builder",
+              "selectedFilePath": "builder_memory.md",
+              "selectedFileTitle": "builder_memory.md",
+              "selectedFileProtected": false,
+              "selectedNodeId": "stage-proto",
+              "selectedTemplate": "default",
+              "releaseBump": "patch",
+              "previewUrl": "https://inimatic.com/?webspace=desktop-dev",
+              "project": {
+                "archived": false,
+                "description": "Рабочее место для сценариев Builder",
+                "title": "Builder",
+                "type": "сценарий"
+              },
+              "dev": {
+                "applyMode": "preview",
+                "linkedSpace": "desktop-dev",
+                "llmProfile": "standard",
+                "model": "gpt-5",
+                "provider": "openai",
+                "voiceEnabled": false
+              }
+            },
+            "layout": {
+              "type": "split",
+              "pattern": "split",
+              "areas": [
+                {
+                  "id": "left",
+                  "role": "nav",
+                  "width": 320
+                },
+                {
+                  "id": "center",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                }
+              ]
+            },
+            "autoActions": [],
+            "widgets": [
+              {
+                "area": "center",
+                "id": "project-header",
+                "type": "ui.actions",
+                "title": "Проект",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "project-label",
+                      "label": "Проект: Builder"
+                    }
+                  ],
+                  "size": "medium",
+                  "variant": "toolbar"
+                }
+              },
+              {
+                "area": "center",
+                "id": "node-views",
+                "type": "input.commandBar",
+                "title": "Представления",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "overview",
+                      "label": "Обзор",
+                      "icon": "information-circle-outline"
+                    },
+                    {
+                      "id": "chat",
+                      "label": "Разговор",
+                      "icon": "chatbubbles-outline"
+                    },
+                    {
+                      "id": "files",
+                      "label": "Артефакты",
+                      "icon": "file-tray-stacked-outline"
+                    },
+                    {
+                      "id": "context",
+                      "label": "ТЗ",
+                      "icon": "document-text-outline"
+                    }
+                  ],
+                  "selectedStateKey": "activeView",
+                  "variant": "segmented"
+                },
+                "actions": [
+                  {
+                    "on": "click",
+                    "type": "updateState",
+                    "params": {
+                      "activeView": "$event.id"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "file-toolbar",
+                "type": "ui.actions",
+                "title": "Выбор файла",
+                "visibleIf": "$state.activeView === 'files'",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "icon": "document-outline",
+                      "id": "choose-file",
+                      "label": "Выбрать файл"
+                    }
+                  ],
+                  "size": "small",
+                  "variant": "toolbar"
+                },
+                "actions": [
+                  {
+                    "on": "click:choose-file",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "file-picker"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "artifact-workbench",
+                "type": "item.textEditor",
+                "title": "Редактор/просмотр файла",
+                "visibleIf": "$state.activeView === 'files' && $state.selectedFileProtected !== true",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.read_project_file",
+                  "params": {
+                    "path": "$state.selectedFilePath",
+                    "object_type": "$state.selectedObjectKind",
+                    "object_id": "$state.selectedObjectId"
+                  }
+                },
+                "inputs": {
+                  "bindField": "content",
+                  "descriptionByPath": {
+                    "*.log": "Это лог, отредактируйте при необходимости.",
+                    "*.md": "Подсказка: это Markdown. Нажмите «Сохранить», чтобы применить изменения."
+                  },
+                  "mode": "markdown",
+                  "stateKey": "editorDraft",
+                  "titleTemplate": "Файл: {path}"
+                },
+                "actions": [
+                  {
+                    "on": "save",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.save_project_file",
+                    "params": {
+                      "path": "$state.selectedFilePath",
+                      "text": "$event.content",
+                      "object_type": "$state.selectedObjectKind",
+                      "object_id": "$state.selectedObjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "artifact-readonly",
+                "type": "item.codeViewer",
+                "title": "Просмотр защищенного файла",
+                "visibleIf": "$state.activeView === 'files' && $state.selectedFileProtected === true",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.read_project_file",
+                  "params": {
+                    "path": "$state.selectedFilePath",
+                    "object_type": "$state.selectedObjectKind",
+                    "object_id": "$state.selectedObjectId"
+                  }
+                },
+                "inputs": {
+                  "mode": "markdown",
+                  "stateKey": "codeViewerDraft",
+                  "titleTemplate": "Файл (только чтение): {path}"
+                }
+              },
+              {
+                "area": "center",
+                "id": "builder-chat",
+                "type": "ui.chat",
+                "title": "Разговор — Builder",
+                "visibleIf": "$state.activeView === 'chat'",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "voice_chat.messages",
+                  "scope": "shared",
+                  "transport": "hub",
+                  "params": {
+                    "conversation_id": "conv.skill.builder_skill.default.desktop",
+                    "conversation_topic_id": "prompt-project:scenario:builder",
+                    "dialog_channel_id": "builder"
+                  }
+                },
+                "inputs": {
+                  "autoGrow": true,
+                  "cmdEnterToSend": true,
+                  "compact": true,
+                  "ctrlEnterToSend": true,
+                  "enterToSend": true,
+                  "hint": "Подсказка: опишите желаемое изменение интерфейса или запрос к Конструктору.",
+                  "historyButtonLabel": "История",
+                  "loadingHistoryLabel": "Загрузка истории…",
+                  "meta": {
+                    "active_agent_id": "agent:builder_skill:builder",
+                    "active_agent_label": "Конструктор",
+                    "conversation_id": "conv.skill.builder_skill.default.desktop",
+                    "conversation_topic_id": "prompt-project:scenario:builder",
+                    "dialog_channel_id": "builder",
+                    "route_id": "voice_chat",
+                    "thread_id": "prompt-project:scenario:builder"
+                  },
+                  "minRows": 4,
+                  "multiline": true,
+                  "placeholder": "Опишите, что нужно изменить или сгенерировать…",
+                  "receiver": "voice_chat.messages",
+                  "scope": "shared",
+                  "sendCommand": "voice.chat.user",
+                  "shiftEnterNewline": true,
+                  "showTimestamps": true
+                }
+              },
+              {
+                "area": "center",
+                "id": "node-overview",
+                "type": "ui.form",
+                "title": "Обзор проекта и стабильность",
+                "visibleIf": "$state.activeView === 'overview'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_project",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "autoCommit": false,
+                  "layout": "responsiveGrid",
+                  "minFieldWidth": 240,
+                  "fields": [
+                    {
+                      "id": "title",
+                      "type": "shortText",
+                      "label": "Название",
+                      "required": true,
+                      "stateKey": "project.title",
+                      "default": "Builder"
+                    },
+                    {
+                      "id": "description",
+                      "type": "longText",
+                      "label": "Описание",
+                      "stateKey": "project.description",
+                      "default": "Рабочее место для сценариев Builder"
+                    },
+                    {
+                      "id": "project_type",
+                      "type": "shortText",
+                      "label": "Тип проекта",
+                      "default": "scenario"
+                    },
+                    {
+                      "id": "ov-version",
+                      "type": "staticContent",
+                      "title": "Версия",
+                      "content": "$data.version"
+                    },
+                    {
+                      "id": "ov-stage",
+                      "type": "staticContent",
+                      "title": "Этап",
+                      "content": "$data.workflow_state"
+                    },
+                    {
+                      "id": "ov-dev",
+                      "type": "staticContent",
+                      "title": "Dev‑пространство",
+                      "content": "$data.dev_webspace_id"
+                    },
+                    {
+                      "id": "ov-archive-section",
+                      "type": "section",
+                      "title": "Архивирование и восстановление"
+                    },
+                    {
+                      "id": "ov-archive-info",
+                      "type": "staticContent",
+                      "content": "Архивация скрывает проект из активных и сохраняет его историю."
+                    }
+                  ],
+                  "submitLabel": "Сохранить"
+                },
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.update_project_metadata",
+                    "params": {
+                      "title": "$event.values.title",
+                      "description": "$event.values.description",
+                      "project_type": "$event.values.project_type",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "left",
+                "id": "left-actions",
+                "type": "ui.actions",
+                "title": "Проект",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "icon": "folder-open-outline",
+                      "id": "choose-project",
+                      "label": "Выбрать проект"
+                    }
+                  ],
+                  "size": "small",
+                  "variant": "stack"
+                },
+                "actions": [
+                  {
+                    "on": "click",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "project-picker"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "left",
+                "id": "project-tree",
+                "type": "collection.tree",
+                "title": "Жизненный цикл",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_lifecycle",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "hideRoot": true,
+                  "selectedStateKey": "selectedNodeId",
+                  "buttons": [
+                    {
+                      "id": "make-current",
+                      "label": "Сделать текущей",
+                      "icon": "flash-outline",
+                      "whenKey": "canMakeCurrent"
+                    },
+                    {
+                      "id": "stabilize",
+                      "label": "Стабилизировать",
+                      "icon": "shield-checkmark-outline",
+                      "whenKey": "canStabilize"
+                    },
+                    {
+                      "id": "go-automation",
+                      "label": "К автоматизации",
+                      "icon": "construct-outline",
+                      "whenKey": "canOpenAutomation"
+                    },
+                    {
+                      "id": "go-publication",
+                      "label": "К публикации",
+                      "icon": "rocket-outline",
+                      "whenKey": "canOpenPublication"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "select",
+                    "type": "updateState",
+                    "params": {
+                      "selectedNodeId": "$event.id"
+                    }
+                  },
+                  {
+                    "on": "click:make-current",
+                    "type": "callSkill",
+                    "target": "builder_skill.set_ui_revision_current",
+                    "params": {
+                      "revision": "$event.item.revision"
+                    }
+                  },
+                  {
+                    "on": "click:stabilize",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.push_project",
+                    "params": {
+                      "message": "Builder prototype stabilization",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  {
+                    "on": "click:stabilize",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.set_workflow_state",
+                    "params": {
+                      "state": "prototype_stable",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  {
+                    "on": "click:go-automation",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "automation"
+                    }
+                  },
+                  {
+                    "on": "click:go-automation",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.set_workflow_state",
+                    "params": {
+                      "state": "automation",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  {
+                    "on": "click:go-publication",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "publication"
+                    }
+                  },
+                  {
+                    "on": "click:go-publication",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.set_workflow_state",
+                    "params": {
+                      "state": "publication",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "right",
+                "id": "overview-side-status",
+                "type": "item.details",
+                "title": "Состояние проекции",
+                "visibleIf": "$state.activeView === 'overview'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_preview",
+                  "params": {}
+                },
+                "inputs": {
+                  "fields": [
+                    {
+                      "key": "source_webspace_id",
+                      "label": "Исходное пространство"
+                    },
+                    {
+                      "key": "dev_webspace_id",
+                      "label": "Dev‑пространство"
+                    },
+                    {
+                      "key": "selected_kind",
+                      "label": "Тип проекта"
+                    },
+                    {
+                      "key": "selected_id",
+                      "label": "Проект"
+                    },
+                    {
+                      "key": "status",
+                      "label": "Состояние"
+                    }
+                  ]
+                }
+              },
+              {
+                "area": "right",
+                "id": "chat-side-settings",
+                "type": "ui.form",
+                "title": "Настройки разработки",
+                "visibleIf": "$state.activeView === 'chat'",
+                "inputs": {
+                  "layout": "responsiveGrid",
+                  "minFieldWidth": 220,
+                  "fields": [
+                    {
+                      "id": "llm-profile",
+                      "label": "Профиль LLM",
+                      "type": "select",
+                      "options": [
+                        {
+                          "label": "Стандартный",
+                          "value": "standard"
+                        },
+                        {
+                          "label": "Творческий",
+                          "value": "creative"
+                        },
+                        {
+                          "label": "Строгий",
+                          "value": "strict"
+                        }
+                      ],
+                      "stateKey": "dev.llmProfile",
+                      "default": "standard"
+                    },
+                    {
+                      "id": "llmModel",
+                      "label": "Модель",
+                      "type": "select",
+                      "options": [
+                        {
+                          "label": "gpt-5",
+                          "value": "gpt-5"
+                        },
+                        {
+                          "label": "gpt-4.1",
+                          "value": "gpt-4.1"
+                        }
+                      ],
+                      "stateKey": "dev.model",
+                      "default": "gpt-5"
+                    },
+                    {
+                      "id": "provider",
+                      "label": "Провайдер",
+                      "type": "select",
+                      "options": [
+                        {
+                          "label": "OpenAI",
+                          "value": "openai"
+                        },
+                        {
+                          "label": "Azure OpenAI",
+                          "value": "azure"
+                        },
+                        {
+                          "label": "Локальный",
+                          "value": "local"
+                        }
+                      ],
+                      "stateKey": "dev.provider",
+                      "default": "openai"
+                    },
+                    {
+                      "id": "voice-input",
+                      "label": "Голосовой ввод",
+                      "type": "toggle",
+                      "stateKey": "dev.voiceEnabled",
+                      "default": false
+                    }
+                  ],
+                  "submitLabel": "Применить"
+                },
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_llm_options",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.set_llm_profile",
+                    "params": {
+                      "model": "$event.values.llmModel",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "overview-archive",
+                "type": "ui.actions",
+                "title": "Архивирование",
+                "visibleIf": "$state.activeView === 'overview' && $state.project.archived !== true",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "icon": "archive-outline",
+                      "id": "archive",
+                      "label": "Архивировать",
+                      "kind": "danger"
+                    }
+                  ],
+                  "variant": "stack"
+                },
+                "actions": [
+                  {
+                    "enabledIf": "$state.project.archived !== true",
+                    "on": "click:archive",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "confirm-archive"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "overview-restore",
+                "type": "ui.actions",
+                "title": "Восстановление",
+                "visibleIf": "$state.activeView === 'overview' && $state.project.archived === true",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "restore",
+                      "label": "Восстановить",
+                      "icon": "refresh-outline"
+                    }
+                  ],
+                  "variant": "stack"
+                },
+                "actions": [
+                  {
+                    "on": "click:restore",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.archive_project",
+                    "params": {
+                      "archived": false,
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  {
+                    "on": "click:restore",
+                    "type": "updateState",
+                    "params": {
+                      "project.archived": false
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "right",
+                "id": "chat-side-links",
+                "type": "ui.actions",
+                "title": "Просмотр dev‑пространства",
+                "visibleIf": "$state.activeView === 'overview'",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "icon": "git-compare-outline",
+                      "id": "compare",
+                      "label": "Сверить"
+                    },
+                    {
+                      "icon": "open-outline",
+                      "id": "open-dev-link",
+                      "label": "Открыть просмотр в новом окне"
+                    },
+                    {
+                      "icon": "qr-code-outline",
+                      "id": "show-qr",
+                      "label": "QR для просмотра"
+                    }
+                  ],
+                  "variant": "stack"
+                },
+                "actions": [
+                  {
+                    "on": "click:open-dev-link",
+                    "type": "openUrl",
+                    "params": {
+                      "target": "_blank",
+                      "url": "$state.previewUrl"
+                    }
+                  },
+                  {
+                    "on": "click:show-qr",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "preview-qr"
+                    }
+                  },
+                  {
+                    "on": "click:compare",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.select_preview",
+                    "params": {
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "technical-spec-editor",
+                "type": "item.textEditor",
+                "title": "Базовое техническое задание",
+                "visibleIf": "$state.activeView === 'context'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_prompt_context",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "bindField": "base_tz",
+                  "mode": "markdown",
+                  "stateKey": "technicalSpecDraft",
+                  "titleTemplate": "ТЗ: {object_id}"
+                },
+                "actions": [
+                  {
+                    "on": "save",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.save_prompt_context",
+                    "params": {
+                      "text": "$event.content",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "technical-spec-actions",
+                "type": "ui.actions",
+                "title": "Дополнения к ТЗ",
+                "visibleIf": "$state.activeView === 'context'",
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "add-addendum",
+                      "label": "Добавить уточнение",
+                      "icon": "add-circle-outline"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:add-addendum",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "technical-addendum"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "technical-spec-addenda",
+                "type": "item.details",
+                "title": "История уточнений",
+                "visibleIf": "$state.activeView === 'context'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_prompt_context",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "fields": [
+                    {
+                      "key": "tz_addenda",
+                      "label": "Дополнения"
+                    }
+                  ]
+                }
+              },
+              {
+                "area": "right",
+                "id": "context-side-state",
+                "type": "item.details",
+                "title": "Контекст разработки",
+                "visibleIf": "$state.activeView === 'context'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_prompt_context",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "fields": [
+                    {
+                      "key": "workflow_state",
+                      "label": "Этап"
+                    },
+                    {
+                      "key": "builder_llm_model",
+                      "label": "Модель"
+                    },
+                    {
+                      "key": "llm_provider",
+                      "label": "Провайдер"
+                    },
+                    {
+                      "key": "updated_at",
+                      "label": "Обновлено"
+                    }
+                  ]
+                }
+              }
+            ],
+            "meta": {
+              "builder": {
+                "scenario_id": "builder",
+                "ui_revision": "030",
+                "prototype_base_revision": "029",
+                "functional": true
+              }
+            },
+            "title_i18n": {
+              "fallback": "Builder",
+              "key": "scenario.builder.title"
+            }
+          }
+        },
+        "modals": {
+          "confirm-archive": {
+            "title": "Подтвердите архивирование",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "confirm-archive",
+              "title": "Подтвердите архивирование",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "archive-details",
+                  "type": "ui.form",
+                  "title": "Что произойдет",
+                  "inputs": {
+                    "fields": [
+                      {
+                        "id": "archive-info",
+                        "type": "staticContent",
+                        "content": "Архивация скрывает проект из активных. Будет создана резервная копия и доступна кнопка восстановления."
+                      }
+                    ]
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "archive-actions",
+                  "type": "ui.actions",
+                  "title": "Действия",
+                  "inputs": {
+                    "buttons": [
+                      {
+                        "id": "confirm",
+                        "label": "Архивировать",
+                        "icon": "archive-outline"
+                      },
+                      {
+                        "id": "cancel",
+                        "label": "Отмена",
+                        "icon": "close-outline"
+                      }
+                    ],
+                    "variant": "stack"
+                  },
+                  "actions": [
+                    {
+                      "on": "click:confirm",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.archive_project",
+                      "params": {
+                        "archived": true,
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:confirm",
+                      "type": "updateState",
+                      "params": {
+                        "project.archived": true
+                      }
+                    },
+                    {
+                      "on": "click:confirm",
+                      "type": "closeModal"
+                    },
+                    {
+                      "on": "click:cancel",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "file-picker": {
+            "title": "Файлы проекта",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "file-picker",
+              "title": "Файлы проекта",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "project-object-list",
+                  "type": "ui.list",
+                  "title": "Состав проекта",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_project_objects",
+                    "params": {
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "variant": "list",
+                    "titleKey": "title",
+                    "subtitleKey": "subtitle",
+                    "search": true
+                  },
+                  "actions": [
+                    {
+                      "on": "select",
+                      "type": "updateState",
+                      "params": {
+                        "selectedObjectKind": "$event.object_type",
+                        "selectedObjectId": "$event.object_id",
+                        "selectedFilePath": null
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "file-tree",
+                  "type": "collection.tree",
+                  "title": "Дерево файлов",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_project_file_tree",
+                    "params": {
+                      "object_type": "$state.selectedObjectKind",
+                      "object_id": "$state.selectedObjectId",
+                      "limit": 1000
+                    }
+                  },
+                  "inputs": {
+                    "hideRoot": true,
+                    "expanded": false,
+                    "selectionMode": "leaf",
+                    "stateKey": "selectedArtifactId"
+                  },
+                  "actions": [
+                    {
+                      "on": "select",
+                      "type": "updateState",
+                      "params": {
+                        "selectedFilePath": "$event.path",
+                        "selectedFileProtected": "$event.protected",
+                        "selectedFileTitle": "$event.title"
+                      }
+                    },
+                    {
+                      "on": "select",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "preview-qr": {
+            "title": "QR для открытия preview",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "preview-qr",
+              "title": "QR для открытия preview",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "qr-image",
+                  "type": "visual.image",
+                  "title": "Сканируйте на другом устройстве",
+                  "inputs": {
+                    "alt": "QR для открытия preview в dev-пространстве",
+                    "fit": "contain",
+                    "src": {
+                      "kind": "expression",
+                      "op": "add",
+                      "args": [
+                        "https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=",
+                        {
+                          "kind": "expression",
+                          "op": "add",
+                          "args": [
+                            "https://inimatic.com/?webspace=",
+                            "desktop",
+                            "-dev"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "preview-qr-actions",
+                  "type": "ui.actions",
+                  "title": "Закрыть",
+                  "inputs": {
+                    "buttons": [
+                      {
+                        "id": "close",
+                        "label": "Закрыть",
+                        "icon": "close-outline"
+                      }
+                    ],
+                    "variant": "stack"
+                  },
+                  "actions": [
+                    {
+                      "on": "click:close",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "project-picker": {
+            "title": "Выбор проекта",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "project-picker",
+              "title": "Выбор проекта",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "project-picker-list",
+                  "type": "ui.list",
+                  "title": "Проекты",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_projects",
+                    "params": {
+                      "limit": 200,
+                      "selected_object_type": "$state.selectedProjectKind",
+                      "selected_object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "variant": "list",
+                    "groupBy": "type",
+                    "groupDisplay": "sections",
+                    "previewKey": "updated",
+                    "search": true,
+                    "searchPlaceholder": "Поиск проектов...",
+                    "titleKey": "title",
+                    "subtitleKey": "stage",
+                    "meta": [
+                      {
+                        "key": "stage",
+                        "label": "Этап"
+                      },
+                      {
+                        "key": "version",
+                        "label": "Версия"
+                      },
+                      {
+                        "key": "sync",
+                        "label": "Синхронизация"
+                      },
+                      {
+                        "key": "space",
+                        "label": "Dev‑пространство"
+                      },
+                      {
+                        "key": "updated",
+                        "label": "Обновлено"
+                      }
+                    ],
+                    "groupTitleKey": "type",
+                    "buttons": [
+                      {
+                        "icon": "radio-button-on-outline",
+                        "id": "current",
+                        "whenKey": "current",
+                        "whenEquals": true
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "select",
+                      "type": "updateState",
+                      "params": {
+                        "selectedProjectKind": "$event.object_type",
+                        "selectedProjectId": "$event.object_id",
+                        "selectedProjectRef": "$event.id",
+                        "selectedProjectTitle": "$event.title",
+                        "selectedObjectKind": "$event.object_type",
+                        "selectedObjectId": "$event.object_id",
+                        "selectedFilePath": null,
+                        "project.archived": "$event.archived"
+                      }
+                    },
+                    {
+                      "on": "select",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.select_preview",
+                      "params": {
+                        "object_type": "$event.object_type",
+                        "object_id": "$event.object_id"
+                      }
+                    },
+                    {
+                      "on": "select",
+                      "type": "closeModal"
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "project-picker-actions",
+                  "type": "ui.actions",
+                  "title": "Действия",
+                  "inputs": {
+                    "buttons": [
+                      {
+                        "id": "create",
+                        "label": "Создать проект",
+                        "icon": "add-outline"
+                      }
+                    ],
+                    "variant": "toolbar"
+                  },
+                  "actions": [
+                    {
+                      "on": "click:create",
+                      "type": "openModal",
+                      "params": {
+                        "modalId": "new-project"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "new-project": {
+            "title": "Новый DEV-проект",
+            "presentation": {
+              "kind": "modal",
+              "restoreFocus": true
+            },
+            "schema": {
+              "id": "new-project",
+              "title": "new-project",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "new-project-form",
+                  "type": "ui.form",
+                  "title": "Создать проект",
+                  "inputs": {
+                    "layout": "responsiveGrid",
+                    "submitLabel": "Создать",
+                    "fields": [
+                      {
+                        "id": "object_type",
+                        "type": "select",
+                        "label": "Тип",
+                        "required": true,
+                        "default": "scenario",
+                        "options": [
+                          {
+                            "label": "Сценарий",
+                            "value": "scenario"
+                          },
+                          {
+                            "label": "Навык",
+                            "value": "skill"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "object_id",
+                        "type": "shortText",
+                        "label": "ID проекта",
+                        "required": true
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "submit",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.create_project",
+                      "params": {
+                        "object_type": "$event.values.object_type",
+                        "object_id": "$event.values.object_id",
+                        "template": "$state.selectedTemplate"
+                      }
+                    },
+                    {
+                      "on": "submit",
+                      "type": "updateState",
+                      "params": {
+                        "selectedProjectKind": "$event.values.object_type",
+                        "selectedProjectId": "$event.values.object_id",
+                        "selectedObjectKind": "$event.values.object_type",
+                        "selectedObjectId": "$event.values.object_id",
+                        "selectedFilePath": null
+                      }
+                    },
+                    {
+                      "on": "submit",
+                      "type": "closeModal"
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "new-project-templates",
+                  "type": "ui.list",
+                  "title": "Шаблон",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_templates",
+                    "params": {
+                      "object_type": "scenario"
+                    }
+                  },
+                  "inputs": {
+                    "variant": "list",
+                    "titleKey": "label",
+                    "subtitleKey": "source"
+                  },
+                  "actions": [
+                    {
+                      "on": "select",
+                      "type": "updateState",
+                      "params": {
+                        "selectedTemplate": "$event.id"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "new-project-actions",
+                  "type": "ui.actions",
+                  "title": "Отмена",
+                  "inputs": {
+                    "variant": "toolbar",
+                    "buttons": [
+                      {
+                        "id": "cancel",
+                        "label": "Отмена",
+                        "icon": "close-outline"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "click:cancel",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "technical-addendum": {
+            "title": "Дополнение к ТЗ",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "technical-addendum",
+              "title": "technical-addendum",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "technical-addendum-form",
+                  "type": "ui.form",
+                  "title": "Новое уточнение",
+                  "inputs": {
+                    "submitLabel": "Добавить",
+                    "fields": [
+                      {
+                        "id": "text",
+                        "type": "longText",
+                        "label": "Текст",
+                        "required": true
+                      },
+                      {
+                        "id": "iteration_ref",
+                        "type": "shortText",
+                        "label": "Ссылка на итерацию"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "submit",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.append_prompt_addendum",
+                      "params": {
+                        "text": "$event.values.text",
+                        "iteration_ref": "$event.values.iteration_ref",
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "submit",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "automation": {
+            "title": "Автоматизация Builder",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "automation",
+              "title": "automation",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "automation-start",
+                  "type": "ui.form",
+                  "title": "Запуск автономной разработки",
+                  "inputs": {
+                    "submitLabel": "Запустить",
+                    "fields": [
+                      {
+                        "id": "implementation_brief",
+                        "type": "longText",
+                        "label": "Утверждённый implementation brief",
+                        "required": true
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "submit",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.start_automation",
+                      "params": {
+                        "implementation_brief": "$event.values.implementation_brief",
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "automation-followup",
+                  "type": "ui.form",
+                  "title": "Уточнение для текущего запуска",
+                  "inputs": {
+                    "submitLabel": "Отправить",
+                    "fields": [
+                      {
+                        "id": "text",
+                        "type": "longText",
+                        "label": "Сообщение",
+                        "required": true
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "submit",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.submit_automation",
+                      "params": {
+                        "text": "$event.values.text",
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "automation-state",
+                  "type": "item.details",
+                  "title": "Состояние",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.get_automation",
+                    "params": {
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "fields": [
+                      {
+                        "key": "session_present",
+                        "label": "Сессия"
+                      },
+                      {
+                        "key": "automation",
+                        "label": "Автоматизация"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "publication": {
+            "title": "Публикация",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "publication",
+              "title": "publication",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "publication-status",
+                  "type": "item.details",
+                  "title": "Проект",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.get_project",
+                    "params": {
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "fields": [
+                      {
+                        "key": "project_ref",
+                        "label": "Проект"
+                      },
+                      {
+                        "key": "version",
+                        "label": "Версия"
+                      },
+                      {
+                        "key": "workflow_state",
+                        "label": "Этап"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "publication-actions",
+                  "type": "ui.actions",
+                  "title": "Forge и публикация",
+                  "inputs": {
+                    "variant": "toolbar",
+                    "buttons": [
+                      {
+                        "id": "checkpoint",
+                        "label": "Checkpoint",
+                        "icon": "git-commit-outline"
+                      },
+                      {
+                        "id": "update",
+                        "label": "Обновить",
+                        "icon": "sync-outline"
+                      },
+                      {
+                        "id": "dry-run",
+                        "label": "Проверить релиз",
+                        "icon": "checkmark-circle-outline"
+                      },
+                      {
+                        "id": "publish",
+                        "label": "Опубликовать",
+                        "icon": "rocket-outline"
+                      },
+                      {
+                        "id": "delete",
+                        "label": "Удалить",
+                        "icon": "trash-outline",
+                        "kind": "danger"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "click:checkpoint",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.push_project",
+                      "params": {
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:update",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.update_project",
+                      "params": {
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:dry-run",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.publish_project",
+                      "params": {
+                        "bump": "$state.releaseBump",
+                        "dry_run": true,
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:publish",
+                      "type": "openModal",
+                      "params": {
+                        "modalId": "confirm-publish"
+                      }
+                    },
+                    {
+                      "on": "click:delete",
+                      "type": "openModal",
+                      "params": {
+                        "modalId": "confirm-delete"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "publication-history",
+                  "type": "ui.list",
+                  "title": "История изменений",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_changes",
+                    "params": {
+                      "limit": 100,
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "variant": "list",
+                    "titleKey": "title",
+                    "subtitleKey": "subtitle",
+                    "previewKey": "created_at"
+                  }
+                }
+              ]
+            }
+          },
+          "confirm-publish": {
+            "title": "Подтверждение публикации",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "confirm-publish",
+              "title": "confirm-publish",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "publish-warning",
+                  "type": "ui.form",
+                  "title": "Внешнее изменение",
+                  "inputs": {
+                    "fields": [
+                      {
+                        "id": "warning",
+                        "type": "staticContent",
+                        "content": "Будет опубликована новая версия выбранного проекта."
+                      }
+                    ]
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "publish-confirm-actions",
+                  "type": "ui.actions",
+                  "inputs": {
+                    "variant": "stack",
+                    "buttons": [
+                      {
+                        "id": "confirm",
+                        "label": "Опубликовать",
+                        "icon": "rocket-outline",
+                        "kind": "danger"
+                      },
+                      {
+                        "id": "cancel",
+                        "label": "Отмена",
+                        "icon": "close-outline"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "click:confirm",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.publish_project",
+                      "params": {
+                        "bump": "$state.releaseBump",
+                        "dry_run": false,
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:confirm",
+                      "type": "closeModal"
+                    },
+                    {
+                      "on": "click:cancel",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "confirm-delete": {
+            "title": "Удаление проекта",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "confirm-delete",
+              "title": "confirm-delete",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "delete-warning",
+                  "type": "ui.form",
+                  "title": "Необратимое изменение Forge",
+                  "inputs": {
+                    "fields": [
+                      {
+                        "id": "warning",
+                        "type": "staticContent",
+                        "content": "Удалить проект в Forge? Локальная DEV-копия будет сохранена."
+                      }
+                    ]
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "delete-confirm-actions",
+                  "type": "ui.actions",
+                  "inputs": {
+                    "variant": "stack",
+                    "buttons": [
+                      {
+                        "id": "confirm",
+                        "label": "Удалить",
+                        "icon": "trash-outline",
+                        "kind": "danger"
+                      },
+                      {
+                        "id": "cancel",
+                        "label": "Отмена",
+                        "icon": "close-outline"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "click:confirm",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.delete_project",
+                      "params": {
+                        "confirm": true,
+                        "remove_local": false,
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:confirm",
+                      "type": "closeModal"
+                    },
+                    {
+                      "on": "click:cancel",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "generated_by": "builder_sdk_control_skill"
+  },
+  "after_webui": {
+    "schema": "adaos.webui.v1",
+    "ui": {
+      "application": {
+        "version": "1",
+        "desktop": {
+          "pageSchema": {
+            "id": "builder",
+            "title": "Builder — рабочее место разработки",
+            "surfaceClass": "",
+            "surfaceObjectKind": "",
+            "semantic": {},
+            "initialState": {
+              "activeView": "files",
+              "chatSurface": "builder",
+              "selectedProjectKind": "scenario",
+              "selectedProjectId": "builder",
+              "selectedProjectRef": "scenario:builder",
+              "selectedProjectTitle": "Builder",
+              "selectedObjectKind": "scenario",
+              "selectedObjectId": "builder",
+              "selectedFilePath": "builder_memory.md",
+              "selectedFileTitle": "builder_memory.md",
+              "selectedFileProtected": false,
+              "selectedNodeId": "stage-proto",
+              "selectedTemplate": "default",
+              "releaseBump": "patch",
+              "previewUrl": "https://inimatic.com/?webspace=desktop-dev",
+              "project": {
+                "archived": false,
+                "description": "Рабочее место для сценариев Builder",
+                "title": "Builder",
+                "type": "сценарий"
+              },
+              "dev": {
+                "applyMode": "preview",
+                "linkedSpace": "desktop-dev",
+                "llmProfile": "standard",
+                "model": "gpt-5",
+                "provider": "openai",
+                "voiceEnabled": false
+              }
+            },
+            "layout": {
+              "type": "split",
+              "pattern": "split",
+              "areas": [
+                {
+                  "id": "left",
+                  "role": "nav",
+                  "width": 320
+                },
+                {
+                  "id": "center",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                }
+              ]
+            },
+            "autoActions": [],
+            "widgets": [
+              {
+                "area": "center",
+                "id": "project-header",
+                "type": "ui.actions",
+                "title": "Проект",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "project-label",
+                      "label": "Проект: Builder"
+                    }
+                  ],
+                  "size": "medium",
+                  "variant": "toolbar"
+                }
+              },
+              {
+                "area": "center",
+                "id": "node-views",
+                "type": "input.commandBar",
+                "title": "Представления",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "overview",
+                      "label": "Обзор",
+                      "icon": "information-circle-outline"
+                    },
+                    {
+                      "id": "chat",
+                      "label": "Разговор",
+                      "icon": "chatbubbles-outline"
+                    },
+                    {
+                      "id": "files",
+                      "label": "Артефакты",
+                      "icon": "file-tray-stacked-outline"
+                    },
+                    {
+                      "id": "context",
+                      "label": "ТЗ",
+                      "icon": "document-text-outline"
+                    }
+                  ],
+                  "selectedStateKey": "activeView",
+                  "variant": "segmented"
+                },
+                "actions": [
+                  {
+                    "on": "click",
+                    "type": "updateState",
+                    "params": {
+                      "activeView": "$event.id"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "file-toolbar",
+                "type": "ui.actions",
+                "title": "Выбор файла",
+                "visibleIf": "$state.activeView === 'files'",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "icon": "document-outline",
+                      "id": "choose-file",
+                      "label": "Выбрать файл"
+                    }
+                  ],
+                  "size": "small",
+                  "variant": "toolbar"
+                },
+                "actions": [
+                  {
+                    "on": "click:choose-file",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "file-picker"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "artifact-workbench",
+                "type": "item.textEditor",
+                "title": "Редактор/просмотр файла",
+                "visibleIf": "$state.activeView === 'files' && $state.selectedFileProtected !== true",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.read_project_file",
+                  "params": {
+                    "path": "$state.selectedFilePath",
+                    "object_type": "$state.selectedObjectKind",
+                    "object_id": "$state.selectedObjectId"
+                  }
+                },
+                "inputs": {
+                  "bindField": "content",
+                  "descriptionByPath": {
+                    "*.log": "Это лог, отредактируйте при необходимости.",
+                    "*.md": "Подсказка: это Markdown. Нажмите «Сохранить», чтобы применить изменения."
+                  },
+                  "mode": "markdown",
+                  "stateKey": "editorDraft",
+                  "titleTemplate": "Файл: {path}"
+                },
+                "actions": [
+                  {
+                    "on": "save",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.save_project_file",
+                    "params": {
+                      "path": "$state.selectedFilePath",
+                      "text": "$event.content",
+                      "object_type": "$state.selectedObjectKind",
+                      "object_id": "$state.selectedObjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "artifact-readonly",
+                "type": "item.codeViewer",
+                "title": "Просмотр защищенного файла",
+                "visibleIf": "$state.activeView === 'files' && $state.selectedFileProtected === true",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.read_project_file",
+                  "params": {
+                    "path": "$state.selectedFilePath",
+                    "object_type": "$state.selectedObjectKind",
+                    "object_id": "$state.selectedObjectId"
+                  }
+                },
+                "inputs": {
+                  "mode": "markdown",
+                  "stateKey": "codeViewerDraft",
+                  "titleTemplate": "Файл (только чтение): {path}"
+                }
+              },
+              {
+                "area": "center",
+                "id": "builder-chat",
+                "type": "ui.chat",
+                "title": "Разговор — Builder",
+                "visibleIf": "$state.activeView === 'chat'",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "voice_chat.messages",
+                  "scope": "shared",
+                  "transport": "hub",
+                  "params": {
+                    "conversation_id": "conv.skill.builder_skill.default.desktop",
+                    "conversation_topic_id": "prompt-project:scenario:builder",
+                    "dialog_channel_id": "builder"
+                  }
+                },
+                "inputs": {
+                  "autoGrow": true,
+                  "cmdEnterToSend": true,
+                  "compact": true,
+                  "ctrlEnterToSend": true,
+                  "enterToSend": true,
+                  "hint": "Подсказка: опишите желаемое изменение интерфейса или запрос к Конструктору.",
+                  "historyButtonLabel": "История",
+                  "loadingHistoryLabel": "Загрузка истории…",
+                  "meta": {
+                    "active_agent_id": "agent:builder_skill:builder",
+                    "active_agent_label": "Конструктор",
+                    "conversation_id": "conv.skill.builder_skill.default.desktop",
+                    "conversation_topic_id": "prompt-project:scenario:builder",
+                    "dialog_channel_id": "builder",
+                    "route_id": "voice_chat",
+                    "thread_id": "prompt-project:scenario:builder"
+                  },
+                  "minRows": 4,
+                  "multiline": true,
+                  "placeholder": "Опишите, что нужно изменить или сгенерировать…",
+                  "receiver": "voice_chat.messages",
+                  "scope": "shared",
+                  "sendCommand": "voice.chat.user",
+                  "shiftEnterNewline": true,
+                  "showTimestamps": true
+                }
+              },
+              {
+                "area": "center",
+                "id": "node-overview",
+                "type": "ui.form",
+                "title": "Обзор проекта и стабильность",
+                "visibleIf": "$state.activeView === 'overview'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_project",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "autoCommit": false,
+                  "layout": "responsiveGrid",
+                  "minFieldWidth": 240,
+                  "fields": [
+                    {
+                      "default": "scenario",
+                      "id": "project_type",
+                      "label": "Тип проекта",
+                      "type": "shortText"
+                    },
+                    {
+                      "default": "Рабочее место для сценариев Builder",
+                      "id": "description",
+                      "label": "Описание",
+                      "stateKey": "project.description",
+                      "type": "longText"
+                    },
+                    {
+                      "default": "Builder",
+                      "id": "title",
+                      "label": "Название",
+                      "required": true,
+                      "stateKey": "project.title",
+                      "type": "shortText"
+                    },
+                    {
+                      "content": "$data.version",
+                      "id": "ov-version",
+                      "title": "Версия",
+                      "type": "staticContent"
+                    },
+                    {
+                      "content": "$data.workflow_state",
+                      "id": "ov-stage",
+                      "title": "Этап",
+                      "type": "staticContent"
+                    },
+                    {
+                      "content": "$data.dev_webspace_id",
+                      "id": "ov-dev",
+                      "title": "Dev‑пространство",
+                      "type": "staticContent"
+                    },
+                    {
+                      "id": "ov-archive-section",
+                      "title": "Архивирование и восстановление",
+                      "type": "section"
+                    },
+                    {
+                      "content": "Архивация скрывает проект из активных и сохраняет его историю.",
+                      "id": "ov-archive-info",
+                      "type": "staticContent"
+                    }
+                  ],
+                  "submitLabel": "Сохранить"
+                },
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.update_project_metadata",
+                    "params": {
+                      "title": "$event.values.title",
+                      "description": "$event.values.description",
+                      "project_type": "$event.values.project_type",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "left",
+                "id": "left-actions",
+                "type": "ui.actions",
+                "title": "Проект",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "icon": "folder-open-outline",
+                      "id": "choose-project",
+                      "label": "Выбрать проект"
+                    }
+                  ],
+                  "size": "small",
+                  "variant": "stack"
+                },
+                "actions": [
+                  {
+                    "on": "click",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "project-picker"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "left",
+                "id": "project-tree",
+                "type": "collection.tree",
+                "title": "Жизненный цикл",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_lifecycle",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "hideRoot": true,
+                  "selectedStateKey": "selectedNodeId",
+                  "buttons": [
+                    {
+                      "id": "make-current",
+                      "label": "Сделать текущей",
+                      "icon": "flash-outline",
+                      "whenKey": "canMakeCurrent"
+                    },
+                    {
+                      "id": "stabilize",
+                      "label": "Стабилизировать",
+                      "icon": "shield-checkmark-outline",
+                      "whenKey": "canStabilize"
+                    },
+                    {
+                      "id": "go-automation",
+                      "label": "К автоматизации",
+                      "icon": "construct-outline",
+                      "whenKey": "canOpenAutomation"
+                    },
+                    {
+                      "id": "go-publication",
+                      "label": "К публикации",
+                      "icon": "rocket-outline",
+                      "whenKey": "canOpenPublication"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "select",
+                    "type": "updateState",
+                    "params": {
+                      "selectedNodeId": "$event.id"
+                    }
+                  },
+                  {
+                    "on": "click:make-current",
+                    "type": "callSkill",
+                    "target": "builder_skill.set_ui_revision_current",
+                    "params": {
+                      "revision": "$event.item.revision"
+                    }
+                  },
+                  {
+                    "on": "click:stabilize",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.push_project",
+                    "params": {
+                      "message": "Builder prototype stabilization",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  {
+                    "on": "click:stabilize",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.set_workflow_state",
+                    "params": {
+                      "state": "prototype_stable",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  {
+                    "on": "click:go-automation",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "automation"
+                    }
+                  },
+                  {
+                    "on": "click:go-automation",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.set_workflow_state",
+                    "params": {
+                      "state": "automation",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  {
+                    "on": "click:go-publication",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "publication"
+                    }
+                  },
+                  {
+                    "on": "click:go-publication",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.set_workflow_state",
+                    "params": {
+                      "state": "publication",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "right",
+                "id": "overview-side-status",
+                "type": "item.details",
+                "title": "Состояние проекции",
+                "visibleIf": "$state.activeView === 'overview'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_preview",
+                  "params": {}
+                },
+                "inputs": {
+                  "fields": [
+                    {
+                      "key": "source_webspace_id",
+                      "label": "Исходное пространство"
+                    },
+                    {
+                      "key": "dev_webspace_id",
+                      "label": "Dev‑пространство"
+                    },
+                    {
+                      "key": "selected_kind",
+                      "label": "Тип проекта"
+                    },
+                    {
+                      "key": "selected_id",
+                      "label": "Проект"
+                    },
+                    {
+                      "key": "status",
+                      "label": "Состояние"
+                    }
+                  ]
+                }
+              },
+              {
+                "area": "right",
+                "id": "chat-side-settings",
+                "type": "ui.form",
+                "title": "Настройки разработки",
+                "visibleIf": "$state.activeView === 'chat'",
+                "inputs": {
+                  "layout": "responsiveGrid",
+                  "minFieldWidth": 220,
+                  "fields": [
+                    {
+                      "id": "llm-profile",
+                      "label": "Профиль LLM",
+                      "type": "select",
+                      "options": [
+                        {
+                          "label": "Стандартный",
+                          "value": "standard"
+                        },
+                        {
+                          "label": "Творческий",
+                          "value": "creative"
+                        },
+                        {
+                          "label": "Строгий",
+                          "value": "strict"
+                        }
+                      ],
+                      "stateKey": "dev.llmProfile",
+                      "default": "standard"
+                    },
+                    {
+                      "id": "llmModel",
+                      "label": "Модель",
+                      "type": "select",
+                      "options": [
+                        {
+                          "label": "gpt-5",
+                          "value": "gpt-5"
+                        },
+                        {
+                          "label": "gpt-4.1",
+                          "value": "gpt-4.1"
+                        }
+                      ],
+                      "stateKey": "dev.model",
+                      "default": "gpt-5"
+                    },
+                    {
+                      "id": "provider",
+                      "label": "Провайдер",
+                      "type": "select",
+                      "options": [
+                        {
+                          "label": "OpenAI",
+                          "value": "openai"
+                        },
+                        {
+                          "label": "Azure OpenAI",
+                          "value": "azure"
+                        },
+                        {
+                          "label": "Локальный",
+                          "value": "local"
+                        }
+                      ],
+                      "stateKey": "dev.provider",
+                      "default": "openai"
+                    },
+                    {
+                      "id": "voice-input",
+                      "label": "Голосовой ввод",
+                      "type": "toggle",
+                      "stateKey": "dev.voiceEnabled",
+                      "default": false
+                    }
+                  ],
+                  "submitLabel": "Применить"
+                },
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_llm_options",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.set_llm_profile",
+                    "params": {
+                      "model": "$event.values.llmModel",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "overview-archive",
+                "type": "ui.actions",
+                "title": "Архивирование",
+                "visibleIf": "$state.activeView === 'overview' && $state.project.archived !== true",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "icon": "archive-outline",
+                      "id": "archive",
+                      "label": "Архивировать",
+                      "kind": "danger"
+                    }
+                  ],
+                  "variant": "stack"
+                },
+                "actions": [
+                  {
+                    "enabledIf": "$state.project.archived !== true",
+                    "on": "click:archive",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "confirm-archive"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "overview-restore",
+                "type": "ui.actions",
+                "title": "Восстановление",
+                "visibleIf": "$state.activeView === 'overview' && $state.project.archived === true",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "restore",
+                      "label": "Восстановить",
+                      "icon": "refresh-outline"
+                    }
+                  ],
+                  "variant": "stack"
+                },
+                "actions": [
+                  {
+                    "on": "click:restore",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.archive_project",
+                    "params": {
+                      "archived": false,
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  {
+                    "on": "click:restore",
+                    "type": "updateState",
+                    "params": {
+                      "project.archived": false
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "right",
+                "id": "chat-side-links",
+                "type": "ui.actions",
+                "title": "Просмотр dev‑пространства",
+                "visibleIf": "$state.activeView === 'overview'",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "icon": "git-compare-outline",
+                      "id": "compare",
+                      "label": "Сверить"
+                    },
+                    {
+                      "icon": "open-outline",
+                      "id": "open-dev-link",
+                      "label": "Открыть просмотр в новом окне"
+                    },
+                    {
+                      "icon": "qr-code-outline",
+                      "id": "show-qr",
+                      "label": "QR для просмотра"
+                    }
+                  ],
+                  "variant": "stack"
+                },
+                "actions": [
+                  {
+                    "on": "click:open-dev-link",
+                    "type": "openUrl",
+                    "params": {
+                      "target": "_blank",
+                      "url": "$state.previewUrl"
+                    }
+                  },
+                  {
+                    "on": "click:show-qr",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "preview-qr"
+                    }
+                  },
+                  {
+                    "on": "click:compare",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.select_preview",
+                    "params": {
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "technical-spec-editor",
+                "type": "item.textEditor",
+                "title": "Базовое техническое задание",
+                "visibleIf": "$state.activeView === 'context'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_prompt_context",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "bindField": "base_tz",
+                  "mode": "markdown",
+                  "stateKey": "technicalSpecDraft",
+                  "titleTemplate": "ТЗ: {object_id}"
+                },
+                "actions": [
+                  {
+                    "on": "save",
+                    "type": "callSkill",
+                    "target": "builder_sdk_control_skill.save_prompt_context",
+                    "params": {
+                      "text": "$event.content",
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "technical-spec-actions",
+                "type": "ui.actions",
+                "title": "Дополнения к ТЗ",
+                "visibleIf": "$state.activeView === 'context'",
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "add-addendum",
+                      "label": "Добавить уточнение",
+                      "icon": "add-circle-outline"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:add-addendum",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "technical-addendum"
+                    }
+                  }
+                ]
+              },
+              {
+                "area": "center",
+                "id": "technical-spec-addenda",
+                "type": "item.details",
+                "title": "История уточнений",
+                "visibleIf": "$state.activeView === 'context'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_prompt_context",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "fields": [
+                    {
+                      "key": "tz_addenda",
+                      "label": "Дополнения"
+                    }
+                  ]
+                }
+              },
+              {
+                "area": "right",
+                "id": "context-side-state",
+                "type": "item.details",
+                "title": "Контекст разработки",
+                "visibleIf": "$state.activeView === 'context'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "builder_sdk_control_skill.get_prompt_context",
+                  "params": {
+                    "object_type": "$state.selectedProjectKind",
+                    "object_id": "$state.selectedProjectId"
+                  }
+                },
+                "inputs": {
+                  "fields": [
+                    {
+                      "key": "workflow_state",
+                      "label": "Этап"
+                    },
+                    {
+                      "key": "builder_llm_model",
+                      "label": "Модель"
+                    },
+                    {
+                      "key": "llm_provider",
+                      "label": "Провайдер"
+                    },
+                    {
+                      "key": "updated_at",
+                      "label": "Обновлено"
+                    }
+                  ]
+                }
+              }
+            ],
+            "meta": {
+              "builder": {
+                "scenario_id": "builder",
+                "ui_revision": "031",
+                "prototype_base_revision": "029",
+                "functional": true,
+                "proto": "031"
+              }
+            },
+            "title_i18n": {
+              "fallback": "Builder",
+              "key": "scenario.builder.title"
+            }
+          }
+        },
+        "modals": {
+          "confirm-archive": {
+            "title": "Подтвердите архивирование",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "confirm-archive",
+              "title": "Подтвердите архивирование",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "archive-details",
+                  "type": "ui.form",
+                  "title": "Что произойдет",
+                  "inputs": {
+                    "fields": [
+                      {
+                        "id": "archive-info",
+                        "type": "staticContent",
+                        "content": "Архивация скрывает проект из активных. Будет создана резервная копия и доступна кнопка восстановления."
+                      }
+                    ]
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "archive-actions",
+                  "type": "ui.actions",
+                  "title": "Действия",
+                  "inputs": {
+                    "buttons": [
+                      {
+                        "id": "confirm",
+                        "label": "Архивировать",
+                        "icon": "archive-outline"
+                      },
+                      {
+                        "id": "cancel",
+                        "label": "Отмена",
+                        "icon": "close-outline"
+                      }
+                    ],
+                    "variant": "stack"
+                  },
+                  "actions": [
+                    {
+                      "on": "click:confirm",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.archive_project",
+                      "params": {
+                        "archived": true,
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:confirm",
+                      "type": "updateState",
+                      "params": {
+                        "project.archived": true
+                      }
+                    },
+                    {
+                      "on": "click:confirm",
+                      "type": "closeModal"
+                    },
+                    {
+                      "on": "click:cancel",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "file-picker": {
+            "title": "Файлы проекта",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "file-picker",
+              "title": "Файлы проекта",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "project-object-list",
+                  "type": "ui.list",
+                  "title": "Состав проекта",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_project_objects",
+                    "params": {
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "variant": "list",
+                    "titleKey": "title",
+                    "subtitleKey": "subtitle",
+                    "search": true
+                  },
+                  "actions": [
+                    {
+                      "on": "select",
+                      "type": "updateState",
+                      "params": {
+                        "selectedObjectKind": "$event.object_type",
+                        "selectedObjectId": "$event.object_id",
+                        "selectedFilePath": null
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "file-tree",
+                  "type": "collection.tree",
+                  "title": "Дерево файлов",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_project_file_tree",
+                    "params": {
+                      "object_type": "$state.selectedObjectKind",
+                      "object_id": "$state.selectedObjectId",
+                      "limit": 1000
+                    }
+                  },
+                  "inputs": {
+                    "hideRoot": true,
+                    "expanded": false,
+                    "selectionMode": "leaf",
+                    "stateKey": "selectedArtifactId"
+                  },
+                  "actions": [
+                    {
+                      "on": "select",
+                      "type": "updateState",
+                      "params": {
+                        "selectedFilePath": "$event.path",
+                        "selectedFileProtected": "$event.protected",
+                        "selectedFileTitle": "$event.title"
+                      }
+                    },
+                    {
+                      "on": "select",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "preview-qr": {
+            "title": "QR для открытия preview",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "preview-qr",
+              "title": "QR для открытия preview",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "qr-image",
+                  "type": "visual.image",
+                  "title": "Сканируйте на другом устройстве",
+                  "inputs": {
+                    "alt": "QR для открытия preview в dev-пространстве",
+                    "fit": "contain",
+                    "src": {
+                      "kind": "expression",
+                      "op": "add",
+                      "args": [
+                        "https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=",
+                        {
+                          "kind": "expression",
+                          "op": "add",
+                          "args": [
+                            "https://inimatic.com/?webspace=",
+                            "desktop",
+                            "-dev"
+                          ]
+                        }
+                      ]
+                    }
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "preview-qr-actions",
+                  "type": "ui.actions",
+                  "title": "Закрыть",
+                  "inputs": {
+                    "buttons": [
+                      {
+                        "id": "close",
+                        "label": "Закрыть",
+                        "icon": "close-outline"
+                      }
+                    ],
+                    "variant": "stack"
+                  },
+                  "actions": [
+                    {
+                      "on": "click:close",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "project-picker": {
+            "title": "Выбор проекта",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "project-picker",
+              "title": "Выбор проекта",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "project-picker-list",
+                  "type": "ui.list",
+                  "title": "Проекты",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_projects",
+                    "params": {
+                      "limit": 200,
+                      "selected_object_type": "$state.selectedProjectKind",
+                      "selected_object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "variant": "list",
+                    "groupBy": "type",
+                    "groupDisplay": "sections",
+                    "previewKey": "updated",
+                    "search": true,
+                    "searchPlaceholder": "Поиск проектов...",
+                    "titleKey": "title",
+                    "subtitleKey": "stage",
+                    "meta": [
+                      {
+                        "key": "stage",
+                        "label": "Этап"
+                      },
+                      {
+                        "key": "version",
+                        "label": "Версия"
+                      },
+                      {
+                        "key": "sync",
+                        "label": "Синхронизация"
+                      },
+                      {
+                        "key": "space",
+                        "label": "Dev‑пространство"
+                      },
+                      {
+                        "key": "updated",
+                        "label": "Обновлено"
+                      }
+                    ],
+                    "groupTitleKey": "type",
+                    "buttons": [
+                      {
+                        "icon": "radio-button-on-outline",
+                        "id": "current",
+                        "whenKey": "current",
+                        "whenEquals": true
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "select",
+                      "type": "updateState",
+                      "params": {
+                        "selectedProjectKind": "$event.object_type",
+                        "selectedProjectId": "$event.object_id",
+                        "selectedProjectRef": "$event.id",
+                        "selectedProjectTitle": "$event.title",
+                        "selectedObjectKind": "$event.object_type",
+                        "selectedObjectId": "$event.object_id",
+                        "selectedFilePath": null,
+                        "project.archived": "$event.archived"
+                      }
+                    },
+                    {
+                      "on": "select",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.select_preview",
+                      "params": {
+                        "object_type": "$event.object_type",
+                        "object_id": "$event.object_id"
+                      }
+                    },
+                    {
+                      "on": "select",
+                      "type": "closeModal"
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "project-picker-actions",
+                  "type": "ui.actions",
+                  "title": "Действия",
+                  "inputs": {
+                    "buttons": [
+                      {
+                        "id": "create",
+                        "label": "Создать проект",
+                        "icon": "add-outline"
+                      }
+                    ],
+                    "variant": "toolbar"
+                  },
+                  "actions": [
+                    {
+                      "on": "click:create",
+                      "type": "openModal",
+                      "params": {
+                        "modalId": "new-project"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "new-project": {
+            "title": "Новый DEV-проект",
+            "presentation": {
+              "kind": "modal",
+              "restoreFocus": true
+            },
+            "schema": {
+              "id": "new-project",
+              "title": "new-project",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "new-project-form",
+                  "type": "ui.form",
+                  "title": "Создать проект",
+                  "inputs": {
+                    "layout": "responsiveGrid",
+                    "submitLabel": "Создать",
+                    "fields": [
+                      {
+                        "id": "object_type",
+                        "type": "select",
+                        "label": "Тип",
+                        "required": true,
+                        "default": "scenario",
+                        "options": [
+                          {
+                            "label": "Сценарий",
+                            "value": "scenario"
+                          },
+                          {
+                            "label": "Навык",
+                            "value": "skill"
+                          }
+                        ]
+                      },
+                      {
+                        "id": "object_id",
+                        "type": "shortText",
+                        "label": "ID проекта",
+                        "required": true
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "submit",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.create_project",
+                      "params": {
+                        "object_type": "$event.values.object_type",
+                        "object_id": "$event.values.object_id",
+                        "template": "$state.selectedTemplate"
+                      }
+                    },
+                    {
+                      "on": "submit",
+                      "type": "updateState",
+                      "params": {
+                        "selectedProjectKind": "$event.values.object_type",
+                        "selectedProjectId": "$event.values.object_id",
+                        "selectedObjectKind": "$event.values.object_type",
+                        "selectedObjectId": "$event.values.object_id",
+                        "selectedFilePath": null
+                      }
+                    },
+                    {
+                      "on": "submit",
+                      "type": "closeModal"
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "new-project-templates",
+                  "type": "ui.list",
+                  "title": "Шаблон",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_templates",
+                    "params": {
+                      "object_type": "scenario"
+                    }
+                  },
+                  "inputs": {
+                    "variant": "list",
+                    "titleKey": "label",
+                    "subtitleKey": "source"
+                  },
+                  "actions": [
+                    {
+                      "on": "select",
+                      "type": "updateState",
+                      "params": {
+                        "selectedTemplate": "$event.id"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "new-project-actions",
+                  "type": "ui.actions",
+                  "title": "Отмена",
+                  "inputs": {
+                    "variant": "toolbar",
+                    "buttons": [
+                      {
+                        "id": "cancel",
+                        "label": "Отмена",
+                        "icon": "close-outline"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "click:cancel",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "technical-addendum": {
+            "title": "Дополнение к ТЗ",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "technical-addendum",
+              "title": "technical-addendum",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "technical-addendum-form",
+                  "type": "ui.form",
+                  "title": "Новое уточнение",
+                  "inputs": {
+                    "submitLabel": "Добавить",
+                    "fields": [
+                      {
+                        "id": "text",
+                        "type": "longText",
+                        "label": "Текст",
+                        "required": true
+                      },
+                      {
+                        "id": "iteration_ref",
+                        "type": "shortText",
+                        "label": "Ссылка на итерацию"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "submit",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.append_prompt_addendum",
+                      "params": {
+                        "text": "$event.values.text",
+                        "iteration_ref": "$event.values.iteration_ref",
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "submit",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "automation": {
+            "title": "Автоматизация Builder",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "automation",
+              "title": "automation",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "automation-start",
+                  "type": "ui.form",
+                  "title": "Запуск автономной разработки",
+                  "inputs": {
+                    "submitLabel": "Запустить",
+                    "fields": [
+                      {
+                        "id": "implementation_brief",
+                        "type": "longText",
+                        "label": "Утверждённый implementation brief",
+                        "required": true
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "submit",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.start_automation",
+                      "params": {
+                        "implementation_brief": "$event.values.implementation_brief",
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "automation-followup",
+                  "type": "ui.form",
+                  "title": "Уточнение для текущего запуска",
+                  "inputs": {
+                    "submitLabel": "Отправить",
+                    "fields": [
+                      {
+                        "id": "text",
+                        "type": "longText",
+                        "label": "Сообщение",
+                        "required": true
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "submit",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.submit_automation",
+                      "params": {
+                        "text": "$event.values.text",
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "automation-state",
+                  "type": "item.details",
+                  "title": "Состояние",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.get_automation",
+                    "params": {
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "fields": [
+                      {
+                        "key": "session_present",
+                        "label": "Сессия"
+                      },
+                      {
+                        "key": "automation",
+                        "label": "Автоматизация"
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          "publication": {
+            "title": "Публикация",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "publication",
+              "title": "publication",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "publication-status",
+                  "type": "item.details",
+                  "title": "Проект",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.get_project",
+                    "params": {
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "fields": [
+                      {
+                        "key": "project_ref",
+                        "label": "Проект"
+                      },
+                      {
+                        "key": "version",
+                        "label": "Версия"
+                      },
+                      {
+                        "key": "workflow_state",
+                        "label": "Этап"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "publication-actions",
+                  "type": "ui.actions",
+                  "title": "Forge и публикация",
+                  "inputs": {
+                    "variant": "toolbar",
+                    "buttons": [
+                      {
+                        "id": "checkpoint",
+                        "label": "Checkpoint",
+                        "icon": "git-commit-outline"
+                      },
+                      {
+                        "id": "update",
+                        "label": "Обновить",
+                        "icon": "sync-outline"
+                      },
+                      {
+                        "id": "dry-run",
+                        "label": "Проверить релиз",
+                        "icon": "checkmark-circle-outline"
+                      },
+                      {
+                        "id": "publish",
+                        "label": "Опубликовать",
+                        "icon": "rocket-outline"
+                      },
+                      {
+                        "id": "delete",
+                        "label": "Удалить",
+                        "icon": "trash-outline",
+                        "kind": "danger"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "click:checkpoint",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.push_project",
+                      "params": {
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:update",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.update_project",
+                      "params": {
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:dry-run",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.publish_project",
+                      "params": {
+                        "bump": "$state.releaseBump",
+                        "dry_run": true,
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:publish",
+                      "type": "openModal",
+                      "params": {
+                        "modalId": "confirm-publish"
+                      }
+                    },
+                    {
+                      "on": "click:delete",
+                      "type": "openModal",
+                      "params": {
+                        "modalId": "confirm-delete"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "area": "main",
+                  "id": "publication-history",
+                  "type": "ui.list",
+                  "title": "История изменений",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "builder_sdk_control_skill.list_changes",
+                    "params": {
+                      "limit": 100,
+                      "object_type": "$state.selectedProjectKind",
+                      "object_id": "$state.selectedProjectId"
+                    }
+                  },
+                  "inputs": {
+                    "variant": "list",
+                    "titleKey": "title",
+                    "subtitleKey": "subtitle",
+                    "previewKey": "created_at"
+                  }
+                }
+              ]
+            }
+          },
+          "confirm-publish": {
+            "title": "Подтверждение публикации",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "confirm-publish",
+              "title": "confirm-publish",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "publish-warning",
+                  "type": "ui.form",
+                  "title": "Внешнее изменение",
+                  "inputs": {
+                    "fields": [
+                      {
+                        "id": "warning",
+                        "type": "staticContent",
+                        "content": "Будет опубликована новая версия выбранного проекта."
+                      }
+                    ]
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "publish-confirm-actions",
+                  "type": "ui.actions",
+                  "inputs": {
+                    "variant": "stack",
+                    "buttons": [
+                      {
+                        "id": "confirm",
+                        "label": "Опубликовать",
+                        "icon": "rocket-outline",
+                        "kind": "danger"
+                      },
+                      {
+                        "id": "cancel",
+                        "label": "Отмена",
+                        "icon": "close-outline"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "click:confirm",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.publish_project",
+                      "params": {
+                        "bump": "$state.releaseBump",
+                        "dry_run": false,
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:confirm",
+                      "type": "closeModal"
+                    },
+                    {
+                      "on": "click:cancel",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "confirm-delete": {
+            "title": "Удаление проекта",
+            "presentation": {
+              "kind": "modal"
+            },
+            "schema": {
+              "id": "confirm-delete",
+              "title": "confirm-delete",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main"
+                  }
+                ]
+              },
+              "widgets": [
+                {
+                  "area": "main",
+                  "id": "delete-warning",
+                  "type": "ui.form",
+                  "title": "Необратимое изменение Forge",
+                  "inputs": {
+                    "fields": [
+                      {
+                        "id": "warning",
+                        "type": "staticContent",
+                        "content": "Удалить проект в Forge? Локальная DEV-копия будет сохранена."
+                      }
+                    ]
+                  }
+                },
+                {
+                  "area": "main",
+                  "id": "delete-confirm-actions",
+                  "type": "ui.actions",
+                  "inputs": {
+                    "variant": "stack",
+                    "buttons": [
+                      {
+                        "id": "confirm",
+                        "label": "Удалить",
+                        "icon": "trash-outline",
+                        "kind": "danger"
+                      },
+                      {
+                        "id": "cancel",
+                        "label": "Отмена",
+                        "icon": "close-outline"
+                      }
+                    ]
+                  },
+                  "actions": [
+                    {
+                      "on": "click:confirm",
+                      "type": "callSkill",
+                      "target": "builder_sdk_control_skill.delete_project",
+                      "params": {
+                        "confirm": true,
+                        "remove_local": false,
+                        "object_type": "$state.selectedProjectKind",
+                        "object_id": "$state.selectedProjectId"
+                      }
+                    },
+                    {
+                      "on": "click:confirm",
+                      "type": "closeModal"
+                    },
+                    {
+                      "on": "click:cancel",
+                      "type": "closeModal"
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "generated_by": "builder_sdk_control_skill"
+  },
+  "preview_state": {
+    "session_id": "scenario.builder",
+    "scenario_id": "builder",
+    "title": "Builder — рабочее место разработки",
+    "page_schema": {
+      "id": "builder",
+      "title": "Builder — рабочее место разработки",
+      "surfaceClass": "",
+      "surfaceObjectKind": "",
+      "semantic": {},
+      "initialState": {
+        "activeView": "files",
+        "chatSurface": "builder",
+        "selectedProjectKind": "scenario",
+        "selectedProjectId": "builder",
+        "selectedProjectRef": "scenario:builder",
+        "selectedProjectTitle": "Builder",
+        "selectedObjectKind": "scenario",
+        "selectedObjectId": "builder",
+        "selectedFilePath": "builder_memory.md",
+        "selectedFileTitle": "builder_memory.md",
+        "selectedFileProtected": false,
+        "selectedNodeId": "stage-proto",
+        "selectedTemplate": "default",
+        "releaseBump": "patch",
+        "previewUrl": "https://inimatic.com/?webspace=desktop-dev",
+        "project": {
+          "archived": false,
+          "description": "Рабочее место для сценариев Builder",
+          "title": "Builder",
+          "type": "сценарий"
+        },
+        "dev": {
+          "applyMode": "preview",
+          "linkedSpace": "desktop-dev",
+          "llmProfile": "standard",
+          "model": "gpt-5",
+          "provider": "openai",
+          "voiceEnabled": false
+        }
+      },
+      "layout": {
+        "type": "split",
+        "pattern": "split",
+        "areas": [
+          {
+            "id": "left",
+            "role": "nav",
+            "width": 320
+          },
+          {
+            "id": "center",
+            "role": "main"
+          },
+          {
+            "id": "right",
+            "role": "aux"
+          }
+        ]
+      },
+      "autoActions": [],
+      "widgets": [
+        {
+          "area": "center",
+          "id": "project-header",
+          "type": "ui.actions",
+          "title": "Проект",
+          "inputs": {
+            "buttons": [
+              {
+                "id": "project-label",
+                "label": "Проект: Builder"
+              }
+            ],
+            "size": "medium",
+            "variant": "toolbar"
+          }
+        },
+        {
+          "area": "center",
+          "id": "node-views",
+          "type": "input.commandBar",
+          "title": "Представления",
+          "inputs": {
+            "buttons": [
+              {
+                "id": "overview",
+                "label": "Обзор",
+                "icon": "information-circle-outline"
+              },
+              {
+                "id": "chat",
+                "label": "Разговор",
+                "icon": "chatbubbles-outline"
+              },
+              {
+                "id": "files",
+                "label": "Артефакты",
+                "icon": "file-tray-stacked-outline"
+              },
+              {
+                "id": "context",
+                "label": "ТЗ",
+                "icon": "document-text-outline"
+              }
+            ],
+            "selectedStateKey": "activeView",
+            "variant": "segmented"
+          },
+          "actions": [
+            {
+              "on": "click",
+              "type": "updateState",
+              "params": {
+                "activeView": "$event.id"
+              }
+            }
+          ]
+        },
+        {
+          "area": "center",
+          "id": "file-toolbar",
+          "type": "ui.actions",
+          "title": "Выбор файла",
+          "visibleIf": "$state.activeView === 'files'",
+          "inputs": {
+            "buttons": [
+              {
+                "icon": "document-outline",
+                "id": "choose-file",
+                "label": "Выбрать файл"
+              }
+            ],
+            "size": "small",
+            "variant": "toolbar"
+          },
+          "actions": [
+            {
+              "on": "click:choose-file",
+              "type": "openModal",
+              "params": {
+                "modalId": "file-picker"
+              }
+            }
+          ]
+        },
+        {
+          "area": "center",
+          "id": "artifact-workbench",
+          "type": "item.textEditor",
+          "title": "Редактор/просмотр файла",
+          "visibleIf": "$state.activeView === 'files' && $state.selectedFileProtected !== true",
+          "dataSource": {
+            "kind": "skill",
+            "name": "builder_sdk_control_skill.read_project_file",
+            "params": {
+              "path": "$state.selectedFilePath",
+              "object_type": "$state.selectedObjectKind",
+              "object_id": "$state.selectedObjectId"
+            }
+          },
+          "inputs": {
+            "bindField": "content",
+            "descriptionByPath": {
+              "*.log": "Это лог, отредактируйте при необходимости.",
+              "*.md": "Подсказка: это Markdown. Нажмите «Сохранить», чтобы применить изменения."
+            },
+            "mode": "markdown",
+            "stateKey": "editorDraft",
+            "titleTemplate": "Файл: {path}"
+          },
+          "actions": [
+            {
+              "on": "save",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.save_project_file",
+              "params": {
+                "path": "$state.selectedFilePath",
+                "text": "$event.content",
+                "object_type": "$state.selectedObjectKind",
+                "object_id": "$state.selectedObjectId"
+              }
+            }
+          ]
+        },
+        {
+          "area": "center",
+          "id": "artifact-readonly",
+          "type": "item.codeViewer",
+          "title": "Просмотр защищенного файла",
+          "visibleIf": "$state.activeView === 'files' && $state.selectedFileProtected === true",
+          "dataSource": {
+            "kind": "skill",
+            "name": "builder_sdk_control_skill.read_project_file",
+            "params": {
+              "path": "$state.selectedFilePath",
+              "object_type": "$state.selectedObjectKind",
+              "object_id": "$state.selectedObjectId"
+            }
+          },
+          "inputs": {
+            "mode": "markdown",
+            "stateKey": "codeViewerDraft",
+            "titleTemplate": "Файл (только чтение): {path}"
+          }
+        },
+        {
+          "area": "center",
+          "id": "builder-chat",
+          "type": "ui.chat",
+          "title": "Разговор — Builder",
+          "visibleIf": "$state.activeView === 'chat'",
+          "dataSource": {
+            "kind": "stream",
+            "receiver": "voice_chat.messages",
+            "scope": "shared",
+            "transport": "hub",
+            "params": {
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "conversation_topic_id": "prompt-project:scenario:builder",
+              "dialog_channel_id": "builder"
+            }
+          },
+          "inputs": {
+            "autoGrow": true,
+            "cmdEnterToSend": true,
+            "compact": true,
+            "ctrlEnterToSend": true,
+            "enterToSend": true,
+            "hint": "Подсказка: опишите желаемое изменение интерфейса или запрос к Конструктору.",
+            "historyButtonLabel": "История",
+            "loadingHistoryLabel": "Загрузка истории…",
+            "meta": {
+              "active_agent_id": "agent:builder_skill:builder",
+              "active_agent_label": "Конструктор",
+              "conversation_id": "conv.skill.builder_skill.default.desktop",
+              "conversation_topic_id": "prompt-project:scenario:builder",
+              "dialog_channel_id": "builder",
+              "route_id": "voice_chat",
+              "thread_id": "prompt-project:scenario:builder"
+            },
+            "minRows": 4,
+            "multiline": true,
+            "placeholder": "Опишите, что нужно изменить или сгенерировать…",
+            "receiver": "voice_chat.messages",
+            "scope": "shared",
+            "sendCommand": "voice.chat.user",
+            "shiftEnterNewline": true,
+            "showTimestamps": true
+          }
+        },
+        {
+          "area": "center",
+          "id": "node-overview",
+          "type": "ui.form",
+          "title": "Обзор проекта и стабильность",
+          "visibleIf": "$state.activeView === 'overview'",
+          "dataSource": {
+            "kind": "skill",
+            "name": "builder_sdk_control_skill.get_project",
+            "params": {
+              "object_type": "$state.selectedProjectKind",
+              "object_id": "$state.selectedProjectId"
+            }
+          },
+          "inputs": {
+            "autoCommit": false,
+            "layout": "responsiveGrid",
+            "minFieldWidth": 240,
+            "fields": [
+              {
+                "default": "scenario",
+                "id": "project_type",
+                "label": "Тип проекта",
+                "type": "shortText"
+              },
+              {
+                "default": "Рабочее место для сценариев Builder",
+                "id": "description",
+                "label": "Описание",
+                "stateKey": "project.description",
+                "type": "longText"
+              },
+              {
+                "default": "Builder",
+                "id": "title",
+                "label": "Название",
+                "required": true,
+                "stateKey": "project.title",
+                "type": "shortText"
+              },
+              {
+                "content": "$data.version",
+                "id": "ov-version",
+                "title": "Версия",
+                "type": "staticContent"
+              },
+              {
+                "content": "$data.workflow_state",
+                "id": "ov-stage",
+                "title": "Этап",
+                "type": "staticContent"
+              },
+              {
+                "content": "$data.dev_webspace_id",
+                "id": "ov-dev",
+                "title": "Dev‑пространство",
+                "type": "staticContent"
+              },
+              {
+                "id": "ov-archive-section",
+                "title": "Архивирование и восстановление",
+                "type": "section"
+              },
+              {
+                "content": "Архивация скрывает проект из активных и сохраняет его историю.",
+                "id": "ov-archive-info",
+                "type": "staticContent"
+              }
+            ],
+            "submitLabel": "Сохранить"
+          },
+          "actions": [
+            {
+              "on": "submit",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.update_project_metadata",
+              "params": {
+                "title": "$event.values.title",
+                "description": "$event.values.description",
+                "project_type": "$event.values.project_type",
+                "object_type": "$state.selectedProjectKind",
+                "object_id": "$state.selectedProjectId"
+              }
+            }
+          ]
+        },
+        {
+          "area": "left",
+          "id": "left-actions",
+          "type": "ui.actions",
+          "title": "Проект",
+          "inputs": {
+            "buttons": [
+              {
+                "icon": "folder-open-outline",
+                "id": "choose-project",
+                "label": "Выбрать проект"
+              }
+            ],
+            "size": "small",
+            "variant": "stack"
+          },
+          "actions": [
+            {
+              "on": "click",
+              "type": "openModal",
+              "params": {
+                "modalId": "project-picker"
+              }
+            }
+          ]
+        },
+        {
+          "area": "left",
+          "id": "project-tree",
+          "type": "collection.tree",
+          "title": "Жизненный цикл",
+          "dataSource": {
+            "kind": "skill",
+            "name": "builder_sdk_control_skill.get_lifecycle",
+            "params": {
+              "object_type": "$state.selectedProjectKind",
+              "object_id": "$state.selectedProjectId"
+            }
+          },
+          "inputs": {
+            "hideRoot": true,
+            "selectedStateKey": "selectedNodeId",
+            "buttons": [
+              {
+                "id": "make-current",
+                "label": "Сделать текущей",
+                "icon": "flash-outline",
+                "whenKey": "canMakeCurrent"
+              },
+              {
+                "id": "stabilize",
+                "label": "Стабилизировать",
+                "icon": "shield-checkmark-outline",
+                "whenKey": "canStabilize"
+              },
+              {
+                "id": "go-automation",
+                "label": "К автоматизации",
+                "icon": "construct-outline",
+                "whenKey": "canOpenAutomation"
+              },
+              {
+                "id": "go-publication",
+                "label": "К публикации",
+                "icon": "rocket-outline",
+                "whenKey": "canOpenPublication"
+              }
+            ]
+          },
+          "actions": [
+            {
+              "on": "select",
+              "type": "updateState",
+              "params": {
+                "selectedNodeId": "$event.id"
+              }
+            },
+            {
+              "on": "click:make-current",
+              "type": "callSkill",
+              "target": "builder_skill.set_ui_revision_current",
+              "params": {
+                "revision": "$event.item.revision"
+              }
+            },
+            {
+              "on": "click:stabilize",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.push_project",
+              "params": {
+                "message": "Builder prototype stabilization",
+                "object_type": "$state.selectedProjectKind",
+                "object_id": "$state.selectedProjectId"
+              }
+            },
+            {
+              "on": "click:stabilize",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.set_workflow_state",
+              "params": {
+                "state": "prototype_stable",
+                "object_type": "$state.selectedProjectKind",
+                "object_id": "$state.selectedProjectId"
+              }
+            },
+            {
+              "on": "click:go-automation",
+              "type": "openModal",
+              "params": {
+                "modalId": "automation"
+              }
+            },
+            {
+              "on": "click:go-automation",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.set_workflow_state",
+              "params": {
+                "state": "automation",
+                "object_type": "$state.selectedProjectKind",
+                "object_id": "$state.selectedProjectId"
+              }
+            },
+            {
+              "on": "click:go-publication",
+              "type": "openModal",
+              "params": {
+                "modalId": "publication"
+              }
+            },
+            {
+              "on": "click:go-publication",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.set_workflow_state",
+              "params": {
+                "state": "publication",
+                "object_type": "$state.selectedProjectKind",
+                "object_id": "$state.selectedProjectId"
+              }
+            }
+          ]
+        },
+        {
+          "area": "right",
+          "id": "overview-side-status",
+          "type": "item.details",
+          "title": "Состояние проекции",
+          "visibleIf": "$state.activeView === 'overview'",
+          "dataSource": {
+            "kind": "skill",
+            "name": "builder_sdk_control_skill.get_preview",
+            "params": {}
+          },
+          "inputs": {
+            "fields": [
+              {
+                "key": "source_webspace_id",
+                "label": "Исходное пространство"
+              },
+              {
+                "key": "dev_webspace_id",
+                "label": "Dev‑пространство"
+              },
+              {
+                "key": "selected_kind",
+                "label": "Тип проекта"
+              },
+              {
+                "key": "selected_id",
+                "label": "Проект"
+              },
+              {
+                "key": "status",
+                "label": "Состояние"
+              }
+            ]
+          }
+        },
+        {
+          "area": "right",
+          "id": "chat-side-settings",
+          "type": "ui.form",
+          "title": "Настройки разработки",
+          "visibleIf": "$state.activeView === 'chat'",
+          "inputs": {
+            "layout": "responsiveGrid",
+            "minFieldWidth": 220,
+            "fields": [
+              {
+                "id": "llm-profile",
+                "label": "Профиль LLM",
+                "type": "select",
+                "options": [
+                  {
+                    "label": "Стандартный",
+                    "value": "standard"
+                  },
+                  {
+                    "label": "Творческий",
+                    "value": "creative"
+                  },
+                  {
+                    "label": "Строгий",
+                    "value": "strict"
+                  }
+                ],
+                "stateKey": "dev.llmProfile",
+                "default": "standard"
+              },
+              {
+                "id": "llmModel",
+                "label": "Модель",
+                "type": "select",
+                "options": [
+                  {
+                    "label": "gpt-5",
+                    "value": "gpt-5"
+                  },
+                  {
+                    "label": "gpt-4.1",
+                    "value": "gpt-4.1"
+                  }
+                ],
+                "stateKey": "dev.model",
+                "default": "gpt-5"
+              },
+              {
+                "id": "provider",
+                "label": "Провайдер",
+                "type": "select",
+                "options": [
+                  {
+                    "label": "OpenAI",
+                    "value": "openai"
+                  },
+                  {
+                    "label": "Azure OpenAI",
+                    "value": "azure"
+                  },
+                  {
+                    "label": "Локальный",
+                    "value": "local"
+                  }
+                ],
+                "stateKey": "dev.provider",
+                "default": "openai"
+              },
+              {
+                "id": "voice-input",
+                "label": "Голосовой ввод",
+                "type": "toggle",
+                "stateKey": "dev.voiceEnabled",
+                "default": false
+              }
+            ],
+            "submitLabel": "Применить"
+          },
+          "dataSource": {
+            "kind": "skill",
+            "name": "builder_sdk_control_skill.get_llm_options",
+            "params": {
+              "object_type": "$state.selectedProjectKind",
+              "object_id": "$state.selectedProjectId"
+            }
+          },
+          "actions": [
+            {
+              "on": "submit",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.set_llm_profile",
+              "params": {
+                "model": "$event.values.llmModel",
+                "object_type": "$state.selectedProjectKind",
+                "object_id": "$state.selectedProjectId"
+              }
+            }
+          ]
+        },
+        {
+          "area": "center",
+          "id": "overview-archive",
+          "type": "ui.actions",
+          "title": "Архивирование",
+          "visibleIf": "$state.activeView === 'overview' && $state.project.archived !== true",
+          "inputs": {
+            "buttons": [
+              {
+                "icon": "archive-outline",
+                "id": "archive",
+                "label": "Архивировать",
+                "kind": "danger"
+              }
+            ],
+            "variant": "stack"
+          },
+          "actions": [
+            {
+              "enabledIf": "$state.project.archived !== true",
+              "on": "click:archive",
+              "type": "openModal",
+              "params": {
+                "modalId": "confirm-archive"
+              }
+            }
+          ]
+        },
+        {
+          "area": "center",
+          "id": "overview-restore",
+          "type": "ui.actions",
+          "title": "Восстановление",
+          "visibleIf": "$state.activeView === 'overview' && $state.project.archived === true",
+          "inputs": {
+            "buttons": [
+              {
+                "id": "restore",
+                "label": "Восстановить",
+                "icon": "refresh-outline"
+              }
+            ],
+            "variant": "stack"
+          },
+          "actions": [
+            {
+              "on": "click:restore",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.archive_project",
+              "params": {
+                "archived": false,
+                "object_type": "$state.selectedProjectKind",
+                "object_id": "$state.selectedProjectId"
+              }
+            },
+            {
+              "on": "click:restore",
+              "type": "updateState",
+              "params": {
+                "project.archived": false
+              }
+            }
+          ]
+        },
+        {
+          "area": "right",
+          "id": "chat-side-links",
+          "type": "ui.actions",
+          "title": "Просмотр dev‑пространства",
+          "visibleIf": "$state.activeView === 'overview'",
+          "inputs": {
+            "buttons": [
+              {
+                "icon": "git-compare-outline",
+                "id": "compare",
+                "label": "Сверить"
+              },
+              {
+                "icon": "open-outline",
+                "id": "open-dev-link",
+                "label": "Открыть просмотр в новом окне"
+              },
+              {
+                "icon": "qr-code-outline",
+                "id": "show-qr",
+                "label": "QR для просмотра"
+              }
+            ],
+            "variant": "stack"
+          },
+          "actions": [
+            {
+              "on": "click:open-dev-link",
+              "type": "openUrl",
+              "params": {
+                "target": "_blank",
+                "url": "$state.previewUrl"
+              }
+            },
+            {
+              "on": "click:show-qr",
+              "type": "openModal",
+              "params": {
+                "modalId": "preview-qr"
+              }
+            },
+            {
+              "on": "click:compare",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.select_preview",
+              "params": {
+                "object_type": "$state.selectedProjectKind",
+                "object_id": "$state.selectedProjectId"
+              }
+            }
+          ]
+        },
+        {
+          "area": "center",
+          "id": "technical-spec-editor",
+          "type": "item.textEditor",
+          "title": "Базовое техническое задание",
+          "visibleIf": "$state.activeView === 'context'",
+          "dataSource": {
+            "kind": "skill",
+            "name": "builder_sdk_control_skill.get_prompt_context",
+            "params": {
+              "object_type": "$state.selectedProjectKind",
+              "object_id": "$state.selectedProjectId"
+            }
+          },
+          "inputs": {
+            "bindField": "base_tz",
+            "mode": "markdown",
+            "stateKey": "technicalSpecDraft",
+            "titleTemplate": "ТЗ: {object_id}"
+          },
+          "actions": [
+            {
+              "on": "save",
+              "type": "callSkill",
+              "target": "builder_sdk_control_skill.save_prompt_context",
+              "params": {
+                "text": "$event.content",
+                "object_type": "$state.selectedProjectKind",
+                "object_id": "$state.selectedProjectId"
+              }
+            }
+          ]
+        },
+        {
+          "area": "center",
+          "id": "technical-spec-actions",
+          "type": "ui.actions",
+          "title": "Дополнения к ТЗ",
+          "visibleIf": "$state.activeView === 'context'",
+          "inputs": {
+            "variant": "toolbar",
+            "buttons": [
+              {
+                "id": "add-addendum",
+                "label": "Добавить уточнение",
+                "icon": "add-circle-outline"
+              }
+            ]
+          },
+          "actions": [
+            {
+              "on": "click:add-addendum",
+              "type": "openModal",
+              "params": {
+                "modalId": "technical-addendum"
+              }
+            }
+          ]
+        },
+        {
+          "area": "center",
+          "id": "technical-spec-addenda",
+          "type": "item.details",
+          "title": "История уточнений",
+          "visibleIf": "$state.activeView === 'context'",
+          "dataSource": {
+            "kind": "skill",
+            "name": "builder_sdk_control_skill.get_prompt_context",
+            "params": {
+              "object_type": "$state.selectedProjectKind",
+              "object_id": "$state.selectedProjectId"
+            }
+          },
+          "inputs": {
+            "fields": [
+              {
+                "key": "tz_addenda",
+                "label": "Дополнения"
+              }
+            ]
+          }
+        },
+        {
+          "area": "right",
+          "id": "context-side-state",
+          "type": "item.details",
+          "title": "Контекст разработки",
+          "visibleIf": "$state.activeView === 'context'",
+          "dataSource": {
+            "kind": "skill",
+            "name": "builder_sdk_control_skill.get_prompt_context",
+            "params": {
+              "object_type": "$state.selectedProjectKind",
+              "object_id": "$state.selectedProjectId"
+            }
+          },
+          "inputs": {
+            "fields": [
+              {
+                "key": "workflow_state",
+                "label": "Этап"
+              },
+              {
+                "key": "builder_llm_model",
+                "label": "Модель"
+              },
+              {
+                "key": "llm_provider",
+                "label": "Провайдер"
+              },
+              {
+                "key": "updated_at",
+                "label": "Обновлено"
+              }
+            ]
+          }
+        }
+      ],
+      "meta": {
+        "builder": {
+          "scenario_id": "builder",
+          "ui_revision": "030",
+          "prototype_base_revision": "029",
+          "functional": true
+        }
+      },
+      "title_i18n": {
+        "fallback": "Builder",
+        "key": "scenario.builder.title"
+      }
+    },
+    "version": "031",
+    "datasources": [],
+    "mock_data": {}
+  },
+  "prompt_files": {
+    "tz/base_tz.md": {
+      "exists": true,
+      "content": "# Builder — Рабочее место\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n"
+    },
+    "builder_memory.md": {
+      "exists": true,
+      "content": "# Builder — Рабочее место\n\n## Builder memory\n- Keep durable product decisions, domain vocabulary, UX preferences, and constraints here.\n- Treat the initial scaffold as a starting point only; the current webui.json is the UI source of truth.\n- Future Builder turns may replace fields, widgets, mock data, layout, and copy when the user asks.\n"
+    },
+    "builder_system_prompt.md": {
+      "exists": true,
+      "content": ""
+    },
+    "prepare/general_prompt.md": {
+      "exists": false,
+      "content": ""
+    },
+    "generate/general_prompt.md": {
+      "exists": false,
+      "content": ""
+    }
+  },
+  "vcs_checkpoint": {
+    "ok": false,
+    "attempted": true,
+    "kind": "scenario",
+    "name": "builder",
+    "revision": "031",
+    "message": "Переставлены поля формы «Обзор проекта»: «Тип проекта» теперь перед «Описание», а «Описание» перед «Название». Поле типа проекта оставлено неизменяемым по инициализации в плане структуры данных.",
+    "error": "RootHttpError: <html>\r\n<head><title>504 Gateway Time-out</title></head>\r\n<body>\r\n<center><h1>504 Gateway Time-out</h1></center>\r\n<hr><center>nginx/1.29.6</center>\r\n</body>\r\n</html>\r\n"
+  }
+}
