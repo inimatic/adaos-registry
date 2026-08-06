@@ -112,6 +112,10 @@ _prewarm_jobs: set[str] = set()
 _device_cache_lock = threading.Lock()
 _device_cache_jobs: dict[str, float] = {}
 _media_lock = threading.Lock()
+_index_schema_lock = threading.Lock()
+_index_schema_ready_path = ""
+_folder_cache_lock = threading.Lock()
+_folder_cache: dict[tuple[str, str, int, int], list[dict[str, Any]]] = {}
 
 
 def _now() -> str:
@@ -421,41 +425,80 @@ def _content_ref(path: Path) -> str:
     return f"content:sha256:{_fingerprint(path)}"
 
 
-def _connect_index() -> sqlite3.Connection:
-    conn = sqlite3.connect(str(_index_path()), timeout=30)
+def _ensure_index_schema() -> None:
+    global _index_schema_ready_path
+    path = _index_path()
+    path_key = str(path.resolve())
+    if _index_schema_ready_path == path_key:
+        return
+    with _index_schema_lock:
+        if _index_schema_ready_path == path_key:
+            return
+        if path.exists():
+            try:
+                probe = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True, timeout=2)
+                try:
+                    tables = {
+                        str(row[0])
+                        for row in probe.execute(
+                            "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('photos', 'roots')"
+                        ).fetchall()
+                    }
+                finally:
+                    probe.close()
+                if tables == {"photos", "roots"}:
+                    _index_schema_ready_path = path_key
+                    return
+            except Exception:
+                pass
+        conn = sqlite3.connect(str(path), timeout=30)
+        try:
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS photos (
+                    content_ref TEXT PRIMARY KEY,
+                    source_path TEXT UNIQUE NOT NULL,
+                    root_dir TEXT NOT NULL,
+                    rel_path TEXT NOT NULL,
+                    top_folder TEXT NOT NULL,
+                    source_name TEXT NOT NULL,
+                    ext TEXT NOT NULL,
+                    size INTEGER NOT NULL,
+                    mtime INTEGER NOT NULL,
+                    favorite INTEGER NOT NULL DEFAULT 0,
+                    hidden INTEGER NOT NULL DEFAULT 0,
+                    indexed_at REAL NOT NULL
+                )
+                """
+            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_root_mtime ON photos(root_dir, mtime DESC)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_root_folder ON photos(root_dir, top_folder, mtime DESC)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_root_favorite ON photos(root_dir, favorite, mtime DESC)")
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS roots (
+                    root_dir TEXT PRIMARY KEY,
+                    indexed_at REAL NOT NULL,
+                    photo_count INTEGER NOT NULL
+                )
+                """
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        _index_schema_ready_path = path_key
+
+
+def _connect_index(*, read_only: bool = False) -> sqlite3.Connection:
+    _ensure_index_schema()
+    path = _index_path()
+    if read_only:
+        conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True, timeout=2)
+    else:
+        conn = sqlite3.connect(str(path), timeout=30)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA synchronous=NORMAL")
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS photos (
-            content_ref TEXT PRIMARY KEY,
-            source_path TEXT UNIQUE NOT NULL,
-            root_dir TEXT NOT NULL,
-            rel_path TEXT NOT NULL,
-            top_folder TEXT NOT NULL,
-            source_name TEXT NOT NULL,
-            ext TEXT NOT NULL,
-            size INTEGER NOT NULL,
-            mtime INTEGER NOT NULL,
-            favorite INTEGER NOT NULL DEFAULT 0,
-            hidden INTEGER NOT NULL DEFAULT 0,
-            indexed_at REAL NOT NULL
-        )
-        """
-    )
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_root_mtime ON photos(root_dir, mtime DESC)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_root_folder ON photos(root_dir, top_folder, mtime DESC)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_photos_root_favorite ON photos(root_dir, favorite, mtime DESC)")
-    conn.execute(
-        """
-        CREATE TABLE IF NOT EXISTS roots (
-            root_dir TEXT PRIMARY KEY,
-            indexed_at REAL NOT NULL,
-            photo_count INTEGER NOT NULL
-        )
-        """
-    )
     return conn
 
 
@@ -477,7 +520,7 @@ def _rel_path(root: Path, path: Path) -> str:
 
 def _index_meta(root: Path) -> dict[str, Any]:
     try:
-        with _connect_index() as conn:
+        with _connect_index(read_only=True) as conn:
             row = conn.execute("SELECT indexed_at, photo_count FROM roots WHERE root_dir = ?", (str(root),)).fetchone()
     except Exception:
         return {}
@@ -806,6 +849,8 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
         "source": "scan",
     }
     _memory_set(_INDEX_META_KEY, meta)
+    with _folder_cache_lock:
+        _folder_cache.clear()
     status = _set_index_status(
         {
             "ok": True,
@@ -940,6 +985,8 @@ def dispose(reason: str | None = None, **_: Any) -> dict[str, Any]:
         _snapshot_seen_at.clear()
     with _device_cache_lock:
         _device_cache_jobs.clear()
+    with _folder_cache_lock:
+        _folder_cache.clear()
     return {
         "ok": True,
         "reason": _text(reason) or "dispose",
@@ -999,7 +1046,7 @@ def _query_photo_records(
         sql += " LIMIT ?"
         params.append(max(1, int(limit)))
     try:
-        with _connect_index() as conn:
+        with _connect_index(read_only=True) as conn:
             return [dict(row) for row in conn.execute(sql, params).fetchall()]
     except Exception:
         _log.debug("failed to query slideshow index", exc_info=True)
@@ -1023,7 +1070,7 @@ def _favorite_files_for_state(state: Mapping[str, Any], limit: int | None = None
 
 def _favorite_refs(root: Path) -> list[str]:
     try:
-        with _connect_index() as conn:
+        with _connect_index(read_only=True) as conn:
             rows = conn.execute(
                 "SELECT content_ref FROM photos WHERE root_dir = ? AND favorite = 1 ORDER BY mtime DESC",
                 (str(root),),
@@ -1035,7 +1082,7 @@ def _favorite_refs(root: Path) -> list[str]:
 
 def _favorite_count(root: Path) -> int:
     try:
-        with _connect_index() as conn:
+        with _connect_index(read_only=True) as conn:
             row = conn.execute(
                 "SELECT COUNT(*) AS count FROM photos WHERE root_dir = ? AND favorite = 1",
                 (str(root),),
@@ -1052,6 +1099,8 @@ def _set_favorite(root: Path, content_ref: str, favorite: bool) -> None:
                 "UPDATE photos SET favorite = ? WHERE root_dir = ? AND content_ref = ?",
                 (1 if favorite else 0, str(root), content_ref),
             )
+        with _folder_cache_lock:
+            _folder_cache.clear()
     except Exception:
         _log.debug("failed to update slideshow favorite ref=%s", content_ref, exc_info=True)
 
@@ -1063,13 +1112,15 @@ def _set_hidden(root: Path, content_ref: str, hidden: bool) -> None:
                 "UPDATE photos SET hidden = ? WHERE root_dir = ? AND content_ref = ?",
                 (1 if hidden else 0, str(root), content_ref),
             )
+        with _folder_cache_lock:
+            _folder_cache.clear()
     except Exception:
         _log.debug("failed to update slideshow hidden ref=%s", content_ref, exc_info=True)
 
 
 def _is_favorite(root: Path, content_ref: str) -> bool:
     try:
-        with _connect_index() as conn:
+        with _connect_index(read_only=True) as conn:
             row = conn.execute(
                 "SELECT favorite FROM photos WHERE root_dir = ? AND content_ref = ?",
                 (str(root), content_ref),
@@ -1083,10 +1134,19 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
     root = _source_dir(_text(state.get("source_dir")))
     _ensure_index(root)
     selected = _text(state.get("selected_folder"))
+    try:
+        stat = _index_path().stat()
+        cache_key = (str(root), selected, int(stat.st_mtime_ns), int(stat.st_size))
+        with _folder_cache_lock:
+            cached = _folder_cache.get(cache_key)
+            if cached is not None:
+                return [dict(item) for item in cached]
+    except Exception:
+        cache_key = None
     items = [{"id": "", "title": "All photos", "subtitle": str(root), "selected": selected == "", "selectable": True}]
     total_folders = 0
     try:
-        with _connect_index() as conn:
+        with _connect_index(read_only=True) as conn:
             count_row = conn.execute(
                 """
                 SELECT COUNT(*) AS count FROM (
@@ -1139,6 +1199,10 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
                 "selectable": False,
             }
         )
+    if cache_key is not None:
+        with _folder_cache_lock:
+            _folder_cache.clear()
+            _folder_cache[cache_key] = [dict(item) for item in items]
     return items
 
 

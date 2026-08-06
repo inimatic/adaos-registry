@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.57
+version: 0.1.58
 description: Slideshow pilot skill that shows photos in the widget and can optionally
   project cached thumbnails to assigned ReDevice endpoints.
 supported_locales:
@@ -318,8 +318,8 @@ tools:
         items:
           type: string
 - name: control_redevice_slideshow
-  description: Control the shared slideshow state for the widget and broadcast it to
-    selected ReDevice endpoints when present.
+  description: Control the shared slideshow state for the widget and broadcast it
+    to selected ReDevice endpoints when present.
   entry: handlers.main:control_redevice_slideshow
   input_schema:
     type: object
@@ -577,6 +577,9 @@ memory_budget:
     max_items: 16
     ttl_seconds: 3600
     cleanup_hook: dispose
+  - name: slideshow.folder_cache
+    max_items: 1
+    cleanup_hook: dispose
   - name: slideshow.command_state
     max_items: 1
     storage: skill_memory
@@ -591,13 +594,13 @@ memory_budget:
     max_threads: 1
     cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-08-05T16:42:00+00:00'
+updated_at: '2026-08-06T12:30:01+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3564.55f7b169
-    recorded_at: '2026-07-08T17:36:06+00:00'
+    min_version: 0.1.686+4583.f5a859b1
+    recorded_at: '2026-08-06T12:30:01+00:00'
     source: skill_push
-    min_commit: 55f7b16997ca9976acc010191849d42782f50949
-    min_short_commit: 55f7b169
-    build_date: '2026-07-08T20:35:43+03:00'
+    min_commit: f5a859b1219012dcc6009d131ad7d9c95b85a55b
+    min_short_commit: f5a859b1
+    build_date: '2026-08-06T15:26:37+03:00'
 

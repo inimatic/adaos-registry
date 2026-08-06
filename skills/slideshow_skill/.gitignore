@@ -1,0 +1,3 @@
+.skill_state/*.sqlite3-shm
+.skill_state/*.sqlite3-wal
+.skill_state/*.sqlite3-journal
