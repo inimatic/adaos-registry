@@ -1190,7 +1190,7 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
         previous = _WEATHER_UPDATE_TASKS.get(task_key)
         if previous and not previous.done():
             previous.cancel()
-        _WEATHER_UPDATE_TASKS[task_key] = asyncio.create_task(
+        refresh_task = asyncio.create_task(
             _refresh_weather_live_snapshot(
                 task_key=task_key,
                 api_entry_point=api_entry_point,
@@ -1200,6 +1200,16 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
                 request_id=request_id,
             )
         )
+        _WEATHER_UPDATE_TASKS[task_key] = refresh_task
+        try:
+            # Event handlers may run in a bounded per-dispatch event loop. A
+            # detached task is cancelled when that loop closes and leaves the
+            # Yjs projection permanently in its pending state, so keep the
+            # handler alive until the offloaded network request is projected.
+            await refresh_task
+        except asyncio.CancelledError:
+            if _WEATHER_UPDATE_TASKS.get(task_key) is refresh_task:
+                raise
     finally:
         if pushed:
             clear_current_skill()

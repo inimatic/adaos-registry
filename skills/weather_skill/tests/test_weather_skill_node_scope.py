@@ -67,9 +67,7 @@ def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch
                 "_meta": {"target_node_id": "member-local"},
             }
         )
-        tasks = list(mod._WEATHER_UPDATE_TASKS.values())
-        if tasks:
-            await asyncio.gather(*tasks)
+        assert mod._WEATHER_UPDATE_TASKS == {}
 
     asyncio.run(_run())
 
@@ -125,9 +123,7 @@ def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
                 "target_node_id": "member-local",
             }
         )
-        tasks = list(mod._WEATHER_UPDATE_TASKS.values())
-        if tasks:
-            await asyncio.gather(*tasks)
+        assert mod._WEATHER_UPDATE_TASKS == {}
 
     asyncio.run(_run())
 
