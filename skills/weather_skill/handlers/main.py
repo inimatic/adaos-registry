@@ -1017,30 +1017,6 @@ def _weather_current_payload(
     return current
 
 
-def _weather_pending_payload(city: str = "", *, request_id: str = "", location: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    label = city or (str(location.get("label") or "Current location") if isinstance(location, dict) else "Current location")
-    current = {
-        "city": label,
-        "label": label,
-        "temp_c": None,
-        "condition": "",
-        "description": "",
-        "wind_ms": None,
-        "updated_at": _now_iso(),
-        "request_id": request_id,
-        "source": "pending",
-        "pending": True,
-    }
-    if isinstance(location, dict):
-        current["location"] = {
-            "latitude": location.get("latitude"),
-            "longitude": location.get("longitude"),
-            "accuracy": location.get("accuracy"),
-            "source": location.get("source") or "browser",
-        }
-    return current
-
-
 def _weather_projection_payload(
     data: Dict[str, Any],
     *,
@@ -1177,14 +1153,12 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
             _log.info("weather request ignored: missing city/location payload_keys=%s", sorted(payload.keys()))
             return
 
-        pending = _weather_pending_payload(city or "", request_id=request_id, location=location)
         _log.info(
-            "%s accepted webspace=%s city=%s source=pending",
+            "%s accepted webspace=%s city=%s",
             event_name,
             webspace_id or "default",
-            pending.get("city"),
+            city or str((location or {}).get("label") or "Current location"),
         )
-        await _project_weather_current_async(pending, webspace_id=webspace_id, status="refreshing")
 
         task_key = f"{str(webspace_id or 'default').strip() or 'default'}::{target_node_id or 'local'}"
         previous = _WEATHER_UPDATE_TASKS.get(task_key)

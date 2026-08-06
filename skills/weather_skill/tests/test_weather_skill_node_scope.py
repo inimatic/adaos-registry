@@ -71,13 +71,11 @@ def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch
 
     asyncio.run(_run())
 
-    assert [entry[0] for entry in projected] == ["weather.snapshot", "weather.snapshot"]
-    assert [entry[1].get("status") for entry in projected] == ["refreshing", "ok"]
+    assert [entry[0] for entry in projected] == ["weather.snapshot"]
+    assert [entry[1].get("status") for entry in projected] == ["ok"]
     assert {entry[2] for entry in projected} == {"desktop"}
     assert projected[0][1]["current"]["city"] == "Berlin"
-    assert projected[0][1]["current"]["temp_c"] is None
-    assert projected[0][1]["current"]["source"] == "pending"
-    assert projected[-1][1]["current"]["source"] == "api"
+    assert projected[0][1]["current"]["source"] == "api"
 
 
 def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
@@ -127,12 +125,10 @@ def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
 
     asyncio.run(_run())
 
-    assert [entry[1].get("status") for entry in projected] == ["refreshing", "ok"]
+    assert [entry[1].get("status") for entry in projected] == ["ok"]
     assert projected[0][1]["current"]["request_id"] == "req-geo"
-    assert projected[0][1]["current"]["pending"] is True
-    assert projected[-1][1]["current"]["request_id"] == "req-geo"
-    assert projected[-1][1]["current"]["pending"] is False
-    assert projected[-1][1]["current"]["location"]["latitude"] == 52.52
+    assert projected[0][1]["current"]["pending"] is False
+    assert projected[0][1]["current"]["location"]["latitude"] == 52.52
 
 
 def test_weather_legacy_openweathermap_endpoint_uses_open_meteo(monkeypatch):
