@@ -5,7 +5,6 @@ import json
 import sys
 import types
 from pathlib import Path
-from types import SimpleNamespace
 from uuid import uuid4
 
 
@@ -38,37 +37,6 @@ def _load_weather_module():
     return module
 
 
-def test_weather_city_changed_ignores_other_target_node(monkeypatch):
-    mod = _load_weather_module()
-    projected: list[tuple[str, object, str | None]] = []
-
-    monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(mod, "_load_skill_data_projections", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", None))
-    monkeypatch.setattr(mod, "_fetch_weather_async", lambda *_args, **_kwargs: (True, {"temp": 10, "description": "clear", "wind_ms": 1}))
-    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace(config=SimpleNamespace(node_id="member-local")))
-    monkeypatch.setattr(
-        mod,
-        "ctx_subnet",
-        SimpleNamespace(set=lambda slot, payload, webspace_id=None: projected.append((slot, payload, webspace_id))),
-    )
-
-    import asyncio
-
-    asyncio.run(
-        mod.on_weather_city_changed(
-            {
-                "city": "Berlin",
-                "webspace_id": "desktop",
-                "target_node_id": "member-remote",
-                "_meta": {"target_node_id": "member-remote"},
-            }
-        )
-    )
-
-    assert projected == []
-
-
 def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch):
     mod = _load_weather_module()
     projected: list[tuple[str, dict, str | None]] = []
@@ -84,10 +52,8 @@ def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch
         return True, {"temp": 10, "description": "clear", "wind_ms": 1}
 
     monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(mod, "_load_skill_data_projections", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", None))
     monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
-    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace(config=SimpleNamespace(node_id="member-local")))
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
 
     import asyncio
@@ -144,10 +110,8 @@ def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
         }
 
     monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(mod, "_load_skill_data_projections", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", "Moscow"))
     monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
-    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace(config=SimpleNamespace(node_id="member-local")))
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
 
     import asyncio

@@ -11,14 +11,13 @@ import hashlib
 import json
 import logging
 import re
+import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import requests
-import yaml
-
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data.bus import emit
 from adaos.sdk.data.context import clear_current_skill, get_current_skill, set_current_skill
@@ -27,7 +26,6 @@ from adaos.sdk.data.i18n import _
 from adaos.sdk.data.skill_memory import get as memory_get, set as memory_set
 from adaos.sdk.data.events import publish as publish_event
 from adaos.sdk.net import external_api
-from adaos.services.agent_context import get_ctx
 
 _log = logging.getLogger("skills.weather_skill")
 
@@ -41,8 +39,11 @@ WEATHER_API_CHANNEL = "weather.open_meteo.forecast"
 _LEGACY_API_ENDPOINT_HOSTS = ("api.openweathermap.org",)
 _CITY_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _GEOCODE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
+_CACHE_LOCK = threading.Lock()
 _CITY_CACHE_TTL = 300.0
 _GEOCODE_CACHE_TTL = 24 * 60 * 60.0
+_CITY_CACHE_MAX_ITEMS = 128
+_GEOCODE_CACHE_MAX_ITEMS = 512
 _STALE_WEATHER_CACHE_TTL = 24 * 60 * 60.0
 _WEATHER_UNAVAILABLE_TEXT = "\u041d\u0435 \u0443\u0434\u0430\u0435\u0442\u0441\u044f \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435 \u043e \u043f\u043e\u0433\u043e\u0434\u0435."
 
@@ -125,6 +126,42 @@ CONDITIONS: Dict[int, Tuple[str, str]] = {
     96: ("Thunderstorm with hail", "thunderstorm-outline"),
     99: ("Thunderstorm with hail", "thunderstorm-outline"),
 }
+
+
+def _cache_get(
+    cache: Dict[str, Tuple[float, Dict[str, Any]]],
+    key: str,
+    *,
+    ttl_seconds: float,
+) -> Optional[Dict[str, Any]]:
+    now = time.time()
+    with _CACHE_LOCK:
+        cached = cache.get(key)
+        if not cached:
+            return None
+        if now - cached[0] >= ttl_seconds:
+            cache.pop(key, None)
+            return None
+        return dict(cached[1])
+
+
+def _cache_put(
+    cache: Dict[str, Tuple[float, Dict[str, Any]]],
+    key: str,
+    value: Dict[str, Any],
+    *,
+    ttl_seconds: float,
+    max_items: int,
+) -> None:
+    now = time.time()
+    with _CACHE_LOCK:
+        expired = [item_key for item_key, item in cache.items() if now - item[0] >= ttl_seconds]
+        for item_key in expired:
+            cache.pop(item_key, None)
+        while len(cache) >= max_items:
+            oldest = min(cache, key=lambda item_key: cache[item_key][0])
+            cache.pop(oldest, None)
+        cache[key] = (now, dict(value))
 
 _RU_TRANSLIT = {
     ord("\u0430"): "a",
@@ -295,28 +332,6 @@ def _normalize_api_entry_point(value: Any) -> str:
     return endpoint
 
 
-def _load_skill_data_projections(ctx) -> None:
-    try:
-        try:
-            existing = ctx.projections.resolve("subnet", "weather.snapshot")
-        except Exception:
-            existing = []
-        if existing:
-            return
-        skills_root = ctx.paths.skills_workspace_dir()
-        skills_root = skills_root() if callable(skills_root) else skills_root
-        manifest_path = Path(skills_root) / "weather_skill" / "skill.yaml"
-        if not manifest_path.exists():
-            _log.warning("weather_skill: skill.yaml not found at %s", manifest_path)
-            return
-        spec = yaml.safe_load(manifest_path.read_text(encoding="utf-8")) or {}
-        entries = spec.get("data_projections") or []
-        if isinstance(entries, list) and entries:
-            ctx.projections.load_entries(entries)
-    except Exception:
-        _log.debug("weather_skill: failed to load skill data_projections", exc_info=True)
-
-
 def _load_config() -> Tuple[str, Optional[str]]:
     raw_api_entry_point = memory_get("api_entry_point")
     api_entry_point = _normalize_api_entry_point(raw_api_entry_point)
@@ -403,10 +418,9 @@ def _geocode_city(city: str) -> Optional[Dict[str, Any]]:
     if known:
         return known
     cache_key = canonical.lower()
-    now = time.time()
-    cached = _GEOCODE_CACHE.get(cache_key)
-    if cached and now - cached[0] < _GEOCODE_CACHE_TTL:
-        return dict(cached[1])
+    cached = _cache_get(_GEOCODE_CACHE, cache_key, ttl_seconds=_GEOCODE_CACHE_TTL)
+    if cached:
+        return cached
     try:
         response = requests.get(
             DEFAULT_GEOCODING_ENDPOINT,
@@ -441,7 +455,13 @@ def _geocode_city(city: str) -> Optional[Dict[str, Any]]:
         "timezone": item.get("timezone"),
         "source": "geocoding",
     }
-    _GEOCODE_CACHE[cache_key] = (now, dict(location))
+    _cache_put(
+        _GEOCODE_CACHE,
+        cache_key,
+        location,
+        ttl_seconds=_GEOCODE_CACHE_TTL,
+        max_items=_GEOCODE_CACHE_MAX_ITEMS,
+    )
     return location
 
 
@@ -735,12 +755,18 @@ def _fetch_weather_by_request(
         return False, {"error_code": "missing_city", "error": _("runtime.weather.errors.missing_city"), "city": city}
     cache_key = _weather_cache_key(city or resolved_location.get("city"), resolved_location)
     now = time.time()
-    cached = _CITY_CACHE.get(cache_key)
-    if cached and now - cached[0] < _CITY_CACHE_TTL:
-        return True, dict(cached[1])
+    cached = _cache_get(_CITY_CACHE, cache_key, ttl_seconds=_CITY_CACHE_TTL)
+    if cached:
+        return True, cached
     ok, data = _fetch_weather_for_location(api_entry_point, resolved_location)
     if ok:
-        _CITY_CACHE[cache_key] = (now, dict(data))
+        _cache_put(
+            _CITY_CACHE,
+            cache_key,
+            data,
+            ttl_seconds=_CITY_CACHE_TTL,
+            max_items=_CITY_CACHE_MAX_ITEMS,
+        )
         _remember_weather_success(cache_key, data, now=now)
         return ok, data
     fallback = _fallback_weather_payload(cache_key, data, now=now)
@@ -881,6 +907,16 @@ def get_snapshot(
         "webspace_id": webspace_id,
         "target_node_id": target_node_id or node_id or "",
     }
+
+
+@tool("dispose")
+def dispose(**_: Any) -> Dict[str, Any]:
+    with _CACHE_LOCK:
+        city_count = len(_CITY_CACHE)
+        geocode_count = len(_GEOCODE_CACHE)
+        _CITY_CACHE.clear()
+        _GEOCODE_CACHE.clear()
+    return {"ok": True, "released": city_count + geocode_count}
 
 
 @subscribe("nlp.intent.weather.get")
@@ -1067,12 +1103,6 @@ def _target_context(payload: Dict[str, Any]) -> Tuple[bool, str, Optional[str]]:
         or payload.get("node_id")
         or ""
     ).strip()
-    try:
-        local_node_id = str(getattr(get_ctx().config, "node_id", "") or "").strip()
-    except Exception:
-        local_node_id = ""
-    if target_node_id and local_node_id and target_node_id != local_node_id:
-        return False, target_node_id, None
     meta = payload.get("_meta") if isinstance(payload.get("_meta"), dict) else {}
     raw_ws = payload.get("webspace_id") or payload.get("workspace_id") or meta.get("webspace_id") or meta.get("workspace_id")
     webspace_id = str(raw_ws).strip() if raw_ws else None
@@ -1128,11 +1158,6 @@ async def _refresh_weather_live_snapshot(
 
 async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
     pushed = set_current_skill("weather_skill")
-    try:
-        ctx = get_ctx()
-        _load_skill_data_projections(ctx)
-    except Exception:
-        pass
     try:
         payload = _event_payload(evt)
         if not payload:

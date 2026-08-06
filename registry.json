@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-06T09:39:14+00:00",
+  "updated_at": "2026-08-06T12:29:14+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -875,8 +875,8 @@
       "kind": "skill",
       "id": "weather_skill",
       "name": "weather_skill",
-      "version": "2.6.12",
-      "updated_at": "2026-07-23T09:49:17+00:00",
+      "version": "2.6.13",
+      "updated_at": "2026-08-06T12:29:14+00:00",
       "path": "skills/weather_skill",
       "manifest": "skills/weather_skill/skill.yaml",
       "source": {
@@ -888,9 +888,9 @@
         "name": "weather_skill",
         "id": "weather_skill"
       },
-      "description": "Weather skill with Open-Meteo current conditions, forecast, browser location support and declarative UI actions.",
+      "description": "Standalone SDK weather skill with Open-Meteo forecasts, browser location, declarative actions and subnet projections.",
       "runtime_python": "3.11",
-      "tools_count": 2
+      "tools_count": 3
     },
     {
       "kind": "skill",

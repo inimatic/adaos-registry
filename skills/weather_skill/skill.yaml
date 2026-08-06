@@ -1,7 +1,7 @@
 name: weather_skill
-version: 2.6.12
-description: Weather skill with Open-Meteo current conditions, forecast, browser location
-  support and declarative UI actions.
+version: 2.6.13
+description: Standalone SDK weather skill with Open-Meteo forecasts, browser location,
+  declarative actions and subnet projections.
 runtime:
   python: '3.11'
 dependencies:
@@ -22,6 +22,19 @@ data_projections:
   targets:
   - backend: yjs
     path: data/weather
+memory_budget:
+  expected_rss_mb: 64
+  caches:
+  - name: city_cache
+    max_items: 128
+    ttl_seconds: 300
+    cleanup_hook: dispose
+  - name: geocode_cache
+    max_items: 512
+    ttl_seconds: 86400
+    cleanup_hook: dispose
+lifecycle:
+  dispose: dispose
 default_tool: get_weather
 tools:
 - name: get_weather
@@ -84,49 +97,56 @@ tools:
         type: object
       weather:
         type: object
+- name: dispose
+  description: Release bounded in-process weather caches before deactivation.
+  entry: handlers.main:dispose
+  input_schema:
+    type: object
+    properties: {}
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
 nlu:
   intents:
-  - name: weather.show
-    utterances:
-    - какая погода {date?} {place?}
-    - погода {date?} {place?}
-    - '{date?} погода {place?}'
-    slots:
-      date:
-        type: datetime
-        required: false
-      place:
-        type: location
-        required: false
-    disambiguation:
-      inherit:
-      - date
-      defaults:
-        place: '@home_city'
-  resolvers:
-    location: handlers.main:resolve_location
+    weather.current:
+      examples:
+      - какая погода
+      - какая погода в Берлине
+      - погода в Москве
+      - weather in London
+      actions:
+      - type: skillTool
+        skill: weather_skill
+        tool: get_weather
+        target: weather_skill.get_weather
+        params:
+          city: $slot.city
   regex_rules:
   - id: rx.1768305525282
     created_at: 1768305525.282357
-    intent: desktop.open_weather
+    intent: weather.current
     pattern: \bпомерить\s+температуру\s+в\s+(?P<city>[^?.!,;:]+)\b
     enabled: true
     source: teacher
     candidate_id: cand.1768305403150
   - id: rx.655bf395-a748-4bf0-b1b2-5213f62daab8
     created_at: 1768330400.5334976
-    intent: desktop.open_weather
+    intent: weather.current
     pattern: \bкакая\s+температура\s+в\s+(?P<city>[^?.!,;:]+)\b
     enabled: true
     source: teacher
     candidate_id: cand.1768330399036
-updated_at: '2026-07-23T09:49:17+00:00'
+updated_at: '2026-08-06T12:29:14+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3880.c8e5b26c
-    recorded_at: '2026-07-23T09:49:17+00:00'
+    min_version: 0.1.686+4583.f5a859b1
+    recorded_at: '2026-08-06T12:29:14+00:00'
     source: skill_push
-    min_commit: c8e5b26c281d1e0ced4ac689ad4744ad35e0caef
-    min_short_commit: c8e5b26c
-    build_date: '2026-07-23T12:45:01+03:00'
+    min_commit: f5a859b1219012dcc6009d131ad7d9c95b85a55b
+    min_short_commit: f5a859b1
+    build_date: '2026-08-06T15:26:37+03:00'
 
