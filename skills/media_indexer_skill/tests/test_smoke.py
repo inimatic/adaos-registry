@@ -397,7 +397,7 @@ def test_play_action_keeps_directory_when_payload_path_is_media_file(monkeypatch
     assert projected[-1]["form"]["directory"] == str(media_dir)
     assert main._state["selected_directory"] == str(media_dir)
     assert projected[-1]["playback"]["items"][0]["content_path"].startswith("/api/node/media-indexer/content/")
-    assert projected[-1]["playback"]["items"][0]["routed_content_path"].startswith("/api/node/media-indexer/content/")
+    assert projected[-1]["playback"]["items"][0]["routed_content_path"].startswith("/media/media-indexer/content/")
 
 
 def test_payload_lookup_falls_back_to_filename_for_lossy_paths(monkeypatch, tmp_path: pathlib.Path) -> None:

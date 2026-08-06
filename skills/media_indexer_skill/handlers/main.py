@@ -1061,7 +1061,7 @@ def _player_item_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         "mime_type": _guess_mime_type(path or name),
         "modified_at": modified_at,
         "content_path": f"/api/node/media-indexer/content/{playback_id}",
-        "routed_content_path": f"/api/node/media-indexer/content/{playback_id}",
+        "routed_content_path": f"/media/media-indexer/content/{playback_id}",
         "playback_id": playback_id,
         "source_path": path,
     }
