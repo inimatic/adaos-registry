@@ -2074,6 +2074,13 @@ def get_settings() -> Dict[str, Any]:
 def rehydrate(webspace_id: str | None = None, **_: Any) -> Dict[str, Any]:
     if _has_persisted_index():
         _ensure_initialized(load_index=True)
+    settings, index, snapshot = _rehydrated_snapshot()
+    _project_snapshot(snapshot, webspace_id=webspace_id)
+    return {"status": "ok", "settings": settings, "index": index, "snapshot": snapshot}
+
+
+def _rehydrated_snapshot() -> tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+    """Restore the compact read model without loading the runtime index."""
     settings = _settings()
     _state["selected_directory"] = settings.get("selected_directory") or settings.get("default_directory") or ""
     _state["selected_query"] = settings.get("selected_query") or DEFAULT_QUERY
@@ -2084,9 +2091,7 @@ def rehydrate(webspace_id: str | None = None, **_: Any) -> Dict[str, Any]:
         subtitle=f"{indexed_count} files indexed" if indexed_count else "Waiting for scan",
         description=str(index.get("indexed_directory") or ""),
     )
-    snapshot = _snapshot_payload(status=status, form=_current_form())
-    _project_snapshot(snapshot, webspace_id=webspace_id)
-    return {"status": "ok", "settings": settings, "index": index, "snapshot": snapshot}
+    return settings, index, _snapshot_payload(status=status, form=_current_form())
 
 
 @tool("dispose")
@@ -2107,6 +2112,16 @@ def dispose() -> Dict[str, Any]:
         }
     )
     return {"status": "ok"}
+
+
+@subscribe("sys.ready")
+async def on_sys_ready(evt: Any) -> None:
+    payload = _event_payload(evt)
+    allowed, webspace_id = _target_context(payload)
+    if not allowed:
+        return
+    _, _, snapshot = await asyncio.to_thread(_rehydrated_snapshot)
+    await _project_snapshot_async(snapshot, webspace_id=webspace_id or "desktop")
 
 
 @subscribe("media_indexer.action")

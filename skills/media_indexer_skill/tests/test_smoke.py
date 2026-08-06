@@ -25,6 +25,7 @@ def test_manifest_declares_runtime_contracts() -> None:
     assert "requirements.txt" not in {path.name for path in SKILL_ROOT.iterdir()}
     assert manifest.get("dependencies") == ["shazamio"]
     assert not (manifest.get("models") or {}).get("artifacts")
+    assert "sys.ready" in manifest["events"]["subscribe"]
     assert "media_indexer.action" in manifest["events"]["subscribe"]
     assert "webio.stream.snapshot.requested" in manifest["events"]["subscribe"]
     assert any(route["route"] == "stream" and route["receiver"] == "media_indexer.operations" for route in manifest["data_routes"])
@@ -724,6 +725,27 @@ def test_rehydrate_restores_index_metadata_from_skill_data(monkeypatch, tmp_path
     assert result["index"]["total_count"] == 3
     stored = json.loads((tmp_path / "skill_env.json").read_text(encoding="utf-8"))
     assert stored["media_indexer.index"]["index_dir"] == str(index_dir)
+
+
+def test_sys_ready_projects_compact_persisted_state_without_loading_index(monkeypatch) -> None:
+    main = importlib.import_module("handlers.main")
+    snapshot = {"form": {"directory": "/media"}, "status": {"value": "indexed"}}
+    projected: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        main,
+        "_rehydrated_snapshot",
+        lambda: ({"selected_directory": "/media"}, {"indexed_count": 3}, snapshot),
+    )
+
+    async def project(value: dict, *, webspace_id: str | None = None) -> None:
+        projected.update({"snapshot": value, "webspace_id": webspace_id})
+
+    monkeypatch.setattr(main, "_project_snapshot_async", project)
+
+    asyncio.run(main.on_sys_ready(SimpleNamespace(payload={"webspace_id": "desktop"})))
+
+    assert projected == {"snapshot": snapshot, "webspace_id": "desktop"}
 
 
 def test_empty_scan_clears_stale_skill_data_index(monkeypatch, tmp_path: pathlib.Path) -> None:
