@@ -10,6 +10,7 @@ import mimetypes
 import os
 import pathlib
 import re
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -59,6 +60,8 @@ SCORE_THRESHOLD = 25.0
 DEFAULT_QUERY = ""
 SETTINGS_KEY = "media_indexer.settings"
 INDEX_META_KEY = "media_indexer.index"
+INDEX_SUMMARY_FILENAME = "summary.json"
+PLAYBACK_INDEX_FILENAME = "playback.sqlite3"
 OPERATION_RECEIVER = "media_indexer.operations"
 MAX_RESULTS = 20
 SNAPSHOT_LIBRARY_LIMIT = 25
@@ -297,7 +300,9 @@ def _index_dir() -> pathlib.Path:
 
 def _has_persisted_index() -> bool:
     path = _index_dir()
-    metadata_path = path / "metadata.json"
+    metadata_path = path / INDEX_SUMMARY_FILENAME
+    if not metadata_path.exists():
+        metadata_path = path / "metadata.json"
     if not metadata_path.exists():
         return False
     try:
@@ -312,7 +317,9 @@ def _has_persisted_index() -> bool:
 
 def _read_persisted_index_metadata() -> Dict[str, Any]:
     path = _index_dir()
-    metadata_path = path / "metadata.json"
+    metadata_path = path / INDEX_SUMMARY_FILENAME
+    if not metadata_path.exists():
+        metadata_path = path / "metadata.json"
     if not metadata_path.exists():
         return {}
     try:
@@ -346,20 +353,72 @@ def _compact_index_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def _index_metadata() -> Dict[str, Any]:
+    if _has_persisted_index():
+        restored = _read_persisted_index_metadata()
+        if restored:
+            compact = _compact_index_metadata(restored)
+            stored = _safe_memory_get(INDEX_META_KEY, {})
+            if compact != stored:
+                _safe_memory_set(INDEX_META_KEY, compact)
+            return compact
     stored = _safe_memory_get(INDEX_META_KEY, {})
     if isinstance(stored, dict) and stored:
         compact = _compact_index_metadata(stored)
         if compact != stored:
             _safe_memory_set(INDEX_META_KEY, compact)
         return compact
-    if not _has_persisted_index():
-        return {}
-    restored = _read_persisted_index_metadata()
-    if restored:
-        compact = _compact_index_metadata(restored)
-        _safe_memory_set(INDEX_META_KEY, compact)
-        return compact
     return {}
+
+
+def _write_index_sidecars(metadata: Dict[str, Any]) -> None:
+    compact = _compact_index_metadata(metadata)
+    (_index_dir() / INDEX_SUMMARY_FILENAME).write_text(
+        json.dumps(compact, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+    playback_path = _index_dir() / PLAYBACK_INDEX_FILENAME
+    temporary_path = playback_path.with_suffix(".tmp")
+    temporary_path.unlink(missing_ok=True)
+    connection = sqlite3.connect(temporary_path)
+    try:
+        connection.execute("PRAGMA journal_mode=OFF")
+        connection.execute("PRAGMA synchronous=OFF")
+        connection.execute("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        connection.execute(
+            "CREATE TABLE items (playback_id TEXT PRIMARY KEY, name TEXT NOT NULL, full_path TEXT NOT NULL, payload_json TEXT NOT NULL)"
+        )
+        connection.execute("CREATE INDEX idx_items_name ON items(name)")
+        connection.execute(
+            "INSERT INTO meta(key, value) VALUES (?, ?)",
+            ("indexed_directory", str(metadata.get("indexed_directory") or "")),
+        )
+        rows = []
+        for doc_key in ("text_docs", "image_docs"):
+            for doc in metadata.get(doc_key) or []:
+                payload = doc.get("payload") if isinstance(doc, dict) else None
+                if not isinstance(payload, dict):
+                    continue
+                full_path = str(payload.get("full_path") or "").strip()
+                if not full_path:
+                    continue
+                playback_id = str(payload.get("playback_id") or _playback_id(full_path))
+                name = str(payload.get("real_file_name") or pathlib.Path(full_path).name)
+                playback_payload = {
+                    **payload,
+                    "playback_id": playback_id,
+                    "real_file_name": name,
+                    "full_path": full_path,
+                }
+                rows.append((playback_id, name, full_path, json.dumps(playback_payload, ensure_ascii=False)))
+                if len(rows) >= 1000:
+                    connection.executemany("INSERT OR REPLACE INTO items VALUES (?, ?, ?, ?)", rows)
+                    rows.clear()
+        if rows:
+            connection.executemany("INSERT OR REPLACE INTO items VALUES (?, ?, ?, ?)", rows)
+        connection.commit()
+    finally:
+        connection.close()
+    temporary_path.replace(playback_path)
 
 
 def _settings() -> Dict[str, Any]:
@@ -876,9 +935,17 @@ def _ensure_initialized(*, load_index: bool = False) -> None:
         loaded = _state["vector_db"].load(_index_dir())
         _state["index_loaded"] = bool(loaded.get("loaded"))
         if loaded.get("loaded"):
-            restored_diagnostics = _diagnostics_from_index_metadata(_read_persisted_index_metadata())
+            restored_metadata = _read_persisted_index_metadata()
+            restored_diagnostics = _diagnostics_from_index_metadata(restored_metadata)
             if restored_diagnostics:
                 _state["last_diagnostics"] = restored_diagnostics
+            if not (_index_dir() / PLAYBACK_INDEX_FILENAME).exists() or not (_index_dir() / INDEX_SUMMARY_FILENAME).exists():
+                vector_db = _state["vector_db"]
+                _write_index_sidecars({
+                    **restored_metadata,
+                    "text_docs": list(getattr(vector_db, "text_docs", None) or []),
+                    "image_docs": list(getattr(vector_db, "image_docs", None) or []),
+                })
             logger.info("Loaded persisted media index: %s", loaded)
 
 
@@ -896,6 +963,7 @@ def _persist_index(directory: str, indexed_count: int) -> Dict[str, Any]:
     }
     try:
         (_index_dir() / "metadata.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        _write_index_sidecars(payload)
     except Exception:
         logger.warning("failed to update persisted media index metadata with playback root", exc_info=True)
     compact = _compact_index_metadata(payload)
@@ -906,7 +974,7 @@ def _persist_index(directory: str, indexed_count: int) -> Dict[str, Any]:
 
 def _clear_persisted_index(directory: str) -> Dict[str, Any]:
     path = _index_dir()
-    for filename in ("metadata.json", "text.index", "image.index"):
+    for filename in ("metadata.json", INDEX_SUMMARY_FILENAME, PLAYBACK_INDEX_FILENAME, "text.index", "image.index"):
         try:
             (path / filename).unlink(missing_ok=True)
         except Exception:
@@ -2003,13 +2071,22 @@ def get_settings() -> Dict[str, Any]:
 
 
 @tool("rehydrate")
-def rehydrate() -> Dict[str, Any]:
+def rehydrate(webspace_id: str | None = None, **_: Any) -> Dict[str, Any]:
     if _has_persisted_index():
         _ensure_initialized(load_index=True)
     settings = _settings()
     _state["selected_directory"] = settings.get("selected_directory") or settings.get("default_directory") or ""
     _state["selected_query"] = settings.get("selected_query") or DEFAULT_QUERY
-    return {"status": "ok", "settings": settings, "index": _index_metadata()}
+    index = _index_metadata()
+    indexed_count = int(index.get("indexed_count") or index.get("total_count") or 0)
+    status = _status_payload(
+        value="indexed" if indexed_count else "ready",
+        subtitle=f"{indexed_count} files indexed" if indexed_count else "Waiting for scan",
+        description=str(index.get("indexed_directory") or ""),
+    )
+    snapshot = _snapshot_payload(status=status, form=_current_form())
+    _project_snapshot(snapshot, webspace_id=webspace_id)
+    return {"status": "ok", "settings": settings, "index": index, "snapshot": snapshot}
 
 
 @tool("dispose")
