@@ -1,7 +1,7 @@
 {
   "schema": "adaos.workflow.definition.v1",
   "workflow_type": "builder.change",
-  "definition_version": "1.0.0",
+  "definition_version": "1.2.0",
   "aggregate_type": "builder.change",
   "initial_state": "ready",
   "states": [
@@ -48,6 +48,13 @@
       "id": "trial_ready",
       "label": "Trial Ready",
       "terminal": false
+    },
+    {
+      "id": "trial_waiting",
+      "label": "Trial Waiting",
+      "terminal": false,
+      "waiting": true,
+      "wait_explanation": "Trial activation is running for the exact candidate digest."
     },
     {
       "id": "trial_review",
@@ -595,48 +602,6 @@
       }
     },
     {
-      "id": "prepare_trial_compatibility",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "confirmed": {
-            "type": "boolean"
-          },
-          "evidence_refs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "legacy_action": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": true
-      }
-    },
-    {
-      "id": "publish_compatibility",
-      "input_schema": {
-        "type": "object",
-        "properties": {
-          "confirmed": {
-            "type": "boolean"
-          },
-          "evidence_refs": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "legacy_action": {
-            "type": "string"
-          }
-        },
-        "additionalProperties": true
-      }
-    },
-    {
       "id": "reconcile_automation",
       "input_schema": {
         "type": "object",
@@ -911,6 +876,69 @@
     },
     {
       "id": "record_publication_unknown",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "legacy_action": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    {
+      "id": "record_trial_failure",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "legacy_action": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    {
+      "id": "record_trial_success",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "confirmed": {
+            "type": "boolean"
+          },
+          "evidence_refs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "legacy_action": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": true
+      }
+    },
+    {
+      "id": "record_trial_unknown",
       "input_schema": {
         "type": "object",
         "properties": {
@@ -2229,7 +2257,7 @@
       "risk": {
         "class": "isolated_write",
         "side_effect": "reversible",
-        "confirmation": "none"
+        "confirmation": "rich_review"
       },
       "effect": {
         "activity": null,
@@ -2871,7 +2899,7 @@
       "risk": {
         "class": "isolated_write",
         "side_effect": "reversible",
-        "confirmation": "none"
+        "confirmation": "rich_review"
       },
       "effect": {
         "activity": "builder.codex.run",
@@ -2995,7 +3023,7 @@
       "risk": {
         "class": "isolated_write",
         "side_effect": "reversible",
-        "confirmation": "none"
+        "confirmation": "rich_review"
       },
       "effect": {
         "activity": "builder.codex.run",
@@ -3475,7 +3503,7 @@
       "risk": {
         "class": "isolated_write",
         "side_effect": "reversible",
-        "confirmation": "none"
+        "confirmation": "rich_review"
       },
       "effect": {
         "activity": "builder.prototype.derive",
@@ -3961,7 +3989,7 @@
       "risk": {
         "class": "isolated_write",
         "side_effect": "reversible",
-        "confirmation": "none"
+        "confirmation": "rich_review"
       },
       "effect": {
         "activity": null,
@@ -4030,7 +4058,7 @@
       "schema": "adaos.workflow.transition.v1",
       "transition_id": "start_trial",
       "source": "trial_ready",
-      "target": "trial_review",
+      "target": "trial_waiting",
       "trigger": {
         "kind": "command",
         "command": "start_trial",
@@ -4081,7 +4109,7 @@
       "risk": {
         "class": "trial_activation",
         "side_effect": "external",
-        "confirmation": "none"
+        "confirmation": "rich_review"
       },
       "effect": {
         "activity": "builder.trial.activate",
@@ -4096,7 +4124,7 @@
         "reconciliation": "required_on_unknown"
       },
       "outcomes": {
-        "success": "trial_review",
+        "success": "trial_waiting",
         "failure": "trial_ready",
         "input_required": "trial_ready",
         "cancelled": "cancelled",
@@ -4142,133 +4170,8 @@
         "trace": true
       },
       "migration": {
-        "introduced_in": "1.0.0",
+        "introduced_in": "1.1.0",
         "aliases": []
-      }
-    },
-    {
-      "schema": "adaos.workflow.transition.v1",
-      "transition_id": "prepare_trial_compatibility",
-      "source": [
-        "verification",
-        "trial_ready"
-      ],
-      "target": "trial_review",
-      "trigger": {
-        "kind": "command",
-        "command": "prepare_trial_compatibility",
-        "input_schema": {
-          "type": "object",
-          "properties": {
-            "confirmed": {
-              "type": "boolean"
-            },
-            "evidence_refs": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "legacy_action": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": true
-        }
-      },
-      "context": {
-        "target_resolution": "instance",
-        "command_context_required": true
-      },
-      "authority": {
-        "actors": [
-          "*"
-        ],
-        "permissions": [],
-        "roles": [
-          "registered"
-        ]
-      },
-      "guards": [
-        {
-          "id": "always",
-          "params": {},
-          "reason_code": "builder_transition_blocked"
-        }
-      ],
-      "concurrency": {
-        "conflict_scope": "builder_change",
-        "requires_generation": true,
-        "idempotency": "required"
-      },
-      "risk": {
-        "class": "trial_activation",
-        "side_effect": "external",
-        "confirmation": "none"
-      },
-      "effect": {
-        "activity": "builder.trial.activate",
-        "transaction": "outbox",
-        "retry": "never",
-        "compensation": null
-      },
-      "recovery": {
-        "timeout_seconds": 1800,
-        "heartbeat_seconds": 30,
-        "cancellation": "cooperative",
-        "reconciliation": "required_on_unknown"
-      },
-      "outcomes": {
-        "success": "trial_review",
-        "failure": "verification",
-        "input_required": "verification",
-        "cancelled": "cancelled",
-        "unknown": "reconciliation_required"
-      },
-      "evidence": {
-        "required": false,
-        "minimum": 0
-      },
-      "approval": {
-        "required": false,
-        "policy_refs": []
-      },
-      "async_reply": {
-        "mode": "progress_and_terminal",
-        "reply_route": "origin"
-      },
-      "capability_requirements": {
-        "required": [],
-        "optional": [
-          "buttons",
-          "progress"
-        ],
-        "fallback": "numbered_text"
-      },
-      "explanations": {
-        "allowed": "prepare_trial_compatibility is available for this Change.",
-        "rejected": "prepare_trial_compatibility is not available in the current Change state.",
-        "completed": "prepare_trial_compatibility was admitted for this Change."
-      },
-      "events": {
-        "emitted": [
-          "builder.change.prepare_trial_compatibility.admitted"
-        ],
-        "outbox": true
-      },
-      "observability": {
-        "audit_event": "builder.change.transition",
-        "redaction": "policy",
-        "metrics": [
-          "builder_change_transition_total"
-        ],
-        "trace": true
-      },
-      "migration": {
-        "introduced_in": "1.0.0",
-        "aliases": [
-          "candidate_prepared"
-        ]
       }
     },
     {
@@ -4753,128 +4656,6 @@
       "migration": {
         "introduced_in": "1.0.0",
         "aliases": []
-      }
-    },
-    {
-      "schema": "adaos.workflow.transition.v1",
-      "transition_id": "publish_compatibility",
-      "source": "publication_ready",
-      "target": "published",
-      "trigger": {
-        "kind": "command",
-        "command": "publish_compatibility",
-        "input_schema": {
-          "type": "object",
-          "properties": {
-            "confirmed": {
-              "type": "boolean"
-            },
-            "evidence_refs": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
-            "legacy_action": {
-              "type": "string"
-            }
-          },
-          "additionalProperties": true
-        }
-      },
-      "context": {
-        "target_resolution": "instance",
-        "command_context_required": true
-      },
-      "authority": {
-        "actors": [
-          "*"
-        ],
-        "permissions": [],
-        "roles": [
-          "registered"
-        ]
-      },
-      "guards": [
-        {
-          "id": "always",
-          "params": {},
-          "reason_code": "builder_transition_blocked"
-        }
-      ],
-      "concurrency": {
-        "conflict_scope": "builder_change",
-        "requires_generation": true,
-        "idempotency": "required"
-      },
-      "risk": {
-        "class": "publication",
-        "side_effect": "external",
-        "confirmation": "required"
-      },
-      "effect": {
-        "activity": "builder.publication.publish",
-        "transaction": "outbox",
-        "retry": "never",
-        "compensation": null
-      },
-      "recovery": {
-        "timeout_seconds": 1800,
-        "heartbeat_seconds": 30,
-        "cancellation": "cooperative",
-        "reconciliation": "required_on_unknown"
-      },
-      "outcomes": {
-        "success": "published",
-        "failure": "publication_ready",
-        "input_required": "publication_ready",
-        "cancelled": "cancelled",
-        "unknown": "reconciliation_required"
-      },
-      "evidence": {
-        "required": false,
-        "minimum": 0
-      },
-      "approval": {
-        "required": true,
-        "policy_refs": []
-      },
-      "async_reply": {
-        "mode": "terminal",
-        "reply_route": "origin"
-      },
-      "capability_requirements": {
-        "required": [],
-        "optional": [
-          "buttons",
-          "progress"
-        ],
-        "fallback": "numbered_text"
-      },
-      "explanations": {
-        "allowed": "publish_compatibility is available for this Change.",
-        "rejected": "publish_compatibility is not available in the current Change state.",
-        "completed": "publish_compatibility was admitted for this Change."
-      },
-      "events": {
-        "emitted": [
-          "builder.change.publish_compatibility.admitted"
-        ],
-        "outbox": true
-      },
-      "observability": {
-        "audit_event": "builder.change.transition",
-        "redaction": "policy",
-        "metrics": [
-          "builder_change_transition_total"
-        ],
-        "trace": true
-      },
-      "migration": {
-        "introduced_in": "1.0.0",
-        "aliases": [
-          "publish"
-        ]
       }
     },
     {
@@ -8476,6 +8257,366 @@
         "introduced_in": "1.0.0",
         "aliases": []
       }
+    },
+    {
+      "schema": "adaos.workflow.transition.v1",
+      "transition_id": "record_trial_success",
+      "source": "trial_waiting",
+      "target": "trial_review",
+      "trigger": {
+        "kind": "command",
+        "command": "record_trial_success",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "confirmed": {
+              "type": "boolean"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "legacy_action": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "context": {
+        "target_resolution": "instance",
+        "command_context_required": true
+      },
+      "authority": {
+        "actors": [
+          "*"
+        ],
+        "permissions": [],
+        "roles": [
+          "registered"
+        ]
+      },
+      "guards": [
+        {
+          "id": "always",
+          "params": {},
+          "reason_code": "builder_transition_blocked"
+        }
+      ],
+      "concurrency": {
+        "conflict_scope": "builder_change",
+        "requires_generation": true,
+        "idempotency": "required"
+      },
+      "risk": {
+        "class": "local_reversible",
+        "side_effect": "reversible",
+        "confirmation": "none"
+      },
+      "effect": {
+        "activity": null,
+        "transaction": "atomic",
+        "retry": "never",
+        "compensation": null
+      },
+      "recovery": {
+        "timeout_seconds": null,
+        "heartbeat_seconds": null,
+        "cancellation": "not_applicable",
+        "reconciliation": "not_applicable"
+      },
+      "outcomes": {
+        "success": "trial_review",
+        "failure": "trial_waiting",
+        "input_required": "trial_waiting",
+        "cancelled": "cancelled",
+        "unknown": "reconciliation_required"
+      },
+      "evidence": {
+        "required": false,
+        "minimum": 0
+      },
+      "approval": {
+        "required": false,
+        "policy_refs": []
+      },
+      "async_reply": {
+        "mode": "terminal",
+        "reply_route": "origin"
+      },
+      "capability_requirements": {
+        "required": [],
+        "optional": [
+          "buttons",
+          "progress"
+        ],
+        "fallback": "numbered_text"
+      },
+      "explanations": {
+        "allowed": "Record the terminal Trial outcome: succeeded.",
+        "rejected": "A Trial outcome can only be recorded for the active waiting activity.",
+        "completed": "The Trial outcome was recorded as succeeded."
+      },
+      "events": {
+        "emitted": [
+          "builder.change.trial.succeeded"
+        ],
+        "outbox": true
+      },
+      "observability": {
+        "audit_event": "builder.change.transition",
+        "redaction": "policy",
+        "metrics": [
+          "builder_change_transition_total"
+        ],
+        "trace": true
+      },
+      "migration": {
+        "introduced_in": "1.1.0",
+        "aliases": []
+      }
+    },
+    {
+      "schema": "adaos.workflow.transition.v1",
+      "transition_id": "record_trial_failure",
+      "source": "trial_waiting",
+      "target": "trial_ready",
+      "trigger": {
+        "kind": "command",
+        "command": "record_trial_failure",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "confirmed": {
+              "type": "boolean"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "legacy_action": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "context": {
+        "target_resolution": "instance",
+        "command_context_required": true
+      },
+      "authority": {
+        "actors": [
+          "*"
+        ],
+        "permissions": [],
+        "roles": [
+          "registered"
+        ]
+      },
+      "guards": [
+        {
+          "id": "always",
+          "params": {},
+          "reason_code": "builder_transition_blocked"
+        }
+      ],
+      "concurrency": {
+        "conflict_scope": "builder_change",
+        "requires_generation": true,
+        "idempotency": "required"
+      },
+      "risk": {
+        "class": "local_reversible",
+        "side_effect": "reversible",
+        "confirmation": "none"
+      },
+      "effect": {
+        "activity": null,
+        "transaction": "atomic",
+        "retry": "never",
+        "compensation": null
+      },
+      "recovery": {
+        "timeout_seconds": null,
+        "heartbeat_seconds": null,
+        "cancellation": "not_applicable",
+        "reconciliation": "not_applicable"
+      },
+      "outcomes": {
+        "success": "trial_ready",
+        "failure": "trial_waiting",
+        "input_required": "trial_waiting",
+        "cancelled": "cancelled",
+        "unknown": "reconciliation_required"
+      },
+      "evidence": {
+        "required": false,
+        "minimum": 0
+      },
+      "approval": {
+        "required": false,
+        "policy_refs": []
+      },
+      "async_reply": {
+        "mode": "terminal",
+        "reply_route": "origin"
+      },
+      "capability_requirements": {
+        "required": [],
+        "optional": [
+          "buttons",
+          "progress"
+        ],
+        "fallback": "numbered_text"
+      },
+      "explanations": {
+        "allowed": "Record the terminal Trial outcome: failed.",
+        "rejected": "A Trial outcome can only be recorded for the active waiting activity.",
+        "completed": "The Trial outcome was recorded as failed."
+      },
+      "events": {
+        "emitted": [
+          "builder.change.trial.failed"
+        ],
+        "outbox": true
+      },
+      "observability": {
+        "audit_event": "builder.change.transition",
+        "redaction": "policy",
+        "metrics": [
+          "builder_change_transition_total"
+        ],
+        "trace": true
+      },
+      "migration": {
+        "introduced_in": "1.1.0",
+        "aliases": []
+      }
+    },
+    {
+      "schema": "adaos.workflow.transition.v1",
+      "transition_id": "record_trial_unknown",
+      "source": "trial_waiting",
+      "target": "reconciliation_required",
+      "trigger": {
+        "kind": "command",
+        "command": "record_trial_unknown",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "confirmed": {
+              "type": "boolean"
+            },
+            "evidence_refs": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "legacy_action": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "context": {
+        "target_resolution": "instance",
+        "command_context_required": true
+      },
+      "authority": {
+        "actors": [
+          "*"
+        ],
+        "permissions": [],
+        "roles": [
+          "registered"
+        ]
+      },
+      "guards": [
+        {
+          "id": "always",
+          "params": {},
+          "reason_code": "builder_transition_blocked"
+        }
+      ],
+      "concurrency": {
+        "conflict_scope": "builder_change",
+        "requires_generation": true,
+        "idempotency": "required"
+      },
+      "risk": {
+        "class": "local_reversible",
+        "side_effect": "reversible",
+        "confirmation": "none"
+      },
+      "effect": {
+        "activity": null,
+        "transaction": "atomic",
+        "retry": "never",
+        "compensation": null
+      },
+      "recovery": {
+        "timeout_seconds": null,
+        "heartbeat_seconds": null,
+        "cancellation": "not_applicable",
+        "reconciliation": "not_applicable"
+      },
+      "outcomes": {
+        "success": "reconciliation_required",
+        "failure": "trial_waiting",
+        "input_required": "trial_waiting",
+        "cancelled": "cancelled",
+        "unknown": "reconciliation_required"
+      },
+      "evidence": {
+        "required": false,
+        "minimum": 0
+      },
+      "approval": {
+        "required": false,
+        "policy_refs": []
+      },
+      "async_reply": {
+        "mode": "terminal",
+        "reply_route": "origin"
+      },
+      "capability_requirements": {
+        "required": [],
+        "optional": [
+          "buttons",
+          "progress"
+        ],
+        "fallback": "numbered_text"
+      },
+      "explanations": {
+        "allowed": "Record the terminal Trial outcome: unknown.",
+        "rejected": "A Trial outcome can only be recorded for the active waiting activity.",
+        "completed": "The Trial outcome was recorded as unknown."
+      },
+      "events": {
+        "emitted": [
+          "builder.change.trial.unknown"
+        ],
+        "outbox": true
+      },
+      "observability": {
+        "audit_event": "builder.change.transition",
+        "redaction": "policy",
+        "metrics": [
+          "builder_change_transition_total"
+        ],
+        "trace": true
+      },
+      "migration": {
+        "introduced_in": "1.1.0",
+        "aliases": []
+      }
     }
   ],
   "subworkflows": [],
@@ -8487,6 +8628,8 @@
       "run",
       "view"
     ],
-    "compatibility_projection": "prompt_state.workflow.v1"
+    "compatibility_projection": "prompt_state.workflow.v1",
+    "activity_callback_contract": "waiting_then_terminal_callback",
+    "compatibility_shortcuts": []
   }
 }

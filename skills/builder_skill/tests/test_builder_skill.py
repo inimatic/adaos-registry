@@ -996,6 +996,54 @@ def test_api_request_chat_meta_uses_semantic_request_origin() -> None:
     assert generic["active_agent_label"] == "API"
 
 
+def test_review_packet_is_promoted_to_durable_revision_aware_context(monkeypatch) -> None:
+    skill = _load_module()
+    submitted: list[dict] = []
+    monkeypatch.setattr(
+        skill.sdk_builder_review,
+        "submit",
+        lambda review: submitted.append(dict(review)) or {"ok": True, "review": dict(review)},
+    )
+    monkeypatch.setattr(
+        skill.sdk_builder_review,
+        "context_for_next_request",
+        lambda object_type, object_id: {"ok": True, "object_type": object_type, "object_id": object_id},
+    )
+
+    result = skill._persist_prototype_review_notes(
+        session={"scenario_id": "recipes"},
+        change_id="CH-recipes-layout",
+        _meta={
+            "principal_id": "user:owner",
+            "prototype_review_notes": {
+                "schema": "adaos.prototype_review_notes.v1",
+                "source_webspace_id": "dev1",
+                "dev_webspace_id": "dev1-dev",
+                "revision_key": "recipes:008",
+                "comments": [
+                    {
+                        "id": "comment-checkboxes",
+                        "at": 1785927600000,
+                        "text": "Place checkboxes on the left.",
+                        "element": {
+                            "ref": "field:shopping-list:completed",
+                            "kind": "field",
+                            "label": "Completed",
+                        },
+                    }
+                ],
+            },
+        },
+    )
+
+    assert result["ok"] is True
+    assert len(submitted) == 1
+    assert submitted[0]["change_id"] == "CH-recipes-layout"
+    assert submitted[0]["artifact_ref"] == "scenario:recipes@ui_revision:008"
+    assert submitted[0]["target_ref"] == "field:shopping-list:completed"
+    assert submitted[0]["author_ref"] == "user:owner"
+
+
 def test_update_current_scenario_recovers_artifact_root_for_ui_revisions(monkeypatch, tmp_path) -> None:
     skill = _load_module()
     artifact_root = tmp_path / "todo_recover_artifact"
@@ -6107,41 +6155,25 @@ def test_builder_topic_keeps_matching_project_thread_stable() -> None:
     assert preserved["thread_id"] == "prompt-project:scenario:recipes"
 
 
-def test_project_workflow_interaction_exposes_only_executable_localized_controls(monkeypatch) -> None:
+def test_project_workflow_interaction_uses_shared_localized_registry(monkeypatch) -> None:
     skill = _load_module()
     captured: dict = {}
-    monkeypatch.setattr(
-        skill.sdk_builder_workflow,
-        "get_interaction_frame",
-        lambda *_args: {
-            "generation": 7,
-            "actions": [
-                {
-                    "command": "builder.change.plan",
-                    "label": "Plan change",
-                    "risk": "local_reversible",
-                    "expected_generation": 7,
-                    "risk_policy": {"confirmation_required": False},
-                },
-                {
-                    "command": "builder.implementation.start",
-                    "label": "Start implementation",
-                    "workflow_command": "start_automation",
-                    "workflow_generation": 3,
-                    "risk": "isolated_write",
-                    "expected_generation": 7,
-                    "risk_policy": {"confirmation_required": True},
-                },
-            ],
-        },
-    )
+    def _create(*args, **kwargs):
+        captured["create_args"] = args
+        captured["create_kwargs"] = dict(kwargs)
+        return {
+            "interaction_id": "interaction.builder",
+            "conversation_id": kwargs["conversation_id"],
+            "owner": kwargs["principal_id"],
+        }
 
-    def _request(specification, **kwargs):
-        captured["specification"] = dict(specification)
+    def _present(interaction, **kwargs):
+        captured["interaction"] = dict(interaction)
         captured["kwargs"] = dict(kwargs)
         return {"handle": {"interaction_id": "interaction.builder"}, "presentation": {"mode": "buttons"}}
 
-    monkeypatch.setattr(skill.sdk_chat, "request", _request)
+    monkeypatch.setattr(skill.sdk_builder_workflow, "create_conversation_interaction", _create)
+    monkeypatch.setattr(skill.sdk_chat, "present", _present)
 
     result = skill._present_project_workflow_interaction(
         webspace_id="dev1-dev",
@@ -6155,45 +6187,34 @@ def test_project_workflow_interaction_exposes_only_executable_localized_controls
     )
 
     assert result["presentation"]["mode"] == "buttons"
-    actions = captured["specification"]["actions"]
-    assert [(item["command"], item["label"]) for item in actions] == [
-        ("builder.change.plan", "Описать изменение"),
-        ("builder.project.list", "Показать проекты"),
-        ("builder.preview.link", "Ссылка на Preview"),
-        ("builder.help", "Помощь"),
-    ]
+    assert captured["create_args"] == ("scenario", "builder")
+    assert captured["create_kwargs"]["locale"] == "ru"
+    assert captured["create_kwargs"]["command_context_id"] == "prompt-project:scenario:builder"
     assert captured["kwargs"]["route_id"] == "telegram"
 
 
 def test_project_workflow_interaction_returns_to_exact_dev_surface(monkeypatch) -> None:
     skill = _load_module()
     captured: dict = {}
-    monkeypatch.setattr(
-        skill.sdk_builder_workflow,
-        "get_interaction_frame",
-        lambda *_args: {
-            "generation": 4,
-            "actions": [
-                {
-                    "command": "builder.process.inspect",
-                    "label": "Show process",
-                    "risk": "read",
-                    "expected_generation": 4,
-                    "risk_policy": {"confirmation_required": False},
-                }
-            ],
-        },
-    )
+    def _create(*args, **kwargs):
+        captured["create_args"] = args
+        captured["create_kwargs"] = dict(kwargs)
+        return {
+            "interaction_id": "interaction.builder.dev",
+            "conversation_id": kwargs["conversation_id"],
+            "owner": kwargs["principal_id"],
+        }
 
-    def _request(specification, **kwargs):
-        captured["specification"] = dict(specification)
+    def _present(interaction, **kwargs):
+        captured["interaction"] = dict(interaction)
         captured["kwargs"] = dict(kwargs)
         return {
             "handle": {"interaction_id": "interaction.builder.dev"},
-            "presentation": {"mode": "buttons", "actions": specification["actions"]},
+            "presentation": {"mode": "buttons", "actions": []},
         }
 
-    monkeypatch.setattr(skill.sdk_chat, "request", _request)
+    monkeypatch.setattr(skill.sdk_builder_workflow, "create_conversation_interaction", _create)
+    monkeypatch.setattr(skill.sdk_chat, "present", _present)
 
     skill._present_project_workflow_interaction(
         webspace_id="dev1",
@@ -6213,13 +6234,13 @@ def test_project_workflow_interaction_returns_to_exact_dev_surface(monkeypatch) 
 
     assert captured["kwargs"]["webspace_id"] == "dev1-dev"
     assert captured["kwargs"]["thread_id"] == "prompt-project:scenario:recipes"
-    assert captured["specification"]["metadata"]["execution_webspace_id"] == "dev1"
-    assert captured["specification"]["metadata"]["reply_webspace_id"] == "dev1-dev"
+    assert captured["create_kwargs"]["metadata"]["execution_webspace_id"] == "dev1"
+    assert captured["create_kwargs"]["metadata"]["reply_webspace_id"] == "dev1-dev"
 
 
 def test_conversation_interaction_response_returns_builder_prompt_to_origin_channel(monkeypatch) -> None:
     skill = _load_module()
-    emitted: list[dict] = []
+    presented: list[dict] = []
     session = {"id": "session.builder", "scenario_id": "builder", "title": "Builder"}
     monkeypatch.setattr(skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id)
     monkeypatch.setattr(
@@ -6235,8 +6256,8 @@ def test_conversation_interaction_response_returns_builder_prompt_to_origin_chan
     )
     monkeypatch.setattr(
         skill,
-        "_safe_emit_chat",
-        lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}),
+        "_present_builder_input_interaction",
+        lambda **kwargs: presented.append(dict(kwargs)) or {"ok": True},
     )
 
     result = skill.handle_interaction_response(
@@ -6266,10 +6287,60 @@ def test_conversation_interaction_response_returns_builder_prompt_to_origin_chan
     )
 
     assert result["status"] == "handled"
-    assert len(emitted) == 1
-    assert "Опишите, что нужно изменить" in emitted[0]["text"]
-    assert emitted[0]["kwargs"]["_meta"]["route_id"] == "telegram"
-    assert emitted[0]["kwargs"]["topic_ref"]["thread_id"] == "prompt-project:scenario:builder"
+    assert len(presented) == 1
+    assert presented[0]["surface_command"] == "builder.change.plan"
+    assert presented[0]["_meta"]["route_id"] == "telegram"
+    assert presented[0]["topic"]["thread_id"] == "prompt-project:scenario:builder"
+
+
+def test_text_continuation_resumes_once_for_the_bound_project(monkeypatch) -> None:
+    skill = _load_module()
+    updates: list[dict] = []
+    emitted: list[dict] = []
+    session = {"id": "session.builder", "scenario_id": "builder", "title": "Builder"}
+    monkeypatch.setattr(skill, "_source_webspace_id", lambda webspace_id, _meta=None: webspace_id)
+    monkeypatch.setattr(skill, "_resolve_project_session", lambda *_args, **_kwargs: {"status": "found", "session": dict(session)})
+    monkeypatch.setattr(skill, "_workbench_binding", lambda _webspace_id: {"runtime_scenario_id": "builder"})
+    monkeypatch.setattr(skill, "_builder_topic_ref", lambda *_args, **_kwargs: {"thread_id": "prompt-project:scenario:builder"})
+    monkeypatch.setattr(skill.sdk_builder_workflow, "get_state", lambda *_args, **_kwargs: {"generation": 7})
+    monkeypatch.setattr(
+        skill,
+        "update_current_scenario",
+        lambda **kwargs: updates.append(dict(kwargs)) or {"ok": True, "message": "accepted"},
+    )
+    monkeypatch.setattr(skill, "_safe_emit_chat", lambda text, **kwargs: emitted.append({"text": text, "kwargs": dict(kwargs)}))
+
+    result = skill.handle_interaction_response(
+        event={
+            "interaction": {
+                "interaction_id": "interaction.builder.input",
+                "metadata": {
+                    "domain": "builder",
+                    "project_ref": "scenario:builder",
+                    "source_webspace_id": "dev1-dev",
+                    "topic_ref": {"thread_id": "prompt-project:scenario:builder"},
+                    "continuation": {
+                        "surface_command": "builder.change.plan",
+                        "expected_generation": 7,
+                    },
+                },
+            },
+            "response": {
+                "response_id": "response.builder.input",
+                "status": "answered",
+                "values": {"text": "Move the controls to the left."},
+                "metadata": {"io_type": "web", "route_id": "voice_chat"},
+            },
+            "duplicate": False,
+        },
+        webspace_id="dev1-dev",
+    )
+
+    assert result["status"] == "handled"
+    assert len(updates) == 1
+    assert updates[0]["instruction"] == "Move the controls to the left."
+    assert updates[0]["conversation_context"]["continuation_command"] == "builder.change.plan"
+    assert emitted[0]["text"] == "accepted"
 
 
 def test_project_selection_interaction_switches_by_stable_target_id(monkeypatch) -> None:

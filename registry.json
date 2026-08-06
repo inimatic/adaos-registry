@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-05T17:57:47+00:00",
+  "updated_at": "2026-08-06T09:25:16+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -136,8 +136,8 @@
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.3.34",
-      "updated_at": "2026-08-04T14:11:08+00:00",
+      "version": "0.3.35",
+      "updated_at": "2026-08-06T09:25:16+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",
       "source": {
@@ -693,7 +693,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-08-05T14:23:05+00:00",
+      "updated_at": "2026-08-06T08:40:21+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
@@ -913,6 +913,28 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "tools_count": 0
+    },
+    {
+      "kind": "skill",
+      "id": "workflow_lab_dashboard_skill",
+      "name": "workflow_lab_dashboard_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-08-05T20:24:22+00:00",
+      "path": "skills/workflow_lab_dashboard_skill",
+      "manifest": "skills/workflow_lab_dashboard_skill/skill.yaml",
+      "source": {
+        "path": "skills/workflow_lab_dashboard_skill",
+        "manifest": "skills/workflow_lab_dashboard_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "workflow_lab_dashboard_skill",
+        "id": "workflow_lab_dashboard_skill"
+      },
+      "description": "Deterministic local request-state tools for the bilingual Workflow Lab dashboard.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 2
     }
   ],
   "scenarios": [
@@ -1259,6 +1281,36 @@
           "greet_on_boot_skill",
           "pair_new_device_skill",
           "voice_chat_skill"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "workflow_lab_dashboard",
+      "name": "workflow_lab_dashboard",
+      "version": "0.1.2",
+      "updated_at": "2026-08-05T20:24:26+00:00",
+      "path": "scenarios/workflow_lab_dashboard",
+      "manifest": "scenarios/workflow_lab_dashboard/scenario.yaml",
+      "source": {
+        "path": "scenarios/workflow_lab_dashboard",
+        "manifest": "scenarios/workflow_lab_dashboard/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "workflow_lab_dashboard",
+        "id": "workflow_lab_dashboard"
+      },
+      "title": "Workflow Lab Dashboard • Панель заявок",
+      "title_i18n": {
+        "key": "scenario.workflow_lab_dashboard.title",
+        "fallback": "Workflow Lab Dashboard"
+      },
+      "description": "Compact bilingual request-state dashboard backed only by deterministic local fixtures.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "workflow_lab_dashboard_skill"
         ]
       }
     }

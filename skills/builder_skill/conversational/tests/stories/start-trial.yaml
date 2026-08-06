@@ -16,9 +16,9 @@ steps:
         command: start_trial
         skill_id: null
         operation_id: null
-        arguments: {}
+        arguments: {confirmed: true}
         confidence: 0.99
-        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: trial_activation, side_effect: external, confirmation: none}
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: trial_activation, side_effect: external, confirmation: rich_review}
       event: null
       skill_result: null
       output_ref: builder_trial_started
@@ -26,7 +26,7 @@ steps:
       proposal: {kind: workflow_command, command: start_trial, confidence_at_least: 0.99}
       command: start_trial
       transition_id: start_trial
-      state: trial_review
+      state: trial_waiting
       reason_code: null
       accepted: true
       generation: 1

@@ -16,9 +16,9 @@ steps:
         command: accept_prototype
         skill_id: null
         operation_id: null
-        arguments: {}
+        arguments: {confirmed: true}
         confidence: 0.99
-        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: isolated_write, side_effect: reversible, confirmation: none}
+        action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: isolated_write, side_effect: reversible, confirmation: rich_review}
       event: null
       skill_result: null
       output_ref: builder_prototype_accepted

@@ -54,7 +54,7 @@ affordances:
       schema: adaos.conversation.action_policy.v1
       risk_class: isolated_write
       side_effect: reversible
-      confirmation: none
+      confirmation: rich_review
     required_capabilities: []
     presentation:
       hint: button
@@ -74,7 +74,7 @@ affordances:
       schema: adaos.conversation.action_policy.v1
       risk_class: isolated_write
       side_effect: reversible
-      confirmation: none
+      confirmation: rich_review
     required_capabilities: []
     presentation:
       hint: button
@@ -94,7 +94,7 @@ affordances:
       schema: adaos.conversation.action_policy.v1
       risk_class: isolated_write
       side_effect: reversible
-      confirmation: none
+      confirmation: rich_review
     required_capabilities: []
     presentation:
       hint: button
@@ -114,7 +114,7 @@ affordances:
       schema: adaos.conversation.action_policy.v1
       risk_class: trial_activation
       side_effect: external
-      confirmation: none
+      confirmation: rich_review
     required_capabilities: []
     presentation:
       hint: button

@@ -4,11 +4,11 @@ package_kind: skill
 owner_ref:
   kind: skill
   id: builder_skill
-version: 0.3.34
+version: 0.3.35
 workflow_refs:
 - workflow_type: builder.change
   definition_ref: ../workflow.json
-  definition_version: 1.0.0
+  definition_version: 1.2.0
   definition_digest: null
 files:
   input: input.yaml
@@ -34,6 +34,7 @@ files:
 locales:
 - en
 - ru
+default_locale: en
 privacy_defaults:
   source_scope: skill
   runtime_overlay_scope: user

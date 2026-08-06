@@ -11,6 +11,7 @@ import re
 import threading
 import time
 from collections.abc import Iterable as IterableABC
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -25,6 +26,7 @@ from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import pending_actions as sdk_pending_actions
 from adaos.sdk.developer import prompt_context as developer_prompt_context
 from adaos.sdk.developer import projects as developer_projects
+from adaos.sdk.web import webspace as sdk_webspace
 
 
 SKILL_ID = "builder_skill"
@@ -8583,119 +8585,93 @@ def _present_project_workflow_interaction(
     )
     conversation_id = str(chat_meta.get("conversation_id") or _conversation_id(webspace_id)).strip()
     thread_id = str(chat_meta.get("thread_id") or topic.get("thread_id") or "").strip()
-    frame = sdk_builder_workflow.get_interaction_frame(object_type, object_id)
-    frame_actions = [dict(item) for item in frame.get("actions") or [] if isinstance(item, Mapping)]
-    # Conversation controls are executable affordances, not a second process
-    # diagram.  Until an activity adapter can prove the external effect and
-    # recovery contract, do not expose a canonical transition as a button.
-    # Intake commands intentionally retain their Builder command identity:
-    # clicking them requests the missing text instead of prematurely recording
-    # a prototype/Codex transition with no work product.
-    executable_commands = {
-        "builder.process.inspect",
-        "builder.change.plan",
-        "builder.change.extend",
-        "builder.prototype.edit",
-        "builder.implementation.iterate",
-        "builder.preview.prototype",
-        "builder.preview.active",
-        "builder.preview.publication",
-    }
-    ru_labels = {
-        "builder.process.inspect": "Показать процесс",
-        "builder.change.plan": "Описать изменение",
-        "builder.change.extend": "Дополнить изменение",
-        "builder.prototype.edit": "Доработать прототип",
-        "builder.implementation.iterate": "Уточнить реализацию",
-        "builder.preview.prototype": "Показать прототип",
-        "builder.preview.active": "Показать реализацию",
-        "builder.preview.publication": "Показать публикацию",
-    }
-    actions: list[dict[str, Any]] = []
-    for index, item in enumerate(frame_actions):
-        frame_command = str(item.get("command") or "").strip()
-        if frame_command not in executable_commands:
-            continue
-        command = frame_command
-        label = ru_labels.get(command) or str(item.get("label") or command).strip()
-        if not command or not label:
-            continue
-        target_ref = str(item.get("target_ref") or "").strip()
-        risk_policy = item.get("risk_policy") if isinstance(item.get("risk_policy"), Mapping) else {}
-        expected_generation = (
-            item.get("expected_generation", frame.get("generation") or 0)
-        )
-        actions.append(
-            {
-                "action_id": f"builder-action-{index}-{command}",
-                "label": label,
-                "command": command,
-                "value": command,
-                "risk": str(item.get("risk") or "read"),
-                "confirmation_required": bool(risk_policy.get("confirmation_required")),
-                "target_ref": (
-                    {"kind": "builder_target", "id": target_ref}
-                    if target_ref
-                    else None
-                ),
-                "expected_generation": int(expected_generation or 0),
-                "principal_scope": ["user", "transport"],
-                "command_context_ref": {
-                    "kind": "view",
-                    "id": thread_id or f"webspace:{webspace_id}",
-                },
-            }
-        )
-    supplemental = (
-        ("builder.project.list", "Показать проекты"),
-        ("builder.preview.link", "Ссылка на Preview"),
-        ("builder.help", "Помощь"),
-    )
-    for command, label in supplemental:
-        if len(actions) >= 8:
-            break
-        actions.append(
-            {
-                "action_id": f"builder-navigation-{command}",
-                "label": label,
-                "command": command,
-                "value": command,
-                "risk": "read",
-                "confirmation_required": False,
-                "target_ref": {"kind": object_type, "id": object_id},
-                "expected_generation": int(frame.get("generation") or 0),
-                "principal_scope": ["user", "transport"],
-                "command_context_ref": {
-                    "kind": "view",
-                    "id": thread_id or f"webspace:{webspace_id}",
-                },
-            }
-        )
-    return sdk_chat.request(
-        {
-            "prompt": prompt,
-            "input_spec": {
-                "kind": "choice",
-                "required_fields": [],
-                "choices": [
-                    {"value": item["value"], "label": item["label"], "description": None}
-                    for item in actions
-                ],
-                "sensitive": False,
-            },
-            "actions": actions,
-            "optional_capabilities": ["buttons"],
-            "fallbacks": ["numbered_text", "plain_text", "unsupported"],
-            "metadata": {
-                "domain": "builder",
-                "project_ref": f"{object_type}:{object_id}",
-                "execution_webspace_id": webspace_id,
-                "source_webspace_id": webspace_id,
-                "reply_webspace_id": reply_webspace_id,
-                "dialog_channel_id": DIALOG_CHANNEL_ID,
-                "topic_ref": {k: v for k, v in dict(topic).items() if k != "stored"},
-            },
+    locale = str(
+        chat_meta.get("locale")
+        or chat_meta.get("language")
+        or (_meta or {}).get("locale")
+        or (_meta or {}).get("language_code")
+        or "ru"
+    ).strip()
+    interaction = sdk_builder_workflow.create_conversation_interaction(
+        object_type,
+        object_id,
+        conversation_id=conversation_id,
+        principal_id=f"skill:{SKILL_ID}",
+        command_context_id=thread_id or f"webspace:{webspace_id}",
+        prompt=prompt,
+        locale=locale,
+        metadata={
+            "execution_webspace_id": webspace_id,
+            "source_webspace_id": webspace_id,
+            "reply_webspace_id": reply_webspace_id,
+            "dialog_channel_id": DIALOG_CHANNEL_ID,
+            "topic_ref": {k: v for k, v in dict(topic).items() if k != "stored"},
         },
+    )
+    return sdk_chat.present(
+        interaction,
+        conversation_id=conversation_id,
+        owner=f"skill:{SKILL_ID}",
+        webspace_id=reply_webspace_id,
+        channel_id=DIALOG_CHANNEL_ID,
+        route_id=str(chat_meta.get("route_id") or "voice_chat"),
+        thread_id=thread_id or None,
+        actor_id=AGENT_ID,
+        actor_label=AGENT_LABEL,
+        request_id=str(chat_meta.get("request_id") or "").strip() or None,
+        turn_trace_id=str(chat_meta.get("turn_trace_id") or "").strip() or None,
+        meta=chat_meta,
+    )
+
+
+def _present_builder_input_interaction(
+    *,
+    webspace_id: str,
+    object_type: str,
+    object_id: str,
+    surface_command: str,
+    session: Mapping[str, Any],
+    binding: Mapping[str, Any],
+    topic: Mapping[str, Any],
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Persist and present one restart-safe Builder text continuation."""
+
+    reply_webspace_id = _reply_webspace_id(webspace_id, _meta)
+    chat_meta = _chat_meta(
+        _meta,
+        webspace_id=reply_webspace_id,
+        session=session,
+        binding=binding,
+        topic_ref=topic,
+    )
+    conversation_id = str(chat_meta.get("conversation_id") or _conversation_id(webspace_id)).strip()
+    thread_id = str(chat_meta.get("thread_id") or topic.get("thread_id") or "").strip()
+    locale = str(
+        chat_meta.get("locale")
+        or chat_meta.get("language")
+        or (_meta or {}).get("locale")
+        or (_meta or {}).get("language_code")
+        or "ru"
+    ).strip()
+    interaction = sdk_builder_workflow.create_conversation_input_interaction(
+        object_type,
+        object_id,
+        surface_command=surface_command,
+        conversation_id=conversation_id,
+        principal_id=f"skill:{SKILL_ID}",
+        command_context_id=thread_id or f"webspace:{webspace_id}",
+        locale=locale,
+        metadata={
+            "execution_webspace_id": webspace_id,
+            "source_webspace_id": webspace_id,
+            "reply_webspace_id": reply_webspace_id,
+            "dialog_channel_id": DIALOG_CHANNEL_ID,
+            "topic_ref": {key: value for key, value in dict(topic).items() if key != "stored"},
+        },
+    )
+    return sdk_chat.present(
+        interaction,
         conversation_id=conversation_id,
         owner=f"skill:{SKILL_ID}",
         webspace_id=reply_webspace_id,
@@ -8915,6 +8891,88 @@ def _webspace_context(
         "explicit_transport_binding": True,
         "provenance": "builder_context",
     }
+
+
+def _persist_prototype_review_notes(
+    *,
+    session: Mapping[str, Any],
+    change_id: str,
+    _meta: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    raw = (_meta or {}).get("prototype_review_notes") if isinstance(_meta, Mapping) else None
+    if raw is None and isinstance(_meta, Mapping):
+        raw = _meta.get("prototypeReviewNotes")
+    if not isinstance(raw, Mapping):
+        return {"ok": True, "submitted": [], "skipped": "review_packet_missing"}
+    scenario_id = str(session.get("scenario_id") or session.get("artifact_id") or "").strip()
+    if not scenario_id or not str(change_id or "").strip():
+        return {"ok": False, "submitted": [], "error": "review_project_context_missing"}
+    revision_key = _repair_mojibake_text(raw.get("revision_key")).strip()
+    source_revision = revision_key.split(":", 1)[-1].strip() if revision_key else ""
+    comments = [dict(item) for item in raw.get("comments") or [] if isinstance(item, Mapping)]
+    if not comments:
+        note_text = _repair_mojibake_text(raw.get("notes")).strip()
+        if note_text:
+            comments = [
+                {
+                    "id": f"surface-{_hash_suffix(scenario_id + revision_key + note_text)}",
+                    "at": raw.get("updated_at"),
+                    "text": note_text,
+                    "element": {"ref": "surface:prototype", "kind": "surface", "label": "Prototype"},
+                }
+            ]
+    submitted: list[dict[str, Any]] = []
+    failures: list[dict[str, str]] = []
+    author_ref = str(
+        (_meta or {}).get("principal_id")
+        or (_meta or {}).get("user_id")
+        or (_meta or {}).get("actor_id")
+        or "user:reviewer"
+    ).strip()
+    for index, item in enumerate(comments[:100]):
+        comment = _repair_mojibake_text(item.get("text")).strip()
+        element = item.get("element") if isinstance(item.get("element"), Mapping) else {}
+        target_ref = _repair_mojibake_text(element.get("ref")).strip() or "surface:prototype"
+        if not re.match(r"^(widget|field|surface):", target_ref):
+            target_ref = f"surface:{target_ref}"
+        comment_id = str(item.get("id") or f"comment-{index + 1}").strip()
+        review_id = f"review.{_hash_suffix(scenario_id + ':' + change_id + ':' + revision_key + ':' + comment_id)}"
+        try:
+            marker = float(item.get("at") or raw.get("updated_at") or 0.0)
+        except Exception:
+            marker = 0.0
+        if marker > 10_000_000_000:
+            marker /= 1000.0
+        created_at = datetime.fromtimestamp(marker, tz=timezone.utc).isoformat() if marker > 0 else datetime.now(timezone.utc).isoformat()
+        try:
+            result = sdk_builder_review.submit(
+                {
+                    "schema": "adaos.builder.review_anchor.v1",
+                    "review_id": review_id,
+                    "change_id": str(change_id),
+                    "artifact_ref": f"scenario:{scenario_id}@ui_revision:{source_revision or revision_key or 'current'}",
+                    "target_ref": target_ref,
+                    "comment": comment,
+                    "status": "submitted",
+                    "author_ref": author_ref,
+                    "created_at": created_at,
+                    "anchor_snapshot": {
+                        "element": dict(element),
+                        "source_webspace_id": raw.get("source_webspace_id"),
+                        "dev_webspace_id": raw.get("dev_webspace_id"),
+                    },
+                }
+            )
+            submitted.append({"review_id": review_id, "target_ref": target_ref, "result": result})
+        except Exception as exc:
+            detail = f"{type(exc).__name__}: {exc}"
+            if "already exists" not in detail:
+                failures.append({"review_id": review_id, "detail": detail})
+    try:
+        context = sdk_builder_review.context_for_next_request("scenario", scenario_id)
+    except Exception as exc:
+        context = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+    return {"ok": not failures, "submitted": submitted, "failures": failures, "context": context}
 
 
 def _format_webspace_context(context: Mapping[str, Any]) -> str:
@@ -10200,6 +10258,12 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
     match = re.fullmatch(r"(scenario|skill):([A-Za-z0-9][A-Za-z0-9_.-]{0,127})", project_ref)
     consumed = response.get("consumed_command") if isinstance(response.get("consumed_command"), Mapping) else {}
     command = str(consumed.get("command") or "").strip()
+    continuation = interaction_meta.get("continuation") if isinstance(interaction_meta.get("continuation"), Mapping) else {}
+    response_values = response.get("values") if isinstance(response.get("values"), Mapping) else {}
+    continuation_text = str(response_values.get("text") or response.get("original_text") or "").strip()
+    continuation_command = str(continuation.get("surface_command") or "").strip()
+    if not command and continuation_text and continuation_command:
+        command = continuation_command
     if not command:
         return
     response_meta = response.get("metadata") if isinstance(response.get("metadata"), Mapping) else {}
@@ -10312,6 +10376,113 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
     )
     reply_meta = {**dict(response_meta), "webspace_id": webspace_id}
 
+    if continuation_text and command == continuation_command:
+        expected_generation = int(
+            continuation.get("expected_generation")
+            if continuation.get("expected_generation") is not None
+            else -1
+        )
+        current_generation = int(
+            sdk_builder_workflow.get_state(object_type, object_id).get("generation") or 0
+        )
+        if expected_generation != current_generation:
+            _safe_emit_chat(
+                f"{AGENT_LABEL}: состояние проекта изменилось после запроса ввода. Откройте процесс и повторите действие.",
+                webspace_id=webspace_id,
+                _meta=reply_meta,
+                session=session,
+                binding=binding,
+                topic_ref=topic,
+            )
+            return
+        if command == "builder.publication.place":
+            target_webspace_id = continuation_text
+            eligible = {
+                str(item.id)
+                for item in sdk_webspace.webspace_list(mode="workspace")
+                if str(item.home_scenario or "").strip() == "web_desktop"
+            }
+            if target_webspace_id not in eligible:
+                _safe_emit_chat(
+                    f"{AGENT_LABEL}: Webspace {target_webspace_id} не найден или не предоставляет desktop host.",
+                    webspace_id=webspace_id,
+                    _meta=reply_meta,
+                    session=session,
+                    binding=binding,
+                    topic_ref=topic,
+                )
+                return
+            current = sdk_builder_workflow.get_state(object_type, object_id)
+            project = current.get("project") if isinstance(current.get("project"), Mapping) else {}
+            release_ref = project.get("stable_release_ref") if isinstance(project.get("stable_release_ref"), Mapping) else {}
+            sdk_builder_workflow.record_project_placement(
+                object_type,
+                object_id,
+                {
+                    "kind": "stable",
+                    "result_ref": dict(release_ref),
+                    "target": {
+                        "webspace_id": target_webspace_id,
+                        "space_kind": "workspace",
+                    },
+                    "scenario_id": object_id if object_type == "scenario" else None,
+                    "host_capability": "adaos.desktop.host.v1",
+                },
+                expected_generation=expected_generation,
+            )
+            navigation = sdk_builder_workflow.get_project_placement_navigation(
+                object_type,
+                object_id,
+                kind="stable",
+            )
+            _safe_emit_chat(
+                f"{AGENT_LABEL}: проект размещён в Webspace {target_webspace_id}.\n{navigation['url']}",
+                webspace_id=webspace_id,
+                _meta=reply_meta,
+                session=session,
+                binding=binding,
+                topic_ref=topic,
+            )
+            return
+        result = update_current_scenario(
+            instruction=continuation_text,
+            webspace_id=webspace_id,
+            auto_apply=True,
+            conversation_context={
+                "interaction_id": str(interaction.get("interaction_id") or ""),
+                "interaction_response_id": str(response.get("response_id") or ""),
+                "continuation_command": command,
+                "expected_generation": expected_generation,
+            },
+            _meta=reply_meta,
+        )
+        result_topic = result.get("topic") if isinstance(result.get("topic"), Mapping) else topic
+        result_meta = {
+            **reply_meta,
+            **(
+                dict(result.get("message_meta"))
+                if isinstance(result.get("message_meta"), Mapping)
+                else {}
+            ),
+        }
+        _safe_emit_chat(
+            str(
+                result.get("message")
+                or (
+                    f"{AGENT_LABEL}: запрос принят."
+                    if result.get("ok")
+                    else f"{AGENT_LABEL}: не удалось принять уточнение."
+                )
+            ),
+            webspace_id=webspace_id,
+            _meta=result_meta,
+            session=session,
+            binding=binding,
+            topic_ref=result_topic,
+            actions=result.get("message_actions") if isinstance(result.get("message_actions"), list) else None,
+        )
+        return
+
     if command == "builder.preview.link":
         _handle_preview_link_command(
             webspace_id=webspace_id,
@@ -10323,15 +10494,15 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
         )
         return
 
-    prompt_by_command = {
-        "builder.change.plan": "Опишите, что нужно изменить. Строитель разложит запрос на Issues и Change.",
-        "builder.change.extend": "Опишите дополнительное замечание для текущего Change.",
-        "builder.prototype.edit": "Опишите требуемое изменение прототипа.",
-        "builder.implementation.iterate": "Опишите, что нужно исправить в текущей реализации.",
-    }
-    if command in prompt_by_command:
+    if command in {"builder.publication.open", "builder.trial.open"}:
+        placement_kind = "trial" if command == "builder.trial.open" else "stable"
+        navigation = sdk_builder_workflow.get_project_placement_navigation(
+            object_type,
+            object_id,
+            kind=placement_kind,
+        )
         _safe_emit_chat(
-            f"{AGENT_LABEL}: {prompt_by_command[command]}",
+            f"{AGENT_LABEL}: {navigation['url']}",
             webspace_id=webspace_id,
             _meta=reply_meta,
             session=session,
@@ -10340,9 +10511,34 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
         )
         return
 
+    if command in {
+        "builder.change.plan",
+        "builder.change.extend",
+        "builder.prototype.edit",
+        "builder.implementation.iterate",
+        "builder.publication.place",
+    }:
+        _present_builder_input_interaction(
+            webspace_id=webspace_id,
+            object_type=object_type,
+            object_id=object_id,
+            surface_command=command,
+            session=session,
+            binding=binding,
+            topic=topic,
+            _meta=reply_meta,
+        )
+        return
+
     if command == "builder.process.inspect":
         frame = sdk_builder_workflow.get_interaction_frame(object_type, object_id)
-        message = f"{AGENT_LABEL}: {str(frame.get('message') or 'Состояние процесса доступно в панели Process.')}"
+        locale = str(reply_meta.get("locale") or reply_meta.get("language_code") or "ru")
+        process = sdk_builder_workflow.get_process_explanation(
+            object_type,
+            object_id,
+            locale=locale,
+        )
+        message = f"{AGENT_LABEL}:\n{str(process.get('text') or frame.get('message') or 'Состояние процесса доступно в панели Process.')}"
         try:
             _present_project_workflow_interaction(
                 webspace_id=webspace_id,
@@ -10413,6 +10609,10 @@ def _handle_builder_conversation_interaction_response(payload: Mapping[str, Any]
             metadata={
                 "interaction_id": interaction.get("interaction_id"),
                 "response_id": response.get("response_id"),
+                "webspace_id": webspace_id,
+                "source_webspace_id": str(
+                    interaction_meta.get("source_webspace_id") or webspace_id
+                ),
             },
         )
         workflow_state = result.get("workflow") if isinstance(result.get("workflow"), Mapping) else {}
@@ -12430,6 +12630,15 @@ def update_current_scenario(
         if isinstance(change_set_result.get("workflow"), Mapping)
         else {}
     )
+    review_context = _persist_prototype_review_notes(
+        session=session,
+        change_id=str(patch.get("change_id") or ""),
+        _meta=_meta,
+    )
+    patch["review_context"] = {
+        "submitted_count": len(review_context.get("submitted") or []),
+        "failure_count": len(review_context.get("failures") or []),
+    }
     change_set = (
         change_set_workflow.get("change_set")
         if isinstance(change_set_workflow.get("change_set"), Mapping)
