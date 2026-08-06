@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.59
+version: 0.1.60
 description: Slideshow pilot skill that shows photos in the widget and can optionally
   project cached thumbnails to assigned ReDevice endpoints.
 supported_locales:
@@ -594,11 +594,11 @@ memory_budget:
     max_threads: 1
     cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-08-06T13:08:27+00:00'
+updated_at: '2026-08-06T14:01:34+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.686+4584.4cfc2436
-    recorded_at: '2026-08-06T13:08:27+00:00'
+    recorded_at: '2026-08-06T14:01:34+00:00'
     source: skill_push
     min_commit: 4cfc24365e05b245128189ab8008ac9515c89d88
     min_short_commit: 4cfc2436

@@ -1550,3 +1550,14 @@ def test_stop_selected_treats_offline_endpoint_as_degraded(monkeypatch, tmp_path
     assert result["sent_codes"] == []
     assert result["results"][0]["state"] == "skipped"
     assert sent == []
+
+
+def test_redevice_auto_refresh_requires_selected_endpoint():
+    webui_path = Path(__file__).resolve().parents[1] / "webui.json"
+    webui = json.loads(webui_path.read_text(encoding="utf-8"))
+    modal = webui["registry"]["modals"]["slideshow_modal"]["schema"]
+    auto_action = next(item for item in modal["autoActions"] if item["id"] == "slideshow_redevice_tick")
+
+    assert auto_action["intervalMs"] >= 15_000
+    assert "$state.slideshowDeviceCode" in auto_action["enabledIf"]
+    assert "!!" in auto_action["enabledIf"]

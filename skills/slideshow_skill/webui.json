@@ -528,8 +528,8 @@
           "autoActions": [
             {
               "id": "slideshow_redevice_tick",
-              "intervalMs": 4000,
-              "enabledIf": "$state.slideshowRunMode !== 'stop'",
+              "intervalMs": 15000,
+              "enabledIf": "$state.slideshowRunMode !== 'stop' && !!$state.slideshowDeviceCode",
               "action": {
                 "on": "interval",
                 "type": "callSkill",
