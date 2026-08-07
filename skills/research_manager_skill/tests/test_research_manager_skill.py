@@ -15,7 +15,7 @@ if str(_SKILL_ROOT) not in sys.path:
 
 from research.contracts import ResearchRecord, identity
 from research.manager import ResearchManager
-from research.tlp_runner import run as run_tlp
+from research.tlp_runner import _model, _state_digest, run as run_tlp
 from research.tracker import MlflowTracker, TrackerConflict
 from research.workflow import TRANSITIONS
 from migrations.data_migration import migrate as migrate_runtime_data
@@ -453,23 +453,6 @@ def test_live_mlflow_provider_contract_when_endpoint_is_declared() -> None:
         parameters={"epochs": 3, "operator": "tlp"},
         tags={"adaos.profile": "contract"},
     )
-
-
-def test_experiment_workdir_does_not_embed_full_record_ids(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    env_path = tmp_path / "research_manager_skill" / "v0.4" / "venv" / "Scripts" / "python.exe"
-    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(env_path))
-    experiment_id = "experiment." + "e" * 64
-    run_id = "run." + "r" * 64
-
-    workdir = ResearchManager._experiment_run_dir(experiment_id, run_id, 2)
-    legacy = ResearchManager._runtime_data_root() / "internal" / "tlp_runs" / experiment_id / run_id / "attempt-2"
-
-    assert workdir.is_dir()
-    assert experiment_id not in str(workdir)
-    assert run_id not in str(workdir)
-    assert len(str(workdir)) <= len(str(legacy)) - 80
-    assert workdir.parts[-3].startswith("e-") and len(workdir.parts[-3]) == 26
-    assert workdir.parts[-2].startswith("r-") and len(workdir.parts[-2]) == 26
     receipt = provider.append_observations(
         session_id,
         [
@@ -491,6 +474,31 @@ def test_experiment_workdir_does_not_embed_full_record_ids(monkeypatch: pytest.M
     )
     assert closed["session"]["status"] == "succeeded"
     assert closed["events"][0]["provider_receipt"]["mlflow_run_id"]
+
+
+def test_experiment_workdir_does_not_embed_full_record_ids(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    env_path = tmp_path / "research_manager_skill" / "v0.4" / "venv" / "Scripts" / "python.exe"
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(env_path))
+    experiment_id = "experiment." + "e" * 64
+    run_id = "run." + "r" * 64
+
+    workdir = ResearchManager._experiment_run_dir(experiment_id, run_id, 2)
+    legacy = ResearchManager._runtime_data_root() / "internal" / "tlp_runs" / experiment_id / run_id / "attempt-2"
+
+    assert workdir.is_dir()
+    assert experiment_id not in str(workdir)
+    assert run_id not in str(workdir)
+    assert len(str(workdir)) <= len(str(legacy)) - 80
+    assert workdir.parts[-3].startswith("e-") and len(workdir.parts[-3]) == 26
+    assert workdir.parts[-2].startswith("r-") and len(workdir.parts[-2]) == 26
+
+
+def test_shared_initialization_digest_is_operator_independent() -> None:
+    maxpool = _model("maxpool", 17)
+    tlp = _model("tlp", 17)
+
+    assert _state_digest(maxpool) == _state_digest(tlp)
+    assert _state_digest(tlp, shared_only=False) != _state_digest(tlp)
 
 
 def test_real_tlp_runner_executes_one_cpu_epoch_on_binary_contract_fixture(tmp_path: Path) -> None:

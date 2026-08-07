@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import ctypes
 import hashlib
-import io
 import json
 import os
 import random
@@ -211,23 +211,25 @@ def _model(operator: str, seed: int):
     return TLPControlCNN()
 
 
-def _state_digest(model) -> str:
-    import torch
-
+def _state_digest(model, *, shared_only: bool = True) -> str:
     value = hashlib.sha256()
     for name, tensor in sorted(model.state_dict().items()):
-        if name.endswith("pool2.theta"):
+        operator_specific = name.endswith("pool2.theta")
+        if shared_only == operator_specific:
             continue
-        contiguous = tensor.detach().cpu().contiguous()
+        contiguous = tensor.detach().cpu().contiguous().clone()
         value.update(name.encode("utf-8"))
         value.update(str(contiguous.dtype).encode("ascii"))
         value.update(json.dumps(list(contiguous.shape)).encode("ascii"))
-        # Keep NumPy optional.  The legacy torch serializer emits the tensor's
-        # exact storage bytes deterministically and is available in the CPU
-        # wheel itself.
-        stream = io.BytesIO()
-        torch.save(contiguous, stream, _use_new_zipfile_serialization=False)
-        value.update(stream.getvalue())
+        # A fresh contiguous storage contains exactly the logical tensor bytes.
+        # torch.save is intentionally not used: its archive embeds per-process
+        # storage identifiers and therefore is not a cross-process digest.
+        value.update(
+            ctypes.string_at(
+                int(contiguous.data_ptr()),
+                int(contiguous.numel()) * int(contiguous.element_size()),
+            )
+        )
     return f"sha256:{value.hexdigest()}"
 
 
@@ -279,6 +281,9 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     dataset_digest = f"sha256:{hashlib.sha256(json.dumps(dataset_manifest, sort_keys=True).encode()).hexdigest()}"
     model = _model(args.operator, args.seed).to("cpu")
     initial_state_digest = _state_digest(model)
+    operator_initial_state_digest = (
+        _state_digest(model, shared_only=False) if args.operator == "tlp" else None
+    )
     optimizer = torch.optim.Adam(model.parameters(), lr=float(args.learning_rate))
     criterion = nn.CrossEntropyLoss()
     output_dir = Path(args.output_dir)
@@ -375,6 +380,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             "best_epoch": best_epoch,
             "dataset_digest": dataset_digest,
             "initial_state_digest": initial_state_digest,
+            "shared_initial_state_digest": initial_state_digest,
+            "operator_initial_state_digest": operator_initial_state_digest,
             "model_state": best_state,
         },
         checkpoint_path,
@@ -423,6 +430,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "dataset_manifest": dataset_manifest,
         "dataset_digest": dataset_digest,
         "initial_state_digest": initial_state_digest,
+        "shared_initial_state_digest": initial_state_digest,
+        "operator_initial_state_digest": operator_initial_state_digest,
         "best_epoch": best_epoch,
         "best_validation_accuracy": best_accuracy,
         "history": history,

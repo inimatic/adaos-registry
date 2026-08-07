@@ -508,7 +508,7 @@ data_routes:
   route: tool/details
   tool: get_experiment
   owner: skill:research_manager_skill
-  first_paint: E001 condition revision, lifecycle, attempts, results, and evidence state
+  first_paint: control-experiment condition revision, lifecycle, attempts, results, and evidence state
   recovery: reconcile the experiment and repeat get_experiment
   guard_visibility: sealed test locators and provider secrets are never projected
   budget:
