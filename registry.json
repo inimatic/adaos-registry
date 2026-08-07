@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-07T12:36:12+00:00",
+  "updated_at": "2026-08-07T12:48:18+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1291,8 +1291,8 @@
       "kind": "scenario",
       "id": "tlp_research",
       "name": "tlp_research",
-      "version": "0.1.1",
-      "updated_at": "2026-08-07T12:27:55+00:00",
+      "version": "0.1.2",
+      "updated_at": "2026-08-07T12:48:18+00:00",
       "path": "scenarios/tlp_research",
       "manifest": "scenarios/tlp_research/scenario.yaml",
       "source": {
