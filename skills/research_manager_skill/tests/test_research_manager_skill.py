@@ -15,6 +15,7 @@ if str(_SKILL_ROOT) not in sys.path:
 from research.contracts import ResearchRecord, identity
 from research.manager import ResearchManager
 from research.workflow import TRANSITIONS
+from migrations.data_migration import migrate as migrate_runtime_data
 
 
 def _splits() -> dict[str, dict[str, str]]:
@@ -241,3 +242,16 @@ def test_migration_fixture_declares_backward_forward_policy() -> None:
     fixture = json.loads((root / "schemas" / "migration-fixtures.json").read_text(encoding="utf-8"))
     assert fixture["fixtures"][-1]["expected"] == "idempotent-noop"
     assert set(fixture["compatibility"]) == {"patch", "minor", "major", "forward_reader", "backward_reader"}
+
+
+def test_reserved_runtime_migration_imports_repository_from_installed_skill(tmp_path: Path) -> None:
+    result = migrate_runtime_data(
+        {
+            "source_data_root": str(tmp_path / "missing-source"),
+            "target_data_root": str(tmp_path / "target-data"),
+        }
+    )
+    assert result["ok"] is True
+    assert result["staged"] is True
+    assert result["provider_id"] == "sqlite"
+    assert result["health"]["ok"] is True

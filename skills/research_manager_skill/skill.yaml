@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.2.0
+version: 0.3.0
 description: Provider-neutral governed research manager, local tracker, evidence exporter,
   and deterministic fixture runner.
 entry: handlers/main.py
@@ -294,11 +294,11 @@ tools:
         type: string
   output_schema:
     type: object
-updated_at: '2026-08-07T12:31:12+00:00'
+updated_at: '2026-08-07T12:36:12+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.703+4668.73e02306
-    recorded_at: '2026-08-07T12:31:12+00:00'
+    recorded_at: '2026-08-07T12:36:12+00:00'
     source: skill_push
     min_commit: 73e02306a7402706985c415c5ecd2a0208c2db9e
     min_short_commit: 73e02306

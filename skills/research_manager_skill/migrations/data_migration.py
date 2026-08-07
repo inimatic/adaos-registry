@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -18,6 +19,10 @@ def migrate(payload: dict[str, Any]) -> dict[str, Any]:
                 shutil.copytree(item, destination, dirs_exist_ok=True)
             elif not destination.exists():
                 shutil.copy2(item, destination)
+    skill_root = Path(__file__).resolve().parents[1]
+    if str(skill_root) not in sys.path:
+        sys.path.insert(0, str(skill_root))
+
     from research.repository import ResearchRepository
 
     repository = ResearchRepository()
