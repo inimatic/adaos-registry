@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-07T12:48:18+00:00",
+  "updated_at": "2026-08-07T17:34:13+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -658,8 +658,8 @@
       "kind": "skill",
       "id": "research_manager_skill",
       "name": "research_manager_skill",
-      "version": "0.3.0",
-      "updated_at": "2026-08-07T12:36:12+00:00",
+      "version": "0.4.0",
+      "updated_at": "2026-08-07T17:34:13+00:00",
       "path": "skills/research_manager_skill",
       "manifest": "skills/research_manager_skill/skill.yaml",
       "source": {
@@ -724,7 +724,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-08-06T09:28:30+00:00",
+      "updated_at": "2026-08-07T14:49:27+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
