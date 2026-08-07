@@ -9,6 +9,7 @@ runtime:
   env:
     mode: shared
     python: '3.11'
+    allow_heavy_dependencies: true
   activation:
     mode: lazy
     startup_allowed: true
@@ -196,6 +197,192 @@ tools:
         type: string
   output_schema:
     type: object
+- name: create_experiment
+  description: Create an experiment aggregate and its first immutable condition revision.
+  entry: handlers.main:create_experiment
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [study_id, slug, title, purpose, conditions, idempotency_key]
+    properties:
+      study_id: {type: string}
+      slug: {type: string}
+      title: {type: string}
+      purpose: {type: string}
+      conditions: {type: object}
+      experiment_id: {type: [string, 'null']}
+      idempotency_key: {type: string}
+  output_schema: {type: object}
+- name: revise_experiment
+  description: Append an optimistic, immutable experiment condition revision.
+  entry: handlers.main:revise_experiment
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [experiment_id, expected_revision, conditions, rationale, idempotency_key]
+    properties:
+      experiment_id: {type: string}
+      expected_revision: {type: integer}
+      conditions: {type: object}
+      rationale: {type: string}
+      idempotency_key: {type: string}
+      actor: {type: string}
+  output_schema: {type: object}
+- name: revise_experiment_json
+  description: Validate an edited JSON condition document and append a new immutable revision.
+  entry: handlers.main:revise_experiment_json
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [experiment_id, expected_revision, conditions_json, rationale]
+    properties:
+      experiment_id: {type: string}
+      expected_revision: {type: integer}
+      conditions_json: {type: string}
+      rationale: {type: string}
+      idempotency_key: {type: string}
+      actor: {type: string}
+  output_schema: {type: object}
+- name: submit_experiment_review
+  description: Move a draft experiment revision into review.
+  entry: handlers.main:submit_experiment_review
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [experiment_id, expected_generation]
+    properties:
+      experiment_id: {type: string}
+      expected_generation: {type: integer}
+      idempotency_key: {type: string}
+      actor: {type: string}
+  output_schema: {type: object}
+- name: lock_experiment
+  description: Lock the reviewed revision and its study protocol against mutation.
+  entry: handlers.main:lock_experiment
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [experiment_id, expected_generation]
+    properties:
+      experiment_id: {type: string}
+      expected_generation: {type: integer}
+      idempotency_key: {type: string}
+      actor: {type: string}
+  output_schema: {type: object}
+- name: start_experiment
+  description: Materialize paired trials and submit non-blocking CPU attempts for a locked profile.
+  entry: handlers.main:start_experiment
+  timeout_seconds: 60
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    required: [experiment_id, profile, expected_generation]
+    properties:
+      experiment_id: {type: string}
+      profile: {enum: [preflight, confirmatory]}
+      expected_generation: {type: integer}
+      idempotency_key: {type: string}
+      actor: {type: string}
+  output_schema: {type: object}
+- name: reconcile_experiment
+  description: Reconcile attempts, ingest tracker events and artifacts, and derive terminal state.
+  entry: handlers.main:reconcile_experiment
+  timeout_seconds: 60
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    required: [experiment_id]
+    properties:
+      experiment_id: {type: string}
+      actor: {type: string}
+  output_schema: {type: object}
+- name: cancel_experiment
+  description: Request cancellation for every current physical attempt without changing run identity.
+  entry: handlers.main:cancel_experiment
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    required: [experiment_id, expected_generation]
+    properties:
+      experiment_id: {type: string}
+      expected_generation: {type: integer}
+      idempotency_key: {type: string}
+      actor: {type: string}
+  output_schema: {type: object}
+- name: retry_run
+  description: Submit a new physical attempt for one unsuccessful logical run.
+  entry: handlers.main:retry_run
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    required: [experiment_id, run_id, expected_generation]
+    properties:
+      experiment_id: {type: string}
+      run_id: {type: string}
+      expected_generation: {type: integer}
+      idempotency_key: {type: string}
+      actor: {type: string}
+  output_schema: {type: object}
+- name: finalize_experiment
+  description: Fix a paired result and its normalized tracker export as immutable evidence.
+  entry: handlers.main:finalize_experiment
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [experiment_id, expected_generation]
+    properties:
+      experiment_id: {type: string}
+      expected_generation: {type: integer}
+      idempotency_key: {type: string}
+      actor: {type: string}
+  output_schema: {type: object}
+- name: verify_experiment_result
+  description: Verify a fixed result, tracker export, and every content-addressed artifact.
+  entry: handlers.main:verify_experiment_result
+  side_effects: read_only
+  input_schema:
+    type: object
+    required: [result_id]
+    properties:
+      result_id: {type: string}
+  output_schema: {type: object}
+- name: get_experiment
+  description: Return the complete Single Experiment Workbench projection.
+  entry: handlers.main:get_experiment
+  side_effects: read_only
+  input_schema:
+    type: object
+    required: [experiment_id]
+    properties:
+      experiment_id: {type: string}
+  output_schema: {type: object}
+- name: list_experiment_attempts
+  description: List the current physical attempt projection for the workbench.
+  entry: handlers.main:list_experiment_attempts
+  side_effects: read_only
+  input_schema:
+    type: object
+    required: [experiment_id]
+    properties: {experiment_id: {type: string}}
+  output_schema: {type: object}
+- name: list_experiment_pairs
+  description: List paired arm results by seed.
+  entry: handlers.main:list_experiment_pairs
+  side_effects: read_only
+  input_schema:
+    type: object
+    required: [experiment_id]
+    properties: {experiment_id: {type: string}}
+  output_schema: {type: object}
+- name: list_experiment_artifacts
+  description: List content-addressed experiment artifacts.
+  entry: handlers.main:list_experiment_artifacts
+  side_effects: read_only
+  input_schema:
+    type: object
+    required: [experiment_id]
+    properties: {experiment_id: {type: string}}
+  output_schema: {type: object}
 - name: unblind_test
   description: Auditably unblind the sealed test binding after the QC gate.
   entry: handlers.main:unblind_test
@@ -317,6 +504,22 @@ data_routes:
     preserve_last_value: true
     invalidation_tags:
     - tlp-research
+- surface: page:tlp-experiment-workbench
+  route: tool/details
+  tool: get_experiment
+  owner: skill:research_manager_skill
+  first_paint: E001 condition revision, lifecycle, attempts, results, and evidence state
+  recovery: reconcile the experiment and repeat get_experiment
+  guard_visibility: sealed test locators and provider secrets are never projected
+  budget:
+    max_payload_bytes: 2097152
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, targeted_invalidation]
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags: [tlp-experiment, tlp-tracking, tlp-evidence]
 updated_at: '2026-08-07T17:34:13+00:00'
 compatibility:
   adaos_core:
@@ -326,4 +529,3 @@ compatibility:
     min_commit: 06c23d310b2af97354aa63093801143873ca696f
     min_short_commit: 06c23d31
     build_date: '2026-08-07T15:58:18+00:00'
-

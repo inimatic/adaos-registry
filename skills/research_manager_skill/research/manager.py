@@ -15,15 +15,16 @@ from adaos.sdk.execution import (
     ExecutionDeterminism,
     ExecutionNetworkPolicy,
     ExecutionResourceRequest,
+    cancel as cancel_execution,
     reconcile,
     spec,
     submit,
 )
 
-from research import evidence
-from research.contracts import ResearchRecord, digest, identity, now
+from research import evidence, experiment
+from research.contracts import ResearchRecord, canonical_json, digest, identity, now
 from research.repository import ResearchRepository
-from research.tracker import LocalTracker
+from research.tracker import LocalTracker, normalize_observation
 from research.workflow import state as workflow_state
 from research.workflow import transition
 
@@ -310,6 +311,34 @@ class ResearchManager:
         root.mkdir(parents=True, exist_ok=True)
         return root
 
+    @staticmethod
+    def _runtime_data_root() -> Path:
+        env_path = str(os.getenv("ADAOS_SKILL_ENV_PATH") or "").strip()
+        if not env_path:
+            raise RuntimeError("skill runtime data path is unavailable")
+        return Path(env_path).resolve().parent.parent
+
+    @classmethod
+    def _experiment_run_dir(cls, experiment_id: str, run_id: str, attempt_number: int) -> Path:
+        root = cls._runtime_data_root() / "internal" / "tlp_runs" / experiment_id / run_id / f"attempt-{attempt_number}"
+        root.mkdir(parents=True, exist_ok=True)
+        return root
+
+    @classmethod
+    def _runner_python(cls) -> Path:
+        bucket = cls._runtime_data_root().parent
+        candidates = (
+            bucket / "venv" / "Scripts" / "python.exe",
+            bucket / "venv" / "bin" / "python",
+        )
+        return next((item for item in candidates if item.is_file()), Path(sys.executable))
+
+    @classmethod
+    def _runner_python_path(cls) -> str:
+        vendor = cls._runtime_data_root().parent / "vendor"
+        existing = str(os.getenv("PYTHONPATH") or "").strip()
+        return os.pathsep.join(item for item in (str(vendor), existing) if item)
+
     def run_fixture(
         self,
         *,
@@ -337,7 +366,18 @@ class ResearchManager:
             for offset, name in enumerate(ExecutionDeterminism.REQUIRED_STREAMS)
         }
         rng_digest = digest(streams)
-        run_id = identity("run", {"trial_id": trial_id, "sample_generation": 0, "rng_digest": rng_digest})
+        # The legacy fixture can exercise validation and the later, explicitly
+        # unblinded test split for the same trial/seed.  They are distinct
+        # logical runs: their admission rules, inputs and tracker tags differ.
+        run_id = identity(
+            "run",
+            {
+                "trial_id": trial_id,
+                "sample_generation": 0,
+                "rng_digest": rng_digest,
+                "split_role": split_role,
+            },
+        )
         run_record = self.repository.put(
             ResearchRecord(
                 "run",
@@ -412,6 +452,1002 @@ class ResearchManager:
                 observations.append(observation.to_dict())
         self.tracker.finalize(run_id, attempt.status)
         return {"run": run_record.to_dict(), "attempt": attempt_record.to_dict(), "observations": observations, "tracker": self.tracker.export(run_id)}
+
+    def create_experiment(
+        self,
+        *,
+        study_id: str,
+        slug: str,
+        title: str,
+        purpose: str,
+        conditions: Mapping[str, Any],
+        idempotency_key: str,
+        experiment_id: str | None = None,
+    ) -> dict[str, Any]:
+        return experiment.create(
+            self.repository,
+            study_id=study_id,
+            slug=slug,
+            title=title,
+            purpose=purpose,
+            conditions=conditions,
+            experiment_id=experiment_id,
+            idempotency_key=idempotency_key,
+        )
+
+    def revise_experiment(
+        self,
+        *,
+        experiment_id: str,
+        expected_revision: int,
+        conditions: Mapping[str, Any],
+        rationale: str,
+        actor: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        return experiment.revise(
+            self.repository,
+            experiment_id=experiment_id,
+            expected_revision=expected_revision,
+            conditions=conditions,
+            rationale=rationale,
+            actor=actor,
+            idempotency_key=idempotency_key,
+        )
+
+    def revise_experiment_json(
+        self,
+        *,
+        experiment_id: str,
+        expected_revision: int,
+        conditions_json: str,
+        rationale: str,
+        actor: str,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        try:
+            conditions = json.loads(conditions_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"experiment conditions are not valid JSON: {exc.msg}") from exc
+        if not isinstance(conditions, dict):
+            raise ValueError("experiment conditions JSON must contain an object")
+        return self.revise_experiment(
+            experiment_id=experiment_id,
+            expected_revision=expected_revision,
+            conditions=conditions,
+            rationale=rationale,
+            actor=actor,
+            idempotency_key=idempotency_key,
+        )
+
+    def submit_experiment_review(
+        self,
+        *,
+        experiment_id: str,
+        expected_generation: int,
+        idempotency_key: str,
+        actor: str,
+    ) -> dict[str, Any]:
+        return experiment.transition(
+            self.repository,
+            experiment_id=experiment_id,
+            command="submit_review",
+            expected_generation=expected_generation,
+            idempotency_key=idempotency_key,
+            actor=actor,
+        )
+
+    def lock_experiment(
+        self,
+        *,
+        experiment_id: str,
+        expected_generation: int,
+        idempotency_key: str,
+        actor: str,
+    ) -> dict[str, Any]:
+        value = experiment.get_experiment(self.repository, experiment_id)
+        study_lifecycle = workflow_state(self.repository, value.study_id)
+        if study_lifecycle["state"] == "protocol_review":
+            self.advance(
+                study_id=value.study_id,
+                command="lock_protocol",
+                expected_generation=study_lifecycle["generation"],
+                idempotency_key=f"{idempotency_key}:study-protocol",
+                actor=actor,
+            )
+        elif study_lifecycle["state"] not in {"locked", "smoke", "executing", "qc", "unblinded", "analysis"}:
+            raise ValueError("study protocol is not ready for experiment lock")
+        return experiment.transition(
+            self.repository,
+            experiment_id=experiment_id,
+            command="lock",
+            expected_generation=expected_generation,
+            idempotency_key=idempotency_key,
+            actor=actor,
+        )
+
+    def _experiment_records(self, experiment_id: str, kind: str) -> list[ResearchRecord]:
+        value = experiment.get_experiment(self.repository, experiment_id)
+        return [
+            item
+            for item in self.repository.list(value.study_id, kind)
+            if item.payload.get("experiment_id") == experiment_id
+        ]
+
+    def _materialize_experiment_plan(
+        self,
+        *,
+        experiment_id: str,
+        profile: str,
+    ) -> tuple[ResearchRecord, list[tuple[ResearchRecord, ResearchRecord, int, str]]]:
+        value = experiment.get_experiment(self.repository, experiment_id)
+        revision = experiment.latest_revision(self.repository, experiment_id)
+        conditions = dict(revision.payload["conditions"])
+        profile_conditions = dict(dict(conditions["execution"])[profile])
+        protocol = self.repository.list(value.study_id, "protocol")[-1]
+        analysis_plan = self.repository.list(value.study_id, "analysis_plan")[-1]
+        seeds = [int(seed) for seed in profile_conditions["seeds"]]
+        arms = [dict(item) for item in dict(conditions["operators"])["arms"]]
+        plan: list[tuple[ResearchRecord, ResearchRecord, int, str]] = []
+        for seed in seeds:
+            pair_key = f"seed-{seed}"
+            group_id = identity(
+                "trial_group",
+                {
+                    "experiment_id": experiment_id,
+                    "experiment_revision_id": revision.record_id,
+                    "profile": profile,
+                    "seed": seed,
+                },
+            )
+            group = self.repository.put(
+                ResearchRecord(
+                    "trial_group",
+                    group_id,
+                    value.study_id,
+                    revision.generation,
+                    {
+                        "experiment_id": experiment_id,
+                        "experiment_revision_id": revision.record_id,
+                        "pair_key": pair_key,
+                        "seed": seed,
+                        "profile": profile,
+                        "operator_count": len(arms),
+                    },
+                )
+            )
+            for arm in arms:
+                arm_id = str(arm["id"])
+                trial_id = identity(
+                    "trial",
+                    {
+                        "experiment_id": experiment_id,
+                        "experiment_revision_id": revision.record_id,
+                        "profile": profile,
+                        "pair_key": pair_key,
+                        "arm_id": arm_id,
+                    },
+                )
+                trial = self.repository.put(
+                    ResearchRecord(
+                        "trial",
+                        trial_id,
+                        value.study_id,
+                        revision.generation,
+                        {
+                            "experiment_id": experiment_id,
+                            "experiment_revision_id": revision.record_id,
+                            "trial_group_id": group_id,
+                            "pair_key": pair_key,
+                            "seed": seed,
+                            "profile": profile,
+                            "operator": arm,
+                            "operator_digest": digest(arm),
+                            "protocol_digest": protocol.digest,
+                            "analysis_plan_digest": analysis_plan.digest,
+                        },
+                    )
+                )
+                plan.append((group, trial, seed, arm_id))
+        return revision, plan
+
+    def _attempt_bindings(self, experiment_id: str, run_id: str | None = None) -> list[ResearchRecord]:
+        values = self._experiment_records(experiment_id, "attempt_binding")
+        if run_id is not None:
+            values = [item for item in values if item.payload.get("run_id") == run_id]
+        return sorted(values, key=lambda item: (int(item.payload["attempt_number"]), item.created_at, item.record_id))
+
+    def _latest_attempt_status(self, experiment_id: str, attempt_id: str, initial: str) -> str:
+        value = experiment.get_experiment(self.repository, experiment_id)
+        status = initial
+        for event in self.repository.events(value.study_id):
+            if event["event_type"] != "research.experiment.attempt":
+                continue
+            payload = dict(event["payload"])
+            if payload.get("experiment_id") == experiment_id and payload.get("attempt_id") == attempt_id:
+                status = str(payload["status"])
+        return status
+
+    def _record_attempt_status(self, experiment_id: str, attempt: Any) -> None:
+        value = experiment.get_experiment(self.repository, experiment_id)
+        current = self._latest_attempt_status(experiment_id, attempt.attempt_id, "")
+        if current == attempt.status:
+            return
+        self.repository.event(
+            value.study_id,
+            "research.experiment.attempt",
+            {
+                "experiment_id": experiment_id,
+                "attempt_id": attempt.attempt_id,
+                "run_id": attempt.run_id,
+                "status": attempt.status,
+                "attempt_number": attempt.attempt_number,
+                "terminal": attempt.terminal,
+            },
+        )
+
+    def _submit_tlp_attempt(
+        self,
+        *,
+        experiment_id: str,
+        revision: ResearchRecord,
+        trial: ResearchRecord,
+        seed: int,
+        arm_id: str,
+        profile: str,
+        command_key: str,
+    ) -> dict[str, Any]:
+        conditions = dict(revision.payload["conditions"])
+        profile_conditions = dict(dict(conditions["execution"])[profile])
+        streams = {
+            name: seed + offset
+            for offset, name in enumerate(ExecutionDeterminism.REQUIRED_STREAMS)
+        }
+        rng_digest = digest(streams)
+        run_id = identity(
+            "run",
+            {
+                "trial_id": trial.record_id,
+                "sample_generation": 0,
+                "rng_digest": rng_digest,
+            },
+        )
+        run_record = self.repository.put(
+            ResearchRecord(
+                "run",
+                run_id,
+                trial.study_id,
+                0,
+                {
+                    "experiment_id": experiment_id,
+                    "experiment_revision_id": revision.record_id,
+                    "trial_id": trial.record_id,
+                    "trial_group_id": trial.payload["trial_group_id"],
+                    "pair_key": trial.payload["pair_key"],
+                    "arm_id": arm_id,
+                    "profile": profile,
+                    "seed": seed,
+                    "sample_generation": 0,
+                    "rng_streams": streams,
+                    "rng_digest": rng_digest,
+                },
+            )
+        )
+        attempt_number = len(self._attempt_bindings(experiment_id, run_id)) + 1
+        run_dir = self._experiment_run_dir(experiment_id, run_id, attempt_number)
+        runner = Path(__file__).with_name("tlp_runner.py").resolve()
+        requirements = Path(__file__).resolve().parents[1] / "requirements.in"
+        environment_digest = digest(
+            {
+                "python": "3.11",
+                "requirements": digest(requirements.read_bytes()) if requirements.is_file() else None,
+                "runner": digest(runner.read_bytes()),
+            }
+        )
+        dataset = dict(conditions["dataset"])
+        data_root_value = str(dataset.get("data_root") or "").strip()
+        data_root = Path(data_root_value) if data_root_value else self._runtime_data_root() / "files" / "datasets"
+        command = [
+            str(self._runner_python()),
+            str(runner),
+            "--operator",
+            arm_id,
+            "--seed",
+            str(seed),
+            "--epochs",
+            str(int(profile_conditions["epochs"])),
+            "--batch-size",
+            str(int(profile_conditions.get("batch_size") or 32)),
+            "--learning-rate",
+            str(float(profile_conditions.get("learning_rate") or 0.001)),
+            "--max-train-samples",
+            str(int(profile_conditions.get("max_train_samples") or 0)),
+            "--max-validation-samples",
+            str(int(profile_conditions.get("max_validation_samples") or 0)),
+            "--validation-per-class",
+            str(int(dataset.get("validation_per_class") or 100)),
+            "--split-seed",
+            str(int(dataset.get("split_seed") or 20260807)),
+            "--cpu-threads",
+            str(int(profile_conditions.get("cpu_threads") or 2)),
+            "--data-root",
+            str(data_root),
+            "--output-dir",
+            str(run_dir),
+            "--evidence-class",
+            str(profile_conditions.get("evidence_class") or ("workflow_validation" if profile == "preflight" else "confirmatory")),
+        ]
+        if bool(dataset.get("download")):
+            command.append("--download")
+        code_digest = digest(runner.read_bytes())
+        execution = spec(
+            "research.tlp.pool2.v1",
+            tuple(command),
+            working_directory=run_dir,
+            trial_id=trial.record_id,
+            run_id=run_id,
+            package_ref=ContentRef(
+                uri="skill-package:research_manager_skill/research/tlp_runner.py",
+                digest=code_digest,
+                size_bytes=runner.stat().st_size,
+                media_type="text/x-python",
+                owner_ref="skill:research_manager_skill",
+                kind="execution-package",
+            ),
+            code_digest=code_digest,
+            environment_digest=environment_digest,
+            environment={"PYTHONHASHSEED": str(seed), "PYTHONPATH": self._runner_python_path()},
+            resources=ExecutionResourceRequest(
+                cpu_cores=int(profile_conditions.get("cpu_threads") or 2),
+                memory_mb=int(profile_conditions.get("memory_mb") or 4096),
+                wall_time_s=int(profile_conditions.get("wall_time_s") or 7200),
+                max_log_bytes=int(profile_conditions.get("max_log_bytes") or 2 * 1024 * 1024),
+            ),
+            network=ExecutionNetworkPolicy(mode="unrestricted"),
+            determinism=ExecutionDeterminism(
+                mode="confirmatory" if profile == "confirmatory" else "exploratory",
+                rng_streams=streams,
+                deterministic_algorithms=True,
+            ),
+            budget=ExecutionBudget(
+                max_attempts=int(profile_conditions.get("max_attempts") or 3),
+                max_compute_seconds=int(profile_conditions.get("max_compute_seconds") or 10800),
+                max_storage_bytes=int(profile_conditions.get("max_storage_bytes") or 2 * 1024 * 1024 * 1024),
+            ),
+            expected_outputs=("observations.ndjson", "result.json", "artifacts.json", "checkpoint.pt", "predictions.jsonl"),
+            metadata={
+                "experiment_id": experiment_id,
+                "experiment_revision_id": revision.record_id,
+                "pair_key": trial.payload["pair_key"],
+                "arm_id": arm_id,
+                "profile": profile,
+                "operator_digest": trial.payload["operator_digest"],
+            },
+        )
+        attempt = submit(execution, idempotency_key=f"{command_key}:{run_id}:attempt:{attempt_number}")
+        session_id = identity(
+            "tracking_session",
+            {"run_id": run_id, "attempt_id": attempt.attempt_id},
+        )
+        binding = self.repository.put(
+            ResearchRecord(
+                "attempt_binding",
+                attempt.attempt_id,
+                trial.study_id,
+                attempt_number,
+                {
+                    "experiment_id": experiment_id,
+                    "experiment_revision_id": revision.record_id,
+                    "trial_id": trial.record_id,
+                    "run_id": run_id,
+                    "attempt_id": attempt.attempt_id,
+                    "attempt_number": attempt_number,
+                    "session_id": session_id,
+                    "profile": profile,
+                    "arm_id": arm_id,
+                    "seed": seed,
+                    "workdir": str(run_dir),
+                    "initial_attempt": attempt.to_dict(),
+                },
+            )
+        )
+        self.tracker.open_session(
+            session_id=session_id,
+            study_id=trial.study_id,
+            experiment_id=experiment_id,
+            experiment_revision_id=revision.record_id,
+            trial_id=trial.record_id,
+            run_id=run_id,
+            attempt_id=attempt.attempt_id,
+            parameters={
+                "operator": arm_id,
+                "seed": seed,
+                "epochs": int(profile_conditions["epochs"]),
+                "batch_size": int(profile_conditions.get("batch_size") or 32),
+                "learning_rate": float(profile_conditions.get("learning_rate") or 0.001),
+                "conditions_digest": revision.payload["conditions_digest"],
+            },
+            tags={
+                "adaos.study_id": trial.study_id,
+                "adaos.experiment_id": experiment_id,
+                "adaos.experiment_revision_id": revision.record_id,
+                "adaos.trial_group_id": str(trial.payload["trial_group_id"]),
+                "adaos.trial_id": trial.record_id,
+                "adaos.run_id": run_id,
+                "adaos.attempt_id": attempt.attempt_id,
+                "adaos.profile": profile,
+            },
+            inputs=(
+                {
+                    "kind": "dataset",
+                    "name": dataset["name"],
+                    "version": dataset["version"],
+                    "source": dataset.get("source"),
+                    "expected_digest": dataset.get("expected_digest"),
+                    "split_role": "train-validation",
+                },
+            ),
+        )
+        self._record_attempt_status(experiment_id, attempt)
+        return {"run": run_record.to_dict(), "binding": binding.to_dict(), "attempt": attempt.to_dict()}
+
+    def start_experiment(
+        self,
+        *,
+        experiment_id: str,
+        profile: str,
+        expected_generation: int,
+        idempotency_key: str,
+        actor: str,
+    ) -> dict[str, Any]:
+        if profile not in {"preflight", "confirmatory"}:
+            raise ValueError("execution profile must be preflight or confirmatory")
+
+        def apply() -> Mapping[str, Any]:
+            lifecycle = experiment.state(self.repository, experiment_id)
+            if lifecycle["state"] != "locked" or lifecycle["generation"] != int(expected_generation):
+                raise ValueError("experiment must be locked at the expected generation")
+            revision, plan = self._materialize_experiment_plan(experiment_id=experiment_id, profile=profile)
+            submissions = [
+                self._submit_tlp_attempt(
+                    experiment_id=experiment_id,
+                    revision=revision,
+                    trial=trial,
+                    seed=seed,
+                    arm_id=arm_id,
+                    profile=profile,
+                    command_key=idempotency_key,
+                )
+                for _group, trial, seed, arm_id in plan
+            ]
+            transition_result = experiment.transition(
+                self.repository,
+                experiment_id=experiment_id,
+                command="start_preflight" if profile == "preflight" else "start_execution",
+                expected_generation=expected_generation,
+                idempotency_key=f"{idempotency_key}:transition",
+                actor=actor,
+                execution_profile=profile,
+                evidence_refs=(revision.digest,),
+            )
+            return {"experiment_id": experiment_id, "profile": profile, "submissions": submissions, "lifecycle": transition_result}
+
+        return self.repository.once(idempotency_key, "start_experiment", apply)
+
+    def _ingest_attempt_progress(self, binding: ResearchRecord) -> list[dict[str, Any]]:
+        path = Path(str(binding.payload["workdir"])) / "observations.ndjson"
+        if not path.is_file():
+            return []
+        session_id = str(binding.payload["session_id"])
+        session = self.tracker.get_session(session_id)
+        values: list[dict[str, Any]] = []
+        lines = path.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            if not line.strip():
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                if index == len(lines) - 1:
+                    continue
+                raise
+            values.append(normalize_observation(session, payload))
+        if not values:
+            return []
+        receipt = self.tracker.append_observations(session_id, values)
+        exported = self.tracker.export_session(session_id)
+        by_id = {
+            item["event_id"]: item
+            for item in exported["events"]
+            if item["event_kind"] == "observation"
+        }
+        records: list[dict[str, Any]] = []
+        for event_id in [*receipt["accepted"], *receipt["duplicates"]]:
+            event = by_id[event_id]
+            record = self.repository.put(
+                ResearchRecord(
+                    "observation",
+                    event_id,
+                    binding.study_id,
+                    0,
+                    {
+                        **dict(event["payload"]),
+                        "experiment_id": binding.payload["experiment_id"],
+                        "experiment_revision_id": binding.payload["experiment_revision_id"],
+                        "trial_id": binding.payload["trial_id"],
+                        "run_id": binding.payload["run_id"],
+                        "attempt_id": binding.payload["attempt_id"],
+                        "session_id": session_id,
+                        "payload_digest": event["payload_digest"],
+                    },
+                )
+            )
+            records.append(record.to_dict())
+        return records
+
+    def _ingest_attempt_artifacts(self, binding: ResearchRecord) -> list[dict[str, Any]]:
+        run_dir = Path(str(binding.payload["workdir"]))
+        manifest_path = run_dir / "artifacts.json"
+        if not manifest_path.is_file():
+            return []
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        artifacts = []
+        for item in manifest.get("artifacts") or []:
+            source = run_dir / str(item["path"])
+            if not source.is_file():
+                raise FileNotFoundError(f"declared experiment artifact is missing: {source.name}")
+            actual = digest(source.read_bytes())
+            if actual != item["digest"] or source.stat().st_size != int(item["size_bytes"]):
+                raise ValueError(f"experiment artifact integrity mismatch: {source.name}")
+            relative = source.relative_to(self._runtime_data_root()).as_posix()
+            artifacts.append(
+                {
+                    "uri": f"skill-data:{relative}",
+                    "digest": actual,
+                    "size_bytes": source.stat().st_size,
+                    "media_type": str(item["media_type"]),
+                    "role": str(item["role"]),
+                    # Reconciliation is repeatable.  Timestamping the same
+                    # immutable artifact with wall-clock time would turn an
+                    # otherwise identical replay into a tracker conflict.
+                    "observed_at": binding.created_at,
+                }
+            )
+        session_id = str(binding.payload["session_id"])
+        receipt = self.tracker.append_artifacts(session_id, artifacts)
+        exported = self.tracker.export_session(session_id)
+        by_id = {
+            item["event_id"]: item
+            for item in exported["events"]
+            if item["event_kind"] == "artifact"
+        }
+        records: list[dict[str, Any]] = []
+        for event_id in [*receipt["accepted"], *receipt["duplicates"]]:
+            event = by_id[event_id]
+            record = self.repository.put(
+                ResearchRecord(
+                    "artifact_ref",
+                    event_id,
+                    binding.study_id,
+                    0,
+                    {
+                        **dict(event["payload"]),
+                        "experiment_id": binding.payload["experiment_id"],
+                        "experiment_revision_id": binding.payload["experiment_revision_id"],
+                        "trial_id": binding.payload["trial_id"],
+                        "run_id": binding.payload["run_id"],
+                        "attempt_id": binding.payload["attempt_id"],
+                        "session_id": session_id,
+                    },
+                )
+            )
+            records.append(record.to_dict())
+        return records
+
+    def reconcile_experiment(self, experiment_id: str, *, actor: str = "user:local") -> dict[str, Any]:
+        bindings = self._attempt_bindings(experiment_id)
+        if not bindings:
+            return self.experiment_status(experiment_id)
+        terminal_statuses = {"succeeded", "failed", "cancelled", "lost"}
+        current_by_run: dict[str, ResearchRecord] = {}
+        for binding in bindings:
+            run_id = str(binding.payload["run_id"])
+            current = current_by_run.get(run_id)
+            if current is None or int(binding.payload["attempt_number"]) > int(current.payload["attempt_number"]):
+                current_by_run[run_id] = binding
+        statuses: dict[str, str] = {}
+        for run_id, binding in current_by_run.items():
+            initial = str(dict(binding.payload["initial_attempt"])["status"])
+            known = self._latest_attempt_status(experiment_id, str(binding.payload["attempt_id"]), initial)
+            if known in terminal_statuses:
+                statuses[run_id] = known
+                continue
+            attempt = reconcile(str(binding.payload["attempt_id"]))
+            self._record_attempt_status(experiment_id, attempt)
+            self._ingest_attempt_progress(binding)
+            if attempt.terminal:
+                if attempt.status == "succeeded":
+                    artifacts = self._ingest_attempt_artifacts(binding)
+                else:
+                    artifacts = []
+                self.tracker.close_session(
+                    str(binding.payload["session_id"]),
+                    attempt.status,
+                    {
+                        "observations_complete": attempt.status == "succeeded",
+                        "artifacts_complete": attempt.status == "succeeded" and bool(artifacts),
+                        "required_delivery_state": "delivered",
+                    },
+                )
+                self.repository.put(
+                    ResearchRecord(
+                        "execution_attempt",
+                        attempt.attempt_id,
+                        binding.study_id,
+                        int(binding.payload["attempt_number"]),
+                        {
+                            **attempt.to_dict(),
+                            "experiment_id": experiment_id,
+                            "experiment_revision_id": binding.payload["experiment_revision_id"],
+                            "session_id": binding.payload["session_id"],
+                        },
+                    )
+                )
+            statuses[run_id] = attempt.status
+        lifecycle = experiment.state(self.repository, experiment_id)
+        if statuses and all(status in terminal_statuses for status in statuses.values()):
+            status_digest = digest(statuses)
+            if all(status == "succeeded" for status in statuses.values()) and lifecycle["state"] in {"running", "cancelling"}:
+                experiment.transition(
+                    self.repository,
+                    experiment_id=experiment_id,
+                    command="mark_results_ready",
+                    expected_generation=lifecycle["generation"],
+                    idempotency_key=f"reconcile:{experiment_id}:{status_digest}:ready",
+                    actor=actor,
+                    execution_profile=lifecycle.get("execution_profile"),
+                    evidence_refs=tuple(
+                        item.digest for item in self._experiment_records(experiment_id, "execution_attempt")
+                    ),
+                )
+            elif lifecycle["state"] == "cancelling":
+                experiment.transition(
+                    self.repository,
+                    experiment_id=experiment_id,
+                    command="mark_cancelled",
+                    expected_generation=lifecycle["generation"],
+                    idempotency_key=f"reconcile:{experiment_id}:{status_digest}:cancelled",
+                    actor=actor,
+                    execution_profile=lifecycle.get("execution_profile"),
+                )
+            elif lifecycle["state"] == "running":
+                experiment.transition(
+                    self.repository,
+                    experiment_id=experiment_id,
+                    command="mark_failed",
+                    expected_generation=lifecycle["generation"],
+                    idempotency_key=f"reconcile:{experiment_id}:{status_digest}:failed",
+                    actor=actor,
+                    execution_profile=lifecycle.get("execution_profile"),
+                )
+        return self.experiment_status(experiment_id)
+
+    def cancel_experiment(
+        self,
+        *,
+        experiment_id: str,
+        expected_generation: int,
+        idempotency_key: str,
+        actor: str,
+    ) -> dict[str, Any]:
+        lifecycle = experiment.state(self.repository, experiment_id)
+        if lifecycle["state"] != "running" or lifecycle["generation"] != int(expected_generation):
+            raise ValueError("only the current running experiment can be cancelled")
+        transition_result = experiment.transition(
+            self.repository,
+            experiment_id=experiment_id,
+            command="request_cancel",
+            expected_generation=expected_generation,
+            idempotency_key=f"{idempotency_key}:transition",
+            actor=actor,
+            execution_profile=lifecycle.get("execution_profile"),
+        )
+        cancelled = []
+        latest: dict[str, ResearchRecord] = {}
+        for binding in self._attempt_bindings(experiment_id):
+            run_id = str(binding.payload["run_id"])
+            if run_id not in latest or int(binding.payload["attempt_number"]) > int(latest[run_id].payload["attempt_number"]):
+                latest[run_id] = binding
+        for binding in latest.values():
+            initial = str(dict(binding.payload["initial_attempt"])["status"])
+            status = self._latest_attempt_status(experiment_id, str(binding.payload["attempt_id"]), initial)
+            if status in {"succeeded", "failed", "cancelled", "lost"}:
+                continue
+            attempt = cancel_execution(str(binding.payload["attempt_id"]))
+            self._record_attempt_status(experiment_id, attempt)
+            cancelled.append(attempt.to_dict())
+        return {"lifecycle": transition_result, "cancelled": cancelled}
+
+    def retry_run(
+        self,
+        *,
+        experiment_id: str,
+        run_id: str,
+        expected_generation: int,
+        idempotency_key: str,
+        actor: str,
+    ) -> dict[str, Any]:
+        lifecycle = experiment.state(self.repository, experiment_id)
+        if lifecycle["state"] not in {"failed", "cancelled"} or lifecycle["generation"] != int(expected_generation):
+            raise ValueError("retry requires the current failed or cancelled experiment")
+        run_record = self.repository.get("run", run_id)
+        if run_record is None or run_record.payload.get("experiment_id") != experiment_id:
+            raise KeyError(run_id)
+        bindings = self._attempt_bindings(experiment_id, run_id)
+        if not bindings:
+            raise ValueError("run has no physical attempt to retry")
+        last = bindings[-1]
+        last_status = self._latest_attempt_status(
+            experiment_id,
+            str(last.payload["attempt_id"]),
+            str(dict(last.payload["initial_attempt"])["status"]),
+        )
+        if last_status not in {"failed", "cancelled", "lost"}:
+            raise ValueError("run retry is admitted only after a terminal unsuccessful attempt")
+        trial = self.repository.get("trial", str(run_record.payload["trial_id"]))
+        if trial is None:
+            raise KeyError(run_record.payload["trial_id"])
+        revision = experiment.latest_revision(self.repository, experiment_id)
+        submission = self._submit_tlp_attempt(
+            experiment_id=experiment_id,
+            revision=revision,
+            trial=trial,
+            seed=int(run_record.payload["seed"]),
+            arm_id=str(run_record.payload["arm_id"]),
+            profile=str(run_record.payload["profile"]),
+            command_key=idempotency_key,
+        )
+        transition_result = experiment.transition(
+            self.repository,
+            experiment_id=experiment_id,
+            command="retry",
+            expected_generation=expected_generation,
+            idempotency_key=f"{idempotency_key}:transition",
+            actor=actor,
+            execution_profile=str(run_record.payload["profile"]),
+        )
+        return {"submission": submission, "lifecycle": transition_result}
+
+    def _experiment_summary(self, experiment_id: str) -> dict[str, Any]:
+        successful: dict[str, tuple[ResearchRecord, dict[str, Any]]] = {}
+        for binding in self._attempt_bindings(experiment_id):
+            status = self._latest_attempt_status(
+                experiment_id,
+                str(binding.payload["attempt_id"]),
+                str(dict(binding.payload["initial_attempt"])["status"]),
+            )
+            result_path = Path(str(binding.payload["workdir"])) / "result.json"
+            if status == "succeeded" and result_path.is_file():
+                successful[str(binding.payload["run_id"])] = (
+                    binding,
+                    json.loads(result_path.read_text(encoding="utf-8")),
+                )
+        pairs: dict[int, dict[str, Any]] = {}
+        for binding, result in successful.values():
+            seed = int(binding.payload["seed"])
+            arm = str(binding.payload["arm_id"])
+            pairs.setdefault(seed, {"seed": seed})[arm] = float(result["best_validation_accuracy"])
+            pairs[seed][f"{arm}_best_epoch"] = int(result["best_epoch"])
+            pairs[seed][f"{arm}_initial_state_digest"] = str(result["initial_state_digest"])
+        paired_values = []
+        for item in pairs.values():
+            if "maxpool" in item and "tlp" in item:
+                item["delta_tlp_minus_maxpool"] = item["tlp"] - item["maxpool"]
+                item["paired_initialization"] = item["maxpool_initial_state_digest"] == item["tlp_initial_state_digest"]
+                paired_values.append(float(item["delta_tlp_minus_maxpool"]))
+        mean_delta = sum(paired_values) / len(paired_values) if paired_values else None
+        confidence_interval = None
+        if len(paired_values) >= 2:
+            import random
+
+            generator = random.Random(20260807)
+            bootstrap = sorted(
+                sum(generator.choice(paired_values) for _ in paired_values) / len(paired_values)
+                for _ in range(10000)
+            )
+            confidence_interval = [bootstrap[249], bootstrap[9749]]
+        return {
+            "schema": "adaos.research.experiment_summary.v1",
+            "experiment_id": experiment_id,
+            "completed_runs": len(successful),
+            "paired_seed_count": len(paired_values),
+            "pairs": [pairs[key] for key in sorted(pairs)],
+            "primary_estimand": "validation.top1_accuracy.tlp_minus_maxpool",
+            "mean_delta": mean_delta,
+            "paired_bootstrap_95": confidence_interval,
+        }
+
+    def finalize_experiment(
+        self,
+        *,
+        experiment_id: str,
+        expected_generation: int,
+        idempotency_key: str,
+        actor: str,
+    ) -> dict[str, Any]:
+        def apply() -> Mapping[str, Any]:
+            lifecycle = experiment.state(self.repository, experiment_id)
+            if lifecycle["state"] != "results_ready" or lifecycle["generation"] != int(expected_generation):
+                raise ValueError("experiment results are not ready at the expected generation")
+            summary = self._experiment_summary(experiment_id)
+            if not summary["paired_seed_count"]:
+                raise ValueError("experiment cannot be finalized without a complete paired result")
+            if any(not item.get("paired_initialization") for item in summary["pairs"] if "delta_tlp_minus_maxpool" in item):
+                raise ValueError("paired experiment initialization lineage does not match")
+            tracker_export = self.tracker.export_experiment(experiment_id)
+            if any(session["session"]["status"] == "running" for session in tracker_export["sessions"]):
+                raise ValueError("tracker sessions must be finalized before experiment result")
+            value = experiment.get_experiment(self.repository, experiment_id)
+            revision = experiment.latest_revision(self.repository, experiment_id)
+            artifact_refs = [item.to_dict() for item in self._experiment_records(experiment_id, "artifact_ref")]
+            result_payload = {
+                "schema": "adaos.research.experiment_result.v1",
+                "experiment_id": experiment_id,
+                "experiment_revision_id": revision.record_id,
+                "conditions_digest": revision.payload["conditions_digest"],
+                "execution_profile": lifecycle.get("execution_profile"),
+                "evidence_class": (
+                    "workflow_validation"
+                    if lifecycle.get("execution_profile") == "preflight"
+                    else "confirmatory"
+                ),
+                "summary": summary,
+                "tracker_export_digest": tracker_export["export_digest"],
+                "artifact_refs": artifact_refs,
+                "finalized_by": actor,
+                "finalized_at": now(),
+            }
+            result_id = identity(
+                "experiment_result",
+                {
+                    "experiment_id": experiment_id,
+                    "revision_id": revision.record_id,
+                    "summary_digest": digest(summary),
+                    "tracker_export_digest": tracker_export["export_digest"],
+                },
+            )
+            result = self.repository.put(
+                ResearchRecord(
+                    "experiment_result",
+                    result_id,
+                    value.study_id,
+                    revision.generation,
+                    result_payload,
+                )
+            )
+            transition_result = experiment.transition(
+                self.repository,
+                experiment_id=experiment_id,
+                command="finalize",
+                expected_generation=expected_generation,
+                idempotency_key=f"{idempotency_key}:transition",
+                actor=actor,
+                execution_profile=lifecycle.get("execution_profile"),
+                evidence_refs=(result.digest, tracker_export["export_digest"]),
+            )
+            return {
+                "result": result.to_dict(),
+                "tracker_export": tracker_export,
+                "lifecycle": transition_result,
+                "verification": self.verify_experiment_result(result_id),
+            }
+
+        return self.repository.once(idempotency_key, "finalize_experiment", apply)
+
+    def verify_experiment_result(self, result_id: str) -> dict[str, Any]:
+        result = self.repository.get("experiment_result", result_id)
+        if result is None:
+            raise KeyError(result_id)
+        errors: list[str] = []
+        tracker_export = self.tracker.export_experiment(str(result.payload["experiment_id"]))
+        if tracker_export["export_digest"] != result.payload["tracker_export_digest"]:
+            errors.append("tracker_export_digest_mismatch")
+        for record in result.payload.get("artifact_refs") or []:
+            payload = dict(record["payload"])
+            uri = str(payload["uri"])
+            if not uri.startswith("skill-data:"):
+                errors.append(f"unsupported_artifact_uri:{uri}")
+                continue
+            path = self._runtime_data_root() / uri.split(":", 1)[1]
+            if not path.is_file():
+                errors.append(f"missing_artifact:{uri}")
+            elif digest(path.read_bytes()) != payload["digest"]:
+                errors.append(f"artifact_digest:{uri}")
+        return {
+            "schema": "adaos.research.experiment_result_verification.v1",
+            "result_id": result_id,
+            "ok": not errors,
+            "errors": errors,
+            "tracker_export_digest": tracker_export["export_digest"],
+            "checked_artifacts": len(result.payload.get("artifact_refs") or []),
+        }
+
+    def experiment_status(self, experiment_id: str) -> dict[str, Any]:
+        value = experiment.get_experiment(self.repository, experiment_id)
+        revision = experiment.latest_revision(self.repository, experiment_id)
+        lifecycle = experiment.state(self.repository, experiment_id)
+        runs = self._experiment_records(experiment_id, "run")
+        bindings = self._attempt_bindings(experiment_id)
+        attempts = []
+        for binding in bindings:
+            initial = dict(binding.payload["initial_attempt"])
+            status = self._latest_attempt_status(experiment_id, str(binding.payload["attempt_id"]), str(initial["status"]))
+            attempts.append(
+                {
+                    "attempt_id": binding.payload["attempt_id"],
+                    "run_id": binding.payload["run_id"],
+                    "arm_id": binding.payload["arm_id"],
+                    "seed": binding.payload["seed"],
+                    "attempt_number": binding.payload["attempt_number"],
+                    "status": status,
+                    "terminal": status in {"succeeded", "failed", "cancelled", "lost"},
+                    "session_id": binding.payload["session_id"],
+                    "workdir": binding.payload["workdir"],
+                }
+            )
+        observations = self._experiment_records(experiment_id, "observation")
+        artifacts = self._experiment_records(experiment_id, "artifact_ref")
+        results = self._experiment_records(experiment_id, "experiment_result")
+        dataset = dict(dict(revision.payload["conditions"])["dataset"])
+        data_root_value = str(dataset.get("data_root") or "").strip()
+        data_root = Path(data_root_value) if data_root_value else self._runtime_data_root() / "files" / "datasets"
+        dataset_ready = all(
+            (data_root / "stl10_binary" / name).is_file()
+            for name in ("train_X.bin", "train_y.bin", "test_X.bin", "test_y.bin")
+        )
+        tracker_health = self.tracker.health()
+        return {
+            "schema": "adaos.research.experiment_workbench.v1",
+            "experiment": value.to_dict(),
+            "revision": revision.to_dict(),
+            "revision_count": len(experiment.revisions(self.repository, experiment_id)),
+            "conditions_document": json.dumps(revision.payload["conditions"], ensure_ascii=False, sort_keys=True, indent=2),
+            "lifecycle": lifecycle,
+            "dataset": {"ready": dataset_ready, "root": str(data_root), "download_declared": bool(dataset.get("download"))},
+            "tracker": tracker_health,
+            "runs": [item.to_dict() for item in runs],
+            "attempts": attempts,
+            "observations": [item.to_dict() for item in observations],
+            "artifacts": [item.to_dict() for item in artifacts],
+            "summary": self._experiment_summary(experiment_id),
+            "result": results[-1].to_dict() if results else None,
+            "result_verification": self.verify_experiment_result(results[-1].record_id) if results else None,
+        }
+
+    def experiment_attempts(self, experiment_id: str) -> dict[str, Any]:
+        status = self.experiment_status(experiment_id)
+        return {"schema": "adaos.research.attempt_list.v1", "items": status["attempts"]}
+
+    def experiment_pairs(self, experiment_id: str) -> dict[str, Any]:
+        return {"schema": "adaos.research.pair_result_list.v1", "items": self._experiment_summary(experiment_id)["pairs"]}
+
+    def experiment_artifacts(self, experiment_id: str) -> dict[str, Any]:
+        items = []
+        for record in self._experiment_records(experiment_id, "artifact_ref"):
+            payload = dict(record.payload)
+            items.append(
+                {
+                    "artifact_id": record.record_id,
+                    "role": payload["role"],
+                    "run_id": payload["run_id"],
+                    "attempt_id": payload["attempt_id"],
+                    "uri": payload["uri"],
+                    "digest": payload["digest"],
+                    "size_bytes": payload["size_bytes"],
+                    "media_type": payload["media_type"],
+                }
+            )
+        return {"schema": "adaos.research.artifact_list.v1", "items": items}
 
     def unblind_test(
         self,

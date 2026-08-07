@@ -33,6 +33,19 @@ MIGRATIONS = (
             "CREATE INDEX tracker_observations_run ON tracker_observations(run_id, name)",
         ),
     ),
+    RelationalMigration(
+        version=3,
+        name="attempt-aware tracker contract journal",
+        idempotent=True,
+        statements=(
+            "CREATE TABLE tracker_sessions (session_id TEXT PRIMARY KEY, provider_id TEXT NOT NULL, study_id TEXT NOT NULL, experiment_id TEXT NOT NULL, experiment_revision_id TEXT NOT NULL, trial_id TEXT NOT NULL, run_id TEXT NOT NULL, attempt_id TEXT NOT NULL, status TEXT NOT NULL, parameters_json TEXT NOT NULL, tags_json TEXT NOT NULL, inputs_json TEXT NOT NULL, provider_binding_json TEXT NOT NULL, completeness_json TEXT NOT NULL, opened_at TEXT NOT NULL, closed_at TEXT)",
+            "CREATE UNIQUE INDEX tracker_sessions_attempt ON tracker_sessions(attempt_id)",
+            "CREATE INDEX tracker_sessions_experiment ON tracker_sessions(experiment_id, opened_at)",
+            "CREATE TABLE tracker_events (event_id TEXT PRIMARY KEY, session_id TEXT NOT NULL, event_kind TEXT NOT NULL, payload_json TEXT NOT NULL, payload_digest TEXT NOT NULL, observed_at TEXT NOT NULL, ingested_at TEXT NOT NULL, delivery_state TEXT NOT NULL, provider_receipt_json TEXT NOT NULL)",
+            "CREATE INDEX tracker_events_session ON tracker_events(session_id, observed_at, event_id)",
+            "CREATE INDEX tracker_events_delivery ON tracker_events(delivery_state, ingested_at)",
+        ),
+    ),
 )
 
 

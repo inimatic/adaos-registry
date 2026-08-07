@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import uuid
+from argparse import Namespace
 from pathlib import Path
 
 import jsonschema
@@ -14,6 +15,8 @@ if str(_SKILL_ROOT) not in sys.path:
 
 from research.contracts import ResearchRecord, identity
 from research.manager import ResearchManager
+from research.tlp_runner import run as run_tlp
+from research.tracker import TrackerConflict
 from research.workflow import TRANSITIONS
 from migrations.data_migration import migrate as migrate_runtime_data
 
@@ -38,6 +41,30 @@ def _create(manager: ResearchManager, suffix: str) -> dict:
         study_id=study_id,
         idempotency_key=f"create:{suffix}",
     )
+
+
+def _experiment_conditions() -> dict:
+    return {
+        "schema": "adaos.research.tlp_experiment_conditions.v1",
+        "dataset": {"name": "STL10", "version": "binary-2011", "split_seed": 7, "validation_per_class": 1, "download": False},
+        "operators": {
+            "location": "pool2",
+            "arms": [
+                {"id": "maxpool", "kind": "torch.nn.MaxPool2d"},
+                {"id": "tlp", "kind": "centered-channelwise-max-plus", "initialization": "zero"},
+            ],
+        },
+        "execution": {
+            "preflight": {"epochs": 1, "seeds": [17], "batch_size": 10, "max_train_samples": 10, "max_validation_samples": 10},
+            "confirmatory": {"epochs": 120, "seeds": [17, 29], "batch_size": 32},
+        },
+        "randomization": {
+            "paired": True,
+            "named_streams": ["initialization", "data_ordering", "augmentation", "operator_initialization", "analysis"],
+        },
+        "analysis": {"paired": True, "primary_metric": "validation.top1_accuracy"},
+        "tracker": {"provider": "local-tracker"},
+    }
 
 
 def _advance(manager: ResearchManager, study_id: str, command: str, generation: int) -> dict:
@@ -255,3 +282,128 @@ def test_reserved_runtime_migration_imports_repository_from_installed_skill(tmp_
     assert result["staged"] is True
     assert result["provider_id"] == "sqlite"
     assert result["health"]["ok"] is True
+
+
+def test_experiment_revisions_lock_and_attempt_aware_tracker_contract() -> None:
+    manager = ResearchManager()
+    created = _create(manager, f"experiment-{uuid.uuid4().hex}")
+    study_id = created["study"]["record_id"]
+    experiment_id = identity("experiment", {"study_id": study_id, "slug": "E001"})
+    first = manager.create_experiment(
+        study_id=study_id,
+        slug="E001",
+        title="STL-10 pool2 control",
+        purpose="Contract vertical",
+        conditions=_experiment_conditions(),
+        experiment_id=experiment_id,
+        idempotency_key=f"{experiment_id}:create",
+    )
+    revised_conditions = _experiment_conditions()
+    revised_conditions["execution"]["preflight"]["epochs"] = 3
+    revised = manager.revise_experiment(
+        experiment_id=experiment_id,
+        expected_revision=1,
+        conditions=revised_conditions,
+        rationale="Use the three-epoch workflow profile",
+        actor="user:test",
+        idempotency_key=f"{experiment_id}:revise:2",
+    )
+    assert revised["revision"]["payload"]["parent_revision_id"] == first["revision"]["record_id"]
+    assert revised["revision"]["payload"]["revision"] == 2
+    manager.submit_experiment_review(
+        experiment_id=experiment_id,
+        expected_generation=0,
+        idempotency_key=f"{experiment_id}:review",
+        actor="user:test",
+    )
+    _advance(manager, study_id, "submit_protocol_review", 0)
+    locked = manager.lock_experiment(
+        experiment_id=experiment_id,
+        expected_generation=1,
+        idempotency_key=f"{experiment_id}:lock",
+        actor="user:test",
+    )
+    assert locked["state"] == "locked"
+    with pytest.raises(ValueError, match="cannot be rewritten"):
+        manager.revise_experiment(
+            experiment_id=experiment_id,
+            expected_revision=2,
+            conditions=revised_conditions,
+            rationale="illegal rewrite",
+            actor="user:test",
+            idempotency_key=f"{experiment_id}:revise:illegal",
+        )
+
+    common = {
+        "study_id": study_id,
+        "experiment_id": experiment_id,
+        "experiment_revision_id": revised["revision"]["record_id"],
+        "trial_id": "trial.contract",
+        "run_id": "run.contract",
+        "parameters": {"epochs": 3},
+        "tags": {"adaos.run_id": "run.contract"},
+    }
+    first_session = manager.tracker.open_session(
+        session_id="session.contract.1", attempt_id="attempt.contract.1", **common
+    )
+    second_session = manager.tracker.open_session(
+        session_id="session.contract.2", attempt_id="attempt.contract.2", **common
+    )
+    assert first_session["run_id"] == second_session["run_id"]
+    assert first_session["attempt_id"] != second_session["attempt_id"]
+    observation = {
+        "metric": {"namespace": "tlp", "name": "top1_accuracy"},
+        "value": 0.5,
+        "value_type": "float",
+        "split_role": "validation",
+        "step": {"axis": "epoch", "value": 1},
+        "producer": {"attempt_id": "attempt.contract.1", "sequence": 1},
+    }
+    receipt = manager.tracker.append_observations("session.contract.1", [observation])
+    duplicate = manager.tracker.append_observations("session.contract.1", [observation])
+    assert receipt["accepted"] == duplicate["duplicates"]
+    conflicting = {**observation, "value": 0.75}
+    with pytest.raises(TrackerConflict, match="conflict"):
+        manager.tracker.append_observations("session.contract.1", [conflicting])
+    exported = manager.tracker.close_session(
+        "session.contract.1", "succeeded", {"observations_complete": True}
+    )
+    assert exported["session"]["attempt_id"] == "attempt.contract.1"
+    assert exported["events"][0]["payload"]["metric"]["name"] == "top1_accuracy"
+
+
+def test_real_tlp_runner_executes_one_cpu_epoch_on_binary_contract_fixture(tmp_path: Path) -> None:
+    binary = tmp_path / "dataset" / "stl10_binary"
+    binary.mkdir(parents=True)
+    generator = __import__("random").Random(17)
+    train_count = 20
+    test_count = 10
+    (binary / "train_X.bin").write_bytes(bytes(generator.randrange(256) for _ in range(train_count * 3 * 96 * 96)))
+    (binary / "train_y.bin").write_bytes(bytes((index % 10) + 1 for index in range(train_count)))
+    (binary / "test_X.bin").write_bytes(bytes(generator.randrange(256) for _ in range(test_count * 3 * 96 * 96)))
+    (binary / "test_y.bin").write_bytes(bytes((index % 10) + 1 for index in range(test_count)))
+    output = tmp_path / "run"
+    result = run_tlp(
+        Namespace(
+            operator="tlp",
+            seed=17,
+            epochs=1,
+            batch_size=10,
+            learning_rate=0.001,
+            max_train_samples=10,
+            max_validation_samples=10,
+            validation_per_class=1,
+            split_seed=7,
+            cpu_threads=1,
+            data_root=str(tmp_path / "dataset"),
+            output_dir=str(output),
+            evidence_class="test-only",
+            download=False,
+        )
+    )
+    assert result["operator"] == "tlp"
+    assert result["epochs"] == 1
+    assert result["tlp_components"]["centered_sum_max_abs"] < 1e-6
+    assert {path.name for path in output.iterdir()} >= {
+        "result.json", "observations.ndjson", "checkpoint.pt", "predictions.jsonl", "artifacts.json"
+    }

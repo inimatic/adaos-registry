@@ -10,6 +10,7 @@
   "fixtures": [
     {"from": 0, "to": 1, "expected_tables": ["research_records", "research_events", "research_commands"]},
     {"from": 1, "to": 2, "expected_tables": ["tracker_runs", "tracker_observations"]},
-    {"from": 2, "to": 2, "expected": "idempotent-noop"}
+    {"from": 2, "to": 3, "expected_tables": ["tracker_sessions", "tracker_events"]},
+    {"from": 3, "to": 3, "expected": "idempotent-noop"}
   ]
 }

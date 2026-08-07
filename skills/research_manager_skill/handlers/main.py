@@ -13,6 +13,7 @@ if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
 from research.manager import ResearchManager
+from research.contracts import digest
 
 
 def _manager() -> ResearchManager:
@@ -117,6 +118,189 @@ def run_fixture(
         seed=seed,
         idempotency_key=idempotency_key,
     )
+
+
+@tool("create_experiment")
+def create_experiment(
+    study_id: str,
+    slug: str,
+    title: str,
+    purpose: str,
+    conditions: Mapping[str, Any],
+    idempotency_key: str,
+    experiment_id: str | None = None,
+) -> dict[str, Any]:
+    return _manager().create_experiment(
+        study_id=study_id,
+        slug=slug,
+        title=title,
+        purpose=purpose,
+        conditions=conditions,
+        experiment_id=experiment_id,
+        idempotency_key=idempotency_key,
+    )
+
+
+@tool("revise_experiment")
+def revise_experiment(
+    experiment_id: str,
+    expected_revision: int,
+    conditions: Mapping[str, Any],
+    rationale: str,
+    idempotency_key: str,
+    actor: str = "user:local",
+) -> dict[str, Any]:
+    return _manager().revise_experiment(
+        experiment_id=experiment_id,
+        expected_revision=expected_revision,
+        conditions=conditions,
+        rationale=rationale,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
+@tool("revise_experiment_json")
+def revise_experiment_json(
+    experiment_id: str,
+    expected_revision: int,
+    conditions_json: str,
+    rationale: str,
+    idempotency_key: str = "",
+    actor: str = "user:local",
+) -> dict[str, Any]:
+    return _manager().revise_experiment_json(
+        experiment_id=experiment_id,
+        expected_revision=expected_revision,
+        conditions_json=conditions_json,
+        rationale=rationale,
+        actor=actor,
+        idempotency_key=idempotency_key or f"ui:revise:{experiment_id}:{expected_revision}:{digest(conditions_json)}",
+    )
+
+
+@tool("submit_experiment_review")
+def submit_experiment_review(
+    experiment_id: str,
+    expected_generation: int,
+    idempotency_key: str = "",
+    actor: str = "user:local",
+) -> dict[str, Any]:
+    return _manager().submit_experiment_review(
+        experiment_id=experiment_id,
+        expected_generation=expected_generation,
+        idempotency_key=idempotency_key or f"ui:review:{experiment_id}:{expected_generation}",
+        actor=actor,
+    )
+
+
+@tool("lock_experiment")
+def lock_experiment(
+    experiment_id: str,
+    expected_generation: int,
+    idempotency_key: str = "",
+    actor: str = "user:local",
+) -> dict[str, Any]:
+    return _manager().lock_experiment(
+        experiment_id=experiment_id,
+        expected_generation=expected_generation,
+        idempotency_key=idempotency_key or f"ui:lock:{experiment_id}:{expected_generation}",
+        actor=actor,
+    )
+
+
+@tool("start_experiment")
+def start_experiment(
+    experiment_id: str,
+    profile: str,
+    expected_generation: int,
+    idempotency_key: str = "",
+    actor: str = "user:local",
+) -> dict[str, Any]:
+    return _manager().start_experiment(
+        experiment_id=experiment_id,
+        profile=profile,
+        expected_generation=expected_generation,
+        idempotency_key=idempotency_key or f"ui:start:{experiment_id}:{profile}:{expected_generation}",
+        actor=actor,
+    )
+
+
+@tool("reconcile_experiment")
+def reconcile_experiment(experiment_id: str, actor: str = "user:local") -> dict[str, Any]:
+    return _manager().reconcile_experiment(experiment_id, actor=actor)
+
+
+@tool("cancel_experiment")
+def cancel_experiment(
+    experiment_id: str,
+    expected_generation: int,
+    idempotency_key: str = "",
+    actor: str = "user:local",
+) -> dict[str, Any]:
+    return _manager().cancel_experiment(
+        experiment_id=experiment_id,
+        expected_generation=expected_generation,
+        idempotency_key=idempotency_key or f"ui:cancel:{experiment_id}:{expected_generation}",
+        actor=actor,
+    )
+
+
+@tool("retry_run")
+def retry_run(
+    experiment_id: str,
+    run_id: str,
+    expected_generation: int,
+    idempotency_key: str = "",
+    actor: str = "user:local",
+) -> dict[str, Any]:
+    return _manager().retry_run(
+        experiment_id=experiment_id,
+        run_id=run_id,
+        expected_generation=expected_generation,
+        idempotency_key=idempotency_key or f"ui:retry:{experiment_id}:{run_id}:{expected_generation}",
+        actor=actor,
+    )
+
+
+@tool("finalize_experiment")
+def finalize_experiment(
+    experiment_id: str,
+    expected_generation: int,
+    idempotency_key: str = "",
+    actor: str = "user:local",
+) -> dict[str, Any]:
+    return _manager().finalize_experiment(
+        experiment_id=experiment_id,
+        expected_generation=expected_generation,
+        idempotency_key=idempotency_key or f"ui:finalize:{experiment_id}:{expected_generation}",
+        actor=actor,
+    )
+
+
+@tool("verify_experiment_result")
+def verify_experiment_result(result_id: str) -> dict[str, Any]:
+    return _manager().verify_experiment_result(result_id)
+
+
+@tool("get_experiment")
+def get_experiment(experiment_id: str) -> dict[str, Any]:
+    return _manager().experiment_status(experiment_id)
+
+
+@tool("list_experiment_attempts")
+def list_experiment_attempts(experiment_id: str) -> dict[str, Any]:
+    return _manager().experiment_attempts(experiment_id)
+
+
+@tool("list_experiment_pairs")
+def list_experiment_pairs(experiment_id: str) -> dict[str, Any]:
+    return _manager().experiment_pairs(experiment_id)
+
+
+@tool("list_experiment_artifacts")
+def list_experiment_artifacts(experiment_id: str) -> dict[str, Any]:
+    return _manager().experiment_artifacts(experiment_id)
 
 
 @tool("unblind_test")
