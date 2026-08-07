@@ -1,6 +1,7 @@
 name: research_manager_skill
-version: 0.1.0
-description: Provider-neutral governed research manager, local tracker, evidence exporter, and deterministic fixture runner.
+version: 0.2.0
+description: Provider-neutral governed research manager, local tracker, evidence exporter,
+  and deterministic fixture runner.
 entry: handlers/main.py
 runtime:
   kind: service
@@ -34,136 +35,272 @@ lifecycle:
 default_tool: get_study
 tools:
 - name: ensure_schema
-  description: Apply checksum-pinned research repository migrations and report the redacted binding.
+  description: Apply checksum-pinned research repository migrations and report the
+    redacted binding.
   entry: handlers.main:ensure_schema
-  input_schema: {type: object, additionalProperties: false}
-  output_schema: {type: object}
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
 - name: rehydrate
   description: Re-open the durable repository after activation or restart.
   entry: handlers.main:rehydrate
-  input_schema: {type: object, additionalProperties: false}
-  output_schema: {type: object}
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
 - name: create_study
-  description: Create an immutable study, hypothesis, protocol, plan, and isolated split bindings.
+  description: Create an immutable study, hypothesis, protocol, plan, and isolated
+    split bindings.
   entry: handlers.main:create_study
   input_schema:
     type: object
-    required: [title, hypothesis, protocol, analysis_plan, splits, idempotency_key]
+    required:
+    - title
+    - hypothesis
+    - protocol
+    - analysis_plan
+    - splits
+    - idempotency_key
     properties:
-      title: {type: string}
-      hypothesis: {type: string}
-      protocol: {type: object}
-      analysis_plan: {type: object}
-      splits: {type: object}
-      mode: {enum: [exploratory, confirmatory]}
-      study_id: {type: [string, 'null']}
-      idempotency_key: {type: string}
-  output_schema: {type: object}
+      title:
+        type: string
+      hypothesis:
+        type: string
+      protocol:
+        type: object
+      analysis_plan:
+        type: object
+      splits:
+        type: object
+      mode:
+        enum:
+        - exploratory
+        - confirmatory
+      study_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+  output_schema:
+    type: object
 - name: advance_workflow
   description: Apply one generation-checked governed research lifecycle command.
   entry: handlers.main:advance_workflow
   input_schema:
     type: object
-    required: [study_id, command, expected_generation, idempotency_key]
+    required:
+    - study_id
+    - command
+    - expected_generation
+    - idempotency_key
     properties:
-      study_id: {type: string}
-      command: {type: string}
-      expected_generation: {type: integer}
-      idempotency_key: {type: string}
-      actor: {type: string}
-      evidence_refs: {type: array, items: {type: string}}
-  output_schema: {type: object}
+      study_id:
+        type: string
+      command:
+        type: string
+      expected_generation:
+        type: integer
+      idempotency_key:
+        type: string
+      actor:
+        type: string
+      evidence_refs:
+        type: array
+        items:
+          type: string
+  output_schema:
+    type: object
 - name: amend_protocol
-  description: Create a lineage-linked protocol version and explicitly retain or invalidate prior trials.
+  description: Create a lineage-linked protocol version and explicitly retain or invalidate
+    prior trials.
   entry: handlers.main:amend_protocol
   input_schema:
     type: object
-    required: [study_id, content, reason, prior_trials, expected_generation, idempotency_key]
+    required:
+    - study_id
+    - content
+    - reason
+    - prior_trials
+    - expected_generation
+    - idempotency_key
     properties:
-      study_id: {type: string}
-      content: {type: object}
-      reason: {type: string}
-      prior_trials: {enum: [retain, invalidate]}
-      expected_generation: {type: integer}
-      idempotency_key: {type: string}
-      actor: {type: string}
-  output_schema: {type: object}
+      study_id:
+        type: string
+      content:
+        type: object
+      reason:
+        type: string
+      prior_trials:
+        enum:
+        - retain
+        - invalidate
+      expected_generation:
+        type: integer
+      idempotency_key:
+        type: string
+      actor:
+        type: string
+  output_schema:
+    type: object
 - name: materialize_trials
-  description: Materialize paired immutable trial groups from a locked protocol and analysis plan.
+  description: Materialize paired immutable trial groups from a locked protocol and
+    analysis plan.
   entry: handlers.main:materialize_trials
   input_schema:
     type: object
-    required: [study_id, matrix, idempotency_key]
+    required:
+    - study_id
+    - matrix
+    - idempotency_key
     properties:
-      study_id: {type: string}
-      matrix: {type: array, items: {type: object}}
-      idempotency_key: {type: string}
-  output_schema: {type: object}
+      study_id:
+        type: string
+      matrix:
+        type: array
+        items:
+          type: object
+      idempotency_key:
+        type: string
+  output_schema:
+    type: object
 - name: run_fixture
-  description: Run the deterministic no-training fixture while preserving run and physical attempt identities.
+  description: Run the deterministic no-training fixture while preserving run and
+    physical attempt identities.
   entry: handlers.main:run_fixture
   timeout_seconds: 30
   input_schema:
     type: object
-    required: [study_id, trial_id, split_role, seed, idempotency_key]
+    required:
+    - study_id
+    - trial_id
+    - split_role
+    - seed
+    - idempotency_key
     properties:
-      study_id: {type: string}
-      trial_id: {type: string}
-      split_role: {enum: [validation, robustness, test]}
-      seed: {type: integer}
-      idempotency_key: {type: string}
-  output_schema: {type: object}
+      study_id:
+        type: string
+      trial_id:
+        type: string
+      split_role:
+        enum:
+        - validation
+        - robustness
+        - test
+      seed:
+        type: integer
+      idempotency_key:
+        type: string
+  output_schema:
+    type: object
 - name: unblind_test
   description: Auditably unblind the sealed test binding after the QC gate.
   entry: handlers.main:unblind_test
   input_schema:
     type: object
-    required: [study_id, expected_generation, idempotency_key, reason, evidence_refs]
+    required:
+    - study_id
+    - expected_generation
+    - idempotency_key
+    - reason
+    - evidence_refs
     properties:
-      study_id: {type: string}
-      expected_generation: {type: integer}
-      idempotency_key: {type: string}
-      reason: {type: string}
-      evidence_refs: {type: array, minItems: 1, items: {type: string}}
-      actor: {type: string}
-  output_schema: {type: object}
+      study_id:
+        type: string
+      expected_generation:
+        type: integer
+      idempotency_key:
+        type: string
+      reason:
+        type: string
+      evidence_refs:
+        type: array
+        minItems: 1
+        items:
+          type: string
+      actor:
+        type: string
+  output_schema:
+    type: object
 - name: export_evidence
   description: Finalize one portable content-addressed evidence manifest.
   entry: handlers.main:export_evidence
   input_schema:
     type: object
-    required: [study_id]
-    properties: {study_id: {type: string}}
-  output_schema: {type: object}
+    required:
+    - study_id
+    properties:
+      study_id:
+        type: string
+  output_schema:
+    type: object
 - name: verify_evidence
-  description: Deterministically verify an evidence manifest and every research-record reference.
+  description: Deterministically verify an evidence manifest and every research-record
+    reference.
   entry: handlers.main:verify_evidence
   input_schema:
     type: object
-    required: [bundle_id]
-    properties: {bundle_id: {type: string}}
-  output_schema: {type: object}
+    required:
+    - bundle_id
+    properties:
+      bundle_id:
+        type: string
+  output_schema:
+    type: object
 - name: decide_claim
   description: Record a claim review decision over a verified evidence bundle.
   entry: handlers.main:decide_claim
   input_schema:
     type: object
-    required: [study_id, verdict, rationale, bundle_id, expected_generation, idempotency_key]
+    required:
+    - study_id
+    - verdict
+    - rationale
+    - bundle_id
+    - expected_generation
+    - idempotency_key
     properties:
-      study_id: {type: string}
-      verdict: {enum: [accepted, rejected, inconclusive]}
-      rationale: {type: string}
-      bundle_id: {type: string}
-      expected_generation: {type: integer}
-      idempotency_key: {type: string}
-      actor: {type: string}
-  output_schema: {type: object}
+      study_id:
+        type: string
+      verdict:
+        enum:
+        - accepted
+        - rejected
+        - inconclusive
+      rationale:
+        type: string
+      bundle_id:
+        type: string
+      expected_generation:
+        type: integer
+      idempotency_key:
+        type: string
+      actor:
+        type: string
+  output_schema:
+    type: object
 - name: get_study
   description: Return the event-derived workflow state, entity counts, and audit history.
   entry: handlers.main:get_study
   input_schema:
     type: object
-    required: [study_id]
-    properties: {study_id: {type: string}}
-  output_schema: {type: object}
-updated_at: '2026-08-07T15:30:00+03:00'
+    required:
+    - study_id
+    properties:
+      study_id:
+        type: string
+  output_schema:
+    type: object
+updated_at: '2026-08-07T12:31:12+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.703+4668.73e02306
+    recorded_at: '2026-08-07T12:31:12+00:00'
+    source: skill_push
+    min_commit: 73e02306a7402706985c415c5ecd2a0208c2db9e
+    min_short_commit: 73e02306
+    build_date: '2026-08-07T15:19:15+03:00'
+
