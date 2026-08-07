@@ -24,7 +24,7 @@ from adaos.sdk.execution import (
 from research import evidence, experiment
 from research.contracts import ResearchRecord, canonical_json, digest, identity, now
 from research.repository import ResearchRepository
-from research.tracker import LocalTracker, normalize_observation
+from research.tracker import LocalTracker, MlflowTracker, normalize_observation
 from research.workflow import state as workflow_state
 from research.workflow import transition
 
@@ -33,6 +33,19 @@ class ResearchManager:
     def __init__(self) -> None:
         self.repository = ResearchRepository()
         self.tracker = LocalTracker(self.repository)
+        self._trackers: dict[str, Any] = {"local-tracker": self.tracker}
+
+    def _tracker_provider(self, provider_id: str):
+        provider_id = str(provider_id or "local-tracker")
+        if provider_id not in self._trackers:
+            if provider_id != "mlflow":
+                raise ValueError(f"unsupported tracker provider: {provider_id}")
+            endpoint = str(os.getenv("ADAOS_MLFLOW_TRACKING_URI") or "http://127.0.0.1:18121")
+            self._trackers[provider_id] = MlflowTracker(self.repository, endpoint)
+        return self._trackers[provider_id]
+
+    def _tracker_for_binding(self, binding: ResearchRecord):
+        return self._tracker_provider(str(binding.payload.get("tracker_provider") or "local-tracker"))
 
     def create_study(
         self,
@@ -583,6 +596,11 @@ class ResearchManager:
         value = experiment.get_experiment(self.repository, experiment_id)
         revision = experiment.latest_revision(self.repository, experiment_id)
         conditions = dict(revision.payload["conditions"])
+        tracker_provider = str(dict(conditions.get("tracker") or {}).get("provider") or "local-tracker")
+        tracker = self._tracker_provider(tracker_provider)
+        tracker_health = tracker.health()
+        if not bool(tracker_health.get("ok")):
+            raise RuntimeError(f"tracker provider {tracker_provider} is not ready")
         profile_conditions = dict(dict(conditions["execution"])[profile])
         protocol = self.repository.list(value.study_id, "protocol")[-1]
         analysis_plan = self.repository.list(value.study_id, "analysis_plan")[-1]
@@ -698,6 +716,8 @@ class ResearchManager:
         command_key: str,
     ) -> dict[str, Any]:
         conditions = dict(revision.payload["conditions"])
+        tracker_provider = str(dict(conditions.get("tracker") or {}).get("provider") or "local-tracker")
+        tracker = self._tracker_provider(tracker_provider)
         profile_conditions = dict(dict(conditions["execution"])[profile])
         streams = {
             name: seed + offset
@@ -843,6 +863,7 @@ class ResearchManager:
                     "attempt_id": attempt.attempt_id,
                     "attempt_number": attempt_number,
                     "session_id": session_id,
+                    "tracker_provider": tracker_provider,
                     "profile": profile,
                     "arm_id": arm_id,
                     "seed": seed,
@@ -851,7 +872,7 @@ class ResearchManager:
                 },
             )
         )
-        self.tracker.open_session(
+        tracker.open_session(
             session_id=session_id,
             study_id=trial.study_id,
             experiment_id=experiment_id,
@@ -939,7 +960,8 @@ class ResearchManager:
         if not path.is_file():
             return []
         session_id = str(binding.payload["session_id"])
-        session = self.tracker.get_session(session_id)
+        tracker = self._tracker_for_binding(binding)
+        session = tracker.get_session(session_id)
         values: list[dict[str, Any]] = []
         lines = path.read_text(encoding="utf-8").splitlines()
         for index, line in enumerate(lines):
@@ -954,8 +976,8 @@ class ResearchManager:
             values.append(normalize_observation(session, payload))
         if not values:
             return []
-        receipt = self.tracker.append_observations(session_id, values)
-        exported = self.tracker.export_session(session_id)
+        receipt = tracker.append_observations(session_id, values)
+        exported = tracker.export_session(session_id)
         by_id = {
             item["event_id"]: item
             for item in exported["events"]
@@ -1014,8 +1036,9 @@ class ResearchManager:
                 }
             )
         session_id = str(binding.payload["session_id"])
-        receipt = self.tracker.append_artifacts(session_id, artifacts)
-        exported = self.tracker.export_session(session_id)
+        tracker = self._tracker_for_binding(binding)
+        receipt = tracker.append_artifacts(session_id, artifacts)
+        exported = tracker.export_session(session_id)
         by_id = {
             item["event_id"]: item
             for item in exported["events"]
@@ -1070,7 +1093,7 @@ class ResearchManager:
                     artifacts = self._ingest_attempt_artifacts(binding)
                 else:
                     artifacts = []
-                self.tracker.close_session(
+                self._tracker_for_binding(binding).close_session(
                     str(binding.payload["session_id"]),
                     attempt.status,
                     {
@@ -1287,6 +1310,14 @@ class ResearchManager:
             tracker_export = self.tracker.export_experiment(experiment_id)
             if any(session["session"]["status"] == "running" for session in tracker_export["sessions"]):
                 raise ValueError("tracker sessions must be finalized before experiment result")
+            pending = [
+                event["event_id"]
+                for session in tracker_export["sessions"]
+                for event in session["events"]
+                if event["delivery_state"] != "delivered"
+            ]
+            if pending:
+                raise ValueError(f"tracker delivery is incomplete for {len(pending)} event(s)")
             value = experiment.get_experiment(self.repository, experiment_id)
             revision = experiment.latest_revision(self.repository, experiment_id)
             artifact_refs = [item.to_dict() for item in self._experiment_records(experiment_id, "artifact_ref")]
@@ -1405,7 +1436,8 @@ class ResearchManager:
             (data_root / "stl10_binary" / name).is_file()
             for name in ("train_X.bin", "train_y.bin", "test_X.bin", "test_y.bin")
         )
-        tracker_health = self.tracker.health()
+        tracker_provider = str(dict(dict(revision.payload["conditions"]).get("tracker") or {}).get("provider") or "local-tracker")
+        tracker_health = self._tracker_provider(tracker_provider).health()
         return {
             "schema": "adaos.research.experiment_workbench.v1",
             "experiment": value.to_dict(),

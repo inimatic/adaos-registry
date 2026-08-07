@@ -54,6 +54,12 @@ def validate_conditions(conditions: Mapping[str, Any]) -> dict[str, Any]:
     analysis = dict(value["analysis"])
     if not bool(analysis.get("paired")) or not str(analysis.get("primary_metric") or "").strip():
         raise ValueError("analysis must declare a paired primary metric")
+    tracker = dict(value.get("tracker") or {"provider": "local-tracker"})
+    if str(tracker.get("provider") or "local-tracker") not in {"local-tracker", "mlflow"}:
+        raise ValueError("tracker.provider must be local-tracker or mlflow")
+    if str(tracker.get("required_delivery") or "durable-before-finalize") != "durable-before-finalize":
+        raise ValueError("tracker.required_delivery must be durable-before-finalize")
+    value["tracker"] = tracker
     return value
 
 

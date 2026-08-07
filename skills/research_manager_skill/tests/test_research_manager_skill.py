@@ -16,7 +16,7 @@ if str(_SKILL_ROOT) not in sys.path:
 from research.contracts import ResearchRecord, identity
 from research.manager import ResearchManager
 from research.tlp_runner import run as run_tlp
-from research.tracker import TrackerConflict
+from research.tracker import MlflowTracker, TrackerConflict
 from research.workflow import TRANSITIONS
 from migrations.data_migration import migrate as migrate_runtime_data
 
@@ -370,6 +370,110 @@ def test_experiment_revisions_lock_and_attempt_aware_tracker_contract() -> None:
     )
     assert exported["session"]["attempt_id"] == "attempt.contract.1"
     assert exported["events"][0]["payload"]["metric"]["name"] == "top1_accuracy"
+
+
+def test_mlflow_provider_projects_only_new_journal_events_per_attempt(monkeypatch: pytest.MonkeyPatch) -> None:
+    manager = ResearchManager()
+    provider = MlflowTracker(manager.repository, "http://127.0.0.1:18121")
+    calls: list[tuple[str, dict | None]] = []
+    remote_run_exists = False
+
+    def request(path: str, payload: dict | None = None, *, method: str | None = None) -> dict:
+        nonlocal remote_run_exists
+        calls.append((path, payload))
+        if path.startswith("/api/2.0/mlflow/experiments/get-by-name"):
+            return {"experiment": {"experiment_id": "42"}}
+        if path == "/api/2.0/mlflow/runs/search":
+            return {"runs": [{"info": {"run_id": "mlflow-run-1"}}]} if remote_run_exists else {"runs": []}
+        if path == "/api/2.0/mlflow/runs/create":
+            remote_run_exists = True
+            return {"run": {"info": {"run_id": "mlflow-run-1"}}}
+        if path.startswith("/api/2.0/mlflow/runs/get"):
+            return {"run": {"data": {"params": []}}}
+        if path in {"/api/2.0/mlflow/runs/log-batch", "/api/2.0/mlflow/runs/update"}:
+            return {}
+        raise AssertionError(path)
+
+    monkeypatch.setattr(provider, "_request", request)
+    provider.open_session(
+        session_id="session.mlflow.1",
+        study_id="study.mlflow",
+        experiment_id="experiment.mlflow",
+        experiment_revision_id="revision.mlflow",
+        trial_id="trial.mlflow",
+        run_id="run.mlflow",
+        attempt_id="attempt.mlflow.1",
+        parameters={"epochs": 3},
+        tags={"adaos.profile": "preflight"},
+        inputs=({"kind": "dataset", "name": "STL10"},),
+    )
+    observation = {
+        "metric": {"namespace": "tlp", "name": "top1_accuracy"},
+        "value": 0.5,
+        "value_type": "float",
+        "split_role": "validation",
+        "step": {"axis": "epoch", "value": 1},
+        "producer": {"attempt_id": "attempt.mlflow.1", "sequence": 1},
+    }
+    first = provider.append_observations("session.mlflow.1", [observation])
+    second = provider.append_observations("session.mlflow.1", [observation])
+    assert first["projection"]["state"] == "delivered"
+    assert second["duplicates"] == first["accepted"]
+    metric_batches = [
+        payload
+        for path, payload in calls
+        if path == "/api/2.0/mlflow/runs/log-batch" and payload and payload.get("metrics")
+    ]
+    assert len(metric_batches) == 1
+    assert metric_batches[0]["metrics"][0]["key"] == "validation.tlp.top1_accuracy"
+    exported = provider.export_session("session.mlflow.1")
+    assert exported["session"]["provider_id"] == "mlflow"
+    assert exported["events"][0]["delivery_state"] == "delivered"
+
+
+def test_live_mlflow_provider_contract_when_endpoint_is_declared() -> None:
+    import os
+
+    endpoint = str(os.getenv("ADAOS_TEST_MLFLOW_URI") or "").strip()
+    if not endpoint:
+        pytest.skip("ADAOS_TEST_MLFLOW_URI is not configured")
+    manager = ResearchManager()
+    provider = MlflowTracker(manager.repository, endpoint)
+    suffix = uuid.uuid4().hex
+    session_id = f"session.live.{suffix}"
+    attempt_id = f"attempt.live.{suffix}"
+    provider.open_session(
+        session_id=session_id,
+        study_id=f"study.live.{suffix}",
+        experiment_id=f"experiment.live.{suffix}",
+        experiment_revision_id=f"revision.live.{suffix}",
+        trial_id=f"trial.live.{suffix}",
+        run_id=f"run.live.{suffix}",
+        attempt_id=attempt_id,
+        parameters={"epochs": 3, "operator": "tlp"},
+        tags={"adaos.profile": "contract"},
+    )
+    receipt = provider.append_observations(
+        session_id,
+        [
+            {
+                "metric": {"namespace": "tlp", "name": "top1_accuracy"},
+                "value": 0.5,
+                "value_type": "float",
+                "split_role": "validation",
+                "step": {"axis": "epoch", "value": 1},
+                "producer": {"attempt_id": attempt_id, "sequence": 1},
+            }
+        ],
+    )
+    assert receipt["projection"]["state"] == "delivered"
+    closed = provider.close_session(
+        session_id,
+        "succeeded",
+        {"observations_complete": True, "artifacts_complete": True},
+    )
+    assert closed["session"]["status"] == "succeeded"
+    assert closed["events"][0]["provider_receipt"]["mlflow_run_id"]
 
 
 def test_real_tlp_runner_executes_one_cpu_epoch_on_binary_contract_fixture(tmp_path: Path) -> None:
