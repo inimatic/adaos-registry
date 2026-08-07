@@ -1,6 +1,7 @@
 name: mlflow_tracker_skill
-version: 0.1.0
-description: Supervised MLflow tracking provider and native query UI for the AdaOS research tracker contract.
+version: 0.1.1
+description: Supervised MLflow tracking provider and native query UI for the AdaOS
+  research tracker contract.
 entry: handlers/main.py
 runtime:
   kind: service
@@ -37,7 +38,8 @@ tools:
   output_schema:
     type: object
 - name: provider_health
-  description: Check the supervised MLflow tracking server and its declared provider contract.
+  description: Check the supervised MLflow tracking server and its declared provider
+    contract.
   entry: handlers.main:provider_health
   input_schema:
     type: object
@@ -45,7 +47,8 @@ tools:
   output_schema:
     type: object
 - name: get_tracking_ui
-  description: Return the safe top-level navigation target for the native MLflow query UI.
+  description: Return the safe top-level navigation target for the native MLflow query
+    UI.
   entry: handlers.main:get_tracking_ui
   input_schema:
     type: object
@@ -60,3 +63,13 @@ tools:
     additionalProperties: false
   output_schema:
     type: object
+updated_at: '2026-08-07T23:24:48+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.714+4716.d28d2b42
+    recorded_at: '2026-08-07T23:24:48+00:00'
+    source: skill_push
+    min_commit: d28d2b4293c142802ec0e8ff4bb0c82dafaedd0e
+    min_short_commit: d28d2b42
+    build_date: '2026-08-08T02:13:02+03:00'
+
