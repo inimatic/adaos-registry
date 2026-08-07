@@ -30,6 +30,19 @@ def test_manifest_binds_only_declared_research_skill_routes() -> None:
     assert manifest["steps"][1]["args"]["command"] == "submit_protocol_review"
 
 
+def test_desktop_surface_binds_read_only_study_status() -> None:
+    manifest = yaml.safe_load((ROOT / "scenario.yaml").read_text(encoding="utf-8"))
+    webui = _json("webui.json")
+    page = webui["ui"]["application"]["desktop"]["pageSchema"]
+    status = next(widget for widget in page["widgets"] if widget["id"] == "tlp-study-status")
+
+    assert manifest["type"] == "desktop"
+    assert manifest["ui"] == {"manifest": "webui.json"}
+    assert status["dataSource"]["name"] == "research_manager_skill.get_study"
+    assert status["dataSource"]["params"]["study_id"] == "$state.studyId"
+    assert page["initialState"]["studyId"] == manifest["steps"][0]["args"]["study_id"]
+
+
 def test_package_preserves_research_gates_and_seals_test_access() -> None:
     workflow = _json("workflow.json")
     transitions = {item["transition_id"]: item for item in workflow["transitions"]}

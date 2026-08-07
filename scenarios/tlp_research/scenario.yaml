@@ -1,10 +1,13 @@
 id: tlp_research
 name: tlp_research
-version: 0.1.2
+version: 0.1.3
 title: TLP Mechanistic Research
 description: Governed confirmatory study of layer-specific non-flat morphological
   max-plus pooling.
-type: workflow
+type: desktop
+supported_locales:
+- en
+- ru
 depends:
 - research_manager_skill
 runtime:
@@ -14,6 +17,8 @@ runtime:
     optional: []
 workflow:
   manifest: workflow.json
+ui:
+  manifest: webui.json
 trigger: manual
 vars:
   study_title: TLP layer-specific spatial selectivity
@@ -59,5 +64,5 @@ steps:
     expected_generation: '0'
     idempotency_key: tlp-scenario-review-v1
     actor: user:scenario
-updated_at: '2026-08-07T12:48:18+00:00'
+updated_at: '2026-08-07T17:34:34+00:00'
 

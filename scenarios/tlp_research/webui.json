@@ -1,0 +1,82 @@
+{
+  "$schema": "../../../src/adaos/abi/webui.v1.schema.json",
+  "schema": "adaos.webui.v1",
+  "ui": {
+    "application": {
+      "version": "1.0",
+      "desktop": {
+        "pageSchema": {
+          "id": "tlp_research",
+          "title": "TLP Research • Исследование TLP",
+          "layout": {
+            "type": "split",
+            "pattern": "focus-detail",
+            "areas": [
+              {"id": "main", "role": "main"},
+              {"id": "context", "role": "aux"}
+            ],
+            "auxWidth": 360
+          },
+          "initialState": {
+            "studyId": "study.ee75f7af4b82a95e6525aeb11efe51cfbf6fdf45f58e382cb030bd3f6542675c"
+          },
+          "widgets": [
+            {
+              "id": "tlp-study-status",
+              "area": "main",
+              "type": "item.details",
+              "title": "Study status • Статус исследования",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_manager_skill.get_study",
+                "params": {"study_id": "$state.studyId"},
+                "cacheTtlMs": 0,
+                "invalidationTags": ["tlp-research"],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "fields": [
+                  {"label": "Title • Название", "path": "study.payload.title"},
+                  {"label": "Mode • Режим", "path": "study.payload.mode"},
+                  {"label": "Workflow state • Состояние", "path": "workflow.state"},
+                  {"label": "Generation • Поколение", "path": "workflow.generation"},
+                  {"label": "Study ID", "path": "study.record_id"},
+                  {"label": "Records • Записи", "path": "counts"}
+                ]
+              }
+            },
+            {
+              "id": "tlp-study-context",
+              "area": "context",
+              "type": "item.details",
+              "title": "Protocol context • Контекст протокола",
+              "dataSource": {
+                "kind": "static",
+                "value": {
+                  "question": "Does layer-specific channel-wise non-flat max-plus pooling improve paired validation accuracy and shift consistency?",
+                  "dataset": "STL10",
+                  "operatorLocation": "pool2",
+                  "pairedSeeds": 10,
+                  "testAccess": "sealed until QC approval",
+                  "evidenceClass": "local conformance; no confirmatory TLP claim"
+                }
+              },
+              "inputs": {
+                "fields": [
+                  {"label": "Question • Вопрос", "path": "question"},
+                  {"label": "Dataset", "path": "dataset"},
+                  {"label": "Operator location", "path": "operatorLocation"},
+                  {"label": "Paired seeds", "path": "pairedSeeds"},
+                  {"label": "Test access", "path": "testAccess"},
+                  {"label": "Evidence", "path": "evidenceClass"}
+                ]
+              }
+            }
+          ],
+          "surfaceClass": "research-workbench",
+          "surfaceObjectKind": "study"
+        }
+      }
+    }
+  }
+}
