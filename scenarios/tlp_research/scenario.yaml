@@ -70,11 +70,11 @@ steps:
   call: research_manager_skill.create_experiment
   args:
     study_id: study.ee75f7af4b82a95e6525aeb11efe51cfbf6fdf45f58e382cb030bd3f6542675c
-    experiment_id: experiment.9856b6fc68b96cf125db54f696d273792015ec24a6f1aefa96b6d157ac39e4c4
-    slug: E001
-    title: STL-10 pool2 centered TLP vs MaxPool
+    experiment_id: experiment.0670d0bc1c99cb6a89af74f0f56457a5d785e2991dd5eba83219ec2d58db63e5
+    slug: E002
+    title: STL-10 pool2 centered TLP vs MaxPool (instrumentation-corrected)
     purpose: Paired control experiment for the AdaOS Single Experiment Control and Tracking vertical.
-    idempotency_key: tlp-scenario-e001-v1
+    idempotency_key: tlp-scenario-e002-v1
     conditions:
       schema: adaos.research.tlp_experiment_conditions.v1
       dataset:

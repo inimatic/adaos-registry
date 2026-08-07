@@ -7,7 +7,7 @@
       "desktop": {
         "pageSchema": {
           "id": "tlp_research",
-          "title": "TLP Research • Experiment E001",
+          "title": "TLP Research • Experiment E002",
           "layout": {
             "type": "split",
             "pattern": "focus-detail",
@@ -20,7 +20,7 @@
           },
           "initialState": {
             "studyId": "study.ee75f7af4b82a95e6525aeb11efe51cfbf6fdf45f58e382cb030bd3f6542675c",
-            "experimentId": "experiment.9856b6fc68b96cf125db54f696d273792015ec24a6f1aefa96b6d157ac39e4c4",
+            "experimentId": "experiment.0670d0bc1c99cb6a89af74f0f56457a5d785e2991dd5eba83219ec2d58db63e5",
             "activeView": "conditions",
             "experimentState": "draft",
             "experimentGeneration": 0,
@@ -122,7 +122,7 @@
               "id": "experiment-status",
               "area": "context",
               "type": "item.details",
-              "title": "E001 status",
+              "title": "E002 status",
               "dataSource": {
                 "kind": "skill",
                 "name": "research_manager_skill.get_experiment",
