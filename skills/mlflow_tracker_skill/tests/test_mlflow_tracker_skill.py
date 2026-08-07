@@ -26,12 +26,19 @@ def test_server_storage_is_skill_scoped() -> None:
     assert artifacts == (root / "files" / "artifacts").as_uri()
     assert "--allowed-hosts" in command
     assert command[command.index("--allowed-hosts") + 1] == "127.0.0.1:*,localhost:*"
+    assert command[command.index("--workers") + 1] == "1"
     assert Path(command[0]) == service_python()
     assert any(
         "site-packages" in item.lower()
         for item in server_environment()["PYTHONPATH"].split(os.pathsep)
         if item
     )
+
+
+def test_server_worker_count_can_be_overridden(monkeypatch) -> None:
+    monkeypatch.setenv("ADAOS_MLFLOW_WORKERS", "2")
+    command = server_command()
+    assert command[command.index("--workers") + 1] == "2"
 
 
 def test_pinned_mlflow_client_roundtrip(tmp_path: Path) -> None:

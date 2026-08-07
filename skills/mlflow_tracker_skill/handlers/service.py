@@ -39,6 +39,7 @@ def server_command() -> list[str]:
     artifacts.mkdir(parents=True, exist_ok=True)
     host = str(os.getenv("ADAOS_SERVICE_HOST") or "127.0.0.1")
     port = str(int(os.getenv("ADAOS_SERVICE_PORT") or "18121"))
+    workers = str(max(1, int(os.getenv("ADAOS_MLFLOW_WORKERS") or "1")))
     backend_uri = str(os.getenv("ADAOS_MLFLOW_BACKEND_STORE_URI") or f"sqlite:///{database.as_posix()}")
     artifact_uri = str(os.getenv("ADAOS_MLFLOW_ARTIFACTS_DESTINATION") or artifacts.as_uri())
     return [
@@ -50,6 +51,8 @@ def server_command() -> list[str]:
         host,
         "--port",
         port,
+        "--workers",
+        workers,
         "--backend-store-uri",
         backend_uri,
         "--artifacts-destination",
