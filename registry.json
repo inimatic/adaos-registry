@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-07T21:35:00+00:00",
+  "updated_at": "2026-08-07T23:24:29+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -400,6 +400,37 @@
     },
     {
       "kind": "skill",
+      "id": "mlflow_tracker_skill",
+      "name": "mlflow_tracker_skill",
+      "version": "0.1.0",
+      "updated_at": "2026-08-07T23:15:48+00:00",
+      "path": "skills/mlflow_tracker_skill",
+      "manifest": "skills/mlflow_tracker_skill/skill.yaml",
+      "source": {
+        "path": "skills/mlflow_tracker_skill",
+        "manifest": "skills/mlflow_tracker_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "mlflow_tracker_skill",
+        "id": "mlflow_tracker_skill"
+      },
+      "description": "Supervised MLflow tracking provider and native query UI for the AdaOS research tracker contract.",
+      "entry": "handlers/main.py",
+      "activation": {
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "tlp_research"
+          ]
+        },
+        "startup_allowed": true,
+        "background_refresh": false
+      },
+      "tools_count": 4
+    },
+    {
+      "kind": "skill",
       "id": "neural_nlu_service_skill",
       "name": "neural_nlu_service_skill",
       "version": "0.2.17",
@@ -656,42 +687,10 @@
     },
     {
       "kind": "skill",
-      "id": "mlflow_tracker_skill",
-      "name": "mlflow_tracker_skill",
-      "version": "0.1.0",
-      "updated_at": "2026-08-07T21:35:00+00:00",
-      "path": "skills/mlflow_tracker_skill",
-      "manifest": "skills/mlflow_tracker_skill/skill.yaml",
-      "source": {
-        "path": "skills/mlflow_tracker_skill",
-        "manifest": "skills/mlflow_tracker_skill/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "mlflow_tracker_skill",
-        "id": "mlflow_tracker_skill"
-      },
-      "description": "Supervised MLflow tracking provider and native query UI for the AdaOS research tracker contract.",
-      "entry": "handlers/main.py",
-      "runtime_python": "3.11",
-      "activation": {
-        "mode": "lazy",
-        "when": {
-          "scenarios_active": [
-            "tlp_research"
-          ]
-        },
-        "startup_allowed": true,
-        "background_refresh": false
-      },
-      "tools_count": 4
-    },
-    {
-      "kind": "skill",
       "id": "research_manager_skill",
       "name": "research_manager_skill",
-      "version": "0.4.0",
-      "updated_at": "2026-08-07T17:34:13+00:00",
+      "version": "0.5.0",
+      "updated_at": "2026-08-07T23:24:29+00:00",
       "path": "skills/research_manager_skill",
       "manifest": "skills/research_manager_skill/skill.yaml",
       "source": {
@@ -715,7 +714,7 @@
         "startup_allowed": true,
         "background_refresh": false
       },
-      "tools_count": 12
+      "tools_count": 27
     },
     {
       "kind": "skill",
@@ -756,7 +755,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-08-07T14:49:27+00:00",
+      "updated_at": "2026-08-07T23:15:49+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
@@ -1341,7 +1340,8 @@
       "trigger": "manual",
       "skills": {
         "required": [
-          "research_manager_skill"
+          "research_manager_skill",
+          "mlflow_tracker_skill"
         ]
       }
     },
