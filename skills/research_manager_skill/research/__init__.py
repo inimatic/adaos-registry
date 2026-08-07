@@ -1,0 +1,1 @@
+"""Research manager domain package."""

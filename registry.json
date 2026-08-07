@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-06T15:51:16+00:00",
+  "updated_at": "2026-08-07T15:30:00+03:00",
   "skills": [
     {
       "kind": "skill",
@@ -653,6 +653,37 @@
         "background_refresh": false
       },
       "tools_count": 9
+    },
+    {
+      "kind": "skill",
+      "id": "research_manager_skill",
+      "name": "research_manager_skill",
+      "version": "0.1.0",
+      "updated_at": "2026-08-07T15:30:00+03:00",
+      "path": "skills/research_manager_skill",
+      "manifest": "skills/research_manager_skill/skill.yaml",
+      "source": {
+        "path": "skills/research_manager_skill",
+        "manifest": "skills/research_manager_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "research_manager_skill",
+        "id": "research_manager_skill"
+      },
+      "description": "Provider-neutral governed research manager, local tracker, evidence exporter, and deterministic fixture runner.",
+      "entry": "handlers/main.py",
+      "activation": {
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "tlp_research"
+          ]
+        },
+        "startup_allowed": true,
+        "background_refresh": false
+      },
+      "tools_count": 12
     },
     {
       "kind": "skill",

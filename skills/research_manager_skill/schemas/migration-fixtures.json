@@ -1,0 +1,15 @@
+{
+  "schema": "adaos.research.migration_fixtures.v1",
+  "compatibility": {
+    "patch": "same runtime bucket; migrations must be additive and checksum stable",
+    "minor": "new bucket; reserved migration stages owner data before activation",
+    "major": "new bucket; explicit export/import or operator-approved compatibility adapter required",
+    "forward_reader": "v1 readers reject unknown required schema versions",
+    "backward_reader": "v2 repository retains all v1 immutable records and migration checksums"
+  },
+  "fixtures": [
+    {"from": 0, "to": 1, "expected_tables": ["research_records", "research_events", "research_commands"]},
+    {"from": 1, "to": 2, "expected_tables": ["tracker_runs", "tracker_observations"]},
+    {"from": 2, "to": 2, "expected": "idempotent-noop"}
+  ]
+}

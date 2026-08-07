@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.evidence_manifest.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "study_id", "content_refs", "verification", "manifest_digest"],
+  "properties": {
+    "schema": {"const": "adaos.research.evidence_manifest.v1"},
+    "study_id": {"type": "string"},
+    "content_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["uri", "digest", "size_bytes", "media_type", "kind", "record_id"],
+        "properties": {
+          "uri": {"type": "string"},
+          "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "size_bytes": {"type": "integer", "minimum": 0},
+          "media_type": {"type": "string"},
+          "kind": {"type": "string"},
+          "record_id": {"type": "string"}
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "required": ["operation", "algorithm"],
+      "properties": {"operation": {"const": "research_manager_skill.verify_evidence"}, "algorithm": {"const": "sha256-canonical-json-v1"}}
+    },
+    "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  }
+}
