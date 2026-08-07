@@ -16,6 +16,21 @@ def data_root() -> Path:
     return Path(env_path).resolve().parent.parent
 
 
+def service_python() -> Path:
+    base = Path(str(getattr(sys, "_base_executable", "") or ""))
+    return base if base.is_file() else Path(sys.executable)
+
+
+def server_environment() -> dict[str, str]:
+    env = dict(os.environ)
+    entries = [str(item) for item in sys.path if str(item).strip()]
+    existing = str(env.get("PYTHONPATH") or "").strip()
+    if existing:
+        entries.extend(existing.split(os.pathsep))
+    env["PYTHONPATH"] = os.pathsep.join(dict.fromkeys(entries))
+    return env
+
+
 def server_command() -> list[str]:
     root = data_root()
     database = root / "db" / "mlflow.db"
@@ -27,7 +42,7 @@ def server_command() -> list[str]:
     backend_uri = str(os.getenv("ADAOS_MLFLOW_BACKEND_STORE_URI") or f"sqlite:///{database.as_posix()}")
     artifact_uri = str(os.getenv("ADAOS_MLFLOW_ARTIFACTS_DESTINATION") or artifacts.as_uri())
     return [
-        sys.executable,
+        str(service_python()),
         "-m",
         "mlflow",
         "server",
@@ -45,7 +60,13 @@ def server_command() -> list[str]:
 
 
 def main() -> None:
-    process = subprocess.Popen(server_command())  # noqa: S603 - fixed argv, no shell
+    # Bypass the Windows venv launcher.  Its intermediate process may exit
+    # while the real interpreter remains alive, which makes the AdaOS
+    # supervisor adopt an untracked endpoint and breaks restart semantics.
+    process = subprocess.Popen(  # noqa: S603 - fixed argv, no shell
+        server_command(),
+        env=server_environment(),
+    )
 
     def stop(_signum: int, _frame: object) -> None:
         if process.poll() is None:

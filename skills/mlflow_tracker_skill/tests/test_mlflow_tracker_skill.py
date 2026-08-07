@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from handlers.main import get_tracking_ui, provider_descriptor
-from handlers.service import data_root, server_command
+from handlers.service import data_root, server_command, server_environment, service_python
 
 
 def test_descriptor_exposes_tracker_contract_without_claiming_authority() -> None:
@@ -25,6 +26,12 @@ def test_server_storage_is_skill_scoped() -> None:
     assert artifacts == (root / "files" / "artifacts").as_uri()
     assert "--allowed-hosts" in command
     assert command[command.index("--allowed-hosts") + 1] == "127.0.0.1:*,localhost:*"
+    assert Path(command[0]) == service_python()
+    assert any(
+        "site-packages" in item.lower()
+        for item in server_environment()["PYTHONPATH"].split(os.pathsep)
+        if item
+    )
 
 
 def test_pinned_mlflow_client_roundtrip(tmp_path: Path) -> None:
