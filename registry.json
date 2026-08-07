@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-07T15:30:00+03:00",
+  "updated_at": "2026-08-07T12:27:55+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1284,6 +1284,32 @@
       "skills": {
         "required": [
           "test05_recipes_skill"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "tlp_research",
+      "name": "tlp_research",
+      "version": "0.1.1",
+      "updated_at": "2026-08-07T12:27:55+00:00",
+      "path": "scenarios/tlp_research",
+      "manifest": "scenarios/tlp_research/scenario.yaml",
+      "source": {
+        "path": "scenarios/tlp_research",
+        "manifest": "scenarios/tlp_research/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "tlp_research",
+        "id": "tlp_research"
+      },
+      "title": "TLP Mechanistic Research",
+      "description": "Governed confirmatory study of layer-specific non-flat morphological max-plus pooling.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "research_manager_skill"
         ]
       }
     },

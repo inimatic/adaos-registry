@@ -1,0 +1,30 @@
+{
+  "schema": "adaos.research.exploratory_provenance.v1",
+  "source": {"display_name": "TropicalMaxPoo1.ipynb", "location_disclosed": false, "executed": false},
+  "classification": "exploratory_only",
+  "sanitization": {
+    "source_code_embedded": false,
+    "cell_outputs_embedded": false,
+    "execution_counts_removed": true,
+    "local_and_cloud_paths_removed": true,
+    "credentials_removed": true,
+    "reason": "Preserve hypothesis provenance without importing executable notebook state or unverified outputs."
+  },
+  "selected_cells": [
+    {"index": 9, "purpose": "STL10 pool2 comparison", "source_digest": "sha256:8acb7eeca6a5848631976ec8a6ff9ff387d19f8cac2a234bbed30f8b63730119", "source_chars": 8516},
+    {"index": 17, "purpose": "exploratory gradient-alignment analysis", "source_digest": "sha256:6e2e6762550945d06d26b05bcff154df673626048491e4405e19974c00b80661", "source_chars": 6407},
+    {"index": 29, "purpose": "repeat STL10 pool2 comparison", "source_digest": "sha256:6b9cca525e60ac9394f23a6a154049f9484a55692a7a1cde1729651f432b5c8a", "source_chars": 5639},
+    {"index": 51, "purpose": "CIFAR10 comparison run 1", "source_digest": "sha256:2f4e0e4a0ec38727bbb2b9e610aa6375ab12be0d7a90a9ad06bd56b697ec85db", "source_chars": 8204},
+    {"index": 52, "purpose": "CIFAR10 comparison run 2", "source_digest": "sha256:b07e1590f8d8d5ea3f5459d2450906f9a1c845b1ed55cd7048d0682c284b5cb8", "source_chars": 8232},
+    {"index": 53, "purpose": "CIFAR10 comparison run 3", "source_digest": "sha256:53f7d3a76ff2d8d3f0bf5bd45b02d1d876b45ab15689f0233dbb6a52e756c505", "source_chars": 8229},
+    {"index": 60, "purpose": "final comparison with invalid min-pool control", "source_digest": "sha256:c4927cc73bb10cd5e6771b8e9459d1be5828ee24811164ca91aba16c6def7de3", "source_chars": 10855}
+  ],
+  "known_integrity_findings": [
+    "random train augmentation was also used for STL10 test evaluation",
+    "comparisons were not seed-paired",
+    "test data was reused for design selection",
+    "the declared min-pool branch instantiated MaxPool",
+    "shared four-parameter and channel-wise operators were mixed",
+    "raw four-weight PCA includes a non-spatial common-shift degree of freedom"
+  ]
+}

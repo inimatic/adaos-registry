@@ -1,0 +1,150 @@
+{
+  "schema": "adaos.workflow.definition.v1",
+  "workflow_type": "research.study",
+  "definition_version": "1.0.0",
+  "aggregate_type": "research.study",
+  "initial_state": "draft",
+  "states": [
+    {"id": "draft", "label": "Draft", "terminal": false},
+    {"id": "protocol_review", "label": "Protocol review", "terminal": false},
+    {"id": "locked", "label": "Protocol locked", "terminal": false},
+    {"id": "smoke", "label": "Smoke qualification", "terminal": false},
+    {"id": "executing", "label": "Execution", "terminal": false},
+    {"id": "qc", "label": "Quality control", "terminal": false},
+    {"id": "unblinded", "label": "Test unblinded", "terminal": false},
+    {"id": "analysis", "label": "Analysis", "terminal": false},
+    {"id": "claim_review", "label": "Claim review", "terminal": false},
+    {"id": "complete", "label": "Complete", "terminal": true}
+  ],
+  "commands": [
+    {"id": "submit_protocol_review", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+    {"id": "lock_protocol", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "minItems": 2, "items": {"type": "string"}}}, "required": ["evidence_refs"], "additionalProperties": false}},
+    {"id": "approve_smoke", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+    {"id": "start_execution", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+    {"id": "complete_execution", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+    {"id": "unblind_test", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}}}, "required": ["evidence_refs"], "additionalProperties": false}},
+    {"id": "run_analysis", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+    {"id": "submit_claim_review", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+    {"id": "decide_claim", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "minItems": 2, "items": {"type": "string"}}}, "required": ["evidence_refs"], "additionalProperties": false}}
+  ],
+  "transitions": [
+    {
+      "schema": "adaos.workflow.transition.v1", "transition_id": "submit_protocol_review", "source": "draft", "target": "protocol_review",
+      "trigger": {"kind": "command", "command": "submit_protocol_review", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+      "context": {"target_resolution": "instance", "command_context_required": false},
+      "authority": {"actors": ["user", "skill"], "permissions": ["research.manage"]},
+      "guards": [{"id": "always", "params": {}, "reason_code": "protocol_review_blocked"}],
+      "concurrency": {"conflict_scope": "study", "requires_generation": true, "idempotency": "required"},
+      "risk": {"class": "isolated_write", "side_effect": "reversible", "confirmation": "none"},
+      "effect": {"activity": "research_manager_skill.advance_workflow", "transaction": "outbox", "retry": "bounded", "compensation": "research.return_to_draft"},
+      "recovery": {"timeout_seconds": 60, "heartbeat_seconds": 10, "cancellation": "cooperative", "reconciliation": "required_on_unknown"},
+      "outcomes": {"success": "target", "failure": "source", "input_required": "source", "cancelled": "source", "unknown": "source"},
+      "evidence": {"required": false, "minimum": 0}, "approval": {"required": false, "policy_refs": []},
+      "async_reply": {"mode": "terminal", "reply_route": "origin"},
+      "capability_requirements": {"required": ["storage.relational"], "optional": ["buttons"], "fallback": "numbered_text"},
+      "explanations": {"allowed": "Protocol is ready for review", "rejected": "Protocol review is blocked", "completed": "Protocol review started"},
+      "events": {"emitted": ["research.protocol.review_started"], "outbox": true},
+      "observability": {"audit_event": "research.workflow.audit", "redaction": "policy", "metrics": ["research_transition_total"], "trace": true},
+      "migration": {"introduced_in": "1.0.0", "aliases": []}
+    },
+    {
+      "schema": "adaos.workflow.transition.v1", "transition_id": "lock_protocol", "source": "protocol_review", "target": "locked",
+      "trigger": {"kind": "command", "command": "lock_protocol", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "minItems": 2, "items": {"type": "string"}}}, "required": ["evidence_refs"], "additionalProperties": false}},
+      "context": {"target_resolution": "instance", "command_context_required": false}, "authority": {"actors": ["user"], "permissions": ["research.manage"]},
+      "guards": [{"id": "input_present", "params": {"field": "evidence_refs"}, "reason_code": "protocol_evidence_required"}],
+      "concurrency": {"conflict_scope": "study", "requires_generation": true, "idempotency": "required"},
+      "risk": {"class": "trial_activation", "side_effect": "reversible", "confirmation": "rich_review"},
+      "effect": {"activity": "research_manager_skill.advance_workflow", "transaction": "outbox", "retry": "bounded", "compensation": "research.amend_protocol"},
+      "recovery": {"timeout_seconds": 60, "heartbeat_seconds": 10, "cancellation": "cooperative", "reconciliation": "required_on_unknown"},
+      "outcomes": {"success": "target", "failure": "source", "input_required": "source", "cancelled": "source", "unknown": "source"},
+      "evidence": {"required": true, "minimum": 2}, "approval": {"required": true, "policy_refs": ["research.protocol_lock"]},
+      "async_reply": {"mode": "terminal", "reply_route": "origin"}, "capability_requirements": {"required": ["storage.relational"], "optional": ["rich_review"], "fallback": "numbered_text"},
+      "explanations": {"allowed": "Protocol and plan can be locked", "rejected": "Protocol evidence is incomplete", "completed": "Protocol and analysis plan locked"},
+      "events": {"emitted": ["research.protocol.locked"], "outbox": true}, "observability": {"audit_event": "research.workflow.audit", "redaction": "policy", "metrics": ["research_transition_total"], "trace": true},
+      "migration": {"introduced_in": "1.0.0", "aliases": []}
+    },
+    {
+      "schema": "adaos.workflow.transition.v1", "transition_id": "approve_smoke", "source": "locked", "target": "smoke",
+      "trigger": {"kind": "command", "command": "approve_smoke", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+      "context": {"target_resolution": "instance", "command_context_required": false}, "authority": {"actors": ["user"], "permissions": ["research.manage"]}, "guards": [{"id": "always", "params": {}, "reason_code": "smoke_blocked"}],
+      "concurrency": {"conflict_scope": "study", "requires_generation": true, "idempotency": "required"}, "risk": {"class": "isolated_write", "side_effect": "reversible", "confirmation": "none"},
+      "effect": {"activity": "research_manager_skill.advance_workflow", "transaction": "outbox", "retry": "bounded", "compensation": "research.return_to_locked"}, "recovery": {"timeout_seconds": 60, "heartbeat_seconds": 10, "cancellation": "cooperative", "reconciliation": "required_on_unknown"},
+      "outcomes": {"success": "target", "failure": "source", "input_required": "source", "cancelled": "source", "unknown": "source"}, "evidence": {"required": false, "minimum": 0}, "approval": {"required": false, "policy_refs": []},
+      "async_reply": {"mode": "terminal", "reply_route": "origin"}, "capability_requirements": {"required": ["execution.jobs"], "optional": ["progress"], "fallback": "numbered_text"},
+      "explanations": {"allowed": "Smoke qualification is available", "rejected": "Smoke qualification is blocked", "completed": "Smoke qualification approved"}, "events": {"emitted": ["research.smoke.approved"], "outbox": true},
+      "observability": {"audit_event": "research.workflow.audit", "redaction": "policy", "metrics": ["research_transition_total"], "trace": true}, "migration": {"introduced_in": "1.0.0", "aliases": []}
+    },
+    {
+      "schema": "adaos.workflow.transition.v1", "transition_id": "start_execution", "source": "smoke", "target": "executing",
+      "trigger": {"kind": "command", "command": "start_execution", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+      "context": {"target_resolution": "instance", "command_context_required": false}, "authority": {"actors": ["user", "skill"], "permissions": ["research.manage"]}, "guards": [{"id": "always", "params": {}, "reason_code": "execution_blocked"}],
+      "concurrency": {"conflict_scope": "study", "requires_generation": true, "idempotency": "required"}, "risk": {"class": "trial_activation", "side_effect": "reversible", "confirmation": "none"},
+      "effect": {"activity": "research_manager_skill.run_fixture", "transaction": "outbox", "retry": "bounded", "compensation": "research.cancel_attempts"}, "recovery": {"timeout_seconds": 86400, "heartbeat_seconds": 30, "cancellation": "cooperative", "reconciliation": "required_on_unknown"},
+      "outcomes": {"success": "target", "failure": "source", "input_required": "source", "cancelled": "source", "unknown": "source"}, "evidence": {"required": false, "minimum": 0}, "approval": {"required": false, "policy_refs": []},
+      "async_reply": {"mode": "progress_and_terminal", "reply_route": "origin"}, "capability_requirements": {"required": ["execution.jobs"], "optional": ["progress"], "fallback": "numbered_text"},
+      "explanations": {"allowed": "Execution can start", "rejected": "Execution is blocked", "completed": "Execution started"}, "events": {"emitted": ["research.execution.started"], "outbox": true},
+      "observability": {"audit_event": "research.workflow.audit", "redaction": "policy", "metrics": ["research_transition_total"], "trace": true}, "migration": {"introduced_in": "1.0.0", "aliases": []}
+    },
+    {
+      "schema": "adaos.workflow.transition.v1", "transition_id": "complete_execution", "source": "executing", "target": "qc",
+      "trigger": {"kind": "command", "command": "complete_execution", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+      "context": {"target_resolution": "instance", "command_context_required": false}, "authority": {"actors": ["user", "skill"], "permissions": ["research.manage"]}, "guards": [{"id": "always", "params": {}, "reason_code": "qc_not_ready"}],
+      "concurrency": {"conflict_scope": "study", "requires_generation": true, "idempotency": "required"}, "risk": {"class": "isolated_write", "side_effect": "reversible", "confirmation": "none"},
+      "effect": {"activity": "research_manager_skill.advance_workflow", "transaction": "outbox", "retry": "bounded", "compensation": "research.return_to_execution"}, "recovery": {"timeout_seconds": 60, "heartbeat_seconds": 10, "cancellation": "cooperative", "reconciliation": "required_on_unknown"},
+      "outcomes": {"success": "target", "failure": "source", "input_required": "source", "cancelled": "source", "unknown": "source"}, "evidence": {"required": false, "minimum": 0}, "approval": {"required": false, "policy_refs": []},
+      "async_reply": {"mode": "terminal", "reply_route": "origin"}, "capability_requirements": {"required": ["storage.relational"], "optional": ["progress"], "fallback": "numbered_text"},
+      "explanations": {"allowed": "Completed attempts can enter QC", "rejected": "Execution evidence is incomplete", "completed": "Quality control started"}, "events": {"emitted": ["research.qc.started"], "outbox": true},
+      "observability": {"audit_event": "research.workflow.audit", "redaction": "policy", "metrics": ["research_transition_total"], "trace": true}, "migration": {"introduced_in": "1.0.0", "aliases": []}
+    },
+    {
+      "schema": "adaos.workflow.transition.v1", "transition_id": "unblind_test", "source": "qc", "target": "unblinded",
+      "trigger": {"kind": "command", "command": "unblind_test", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "minItems": 1, "items": {"type": "string"}}}, "required": ["evidence_refs"], "additionalProperties": false}},
+      "context": {"target_resolution": "instance", "command_context_required": false}, "authority": {"actors": ["user"], "permissions": ["research.unblind"]}, "guards": [{"id": "input_present", "params": {"field": "evidence_refs"}, "reason_code": "qc_evidence_required"}],
+      "concurrency": {"conflict_scope": "study", "requires_generation": true, "idempotency": "required"}, "risk": {"class": "trial_activation", "side_effect": "external", "confirmation": "rich_review"},
+      "effect": {"activity": "research_manager_skill.unblind_test", "transaction": "outbox", "retry": "never", "compensation": "none"}, "recovery": {"timeout_seconds": 60, "heartbeat_seconds": 10, "cancellation": "not_applicable", "reconciliation": "always"},
+      "outcomes": {"success": "target", "failure": "source", "input_required": "source", "cancelled": "source", "unknown": "source"}, "evidence": {"required": true, "minimum": 1}, "approval": {"required": true, "policy_refs": ["research.test_unblind"]},
+      "async_reply": {"mode": "terminal", "reply_route": "origin"}, "capability_requirements": {"required": ["storage.relational"], "optional": ["rich_review"], "fallback": "numbered_text"},
+      "explanations": {"allowed": "QC permits test unblind", "rejected": "Test remains sealed until QC evidence is approved", "completed": "Test binding unblinded and audited"}, "events": {"emitted": ["research.test.unblinded"], "outbox": true},
+      "observability": {"audit_event": "research.unblind.audit", "redaction": "evidence", "metrics": ["research_unblind_total"], "trace": true}, "migration": {"introduced_in": "1.0.0", "aliases": []}
+    },
+    {
+      "schema": "adaos.workflow.transition.v1", "transition_id": "run_analysis", "source": "unblinded", "target": "analysis",
+      "trigger": {"kind": "command", "command": "run_analysis", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+      "context": {"target_resolution": "instance", "command_context_required": false}, "authority": {"actors": ["user", "skill"], "permissions": ["research.manage"]}, "guards": [{"id": "always", "params": {}, "reason_code": "analysis_blocked"}],
+      "concurrency": {"conflict_scope": "study", "requires_generation": true, "idempotency": "required"}, "risk": {"class": "isolated_write", "side_effect": "reversible", "confirmation": "none"},
+      "effect": {"activity": "research_manager_skill.advance_workflow", "transaction": "outbox", "retry": "bounded", "compensation": "research.invalidate_analysis"}, "recovery": {"timeout_seconds": 3600, "heartbeat_seconds": 30, "cancellation": "cooperative", "reconciliation": "required_on_unknown"},
+      "outcomes": {"success": "target", "failure": "source", "input_required": "source", "cancelled": "source", "unknown": "source"}, "evidence": {"required": false, "minimum": 0}, "approval": {"required": false, "policy_refs": []},
+      "async_reply": {"mode": "progress_and_terminal", "reply_route": "origin"}, "capability_requirements": {"required": ["execution.jobs"], "optional": ["progress"], "fallback": "numbered_text"},
+      "explanations": {"allowed": "Analysis can run", "rejected": "Analysis is blocked", "completed": "Analysis started"}, "events": {"emitted": ["research.analysis.started"], "outbox": true},
+      "observability": {"audit_event": "research.workflow.audit", "redaction": "policy", "metrics": ["research_transition_total"], "trace": true}, "migration": {"introduced_in": "1.0.0", "aliases": []}
+    },
+    {
+      "schema": "adaos.workflow.transition.v1", "transition_id": "submit_claim_review", "source": "analysis", "target": "claim_review",
+      "trigger": {"kind": "command", "command": "submit_claim_review", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "items": {"type": "string"}}}, "additionalProperties": false}},
+      "context": {"target_resolution": "instance", "command_context_required": false}, "authority": {"actors": ["user"], "permissions": ["research.manage"]}, "guards": [{"id": "always", "params": {}, "reason_code": "claim_review_blocked"}],
+      "concurrency": {"conflict_scope": "study", "requires_generation": true, "idempotency": "required"}, "risk": {"class": "isolated_write", "side_effect": "reversible", "confirmation": "none"},
+      "effect": {"activity": "research_manager_skill.export_evidence", "transaction": "outbox", "retry": "bounded", "compensation": "research.invalidate_evidence"}, "recovery": {"timeout_seconds": 300, "heartbeat_seconds": 30, "cancellation": "cooperative", "reconciliation": "required_on_unknown"},
+      "outcomes": {"success": "target", "failure": "source", "input_required": "source", "cancelled": "source", "unknown": "source"}, "evidence": {"required": false, "minimum": 0}, "approval": {"required": false, "policy_refs": []},
+      "async_reply": {"mode": "terminal", "reply_route": "origin"}, "capability_requirements": {"required": ["storage.relational"], "optional": ["rich_review"], "fallback": "numbered_text"},
+      "explanations": {"allowed": "Evidence can enter claim review", "rejected": "Evidence is incomplete", "completed": "Claim review started"}, "events": {"emitted": ["research.claim_review.started"], "outbox": true},
+      "observability": {"audit_event": "research.workflow.audit", "redaction": "policy", "metrics": ["research_transition_total"], "trace": true}, "migration": {"introduced_in": "1.0.0", "aliases": []}
+    },
+    {
+      "schema": "adaos.workflow.transition.v1", "transition_id": "decide_claim", "source": "claim_review", "target": "complete",
+      "trigger": {"kind": "command", "command": "decide_claim", "input_schema": {"type": "object", "properties": {"evidence_refs": {"type": "array", "minItems": 2, "items": {"type": "string"}}}, "required": ["evidence_refs"], "additionalProperties": false}},
+      "context": {"target_resolution": "instance", "command_context_required": false}, "authority": {"actors": ["user"], "permissions": ["research.decide"]}, "guards": [{"id": "input_present", "params": {"field": "evidence_refs"}, "reason_code": "verified_evidence_required"}],
+      "concurrency": {"conflict_scope": "study", "requires_generation": true, "idempotency": "required"}, "risk": {"class": "publication", "side_effect": "external", "confirmation": "rich_review"},
+      "effect": {"activity": "research_manager_skill.decide_claim", "transaction": "outbox", "retry": "never", "compensation": "none"}, "recovery": {"timeout_seconds": 300, "heartbeat_seconds": 30, "cancellation": "not_applicable", "reconciliation": "always"},
+      "outcomes": {"success": "target", "failure": "source", "input_required": "source", "cancelled": "source", "unknown": "source"}, "evidence": {"required": true, "minimum": 2}, "approval": {"required": true, "policy_refs": ["research.claim_decision"]},
+      "async_reply": {"mode": "terminal", "reply_route": "origin"}, "capability_requirements": {"required": ["storage.relational"], "optional": ["rich_review"], "fallback": "numbered_text"},
+      "explanations": {"allowed": "Verified evidence can support a claim decision", "rejected": "Verified evidence is required", "completed": "Claim decision recorded"}, "events": {"emitted": ["research.claim.decided"], "outbox": true},
+      "observability": {"audit_event": "research.claim.audit", "redaction": "policy", "metrics": ["research_claim_decision_total"], "trace": true}, "migration": {"introduced_in": "1.0.0", "aliases": []}
+    }
+  ],
+  "subworkflows": [],
+  "metadata": {
+    "owner_skill": "research_manager_skill",
+    "fixture_package": "fixtures/",
+    "policy": "package-bound; protocol amendments create a new version and reset to protocol review"
+  }
+}

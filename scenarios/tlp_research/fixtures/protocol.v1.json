@@ -1,0 +1,32 @@
+{
+  "schema": "adaos.research.protocol_fixture.v1",
+  "title": "Layer-specific behaviour and learned spatial geometry of non-flat morphological pooling",
+  "mode": "confirmatory",
+  "research_question": "Does channel-wise max-plus pooling localized to the second pooling layer improve paired generalization and shift consistency over MaxPool?",
+  "operators": {
+    "baseline": {"name": "baseline", "definition": "MaxPool2d(kernel=2,stride=2)"},
+    "max_plus": {"name": "max_plus", "definition": "max over x[c,2i+u,2j+v] + centered w[c,u,v]"}
+  },
+  "datasets": [
+    {"name": "STL10", "role": "primary", "splits": ["train", "validation", "robustness", "sealed_test"]},
+    {"name": "CIFAR10", "role": "external_replication", "splits": ["train", "validation", "sealed_test"]}
+  ],
+  "design": {
+    "paired_seeds": 10,
+    "shared_initialization": true,
+    "shared_minibatch_order": true,
+    "shared_augmentation_stream": true,
+    "train_augmentation_only": true,
+    "test_time_augmentation": false,
+    "operator_locations": ["pool1", "pool2", "pool3", "all"],
+    "primary_location": "pool2",
+    "weight_variants": ["channelwise_centered", "shared_centered"]
+  },
+  "rng_streams": ["initialization", "data_ordering", "augmentation", "operator_initialization", "analysis"],
+  "stopping": {"fixed_epochs": 120, "selection_metric": "validation_accuracy", "test_access": "after_qc_only"},
+  "known_exploratory_signals": {
+    "stl10_pool2_delta_pp": [1.57, 1.14],
+    "cifar10_six_run_mean_delta_pp": 0.26,
+    "status": "hypothesis-generating only"
+  }
+}

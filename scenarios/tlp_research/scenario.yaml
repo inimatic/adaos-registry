@@ -1,0 +1,63 @@
+id: tlp_research
+name: tlp_research
+version: 0.1.1
+title: TLP Mechanistic Research
+description: Governed confirmatory study of layer-specific non-flat morphological
+  max-plus pooling.
+type: workflow
+depends:
+- research_manager_skill
+runtime:
+  skills:
+    required:
+    - research_manager_skill
+    optional: []
+workflow:
+  manifest: workflow.json
+trigger: manual
+vars:
+  study_title: TLP layer-specific spatial selectivity
+steps:
+- name: create_tlp_study
+  call: research_manager_skill.create_study
+  args:
+    title: TLP layer-specific spatial selectivity
+    hypothesis: Channel-wise non-flat max-plus pooling in the second pooling layer
+      improves paired validation accuracy and shift consistency relative to MaxPool
+      without a universal all-layer advantage.
+    mode: confirmatory
+    study_id: study.ee75f7af4b82a95e6525aeb11efe51cfbf6fdf45f58e382cb030bd3f6542675c
+    idempotency_key: tlp-scenario-create-v1
+    protocol:
+      fixture_ref: fixtures/protocol.v1.json
+      primary_dataset: STL10
+      primary_operator_location: pool2
+      paired_seeds: '10'
+    analysis_plan:
+      fixture_ref: fixtures/analysis-plan.v1.json
+      primary_estimand: paired_accuracy_delta
+      confidence_interval: paired_bootstrap_95
+    splits:
+      validation:
+        digest: sha256:1111111111111111111111111111111111111111111111111111111111111111
+        dataset_digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        locator: dataset:stl10/validation-v1
+      robustness:
+        digest: sha256:2222222222222222222222222222222222222222222222222222222222222222
+        dataset_digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        locator: dataset:stl10/robustness-v1
+      test:
+        digest: sha256:3333333333333333333333333333333333333333333333333333333333333333
+        dataset_digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        locator: secret-ref:tlp/stl10-test-v1
+  save_as: created
+- name: submit_protocol_review
+  call: research_manager_skill.advance_workflow
+  args:
+    study_id: study.ee75f7af4b82a95e6525aeb11efe51cfbf6fdf45f58e382cb030bd3f6542675c
+    command: submit_protocol_review
+    expected_generation: '0'
+    idempotency_key: tlp-scenario-review-v1
+    actor: user:scenario
+updated_at: '2026-08-07T12:27:55+00:00'
+

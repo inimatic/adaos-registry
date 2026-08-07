@@ -1,0 +1,20 @@
+{
+  "schema": "adaos.research.analysis_plan_fixture.v1",
+  "primary_estimand": "mean paired test accuracy difference: pool2 channelwise centered max-plus minus MaxPool",
+  "primary_metric": "top1_accuracy",
+  "secondary_metrics": ["negative_log_likelihood", "expected_calibration_error", "shift_consistency", "mcnemar_discordance"],
+  "mechanistic_metrics": ["centered_h_component", "centered_v_component", "centered_checkerboard_component", "channel_stability_across_seeds"],
+  "inference": {
+    "confidence_level": 0.95,
+    "paired_bootstrap_resamples": 10000,
+    "seed_is_unit": true,
+    "report_effect_and_interval": true,
+    "multiplicity": "Holm correction for non-primary layer comparisons"
+  },
+  "decision_rule": {
+    "accepted": "primary interval excludes zero in the positive direction and no declared integrity gate fails",
+    "rejected": "primary interval excludes zero in the negative direction",
+    "inconclusive": "otherwise"
+  },
+  "integrity_gates": ["paired RNG streams", "deterministic test transform", "sealed test", "saved logits and labels", "complete trial matrix"]
+}

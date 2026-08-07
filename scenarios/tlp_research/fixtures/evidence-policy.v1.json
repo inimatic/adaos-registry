@@ -1,0 +1,9 @@
+{
+  "schema": "adaos.research.evidence_policy.v1",
+  "required_refs": ["protocol", "analysis_plan", "dataset", "split", "operator_package", "environment", "trial", "run", "attempt", "observations"],
+  "finalization": "immutable-after-analysis",
+  "verification": "sha256-canonical-json-v1",
+  "claim_review_requires_verified_bundle": true,
+  "raw_notebook_outputs_admitted": false,
+  "exploratory_provenance_admitted": true
+}

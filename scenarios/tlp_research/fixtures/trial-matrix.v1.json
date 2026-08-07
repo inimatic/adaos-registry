@@ -1,0 +1,17 @@
+{
+  "schema": "adaos.research.trial_matrix_fixture.v1",
+  "groups": [
+    {
+      "pair_key": "stl10-pool2-seed-000",
+      "dataset": "STL10",
+      "layer": "pool2",
+      "seed": 0,
+      "operators": [
+        {"name": "baseline", "variant": "flat-max"},
+        {"name": "max_plus", "variant": "channelwise-centered"}
+      ]
+    }
+  ],
+  "expansion": {"seed_range": [0, 9], "layers": ["pool1", "pool2", "pool3", "all"], "primary_pair": "pool2"},
+  "fixture_note": "The packaged no-training group proves orchestration only; full model jobs are materialized after protocol lock."
+}
