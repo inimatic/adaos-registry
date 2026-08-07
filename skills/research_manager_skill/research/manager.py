@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -333,7 +334,23 @@ class ResearchManager:
 
     @classmethod
     def _experiment_run_dir(cls, experiment_id: str, run_id: str, attempt_number: int) -> Path:
-        root = cls._runtime_data_root() / "internal" / "tlp_runs" / experiment_id / run_id / f"attempt-{attempt_number}"
+        # AdaOS record identifiers intentionally carry a full SHA-256 digest.  Two
+        # such identifiers in a runtime path cross the legacy Win32 MAX_PATH
+        # boundary before CreateProcess can enter the working directory.  The
+        # repository/binding remains the authoritative reversible mapping; the
+        # filesystem only needs a stable, collision-resistant token.
+        def path_token(prefix: str, value: str) -> str:
+            token = hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
+            return f"{prefix}-{token}"
+
+        root = (
+            cls._runtime_data_root()
+            / "internal"
+            / "tlp_runs"
+            / path_token("e", experiment_id)
+            / path_token("r", run_id)
+            / f"attempt-{attempt_number}"
+        )
         root.mkdir(parents=True, exist_ok=True)
         return root
 

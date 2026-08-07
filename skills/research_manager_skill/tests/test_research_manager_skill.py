@@ -453,6 +453,23 @@ def test_live_mlflow_provider_contract_when_endpoint_is_declared() -> None:
         parameters={"epochs": 3, "operator": "tlp"},
         tags={"adaos.profile": "contract"},
     )
+
+
+def test_experiment_workdir_does_not_embed_full_record_ids(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    env_path = tmp_path / "research_manager_skill" / "v0.4" / "venv" / "Scripts" / "python.exe"
+    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(env_path))
+    experiment_id = "experiment." + "e" * 64
+    run_id = "run." + "r" * 64
+
+    workdir = ResearchManager._experiment_run_dir(experiment_id, run_id, 2)
+    legacy = ResearchManager._runtime_data_root() / "internal" / "tlp_runs" / experiment_id / run_id / "attempt-2"
+
+    assert workdir.is_dir()
+    assert experiment_id not in str(workdir)
+    assert run_id not in str(workdir)
+    assert len(str(workdir)) <= len(str(legacy)) - 80
+    assert workdir.parts[-3].startswith("e-") and len(workdir.parts[-3]) == 26
+    assert workdir.parts[-2].startswith("r-") and len(workdir.parts[-2]) == 26
     receipt = provider.append_observations(
         session_id,
         [
