@@ -25,22 +25,33 @@ def test_manifest_binds_only_declared_research_skill_routes() -> None:
     assert [step["call"] for step in manifest["steps"]] == [
         "research_manager_skill.create_study",
         "research_manager_skill.advance_workflow",
+        "research_manager_skill.create_experiment",
     ]
     assert manifest["steps"][0]["args"]["mode"] == "confirmatory"
     assert manifest["steps"][1]["args"]["command"] == "submit_protocol_review"
 
 
-def test_desktop_surface_binds_read_only_study_status() -> None:
+def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -> None:
     manifest = yaml.safe_load((ROOT / "scenario.yaml").read_text(encoding="utf-8"))
     webui = _json("webui.json")
     page = webui["ui"]["application"]["desktop"]["pageSchema"]
-    status = next(widget for widget in page["widgets"] if widget["id"] == "tlp-study-status")
+    status = next(widget for widget in page["widgets"] if widget["id"] == "experiment-status")
+    editor = next(widget for widget in page["widgets"] if widget["id"] == "experiment-conditions")
+    actions = next(widget for widget in page["widgets"] if widget["id"] == "experiment-actions")
 
     assert manifest["type"] == "desktop"
     assert manifest["ui"] == {"manifest": "webui.json"}
-    assert status["dataSource"]["name"] == "research_manager_skill.get_study"
-    assert status["dataSource"]["params"]["study_id"] == "$state.studyId"
-    assert page["initialState"]["studyId"] == manifest["steps"][0]["args"]["study_id"]
+    assert status["dataSource"]["name"] == "research_manager_skill.get_experiment"
+    assert status["dataSource"]["params"]["experiment_id"] == "$state.experimentId"
+    assert editor["actions"][0]["target"] == "research_manager_skill.revise_experiment_json"
+    assert {item["target"] for item in actions["actions"]} >= {
+        "research_manager_skill.lock_experiment",
+        "research_manager_skill.start_experiment",
+        "research_manager_skill.cancel_experiment",
+        "research_manager_skill.reconcile_experiment",
+        "research_manager_skill.finalize_experiment",
+    }
+    assert page["initialState"]["experimentId"] == manifest["steps"][2]["args"]["experiment_id"]
 
 
 def test_package_preserves_research_gates_and_seals_test_access() -> None:
@@ -67,6 +78,7 @@ def test_package_preserves_research_gates_and_seals_test_access() -> None:
 
 def test_fixtures_are_paired_deterministic_and_provenance_only() -> None:
     protocol = _json("fixtures/protocol.v1.json")
+    experiment = _json("fixtures/experiment-e001.v1.json")
     analysis = _json("fixtures/analysis-plan.v1.json")
     evidence = _json("fixtures/evidence-policy.v1.json")
     provenance = _json("provenance/exploratory-notebook.v1.json")
@@ -80,6 +92,9 @@ def test_fixtures_are_paired_deterministic_and_provenance_only() -> None:
     assert provenance["sanitization"]["source_code_embedded"] is False
     assert provenance["sanitization"]["cell_outputs_embedded"] is False
     assert provenance["selected_cells"]
+    assert experiment["execution"]["preflight"]["epochs"] == 3
+    assert experiment["operators"]["arms"][1]["constraint"] == "theta-minus-channel-mean"
+    assert len(experiment["execution"]["confirmatory"]["seeds"]) == 10
     assert all(SHA256.fullmatch(cell["source_digest"]) for cell in provenance["selected_cells"])
 
 
@@ -95,14 +110,20 @@ def test_scenario_dry_run_reaches_protocol_review_with_typed_calls() -> None:
         calls.append(("advance_workflow", dict(args)))
         return {"accepted": True, "state": "protocol_review", "generation": 1}
 
+    def _experiment(args: dict) -> dict:
+        calls.append(("create_experiment", dict(args)))
+        return {"lifecycle": {"state": "draft", "generation": 0}}
+
     registry.register("research_manager_skill.create_study", _create)
     registry.register("research_manager_skill.advance_workflow", _advance)
+    registry.register("research_manager_skill.create_experiment", _experiment)
 
     result = ScenarioRuntime(registry=registry).run(load_scenario(ROOT))
 
-    assert [name for name, _args in calls] == ["create_study", "advance_workflow"]
+    assert [name for name, _args in calls] == ["create_study", "advance_workflow", "create_experiment"]
     assert result["steps"]["submit_protocol_review"]["result"] == {
         "accepted": True,
         "state": "protocol_review",
         "generation": 1,
     }
+    assert result["steps"]["create_control_experiment"]["result"]["lifecycle"]["state"] == "draft"

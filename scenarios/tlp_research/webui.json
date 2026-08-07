@@ -3,78 +3,353 @@
   "schema": "adaos.webui.v1",
   "ui": {
     "application": {
-      "version": "1.0",
+      "version": "2.0",
       "desktop": {
         "pageSchema": {
           "id": "tlp_research",
-          "title": "TLP Research • Исследование TLP",
+          "title": "TLP Research • Experiment E001",
           "layout": {
             "type": "split",
             "pattern": "focus-detail",
             "areas": [
+              {"id": "toolbar", "role": "toolbar"},
               {"id": "main", "role": "main"},
               {"id": "context", "role": "aux"}
             ],
-            "auxWidth": 360
+            "auxWidth": 380
           },
           "initialState": {
-            "studyId": "study.ee75f7af4b82a95e6525aeb11efe51cfbf6fdf45f58e382cb030bd3f6542675c"
+            "studyId": "study.ee75f7af4b82a95e6525aeb11efe51cfbf6fdf45f58e382cb030bd3f6542675c",
+            "experimentId": "experiment.9856b6fc68b96cf125db54f696d273792015ec24a6f1aefa96b6d157ac39e4c4",
+            "activeView": "conditions",
+            "experimentState": "draft",
+            "experimentGeneration": 0,
+            "experimentRevision": 1
           },
           "widgets": [
             {
-              "id": "tlp-study-status",
-              "area": "main",
+              "id": "experiment-views",
+              "area": "toolbar",
+              "type": "input.commandBar",
+              "title": "Single Experiment Workbench",
+              "inputs": {
+                "variant": "segmented",
+                "selectedStateKey": "activeView",
+                "buttons": [
+                  {"id": "conditions", "label": "Conditions", "icon": "options-outline"},
+                  {"id": "runs", "label": "Runs", "icon": "pulse-outline"},
+                  {"id": "results", "label": "Results", "icon": "git-compare-outline"},
+                  {"id": "evidence", "label": "Evidence", "icon": "shield-checkmark-outline"}
+                ]
+              },
+              "actions": [
+                {"on": "click", "type": "updateState", "params": {"activeView": "$event.id"}}
+              ]
+            },
+            {
+              "id": "experiment-actions",
+              "area": "toolbar",
+              "type": "ui.actions",
+              "title": "Experiment commands",
+              "inputs": {
+                "variant": "toolbar",
+                "buttons": [
+                  {"id": "review", "label": "Submit review", "icon": "eye-outline"},
+                  {"id": "lock", "label": "Lock", "icon": "lock-closed-outline"},
+                  {"id": "start-preflight", "label": "Start CPU preflight", "icon": "play-outline"},
+                  {"id": "reconcile", "label": "Reconcile", "icon": "sync-outline"},
+                  {"id": "cancel", "label": "Cancel", "icon": "stop-circle-outline"},
+                  {"id": "finalize", "label": "Finalize", "icon": "checkmark-done-outline"}
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:review",
+                  "type": "callSkill",
+                  "target": "research_manager_skill.submit_experiment_review",
+                  "params": {"experiment_id": "$state.experimentId", "expected_generation": "$state.experimentGeneration", "actor": "user:desktop"},
+                  "enabledIf": "$state.experimentState === 'draft'",
+                  "invalidates": ["tlp-experiment"]
+                },
+                {
+                  "on": "click:lock",
+                  "type": "callSkill",
+                  "target": "research_manager_skill.lock_experiment",
+                  "params": {"experiment_id": "$state.experimentId", "expected_generation": "$state.experimentGeneration", "actor": "user:desktop"},
+                  "enabledIf": "$state.experimentState === 'review'",
+                  "invalidates": ["tlp-experiment"]
+                },
+                {
+                  "on": "click:start-preflight",
+                  "type": "callSkill",
+                  "target": "research_manager_skill.start_experiment",
+                  "params": {"experiment_id": "$state.experimentId", "profile": "preflight", "expected_generation": "$state.experimentGeneration", "actor": "user:desktop"},
+                  "enabledIf": "$state.experimentState === 'locked'",
+                  "invalidates": ["tlp-experiment", "tlp-tracking"]
+                },
+                {
+                  "on": "click:reconcile",
+                  "type": "callSkill",
+                  "target": "research_manager_skill.reconcile_experiment",
+                  "params": {"experiment_id": "$state.experimentId", "actor": "user:desktop"},
+                  "invalidates": ["tlp-experiment", "tlp-tracking", "tlp-evidence"]
+                },
+                {
+                  "on": "click:cancel",
+                  "type": "callSkill",
+                  "target": "research_manager_skill.cancel_experiment",
+                  "params": {"experiment_id": "$state.experimentId", "expected_generation": "$state.experimentGeneration", "actor": "user:desktop"},
+                  "enabledIf": "$state.experimentState === 'running'",
+                  "invalidates": ["tlp-experiment", "tlp-tracking"]
+                },
+                {
+                  "on": "click:finalize",
+                  "type": "callSkill",
+                  "target": "research_manager_skill.finalize_experiment",
+                  "params": {"experiment_id": "$state.experimentId", "expected_generation": "$state.experimentGeneration", "actor": "user:desktop"},
+                  "enabledIf": "$state.experimentState === 'results_ready'",
+                  "invalidates": ["tlp-experiment", "tlp-evidence"]
+                }
+              ]
+            },
+            {
+              "id": "experiment-status",
+              "area": "context",
               "type": "item.details",
-              "title": "Study status • Статус исследования",
+              "title": "E001 status",
               "dataSource": {
                 "kind": "skill",
-                "name": "research_manager_skill.get_study",
-                "params": {"study_id": "$state.studyId"},
+                "name": "research_manager_skill.get_experiment",
+                "params": {"experiment_id": "$state.experimentId"},
                 "cacheTtlMs": 0,
-                "invalidationTags": ["tlp-research"],
+                "invalidationTags": ["tlp-experiment", "tlp-tracking", "tlp-evidence"],
                 "preserveLastValue": true
               },
               "inputs": {
+                "stateBindings": {
+                  "experimentState": "lifecycle.state",
+                  "experimentGeneration": "lifecycle.generation",
+                  "experimentRevision": "revision.payload.revision",
+                  "datasetReady": "dataset.ready",
+                  "trackerState": "tracker.state"
+                },
                 "fields": [
-                  {"label": "Title • Название", "path": "study.payload.title"},
-                  {"label": "Mode • Режим", "path": "study.payload.mode"},
-                  {"label": "Workflow state • Состояние", "path": "workflow.state"},
-                  {"label": "Generation • Поколение", "path": "workflow.generation"},
-                  {"label": "Study ID", "path": "study.record_id"},
-                  {"label": "Records • Записи", "path": "counts"}
+                  {"label": "Experiment", "path": "experiment.payload.slug"},
+                  {"label": "State", "path": "lifecycle.state"},
+                  {"label": "Generation", "path": "lifecycle.generation"},
+                  {"label": "Revision", "path": "revision.payload.revision"},
+                  {"label": "Execution profile", "path": "lifecycle.execution_profile"},
+                  {"label": "Dataset ready", "path": "dataset.ready"},
+                  {"label": "Tracker", "path": "tracker.descriptor.provider_id"},
+                  {"label": "Tracker state", "path": "tracker.state"},
+                  {"label": "Attempts", "path": "attempts.length"},
+                  {"label": "Paired seeds", "path": "summary.paired_seed_count"}
                 ]
               }
             },
             {
-              "id": "tlp-study-context",
+              "id": "experiment-conditions",
+              "area": "main",
+              "type": "item.textEditor",
+              "title": "Versioned experiment conditions",
+              "visibleIf": "$state.activeView === 'conditions'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_manager_skill.get_experiment",
+                "params": {"experiment_id": "$state.experimentId"},
+                "cacheTtlMs": 0,
+                "invalidationTags": ["tlp-experiment"],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "bindField": "conditions_document",
+                "mode": "json",
+                "stateKey": "experimentConditionsDraft",
+                "readOnlyIf": "$state.experimentState !== 'draft' && $state.experimentState !== 'review'"
+              },
+              "actions": [
+                {
+                  "on": "save",
+                  "type": "callSkill",
+                  "target": "research_manager_skill.revise_experiment_json",
+                  "params": {
+                    "experiment_id": "$state.experimentId",
+                    "expected_revision": "$state.experimentRevision",
+                    "conditions_json": "$event.content",
+                    "rationale": "Edited in TLP Experiment Workbench",
+                    "actor": "user:desktop"
+                  },
+                  "enabledIf": "$state.experimentState === 'draft' || $state.experimentState === 'review'",
+                  "invalidates": ["tlp-experiment"]
+                }
+              ]
+            },
+            {
+              "id": "conditions-guidance",
+              "area": "context",
+              "type": "static.markdown",
+              "title": "Protocol guard",
+              "visibleIf": "$state.activeView === 'conditions'",
+              "inputs": {
+                "content": "The **preflight** profile is a real three-epoch CPU run over a bounded STL-10 subset. It validates workflow and instrumentation only. The **confirmatory** profile remains 10 paired seeds × 120 epochs and is the only profile eligible for a scientific claim. Saving creates a new immutable revision; locking prevents in-place edits."
+              }
+            },
+            {
+              "id": "attempts-table",
+              "area": "main",
+              "type": "ui.table",
+              "title": "Logical runs and physical attempts",
+              "visibleIf": "$state.activeView === 'runs'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_manager_skill.list_experiment_attempts",
+                "params": {"experiment_id": "$state.experimentId"},
+                "cacheTtlMs": 0,
+                "invalidationTags": ["tlp-experiment", "tlp-tracking"],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "emptyText": "No attempts yet. Review, lock and start the CPU preflight.",
+                "pagination": true,
+                "pageSize": 20,
+                "columns": [
+                  {"key": "seed", "label": "Seed", "width": "70px"},
+                  {"key": "arm_id", "label": "Arm"},
+                  {"key": "attempt_number", "label": "Attempt", "width": "80px"},
+                  {"key": "status", "label": "Status"},
+                  {"key": "run_id", "label": "Logical run", "mono": true},
+                  {"key": "attempt_id", "label": "Physical attempt", "mono": true}
+                ],
+                "buttons": [
+                  {"id": "retry-failed", "label": "Retry", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "failed"},
+                  {"id": "retry-cancelled", "label": "Retry", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "cancelled"},
+                  {"id": "retry-lost", "label": "Retry", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "lost"}
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click",
+                  "type": "callSkill",
+                  "target": "research_manager_skill.retry_run",
+                  "params": {"experiment_id": "$state.experimentId", "run_id": "$event.run_id", "expected_generation": "$state.experimentGeneration", "actor": "user:desktop"},
+                  "enabledIf": "$state.experimentState === 'failed' || $state.experimentState === 'cancelled'",
+                  "invalidates": ["tlp-experiment", "tlp-tracking"]
+                }
+              ]
+            },
+            {
+              "id": "run-guidance",
+              "area": "context",
+              "type": "static.markdown",
+              "title": "Execution semantics",
+              "visibleIf": "$state.activeView === 'runs'",
+              "inputs": {
+                "content": "A retry creates a new **ExecutionAttempt** and a new tracking session while preserving the scientific Trial and logical Run. Use **Reconcile** after restart or while jobs are running to ingest progress, terminal status and artifacts."
+              }
+            },
+            {
+              "id": "pairs-table",
+              "area": "main",
+              "type": "ui.table",
+              "title": "Paired validation results",
+              "visibleIf": "$state.activeView === 'results'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_manager_skill.list_experiment_pairs",
+                "params": {"experiment_id": "$state.experimentId"},
+                "cacheTtlMs": 0,
+                "invalidationTags": ["tlp-experiment", "tlp-tracking"],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "emptyText": "Paired results appear after both arms finish.",
+                "columns": [
+                  {"key": "seed", "label": "Seed"},
+                  {"key": "maxpool", "label": "MaxPool accuracy"},
+                  {"key": "tlp", "label": "TLP accuracy"},
+                  {"key": "delta_tlp_minus_maxpool", "label": "Δ TLP − MaxPool"},
+                  {"key": "paired_initialization", "label": "Shared init", "kind": "boolean"}
+                ]
+              }
+            },
+            {
+              "id": "results-summary",
               "area": "context",
               "type": "item.details",
-              "title": "Protocol context • Контекст протокола",
+              "title": "Primary estimand",
+              "visibleIf": "$state.activeView === 'results'",
               "dataSource": {
-                "kind": "static",
-                "value": {
-                  "question": "Does layer-specific channel-wise non-flat max-plus pooling improve paired validation accuracy and shift consistency?",
-                  "dataset": "STL10",
-                  "operatorLocation": "pool2",
-                  "pairedSeeds": 10,
-                  "testAccess": "sealed until QC approval",
-                  "evidenceClass": "local conformance; no confirmatory TLP claim"
-                }
+                "kind": "skill",
+                "name": "research_manager_skill.get_experiment",
+                "params": {"experiment_id": "$state.experimentId"},
+                "cacheTtlMs": 0,
+                "invalidationTags": ["tlp-experiment", "tlp-tracking"],
+                "preserveLastValue": true
               },
               "inputs": {
                 "fields": [
-                  {"label": "Question • Вопрос", "path": "question"},
-                  {"label": "Dataset", "path": "dataset"},
-                  {"label": "Operator location", "path": "operatorLocation"},
-                  {"label": "Paired seeds", "path": "pairedSeeds"},
-                  {"label": "Test access", "path": "testAccess"},
-                  {"label": "Evidence", "path": "evidenceClass"}
+                  {"label": "Estimand", "path": "summary.primary_estimand"},
+                  {"label": "Complete pairs", "path": "summary.paired_seed_count"},
+                  {"label": "Mean delta", "path": "summary.mean_delta"},
+                  {"label": "Paired bootstrap 95%", "path": "summary.paired_bootstrap_95"}
+                ]
+              }
+            },
+            {
+              "id": "artifacts-table",
+              "area": "main",
+              "type": "ui.table",
+              "title": "Content-addressed evidence artifacts",
+              "visibleIf": "$state.activeView === 'evidence'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_manager_skill.list_experiment_artifacts",
+                "params": {"experiment_id": "$state.experimentId"},
+                "cacheTtlMs": 0,
+                "invalidationTags": ["tlp-experiment", "tlp-evidence"],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "emptyText": "Artifacts are registered after successful attempt reconciliation.",
+                "pagination": true,
+                "pageSize": 20,
+                "columns": [
+                  {"key": "role", "label": "Role"},
+                  {"key": "media_type", "label": "Media type"},
+                  {"key": "size_bytes", "label": "Bytes"},
+                  {"key": "digest", "label": "Digest", "mono": true},
+                  {"key": "run_id", "label": "Run", "mono": true}
+                ]
+              }
+            },
+            {
+              "id": "evidence-status",
+              "area": "context",
+              "type": "item.details",
+              "title": "Immutable result",
+              "visibleIf": "$state.activeView === 'evidence'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_manager_skill.get_experiment",
+                "params": {"experiment_id": "$state.experimentId"},
+                "cacheTtlMs": 0,
+                "invalidationTags": ["tlp-experiment", "tlp-evidence"],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "fields": [
+                  {"label": "Result ID", "path": "result.record_id"},
+                  {"label": "Evidence class", "path": "result.payload.evidence_class"},
+                  {"label": "Tracker export", "path": "result.payload.tracker_export_digest"},
+                  {"label": "Verification OK", "path": "result_verification.ok"},
+                  {"label": "Checked artifacts", "path": "result_verification.checked_artifacts"},
+                  {"label": "Verification errors", "path": "result_verification.errors"}
                 ]
               }
             }
           ],
           "surfaceClass": "research-workbench",
-          "surfaceObjectKind": "study"
+          "surfaceObjectKind": "experiment"
         }
       }
     }

@@ -64,5 +64,57 @@ steps:
     expected_generation: '0'
     idempotency_key: tlp-scenario-review-v1
     actor: user:scenario
+- name: create_control_experiment
+  call: research_manager_skill.create_experiment
+  args:
+    study_id: study.ee75f7af4b82a95e6525aeb11efe51cfbf6fdf45f58e382cb030bd3f6542675c
+    experiment_id: experiment.9856b6fc68b96cf125db54f696d273792015ec24a6f1aefa96b6d157ac39e4c4
+    slug: E001
+    title: STL-10 pool2 centered TLP vs MaxPool
+    purpose: Paired control experiment for the AdaOS Single Experiment Control and Tracking vertical.
+    idempotency_key: tlp-scenario-e001-v1
+    conditions:
+      schema: adaos.research.tlp_experiment_conditions.v1
+      dataset:
+        name: STL10
+        version: binary-2011
+        source: https://ai.stanford.edu/~acoates/stl10/stl10_binary.tar.gz
+        archive_md5: 91f7769df0f17e558f3565bffb0c7dfb
+        download: true
+        split_seed: '20260807'
+        validation_per_class: '100'
+        test_policy: sealed-until-qc
+      architecture:
+        name: tlp-control-cnn-v1
+        layers: [conv3x3:3:32, pool1:maxpool2, conv3x3:32:64, pool2:variant,
+          conv3x3:64:128, pool3:maxpool2, 'linear:18432:256:10']
+      operators:
+        location: pool2
+        arms:
+        - {id: maxpool, kind: torch.nn.MaxPool2d, kernel: '2', stride: '2'}
+        - {id: tlp, kind: centered-channelwise-max-plus, kernel: '2', stride: '2',
+           initialization: zero, constraint: theta-minus-channel-mean}
+      execution:
+        preflight: {epochs: '3', seeds: ['17'], batch_size: '32', learning_rate: 0.001,
+          max_train_samples: '300', max_validation_samples: '100', cpu_threads: '2',
+          memory_mb: '4096', wall_time_s: '10800', max_attempts: '3',
+          max_compute_seconds: '21600', max_storage_bytes: '2147483648',
+          evidence_class: workflow_validation}
+        confirmatory: {epochs: '120', seeds: ['17', '29', '41', '53', '67', '79', '97', '109', '127', '149'],
+          batch_size: '32', learning_rate: 0.001, max_train_samples: '0',
+          max_validation_samples: '0', cpu_threads: '4', memory_mb: '6144',
+          wall_time_s: '86400', max_attempts: '3', max_compute_seconds: '259200',
+          max_storage_bytes: '4294967296', evidence_class: confirmatory}
+      randomization:
+        paired: true
+        shared_initialization: true
+        shared_batch_order: true
+        shared_augmentation_schedule: true
+        named_streams: [initialization, data_ordering, augmentation, operator_initialization, analysis]
+      analysis: {paired: true, primary_metric: validation.top1_accuracy,
+        primary_estimand: mean(tlp-maxpool), interval: paired-bootstrap-95,
+        checkpoint_selection: best-validation-only, test_access: sealed-until-qc}
+      tracker: {contract: adaos.research.tracker.v1-rc1, provider: local-tracker,
+        required_delivery: durable-before-finalize}
+  save_as: experiment
 updated_at: '2026-08-07T17:34:34+00:00'
-
