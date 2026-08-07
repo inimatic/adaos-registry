@@ -10,10 +10,12 @@ supported_locales:
 - ru
 depends:
 - research_manager_skill
+- mlflow_tracker_skill
 runtime:
   skills:
     required:
     - research_manager_skill
+    - mlflow_tracker_skill
     optional: []
 workflow:
   manifest: workflow.json
@@ -114,7 +116,7 @@ steps:
       analysis: {paired: true, primary_metric: validation.top1_accuracy,
         primary_estimand: mean(tlp-maxpool), interval: paired-bootstrap-95,
         checkpoint_selection: best-validation-only, test_access: sealed-until-qc}
-      tracker: {contract: adaos.research.tracker.v1-rc1, provider: local-tracker,
+      tracker: {contract: adaos.research.tracker.v1-rc1, provider: mlflow,
         required_delivery: durable-before-finalize}
   save_as: experiment
 updated_at: '2026-08-07T17:34:34+00:00'

@@ -20,8 +20,8 @@ def _json(relative: str) -> dict:
 def test_manifest_binds_only_declared_research_skill_routes() -> None:
     manifest = yaml.safe_load((ROOT / "scenario.yaml").read_text(encoding="utf-8"))
 
-    assert manifest["depends"] == ["research_manager_skill"]
-    assert manifest["runtime"]["skills"]["required"] == ["research_manager_skill"]
+    assert manifest["depends"] == ["research_manager_skill", "mlflow_tracker_skill"]
+    assert manifest["runtime"]["skills"]["required"] == ["research_manager_skill", "mlflow_tracker_skill"]
     assert [step["call"] for step in manifest["steps"]] == [
         "research_manager_skill.create_study",
         "research_manager_skill.advance_workflow",
@@ -44,13 +44,14 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
     assert status["dataSource"]["name"] == "research_manager_skill.get_experiment"
     assert status["dataSource"]["params"]["experiment_id"] == "$state.experimentId"
     assert editor["actions"][0]["target"] == "research_manager_skill.revise_experiment_json"
-    assert {item["target"] for item in actions["actions"]} >= {
+    assert {item["target"] for item in actions["actions"] if "target" in item} >= {
         "research_manager_skill.lock_experiment",
         "research_manager_skill.start_experiment",
         "research_manager_skill.cancel_experiment",
         "research_manager_skill.reconcile_experiment",
         "research_manager_skill.finalize_experiment",
     }
+    assert next(item for item in actions["actions"] if item["on"] == "click:mlflow")["type"] == "openUrl"
     assert page["initialState"]["experimentId"] == manifest["steps"][2]["args"]["experiment_id"]
 
 
@@ -95,6 +96,7 @@ def test_fixtures_are_paired_deterministic_and_provenance_only() -> None:
     assert experiment["execution"]["preflight"]["epochs"] == 3
     assert experiment["operators"]["arms"][1]["constraint"] == "theta-minus-channel-mean"
     assert len(experiment["execution"]["confirmatory"]["seeds"]) == 10
+    assert experiment["tracker"]["provider"] == "mlflow"
     assert all(SHA256.fullmatch(cell["source_digest"]) for cell in provenance["selected_cells"])
 
 

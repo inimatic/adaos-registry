@@ -78,7 +78,7 @@
   },
   "tracker": {
     "contract": "adaos.research.tracker.v1-rc1",
-    "provider": "local-tracker",
+    "provider": "mlflow",
     "required_delivery": "durable-before-finalize"
   }
 }

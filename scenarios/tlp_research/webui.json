@@ -58,6 +58,7 @@
                   {"id": "lock", "label": "Lock", "icon": "lock-closed-outline"},
                   {"id": "start-preflight", "label": "Start CPU preflight", "icon": "play-outline"},
                   {"id": "reconcile", "label": "Reconcile", "icon": "sync-outline"},
+                  {"id": "mlflow", "label": "Open MLflow", "icon": "open-outline"},
                   {"id": "cancel", "label": "Cancel", "icon": "stop-circle-outline"},
                   {"id": "finalize", "label": "Finalize", "icon": "checkmark-done-outline"}
                 ]
@@ -93,6 +94,11 @@
                   "target": "research_manager_skill.reconcile_experiment",
                   "params": {"experiment_id": "$state.experimentId", "actor": "user:desktop"},
                   "invalidates": ["tlp-experiment", "tlp-tracking", "tlp-evidence"]
+                },
+                {
+                  "on": "click:mlflow",
+                  "type": "openUrl",
+                  "params": {"url": "http://127.0.0.1:18121", "target": "_blank", "withAuth": false}
                 },
                 {
                   "on": "click:cancel",
