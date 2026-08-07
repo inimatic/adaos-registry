@@ -1,0 +1,62 @@
+name: mlflow_tracker_skill
+version: 0.1.0
+description: Supervised MLflow tracking provider and native query UI for the AdaOS research tracker contract.
+entry: handlers/main.py
+runtime:
+  kind: service
+  in_process_events: false
+  env:
+    mode: venv
+    python: '3.11'
+    allow_heavy_dependencies: true
+  activation:
+    mode: lazy
+    startup_allowed: true
+    background_refresh: false
+    when:
+      scenarios_active:
+      - tlp_research
+service:
+  host: 127.0.0.1
+  port: 18121
+  command:
+  - -m
+  - handlers.service
+  healthcheck:
+    path: /health
+    timeout_ms: 2000
+dependencies: []
+default_tool: provider_health
+tools:
+- name: provider_descriptor
+  description: Return the MLflow implementation descriptor for the AdaOS tracker contract.
+  entry: handlers.main:provider_descriptor
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: provider_health
+  description: Check the supervised MLflow tracking server and its declared provider contract.
+  entry: handlers.main:provider_health
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: get_tracking_ui
+  description: Return the safe top-level navigation target for the native MLflow query UI.
+  entry: handlers.main:get_tracking_ui
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: rehydrate
+  description: Recheck the provider after runtime activation or restart.
+  entry: handlers.main:rehydrate
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object

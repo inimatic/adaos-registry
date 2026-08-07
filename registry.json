@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-07T17:34:34+00:00",
+  "updated_at": "2026-08-07T21:35:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -653,6 +653,38 @@
         "background_refresh": false
       },
       "tools_count": 9
+    },
+    {
+      "kind": "skill",
+      "id": "mlflow_tracker_skill",
+      "name": "mlflow_tracker_skill",
+      "version": "0.1.0",
+      "updated_at": "2026-08-07T21:35:00+00:00",
+      "path": "skills/mlflow_tracker_skill",
+      "manifest": "skills/mlflow_tracker_skill/skill.yaml",
+      "source": {
+        "path": "skills/mlflow_tracker_skill",
+        "manifest": "skills/mlflow_tracker_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "mlflow_tracker_skill",
+        "id": "mlflow_tracker_skill"
+      },
+      "description": "Supervised MLflow tracking provider and native query UI for the AdaOS research tracker contract.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "tlp_research"
+          ]
+        },
+        "startup_allowed": true,
+        "background_refresh": false
+      },
+      "tools_count": 4
     },
     {
       "kind": "skill",
