@@ -29,7 +29,7 @@
           "widgets": [
             {
               "id": "experiment-views",
-              "area": "toolbar",
+              "area": "main",
               "type": "input.commandBar",
               "title": "Single Experiment Workbench",
               "inputs": {
@@ -98,7 +98,7 @@
                 {
                   "on": "click:mlflow",
                   "type": "openUrl",
-                  "params": {"url": "http://127.0.0.1:18121", "target": "_blank", "withAuth": false}
+                  "params": {"url": "/api/services/mlflow_tracker_skill/ui-bootstrap", "target": "_blank", "withAuth": true}
                 },
                 {
                   "on": "click:cancel",

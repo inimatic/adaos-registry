@@ -77,7 +77,7 @@
     "test_access": "sealed-until-qc"
   },
   "tracker": {
-    "contract": "adaos.research.tracker.v1-rc1",
+    "contract": "adaos.research.tracker.v1",
     "provider": "mlflow",
     "required_delivery": "durable-before-finalize"
   }

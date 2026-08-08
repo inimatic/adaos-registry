@@ -169,9 +169,8 @@ steps:
         checkpoint_selection: best-validation-only
         test_access: sealed-until-qc
       tracker:
-        contract: adaos.research.tracker.v1-rc1
+        contract: adaos.research.tracker.v1
         provider: mlflow
         required_delivery: durable-before-finalize
   save_as: experiment
 updated_at: '2026-08-07T23:25:09+00:00'
-

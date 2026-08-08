@@ -38,12 +38,15 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
     status = next(widget for widget in page["widgets"] if widget["id"] == "experiment-status")
     editor = next(widget for widget in page["widgets"] if widget["id"] == "experiment-conditions")
     actions = next(widget for widget in page["widgets"] if widget["id"] == "experiment-actions")
+    views = next(widget for widget in page["widgets"] if widget["id"] == "experiment-views")
 
     assert manifest["type"] == "desktop"
     assert manifest["ui"] == {"manifest": "webui.json"}
     assert status["dataSource"]["name"] == "research_manager_skill.get_experiment"
     assert status["dataSource"]["params"]["experiment_id"] == "$state.experimentId"
     assert editor["actions"][0]["target"] == "research_manager_skill.revise_experiment_json"
+    assert views["area"] == "main"
+    assert page["widgets"].index(views) < page["widgets"].index(editor)
     assert {item["target"] for item in actions["actions"] if "target" in item} >= {
         "research_manager_skill.lock_experiment",
         "research_manager_skill.start_experiment",
@@ -51,7 +54,13 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
         "research_manager_skill.reconcile_experiment",
         "research_manager_skill.finalize_experiment",
     }
-    assert next(item for item in actions["actions"] if item["on"] == "click:mlflow")["type"] == "openUrl"
+    mlflow = next(item for item in actions["actions"] if item["on"] == "click:mlflow")
+    assert mlflow["type"] == "openUrl"
+    assert mlflow["params"] == {
+        "url": "/api/services/mlflow_tracker_skill/ui-bootstrap",
+        "target": "_blank",
+        "withAuth": True,
+    }
     assert page["initialState"]["experimentId"] == manifest["steps"][2]["args"]["experiment_id"]
 
 
