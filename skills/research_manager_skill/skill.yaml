@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.5.0
+version: 0.6.0
 description: Provider-neutral governed research manager, local tracker, evidence exporter,
   and deterministic fixture runner.
 entry: handlers/main.py
