@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.6.0
+version: 0.7.0
 description: Provider-neutral governed research manager, local tracker, evidence exporter,
   and deterministic fixture runner.
 entry: handlers/main.py
@@ -448,7 +448,8 @@ tools:
   output_schema:
     type: object
 - name: accept_tracker_evidence
-  description: Persist and accept a versioned normalized tracker export so provider-native data may be retired safely.
+  description: Persist and accept a versioned normalized tracker export so provider-native
+    data may be retired safely.
   entry: handlers.main:accept_tracker_evidence
   side_effects: local_write
   input_schema:
@@ -478,7 +479,8 @@ tools:
   output_schema:
     type: object
 - name: delete_tracker_projection
-  description: Delete one provider-native tracking projection only after immutable export acceptance.
+  description: Delete one provider-native tracking projection only after immutable
+    export acceptance.
   entry: handlers.main:delete_tracker_projection
   side_effects: external_write
   input_schema:
@@ -692,12 +694,13 @@ data_routes:
     - tlp-experiment
     - tlp-tracking
     - tlp-evidence
-updated_at: '2026-08-07T23:24:29+00:00'
+updated_at: '2026-08-08T02:17:42+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.714+4716.d28d2b42
-    recorded_at: '2026-08-07T23:24:30+00:00'
+    min_version: 0.1.716+4724.5c24dd02
+    recorded_at: '2026-08-08T02:17:42+00:00'
     source: skill_push
-    min_commit: d28d2b4293c142802ec0e8ff4bb0c82dafaedd0e
-    min_short_commit: d28d2b42
-    build_date: '2026-08-08T02:13:02+03:00'
+    min_commit: 5c24dd0283ffc7578477778cc80c840b8c339375
+    min_short_commit: 5c24dd02
+    build_date: '2026-08-08T05:11:24+03:00'
+

@@ -45,7 +45,10 @@ class ResearchManager:
         if provider_id not in self._trackers:
             if provider_id != "mlflow":
                 raise ValueError(f"unsupported tracker provider: {provider_id}")
-            endpoint = str(os.getenv("ADAOS_MLFLOW_TRACKING_URI") or "http://127.0.0.1:18121")
+            endpoint = str(
+                os.getenv("ADAOS_MLFLOW_TRACKING_URI")
+                or "http://127.0.0.1:18121/api/services/mlflow_tracker_skill/ui"
+            )
             binding_json = str(os.getenv("ADAOS_MLFLOW_SERVICE_BINDING_JSON") or "").strip()
             binding: ServiceBinding | str = endpoint
             auth_headers: dict[str, str] = {}
