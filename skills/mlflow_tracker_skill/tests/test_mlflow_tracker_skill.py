@@ -11,6 +11,7 @@ def test_descriptor_exposes_tracker_contract_without_claiming_authority() -> Non
     descriptor = provider_descriptor()
     assert descriptor["provider_id"] == "mlflow"
     assert descriptor["contract_version"] == "1.0"
+    assert descriptor["tracking_uri"].endswith("/api/services/mlflow_tracker_skill/ui")
     assert descriptor["authority"] == "telemetry-projection"
     assert "typed-scalar-observations" in descriptor["capabilities"]
     assert get_tracking_ui()["presentation"] == "external-tab"

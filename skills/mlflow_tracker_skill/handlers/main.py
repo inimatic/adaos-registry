@@ -16,7 +16,10 @@ CONTRACT_VERSION = "1.0"
 
 
 def _endpoint() -> str:
-    return str(os.getenv("ADAOS_MLFLOW_TRACKING_URI") or "http://127.0.0.1:18121").rstrip("/")
+    return str(
+        os.getenv("ADAOS_MLFLOW_TRACKING_URI")
+        or "http://127.0.0.1:18121/api/services/mlflow_tracker_skill/ui"
+    ).rstrip("/")
 
 
 @tool("provider_descriptor")

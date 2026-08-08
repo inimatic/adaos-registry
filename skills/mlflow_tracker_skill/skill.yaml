@@ -1,5 +1,5 @@
 name: mlflow_tracker_skill
-version: 0.2.0
+version: 0.2.1
 description: Supervised MLflow tracking provider and native query UI for the AdaOS
   research tracker contract.
 entry: handlers/main.py
@@ -24,7 +24,7 @@ service:
   - -m
   - handlers.service
   healthcheck:
-    path: /health
+    path: /api/services/mlflow_tracker_skill/ui/health
     timeout_ms: 2000
   storage:
     relational:
@@ -52,7 +52,7 @@ service:
         retention_policy: retain
   ui:
     enabled: true
-    path: /
+    path: /api/services/mlflow_tracker_skill/ui
     access: authenticated
     origin_policy: same-origin
     embedding: same-origin
@@ -97,12 +97,13 @@ tools:
     additionalProperties: false
   output_schema:
     type: object
-updated_at: '2026-08-07T23:24:48+00:00'
+updated_at: '2026-08-08T02:17:54+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.714+4716.d28d2b42
-    recorded_at: '2026-08-07T23:24:48+00:00'
+    min_version: 0.1.716+4724.5c24dd02
+    recorded_at: '2026-08-08T02:17:54+00:00'
     source: skill_push
-    min_commit: d28d2b4293c142802ec0e8ff4bb0c82dafaedd0e
-    min_short_commit: d28d2b42
-    build_date: '2026-08-08T02:13:02+03:00'
+    min_commit: 5c24dd0283ffc7578477778cc80c840b8c339375
+    min_short_commit: 5c24dd02
+    build_date: '2026-08-08T05:11:24+03:00'
+
