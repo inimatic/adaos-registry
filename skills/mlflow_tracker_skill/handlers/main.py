@@ -12,7 +12,7 @@ from adaos.sdk.core.decorators import tool
 
 
 PROVIDER_ID = "mlflow"
-CONTRACT_VERSION = "1.0-rc1"
+CONTRACT_VERSION = "1.0"
 
 
 def _endpoint() -> str:
@@ -37,6 +37,7 @@ def provider_descriptor() -> dict[str, Any]:
         ],
         "limits": {
             "max_batch_events": 500,
+            "max_pending_events": 10000,
             "metric_step": "integer",
             "parameter_value_bytes": 6000,
         },
@@ -53,6 +54,8 @@ def provider_health() -> dict[str, Any]:
         with urllib.request.urlopen(f"{endpoint}/health", timeout=2.0) as response:
             body = response.read(4096).decode("utf-8", errors="replace")
             ok = 200 <= int(response.status) < 300
+        with urllib.request.urlopen(f"{endpoint}/version", timeout=2.0) as response:
+            provider_version = response.read(256).decode("utf-8", errors="replace").strip().strip('"')
     except (OSError, urllib.error.URLError) as exc:
         return {
             "ok": False,
@@ -69,18 +72,22 @@ def provider_health() -> dict[str, Any]:
         "state": "ready" if ok else "degraded",
         "provider": provider_descriptor(),
         "upstream": upstream,
+        "provider_version": provider_version,
+        "capability_probe": bool(provider_version),
     }
 
 
 @tool("get_tracking_ui")
 def get_tracking_ui() -> dict[str, Any]:
     return {
-        "schema": "adaos.research.tracker_ui_link.v1",
+        "schema": "adaos.service.ui_surface.v1",
         "provider_id": PROVIDER_ID,
-        "url": _endpoint(),
+        "url": "/api/services/mlflow_tracker_skill/ui-bootstrap",
         "presentation": "external-tab",
-        "embedded": False,
-        "reason": "MLflow security headers and independent navigation make a top-level view the stable integration boundary.",
+        "embedded": True,
+        "embedding_policy": "same-origin",
+        "access": "authenticated",
+        "origin_policy": "same-origin",
     }
 
 

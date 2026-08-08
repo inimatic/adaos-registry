@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.tracker.contract.v1",
+  "title": "AdaOS Research Tracker Contract 1.0",
+  "$defs": {
+    "descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "provider_id", "contract_version", "capabilities", "limits"],
+      "properties": {
+        "schema": {"const": "adaos.research.tracker_descriptor.v1"},
+        "provider_id": {"type": "string", "minLength": 1},
+        "contract_version": {"const": "1.0"},
+        "capabilities": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "limits": {
+          "type": "object",
+          "required": ["max_batch_events", "max_pending_events"],
+          "properties": {
+            "max_batch_events": {"type": "integer", "minimum": 1},
+            "max_pending_events": {"type": "integer", "minimum": 1}
+          },
+          "additionalProperties": true
+        }
+      }
+    },
+    "metricIdentity": {
+      "type": "object",
+      "required": ["schema", "event_id", "metric", "value", "value_type", "unit", "direction", "split_role", "dataset_digest", "step", "aggregation", "observed_at", "producer", "evidence_role"],
+      "properties": {
+        "schema": {"const": "adaos.research.observation.v1"},
+        "event_id": {"type": "string", "minLength": 1},
+        "metric": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["namespace", "name"],
+          "properties": {"namespace": {"type": "string", "minLength": 1}, "name": {"type": "string", "minLength": 1}}
+        },
+        "value": {},
+        "value_type": {"enum": ["float", "integer", "boolean", "string", "vector", "table", "distribution"]},
+        "unit": {"type": "string"},
+        "direction": {"type": "string"},
+        "split_role": {"enum": ["train", "validation", "robustness", "test", "system"]},
+        "dataset_digest": {"type": ["string", "null"]},
+        "step": {"type": "object"},
+        "aggregation": {"type": "string"},
+        "observed_at": {"type": "string"},
+        "producer": {"type": "object", "required": ["attempt_id"]},
+        "evidence_role": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "artifactRef": {
+      "type": "object",
+      "required": ["schema", "event_id", "uri", "digest", "size_bytes", "media_type", "role", "producer_attempt_id", "observed_at"],
+      "properties": {
+        "schema": {"const": "adaos.research.artifact_ref.v1"},
+        "event_id": {"type": "string", "minLength": 1},
+        "uri": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "media_type": {"type": "string", "minLength": 1},
+        "role": {"type": "string", "minLength": 1},
+        "producer_attempt_id": {"type": "string", "minLength": 1},
+        "observed_at": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "providerLink": {
+      "type": "object",
+      "required": ["schema", "session_id", "provider_id", "state"],
+      "properties": {
+        "schema": {"const": "adaos.research.tracker_provider_link.v1"},
+        "session_id": {"type": "string", "minLength": 1},
+        "provider_id": {"type": "string", "minLength": 1},
+        "state": {"enum": ["active", "deleted", "unavailable"]}
+      },
+      "additionalProperties": true
+    },
+    "session": {
+      "type": "object",
+      "required": ["session_id", "provider_id", "study_id", "experiment_id", "experiment_revision_id", "trial_id", "run_id", "attempt_id", "status", "parameters", "tags", "inputs", "provider_binding", "completeness"],
+      "properties": {
+        "session_id": {"type": "string"},
+        "provider_id": {"type": "string"},
+        "study_id": {"type": "string"},
+        "experiment_id": {"type": "string"},
+        "experiment_revision_id": {"type": "string"},
+        "trial_id": {"type": "string"},
+        "run_id": {"type": "string"},
+        "attempt_id": {"type": "string"},
+        "status": {"enum": ["running", "succeeded", "failed", "cancelled", "lost"]},
+        "parameters": {"type": "object"},
+        "tags": {"type": "object"},
+        "inputs": {"type": "array", "items": {"type": "object"}},
+        "provider_binding": {"type": "object"},
+        "completeness": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "export": {
+      "type": "object",
+      "required": ["schema", "contract_version", "session", "provider_links", "events", "export_digest"],
+      "properties": {
+        "schema": {"const": "adaos.research.tracker_export.v1"},
+        "contract_version": {"const": "1.0"},
+        "session": {"$ref": "#/$defs/session"},
+        "provider_links": {"type": "array", "items": {"$ref": "#/$defs/providerLink"}},
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["event_id", "event_kind", "payload", "payload_digest", "delivery_state", "provider_receipt"],
+            "properties": {
+              "event_id": {"type": "string"},
+              "event_kind": {"enum": ["observation", "artifact"]},
+              "payload": {"type": "object"},
+              "payload_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "delivery_state": {"enum": ["pending", "delivered", "failed"]},
+              "provider_receipt": {"type": "object"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "export_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

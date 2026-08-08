@@ -9,6 +9,10 @@ import sys
 import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+from urllib.parse import urlsplit
+
+from adaos.domain.runtime_bindings import ServiceBinding
+from adaos.sdk.data.secrets import get as get_secret
 
 from adaos.sdk.execution import (
     ContentRef,
@@ -42,7 +46,41 @@ class ResearchManager:
             if provider_id != "mlflow":
                 raise ValueError(f"unsupported tracker provider: {provider_id}")
             endpoint = str(os.getenv("ADAOS_MLFLOW_TRACKING_URI") or "http://127.0.0.1:18121")
-            self._trackers[provider_id] = MlflowTracker(self.repository, endpoint)
+            binding_json = str(os.getenv("ADAOS_MLFLOW_SERVICE_BINDING_JSON") or "").strip()
+            binding: ServiceBinding | str = endpoint
+            auth_headers: dict[str, str] = {}
+            if binding_json:
+                raw = dict(json.loads(binding_json))
+                raw.pop("schema", None)
+                binding = ServiceBinding(**raw)
+            elif urlsplit(endpoint).hostname not in {"127.0.0.1", "localhost", "::1"}:
+                secret_ref = str(os.getenv("ADAOS_MLFLOW_SECRET_REF") or "").strip() or None
+                binding = ServiceBinding(
+                    binding_id="service-binding.mlflow.external",
+                    capability="tracker.experiment",
+                    provider_ref="service:mlflow-tracker",
+                    consumer_ref="skill:research_manager_skill",
+                    endpoint=endpoint,
+                    protocol="mlflow-rest",
+                    protocol_version="2.0",
+                    health_endpoint=f"{endpoint.rstrip('/')}/health",
+                    ui_endpoint=endpoint,
+                    secret_ref=secret_ref,
+                    metadata={"authentication": "bearer" if secret_ref else "none"},
+                )
+            if isinstance(binding, ServiceBinding) and binding.secret_ref:
+                secret_name = binding.secret_ref.split(":", 1)[1]
+                secret_value = get_secret(secret_name)
+                if not secret_value:
+                    raise RuntimeError("MLflow service binding secret is unavailable")
+                header_name = str(binding.metadata.get("auth_header") or "Authorization")
+                scheme = str(binding.metadata.get("auth_scheme") or "Bearer").strip()
+                auth_headers[header_name] = f"{scheme} {secret_value}".strip()
+            self._trackers[provider_id] = MlflowTracker(
+                self.repository,
+                binding,
+                auth_headers=auth_headers,
+            )
         return self._trackers[provider_id]
 
     def _tracker_for_binding(self, binding: ResearchRecord):
@@ -817,6 +855,16 @@ class ResearchManager:
         if bool(dataset.get("download")):
             command.append("--download")
         code_digest = digest(runner.read_bytes())
+        data_identity_digest = digest(
+            {
+                "name": dataset.get("name"),
+                "version": dataset.get("version"),
+                "source": dataset.get("source"),
+                "archive_md5": dataset.get("archive_md5"),
+                "split_seed": dataset.get("split_seed"),
+                "validation_per_class": dataset.get("validation_per_class"),
+            }
+        )
         execution = spec(
             "research.tlp.pool2.v1",
             tuple(command),
@@ -866,6 +914,10 @@ class ResearchManager:
             "tracking_session",
             {"run_id": run_id, "attempt_id": attempt.attempt_id},
         )
+        trace_id = identity(
+            "trace",
+            {"experiment_revision_id": revision.record_id, "attempt_id": attempt.attempt_id},
+        )
         binding = self.repository.put(
             ResearchRecord(
                 "attempt_binding",
@@ -913,6 +965,13 @@ class ResearchManager:
                 "adaos.trial_id": trial.record_id,
                 "adaos.run_id": run_id,
                 "adaos.attempt_id": attempt.attempt_id,
+                "adaos.protocol_digest": str(trial.payload["protocol_digest"]),
+                "adaos.analysis_plan_digest": str(trial.payload["analysis_plan_digest"]),
+                "adaos.source.code_digest": code_digest,
+                "adaos.environment_digest": environment_digest,
+                "adaos.data_digest": data_identity_digest,
+                "adaos.trace_id": trace_id,
+                "adaos.evidence_class": str(profile_conditions.get("evidence_class") or "workflow_validation"),
                 "adaos.profile": profile,
             },
             inputs=(
@@ -921,7 +980,8 @@ class ResearchManager:
                     "name": dataset["name"],
                     "version": dataset["version"],
                     "source": dataset.get("source"),
-                    "expected_digest": dataset.get("expected_digest"),
+                    "digest": data_identity_digest,
+                    "archive_md5": dataset.get("archive_md5"),
                     "split_role": "train-validation",
                 },
             ),
@@ -1335,6 +1395,11 @@ class ResearchManager:
             ]
             if pending:
                 raise ValueError(f"tracker delivery is incomplete for {len(pending)} event(s)")
+            tracker_acceptance = self._accept_tracker_evidence(
+                experiment_id=experiment_id,
+                tracker_export=tracker_export,
+                actor=actor,
+            )
             value = experiment.get_experiment(self.repository, experiment_id)
             revision = experiment.latest_revision(self.repository, experiment_id)
             artifact_refs = [item.to_dict() for item in self._experiment_records(experiment_id, "artifact_ref")]
@@ -1351,6 +1416,8 @@ class ResearchManager:
                 ),
                 "summary": summary,
                 "tracker_export_digest": tracker_export["export_digest"],
+                "tracker_export_record_id": tracker_acceptance["export"]["record_id"],
+                "tracker_acceptance_id": tracker_acceptance["acceptance"]["record_id"],
                 "artifact_refs": artifact_refs,
                 "finalized_by": actor,
                 "finalized_at": now(),
@@ -1386,19 +1453,166 @@ class ResearchManager:
             return {
                 "result": result.to_dict(),
                 "tracker_export": tracker_export,
+                "tracker_acceptance": tracker_acceptance,
                 "lifecycle": transition_result,
                 "verification": self.verify_experiment_result(result_id),
             }
 
         return self.repository.once(idempotency_key, "finalize_experiment", apply)
 
+    def _accept_tracker_evidence(
+        self,
+        *,
+        experiment_id: str,
+        tracker_export: Mapping[str, Any],
+        actor: str,
+    ) -> dict[str, Any]:
+        value = experiment.get_experiment(self.repository, experiment_id)
+        export_payload = dict(tracker_export)
+        export_digest = str(export_payload.get("export_digest") or "")
+        digest_input = dict(export_payload)
+        digest_input.pop("export_digest", None)
+        if not export_digest or digest(digest_input) != export_digest:
+            raise ValueError("tracker export digest is invalid")
+        export_id = identity(
+            "tracker_export",
+            {"experiment_id": experiment_id, "export_digest": export_digest},
+        )
+        export_record = self.repository.put(
+            ResearchRecord(
+                "tracker_export",
+                export_id,
+                value.study_id,
+                0,
+                export_payload,
+            )
+        )
+        acceptance_id = identity(
+            "tracker_evidence_acceptance",
+            {"experiment_id": experiment_id, "tracker_export_digest": export_digest},
+        )
+        existing_acceptance = self.repository.get(
+            "tracker_evidence_acceptance",
+            acceptance_id,
+        )
+        if existing_acceptance is not None:
+            return {
+                "export": export_record.to_dict(),
+                "acceptance": existing_acceptance.to_dict(),
+            }
+        acceptance = self.repository.put(
+            ResearchRecord(
+                "tracker_evidence_acceptance",
+                acceptance_id,
+                value.study_id,
+                0,
+                {
+                    "schema": "adaos.research.tracker_evidence_acceptance.v1",
+                    "experiment_id": experiment_id,
+                    "tracker_export_record_id": export_record.record_id,
+                    "tracker_export_digest": export_digest,
+                    "accepted_by": actor,
+                    "accepted_at": now(),
+                },
+            )
+        )
+        return {"export": export_record.to_dict(), "acceptance": acceptance.to_dict()}
+
+    def accept_tracker_evidence(
+        self,
+        *,
+        experiment_id: str,
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        tracker_export = self._tracker_provider_for_experiment(experiment_id).export_experiment(experiment_id)
+        if any(item["session"]["status"] == "running" for item in tracker_export["sessions"]):
+            raise ValueError("tracker sessions must be finalized before evidence acceptance")
+        pending = [
+            event["event_id"]
+            for item in tracker_export["sessions"]
+            for event in item["events"]
+            if event["delivery_state"] != "delivered"
+        ]
+        if pending:
+            raise ValueError(f"tracker delivery is incomplete for {len(pending)} event(s)")
+        return self._accept_tracker_evidence(
+            experiment_id=experiment_id,
+            tracker_export=tracker_export,
+            actor=actor,
+        )
+
+    def _tracker_provider_for_experiment(self, experiment_id: str):
+        revision = experiment.latest_revision(self.repository, experiment_id)
+        provider_id = str(
+            dict(dict(revision.payload["conditions"]).get("tracker") or {}).get("provider")
+            or "local-tracker"
+        )
+        return self._tracker_provider(provider_id)
+
+    def flush_experiment_tracker(self, experiment_id: str, *, required: bool = False) -> dict[str, Any]:
+        provider = self._tracker_provider_for_experiment(experiment_id)
+        sessions = provider.query_sessions(experiment_id=experiment_id)
+        results = [
+            provider.flush(str(session["session_id"]), required=required)
+            for session in sessions
+        ]
+        return {
+            "schema": "adaos.research.experiment_tracker_flush.v1",
+            "experiment_id": experiment_id,
+            "provider_id": provider.descriptor.provider_id,
+            "sessions": results,
+        }
+
+    def delete_tracker_projection(
+        self,
+        *,
+        experiment_id: str,
+        session_id: str,
+        accepted_export_digest: str,
+    ) -> dict[str, Any]:
+        provider = self._tracker_provider_for_experiment(experiment_id)
+        session = provider.get_session(session_id)
+        if session["experiment_id"] != experiment_id:
+            raise ValueError("tracking session belongs to another experiment")
+        delete = getattr(provider, "delete_provider_session", None)
+        if not callable(delete):
+            raise ValueError("selected tracker does not expose a deletable projection")
+        return dict(delete(session_id, accepted_export_digest=accepted_export_digest))
+
     def verify_experiment_result(self, result_id: str) -> dict[str, Any]:
         result = self.repository.get("experiment_result", result_id)
         if result is None:
             raise KeyError(result_id)
         errors: list[str] = []
-        tracker_export = self.tracker.export_experiment(str(result.payload["experiment_id"]))
-        if tracker_export["export_digest"] != result.payload["tracker_export_digest"]:
+        expected_export_digest = str(result.payload["tracker_export_digest"])
+        tracker_export = None
+        export_record_id = str(result.payload.get("tracker_export_record_id") or "")
+        if export_record_id:
+            export_record = self.repository.get("tracker_export", export_record_id)
+            tracker_export = dict(export_record.payload) if export_record else None
+        if tracker_export is None:
+            accepted = [
+                item
+                for item in self.repository.list(result.study_id, "tracker_evidence_acceptance")
+                if item.payload.get("experiment_id") == result.payload["experiment_id"]
+                and item.payload.get("tracker_export_digest") == expected_export_digest
+            ]
+            if accepted:
+                export_record = self.repository.get(
+                    "tracker_export",
+                    str(accepted[-1].payload["tracker_export_record_id"]),
+                )
+                tracker_export = dict(export_record.payload) if export_record else None
+        verification_source = "accepted-export"
+        if tracker_export is None:
+            # Compatibility for evidence finalized under tracker 1.0-rc1.
+            tracker_export = self._tracker_provider_for_experiment(
+                str(result.payload["experiment_id"])
+            ).export_experiment(str(result.payload["experiment_id"]))
+            verification_source = "live-journal-legacy"
+        digest_input = dict(tracker_export)
+        actual_export_digest = str(digest_input.pop("export_digest", ""))
+        if digest(digest_input) != actual_export_digest or actual_export_digest != expected_export_digest:
             errors.append("tracker_export_digest_mismatch")
         for record in result.payload.get("artifact_refs") or []:
             payload = dict(record["payload"])
@@ -1416,7 +1630,8 @@ class ResearchManager:
             "result_id": result_id,
             "ok": not errors,
             "errors": errors,
-            "tracker_export_digest": tracker_export["export_digest"],
+            "tracker_export_digest": actual_export_digest,
+            "tracker_verification_source": verification_source,
             "checked_artifacts": len(result.payload.get("artifact_refs") or []),
         }
 

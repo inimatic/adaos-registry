@@ -29,6 +29,7 @@ service:
 capabilities:
 - storage.relational
 - execution.jobs
+- secrets.read
 dependencies: []
 lifecycle:
   after_activate: ensure_schema
@@ -446,6 +447,55 @@ tools:
         type: string
   output_schema:
     type: object
+- name: accept_tracker_evidence
+  description: Persist and accept a versioned normalized tracker export so provider-native data may be retired safely.
+  entry: handlers.main:accept_tracker_evidence
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - experiment_id
+    properties:
+      experiment_id:
+        type: string
+      actor:
+        type: string
+  output_schema:
+    type: object
+- name: flush_experiment_tracker
+  description: Retry the bounded provider outbox and report explicit delivery state.
+  entry: handlers.main:flush_experiment_tracker
+  side_effects: runtime_write
+  input_schema:
+    type: object
+    required:
+    - experiment_id
+    properties:
+      experiment_id:
+        type: string
+      required:
+        type: boolean
+  output_schema:
+    type: object
+- name: delete_tracker_projection
+  description: Delete one provider-native tracking projection only after immutable export acceptance.
+  entry: handlers.main:delete_tracker_projection
+  side_effects: external_write
+  input_schema:
+    type: object
+    required:
+    - experiment_id
+    - session_id
+    - accepted_export_digest
+    properties:
+      experiment_id:
+        type: string
+      session_id:
+        type: string
+      accepted_export_digest:
+        type: string
+  output_schema:
+    type: object
 - name: get_experiment
   description: Return the complete Single Experiment Workbench projection.
   entry: handlers.main:get_experiment
@@ -651,4 +701,3 @@ compatibility:
     min_commit: d28d2b4293c142802ec0e8ff4bb0c82dafaedd0e
     min_short_commit: d28d2b42
     build_date: '2026-08-08T02:13:02+03:00'
-

@@ -46,6 +46,15 @@ MIGRATIONS = (
             "CREATE INDEX tracker_events_delivery ON tracker_events(delivery_state, ingested_at)",
         ),
     ),
+    RelationalMigration(
+        version=4,
+        name="tracker provider links",
+        idempotent=True,
+        statements=(
+            "CREATE TABLE tracker_provider_links (session_id TEXT NOT NULL, provider_id TEXT NOT NULL, link_json TEXT NOT NULL, state TEXT NOT NULL, updated_at TEXT NOT NULL, PRIMARY KEY(session_id, provider_id))",
+            "CREATE INDEX tracker_provider_links_state ON tracker_provider_links(provider_id, state, updated_at)",
+        ),
+    ),
 )
 
 

@@ -283,6 +283,35 @@ def verify_experiment_result(result_id: str) -> dict[str, Any]:
     return _manager().verify_experiment_result(result_id)
 
 
+@tool("accept_tracker_evidence")
+def accept_tracker_evidence(
+    experiment_id: str,
+    actor: str = "user:local",
+) -> dict[str, Any]:
+    return _manager().accept_tracker_evidence(experiment_id=experiment_id, actor=actor)
+
+
+@tool("flush_experiment_tracker")
+def flush_experiment_tracker(
+    experiment_id: str,
+    required: bool = False,
+) -> dict[str, Any]:
+    return _manager().flush_experiment_tracker(experiment_id, required=required)
+
+
+@tool("delete_tracker_projection")
+def delete_tracker_projection(
+    experiment_id: str,
+    session_id: str,
+    accepted_export_digest: str,
+) -> dict[str, Any]:
+    return _manager().delete_tracker_projection(
+        experiment_id=experiment_id,
+        session_id=session_id,
+        accepted_export_digest=accepted_export_digest,
+    )
+
+
 @tool("get_experiment")
 def get_experiment(experiment_id: str) -> dict[str, Any]:
     return _manager().experiment_status(experiment_id)

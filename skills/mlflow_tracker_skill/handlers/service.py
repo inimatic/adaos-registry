@@ -40,8 +40,16 @@ def server_command() -> list[str]:
     host = str(os.getenv("ADAOS_SERVICE_HOST") or "127.0.0.1")
     port = str(int(os.getenv("ADAOS_SERVICE_PORT") or "18121"))
     workers = str(max(1, int(os.getenv("ADAOS_MLFLOW_WORKERS") or "1")))
-    backend_uri = str(os.getenv("ADAOS_MLFLOW_BACKEND_STORE_URI") or f"sqlite:///{database.as_posix()}")
-    artifact_uri = str(os.getenv("ADAOS_MLFLOW_ARTIFACTS_DESTINATION") or artifacts.as_uri())
+    backend_uri = str(
+        os.getenv("ADAOS_SERVICE_RELATIONAL_URI")
+        or os.getenv("ADAOS_MLFLOW_BACKEND_STORE_URI")
+        or f"sqlite:///{database.as_posix()}"
+    )
+    artifact_uri = str(
+        os.getenv("ADAOS_SERVICE_BLOB_URI")
+        or os.getenv("ADAOS_MLFLOW_ARTIFACTS_DESTINATION")
+        or artifacts.as_uri()
+    )
     return [
         str(service_python()),
         "-m",
@@ -59,6 +67,10 @@ def server_command() -> list[str]:
         artifact_uri,
         "--allowed-hosts",
         "127.0.0.1:*,localhost:*",
+        "--static-prefix",
+        "/api/services/mlflow_tracker_skill/ui",
+        "--x-frame-options",
+        "SAMEORIGIN",
     ]
 
 

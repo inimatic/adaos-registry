@@ -26,6 +26,40 @@ service:
   healthcheck:
     path: /health
     timeout_ms: 2000
+  storage:
+    relational:
+      logical_name: mlflow
+      environment: ADAOS_SERVICE_RELATIONAL_URI
+      prefer_provisioned: true
+      requirements:
+        durability: durable
+        transactions_required: true
+        concurrent_writers: 1
+        json_required: false
+        backup_required: true
+        restore_required: true
+        locality: any
+        rollback_policy: restore
+        retention_policy: retain
+    blob:
+      logical_name: artifacts
+      environment: ADAOS_SERVICE_BLOB_URI
+      prefer_provisioned: true
+      requirements:
+        durability: durable
+        locality: any
+        content_addressed: true
+        retention_policy: retain
+  ui:
+    enabled: true
+    path: /
+    access: authenticated
+    origin_policy: same-origin
+    embedding: same-origin
+    max_request_bytes: 16777216
+capabilities:
+- storage.relational
+- storage.blob
 dependencies: []
 default_tool: provider_health
 tools:
@@ -72,4 +106,3 @@ compatibility:
     min_commit: d28d2b4293c142802ec0e8ff4bb0c82dafaedd0e
     min_short_commit: d28d2b42
     build_date: '2026-08-08T02:13:02+03:00'
-

@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Mapping, Protocol, Sequence
 
+from adaos.domain.runtime_bindings import ServiceBinding
+
 from research.contracts import canonical_json, digest, identity, now
 from research.repository import ResearchRepository
 
@@ -18,10 +20,19 @@ from research.repository import ResearchRepository
 FINAL_STATUSES = {"succeeded", "failed", "cancelled", "lost"}
 SPLIT_ROLES = {"train", "validation", "robustness", "test", "system"}
 VALUE_TYPES = {"float", "integer", "boolean", "string", "vector", "table", "distribution"}
+TRACKER_CONTRACT_VERSION = "1.0"
 
 
 class TrackerConflict(ValueError):
     """The same idempotency identity was reused with different content."""
+
+
+class TrackerBackpressure(RuntimeError):
+    """The durable provider outbox reached its admitted capacity."""
+
+
+class TrackerDeliveryError(RuntimeError):
+    """Required tracker data could not reach the selected provider."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,6 +72,12 @@ class TrackerProvider(Protocol):
     ) -> Mapping[str, Any]: ...
 
     def export_session(self, session_id: str) -> Mapping[str, Any]: ...
+
+    def query_sessions(self, **filters: Any) -> Sequence[Mapping[str, Any]]: ...
+
+    def metric_history(self, session_id: str, namespace: str, name: str) -> Sequence[Mapping[str, Any]]: ...
+
+    def flush(self, session_id: str | None = None, *, required: bool = False) -> Mapping[str, Any]: ...
 
 
 def observation_event_id(session_id: str, payload: Mapping[str, Any]) -> str:
@@ -131,7 +148,7 @@ class LocalTracker:
 
     descriptor = TrackerDescriptor(
         provider_id="local-tracker",
-        contract_version="1.0-rc1",
+        contract_version=TRACKER_CONTRACT_VERSION,
         capabilities=(
             "sessions",
             "typed-observations",
@@ -140,8 +157,11 @@ class LocalTracker:
             "dataset-inputs",
             "idempotent-batch",
             "deterministic-export",
+            "query",
+            "provider-links",
+            "bounded-delivery",
         ),
-        limits={"max_batch_events": 500, "max_inline_value_bytes": 65536},
+        limits={"max_batch_events": 500, "max_inline_value_bytes": 65536, "max_pending_events": 10000},
     )
 
     def __init__(
@@ -156,11 +176,13 @@ class LocalTracker:
 
     def health(self) -> dict[str, Any]:
         storage = dict(self.db.health())
+        delivery = self.delivery_status()
         return {
             "ok": bool(storage.get("ok")),
             "state": "ready" if storage.get("ok") else "degraded",
             "descriptor": self.descriptor.to_dict(),
             "storage": storage,
+            "delivery": delivery,
         }
 
     @staticmethod
@@ -183,6 +205,108 @@ class LocalTracker:
             raise KeyError(session_id)
         return self._decode_session(row)
 
+    def query_sessions(
+        self,
+        *,
+        experiment_id: str | None = None,
+        run_id: str | None = None,
+        attempt_id: str | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        parameters: dict[str, Any] = {}
+        for key, value in (
+            ("experiment_id", experiment_id),
+            ("run_id", run_id),
+            ("attempt_id", attempt_id),
+            ("status", status),
+        ):
+            if value is not None:
+                clauses.append(f"{key}=:{key}")
+                parameters[key] = str(value)
+        statement = "SELECT * FROM tracker_sessions"
+        if clauses:
+            statement += " WHERE " + " AND ".join(clauses)
+        statement += " ORDER BY opened_at, session_id"
+        return [self._decode_session(row) for row in self.db.fetch_all(statement, parameters)]
+
+    def bind_provider_link(
+        self,
+        session_id: str,
+        provider_id: str,
+        link: Mapping[str, Any],
+        *,
+        state: str = "active",
+    ) -> dict[str, Any]:
+        self.get_session(session_id)
+        if state not in {"active", "deleted", "unavailable"}:
+            raise ValueError("provider link state is invalid")
+        normalized = {
+            "schema": "adaos.research.tracker_provider_link.v1",
+            "session_id": session_id,
+            "provider_id": str(provider_id),
+            **dict(link),
+            "state": state,
+        }
+        existing = self.db.fetch_one(
+            "SELECT link_json, state FROM tracker_provider_links WHERE session_id=:session_id AND provider_id=:provider_id",
+            {"session_id": session_id, "provider_id": str(provider_id)},
+        )
+        if existing and str(existing["state"]) == state and canonical_json(json.loads(str(existing["link_json"]))) == canonical_json(normalized):
+            return normalized
+        if existing:
+            self.db.execute(
+                "UPDATE tracker_provider_links SET link_json=:link, state=:state, updated_at=:updated_at WHERE session_id=:session_id AND provider_id=:provider_id",
+                {
+                    "link": canonical_json(normalized),
+                    "state": state,
+                    "updated_at": now(),
+                    "session_id": session_id,
+                    "provider_id": str(provider_id),
+                },
+            )
+        else:
+            self.db.execute(
+                "INSERT INTO tracker_provider_links(session_id, provider_id, link_json, state, updated_at) VALUES (:session_id, :provider_id, :link, :state, :updated_at)",
+                {
+                    "session_id": session_id,
+                    "provider_id": str(provider_id),
+                    "link": canonical_json(normalized),
+                    "state": state,
+                    "updated_at": now(),
+                },
+            )
+        return normalized
+
+    def provider_links(self, session_id: str) -> list[dict[str, Any]]:
+        return [
+            json.loads(str(row["link_json"]))
+            for row in self.db.fetch_all(
+                "SELECT link_json FROM tracker_provider_links WHERE session_id=:session_id ORDER BY provider_id",
+                {"session_id": session_id},
+            )
+        ]
+
+    def delivery_status(self, session_id: str | None = None) -> dict[str, Any]:
+        statement = "SELECT delivery_state, COUNT(*) AS count FROM tracker_events"
+        parameters: dict[str, Any] = {}
+        if session_id is not None:
+            statement += " WHERE session_id=:session_id"
+            parameters["session_id"] = session_id
+        statement += " GROUP BY delivery_state"
+        counts = {str(row["delivery_state"]): int(row["count"]) for row in self.db.fetch_all(statement, parameters)}
+        pending = int(counts.get("pending", 0)) + int(counts.get("failed", 0))
+        capacity = int(self.descriptor.limits.get("max_pending_events") or 0)
+        return {
+            "schema": "adaos.research.tracker_delivery_status.v1",
+            "session_id": session_id,
+            "counts": counts,
+            "pending": pending,
+            "capacity": capacity,
+            "backpressure": bool(capacity and pending >= capacity),
+            "state": "degraded" if pending else "ready",
+        }
+
     def open_session(
         self,
         *,
@@ -198,6 +322,13 @@ class LocalTracker:
         inputs: Sequence[Mapping[str, Any]] = (),
         provider_binding: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
+        existing = self.db.fetch_one(
+            "SELECT * FROM tracker_sessions WHERE session_id=:session_id",
+            {"session_id": session_id},
+        )
+        normalized_tags = dict(tags)
+        if not existing:
+            normalized_tags.setdefault("adaos.contract_version", self.descriptor.contract_version)
         candidate = {
             "session_id": session_id,
             "provider_id": self.descriptor.provider_id,
@@ -209,15 +340,11 @@ class LocalTracker:
             "attempt_id": attempt_id,
             "status": "running",
             "parameters": dict(parameters),
-            "tags": dict(tags),
+            "tags": normalized_tags,
             "inputs": [dict(item) for item in inputs],
             "provider_binding": dict(provider_binding or {}),
             "completeness": {},
         }
-        existing = self.db.fetch_one(
-            "SELECT * FROM tracker_sessions WHERE session_id=:session_id",
-            {"session_id": session_id},
-        )
         if existing:
             decoded = self._decode_session(existing)
             comparable = {key: decoded[key] for key in candidate}
@@ -250,6 +377,8 @@ class LocalTracker:
             raise ValueError("tracking session is finalized")
         if len(payloads) > int(self.descriptor.limits["max_batch_events"]):
             raise ValueError("tracker batch exceeds provider limit")
+        prepared: list[tuple[str, dict[str, Any], str]] = []
+        by_event_id: dict[str, str] = {}
         accepted: list[str] = []
         duplicates: list[str] = []
         for source in payloads:
@@ -279,40 +408,63 @@ class LocalTracker:
                 payload.setdefault("observed_at", session["opened_at"])
             event_id = str(payload["event_id"])
             payload_digest = digest(payload)
-            existing = self.db.fetch_one(
-                "SELECT payload_digest FROM tracker_events WHERE event_id=:event_id",
-                {"event_id": event_id},
-            )
-            if existing:
-                if str(existing["payload_digest"]) != payload_digest:
+            batch_digest = by_event_id.get(event_id)
+            if batch_digest is not None:
+                if batch_digest != payload_digest:
                     raise TrackerConflict(f"tracker event conflict: {event_id}")
                 duplicates.append(event_id)
                 continue
-            ingested_at = now()
-            local_delivery = self.descriptor.provider_id == "local-tracker"
-            self.db.execute(
-                "INSERT INTO tracker_events(event_id, session_id, event_kind, payload_json, payload_digest, observed_at, ingested_at, delivery_state, provider_receipt_json) VALUES (:event_id, :session_id, :event_kind, :payload, :payload_digest, :observed_at, :ingested_at, 'delivered', :receipt)",
-                {
-                    "event_id": event_id,
-                    "session_id": session_id,
-                    "event_kind": event_kind,
-                    "payload": canonical_json(payload),
-                    "payload_digest": payload_digest,
-                    "observed_at": str(payload.get("observed_at") or ingested_at),
-                    "ingested_at": ingested_at,
-                    "receipt": canonical_json(
-                        {"provider_id": self.descriptor.provider_id, "accepted": True}
-                        if local_delivery
-                        else {"provider_id": self.descriptor.provider_id, "accepted": False, "state": "pending"}
-                    ),
-                },
-            )
-            if not local_delivery:
-                self.db.execute(
-                    "UPDATE tracker_events SET delivery_state='pending' WHERE event_id=:event_id",
+            by_event_id[event_id] = payload_digest
+            prepared.append((event_id, payload, payload_digest))
+        local_delivery = self.descriptor.provider_id == "local-tracker"
+        with self.db.transaction() as transaction:
+            pending_insertions: list[tuple[str, dict[str, Any], str]] = []
+            for event_id, payload, payload_digest in prepared:
+                existing = transaction.fetch_one(
+                    "SELECT payload_digest FROM tracker_events WHERE event_id=:event_id",
                     {"event_id": event_id},
                 )
-            accepted.append(event_id)
+                if existing:
+                    if str(existing["payload_digest"]) != payload_digest:
+                        raise TrackerConflict(f"tracker event conflict: {event_id}")
+                    duplicates.append(event_id)
+                else:
+                    pending_insertions.append((event_id, payload, payload_digest))
+            if not local_delivery:
+                pending_count = int(
+                    transaction.scalar(
+                        "SELECT COUNT(*) FROM tracker_events WHERE delivery_state!='delivered'"
+                    )
+                    or 0
+                )
+                capacity = int(self.descriptor.limits.get("max_pending_events") or 0)
+                if capacity and pending_count + len(pending_insertions) > capacity:
+                    raise TrackerBackpressure(
+                        f"tracker outbox capacity exceeded: {pending_count + len(pending_insertions)}>{capacity}"
+                    )
+            for event_id, payload, payload_digest in pending_insertions:
+                ingested_at = now()
+                delivery_state = "delivered" if local_delivery else "pending"
+                receipt = (
+                    {"provider_id": self.descriptor.provider_id, "accepted": True, "state": "delivered"}
+                    if local_delivery
+                    else {"provider_id": self.descriptor.provider_id, "accepted": False, "state": "pending"}
+                )
+                transaction.execute(
+                    "INSERT INTO tracker_events(event_id, session_id, event_kind, payload_json, payload_digest, observed_at, ingested_at, delivery_state, provider_receipt_json) VALUES (:event_id, :session_id, :event_kind, :payload, :payload_digest, :observed_at, :ingested_at, :delivery_state, :receipt)",
+                    {
+                        "event_id": event_id,
+                        "session_id": session_id,
+                        "event_kind": event_kind,
+                        "payload": canonical_json(payload),
+                        "payload_digest": payload_digest,
+                        "observed_at": str(payload.get("observed_at") or ingested_at),
+                        "ingested_at": ingested_at,
+                        "delivery_state": delivery_state,
+                        "receipt": canonical_json(receipt),
+                    },
+                )
+                accepted.append(event_id)
         return {
             "schema": "adaos.research.tracker_batch_receipt.v1",
             "session_id": session_id,
@@ -392,6 +544,10 @@ class LocalTracker:
         )
         return self.export_session(session_id)
 
+    def flush(self, session_id: str | None = None, *, required: bool = False) -> dict[str, Any]:
+        del required
+        return self.delivery_status(session_id)
+
     def export_session(self, session_id: str) -> dict[str, Any]:
         session = self.get_session(session_id)
         events = []
@@ -428,12 +584,15 @@ class LocalTracker:
                 "completeness",
             )
         }
+        contract_version = str(session["tags"].get("adaos.contract_version") or "1.0-rc1")
         value = {
             "schema": "adaos.research.tracker_export.v1",
-            "contract_version": self.descriptor.contract_version,
+            "contract_version": contract_version,
             "session": normalized_session,
             "events": events,
         }
+        if contract_version != "1.0-rc1":
+            value["provider_links"] = self.provider_links(session_id)
         return {**value, "export_digest": digest(value)}
 
     def export_experiment(self, experiment_id: str) -> dict[str, Any]:
@@ -442,9 +601,11 @@ class LocalTracker:
             {"experiment_id": experiment_id},
         )
         sessions = [self.export_session(str(row["session_id"])) for row in rows]
+        contract_versions = {str(item["contract_version"]) for item in sessions}
+        contract_version = next(iter(contract_versions)) if len(contract_versions) == 1 else "mixed"
         value = {
             "schema": "adaos.research.tracker_experiment_export.v1",
-            "contract_version": self.descriptor.contract_version,
+            "contract_version": contract_version,
             "experiment_id": experiment_id,
             "sessions": sessions,
         }
@@ -536,7 +697,7 @@ class MlflowTracker:
 
     descriptor = TrackerDescriptor(
         provider_id="mlflow",
-        contract_version="1.0-rc1",
+        contract_version=TRACKER_CONTRACT_VERSION,
         capabilities=(
             "sessions",
             "typed-scalar-observations",
@@ -545,19 +706,48 @@ class MlflowTracker:
             "artifact-reference-tags",
             "idempotent-journal-projection",
             "native-query-ui",
+            "query",
+            "provider-links",
+            "bounded-delivery",
+            "authenticated-service-binding",
         ),
         limits={
             "max_batch_events": 500,
             "metric_step": "integer",
             "parameter_value_bytes": 6000,
             "delivery_semantics": "transactional-outbox-at-least-once",
+            "max_pending_events": 10000,
         },
     )
 
-    def __init__(self, repository: ResearchRepository, endpoint: str) -> None:
-        self.endpoint = str(endpoint).rstrip("/")
-        if not self.endpoint.startswith(("http://127.0.0.1:", "http://localhost:")):
-            raise ValueError("the initial MLflow provider only admits a loopback tracking endpoint")
+    def __init__(
+        self,
+        repository: ResearchRepository,
+        endpoint: str | ServiceBinding,
+        *,
+        auth_headers: Mapping[str, str] | None = None,
+    ) -> None:
+        self.service_binding: ServiceBinding | None = endpoint if isinstance(endpoint, ServiceBinding) else None
+        if self.service_binding is not None:
+            if self.service_binding.capability != "tracker.experiment":
+                raise ValueError("MLflow service binding capability is invalid")
+            if self.service_binding.protocol != "mlflow-rest":
+                raise ValueError("MLflow service binding protocol is invalid")
+            endpoint_value = self.service_binding.endpoint
+        else:
+            endpoint_value = str(endpoint)
+        self.endpoint = str(endpoint_value).rstrip("/")
+        parsed = urllib.parse.urlsplit(self.endpoint)
+        loopback = parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            raise ValueError("MLflow tracking endpoint must use HTTP(S)")
+        if not loopback and parsed.scheme != "https":
+            raise ValueError("externally managed MLflow requires TLS")
+        self.auth_headers = {str(key): str(value) for key, value in dict(auth_headers or {}).items()}
+        if not loopback and self.service_binding is None:
+            raise ValueError("externally managed MLflow requires an AdaOS service binding")
+        if self.service_binding is not None and self.service_binding.secret_ref and not self.auth_headers:
+            raise ValueError("authenticated MLflow binding requires resolved request headers")
         self.journal = LocalTracker(repository, descriptor=self.descriptor)
 
     def _request(
@@ -572,7 +762,7 @@ class MlflowTracker:
             f"{self.endpoint}{path}",
             data=body,
             method=method or ("POST" if body is not None else "GET"),
-            headers={"Content-Type": "application/json"},
+            headers={"Content-Type": "application/json", **self.auth_headers},
         )
         try:
             with urllib.request.urlopen(request, timeout=5.0) as response:
@@ -585,29 +775,51 @@ class MlflowTracker:
         if not raw.strip():
             return {}
         try:
-            return dict(json.loads(raw))
+            decoded = json.loads(raw)
+            return dict(decoded) if isinstance(decoded, Mapping) else {"value": decoded}
         except json.JSONDecodeError:
             return {"body": raw}
 
+    def capability_probe(self) -> dict[str, Any]:
+        health = self._request("/health")
+        version_payload = self._request("/version")
+        version = str(version_payload.get("value") or version_payload.get("body") or "").strip().strip('"')
+        if not version or not version.split(".", 1)[0].isdigit():
+            raise RuntimeError("MLflow version probe returned an invalid value")
+        return {
+            "schema": "adaos.research.tracker_capability_probe.v1",
+            "provider_id": "mlflow",
+            "contract_version": self.descriptor.contract_version,
+            "provider_version": version,
+            "health": health,
+            "authenticated": bool(self.auth_headers),
+            "binding_id": self.service_binding.binding_id if self.service_binding else None,
+        }
+
     def health(self) -> dict[str, Any]:
         try:
-            upstream = self._request("/health")
+            probe = self.capability_probe()
         except RuntimeError as exc:
+            delivery = self.journal.delivery_status()
             return {
                 "ok": False,
                 "state": "unavailable",
                 "descriptor": self.descriptor.to_dict(),
                 "endpoint": self.endpoint,
                 "error": str(exc),
+                "delivery": delivery,
             }
+        delivery = self.journal.delivery_status()
+        ready = not bool(delivery["pending"])
         return {
-            "ok": True,
-            "state": "ready",
+            "ok": ready,
+            "state": "ready" if ready else "degraded",
             "descriptor": self.descriptor.to_dict(),
             "endpoint": self.endpoint,
             "ui_url": self.endpoint,
-            "upstream": upstream,
+            "probe": probe,
             "journal": self.journal.health(),
+            "delivery": delivery,
         }
 
     @staticmethod
@@ -692,6 +904,16 @@ class MlflowTracker:
                 "/api/2.0/mlflow/runs/log-batch",
                 {"run_id": run_id, "metrics": [], "params": params, "tags": []},
             )
+        self.journal.bind_provider_link(
+            session_id,
+            "mlflow",
+            {
+                "binding_id": self.service_binding.binding_id if self.service_binding else "service-binding.mlflow.local",
+                "mlflow_experiment_id": experiment_id,
+                "mlflow_run_id": run_id,
+                "authority": "telemetry-projection",
+            },
+        )
         return {"experiment_id": experiment_id, "run_id": run_id}
 
     @staticmethod
@@ -790,18 +1012,56 @@ class MlflowTracker:
     def close_session(
         self, session_id: str, status: str, completeness: Mapping[str, Any]
     ) -> dict[str, Any]:
-        self._project(session_id, [item["event_id"] for item in self.journal.pending_events(session_id)])
-        exported = self.journal.close_session(session_id, status, completeness)
+        self.flush(session_id, required=True)
+        session = self.journal.get_session(session_id)
         try:
-            binding = self._ensure_run(exported["session"])
+            binding = self._ensure_run(session)
             mapped = {"succeeded": "FINISHED", "failed": "FAILED", "cancelled": "KILLED", "lost": "FAILED"}[status]
             self._request(
                 "/api/2.0/mlflow/runs/update",
                 {"run_id": binding["run_id"], "status": mapped, "end_time": int(time.time() * 1000)},
             )
-        except RuntimeError:
-            pass
-        return self.journal.export_session(session_id)
+        except RuntimeError as exc:
+            self.journal.bind_provider_link(
+                session_id,
+                "mlflow",
+                {"authority": "telemetry-projection", "error": str(exc)},
+                state="unavailable",
+            )
+            raise TrackerDeliveryError("MLflow terminal status delivery failed") from exc
+        return self.journal.close_session(session_id, status, completeness)
+
+    def flush(self, session_id: str | None = None, *, required: bool = False) -> dict[str, Any]:
+        sessions = (
+            [self.journal.get_session(session_id)]
+            if session_id is not None
+            else self.journal.query_sessions()
+        )
+        delivered: list[str] = []
+        batch_size = int(self.descriptor.limits["max_batch_events"])
+        for session in sessions:
+            current_id = str(session["session_id"])
+            pending = self.journal.pending_events(current_id)
+            for offset in range(0, len(pending), batch_size):
+                receipt = self._project(
+                    current_id,
+                    [item["event_id"] for item in pending[offset : offset + batch_size]],
+                )
+                delivered.extend(str(item) for item in receipt.get("delivered") or [])
+                if receipt.get("state") == "failed":
+                    break
+        delivery = self.journal.delivery_status(session_id)
+        result = {
+            "schema": "adaos.research.tracker_flush.v1",
+            "provider_id": "mlflow",
+            "delivered": delivered,
+            "delivery": delivery,
+        }
+        if required and delivery["pending"]:
+            raise TrackerDeliveryError(
+                f"required MLflow delivery remains incomplete for {delivery['pending']} event(s)"
+            )
+        return result
 
     def get_session(self, session_id: str) -> dict[str, Any]:
         return self.journal.get_session(session_id)
@@ -812,6 +1072,38 @@ class MlflowTracker:
     def export_experiment(self, experiment_id: str) -> dict[str, Any]:
         return self.journal.export_experiment(experiment_id)
 
+    def query_sessions(self, **filters: Any) -> list[dict[str, Any]]:
+        return self.journal.query_sessions(**filters)
+
+    def delete_provider_session(self, session_id: str, *, accepted_export_digest: str) -> dict[str, Any]:
+        session = self.journal.get_session(session_id)
+        accepted = [
+            item
+            for item in self.journal.repository.list(str(session["study_id"]), "tracker_evidence_acceptance")
+            if item.payload.get("experiment_id") == session["experiment_id"]
+            and item.payload.get("tracker_export_digest") == accepted_export_digest
+        ]
+        if not accepted:
+            raise ValueError("provider deletion requires accepted immutable tracker evidence")
+        binding = self._ensure_run(session)
+        self._request(
+            "/api/2.0/mlflow/runs/delete",
+            {"run_id": binding["run_id"]},
+        )
+        link = self.journal.bind_provider_link(
+            session_id,
+            "mlflow",
+            {
+                "binding_id": self.service_binding.binding_id if self.service_binding else "service-binding.mlflow.local",
+                "mlflow_experiment_id": binding["experiment_id"],
+                "mlflow_run_id": binding["run_id"],
+                "authority": "telemetry-projection",
+                "accepted_export_digest": accepted_export_digest,
+            },
+            state="deleted",
+        )
+        return {"schema": "adaos.research.tracker_provider_deletion.v1", "deleted": True, "link": link}
+
     def metric_history(self, session_id: str, namespace: str, name: str) -> list[dict[str, Any]]:
         return self.journal.metric_history(session_id, namespace, name)
 
@@ -820,7 +1112,10 @@ __all__ = [
     "FINAL_STATUSES",
     "LocalTracker",
     "MlflowTracker",
+    "TRACKER_CONTRACT_VERSION",
+    "TrackerBackpressure",
     "TrackerConflict",
+    "TrackerDeliveryError",
     "TrackerDescriptor",
     "TrackerProvider",
     "normalize_observation",
