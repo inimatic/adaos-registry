@@ -1,5 +1,5 @@
 name: mlflow_tracker_skill
-version: 0.1.1
+version: 0.2.0
 description: Supervised MLflow tracking provider and native query UI for the AdaOS
   research tracker contract.
 entry: handlers/main.py
