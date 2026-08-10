@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import uuid
 from pathlib import Path
 
 import yaml
@@ -135,13 +136,14 @@ def test_talk_fallback_answers_common_factual_and_term_questions() -> None:
 
 def test_capture_feedback_stores_trial_observation() -> None:
     skill = _load_module()
-    skill.reset_session(webspace_id="test-feedback")
+    webspace_id = f"test-feedback-{uuid.uuid4().hex}"
+    skill.reset_session(webspace_id=webspace_id)
 
     result = skill.capture_feedback(
         rating=4,
         expectation="хотелось быстро понять, кто говорит",
         observation="старт понятный",
-        webspace_id="test-feedback",
+        webspace_id=webspace_id,
     )
 
     assert result["ok"] is True

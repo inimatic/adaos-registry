@@ -1,5 +1,5 @@
 name: conversation_companions
-version: 0.1.12
+version: 0.1.13
 description: Draft conversational character skill for onboarding, profile tuning,
   and controlled user trials.
 entry: handlers/main.py
