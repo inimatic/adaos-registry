@@ -4,7 +4,7 @@ type: desktop
 title: Builder — рабочее место разработки
 description: Safe local Builder prototype for the dependent Prototype, Automation,
   Trial, and Publication lifecycle.
-version: 0.2.56
+version: 0.2.57
 title_i18n:
   fallback: Builder
   key: scenario.builder.title
@@ -30,13 +30,15 @@ nlu:
 depends:
 - builder_skill
 - builder_sdk_control_skill
+- research_orchestrator_skill
 - voice_chat_skill
 runtime:
   skills:
     required:
     - builder_skill
     - builder_sdk_control_skill
+    - research_orchestrator_skill
     - voice_chat_skill
 ui:
   manifest: webui.json
-updated_at: '2026-08-06T09:25:37+00:00'
+updated_at: '2026-08-10T14:43:26+00:00'

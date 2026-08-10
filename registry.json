@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-10T14:43:09+00:00",
+  "updated_at": "2026-08-10T14:43:26+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1053,8 +1053,8 @@
       "kind": "scenario",
       "id": "builder",
       "name": "builder",
-      "version": "0.2.56",
-      "updated_at": "2026-08-06T09:25:37+00:00",
+      "version": "0.2.57",
+      "updated_at": "2026-08-10T14:43:26+00:00",
       "path": "scenarios/builder",
       "manifest": "scenarios/builder/scenario.yaml",
       "source": {
@@ -1076,6 +1076,7 @@
         "required": [
           "builder_skill",
           "builder_sdk_control_skill",
+          "research_orchestrator_skill",
           "voice_chat_skill"
         ]
       }

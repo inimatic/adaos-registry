@@ -42,6 +42,10 @@
                         "builderConversationId": "conv.skill.builder_skill.default",
                         "builderTopicId": "prompt-project:scenario:builder",
                         "builderThreadId": "prompt-project:scenario:builder",
+                        "researchConversationId": "conv.skill.research_orchestrator_skill.builder",
+                        "researchThreadId": "research:builder",
+                        "researchGeneration": 0,
+                        "researchPrototypeDigest": null,
                         "projectPickerArchived": false,
                         "projectArchived": false,
                         "selectedLifecycleStage": "prototype",
@@ -376,6 +380,11 @@
                                         }
                                     },
                                     {
+                                        "id": "research",
+                                        "label": "Research",
+                                        "icon": "flask-outline"
+                                    },
+                                    {
                                         "id": "context",
                                         "label": "ТЗ",
                                         "icon": "document-text-outline",
@@ -520,6 +529,193 @@
                             "title_i18n": {
                                 "key": "builder.text.protected.file.preview"
                             }
+                        },
+                        {
+                            "area": "center",
+                            "id": "research-actions",
+                            "type": "ui.actions",
+                            "title": "Research direction",
+                            "visibleIf": "$state.activeView === 'research' && $state.selectedProjectKind === 'skill'",
+                            "inputs": {
+                                "variant": "toolbar",
+                                "size": "small",
+                                "buttons": [
+                                    {"id": "initialize", "label": "Initialize", "icon": "flask-outline", "title": "Связать выбранный research-direction skill с durable ledger ОИ."},
+                                    {"id": "sync", "label": "Sync sources", "icon": "sync-outline", "title": "Сверить текущий immutable SourceBundle после загрузки файлов."},
+                                    {"id": "accept", "label": "Accept prototype", "icon": "shield-checkmark-outline", "enabledIf": "$state.researchPrototypeDigest !== null", "title": "Принять точную ревизию, создать Forge checkpoint и Automation Brief. Codex не запускается."}
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "click:initialize",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.initialize_direction",
+                                    "params": {"direction_id": "$state.selectedProjectId", "title": "$state.selectedProjectTitle"},
+                                    "invalidates": ["research.formulation"]
+                                },
+                                {
+                                    "on": "click:sync",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.sync_source_bundle",
+                                    "params": {"direction_id": "$state.selectedProjectId"},
+                                    "invalidates": ["research.formulation"]
+                                },
+                                {
+                                    "on": "click:accept",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.accept_prototype",
+                                    "params": {
+                                        "direction_id": "$state.selectedProjectId",
+                                        "prototype_digest": "$state.researchPrototypeDigest",
+                                        "expected_generation": "$state.researchGeneration",
+                                        "idempotency_key": "builder-accept-$state.selectedProjectId-$state.researchGeneration"
+                                    },
+                                    "invalidates": ["research.formulation", "research.activity", "research.automation_brief"]
+                                }
+                            ]
+                        },
+                        {
+                            "area": "center",
+                            "id": "research-source-upload",
+                            "type": "input.fileUpload",
+                            "title": "Исходные артефакты",
+                            "visibleIf": "$state.activeView === 'research' && $state.selectedProjectKind === 'skill'",
+                            "inputs": {
+                                "label": "Добавить notebook, Markdown, текст, код или PDF",
+                                "accept": ".ipynb,.md,.txt,.py,.json,.yaml,.yml,.pdf",
+                                "maxBytes": 134217728,
+                                "target": "builderProjectSource",
+                                "projectKind": "$state.selectedProjectKind",
+                                "projectId": "$state.selectedProjectId",
+                                "role": "research_source"
+                            },
+                            "actions": [
+                                {
+                                    "on": "uploaded",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.initialize_direction",
+                                    "params": {"direction_id": "$state.selectedProjectId", "title": "$state.selectedProjectTitle"}
+                                },
+                                {
+                                    "on": "uploaded",
+                                    "type": "callSkill",
+                                    "target": "research_orchestrator_skill.sync_source_bundle",
+                                    "params": {"direction_id": "$state.selectedProjectId"},
+                                    "invalidates": ["research.formulation", "research.activity"]
+                                }
+                            ]
+                        },
+                        {
+                            "area": "center",
+                            "id": "research-state-binding",
+                            "type": "item.details",
+                            "title": "Formulation status",
+                            "visibleIf": "$state.activeView === 'research' && $state.selectedProjectKind === 'skill'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_direction",
+                                "params": {"direction_id": "$state.selectedProjectId"},
+                                "cacheTtlMs": 0,
+                                "invalidationTags": ["research.formulation"],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {
+                                "compact": true,
+                                "fields": [
+                                    {"key": "direction.status", "label": "Stage"},
+                                    {"key": "direction.generation", "label": "Generation"},
+                                    {"key": "source_bundle.generation", "label": "Source bundle"},
+                                    {"key": "current_prototype.revision", "label": "Prototype"}
+                                ],
+                                "stateBindings": {
+                                    "researchGeneration": "direction.generation",
+                                    "researchPrototypeDigest": "current_prototype.digest"
+                                }
+                            }
+                        },
+                        {
+                            "area": "center",
+                            "id": "research-state",
+                            "type": "static.markdown",
+                            "title": "Постановка и следующие шаги",
+                            "visibleIf": "$state.activeView === 'research' && $state.selectedProjectKind === 'skill'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_direction",
+                                "params": {"direction_id": "$state.selectedProjectId"},
+                                "cacheTtlMs": 0,
+                                "invalidationTags": ["research.formulation"],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {"bindField": "content"}
+                        },
+                        {
+                            "area": "center",
+                            "id": "research-chat",
+                            "type": "ui.chat",
+                            "title": "Обсуждение постановки",
+                            "visibleIf": "$state.activeView === 'research' && $state.selectedProjectKind === 'skill'",
+                            "dataSource": {
+                                "kind": "stream",
+                                "receiver": "voice_chat.messages",
+                                "scope": "shared",
+                                "transport": "hub",
+                                "params": {"conversation_id": "$state.researchConversationId", "conversation_topic_id": "research:$state.selectedProjectId", "dialog_channel_id": "research_orchestrator"}
+                            },
+                            "inputs": {
+                                "autoGrow": true,
+                                "compact": true,
+                                "enterToSend": true,
+                                "shiftEnterNewline": true,
+                                "showTimestamps": true,
+                                "placeholder": "Обсудите вопрос, гипотезы, протокол, метрики или требования к экспериментальной базе…",
+                                "sendCommand": "voice.chat.user",
+                                "receiver": "voice_chat.messages",
+                                "scope": "shared",
+                                "meta": {
+                                    "active_agent_id": "agent:research_orchestrator_skill:researcher",
+                                    "active_agent_label": "Исследователь",
+                                    "conversation_id": "$state.researchConversationId",
+                                    "conversation_topic_id": "research:$state.selectedProjectId",
+                                    "thread_id": "research:$state.selectedProjectId",
+                                    "dialog_channel_id": "research_orchestrator",
+                                    "direction_id": "$state.selectedProjectId",
+                                    "route_id": "voice_chat"
+                                }
+                            },
+                            "actions": []
+                        },
+                        {
+                            "area": "right",
+                            "id": "research-activity",
+                            "type": "static.markdown",
+                            "title": "Ход работы ОИ",
+                            "visibleIf": "$state.activeView === 'research' && $state.selectedProjectKind === 'skill'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_activity",
+                                "params": {"direction_id": "$state.selectedProjectId", "limit": 100},
+                                "cacheTtlMs": 0,
+                                "invalidationTags": ["research.activity", "research.formulation"],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {"bindField": "content"}
+                        },
+                        {
+                            "area": "right",
+                            "id": "research-automation-brief",
+                            "type": "item.codeViewer",
+                            "title": "Automation Brief (pre-Codex)",
+                            "visibleIf": "$state.activeView === 'research' && $state.selectedProjectKind === 'skill'",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "research_orchestrator_skill.get_automation_brief",
+                                "params": {"direction_id": "$state.selectedProjectId"},
+                                "cacheTtlMs": 0,
+                                "invalidationTags": ["research.automation_brief"],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {"bindField": "content", "languageField": "language", "copyButton": true}
                         },
                         {
                             "area": "center",
