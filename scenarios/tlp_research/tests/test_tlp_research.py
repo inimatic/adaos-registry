@@ -58,6 +58,13 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
     assert status["dataSource"]["params"]["experiment_id"] == "$state.experimentId"
     assert editor["actions"][0]["target"] == "research_manager_skill.revise_experiment_json"
     assert views["area"] == "main"
+    assert actions["area"] == "commands"
+    assert next(area for area in page["layout"]["areas"] if area["id"] == "commands") == {
+        "id": "commands",
+        "role": "footer",
+    }
+    assert all(button.get("title") for button in views["inputs"]["buttons"])
+    assert all(button.get("title") for button in actions["inputs"]["buttons"])
     assert page["widgets"].index(views) < page["widgets"].index(editor)
     assert next(item for item in views["actions"] if item["on"] == "click:help") == {
         "on": "click:help",
@@ -87,7 +94,10 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
     mlflow = next(item for item in actions["actions"] if item["on"] == "click:mlflow")
     assert mlflow["type"] == "openUrl"
     assert mlflow["params"] == {
-        "url": "/api/services/mlflow_tracker_skill/ui-bootstrap",
+        "url": (
+            "/api/services/mlflow_tracker_skill/ui-bootstrap"
+            "?fragment=%23%2Fexperiments%3FworkflowType%3Dmachine_learning"
+        ),
         "target": "_blank",
         "withAuth": True,
     }

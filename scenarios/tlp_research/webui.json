@@ -12,7 +12,7 @@
             "type": "split",
             "pattern": "focus-detail",
             "areas": [
-              {"id": "toolbar", "role": "toolbar"},
+              {"id": "commands", "role": "footer"},
               {"id": "main", "role": "main"},
               {"id": "context", "role": "aux"}
             ],
@@ -36,11 +36,11 @@
                 "variant": "segmented",
                 "selectedStateKey": "activeView",
                 "buttons": [
-                  {"id": "conditions", "label": "Conditions", "icon": "options-outline"},
-                  {"id": "runs", "label": "Runs", "icon": "pulse-outline"},
-                  {"id": "results", "label": "Results", "icon": "git-compare-outline"},
-                  {"id": "evidence", "label": "Evidence", "icon": "shield-checkmark-outline"},
-                  {"id": "help", "label": "Help", "icon": "help-circle-outline"}
+                  {"id": "conditions", "label": "Conditions", "title": "Просмотреть и изменить условия текущей ревизии эксперимента", "icon": "options-outline"},
+                  {"id": "runs", "label": "Runs", "title": "Просмотреть логические запуски, физические попытки и их состояния", "icon": "pulse-outline"},
+                  {"id": "results", "label": "Results", "title": "Открыть парные результаты и основной статистический контраст", "icon": "git-compare-outline"},
+                  {"id": "evidence", "label": "Evidence", "title": "Проверить зафиксированный результат, артефакты и tracker export", "icon": "shield-checkmark-outline"},
+                  {"id": "help", "label": "Help", "title": "Открыть руководство и следующие шаги для текущего состояния workflow", "icon": "help-circle-outline"}
                 ]
               },
               "actions": [
@@ -53,19 +53,19 @@
             },
             {
               "id": "experiment-actions",
-              "area": "toolbar",
+              "area": "commands",
               "type": "ui.actions",
               "title": "Experiment commands",
               "inputs": {
                 "variant": "toolbar",
                 "buttons": [
-                  {"id": "review", "label": "Submit review", "icon": "eye-outline"},
-                  {"id": "lock", "label": "Lock", "icon": "lock-closed-outline"},
-                  {"id": "start-preflight", "label": "Start CPU preflight", "icon": "play-outline"},
-                  {"id": "reconcile", "label": "Reconcile", "icon": "sync-outline"},
-                  {"id": "mlflow", "label": "Open MLflow", "icon": "open-outline"},
-                  {"id": "cancel", "label": "Cancel", "icon": "stop-circle-outline"},
-                  {"id": "finalize", "label": "Finalize", "icon": "checkmark-done-outline"}
+                  {"id": "review", "label": "Submit review", "title": "Отправить текущую неизменяемую ревизию условий на проверку", "icon": "eye-outline"},
+                  {"id": "lock", "label": "Lock", "title": "Принять проверенную ревизию и запретить её изменение на месте", "icon": "lock-closed-outline"},
+                  {"id": "start-preflight", "label": "Start CPU preflight", "title": "Запустить реальный трёхэпоховый CPU-профиль проверки workflow", "icon": "play-outline"},
+                  {"id": "reconcile", "label": "Reconcile", "title": "Загрузить прогресс, состояния, результаты и артефакты физических попыток", "icon": "sync-outline"},
+                  {"id": "mlflow", "label": "Open MLflow", "title": "Открыть MLflow в режиме Model training; выберите эксперимент, имя которого оканчивается на AdaOS experiment ID", "icon": "open-outline"},
+                  {"id": "cancel", "label": "Cancel", "title": "Запросить кооперативную отмену активных физических попыток", "icon": "stop-circle-outline"},
+                  {"id": "finalize", "label": "Finalize", "title": "Зафиксировать результат после доставки tracker и проверки артефактов", "icon": "checkmark-done-outline"}
                 ]
               },
               "actions": [
@@ -103,7 +103,7 @@
                 {
                   "on": "click:mlflow",
                   "type": "openUrl",
-                  "params": {"url": "/api/services/mlflow_tracker_skill/ui-bootstrap", "target": "_blank", "withAuth": true}
+                  "params": {"url": "/api/services/mlflow_tracker_skill/ui-bootstrap?fragment=%23%2Fexperiments%3FworkflowType%3Dmachine_learning", "target": "_blank", "withAuth": true}
                 },
                 {
                   "on": "click:cancel",
@@ -232,9 +232,9 @@
                   {"key": "attempt_id", "label": "Physical attempt", "mono": true}
                 ],
                 "buttons": [
-                  {"id": "retry-failed", "label": "Retry", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "failed"},
-                  {"id": "retry-cancelled", "label": "Retry", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "cancelled"},
-                  {"id": "retry-lost", "label": "Retry", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "lost"}
+                  {"id": "retry-failed", "label": "Retry", "title": "Создать новую физическую попытку для ошибочного запуска, сохранив Trial и Run", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "failed"},
+                  {"id": "retry-cancelled", "label": "Retry", "title": "Создать новую физическую попытку для отменённого запуска, сохранив Trial и Run", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "cancelled"},
+                  {"id": "retry-lost", "label": "Retry", "title": "Создать новую физическую попытку для потерянного запуска, сохранив Trial и Run", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "lost"}
                 ]
               },
               "actions": [

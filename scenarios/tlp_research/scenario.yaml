@@ -1,6 +1,6 @@
 id: tlp_research
 name: tlp_research
-version: 0.3.1
+version: 0.3.2
 title: TLP Mechanistic Research
 description: Governed confirmatory study of layer-specific non-flat morphological
   max-plus pooling.
@@ -212,5 +212,5 @@ steps:
         provider: mlflow
         required_delivery: durable-before-finalize
   save_as: experiment
-updated_at: '2026-08-10T06:03:05+00:00'
+updated_at: '2026-08-10T08:23:05+00:00'
 
