@@ -1,0 +1,119 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.prototype.v1",
+  "type": "object",
+  "required": [
+    "schema", "schema_version", "direction", "revision", "parent_digest",
+    "source_bundle_digest", "title", "background", "research_question",
+    "hypotheses", "experimental_plan", "evaluation_plan", "constraints",
+    "assumptions", "open_questions", "implementation_requirements",
+    "acceptance_checks", "readiness", "created_at", "created_by", "digest"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.prototype.v1"},
+    "schema_version": {"const": "1.0.0"},
+    "direction": {
+      "type": "object",
+      "required": ["kind", "id", "ref"],
+      "properties": {"kind": {"const": "skill"}, "id": {"type": "string"}, "ref": {"type": "string"}},
+      "additionalProperties": false
+    },
+    "revision": {"type": "integer", "minimum": 1},
+    "parent_digest": {"type": ["string", "null"]},
+    "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "title": {"type": "string", "minLength": 3},
+    "background": {"type": "string", "minLength": 20},
+    "research_question": {"type": "string", "minLength": 10},
+    "hypotheses": {
+      "type": "array", "minItems": 1, "maxItems": 30,
+      "items": {
+        "type": "object", "required": ["id", "statement", "falsification"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "statement": {"type": "string", "minLength": 5},
+          "falsification": {"type": "string", "minLength": 5},
+          "status": {"enum": ["proposed", "exploratory", "confirmatory"]}
+        },
+        "additionalProperties": true
+      }
+    },
+    "experimental_plan": {
+      "type": "object",
+      "required": ["stages", "data_policy", "reproducibility"],
+      "properties": {
+        "comparators": {"type": "array", "items": {"type": "string"}},
+        "stages": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "purpose", "evidence_class", "execution_profile", "budget", "inference_allowed", "stop_conditions"],
+            "properties": {
+              "id": {"type": "string"},
+              "purpose": {"type": "string", "minLength": 10},
+              "evidence_class": {"enum": ["workflow_smoke", "exploratory", "confirmatory"]},
+              "execution_profile": {"type": "object", "minProperties": 1},
+              "budget": {"type": "object", "minProperties": 1},
+              "inference_allowed": {"type": "boolean"},
+              "stop_conditions": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+            },
+            "additionalProperties": true
+          }
+        },
+        "data_policy": {"type": "object", "minProperties": 1},
+        "reproducibility": {
+          "type": "object",
+          "required": ["rng_streams", "pairing", "environment"],
+          "properties": {
+            "rng_streams": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+            "pairing": {"type": "string", "minLength": 5},
+            "environment": {"type": "string", "minLength": 5}
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    },
+    "evaluation_plan": {
+      "type": "object",
+      "required": ["primary_estimand", "outcomes", "uncertainty", "decision_rules", "multiplicity", "negative_result_policy"],
+      "properties": {
+        "primary_estimand": {"type": "string", "minLength": 10},
+        "outcomes": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object", "required": ["name", "role", "measurement"],
+            "properties": {
+              "name": {"type": "string"},
+              "role": {"enum": ["primary", "secondary", "diagnostic"]},
+              "measurement": {"type": "string", "minLength": 5}
+            },
+            "additionalProperties": true
+          }
+        },
+        "uncertainty": {"type": "string", "minLength": 10},
+        "decision_rules": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "multiplicity": {"type": "string", "minLength": 5},
+        "negative_result_policy": {"type": "string", "minLength": 5}
+      },
+      "additionalProperties": true
+    },
+    "constraints": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "assumptions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "open_questions": {"type": "array", "items": {"type": "string"}},
+    "implementation_requirements": {"type": "array", "minItems": 5, "items": {"type": "string"}},
+    "acceptance_checks": {"type": "array", "minItems": 4, "items": {"type": "string"}},
+    "readiness": {
+      "type": "object", "required": ["decision", "blocking_questions"],
+      "properties": {
+        "decision": {"enum": ["needs_discussion", "ready_for_automation"]},
+        "blocking_questions": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "created_at": {"type": "string"},
+    "created_by": {"type": "string"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "assistant_message": {"type": "string"}
+  },
+  "additionalProperties": true
+}

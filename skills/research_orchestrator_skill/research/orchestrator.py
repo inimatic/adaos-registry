@@ -1,0 +1,443 @@
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Callable, Mapping
+from typing import Any
+
+import yaml
+
+from adaos.sdk import chat as sdk_chat
+from adaos.sdk.builder import artifacts as builder_artifacts
+from adaos.sdk.builder import sources as builder_sources
+from adaos.sdk.developer import projects
+from adaos.sdk.llm import llm_client
+
+from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues
+from research.repository import OrchestratorRepository
+
+
+_DIRECTION_RE = re.compile(r"^[a-z0-9_.-]+$")
+
+
+def _direction_id(value: str) -> str:
+    token = str(value or "").strip().lower()
+    if not _DIRECTION_RE.fullmatch(token):
+        raise ValueError("direction_id must match ^[a-z0-9_.-]+$")
+    return token
+
+
+def _json_object(text: str) -> dict[str, Any]:
+    raw = str(text or "").strip()
+    if raw.startswith("```"):
+        raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
+        raw = re.sub(r"\s*```$", "", raw)
+    try:
+        value = json.loads(raw)
+    except ValueError:
+        start, end = raw.find("{"), raw.rfind("}")
+        if start < 0 or end <= start:
+            raise ValueError("LLM response does not contain a JSON object") from None
+        value = json.loads(raw[start : end + 1])
+    if not isinstance(value, dict):
+        raise ValueError("LLM response must be a JSON object")
+    return value
+
+
+def _notebook_excerpt(text: str, *, max_characters: int) -> str:
+    try:
+        notebook = json.loads(text)
+    except ValueError:
+        return text[:max_characters]
+    parts: list[str] = []
+    for index, cell in enumerate(notebook.get("cells") or []):
+        if not isinstance(cell, Mapping):
+            continue
+        cell_type = str(cell.get("cell_type") or "unknown")
+        source = cell.get("source") or ""
+        body = "".join(source) if isinstance(source, list) else str(source)
+        if body.strip():
+            parts.append(f"\n--- cell {index} ({cell_type}) ---\n{body.strip()}")
+        if sum(len(item) for item in parts) >= max_characters:
+            break
+    return "".join(parts)[:max_characters]
+
+
+class ResearchOrchestrator:
+    def __init__(
+        self,
+        repository: OrchestratorRepository | None = None,
+        *,
+        checkpoint: Callable[..., Mapping[str, Any]] | None = None,
+    ) -> None:
+        self.repository = repository or OrchestratorRepository()
+        self._checkpoint = checkpoint or builder_artifacts.checkpoint
+
+    def _require_direction_project(self, direction_id: str) -> dict[str, Any]:
+        description = projects.describe("skill", direction_id)
+        manifest = yaml.safe_load(projects.read_file("skill", direction_id, "skill.yaml")["content"]) or {}
+        research = manifest.get("research_direction") if isinstance(manifest, Mapping) else None
+        if not isinstance(research, Mapping) or research.get("schema") != "adaos.research.direction.v1":
+            raise ValueError(f"skill:{direction_id} is not a research_direction project")
+        return description
+
+    def initialize(self, direction_id: str, title: str, *, actor: str = "user:local") -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        self._require_direction_project(token)
+        state = self.repository.initialize(token, str(title or token).strip())
+        self.repository.activity(token, "intake", "ready", "Research direction initialized.", {"actor": actor})
+        return self.get(token)
+
+    def attach_source(self, direction_id: str, path: str, *, name: str | None = None, role: str = "source", actor: str = "user:local") -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        if not self.repository.get_direction(token):
+            self.initialize(token, token, actor=actor)
+        result = builder_sources.add_path(
+            path,
+            kind="skill",
+            project_id=token,
+            name=name,
+            role=role,
+            origin={"kind": "orchestrator_intake", "actor": actor},
+        )
+        state = self.repository.set_bundle(token, str(result["bundle"]["digest"]))
+        self.repository.activity(
+            token,
+            "intake",
+            "source_added" if not result.get("idempotent") else "source_reused",
+            f"Source {result['source']['name']} is bound to SourceBundle generation {result['bundle']['generation']}.",
+            {"source_digest": result["source"]["digest"], "bundle_digest": result["bundle"]["digest"], "actor": actor},
+        )
+        return {"ok": True, "source": result["source"], "bundle": result["bundle"], "direction": state}
+
+    def get(self, direction_id: str) -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        state = self.repository.get_direction(token)
+        if not state:
+            raise ValueError("research direction is not initialized")
+        bundle = builder_sources.current_bundle("skill", token)
+        prototype = self.repository.get_prototype(state.get("current_prototype_digest"))
+        accepted = self.repository.get_prototype(state.get("accepted_prototype_digest"))
+        brief = self.repository.get_brief(state.get("automation_brief_digest"))
+        return {
+            "ok": True,
+            "direction": state,
+            "source_bundle": bundle,
+            "current_prototype": prototype,
+            "accepted_prototype": accepted,
+            "automation_brief": brief,
+            "next_steps": self._next_steps(state, bundle, prototype),
+        }
+
+    def sync_source_bundle(self, direction_id: str, *, actor: str = "user:local") -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        state = self.repository.get_direction(token)
+        if not state:
+            self.initialize(token, token, actor=actor)
+            state = self.repository.get_direction(token)
+        bundle = builder_sources.current_bundle("skill", token)
+        if not bundle.get("sources"):
+            raise ValueError("Builder project SourceBundle is empty")
+        changed = str((state or {}).get("current_bundle_digest") or "") != str(bundle["digest"])
+        if changed:
+            self.repository.set_bundle(token, str(bundle["digest"]))
+            self.repository.activity(
+                token,
+                "intake",
+                "bundle_synchronized",
+                f"SourceBundle generation {bundle['generation']} is ready for formulation.",
+                {"bundle_digest": bundle["digest"], "actor": actor},
+            )
+        return {"ok": True, "changed": changed, "direction": self.repository.get_direction(token), "source_bundle": bundle}
+
+    @staticmethod
+    def _next_steps(state: Mapping[str, Any], bundle: Mapping[str, Any], prototype: Mapping[str, Any] | None) -> list[dict[str, str]]:
+        if state.get("status") == "handoff_ready":
+            return [
+                {"id": "inspect_brief", "label": "Проверить Automation Brief", "reason": "Он фиксирует точное задание для Codex."},
+                {"id": "start_builder_automation", "label": "Запустить Builder Automation", "reason": "Это отдельное решение; ОИ не запускает Codex автоматически."},
+            ]
+        if not bundle.get("sources"):
+            return [{"id": "attach_sources", "label": "Добавить исходные артефакты", "reason": "Постановка должна ссылаться на immutable SourceBundle."}]
+        if not prototype:
+            return [{"id": "discuss", "label": "Обсудить постановку", "reason": "ОИ создаст первую структурированную ревизию ResearchPrototype."}]
+        readiness = prototype.get("readiness") if isinstance(prototype.get("readiness"), Mapping) else {}
+        if readiness.get("decision") != "ready_for_automation" or readiness.get("blocking_questions"):
+            return [{"id": "resolve_questions", "label": "Снять блокирующие вопросы", "reason": "Принять можно только готовую к автоматизации ревизию."}]
+        return [{"id": "accept_prototype", "label": "Принять точную ревизию", "reason": "Acceptance создаст Forge checkpoint и digest-bound Automation Brief."}]
+
+    def record_prototype(self, direction_id: str, value: Mapping[str, Any], *, actor: str = "user:local") -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        state = self.repository.get_direction(token)
+        if not state:
+            raise ValueError("research direction is not initialized")
+        if state.get("accepted_prototype_digest"):
+            raise ValueError("accepted formulation is immutable; create a new Builder change before revising it")
+        bundle = builder_sources.current_bundle("skill", token)
+        if not bundle.get("sources"):
+            raise ValueError("at least one source artifact is required")
+        previous = self.repository.get_prototype(state.get("current_prototype_digest"))
+        prototype = materialize_prototype(
+            value,
+            direction_id=token,
+            source_bundle_digest=str(bundle["digest"]),
+            revision=int(previous.get("revision") or 0) + 1 if previous else 1,
+            parent_digest=str(previous["digest"]) if previous else None,
+            actor=actor,
+        )
+        admission_issues = prototype_admission_issues(prototype)
+        if admission_issues:
+            revised_value = dict(value)
+            revised_value["readiness"] = {"decision": "needs_discussion", "blocking_questions": admission_issues}
+            prototype = materialize_prototype(
+                revised_value,
+                direction_id=token,
+                source_bundle_digest=str(bundle["digest"]),
+                revision=int(previous.get("revision") or 0) + 1 if previous else 1,
+                parent_digest=str(previous["digest"]) if previous else None,
+                actor=actor,
+            )
+        stored = self.repository.put_prototype(token, prototype)
+        self.repository.activity(
+            token,
+            "formulation",
+            "candidate_ready",
+            f"ResearchPrototype revision {stored['revision']} is ready for review.",
+            {"prototype_digest": stored["digest"], "source_bundle_digest": stored["source_bundle_digest"], "actor": actor},
+        )
+        return {"ok": True, "prototype": stored, "direction": self.repository.get_direction(token), "next_steps": self._next_steps(self.repository.get_direction(token) or {}, bundle, stored)}
+
+    def _source_context(self, bundle: Mapping[str, Any]) -> list[dict[str, Any]]:
+        selected: list[dict[str, Any]] = []
+        remaining = 50_000
+        for source in bundle.get("sources") or []:
+            if remaining <= 0:
+                break
+            digest = str(source.get("digest") or "")
+            media = str(source.get("media_type") or "")
+            name = str(source.get("name") or "source")
+            excerpt = ""
+            try:
+                raw = builder_sources.read_text(digest, max_characters=min(30_000, remaining))
+                excerpt = _notebook_excerpt(raw, max_characters=min(30_000, remaining)) if name.lower().endswith(".ipynb") else raw
+            except (UnicodeDecodeError, ValueError):
+                excerpt = "[binary source; use structural inventory]"
+            remaining -= len(excerpt)
+            selected.append({"name": name, "digest": digest, "media_type": media, "role": source.get("role"), "analysis": source.get("analysis"), "excerpt": excerpt})
+        return selected
+
+    @staticmethod
+    def _dialog(payload: Mapping[str, Any]) -> dict[str, str | None]:
+        meta = payload.get("_meta") if isinstance(payload.get("_meta"), Mapping) else {}
+        webspace = str(payload.get("webspace_id") or meta.get("webspace_id") or "desktop")
+        direction_id = str(payload.get("direction_id") or "research")
+        return {
+            "webspace_id": webspace,
+            "conversation_id": str(payload.get("conversation_id") or meta.get("conversation_id") or f"conv.skill.research_orchestrator_skill.{direction_id}.{webspace}"),
+            "thread_id": str(payload.get("thread_id") or meta.get("thread_id") or f"research:{direction_id}"),
+            "request_id": str(meta.get("request_id") or "") or None,
+            "turn_trace_id": str(meta.get("turn_trace_id") or "") or None,
+        }
+
+    @staticmethod
+    def _emit(message: str, dialog: Mapping[str, Any], *, group_id: str, phase: str, status: str, seq: int = 0) -> None:
+        try:
+            sdk_chat.send(
+                message,
+                conversation_id=str(dialog["conversation_id"]),
+                webspace_id=str(dialog["webspace_id"]),
+                channel_id="research_orchestrator",
+                owner="skill:research_orchestrator_skill",
+                route_id="voice_chat",
+                actor_id="agent:research_orchestrator_skill:researcher",
+                actor_label="Исследователь",
+                request_id=dialog.get("request_id"),
+                turn_trace_id=dialog.get("turn_trace_id"),
+                thread_id=str(dialog.get("thread_id") or "") or None,
+                meta={"progress_group_id": group_id, "progress_phase": phase, "progress_status": status, "progress_seq": seq, "progress_label": "Research formulation"},
+            )
+        except Exception:
+            pass
+
+    def discuss(self, direction_id: str, text: str, *, model: str | None = None, actor: str = "user:local", dialog_payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        state = self.repository.get_direction(token)
+        if not state:
+            raise ValueError("research direction is not initialized")
+        bundle = builder_sources.current_bundle("skill", token)
+        if not bundle.get("sources"):
+            raise ValueError("attach at least one source before discussion")
+        current = self.repository.get_prototype(state.get("current_prototype_digest"))
+        group_id = f"research-formulation-{token}-{int(state['generation']) + 1}"
+        dialog = self._dialog({"direction_id": token, **dict(dialog_payload or {})})
+        self.repository.activity(token, "formulation", "llm_submitted", "Research formulation sent to the configured Root LLM.", {"group_id": group_id, "actor": actor})
+        self._emit("Анализирую SourceBundle и текущую постановку…", dialog, group_id=group_id, phase="submitted", status="working")
+        instructions = {
+            "role": "You are a rigorous research-design collaborator. Discuss, but output a machine-valid candidate rather than treating chat as truth.",
+            "task": str(text or "").strip(),
+            "direction_id": token,
+            "current_prototype": current,
+            "output_contract": {
+                "assistant_message": "clear Russian explanation of what changed and remaining uncertainty",
+                "title": "string",
+                "background": "string >= 20 chars",
+                "research_question": "falsifiable question",
+                "hypotheses": [{"id": "H1", "statement": "...", "falsification": "...", "status": "proposed|exploratory|confirmatory"}],
+                "experimental_plan": {
+                    "comparators": ["..."],
+                    "stages": [{"id": "smoke", "purpose": "...", "evidence_class": "workflow_smoke|exploratory|confirmatory", "execution_profile": {"node": "..."}, "budget": {"epochs": 3}, "inference_allowed": False, "stop_conditions": ["..."]}],
+                    "data_policy": {"dataset": "...", "splits": "...", "unblinding": "..."},
+                    "reproducibility": {"rng_streams": ["initialization", "sampling", "augmentation", "analysis"], "pairing": "...", "environment": "..."},
+                },
+                "evaluation_plan": {
+                    "primary_estimand": "...",
+                    "outcomes": [{"name": "...", "role": "primary|secondary|diagnostic", "measurement": "..."}],
+                    "uncertainty": "...", "decision_rules": ["..."], "multiplicity": "...", "negative_result_policy": "..."
+                },
+                "constraints": ["..."],
+                "assumptions": ["..."],
+                "open_questions": ["..."],
+                "implementation_requirements": ["concrete requirements for Codex"],
+                "acceptance_checks": ["observable checks"],
+                "readiness": {"decision": "needs_discussion|ready_for_automation", "blocking_questions": ["..."]},
+            },
+            "rules": [
+                "Return JSON only.",
+                "Do not invent facts absent from sources; put uncertainty into assumptions/open_questions.",
+                "Historical notebook outputs are exploratory source material, never confirmation.",
+                "Separate workflow smoke execution from scientific confirmation.",
+                "The direction is one AdaOS skill; do not request a direction-specific scenario.",
+                "The first implementation must run a bounded deterministic CPU profile on the current/member node; Ray is deferred.",
+            ],
+            "source_bundle": {"digest": bundle["digest"], "sources": self._source_context(bundle)},
+        }
+        request_id = f"adaos-research-{token}-{bundle['digest'].removeprefix('sha256:')[:16]}-{int(state['generation']) + 1}"
+        try:
+            submitted = llm_client.submit_response_job(
+                [{"role": "system", "content": "Return one JSON object matching the supplied output_contract."}, {"role": "user", "content": json.dumps(instructions, ensure_ascii=False)}],
+                model=model,
+                max_tokens=7000,
+                request_id=request_id,
+                profile_scope="research.formulation",
+                stream=True,
+                timeout=30,
+            )
+            job_id = str(submitted.get("job_id") or "")
+            if not job_id:
+                raise RuntimeError("Root LLM did not return a job_id")
+            base_url = str((submitted.get("_client") or {}).get("base_url") or "") or None
+            self.repository.activity(token, "formulation", "llm_running", "Root LLM job accepted.", {"job_id": job_id, "request_id": request_id})
+
+            def progress(value: Mapping[str, Any]) -> None:
+                seq = int(value.get("seq") or 0)
+                label = str(value.get("label") or value.get("phase") or "LLM working")
+                self.repository.activity(token, "formulation", "llm_progress", label, {"job_id": job_id, "progress": dict(value)})
+                self._emit(label, dialog, group_id=group_id, phase="progress", status="working", seq=seq)
+
+            completed = llm_client.wait_response_job(job_id, base_url=base_url, timeout_s=280, poll_interval_s=1.5, progress_callback=progress)
+            if str(completed.get("status") or "").lower() != "succeeded":
+                raise RuntimeError(str(completed.get("error") or "Root LLM job failed"))
+            candidate = _json_object(str(completed.get("output_text") or ""))
+            recorded: dict[str, Any] | None = None
+            repair_attempt = 0
+            while recorded is None:
+                try:
+                    recorded = self.record_prototype(token, candidate, actor=f"llm:{model or 'root-default'}")
+                except ValueError as validation_error:
+                    if repair_attempt >= 2:
+                        raise
+                    repair_attempt += 1
+                    repair_request_id = f"{request_id}-repair-{repair_attempt}"
+                    self.repository.activity(
+                        token,
+                        "formulation",
+                        "schema_repair",
+                        f"Candidate rejected by the typed contract; requesting bounded repair {repair_attempt}/2.",
+                        {"validation_error": str(validation_error), "request_id": repair_request_id},
+                    )
+                    self._emit(
+                        f"Структурная проверка не пройдена; исправляю ревизию ({repair_attempt}/2)…",
+                        dialog,
+                        group_id=group_id,
+                        phase="schema_repair",
+                        status="working",
+                        seq=900000 + repair_attempt,
+                    )
+                    repair_payload = {
+                        "task": "Repair the rejected candidate. Preserve its scientifically correct content, apply the user's requested corrections, and return a complete JSON object matching output_contract.",
+                        "validation_error": str(validation_error),
+                        "rejected_candidate": candidate,
+                        "output_contract": instructions["output_contract"],
+                        "rules": instructions["rules"],
+                        "user_request": instructions["task"],
+                    }
+                    repaired_submit = llm_client.submit_response_job(
+                        [
+                            {"role": "system", "content": "You are a strict JSON contract repairer. Return JSON only and never omit required nested fields."},
+                            {"role": "user", "content": json.dumps(repair_payload, ensure_ascii=False)},
+                        ],
+                        model=model,
+                        max_tokens=7000,
+                        request_id=repair_request_id,
+                        profile_scope="research.formulation.repair",
+                        stream=True,
+                        timeout=30,
+                    )
+                    job_id = str(repaired_submit.get("job_id") or "")
+                    if not job_id:
+                        raise RuntimeError("Root LLM repair did not return a job_id")
+                    base_url = str((repaired_submit.get("_client") or {}).get("base_url") or "") or None
+                    repaired = llm_client.wait_response_job(job_id, base_url=base_url, timeout_s=60, poll_interval_s=1.5, progress_callback=progress)
+                    if str(repaired.get("status") or "").lower() != "succeeded":
+                        raise RuntimeError(str(repaired.get("error") or "Root LLM repair failed"))
+                    candidate = _json_object(str(repaired.get("output_text") or ""))
+            message = str(recorded["prototype"].get("assistant_message") or f"ResearchPrototype revision {recorded['prototype']['revision']} is ready.")
+            self.repository.activity(token, "formulation", "llm_completed", message, {"job_id": job_id, "prototype_digest": recorded["prototype"]["digest"]})
+            self._emit(message, dialog, group_id=group_id, phase="completed", status="succeeded", seq=999999)
+            return {**recorded, "message": message, "llm_job": {"job_id": job_id, "request_id": request_id, "status": "succeeded"}}
+        except Exception as exc:
+            self.repository.activity(token, "formulation", "failed", f"Formulation failed: {type(exc).__name__}: {exc}", {"request_id": request_id})
+            self._emit(f"Не удалось сформировать ревизию: {exc}", dialog, group_id=group_id, phase="failed", status="failed", seq=999999)
+            raise
+
+    def accept(self, direction_id: str, prototype_digest: str, *, expected_generation: int, idempotency_key: str, actor: str = "user:local") -> dict[str, Any]:
+        token = _direction_id(direction_id)
+
+        def operation() -> Mapping[str, Any]:
+            state = self.repository.get_direction(token)
+            if not state:
+                raise ValueError("research direction is not initialized")
+            prototype = self.repository.get_prototype(prototype_digest)
+            if not prototype or prototype.get("direction", {}).get("id") != token:
+                raise ValueError("ResearchPrototype does not belong to this direction")
+            if state.get("current_prototype_digest") != prototype_digest:
+                raise ValueError("only the current ResearchPrototype can be accepted")
+            admission_issues = prototype_admission_issues(prototype)
+            if admission_issues:
+                raise ValueError("ResearchPrototype does not pass automation admission: " + "; ".join(admission_issues))
+            bundle = builder_sources.current_bundle("skill", token)
+            if bundle.get("digest") != prototype.get("source_bundle_digest"):
+                raise ValueError("SourceBundle changed after this ResearchPrototype revision; discuss and review a new revision")
+            readiness = prototype.get("readiness") if isinstance(prototype.get("readiness"), Mapping) else {}
+            if readiness.get("decision") != "ready_for_automation" or list(readiness.get("blocking_questions") or []):
+                raise ValueError("ResearchPrototype still has blocking questions")
+            self.repository.activity(token, "acceptance", "checkpointing", "Creating exact Builder/Forge checkpoint for the direction skill.", {"prototype_digest": prototype_digest, "actor": actor})
+            checkpoint = dict(
+                self._checkpoint(
+                    kind="skill",
+                    artifact_id=token,
+                    message=f"research formulation accepted {prototype_digest}",
+                    metadata={"research_prototype_digest": prototype_digest, "source_bundle_digest": bundle["digest"], "actor": actor},
+                )
+            )
+            if not any(checkpoint.get(key) for key in ("package_digest", "source_revision", "source_tree", "sha256", "commit")):
+                raise ValueError("Builder checkpoint did not return an immutable source identity")
+            brief = materialize_automation_brief(direction_id=token, source_bundle=bundle, prototype=prototype, checkpoint=checkpoint, actor=actor)
+            stored = self.repository.accept(token, expected_generation=expected_generation, prototype=prototype, brief=brief)
+            self.repository.activity(token, "acceptance", "handoff_ready", "Research formulation accepted; Automation Brief is ready. Codex was not started.", {"prototype_digest": prototype_digest, "automation_brief_digest": stored["digest"], "checkpoint": checkpoint})
+            return {"ok": True, "direction": self.repository.get_direction(token), "prototype": prototype, "automation_brief": stored, "builder_checkpoint": checkpoint, "codex_started": False}
+
+        return self.repository.once(str(idempotency_key or "").strip(), "accept_prototype", operation)
+
+
+__all__ = ["ResearchOrchestrator"]

@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.automation_brief.v1",
+  "type": "object",
+  "required": [
+    "schema", "schema_version", "brief_id", "direction", "source_bundle_digest",
+    "prototype_digest", "builder_checkpoint", "objective", "research_prototype",
+    "source_inventory", "implementation_requirements", "acceptance_checks",
+    "prohibited_actions", "handoff_state", "created_at", "created_by", "digest"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.automation_brief.v1"},
+    "schema_version": {"const": "1.0.0"},
+    "brief_id": {"type": "string"},
+    "direction": {"type": "object"},
+    "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "prototype_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "builder_checkpoint": {
+      "type": "object",
+      "required": ["package_digest", "source_revision", "source_tree", "sha256"],
+      "properties": {
+        "package_digest": {"type": ["string", "null"]},
+        "source_revision": {"type": ["string", "null"]},
+        "source_tree": {"type": ["string", "null"]},
+        "sha256": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "objective": {"type": "string"},
+    "research_prototype": {"type": "object"},
+    "source_inventory": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "implementation_requirements": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "acceptance_checks": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "prohibited_actions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "handoff_state": {"const": "ready_for_codex"},
+    "created_at": {"type": "string"},
+    "created_by": {"type": "string"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}
