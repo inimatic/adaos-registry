@@ -36,10 +36,10 @@
                 "variant": "segmented",
                 "selectedStateKey": "activeView",
                 "buttons": [
-                  {"id": "conditions", "label": "Conditions", "title": "Просмотреть и изменить условия текущей ревизии эксперимента", "icon": "options-outline"},
-                  {"id": "runs", "label": "Runs", "title": "Просмотреть логические запуски, физические попытки и их состояния", "icon": "pulse-outline"},
-                  {"id": "results", "label": "Results", "title": "Открыть парные результаты и основной статистический контраст", "icon": "git-compare-outline"},
-                  {"id": "evidence", "label": "Evidence", "title": "Проверить зафиксированный результат, артефакты и tracker export", "icon": "shield-checkmark-outline"},
+                  {"id": "conditions", "guidanceActionId": "edit_conditions", "label": "Conditions", "title": "Просмотреть и изменить условия текущей ревизии эксперимента", "icon": "options-outline"},
+                  {"id": "runs", "guidanceActionId": "inspect_attempts", "label": "Runs", "title": "Просмотреть логические запуски, физические попытки и их состояния", "icon": "pulse-outline"},
+                  {"id": "results", "guidanceActionId": "inspect_results", "label": "Results", "title": "Открыть парные результаты и основной статистический контраст", "icon": "git-compare-outline"},
+                  {"id": "evidence", "guidanceActionId": "verify_evidence", "label": "Evidence", "title": "Проверить зафиксированный результат, артефакты и tracker export", "icon": "shield-checkmark-outline"},
                   {"id": "help", "label": "Help", "title": "Открыть руководство и следующие шаги для текущего состояния workflow", "icon": "help-circle-outline"}
                 ]
               },
@@ -59,18 +59,18 @@
               "inputs": {
                 "variant": "toolbar",
                 "buttons": [
-                  {"id": "review", "label": "Submit review", "title": "Отправить текущую неизменяемую ревизию условий на проверку", "icon": "eye-outline"},
+                  {"id": "submit_review", "label": "Submit review", "title": "Отправить текущую неизменяемую ревизию условий на проверку", "icon": "eye-outline"},
                   {"id": "lock", "label": "Lock", "title": "Принять проверенную ревизию и запретить её изменение на месте", "icon": "lock-closed-outline"},
-                  {"id": "start-preflight", "label": "Start CPU preflight", "title": "Запустить реальный трёхэпоховый CPU-профиль проверки workflow", "icon": "play-outline"},
+                  {"id": "start_preflight", "label": "Start CPU preflight", "title": "Запустить реальный трёхэпоховый CPU-профиль проверки workflow", "icon": "play-outline"},
                   {"id": "reconcile", "label": "Reconcile", "title": "Загрузить прогресс, состояния, результаты и артефакты физических попыток", "icon": "sync-outline"},
-                  {"id": "mlflow", "label": "Open MLflow", "title": "Открыть MLflow в режиме Model training; выберите эксперимент, имя которого оканчивается на AdaOS experiment ID", "icon": "open-outline"},
+                  {"id": "inspect_tracker", "label": "Open MLflow", "title": "Шаг «Открыть трекер»: открыть MLflow в режиме Model training и выбрать эксперимент по AdaOS experiment ID", "icon": "open-outline"},
                   {"id": "cancel", "label": "Cancel", "title": "Запросить кооперативную отмену активных физических попыток", "icon": "stop-circle-outline"},
                   {"id": "finalize", "label": "Finalize", "title": "Зафиксировать результат после доставки tracker и проверки артефактов", "icon": "checkmark-done-outline"}
                 ]
               },
               "actions": [
                 {
-                  "on": "click:review",
+                  "on": "click:submit_review",
                   "type": "callSkill",
                   "target": "research_manager_skill.submit_experiment_review",
                   "params": {"experiment_id": "$state.experimentId", "expected_generation": "$state.experimentGeneration", "actor": "user:desktop"},
@@ -86,7 +86,7 @@
                   "invalidates": ["tlp-experiment"]
                 },
                 {
-                  "on": "click:start-preflight",
+                  "on": "click:start_preflight",
                   "type": "callSkill",
                   "target": "research_manager_skill.start_experiment",
                   "params": {"experiment_id": "$state.experimentId", "profile": "preflight", "expected_generation": "$state.experimentGeneration", "actor": "user:desktop"},
@@ -101,7 +101,7 @@
                   "invalidates": ["tlp-experiment", "tlp-tracking", "tlp-evidence"]
                 },
                 {
-                  "on": "click:mlflow",
+                  "on": "click:inspect_tracker",
                   "type": "openUrl",
                   "params": {"url": "/api/services/mlflow_tracker_skill/ui-bootstrap?fragment=%23%2Fexperiments%3FworkflowType%3Dmachine_learning", "target": "_blank", "withAuth": true}
                 },
@@ -232,9 +232,9 @@
                   {"key": "attempt_id", "label": "Physical attempt", "mono": true}
                 ],
                 "buttons": [
-                  {"id": "retry-failed", "label": "Retry", "title": "Создать новую физическую попытку для ошибочного запуска, сохранив Trial и Run", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "failed"},
-                  {"id": "retry-cancelled", "label": "Retry", "title": "Создать новую физическую попытку для отменённого запуска, сохранив Trial и Run", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "cancelled"},
-                  {"id": "retry-lost", "label": "Retry", "title": "Создать новую физическую попытку для потерянного запуска, сохранив Trial и Run", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "lost"}
+                  {"id": "retry-failed", "guidanceActionId": "retry", "label": "Retry", "title": "Создать новую физическую попытку для ошибочного запуска, сохранив Trial и Run", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "failed"},
+                  {"id": "retry-cancelled", "guidanceActionId": "retry", "label": "Retry", "title": "Создать новую физическую попытку для отменённого запуска, сохранив Trial и Run", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "cancelled"},
+                  {"id": "retry-lost", "guidanceActionId": "retry", "label": "Retry", "title": "Создать новую физическую попытку для потерянного запуска, сохранив Trial и Run", "icon": "refresh-outline", "whenKey": "status", "whenEquals": "lost"}
                 ]
               },
               "actions": [
@@ -396,7 +396,8 @@
                       "experiment_id": "$state.experimentId",
                       "locale": "ru",
                       "channel": "web",
-                      "section": "next_steps"
+                      "section": "next_steps",
+                      "available_actions": ["edit_conditions", "submit_review", "lock", "start_preflight", "reconcile", "cancel", "inspect_results", "finalize", "inspect_attempts", "retry", "verify_evidence", "inspect_tracker"]
                     },
                     "cacheTtlMs": 0,
                     "invalidationTags": ["tlp-experiment", "tlp-tracking", "tlp-evidence"],

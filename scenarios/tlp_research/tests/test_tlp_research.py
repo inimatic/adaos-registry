@@ -65,6 +65,20 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
     }
     assert all(button.get("title") for button in views["inputs"]["buttons"])
     assert all(button.get("title") for button in actions["inputs"]["buttons"])
+    available_actions = manifest["guidance"]["workflow"]["state_source"]["params"][
+        "available_actions"
+    ]
+    attempts = next(widget for widget in page["widgets"] if widget["id"] == "attempts-table")
+    control_buttons = (
+        actions["inputs"]["buttons"]
+        + views["inputs"]["buttons"]
+        + attempts["inputs"]["buttons"]
+    )
+    control_action_ids = {
+        button.get("guidanceActionId", button["id"]) for button in control_buttons
+    }
+    assert set(available_actions) <= control_action_ids
+    assert "start_confirmatory" not in available_actions
     assert page["widgets"].index(views) < page["widgets"].index(editor)
     assert next(item for item in views["actions"] if item["on"] == "click:help") == {
         "on": "click:help",
@@ -91,7 +105,9 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
         "research_manager_skill.reconcile_experiment",
         "research_manager_skill.finalize_experiment",
     }
-    mlflow = next(item for item in actions["actions"] if item["on"] == "click:mlflow")
+    mlflow = next(
+        item for item in actions["actions"] if item["on"] == "click:inspect_tracker"
+    )
     assert mlflow["type"] == "openUrl"
     assert mlflow["params"] == {
         "url": (
