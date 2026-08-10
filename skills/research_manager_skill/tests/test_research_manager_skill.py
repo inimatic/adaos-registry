@@ -403,6 +403,14 @@ def test_experiment_guidance_is_localized_channel_neutral_and_workflow_aware() -
         "submit_review",
     ]
     assert draft["message"] == draft["speech_text"]
+
+    filtered = manager.describe_experiment(
+        experiment_id,
+        locale="en",
+        channel="web",
+        available_actions=("submit_review",),
+    )
+    assert [item["id"] for item in filtered["next_actions"]] == ["submit_review"]
     assert "Следующие шаги" in draft["speech_text"]
 
     manager.submit_experiment_review(

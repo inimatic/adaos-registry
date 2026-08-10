@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.8.1
+version: 0.9.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -552,7 +552,8 @@ tools:
   output_schema:
     type: object
 - name: describe_experiment
-  description: Present a channel-neutral experiment overview and workflow-aware next actions.
+  description: Present a channel-neutral experiment overview and workflow-aware next
+    actions.
   entry: handlers.main:describe_experiment
   side_effects: read_only
   input_schema:
@@ -574,6 +575,11 @@ tools:
         - all
         - overview
         - next_steps
+      available_actions:
+        type: array
+        uniqueItems: true
+        items:
+          type: string
   output_schema:
     type: object
 - name: unblind_test
@@ -680,7 +686,8 @@ data_routes:
   route: tool/details
   tool: get_study
   owner: skill:research_manager_skill
-  first_paint: study identity and protocol-review context from the owning scenario package
+  first_paint: study identity and protocol-review context from the owning scenario
+    package
   recovery: repeat get_study for the immutable study identity
   guard_visibility: read-only study metadata and audit history; sealed dataset locators
     remain governed by the skill
@@ -727,14 +734,20 @@ data_routes:
   first_paint: current logical-run and physical-attempt status
   recovery: reconcile and repeat the read-only attempt projection
   guard_visibility: provider secrets and private paths are excluded
-  budget: {max_payload_bytes: 1048576}
+  budget:
+    max_payload_bytes: 1048576
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
     preserve_last_value: true
-    invalidation_tags: [research-experiment, research-tracking]
+    invalidation_tags:
+    - research-experiment
+    - research-tracking
 - surface: widget:research-experiment-pairs
   route: tool/details
   tool: list_experiment_pairs
@@ -742,14 +755,20 @@ data_routes:
   first_paint: normalized paired-arm result rows
   recovery: reconcile and repeat the read-only paired-result projection
   guard_visibility: only declared result paths and digests are projected
-  budget: {max_payload_bytes: 1048576}
+  budget:
+    max_payload_bytes: 1048576
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
     preserve_last_value: true
-    invalidation_tags: [research-experiment, research-tracking]
+    invalidation_tags:
+    - research-experiment
+    - research-tracking
 - surface: widget:research-experiment-artifacts
   route: tool/details
   tool: list_experiment_artifacts
@@ -757,14 +776,20 @@ data_routes:
   first_paint: logical content-addressed evidence references
   recovery: reconcile and repeat the read-only artifact projection
   guard_visibility: provider-owned physical paths are excluded
-  budget: {max_payload_bytes: 1048576}
+  budget:
+    max_payload_bytes: 1048576
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
     preserve_last_value: true
-    invalidation_tags: [research-experiment, research-evidence]
+    invalidation_tags:
+    - research-experiment
+    - research-evidence
 - surface: modal:scenario-guidance
   route: tool/details
   tool: describe_experiment
@@ -772,20 +797,28 @@ data_routes:
   first_paint: localized current workflow state and next-action guidance
   recovery: repeat the read-only guidance projection
   guard_visibility: no provider secrets, datasets, or private paths are projected
-  budget: {max_payload_bytes: 131072}
+  budget:
+    max_payload_bytes: 131072
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
     preserve_last_value: true
-    invalidation_tags: [research-experiment, research-tracking, research-evidence]
-updated_at: '2026-08-10T06:00:00+00:00'
+    invalidation_tags:
+    - research-experiment
+    - research-tracking
+    - research-evidence
+updated_at: '2026-08-10T08:40:08+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.726+4771.d501c929
-    recorded_at: '2026-08-10T05:53:56+00:00'
+    min_version: 0.1.726+4776.d07de438
+    recorded_at: '2026-08-10T08:40:08+00:00'
     source: skill_push
-    min_commit: d501c92977e1c589e5edab33bd78304893896549
-    min_short_commit: d501c929
-    build_date: '2026-08-10T08:48:49+03:00'
+    min_commit: d07de43885a5c23af69387d9ddc29fac18ee7ad1
+    min_short_commit: d07de438
+    build_date: '2026-08-10T11:28:15+03:00'
+

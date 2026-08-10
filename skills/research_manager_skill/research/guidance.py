@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 
 _STATE_ACTIONS = (
@@ -97,6 +97,7 @@ def describe(
     locale: str = "ru",
     channel: str = "text",
     section: str = "all",
+    available_actions: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     selected_locale = "ru" if str(locale).lower().startswith("ru") else "en"
     selected_channel = str(channel or "text").lower()
@@ -107,7 +108,14 @@ def describe(
     copy = _COPY[selected_locale]
     actions = []
     state_actions = next((items for key, items in _STATE_ACTIONS if key == state), ())
+    allowed_actions = (
+        {str(item).strip() for item in available_actions if str(item).strip()}
+        if available_actions is not None
+        else None
+    )
     for priority, action_id in enumerate(state_actions, start=1):
+        if allowed_actions is not None and action_id not in allowed_actions:
+            continue
         label, description = copy["actions"][action_id]
         actions.append(
             {

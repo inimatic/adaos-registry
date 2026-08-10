@@ -338,6 +338,7 @@ def describe_experiment(
     locale: str = "ru",
     channel: str = "text",
     section: str = "all",
+    available_actions: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Present the workbench and workflow-aware next steps for text or voice."""
 
@@ -346,6 +347,7 @@ def describe_experiment(
         locale=locale,
         channel=channel,
         section=section,
+        available_actions=available_actions,
     )
 
 

@@ -1759,6 +1759,7 @@ class ResearchManager:
         locale: str = "ru",
         channel: str = "text",
         section: str = "all",
+        available_actions: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         experiment.get_experiment(self.repository, experiment_id)
         return guidance.describe(
@@ -1766,6 +1767,7 @@ class ResearchManager:
             locale=locale,
             channel=channel,
             section=section,
+            available_actions=available_actions,
         )
 
     def unblind_test(
