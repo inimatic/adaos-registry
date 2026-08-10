@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import sys
@@ -13,6 +12,7 @@ from urllib.parse import urlsplit
 
 from adaos.domain.runtime_bindings import ServiceBinding
 from adaos.sdk.data.secrets import get as get_secret
+from adaos.sdk.skills import invoke as invoke_skill
 
 from adaos.sdk.execution import (
     ContentRef,
@@ -26,7 +26,7 @@ from adaos.sdk.execution import (
     submit,
 )
 
-from research import evidence, experiment
+from research import evidence, experiment, guidance
 from research.contracts import ResearchRecord, canonical_json, digest, identity, now
 from research.repository import ResearchRepository
 from research.tracker import LocalTracker, MlflowTracker, normalize_observation
@@ -373,43 +373,6 @@ class ResearchManager:
             raise RuntimeError("skill runtime data path is unavailable")
         return Path(env_path).resolve().parent.parent
 
-    @classmethod
-    def _experiment_run_dir(cls, experiment_id: str, run_id: str, attempt_number: int) -> Path:
-        # AdaOS record identifiers intentionally carry a full SHA-256 digest.  Two
-        # such identifiers in a runtime path cross the legacy Win32 MAX_PATH
-        # boundary before CreateProcess can enter the working directory.  The
-        # repository/binding remains the authoritative reversible mapping; the
-        # filesystem only needs a stable, collision-resistant token.
-        def path_token(prefix: str, value: str) -> str:
-            token = hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
-            return f"{prefix}-{token}"
-
-        root = (
-            cls._runtime_data_root()
-            / "internal"
-            / "tlp_runs"
-            / path_token("e", experiment_id)
-            / path_token("r", run_id)
-            / f"attempt-{attempt_number}"
-        )
-        root.mkdir(parents=True, exist_ok=True)
-        return root
-
-    @classmethod
-    def _runner_python(cls) -> Path:
-        bucket = cls._runtime_data_root().parent
-        candidates = (
-            bucket / "venv" / "Scripts" / "python.exe",
-            bucket / "venv" / "bin" / "python",
-        )
-        return next((item for item in candidates if item.is_file()), Path(sys.executable))
-
-    @classmethod
-    def _runner_python_path(cls) -> str:
-        vendor = cls._runtime_data_root().parent / "vendor"
-        existing = str(os.getenv("PYTHONPATH") or "").strip()
-        return os.pathsep.join(item for item in (str(vendor), existing) if item)
-
     def run_fixture(
         self,
         *,
@@ -430,8 +393,8 @@ class ResearchManager:
         if trial is None or trial.study_id != study_id:
             raise KeyError(trial_id)
         operator = str(trial.payload["operator"].get("name") or "")
-        if operator not in {"baseline", "max_plus"}:
-            raise ValueError("fixture supports baseline and max_plus operators")
+        if not operator:
+            raise ValueError("fixture operator name is required")
         streams = {
             name: int(seed) + offset
             for offset, name in enumerate(ExecutionDeterminism.REQUIRED_STREAMS)
@@ -762,7 +725,7 @@ class ResearchManager:
             },
         )
 
-    def _submit_tlp_attempt(
+    def _submit_runner_attempt(
         self,
         *,
         experiment_id: str,
@@ -777,6 +740,10 @@ class ResearchManager:
         tracker_provider = str(dict(conditions.get("tracker") or {}).get("provider") or "local-tracker")
         tracker = self._tracker_provider(tracker_provider)
         profile_conditions = dict(dict(conditions["execution"])[profile])
+        runner_binding = dict(conditions.get("runner") or {})
+        runner_provider = str(runner_binding.get("provider") or "").strip()
+        if not runner_provider:
+            raise ValueError("experiment runner provider is missing")
         streams = {
             name: seed + offset
             for offset, name in enumerate(ExecutionDeterminism.REQUIRED_STREAMS)
@@ -812,79 +779,55 @@ class ResearchManager:
             )
         )
         attempt_number = len(self._attempt_bindings(experiment_id, run_id)) + 1
-        run_dir = self._experiment_run_dir(experiment_id, run_id, attempt_number)
-        runner = Path(__file__).with_name("tlp_runner.py").resolve()
-        requirements = Path(__file__).resolve().parents[1] / "requirements.in"
-        environment_digest = digest(
+        arm = dict(trial.payload["operator"])
+        prepared = invoke_skill(
+            runner_provider,
+            "prepare_attempt",
             {
-                "python": "3.11",
-                "requirements": digest(requirements.read_bytes()) if requirements.is_file() else None,
-                "runner": digest(runner.read_bytes()),
-            }
+                "request": {
+                    "experiment_id": experiment_id,
+                    "experiment_revision_id": revision.record_id,
+                    "trial_id": trial.record_id,
+                    "run_id": run_id,
+                    "attempt_number": attempt_number,
+                    "profile": profile,
+                    "seed": seed,
+                    "arm": arm,
+                    "conditions": conditions,
+                    "profile_conditions": profile_conditions,
+                }
+            },
+            timeout=30,
         )
-        dataset = dict(conditions["dataset"])
-        data_root_value = str(dataset.get("data_root") or "").strip()
-        data_root = Path(data_root_value) if data_root_value else self._runtime_data_root() / "files" / "datasets"
-        command = [
-            str(self._runner_python()),
-            str(runner),
-            "--operator",
-            arm_id,
-            "--seed",
-            str(seed),
-            "--epochs",
-            str(int(profile_conditions["epochs"])),
-            "--batch-size",
-            str(int(profile_conditions.get("batch_size") or 32)),
-            "--learning-rate",
-            str(float(profile_conditions.get("learning_rate") or 0.001)),
-            "--max-train-samples",
-            str(int(profile_conditions.get("max_train_samples") or 0)),
-            "--max-validation-samples",
-            str(int(profile_conditions.get("max_validation_samples") or 0)),
-            "--validation-per-class",
-            str(int(dataset.get("validation_per_class") or 100)),
-            "--split-seed",
-            str(int(dataset.get("split_seed") or 20260807)),
-            "--cpu-threads",
-            str(int(profile_conditions.get("cpu_threads") or 2)),
-            "--data-root",
-            str(data_root),
-            "--output-dir",
-            str(run_dir),
-            "--evidence-class",
-            str(profile_conditions.get("evidence_class") or ("workflow_validation" if profile == "preflight" else "confirmatory")),
-        ]
-        if bool(dataset.get("download")):
-            command.append("--download")
-        code_digest = digest(runner.read_bytes())
-        data_identity_digest = digest(
-            {
-                "name": dataset.get("name"),
-                "version": dataset.get("version"),
-                "source": dataset.get("source"),
-                "archive_md5": dataset.get("archive_md5"),
-                "split_seed": dataset.get("split_seed"),
-                "validation_per_class": dataset.get("validation_per_class"),
-            }
+        if not isinstance(prepared, Mapping):
+            raise RuntimeError("runner provider returned a non-object preparation")
+        prepared = dict(prepared)
+        if prepared.get("contract") != "adaos.research.runner.v1":
+            raise ValueError("runner provider contract is incompatible")
+        if str(prepared.get("provider_id") or "") != runner_provider:
+            raise ValueError("runner provider identity mismatch")
+        package = dict(prepared.get("package_ref") or {})
+        package_ref = ContentRef(
+            uri=str(package["uri"]),
+            digest=str(package["digest"]),
+            size_bytes=int(package["size_bytes"]),
+            media_type=str(package["media_type"]),
+            owner_ref=str(package["owner_ref"]),
+            kind=str(package.get("kind") or "execution-package"),
+            metadata=dict(package.get("metadata") or {}),
         )
+        code_digest = str(prepared["code_digest"])
+        environment_digest = str(prepared["environment_digest"])
         execution = spec(
-            "research.tlp.pool2.v1",
-            tuple(command),
-            working_directory=run_dir,
+            str(prepared["spec_id"]),
+            tuple(str(item) for item in prepared["command"]),
+            working_directory=str(prepared["working_directory"]),
             trial_id=trial.record_id,
             run_id=run_id,
-            package_ref=ContentRef(
-                uri="skill-package:research_manager_skill/research/tlp_runner.py",
-                digest=code_digest,
-                size_bytes=runner.stat().st_size,
-                media_type="text/x-python",
-                owner_ref="skill:research_manager_skill",
-                kind="execution-package",
-            ),
+            package_ref=package_ref,
             code_digest=code_digest,
             environment_digest=environment_digest,
-            environment={"PYTHONHASHSEED": str(seed), "PYTHONPATH": self._runner_python_path()},
+            environment={str(key): str(value) for key, value in dict(prepared.get("environment") or {}).items()},
             resources=ExecutionResourceRequest(
                 cpu_cores=int(profile_conditions.get("cpu_threads") or 2),
                 memory_mb=int(profile_conditions.get("memory_mb") or 4096),
@@ -902,7 +845,7 @@ class ResearchManager:
                 max_compute_seconds=int(profile_conditions.get("max_compute_seconds") or 10800),
                 max_storage_bytes=int(profile_conditions.get("max_storage_bytes") or 2 * 1024 * 1024 * 1024),
             ),
-            expected_outputs=("observations.ndjson", "result.json", "artifacts.json", "checkpoint.pt", "predictions.jsonl"),
+            expected_outputs=tuple(str(item) for item in prepared.get("expected_outputs") or ()),
             metadata={
                 "experiment_id": experiment_id,
                 "experiment_revision_id": revision.record_id,
@@ -910,6 +853,8 @@ class ResearchManager:
                 "arm_id": arm_id,
                 "profile": profile,
                 "operator_digest": trial.payload["operator_digest"],
+                "runner_provider": runner_provider,
+                "runner_output_ref": str(prepared["output_ref"]),
             },
         )
         attempt = submit(execution, idempotency_key=f"{command_key}:{run_id}:attempt:{attempt_number}")
@@ -936,10 +881,13 @@ class ResearchManager:
                     "attempt_number": attempt_number,
                     "session_id": session_id,
                     "tracker_provider": tracker_provider,
+                    "runner_provider": runner_provider,
+                    "runner_contract": str(prepared["contract"]),
+                    "data_owner_skill_id": str(dict(revision.payload["conditions"])["runner"]["data_owner"]),
+                    "runner_output_ref": str(prepared["output_ref"]),
                     "profile": profile,
                     "arm_id": arm_id,
                     "seed": seed,
-                    "workdir": str(run_dir),
                     "initial_attempt": attempt.to_dict(),
                 },
             )
@@ -952,14 +900,7 @@ class ResearchManager:
             trial_id=trial.record_id,
             run_id=run_id,
             attempt_id=attempt.attempt_id,
-            parameters={
-                "operator": arm_id,
-                "seed": seed,
-                "epochs": int(profile_conditions["epochs"]),
-                "batch_size": int(profile_conditions.get("batch_size") or 32),
-                "learning_rate": float(profile_conditions.get("learning_rate") or 0.001),
-                "conditions_digest": revision.payload["conditions_digest"],
-            },
+            parameters={**dict(prepared.get("parameters") or {}), "conditions_digest": revision.payload["conditions_digest"]},
             tags={
                 "adaos.study_id": trial.study_id,
                 "adaos.experiment_id": experiment_id,
@@ -972,22 +913,12 @@ class ResearchManager:
                 "adaos.analysis_plan_digest": str(trial.payload["analysis_plan_digest"]),
                 "adaos.source.code_digest": code_digest,
                 "adaos.environment_digest": environment_digest,
-                "adaos.data_digest": data_identity_digest,
+                "adaos.runner_provider": runner_provider,
                 "adaos.trace_id": trace_id,
                 "adaos.evidence_class": str(profile_conditions.get("evidence_class") or "workflow_validation"),
                 "adaos.profile": profile,
             },
-            inputs=(
-                {
-                    "kind": "dataset",
-                    "name": dataset["name"],
-                    "version": dataset["version"],
-                    "source": dataset.get("source"),
-                    "digest": data_identity_digest,
-                    "archive_md5": dataset.get("archive_md5"),
-                    "split_role": "train-validation",
-                },
-            ),
+            inputs=tuple(dict(item) for item in prepared.get("inputs") or ()),
         )
         self._record_attempt_status(experiment_id, attempt)
         return {"run": run_record.to_dict(), "binding": binding.to_dict(), "attempt": attempt.to_dict()}
@@ -1010,7 +941,7 @@ class ResearchManager:
                 raise ValueError("experiment must be locked at the expected generation")
             revision, plan = self._materialize_experiment_plan(experiment_id=experiment_id, profile=profile)
             submissions = [
-                self._submit_tlp_attempt(
+                self._submit_runner_attempt(
                     experiment_id=experiment_id,
                     revision=revision,
                     trial=trial,
@@ -1035,24 +966,61 @@ class ResearchManager:
 
         return self.repository.once(idempotency_key, "start_experiment", apply)
 
+    def _collect_runner_output(self, binding: ResearchRecord) -> dict[str, Any]:
+        provider = str(binding.payload.get("runner_provider") or "").strip()
+        output_ref = str(binding.payload.get("runner_output_ref") or "").strip()
+        if not provider and binding.payload.get("workdir"):
+            # Compatibility reader for attempts produced before runner-provider
+            # ownership was introduced. New attempts never expose or consume a
+            # foreign physical path through this branch.
+            root = Path(str(binding.payload["workdir"])).resolve()
+            observations: list[dict[str, Any]] = []
+            observation_path = root / "observations.ndjson"
+            if observation_path.is_file():
+                for line in observation_path.read_text(encoding="utf-8").splitlines():
+                    if line.strip():
+                        observations.append(json.loads(line))
+            result_path = root / "result.json"
+            result = json.loads(result_path.read_text(encoding="utf-8")) if result_path.is_file() else None
+            artifacts: list[dict[str, Any]] = []
+            manifest_path = root / "artifacts.json"
+            if manifest_path.is_file():
+                for item in json.loads(manifest_path.read_text(encoding="utf-8")).get("artifacts") or []:
+                    source = (root / str(item["path"])).resolve()
+                    relative = source.relative_to(self._runtime_data_root()).as_posix()
+                    artifacts.append({**dict(item), "uri": f"skill-data:{relative}"})
+            return {
+                "schema": "adaos.research.runner_collection.v1",
+                "provider_id": "legacy-local",
+                "observations": observations,
+                "artifacts": artifacts,
+                "result": result,
+                "complete": result is not None and bool(artifacts),
+            }
+        if not provider or not output_ref:
+            raise ValueError("attempt binding has no runner-provider output reference")
+        result = invoke_skill(
+            provider,
+            "collect_attempt",
+            {"output_ref": output_ref},
+            timeout=30,
+        )
+        if not isinstance(result, Mapping):
+            raise RuntimeError("runner provider returned a non-object collection")
+        value = dict(result)
+        if str(value.get("provider_id") or "") != provider:
+            raise ValueError("runner collection provider identity mismatch")
+        return value
+
     def _ingest_attempt_progress(self, binding: ResearchRecord) -> list[dict[str, Any]]:
-        path = Path(str(binding.payload["workdir"])) / "observations.ndjson"
-        if not path.is_file():
-            return []
+        collection = self._collect_runner_output(binding)
         session_id = str(binding.payload["session_id"])
         tracker = self._tracker_for_binding(binding)
         session = tracker.get_session(session_id)
         values: list[dict[str, Any]] = []
-        lines = path.read_text(encoding="utf-8").splitlines()
-        for index, line in enumerate(lines):
-            if not line.strip():
-                continue
-            try:
-                payload = json.loads(line)
-            except json.JSONDecodeError:
-                if index == len(lines) - 1:
-                    continue
-                raise
+        for payload in collection.get("observations") or []:
+            if not isinstance(payload, Mapping):
+                raise ValueError("runner observation must be an object")
             values.append(normalize_observation(session, payload))
         if not values:
             return []
@@ -1088,27 +1056,19 @@ class ResearchManager:
         return records
 
     def _ingest_attempt_artifacts(self, binding: ResearchRecord) -> list[dict[str, Any]]:
-        run_dir = Path(str(binding.payload["workdir"]))
-        manifest_path = run_dir / "artifacts.json"
-        if not manifest_path.is_file():
-            return []
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        collection = self._collect_runner_output(binding)
         artifacts = []
-        for item in manifest.get("artifacts") or []:
-            source = run_dir / str(item["path"])
-            if not source.is_file():
-                raise FileNotFoundError(f"declared experiment artifact is missing: {source.name}")
-            actual = digest(source.read_bytes())
-            if actual != item["digest"] or source.stat().st_size != int(item["size_bytes"]):
-                raise ValueError(f"experiment artifact integrity mismatch: {source.name}")
-            relative = source.relative_to(self._runtime_data_root()).as_posix()
+        for item in collection.get("artifacts") or []:
+            item = dict(item)
             artifacts.append(
                 {
-                    "uri": f"skill-data:{relative}",
-                    "digest": actual,
-                    "size_bytes": source.stat().st_size,
+                    "uri": str(item["uri"]),
+                    "digest": str(item["digest"]),
+                    "size_bytes": int(item["size_bytes"]),
                     "media_type": str(item["media_type"]),
                     "role": str(item["role"]),
+                    "owner_ref": f"skill:{binding.payload['runner_provider']}",
+                    "runner_provider": str(binding.payload["runner_provider"]),
                     # Reconciliation is repeatable.  Timestamping the same
                     # immutable artifact with wall-clock time would turn an
                     # otherwise identical replay into a tracker conflict.
@@ -1301,7 +1261,7 @@ class ResearchManager:
         if trial is None:
             raise KeyError(run_record.payload["trial_id"])
         revision = experiment.latest_revision(self.repository, experiment_id)
-        submission = self._submit_tlp_attempt(
+        submission = self._submit_runner_attempt(
             experiment_id=experiment_id,
             revision=revision,
             trial=trial,
@@ -1321,7 +1281,26 @@ class ResearchManager:
         )
         return {"submission": submission, "lifecycle": transition_result}
 
+    @staticmethod
+    def _result_path(result: Mapping[str, Any], path: str) -> Any:
+        current: Any = result
+        for token in str(path or "").split("."):
+            if not token or not isinstance(current, Mapping) or token not in current:
+                return None
+            current = current[token]
+        return current
+
     def _experiment_summary(self, experiment_id: str) -> dict[str, Any]:
+        revision = experiment.latest_revision(self.repository, experiment_id)
+        conditions = dict(revision.payload["conditions"])
+        analysis = dict(conditions.get("analysis") or {})
+        arms = [str(dict(item).get("id") or "") for item in dict(conditions.get("operators") or {}).get("arms") or []]
+        contrast = dict(analysis.get("primary_contrast") or {})
+        minuend = str(contrast.get("minuend") or (arms[1] if len(arms) > 1 else ""))
+        subtrahend = str(contrast.get("subtrahend") or (arms[0] if arms else ""))
+        metric_path = str(analysis.get("result_metric_path") or "best_validation_accuracy")
+        step_path = str(analysis.get("result_step_path") or "best_epoch")
+        initialization_path = str(analysis.get("initialization_digest_path") or "initial_state_digest")
         successful: dict[str, tuple[ResearchRecord, dict[str, Any]]] = {}
         for binding in self._attempt_bindings(experiment_id):
             status = self._latest_attempt_status(
@@ -1329,25 +1308,32 @@ class ResearchManager:
                 str(binding.payload["attempt_id"]),
                 str(dict(binding.payload["initial_attempt"])["status"]),
             )
-            result_path = Path(str(binding.payload["workdir"])) / "result.json"
-            if status == "succeeded" and result_path.is_file():
-                successful[str(binding.payload["run_id"])] = (
-                    binding,
-                    json.loads(result_path.read_text(encoding="utf-8")),
-                )
+            if status == "succeeded":
+                result = self._collect_runner_output(binding).get("result")
+                if isinstance(result, Mapping):
+                    successful[str(binding.payload["run_id"])] = (binding, dict(result))
         pairs: dict[int, dict[str, Any]] = {}
         for binding, result in successful.values():
             seed = int(binding.payload["seed"])
             arm = str(binding.payload["arm_id"])
-            pairs.setdefault(seed, {"seed": seed})[arm] = float(result["best_validation_accuracy"])
-            pairs[seed][f"{arm}_best_epoch"] = int(result["best_epoch"])
-            pairs[seed][f"{arm}_initial_state_digest"] = str(result["initial_state_digest"])
+            metric = self._result_path(result, metric_path)
+            if metric is None:
+                raise ValueError(f"runner result omits analysis metric path: {metric_path}")
+            pairs.setdefault(seed, {"seed": seed})[arm] = float(metric)
+            step = self._result_path(result, step_path)
+            if step is not None:
+                pairs[seed][f"{arm}_step"] = int(step)
+            initialization = self._result_path(result, initialization_path)
+            if initialization is not None:
+                pairs[seed][f"{arm}_initialization_digest"] = str(initialization)
         paired_values = []
         for item in pairs.values():
-            if "maxpool" in item and "tlp" in item:
-                item["delta_tlp_minus_maxpool"] = item["tlp"] - item["maxpool"]
-                item["paired_initialization"] = item["maxpool_initial_state_digest"] == item["tlp_initial_state_digest"]
-                paired_values.append(float(item["delta_tlp_minus_maxpool"]))
+            if minuend in item and subtrahend in item:
+                item["delta"] = item[minuend] - item[subtrahend]
+                left_digest = item.get(f"{minuend}_initialization_digest")
+                right_digest = item.get(f"{subtrahend}_initialization_digest")
+                item["paired_initialization"] = bool(left_digest and left_digest == right_digest)
+                paired_values.append(float(item["delta"]))
         mean_delta = sum(paired_values) / len(paired_values) if paired_values else None
         confidence_interval = None
         if len(paired_values) >= 2:
@@ -1365,7 +1351,11 @@ class ResearchManager:
             "completed_runs": len(successful),
             "paired_seed_count": len(paired_values),
             "pairs": [pairs[key] for key in sorted(pairs)],
-            "primary_estimand": "validation.top1_accuracy.tlp_minus_maxpool",
+            "primary_estimand": str(
+                analysis.get("primary_estimand")
+                or f"{analysis.get('primary_metric')}.{minuend}_minus_{subtrahend}"
+            ),
+            "primary_contrast": {"minuend": minuend, "subtrahend": subtrahend},
             "mean_delta": mean_delta,
             "paired_bootstrap_95": confidence_interval,
         }
@@ -1385,7 +1375,7 @@ class ResearchManager:
             summary = self._experiment_summary(experiment_id)
             if not summary["paired_seed_count"]:
                 raise ValueError("experiment cannot be finalized without a complete paired result")
-            if any(not item.get("paired_initialization") for item in summary["pairs"] if "delta_tlp_minus_maxpool" in item):
+            if any(not item.get("paired_initialization") for item in summary["pairs"] if "delta" in item):
                 raise ValueError("paired experiment initialization lineage does not match")
             tracker_export = self.tracker.export_experiment(experiment_id)
             if any(session["session"]["status"] == "running" for session in tracker_export["sessions"]):
@@ -1620,6 +1610,17 @@ class ResearchManager:
         for record in result.payload.get("artifact_refs") or []:
             payload = dict(record["payload"])
             uri = str(payload["uri"])
+            runner_provider = str(payload.get("runner_provider") or "").strip()
+            if runner_provider:
+                verification = invoke_skill(
+                    runner_provider,
+                    "verify_artifact",
+                    {"uri": uri, "digest": str(payload["digest"])},
+                    timeout=30,
+                )
+                if not isinstance(verification, Mapping) or not bool(verification.get("ok")):
+                    errors.append(f"artifact_verification:{uri}")
+                continue
             if not uri.startswith("skill-data:"):
                 errors.append(f"unsupported_artifact_uri:{uri}")
                 continue
@@ -1658,29 +1659,64 @@ class ResearchManager:
                     "status": status,
                     "terminal": status in {"succeeded", "failed", "cancelled", "lost"},
                     "session_id": binding.payload["session_id"],
-                    "workdir": binding.payload["workdir"],
+                    "runner_provider": binding.payload.get("runner_provider") or "legacy-local",
+                    "runner_output_ref": binding.payload.get("runner_output_ref"),
                 }
             )
         observations = self._experiment_records(experiment_id, "observation")
         artifacts = self._experiment_records(experiment_id, "artifact_ref")
         results = self._experiment_records(experiment_id, "experiment_result")
-        dataset = dict(dict(revision.payload["conditions"])["dataset"])
-        data_root_value = str(dataset.get("data_root") or "").strip()
-        data_root = Path(data_root_value) if data_root_value else self._runtime_data_root() / "files" / "datasets"
-        dataset_ready = all(
-            (data_root / "stl10_binary" / name).is_file()
-            for name in ("train_X.bin", "train_y.bin", "test_X.bin", "test_y.bin")
+        conditions = dict(revision.payload["conditions"])
+        dataset = dict(conditions["dataset"])
+        runner = dict(conditions.get("runner") or {})
+        runner_provider = str(runner.get("provider") or "").strip()
+        data_owner_skill_id = str(
+            runner.get("data_owner")
+            or value.payload.get("data_owner_skill_id")
+            or runner_provider
+            or "research_manager_skill"
         )
+        if runner_provider:
+            data_status = invoke_skill(runner_provider, "dataset_status", {}, timeout=30)
+            if not isinstance(data_status, Mapping):
+                raise RuntimeError("runner provider returned a non-object data status")
+            data_projection = dict(data_status)
+        else:
+            data_root_value = str(dataset.get("data_root") or "").strip()
+            data_root = Path(data_root_value) if data_root_value else self._runtime_data_root() / "files" / "datasets"
+            required_files = [
+                str(item).replace("\\", "/").lstrip("/")
+                for item in dataset.get("required_files") or []
+                if str(item).strip()
+            ]
+            dataset_ready = (
+                all((data_root / name).is_file() for name in required_files)
+                if required_files
+                else data_root.is_dir() and any(data_root.iterdir())
+            )
+            data_projection = {
+                "owner_ref": "skill:research_manager_skill",
+                "logical_name": str(dataset.get("name") or "legacy-dataset"),
+                "ready": dataset_ready,
+                "legacy": True,
+            }
         tracker_provider = str(dict(dict(revision.payload["conditions"]).get("tracker") or {}).get("provider") or "local-tracker")
         tracker_health = self._tracker_provider(tracker_provider).health()
         return {
             "schema": "adaos.research.experiment_workbench.v1",
             "experiment": value.to_dict(),
+            "research_space": {
+                "schema": "adaos.research.space.v1",
+                "space_id": f"skill:{data_owner_skill_id}/experiment:{experiment_id}",
+                "control_plane_owner_ref": "skill:research_manager_skill",
+                "data_owner_ref": f"skill:{data_owner_skill_id}",
+                "runner_provider": runner_provider or "legacy-local",
+            },
             "revision": revision.to_dict(),
             "revision_count": len(experiment.revisions(self.repository, experiment_id)),
             "conditions_document": json.dumps(revision.payload["conditions"], ensure_ascii=False, sort_keys=True, indent=2),
             "lifecycle": lifecycle,
-            "dataset": {"ready": dataset_ready, "root": str(data_root), "download_declared": bool(dataset.get("download"))},
+            "dataset": {**data_projection, "download_declared": bool(dataset.get("download"))},
             "tracker": tracker_health,
             "runs": [item.to_dict() for item in runs],
             "attempts": attempts,
@@ -1715,6 +1751,22 @@ class ResearchManager:
                 }
             )
         return {"schema": "adaos.research.artifact_list.v1", "items": items}
+
+    def describe_experiment(
+        self,
+        experiment_id: str,
+        *,
+        locale: str = "ru",
+        channel: str = "text",
+        section: str = "all",
+    ) -> dict[str, Any]:
+        experiment.get_experiment(self.repository, experiment_id)
+        return guidance.describe(
+            {"lifecycle": experiment.state(self.repository, experiment_id)},
+            locale=locale,
+            channel=channel,
+            section=section,
+        )
 
     def unblind_test(
         self,

@@ -37,29 +37,49 @@ def validate_conditions(conditions: Mapping[str, Any]) -> dict[str, Any]:
     operators = dict(value["operators"])
     arms = list(operators.get("arms") or [])
     arm_ids = [str(dict(item).get("id") or "") for item in arms]
-    if len(arms) < 2 or len(set(arm_ids)) != len(arms) or any(not item for item in arm_ids):
-        raise ValueError("experiment requires at least two uniquely identified operator arms")
+    if not arms or len(set(arm_ids)) != len(arms) or any(not item for item in arm_ids):
+        raise ValueError("experiment requires one or more uniquely identified arms")
     execution = dict(value["execution"])
-    for profile in ("preflight", "confirmatory"):
-        item = dict(execution.get(profile) or {})
+    if not execution:
+        raise ValueError("experiment execution requires at least one named profile")
+    for profile, profile_value in execution.items():
+        if not isinstance(profile_value, Mapping):
+            raise ValueError(f"execution.{profile} must be an object")
+        item = dict(profile_value)
         if int(item.get("epochs") or 0) < 1:
             raise ValueError(f"execution.{profile}.epochs must be >= 1")
         seeds = list(item.get("seeds") or [])
         if not seeds or len(set(int(seed) for seed in seeds)) != len(seeds):
             raise ValueError(f"execution.{profile}.seeds must be unique and non-empty")
     randomization = dict(value["randomization"])
-    required_streams = {"initialization", "data_ordering", "augmentation", "operator_initialization", "analysis"}
-    if set(randomization.get("named_streams") or []) != required_streams:
-        raise ValueError("randomization must declare all five named RNG streams")
+    streams = [str(item).strip() for item in randomization.get("named_streams") or []]
+    if not streams or any(not item for item in streams) or len(set(streams)) != len(streams):
+        raise ValueError("randomization.named_streams must be unique and non-empty")
     analysis = dict(value["analysis"])
-    if not bool(analysis.get("paired")) or not str(analysis.get("primary_metric") or "").strip():
-        raise ValueError("analysis must declare a paired primary metric")
+    if not str(analysis.get("primary_metric") or "").strip():
+        raise ValueError("analysis must declare a primary metric")
+    if bool(analysis.get("paired")):
+        contrast = dict(analysis.get("primary_contrast") or {})
+        if not str(contrast.get("minuend") or "").strip() or not str(contrast.get("subtrahend") or "").strip():
+            raise ValueError("paired analysis must declare primary_contrast minuend and subtrahend")
     tracker = dict(value.get("tracker") or {"provider": "local-tracker"})
-    if str(tracker.get("provider") or "local-tracker") not in {"local-tracker", "mlflow"}:
-        raise ValueError("tracker.provider must be local-tracker or mlflow")
+    if not str(tracker.get("provider") or "").strip():
+        raise ValueError("tracker.provider must be non-empty")
     if str(tracker.get("required_delivery") or "durable-before-finalize") != "durable-before-finalize":
         raise ValueError("tracker.required_delivery must be durable-before-finalize")
     value["tracker"] = tracker
+    runner = dict(value.get("runner") or {})
+    provider = str(runner.get("provider") or "").strip()
+    if not provider:
+        raise ValueError("experiment runner.provider is required")
+    if str(runner.get("contract") or "") != "adaos.research.runner.v1":
+        raise ValueError("experiment runner.contract must be adaos.research.runner.v1")
+    data_owner = str(runner.get("data_owner") or provider).strip()
+    if not data_owner:
+        raise ValueError("experiment runner.data_owner must be non-empty")
+    runner["provider"] = provider
+    runner["data_owner"] = data_owner
+    value["runner"] = runner
     return value
 
 
@@ -144,6 +164,7 @@ def create(
                     "title": str(title),
                     "purpose": str(purpose),
                     "experiment_id": experiment_id,
+                    "data_owner_skill_id": str(normalized["runner"]["data_owner"]),
                 },
             )
         )

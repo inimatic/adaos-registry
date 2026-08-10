@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-10T05:53:56+00:00",
+  "updated_at": "2026-08-10T00:00:00+03:00",
   "skills": [
     {
       "kind": "skill",
@@ -689,8 +689,8 @@
       "kind": "skill",
       "id": "research_manager_skill",
       "name": "research_manager_skill",
-      "version": "0.7.0",
-      "updated_at": "2026-08-08T02:17:42+00:00",
+      "version": "0.8.0",
+      "updated_at": "2026-08-10T00:00:00+03:00",
       "path": "skills/research_manager_skill",
       "manifest": "skills/research_manager_skill/skill.yaml",
       "source": {
@@ -702,19 +702,14 @@
         "name": "research_manager_skill",
         "id": "research_manager_skill"
       },
-      "description": "Provider-neutral governed research manager, local tracker, evidence exporter, and deterministic fixture runner.",
+      "description": "Reusable provider-neutral research control plane for governed studies, experiments, runner providers, trackers and immutable evidence.",
       "entry": "handlers/main.py",
       "activation": {
         "mode": "lazy",
-        "when": {
-          "scenarios_active": [
-            "tlp_research"
-          ]
-        },
         "startup_allowed": true,
         "background_refresh": false
       },
-      "tools_count": 30
+      "tools_count": 31
     },
     {
       "kind": "skill",

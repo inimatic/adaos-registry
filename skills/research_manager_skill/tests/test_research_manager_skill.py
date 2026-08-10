@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import sys
 import uuid
-from argparse import Namespace
 from pathlib import Path
 
 import jsonschema
@@ -15,7 +14,6 @@ if str(_SKILL_ROOT) not in sys.path:
 
 from research.contracts import ResearchRecord, identity
 from research.manager import ResearchManager
-from research.tlp_runner import _model, _state_digest, run as run_tlp
 from research.tracker import MlflowTracker, TrackerConflict
 from research.workflow import TRANSITIONS
 from migrations.data_migration import migrate as migrate_runtime_data
@@ -62,8 +60,17 @@ def _experiment_conditions() -> dict:
             "paired": True,
             "named_streams": ["initialization", "data_ordering", "augmentation", "operator_initialization", "analysis"],
         },
-        "analysis": {"paired": True, "primary_metric": "validation.top1_accuracy"},
+        "analysis": {
+            "paired": True,
+            "primary_metric": "validation.top1_accuracy",
+            "primary_contrast": {"minuend": "tlp", "subtrahend": "maxpool"},
+        },
         "tracker": {"provider": "local-tracker"},
+        "runner": {
+            "provider": "fixture_runner_skill",
+            "contract": "adaos.research.runner.v1",
+            "data_owner": "fixture_data_skill",
+        },
     }
 
 
@@ -372,6 +379,51 @@ def test_experiment_revisions_lock_and_attempt_aware_tracker_contract() -> None:
     assert exported["events"][0]["payload"]["metric"]["name"] == "top1_accuracy"
 
 
+def test_experiment_guidance_is_localized_channel_neutral_and_workflow_aware() -> None:
+    manager = ResearchManager()
+    created = _create(manager, f"guidance-{uuid.uuid4().hex}")
+    study_id = created["study"]["record_id"]
+    experiment_id = identity("experiment", {"study_id": study_id, "slug": "GUIDE"})
+    manager.create_experiment(
+        study_id=study_id,
+        slug="GUIDE",
+        title="Guidance contract",
+        purpose="Verify channel-neutral workflow guidance",
+        conditions=_experiment_conditions(),
+        experiment_id=experiment_id,
+        idempotency_key=f"{experiment_id}:create",
+    )
+    assert first["experiment"]["payload"]["data_owner_skill_id"] == "fixture_data_skill"
+
+    draft = manager.describe_experiment(experiment_id, locale="ru", channel="voice")
+
+    assert draft["schema"] == "adaos.scenario.guidance_projection.v1"
+    assert draft["workflow"]["state"] == "draft"
+    assert [item["id"] for item in draft["next_actions"]] == [
+        "edit_conditions",
+        "submit_review",
+    ]
+    assert draft["message"] == draft["speech_text"]
+    assert "Следующие шаги" in draft["speech_text"]
+
+    manager.submit_experiment_review(
+        experiment_id=experiment_id,
+        expected_generation=0,
+        idempotency_key=f"{experiment_id}:review",
+        actor="user:test",
+    )
+    review = manager.describe_experiment(
+        experiment_id,
+        locale="en",
+        channel="text",
+        section="next_steps",
+    )
+
+    assert review["workflow"]["state"] == "review"
+    assert [item["id"] for item in review["next_actions"]] == ["edit_conditions", "lock"]
+    assert review["message"] == review["text"]
+
+
 def test_mlflow_provider_projects_only_new_journal_events_per_attempt(monkeypatch: pytest.MonkeyPatch) -> None:
     manager = ResearchManager()
     provider = MlflowTracker(manager.repository, "http://127.0.0.1:18121")
@@ -474,65 +526,3 @@ def test_live_mlflow_provider_contract_when_endpoint_is_declared() -> None:
     )
     assert closed["session"]["status"] == "succeeded"
     assert closed["events"][0]["provider_receipt"]["mlflow_run_id"]
-
-
-def test_experiment_workdir_does_not_embed_full_record_ids(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    env_path = tmp_path / "research_manager_skill" / "v0.4" / "venv" / "Scripts" / "python.exe"
-    monkeypatch.setenv("ADAOS_SKILL_ENV_PATH", str(env_path))
-    experiment_id = "experiment." + "e" * 64
-    run_id = "run." + "r" * 64
-
-    workdir = ResearchManager._experiment_run_dir(experiment_id, run_id, 2)
-    legacy = ResearchManager._runtime_data_root() / "internal" / "tlp_runs" / experiment_id / run_id / "attempt-2"
-
-    assert workdir.is_dir()
-    assert experiment_id not in str(workdir)
-    assert run_id not in str(workdir)
-    assert len(str(workdir)) <= len(str(legacy)) - 80
-    assert workdir.parts[-3].startswith("e-") and len(workdir.parts[-3]) == 26
-    assert workdir.parts[-2].startswith("r-") and len(workdir.parts[-2]) == 26
-
-
-def test_shared_initialization_digest_is_operator_independent() -> None:
-    maxpool = _model("maxpool", 17)
-    tlp = _model("tlp", 17)
-
-    assert _state_digest(maxpool) == _state_digest(tlp)
-    assert _state_digest(tlp, shared_only=False) != _state_digest(tlp)
-
-
-def test_real_tlp_runner_executes_one_cpu_epoch_on_binary_contract_fixture(tmp_path: Path) -> None:
-    binary = tmp_path / "dataset" / "stl10_binary"
-    binary.mkdir(parents=True)
-    generator = __import__("random").Random(17)
-    train_count = 20
-    test_count = 10
-    (binary / "train_X.bin").write_bytes(bytes(generator.randrange(256) for _ in range(train_count * 3 * 96 * 96)))
-    (binary / "train_y.bin").write_bytes(bytes((index % 10) + 1 for index in range(train_count)))
-    (binary / "test_X.bin").write_bytes(bytes(generator.randrange(256) for _ in range(test_count * 3 * 96 * 96)))
-    (binary / "test_y.bin").write_bytes(bytes((index % 10) + 1 for index in range(test_count)))
-    output = tmp_path / "run"
-    result = run_tlp(
-        Namespace(
-            operator="tlp",
-            seed=17,
-            epochs=1,
-            batch_size=10,
-            learning_rate=0.001,
-            max_train_samples=10,
-            max_validation_samples=10,
-            validation_per_class=1,
-            split_seed=7,
-            cpu_threads=1,
-            data_root=str(tmp_path / "dataset"),
-            output_dir=str(output),
-            evidence_class="test-only",
-            download=False,
-        )
-    )
-    assert result["operator"] == "tlp"
-    assert result["epochs"] == 1
-    assert result["tlp_components"]["centered_sum_max_abs"] < 1e-6
-    assert {path.name for path in output.iterdir()} >= {
-        "result.json", "observations.ndjson", "checkpoint.pt", "predictions.jsonl", "artifacts.json"
-    }

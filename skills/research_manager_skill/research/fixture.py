@@ -1,4 +1,4 @@
-"""Deterministic no-training execution fixture used by TLP conformance."""
+"""Provider-neutral deterministic no-training research fixture."""
 
 from __future__ import annotations
 
@@ -11,12 +11,13 @@ from pathlib import Path
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--operator", choices=("baseline", "max_plus"), required=True)
+    parser.add_argument("--operator", required=True)
     parser.add_argument("--seed", type=int, required=True)
     parser.add_argument("--output", required=True)
     args = parser.parse_args()
     rng = random.Random(args.seed)
-    base = 0.51 if args.operator == "baseline" else 0.57
+    operator_offset = int(hashlib.sha256(args.operator.encode("utf-8")).hexdigest()[:4], 16) % 5
+    base = 0.51 + operator_offset / 100.0
     accuracy = round(base + rng.random() * 0.01, 8)
     payload = {
         "schema": "adaos.research.fixture_observation.v1",

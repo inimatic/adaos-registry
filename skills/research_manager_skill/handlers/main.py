@@ -332,6 +332,23 @@ def list_experiment_artifacts(experiment_id: str) -> dict[str, Any]:
     return _manager().experiment_artifacts(experiment_id)
 
 
+@tool("describe_experiment")
+def describe_experiment(
+    experiment_id: str,
+    locale: str = "ru",
+    channel: str = "text",
+    section: str = "all",
+) -> dict[str, Any]:
+    """Present the workbench and workflow-aware next steps for text or voice."""
+
+    return _manager().describe_experiment(
+        experiment_id,
+        locale=locale,
+        channel=channel,
+        section=section,
+    )
+
+
 @tool("unblind_test")
 def unblind_test(
     study_id: str,
