@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-08T02:41:08+00:00",
+  "updated_at": "2026-08-10T05:53:56+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -911,6 +911,38 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "tools_count": 4
+    },
+    {
+      "kind": "skill",
+      "id": "tlp_experiment_skill",
+      "name": "tlp_experiment_skill",
+      "version": "0.1.1",
+      "updated_at": "2026-08-10T05:53:56+00:00",
+      "path": "skills/tlp_experiment_skill",
+      "manifest": "skills/tlp_experiment_skill/skill.yaml",
+      "source": {
+        "path": "skills/tlp_experiment_skill",
+        "manifest": "skills/tlp_experiment_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "tlp_experiment_skill",
+        "id": "tlp_experiment_skill"
+      },
+      "description": "TLP-specific STL-10 data owner and typed CPU runner provider for AdaOS Research Fabric.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "activation": {
+        "mode": "lazy",
+        "when": {
+          "scenarios_active": [
+            "tlp_research"
+          ]
+        },
+        "startup_allowed": true,
+        "background_refresh": false
+      },
+      "tools_count": 5
     },
     {
       "kind": "skill",

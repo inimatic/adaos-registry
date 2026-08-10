@@ -1,0 +1,105 @@
+name: tlp_experiment_skill
+version: 0.1.1
+description: TLP-specific STL-10 data owner and typed CPU runner provider for AdaOS
+  Research Fabric.
+entry: handlers/main.py
+runtime:
+  python: '3.11'
+  env:
+    mode: shared
+    allow_heavy_dependencies: true
+  activation:
+    mode: lazy
+    startup_allowed: true
+    background_refresh: false
+    when:
+      scenarios_active:
+      - tlp_research
+capabilities: []
+dependencies: []
+lifecycle:
+  after_activate: adopt_legacy_data
+default_tool: dataset_status
+provider_contracts:
+- contract: adaos.research.runner.v1
+  capability: research.runner
+  operations:
+  - prepare_attempt
+  - collect_attempt
+  - verify_artifact
+  - dataset_status
+tools:
+- name: adopt_legacy_data
+  description: Adopt the legacy STL-10 payload into this skill-owned data binding.
+  entry: handlers.main:adopt_legacy_data
+  side_effects: local_write
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: dataset_status
+  description: Report the redacted status of the TLP-owned STL-10 binding.
+  entry: handlers.main:dataset_status
+  side_effects: read_only
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: prepare_attempt
+  description: Prepare one immutable TLP execution package and owned output binding.
+  entry: handlers.main:prepare_attempt
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - request
+    properties:
+      request:
+        type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: collect_attempt
+  description: Return normalized observations, result and artifact references for
+    one owned output binding.
+  entry: handlers.main:collect_attempt
+  side_effects: read_only
+  input_schema:
+    type: object
+    required:
+    - output_ref
+    properties:
+      output_ref:
+        type: string
+    additionalProperties: false
+  output_schema:
+    type: object
+- name: verify_artifact
+  description: Verify a content-addressed artifact within the TLP-owned data binding.
+  entry: handlers.main:verify_artifact
+  side_effects: read_only
+  input_schema:
+    type: object
+    required:
+    - uri
+    - digest
+    properties:
+      uri:
+        type: string
+      digest:
+        type: string
+    additionalProperties: false
+  output_schema:
+    type: object
+updated_at: '2026-08-10T05:53:56+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.726+4771.d501c929
+    recorded_at: '2026-08-10T05:53:56+00:00'
+    source: skill_push
+    min_commit: d501c92977e1c589e5edab33bd78304893896549
+    min_short_commit: d501c929
+    build_date: '2026-08-10T08:48:49+03:00'
+
