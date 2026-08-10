@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-10T00:00:00+03:00",
+  "updated_at": "2026-08-10T06:00:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -689,8 +689,8 @@
       "kind": "skill",
       "id": "research_manager_skill",
       "name": "research_manager_skill",
-      "version": "0.8.0",
-      "updated_at": "2026-08-10T00:00:00+03:00",
+      "version": "0.8.1",
+      "updated_at": "2026-08-10T06:00:00+00:00",
       "path": "skills/research_manager_skill",
       "manifest": "skills/research_manager_skill/skill.yaml",
       "source": {

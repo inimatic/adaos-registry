@@ -305,6 +305,7 @@ def test_experiment_revisions_lock_and_attempt_aware_tracker_contract() -> None:
         experiment_id=experiment_id,
         idempotency_key=f"{experiment_id}:create",
     )
+    assert first["experiment"]["payload"]["data_owner_skill_id"] == "fixture_data_skill"
     revised_conditions = _experiment_conditions()
     revised_conditions["execution"]["preflight"]["epochs"] = 3
     revised = manager.revise_experiment(
@@ -393,8 +394,6 @@ def test_experiment_guidance_is_localized_channel_neutral_and_workflow_aware() -
         experiment_id=experiment_id,
         idempotency_key=f"{experiment_id}:create",
     )
-    assert first["experiment"]["payload"]["data_owner_skill_id"] == "fixture_data_skill"
-
     draft = manager.describe_experiment(experiment_id, locale="ru", channel="voice")
 
     assert draft["schema"] == "adaos.scenario.guidance_projection.v1"
