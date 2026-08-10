@@ -1,0 +1,60 @@
+schema: adaos.conversational.input.v1
+package_id: tlp_research
+intents:
+- id: tlp_research.help
+  description: Read the scenario overview and usage help.
+  kind: query
+  affordance_id: tlp_research.help
+  workflow: null
+  skill_invocation:
+    skill_id: research_manager_skill
+    operation_id: describe_experiment
+  example_ids: [tlp_research.help.en, tlp_research.help.ru]
+  slots:
+  - id: experiment_id
+    required: true
+    schema: {type: string, minLength: 1}
+    entity_type: null
+  - id: locale
+    required: true
+    schema: {type: string, enum: [en, ru]}
+    entity_type: null
+  - id: channel
+    required: true
+    schema: {type: string, enum: [text, voice]}
+    entity_type: null
+  - id: section
+    required: true
+    schema: {type: string, const: all}
+    entity_type: null
+- id: tlp_research.next_steps
+  description: Read workflow-aware next steps for the current experiment.
+  kind: query
+  affordance_id: tlp_research.next_steps
+  workflow: null
+  skill_invocation:
+    skill_id: research_manager_skill
+    operation_id: describe_experiment
+  example_ids: [tlp_research.next_steps.en, tlp_research.next_steps.ru]
+  slots:
+  - id: experiment_id
+    required: true
+    schema: {type: string, minLength: 1}
+    entity_type: null
+  - id: locale
+    required: true
+    schema: {type: string, enum: [en, ru]}
+    entity_type: null
+  - id: channel
+    required: true
+    schema: {type: string, enum: [text, voice]}
+    entity_type: null
+  - id: section
+    required: true
+    schema: {type: string, const: next_steps}
+    entity_type: null
+policy:
+  default_confidence: 0.9
+  abstain_below: 0.6
+  protected_action_confirmation: true
+

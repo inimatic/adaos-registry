@@ -1,0 +1,56 @@
+schema: adaos.conversational.matchers.v1
+package_id: tlp_research
+matchers:
+- id: tlp_research.help.en
+  kind: regex
+  intent_id: tlp_research.help
+  locale: en
+  pattern: '^(?:help|what (?:can|does) tlp research do|how (?:do i|to) use tlp research)[?!. ]*$'
+  flags: [ignore_case, unicode]
+  slots:
+    experiment_id: experiment.0670d0bc1c99cb6a89af74f0f56457a5d785e2991dd5eba83219ec2d58db63e5
+    locale: en
+    channel: text
+    section: all
+  source: authored
+  provenance: {source: tlp_research_guidance_v1}
+- id: tlp_research.help.ru
+  kind: regex
+  intent_id: tlp_research.help
+  locale: ru
+  pattern: '^(?:помощь|что умеет tlp research|как (?:мне )?пользоваться tlp research)[?!. ]*$'
+  flags: [ignore_case, unicode]
+  slots:
+    experiment_id: experiment.0670d0bc1c99cb6a89af74f0f56457a5d785e2991dd5eba83219ec2d58db63e5
+    locale: ru
+    channel: text
+    section: all
+  source: authored
+  provenance: {source: tlp_research_guidance_v1}
+- id: tlp_research.next_steps.en
+  kind: regex
+  intent_id: tlp_research.next_steps
+  locale: en
+  pattern: '^(?:what should i do next|what is the next step|next steps)[?!. ]*$'
+  flags: [ignore_case, unicode]
+  slots:
+    experiment_id: experiment.0670d0bc1c99cb6a89af74f0f56457a5d785e2991dd5eba83219ec2d58db63e5
+    locale: en
+    channel: voice
+    section: next_steps
+  source: authored
+  provenance: {source: tlp_research_guidance_v1}
+- id: tlp_research.next_steps.ru
+  kind: regex
+  intent_id: tlp_research.next_steps
+  locale: ru
+  pattern: '^(?:что (?:мне )?делать дальше|какой следующий шаг|следующие шаги)[?!. ]*$'
+  flags: [ignore_case, unicode]
+  slots:
+    experiment_id: experiment.0670d0bc1c99cb6a89af74f0f56457a5d785e2991dd5eba83219ec2d58db63e5
+    locale: ru
+    channel: voice
+    section: next_steps
+  source: authored
+  provenance: {source: tlp_research_guidance_v1}
+

@@ -1,0 +1,10 @@
+schema: adaos.conversational.locale.v1
+package_id: tlp_research
+locale: en
+messages:
+  action.help.label: Read help
+  action.next_steps.label: Read next steps
+  output.help.summary: TLP Research help and current next steps are ready.
+  output.next_steps.summary: Current workflow next steps are ready.
+  output.no_match.summary: Ask “What can TLP Research do?” or “What should I do next?”.
+

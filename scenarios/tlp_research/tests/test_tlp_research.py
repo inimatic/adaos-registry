@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from adaos.sdk.scenarios.runtime import ActionRegistry, ScenarioRuntime, load_scenario
+from adaos.services.conversational_pipeline import compile_conversational_package
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,8 +21,12 @@ def _json(relative: str) -> dict:
 def test_manifest_binds_only_declared_research_skill_routes() -> None:
     manifest = yaml.safe_load((ROOT / "scenario.yaml").read_text(encoding="utf-8"))
 
-    assert manifest["depends"] == ["research_manager_skill", "mlflow_tracker_skill"]
-    assert manifest["runtime"]["skills"]["required"] == ["research_manager_skill", "mlflow_tracker_skill"]
+    assert manifest["depends"] == ["research_manager_skill", "mlflow_tracker_skill", "tlp_experiment_skill"]
+    assert manifest["runtime"]["skills"]["required"] == [
+        "research_manager_skill",
+        "mlflow_tracker_skill",
+        "tlp_experiment_skill",
+    ]
     assert [step["call"] for step in manifest["steps"]] == [
         "research_manager_skill.create_study",
         "research_manager_skill.advance_workflow",
@@ -29,6 +34,12 @@ def test_manifest_binds_only_declared_research_skill_routes() -> None:
     ]
     assert manifest["steps"][0]["args"]["mode"] == "confirmatory"
     assert manifest["steps"][1]["args"]["command"] == "submit_protocol_review"
+    conditions = manifest["steps"][2]["args"]["conditions"]
+    assert conditions["runner"] == {
+        "contract": "adaos.research.runner.v1",
+        "provider": "tlp_experiment_skill",
+        "data_owner": "tlp_experiment_skill",
+    }
 
 
 def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -> None:
@@ -39,6 +50,7 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
     editor = next(widget for widget in page["widgets"] if widget["id"] == "experiment-conditions")
     actions = next(widget for widget in page["widgets"] if widget["id"] == "experiment-actions")
     views = next(widget for widget in page["widgets"] if widget["id"] == "experiment-views")
+    help_modal = webui["ui"]["application"]["modals"]["tlp_research_help"]
 
     assert manifest["type"] == "desktop"
     assert manifest["ui"] == {"manifest": "webui.json"}
@@ -47,6 +59,24 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
     assert editor["actions"][0]["target"] == "research_manager_skill.revise_experiment_json"
     assert views["area"] == "main"
     assert page["widgets"].index(views) < page["widgets"].index(editor)
+    assert next(item for item in views["actions"] if item["on"] == "click:help") == {
+        "on": "click:help",
+        "type": "openModal",
+        "params": {"modalId": "tlp_research_help"},
+    }
+    readme = (ROOT / "README.md").read_text(encoding="utf-8").rstrip()
+    modal_readme = next(
+        widget
+        for widget in help_modal["schema"]["widgets"]
+        if widget["id"] == "tlp-help-readme"
+    )
+    assert modal_readme["inputs"]["content"] == readme
+    current_step = next(
+        widget
+        for widget in help_modal["schema"]["widgets"]
+        if widget["id"] == "tlp-help-current-step"
+    )
+    assert current_step["dataSource"]["name"] == "research_manager_skill.describe_experiment"
     assert {item["target"] for item in actions["actions"] if "target" in item} >= {
         "research_manager_skill.lock_experiment",
         "research_manager_skill.start_experiment",
@@ -62,6 +92,37 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
         "withAuth": True,
     }
     assert page["initialState"]["experimentId"] == manifest["steps"][2]["args"]["experiment_id"]
+
+
+def test_guidance_is_available_on_web_text_and_voice() -> None:
+    manifest = yaml.safe_load((ROOT / "scenario.yaml").read_text(encoding="utf-8"))
+
+    assert manifest["conversational"] == {"manifest": "conversational/manifest.yaml"}
+    assert manifest["guidance"]["schema"] == "adaos.scenario.guidance.v1"
+    assert manifest["guidance"]["presentation"]["channels"] == ["web", "text", "voice"]
+    assert manifest["guidance"]["workflow"]["state_source"]["name"] == (
+        "research_manager_skill.describe_experiment"
+    )
+    assert manifest["guidance"]["conversational"] == {
+        "help_intent": "tlp_research.help",
+        "next_steps_intent": "tlp_research.next_steps",
+    }
+
+
+def test_conversational_guidance_package_compiles_without_an_llm() -> None:
+    result = compile_conversational_package(
+        ROOT,
+        manifest_name="scenario.yaml",
+        operation_catalog={"research_manager_skill": ["describe_experiment"]},
+    )
+
+    assert result.valid is True, result.validation.report
+    assert result.validation.report["diagnostics"] == []
+    assert result.runtime_bundle is not None
+    assert {item["intent_id"] for item in result.runtime_bundle["matchers"].values()} == {
+        "tlp_research.help",
+        "tlp_research.next_steps",
+    }
 
 
 def test_package_preserves_research_gates_and_seals_test_access() -> None:

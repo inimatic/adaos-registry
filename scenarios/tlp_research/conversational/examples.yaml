@@ -1,0 +1,37 @@
+schema: adaos.conversational.examples.v1
+package_id: tlp_research
+examples:
+- id: tlp_research.help.en
+  intent_id: tlp_research.help
+  text: What can TLP Research do?
+  locale: en
+  source: authored
+  entities: []
+- id: tlp_research.help.ru
+  intent_id: tlp_research.help
+  text: Что умеет TLP Research?
+  locale: ru
+  source: authored
+  entities: []
+- id: tlp_research.next_steps.en
+  intent_id: tlp_research.next_steps
+  text: What should I do next?
+  locale: en
+  source: authored
+  entities: []
+- id: tlp_research.next_steps.ru
+  intent_id: tlp_research.next_steps
+  text: Что делать дальше?
+  locale: ru
+  source: authored
+  entities: []
+hard_negatives:
+- id: tlp_research.negative.start.ru
+  text: Запусти эксперимент
+  locale: ru
+  reason: Запрос запуска не должен распознаваться как чтение помощи.
+- id: tlp_research.negative.start.en
+  text: Start the experiment
+  locale: en
+  reason: A mutating execution request must not match read-only guidance.
+

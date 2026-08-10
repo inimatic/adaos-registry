@@ -1,0 +1,10 @@
+schema: adaos.conversational.locale.v1
+package_id: tlp_research
+locale: ru
+messages:
+  action.help.label: Прочитать справку
+  action.next_steps.label: Прочитать следующие шаги
+  output.help.summary: Справка TLP Research и текущие следующие шаги готовы.
+  output.next_steps.summary: Текущие следующие шаги workflow готовы.
+  output.no_match.summary: Спросите «Что умеет TLP Research?» или «Что делать дальше?».
+

@@ -39,11 +39,16 @@
                   {"id": "conditions", "label": "Conditions", "icon": "options-outline"},
                   {"id": "runs", "label": "Runs", "icon": "pulse-outline"},
                   {"id": "results", "label": "Results", "icon": "git-compare-outline"},
-                  {"id": "evidence", "label": "Evidence", "icon": "shield-checkmark-outline"}
+                  {"id": "evidence", "label": "Evidence", "icon": "shield-checkmark-outline"},
+                  {"id": "help", "label": "Help", "icon": "help-circle-outline"}
                 ]
               },
               "actions": [
-                {"on": "click", "type": "updateState", "params": {"activeView": "$event.id"}}
+                {"on": "click:conditions", "type": "updateState", "params": {"activeView": "conditions"}},
+                {"on": "click:runs", "type": "updateState", "params": {"activeView": "runs"}},
+                {"on": "click:results", "type": "updateState", "params": {"activeView": "results"}},
+                {"on": "click:evidence", "type": "updateState", "params": {"activeView": "evidence"}},
+                {"on": "click:help", "type": "openModal", "params": {"modalId": "tlp_research_help"}}
               ]
             },
             {
@@ -273,7 +278,7 @@
                   {"key": "seed", "label": "Seed"},
                   {"key": "maxpool", "label": "MaxPool accuracy"},
                   {"key": "tlp", "label": "TLP accuracy"},
-                  {"key": "delta_tlp_minus_maxpool", "label": "Δ TLP − MaxPool"},
+                  {"key": "delta", "label": "Δ TLP − MaxPool"},
                   {"key": "paired_initialization", "label": "Shared init", "kind": "boolean"}
                 ]
               }
@@ -357,7 +362,58 @@
           "surfaceClass": "research-workbench",
           "surfaceObjectKind": "experiment"
         }
+      },
+        "modals": {
+          "tlp_research_help": {
+            "title": "TLP Research Workbench — справка",
+            "schema": {
+              "id": "tlp_research_help",
+              "layout": {
+                "type": "stack",
+                "areas": [
+                  {"id": "modal", "role": "main"}
+                ]
+              },
+              "widgets": [
+                {
+                  "id": "tlp-help-readme",
+                  "area": "modal",
+                  "type": "static.markdown",
+                  "title": "Использование и возможности",
+                  "inputs": {
+                    "content": "# TLP Research Workbench\n\nЭтот сценарий управляет одним воспроизводимым экспериментом E002: сравнивает обычный `MaxPool` и centered channel-wise max-plus pooling (TLP) во втором pooling-слое одной и той же CNN на STL-10.\n\n## Что здесь можно сделать\n\n- Просмотреть и изменить версионируемые условия эксперимента до блокировки.\n- Зафиксировать ревизию через review и lock, не меняя её задним числом.\n- Запустить реальный трёхэпоховый CPU preflight или подтверждающий профиль.\n- Следить отдельно за логическими запусками и их физическими попытками, повторять неуспешные попытки и выполнять сверку.\n- Сравнить парные результаты по одинаковым seed и общей инициализации.\n- Проверить артефакты и зафиксировать результат как неизменяемое свидетельство.\n- Открыть MLflow для подробной телеметрии. Источником состояния workflow и научного решения остаётся AdaOS, а не MLflow.\n\n## Рабочий цикл\n\n1. **Conditions** — проверьте dataset, две экспериментальные ветви, профили исполнения, рандомизацию, основной контраст и tracker. Сохранение создаёт новую неизменяемую ревизию.\n2. **Submit review** — переведите текущую ревизию на проверку. Пока эксперимент в `draft` или `review`, условия ещё можно пересмотреть.\n3. **Lock** — примите проверенную ревизию. После блокировки менять её на месте нельзя.\n4. **Start CPU preflight** — запустите ограниченный реальный профиль: 3 эпохи, один парный seed и CPU. Он проверяет механику, но не подтверждает научное утверждение.\n5. **Runs** и **Reconcile** — наблюдайте попытки и загружайте прогресс, результаты и артефакты. Retry создаёт новую физическую попытку, сохраняя идентичность логического запуска.\n6. **Results** — проверьте TLP − MaxPool, число полных пар и совпадение digest общей инициализации.\n7. **Evidence** и **Finalize** — убедитесь, что доставка tracker завершена и digest артефактов проверяется, затем зафиксируйте результат.\n\n## Как получить подсказку\n\nКнопка **Help** открывает этот документ и актуальные следующие шаги. В текстовом или голосовом канале спросите: «Что умеет TLP Research?» либо «Что делать дальше?». Ответ формируется детерминированно из текущего состояния workflow; внешний LLM для этого не нужен.\n\n## Важные границы\n\n- Preflight имеет класс `workflow_validation` и не является доказательством гипотезы.\n- Подтверждающий профиль допускается только после проверки протокола и вычислительного бюджета.\n- `research_manager_skill` — универсальный control plane. TLP-код и первичные данные принадлежат `tlp_experiment_skill`; MLflow реализует типизированный tracker-контракт.\n- Физические пути одного навыка не используются другим навыком для прямого чтения или записи. Между навыками используются логические ссылки и типизированные provider-контракты; технические пути внутри execution descriptor потребляет штатный executor."
+                  }
+                },
+                {
+                  "id": "tlp-help-current-step",
+                  "area": "modal",
+                  "type": "item.details",
+                  "title": "Текущее состояние и следующие шаги",
+                  "dataSource": {
+                    "kind": "skill",
+                    "name": "research_manager_skill.describe_experiment",
+                    "params": {
+                      "experiment_id": "$state.experimentId",
+                      "locale": "ru",
+                      "channel": "web",
+                      "section": "next_steps"
+                    },
+                    "cacheTtlMs": 0,
+                    "invalidationTags": ["tlp-experiment", "tlp-tracking", "tlp-evidence"],
+                    "preserveLastValue": true
+                  },
+                  "inputs": {
+                    "fields": [
+                      {"label": "State", "path": "workflow.state"},
+                      {"label": "Описание", "path": "workflow.description"},
+                      {"label": "Что делать дальше", "path": "speech_text"}
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     }
   }
-}

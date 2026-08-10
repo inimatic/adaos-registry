@@ -1,0 +1,49 @@
+schema: adaos.conversational.output.v1
+package_id: tlp_research
+outputs:
+- id: tlp_research.help_read
+  kind: result
+  audience: user
+  risk_level: none
+  reason_code: guidance_read
+  explanation: The scenario returned deterministic help and current workflow guidance.
+  summary: TLP Research help and current next steps are ready.
+  summary_ref: output.help.summary
+  content_parts: []
+  details: []
+  actions: []
+  next_expected_input: none
+  handoff_target: null
+  metadata:
+    result_message_path: data.message
+    speech_text_path: data.speech_text
+- id: tlp_research.next_steps_read
+  kind: result
+  audience: user
+  risk_level: none
+  reason_code: next_steps_read
+  explanation: The scenario returned next actions derived from the current workflow state.
+  summary: Current workflow next steps are ready.
+  summary_ref: output.next_steps.summary
+  content_parts: []
+  details: []
+  actions: []
+  next_expected_input: none
+  handoff_target: null
+  metadata:
+    result_message_path: data.message
+    speech_text_path: data.speech_text
+- id: tlp_research.no_match
+  kind: repair
+  audience: user
+  risk_level: none
+  reason_code: no_match
+  explanation: The text did not match a declared TLP Research guidance query.
+  summary: Спросите «Что умеет TLP Research?» или «Что делать дальше?».
+  summary_ref: output.no_match.summary
+  content_parts: []
+  details: []
+  actions: []
+  next_expected_input: text
+  handoff_target: null
+

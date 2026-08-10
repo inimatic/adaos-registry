@@ -1,0 +1,39 @@
+schema: adaos.conversational.story.v1
+id: tlp_research.help.ru
+title: Чтение справки TLP Research
+story_kind: skill
+workflow_type: null
+locale: ru
+channel: text
+actor: {id: 'user:local', permissions: [], roles: [registered]}
+start: null
+steps:
+- user: Что умеет TLP Research?
+  given:
+    proposal:
+      kind: skill_invocation
+      intent_id: tlp_research.help
+      command: null
+      skill_id: research_manager_skill
+      operation_id: describe_experiment
+      arguments:
+        experiment_id: experiment.0670d0bc1c99cb6a89af74f0f56457a5d785e2991dd5eba83219ec2d58db63e5
+        locale: ru
+        channel: text
+        section: all
+      confidence: 0.98
+      action_policy: {schema: adaos.conversation.action_policy.v1, risk_class: read, side_effect: none, confirmation: none}
+    event: null
+    skill_result:
+      status: completed
+      data: {message: Справка и следующие шаги}
+      reason_code: null
+    output_ref: tlp_research.help_read
+  expect:
+    proposal: {kind: skill_invocation, command: null, confidence_at_least: 0.9}
+    command: null
+    transition_id: null
+    state: null
+    reason_code: null
+    output: {kind: result, output_ref: tlp_research.help_read, summary: TLP Research help and current next steps are ready., actions: [], next_expected_input: none}
+

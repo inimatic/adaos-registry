@@ -1,0 +1,38 @@
+schema: adaos.conversational.affordances.v1
+package_id: tlp_research
+affordances:
+- id: tlp_research.help
+  kind: query
+  label: Read TLP Research help
+  label_ref: action.help.label
+  description: Read the scenario overview, capabilities and workflow usage.
+  workflow: null
+  skill_invocation:
+    skill_id: research_manager_skill
+    operation_id: describe_experiment
+  action_policy:
+    schema: adaos.conversation.action_policy.v1
+    risk_class: read
+    side_effect: none
+    confirmation: none
+  required_capabilities: []
+  presentation: {hint: text, priority: 10}
+  output_refs: [tlp_research.help_read]
+- id: tlp_research.next_steps
+  kind: query
+  label: Read next experiment steps
+  label_ref: action.next_steps.label
+  description: Read the next actions admitted by the current experiment state.
+  workflow: null
+  skill_invocation:
+    skill_id: research_manager_skill
+    operation_id: describe_experiment
+  action_policy:
+    schema: adaos.conversation.action_policy.v1
+    risk_class: read
+    side_effect: none
+    confirmation: none
+  required_capabilities: []
+  presentation: {hint: text, priority: 20}
+  output_refs: [tlp_research.next_steps_read]
+
