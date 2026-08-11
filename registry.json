@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-11T09:28:32+00:00",
+  "updated_at": "2026-08-11T09:28:56+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -655,8 +655,8 @@
       "kind": "skill",
       "id": "release_validation_skill",
       "name": "release_validation_skill",
-      "version": "0.1.5",
-      "updated_at": "2026-07-24T09:15:00+00:00",
+      "version": "0.1.6",
+      "updated_at": "2026-08-11T09:28:56+00:00",
       "path": "skills/release_validation_skill",
       "manifest": "skills/release_validation_skill/skill.yaml",
       "source": {

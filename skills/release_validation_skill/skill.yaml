@@ -1,5 +1,5 @@
 name: release_validation_skill
-version: 0.1.5
+version: 0.1.6
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -12,7 +12,8 @@ runtime:
       - release_validation_ops
       client_presence: true
       webspace_scope: active
-description: Private observe-only release validation registry, campaign runner, evidence log, and operator projection.
+description: Private observe-only release validation registry, campaign runner, evidence
+  log, and operator projection.
 webui_owner: shared
 dependencies: []
 data_projections:
@@ -49,13 +50,16 @@ events:
 default_tool: get_snapshot
 tools:
 - name: rehydrate
-  description: Restore the release validation projection from durable state after activation.
+  description: Restore the release validation projection from durable state after
+    activation.
   entry: handlers.main:rehydrate
   input_schema:
     type: object
     properties:
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
 - name: get_snapshot
@@ -65,7 +69,9 @@ tools:
     type: object
     properties:
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
 - name: refresh_snapshot
@@ -75,7 +81,9 @@ tools:
     type: object
     properties:
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
 - name: register_default_observe_contracts
@@ -85,21 +93,30 @@ tools:
     type: object
     properties:
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
 - name: prepare_campaign
-  description: Create one pending observe-only campaign for the latest installed or an exact AdaOS build.
+  description: Create one pending observe-only campaign for the latest installed or
+    an exact AdaOS build.
   entry: handlers.main:prepare_campaign
   input_schema:
     type: object
     properties:
       target_build:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
       campaign_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
 - name: run_campaign
@@ -111,43 +128,67 @@ tools:
       campaign_id:
         type: string
       webspace_id:
-        type: [string, 'null']
-    required: [campaign_id]
+        type:
+        - string
+        - 'null'
+    required:
+    - campaign_id
   output_schema:
     type: object
 - name: run_latest_campaign
-  description: Run the newest pending validation campaign or return the latest terminal snapshot as a no-op.
+  description: Run the newest pending validation campaign or return the latest terminal
+    snapshot as a no-op.
   entry: handlers.main:run_latest_campaign
   input_schema:
     type: object
     properties:
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
 - name: retry_latest_campaign
-  description: Create and run a new campaign from the latest campaign target without rewriting history.
+  description: Create and run a new campaign from the latest campaign target without
+    rewriting history.
   entry: handlers.main:retry_latest_campaign
   input_schema:
     type: object
     properties:
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
 - name: run_default_observe
-  description: Register defaults, create a campaign, run it, and project the terminal result.
+  description: Register defaults, create a campaign, run it, and project the terminal
+    result.
   entry: handlers.main:run_default_observe
   input_schema:
     type: object
     properties:
       target_build:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
       campaign_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
       webspace_id:
-        type: [string, 'null']
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
-updated_at: '2026-07-24T09:15:00+00:00'
+updated_at: '2026-08-11T09:28:56+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.741+4835.a49f9166
+    recorded_at: '2026-08-11T09:28:56+00:00'
+    source: skill_push
+    min_commit: a49f9166fd42df8b3d371f22dc81239ebb000a10
+    min_short_commit: a49f9166
+    build_date: '2026-08-11T12:26:21+03:00'
 
