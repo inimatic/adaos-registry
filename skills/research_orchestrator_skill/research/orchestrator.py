@@ -287,7 +287,7 @@ class ResearchOrchestrator:
             destination = navigation.webspace_destination(
                 zone=str(scope["zone"]),
                 subnet_id=str(scope["subnet_id"]),
-                webspace_id="desktop",
+                webspace_id="desktop-dev",
                 space_kind="workspace",
                 expected_scenario_id="builder",
             )
@@ -340,7 +340,7 @@ class ResearchOrchestrator:
         self,
         direction_id: str,
         *,
-        builder_webspace_id: str = "desktop",
+        builder_webspace_id: str = "desktop-dev",
         base_url: str | None = None,
     ) -> dict[str, Any]:
         state = self.get(direction_id)

@@ -331,7 +331,7 @@ def get_automation_brief(direction_id: str, **_: Any) -> dict[str, Any]:
 @tool(summary="Bind and open the exact pre-Codex Development Session in Builder.", side_effects="local_write")
 def open_builder_session(
     direction_id: str,
-    builder_webspace_id: str = "desktop",
+    builder_webspace_id: str = "desktop-dev",
     base_url: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
