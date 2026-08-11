@@ -493,6 +493,17 @@
                   }
                 },
                 {
+                  "on": "click:open-builder",
+                  "type": "callHost",
+                  "target": "builder.context.selected",
+                  "params": {
+                    "source_webspace_id": "desktop",
+                    "object_type": "skill",
+                    "object_id": "$state.selectedDirectionId",
+                    "title": "$state.selectedDirectionTitle"
+                  }
+                },
+                {
                   "on": "click:help-modal",
                   "type": "openModal",
                   "params": {
