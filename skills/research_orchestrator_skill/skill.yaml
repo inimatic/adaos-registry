@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.2.0
+version: 0.3.0
 description: Durable pre-Codex orchestration for reusable AdaOS research-direction
   skill projects.
 supported_locales:
@@ -36,6 +36,8 @@ exports:
   - sync_source_bundle
   - get_direction
   - list_artifacts
+  - preview_artifact
+  - get_consensus
   - record_prototype
   - chat
   - accept_prototype
@@ -47,6 +49,7 @@ tools:
 - name: ensure_schema
   description: Apply checksum-pinned orchestrator migrations.
   entry: handlers.main:ensure_schema
+  side_effects: local_write
   input_schema:
     type: object
     additionalProperties: false
@@ -55,6 +58,7 @@ tools:
 - name: rehydrate
   description: Re-open durable orchestration state after activation.
   entry: handlers.main:rehydrate
+  side_effects: local_write
   input_schema:
     type: object
     additionalProperties: false
@@ -63,6 +67,7 @@ tools:
 - name: list_directions
   description: List local adaos.research.direction.v1 Projects and formulation status.
   entry: handlers.main:list_directions
+  side_effects: none
   input_schema:
     type: object
     properties:
@@ -77,6 +82,7 @@ tools:
   description: Resolve a research direction from the selection of a paired Builder
     host.
   entry: handlers.main:resolve_focus
+  side_effects: none
   input_schema:
     type: object
     properties:
@@ -88,6 +94,7 @@ tools:
 - name: create_direction
   description: Atomically create a research Project and its primary direction skill.
   entry: handlers.main:create_direction
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -116,6 +123,7 @@ tools:
 - name: initialize_direction
   description: Bind a research-direction session to one Builder skill project.
   entry: handlers.main:initialize_direction
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -135,6 +143,7 @@ tools:
   description: Copy a local upload into a manifested artifact group owned by the direction
     skill.
   entry: handlers.main:attach_source
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -163,6 +172,7 @@ tools:
 - name: get_direction
   description: Return the canonical pre-Codex state and current SourceBundle.
   entry: handlers.main:get_direction
+  side_effects: none
   input_schema:
     type: object
     required:
@@ -177,6 +187,7 @@ tools:
   description: Reconcile direct Builder project uploads into durable orchestration
     state.
   entry: handlers.main:sync_source_bundle
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -192,6 +203,42 @@ tools:
 - name: list_artifacts
   description: List exact manifested artifact items owned by a direction skill.
   entry: handlers.main:list_artifacts
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: preview_artifact
+  description: Preview one exact manifested Markdown, text, or PDF source artifact.
+  entry: handlers.main:preview_artifact
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - group_id
+    - artifact_id
+    properties:
+      direction_id:
+        type: string
+      group_id:
+        type: string
+      artifact_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: get_consensus
+  description: Read a compact human-readable projection of the evolving ResearchPrototype
+    or accepted AutomationBrief.
+  entry: handlers.main:get_consensus
+  side_effects: none
   input_schema:
     type: object
     required:
@@ -205,6 +252,7 @@ tools:
 - name: record_prototype
   description: Record one schema-valid ResearchPrototype candidate revision.
   entry: handlers.main:record_prototype
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -224,6 +272,7 @@ tools:
   description: Discuss a research direction with the configured Root LLM and materialize
     a ResearchPrototype revision.
   entry: handlers.main:chat
+  side_effects: local_write
   timeout_seconds: 300
   input_schema:
     type: object
@@ -250,6 +299,7 @@ tools:
   description: Accept an exact candidate digest and emit a digest-bound pre-Codex
     AutomationBrief.
   entry: handlers.main:accept_prototype
+  side_effects: external_write
   input_schema:
     type: object
     required:
@@ -274,6 +324,7 @@ tools:
 - name: get_automation_brief
   description: Read the accepted immutable AutomationBrief.
   entry: handlers.main:get_automation_brief
+  side_effects: none
   input_schema:
     type: object
     required:
@@ -287,6 +338,7 @@ tools:
 - name: open_builder_session
   description: Bind the exact Development Session and return a canonical Builder link.
   entry: handlers.main:open_builder_session
+  side_effects: local_write
   input_schema:
     type: object
     required:
@@ -307,6 +359,7 @@ tools:
 - name: get_activity
   description: Read durable stage activity for chat and widget projections.
   entry: handlers.main:get_activity
+  side_effects: none
   input_schema:
     type: object
     required:
@@ -324,6 +377,7 @@ tools:
 - name: next_steps
   description: Explain workflow-aware next steps in text or voice-compatible form.
   entry: handlers.main:next_steps
+  side_effects: none
   input_schema:
     type: object
     required:
@@ -451,6 +505,27 @@ data_routes:
     invalidation_tags:
     - research.artifacts
     - research.formulation
+- surface: modal:research-artifact-preview
+  route: tool/details
+  tool: preview_artifact
+  owner: skill:research_orchestrator_skill
+  first_paint: artifact preview not selected
+  recovery: select a manifested artifact again
+  guard_visibility: one bounded text payload or an authenticated manifest-admitted
+    PDF content path
+  budget:
+    max_payload_bytes: 1048576
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: false
+    invalidation_tags:
+    - research.artifacts
 - surface: widget:research-state
   route: tool/details
   tool: get_direction
@@ -471,6 +546,27 @@ data_routes:
     preserve_last_value: true
     invalidation_tags:
     - research.formulation
+- surface: widget:research-consensus
+  route: tool/details
+  tool: get_consensus
+  owner: skill:research_orchestrator_skill
+  first_paint: research consensus not formulated
+  recovery: continue the discussion or refresh after a ResearchPrototype revision
+  guard_visibility: compact structured formulation; source bytes excluded
+  budget:
+    max_payload_bytes: 262144
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - research.formulation
+    - research.automation_brief
 - surface: widget:research-activity
   route: tool/details
   tool: get_activity
@@ -552,4 +648,4 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-11T13:51:00+00:00'
+updated_at: '2026-08-11T15:52:43+00:00'

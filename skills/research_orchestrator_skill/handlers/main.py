@@ -6,7 +6,7 @@ from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import tool
 from adaos.sdk.builder import preview as builder_preview
-from adaos.sdk.developer import compositions
+from adaos.sdk.developer import artifact_context, compositions
 
 
 _SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -155,6 +155,18 @@ def list_artifacts(direction_id: str, **_: Any) -> dict[str, Any]:
     items = []
     for group in state.get("artifact_groups") or []:
         for item in group.get("items") or []:
+            path = str(item.get("path") or "")
+            media_type = str(item.get("media_type") or "application/octet-stream").lower()
+            suffix = Path(path).suffix.lower()
+            preview_kind = (
+                "markdown"
+                if media_type in {"text/markdown", "text/x-markdown"} or suffix in {".md", ".markdown"}
+                else "pdf"
+                if media_type == "application/pdf" or suffix == ".pdf"
+                else "text"
+                if media_type.startswith("text/") or suffix in {".txt", ".json", ".yaml", ".yml", ".py", ".ipynb"}
+                else "unsupported"
+            )
             items.append(
                 {
                     **dict(item),
@@ -163,9 +175,115 @@ def list_artifacts(direction_id: str, **_: Any) -> dict[str, Any]:
                     "subtitle": f"{group.get('group_id')} · {item.get('role')} · {item.get('size_bytes')} bytes",
                     "preview": item.get("digest"),
                     "group_id": group.get("group_id"),
+                    "preview_kind": preview_kind,
                 }
             )
     return {"ok": True, "direction_id": direction_id, "items": items, "count": len(items)}
+
+
+@tool(summary="Preview one manifested text, Markdown, or PDF artifact.", side_effects="none")
+def preview_artifact(direction_id: str, group_id: str, artifact_id: str, **_: Any) -> dict[str, Any]:
+    state = _orchestrator().get(direction_id)
+    skill_id = str(state["direction"]["primary_skill_ref"]).partition(":")[2]
+    resolved = artifact_context.resolve(skill_id, group_id, artifact_id)
+    path = str(resolved.get("path") or artifact_id)
+    media_type = str(resolved.get("media_type") or "application/octet-stream").lower()
+    suffix = Path(path).suffix.lower()
+    base = {
+        "ok": True,
+        "direction_id": direction_id,
+        "artifact_id": artifact_id,
+        "group_id": group_id,
+        "title": path,
+        "media_type": media_type,
+    }
+    if media_type in {"text/markdown", "text/x-markdown"} or suffix in {".md", ".markdown"}:
+        return {**base, "preview_kind": "markdown", "content": artifact_context.read_text(skill_id, group_id, artifact_id)}
+    if media_type == "application/pdf" or suffix == ".pdf":
+        return {
+            **base,
+            "preview_kind": "pdf",
+            "content_path": (
+                f"/api/builder/projects/skill/{skill_id}/artifacts/{group_id}/{artifact_id}/content"
+            ),
+        }
+    if media_type.startswith("text/") or suffix in {".txt", ".json", ".yaml", ".yml", ".py", ".ipynb"}:
+        language = {
+            ".json": "json",
+            ".ipynb": "json",
+            ".yaml": "yaml",
+            ".yml": "yaml",
+            ".py": "python",
+        }.get(suffix, "text")
+        return {
+            **base,
+            "preview_kind": "text",
+            "content": artifact_context.read_text(skill_id, group_id, artifact_id),
+            "language": language,
+        }
+    return {
+        **base,
+        "ok": False,
+        "preview_kind": "unsupported",
+        "content": f"Preview is not available for `{media_type}`. The artifact remains digest-bound and available to Builder/Codex.",
+    }
+
+
+def _markdown_lines(items: Any, *, empty: str = "—") -> str:
+    values = list(items or []) if isinstance(items, (list, tuple)) else []
+    return "\n".join(f"- {item}" for item in values) or empty
+
+
+@tool(summary="Read the evolving human-readable research consensus.", side_effects="none")
+def get_consensus(direction_id: str, **_: Any) -> dict[str, Any]:
+    state = _orchestrator().get(direction_id)
+    prototype = state.get("accepted_prototype") or state.get("current_prototype") or {}
+    brief = state.get("automation_brief") or {}
+    direction = state["direction"]
+    if not prototype:
+        return {
+            "ok": True,
+            "direction_id": direction_id,
+            "status": "not_formulated",
+            "content": "## Согласованная постановка\n\nПока не сформирована. Начните обсуждение: сформулируйте вопрос, проверяемые гипотезы, протокол и критерии решения.",
+        }
+    hypotheses = [
+        f"**{item.get('id', 'H')}** — {item.get('statement', '')}  \n  Опровержение: {item.get('falsification', 'не задано')}"
+        for item in prototype.get("hypotheses") or []
+        if isinstance(item, Mapping)
+    ]
+    plan = prototype.get("experimental_plan") if isinstance(prototype.get("experimental_plan"), Mapping) else {}
+    stages = [
+        f"**{item.get('id', 'stage')}** — {item.get('purpose', '')} (`{item.get('execution_profile', 'unspecified')}`)"
+        for item in plan.get("stages") or []
+        if isinstance(item, Mapping)
+    ]
+    evaluation = prototype.get("evaluation_plan") if isinstance(prototype.get("evaluation_plan"), Mapping) else {}
+    readiness = prototype.get("readiness") if isinstance(prototype.get("readiness"), Mapping) else {}
+    requirements = brief.get("implementation_requirements") or prototype.get("implementation_requirements") or []
+    checks = brief.get("acceptance_checks") or prototype.get("acceptance_checks") or []
+    accepted = bool(state.get("automation_brief"))
+    status = "accepted" if accepted else str(readiness.get("decision") or "draft")
+    content = (
+        f"## Согласованная постановка\n\n"
+        f"**Статус:** `{status}` · **ревизия:** `{prototype.get('revision', '—')}`\n\n"
+        f"### Исследовательский вопрос\n\n{prototype.get('research_question') or '—'}\n\n"
+        f"### Проверяемые гипотезы\n\n{_markdown_lines(hypotheses)}\n\n"
+        f"### Экспериментальный протокол\n\n{_markdown_lines(stages)}\n\n"
+        f"**Primary estimand:** {evaluation.get('primary_estimand') or '—'}\n\n"
+        f"### Нерешённые вопросы\n\n{_markdown_lines(readiness.get('blocking_questions') or prototype.get('open_questions'))}\n\n"
+        f"### Требования к автоматизации\n\n{_markdown_lines(requirements)}\n\n"
+        f"### Критерии приёмки\n\n{_markdown_lines(checks)}"
+    )
+    return {
+        "ok": True,
+        "direction_id": direction_id,
+        "status": status,
+        "accepted": accepted,
+        "prototype_digest": prototype.get("digest"),
+        "automation_brief_digest": direction.get("automation_brief_digest"),
+        "content": content,
+    }
 
 
 @tool(summary="Synchronize manifested artifact groups into orchestration state.", side_effects="local_write")

@@ -6,6 +6,7 @@ import re
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import yaml
 
@@ -48,6 +49,22 @@ def _json_object(text: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError("LLM response must be a JSON object")
     return value
+
+
+def _address_builder_url(url: str, *, direction_id: str, title: str) -> str:
+    """Attach a declared first-paint address; the Yjs binding remains canonical."""
+
+    parts = urlsplit(str(url or ""))
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query.update(
+        {
+            "builder_object_type": "skill",
+            "builder_object_id": direction_id,
+            "builder_object_ref": f"skill:{direction_id}",
+            "builder_object_title": title or direction_id,
+        }
+    )
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
 def _notebook_excerpt(text: str, *, max_characters: int) -> str:
@@ -262,10 +279,19 @@ class ResearchOrchestrator:
                 space_kind="workspace",
                 expected_scenario_id="builder",
             )
-            builder_url = navigation.build_url(destination, base_url=builder_preview.public_app_base())
+            builder_url = _address_builder_url(
+                navigation.build_url(destination, base_url=builder_preview.public_app_base()),
+                direction_id=token,
+                title=str(state.get("title") or token),
+            )
         prototype_stale = bool(
             prototype
             and str(prototype.get("source_bundle_digest") or "") != str(bundle.get("digest") or "")
+        )
+        builder_url = _address_builder_url(
+            navigation.build_url(destination, base_url=base_url or builder_preview.public_app_base()),
+            direction_id=direction_id,
+            title=str(state["direction"].get("title") or direction_id),
         )
         return {
             "ok": True,
@@ -333,7 +359,7 @@ class ResearchOrchestrator:
         )
         return {
             "ok": True,
-            "url": navigation.build_url(destination, base_url=base_url or builder_preview.public_app_base()),
+            "url": builder_url,
             "destination": destination,
             "binding": binding["binding"],
             "session": session,
