@@ -48,7 +48,9 @@ def test_prototype_and_automation_brief_bind_exact_inputs() -> None:
     assert validate("research.prototype.v1.schema.json", prototype)["digest"] == prototype["digest"]
     brief = materialize_automation_brief(
         direction_id="tlp_direction_skill",
-        source_bundle={"digest": source_digest, "sources": [{"source_id": "s1", "name": "study.ipynb", "digest": "sha256:" + "2" * 64, "media_type": "application/x-ipynb+json", "role": "notebook", "analysis": {"warnings": ["notebook_outputs_are_untrusted_source_material"]}}]},
+        project={"id": "tlp_research", "ref": "project:tlp_research", "version": "0.1.0", "manifest_digest": "sha256:" + "6" * 64, "source_path": "/dev/projects/tlp_research"},
+        artifact_groups=[{"ref": "artifact://skill/tlp_direction_skill/part0", "group_id": "part0", "digest": "sha256:" + "7" * 64, "root_path": "/dev/skills/tlp_direction_skill/artifacts/part0", "manifest_path": "/dev/skills/tlp_direction_skill/artifacts/part0/manifest.yaml"}],
+        source_bundle={"digest": source_digest, "sources": [{"source_id": "s1", "name": "study.ipynb", "digest": "sha256:" + "2" * 64, "media_type": "application/x-ipynb+json", "role": "notebook", "analysis": {"warnings": ["notebook_outputs_are_untrusted_source_material"]}, "artifact_ref": "artifact://skill/tlp_direction_skill/part0/s1", "group_id": "part0"}]},
         prototype=prototype,
         checkpoint={"package_digest": "sha256:" + "3" * 64, "source_revision": "abc", "source_tree": "sha256:" + "4" * 64, "sha256": "sha256:" + "5" * 64},
         actor="user:test",
@@ -56,5 +58,8 @@ def test_prototype_and_automation_brief_bind_exact_inputs() -> None:
     assert brief["source_bundle_digest"] == source_digest
     assert brief["prototype_digest"] == prototype["digest"]
     assert brief["handoff_state"] == "ready_for_codex"
+    assert brief["project"]["manifest_digest"] == "sha256:" + "6" * 64
+    assert brief["development_scope"]["targets"][0]["access"] == "read-write"
+    assert brief["development_scope"]["context_members"][0]["access"] == "read-only"
     assert any("direction-specific scenario" in item for item in brief["acceptance_checks"])
     assert any("three-epoch" in item.lower() for item in brief["prohibited_actions"])

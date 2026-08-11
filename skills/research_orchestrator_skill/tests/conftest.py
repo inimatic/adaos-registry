@@ -17,7 +17,7 @@ if str(SKILL_ROOT) not in sys.path:
 @pytest.fixture(autouse=True)
 def _skill_test_context(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     base_dir = tmp_path / ".adaos"
-    slot_dir = base_dir / "workspace" / "skills" / ".runtime" / "research_orchestrator_skill" / "v0.1" / "slots" / "A"
+    slot_dir = base_dir / "workspace" / "skills" / ".runtime" / "research_orchestrator_skill" / "v0.2" / "slots" / "A"
     slot_dir.mkdir(parents=True, exist_ok=True)
     shutil.copy2(SKILL_ROOT / "skill.yaml", slot_dir / "skill.yaml")
     monkeypatch.setenv("ADAOS_BASE_DIR", str(base_dir))

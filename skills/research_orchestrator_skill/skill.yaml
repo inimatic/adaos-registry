@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.0.1
+version: 0.1.0
 description: Durable pre-Codex orchestration for reusable AdaOS research-direction
   skill projects.
 supported_locales:
@@ -9,6 +9,10 @@ entry: handlers/main.py
 default_tool: chat
 runtime:
   python: '3.11'
+data_migration:
+  file: migrations/data_migration.py
+  source_policy: previous_runtime_bucket
+  retention: retain_until_previous_runtime_retired
 capabilities:
 - storage.relational
 - builder.project_sources
@@ -24,14 +28,19 @@ exports:
   tools:
   - ensure_schema
   - rehydrate
+  - list_directions
+  - resolve_focus
+  - create_direction
   - initialize_direction
   - attach_source
   - sync_source_bundle
   - get_direction
+  - list_artifacts
   - record_prototype
   - chat
   - accept_prototype
   - get_automation_brief
+  - open_builder_session
   - get_activity
   - next_steps
 tools:
@@ -49,6 +58,59 @@ tools:
   input_schema:
     type: object
     additionalProperties: false
+  output_schema:
+    type: object
+- name: list_directions
+  description: List local adaos.research.direction.v1 Projects and formulation status.
+  entry: handlers.main:list_directions
+  input_schema:
+    type: object
+    properties:
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 5000
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: resolve_focus
+  description: Resolve a research direction from the selection of a paired Builder
+    host.
+  entry: handlers.main:resolve_focus
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: create_direction
+  description: Atomically create a research Project and its primary direction skill.
+  entry: handlers.main:create_direction
+  input_schema:
+    type: object
+    required:
+    - project_id
+    - title
+    properties:
+      project_id:
+        type: string
+      title:
+        type: string
+      description:
+        type: string
+      skill_id:
+        type:
+        - string
+        - 'null'
+      tags:
+        type: array
+        items:
+          type: string
+      actor:
+        type: string
+    additionalProperties: true
   output_schema:
     type: object
 - name: initialize_direction
@@ -70,7 +132,8 @@ tools:
   output_schema:
     type: object
 - name: attach_source
-  description: Adopt a local upload or file into the immutable Builder SourceBundle.
+  description: Copy a local upload into a manifested artifact group owned by the direction
+    skill.
   entry: handlers.main:attach_source
   input_schema:
     type: object
@@ -82,12 +145,18 @@ tools:
         type: string
       path:
         type: string
+      group_id:
+        type: string
+        default: part0
       name:
         type:
         - string
         - 'null'
       role:
         type: string
+      cleanup_staging:
+        type: boolean
+        default: false
     additionalProperties: true
   output_schema:
     type: object
@@ -116,6 +185,19 @@ tools:
       direction_id:
         type: string
       actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: list_artifacts
+  description: List exact manifested artifact items owned by a direction skill.
+  entry: handlers.main:list_artifacts
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
         type: string
     additionalProperties: true
   output_schema:
@@ -199,6 +281,26 @@ tools:
     properties:
       direction_id:
         type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: open_builder_session
+  description: Bind the exact Development Session and return a canonical Builder link.
+  entry: handlers.main:open_builder_session
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      builder_webspace_id:
+        type: string
+        default: desktop
+      base_url:
+        type:
+        - string
+        - 'null'
     additionalProperties: true
   output_schema:
     type: object
@@ -286,6 +388,69 @@ conversation:
     - aResearcher
     - research orchestrator
 data_routes:
+- surface: widget:research-focus
+  route: tool/details
+  tool: resolve_focus
+  owner: skill:research_orchestrator_skill
+  first_paint: portfolio focus or paired Builder selection
+  recovery: choose a direction from the portfolio
+  guard_visibility: Project identity only
+  budget:
+    max_payload_bytes: 65536
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - research.portfolio
+    - builder.project.preview
+- surface: widget:directions
+  route: tool/details
+  tool: list_directions
+  owner: skill:research_orchestrator_skill
+  first_paint: empty local research Project portfolio
+  recovery: repeat list_directions after targeted invalidation
+  guard_visibility: Project catalog metadata and formulation status only
+  budget:
+    max_payload_bytes: 1048576
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - research.portfolio
+    - research.formulation
+- surface: widget:artifact-list
+  route: tool/details
+  tool: list_artifacts
+  owner: skill:research_orchestrator_skill
+  first_paint: empty manifested artifact group
+  recovery: repeat list_artifacts after targeted invalidation
+  guard_visibility: artifact metadata and digests; payload bytes excluded
+  budget:
+    max_payload_bytes: 1048576
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - research.artifacts
+    - research.formulation
 - surface: widget:research-state
   route: tool/details
   tool: get_direction
@@ -387,4 +552,4 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-10T14:43:09+00:00'
+updated_at: '2026-08-11T10:44:11+00:00'

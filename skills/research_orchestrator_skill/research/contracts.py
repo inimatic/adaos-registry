@@ -87,6 +87,8 @@ def materialize_prototype(
 def materialize_automation_brief(
     *,
     direction_id: str,
+    project: Mapping[str, Any],
+    artifact_groups: list[Mapping[str, Any]],
     source_bundle: Mapping[str, Any],
     prototype: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
@@ -98,6 +100,13 @@ def materialize_automation_brief(
         "schema_version": "1.0.0",
         "brief_id": f"automation-{prototype['digest'].removeprefix('sha256:')[:20]}",
         "direction": {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"},
+        "project": {
+            "id": project["id"],
+            "ref": project["ref"],
+            "version": project["version"],
+            "manifest_digest": project["manifest_digest"],
+            "source_path": project["source_path"],
+        },
         "source_bundle_digest": str(source_bundle["digest"]),
         "prototype_digest": str(prototype["digest"]),
         "builder_checkpoint": {
@@ -116,12 +125,42 @@ def materialize_automation_brief(
                 "media_type": item.get("media_type"),
                 "role": item.get("role"),
                 "analysis": item.get("analysis"),
+                "artifact_ref": item.get("artifact_ref"),
+                "group_id": item.get("group_id"),
             }
             for item in source_bundle.get("sources") or []
         ],
+        "artifact_groups": [
+            {
+                "ref": item["ref"],
+                "group_id": item["group_id"],
+                "manifest_digest": item["digest"],
+                "root_path": item["root_path"],
+                "manifest_path": item["manifest_path"],
+            }
+            for item in artifact_groups
+        ],
+        "development_scope": {
+            "targets": [
+                {
+                    "ref": f"skill:{direction_id}",
+                    "access": "read-write",
+                    "context": "full",
+                    "source_path": str(Path(project["source_path"]).parent.parent / "skills" / direction_id),
+                }
+            ],
+            "context_members": [
+                {"ref": "scenario:research_workbench", "relation": "presentation", "access": "read-only", "context": "contract"},
+                {"ref": "skill:research_orchestrator_skill", "relation": "dependency", "access": "read-only", "context": "contract"},
+            ],
+            "artifact_inputs": [
+                {"ref": item["ref"], "access": "read-only", "manifest_digest": item["digest"], "root_path": item["root_path"]}
+                for item in artifact_groups
+            ],
+        },
         "implementation_requirements": implementation_requirements,
         "acceptance_checks": [
-            "Preserve the one-direction-one-skill boundary; do not create a direction-specific scenario.",
+            "Preserve the Project-owned direction-skill boundary; do not create a direction-specific scenario.",
             "Keep primary experimental data in this direction skill's scoped runtime data bucket.",
             "Implement the declared runner contract and deterministic CPU smoke profile.",
             "Bind experiment inputs, code, environment, metrics and evidence by digest.",

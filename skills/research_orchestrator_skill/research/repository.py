@@ -81,6 +81,13 @@ class OrchestratorRepository:
         row = self._db.fetch_one("SELECT * FROM research_directions WHERE direction_id=:direction_id", {"direction_id": direction_id})
         return self._direction(row)
 
+    def list_directions(self, limit: int = 500) -> list[dict[str, Any]]:
+        rows = self._db.fetch_all(
+            "SELECT * FROM research_directions ORDER BY updated_at DESC, direction_id",
+            {},
+        )[: max(1, min(int(limit), 5000))]
+        return [value for row in rows if (value := self._direction(row)) is not None]
+
     def set_bundle(self, direction_id: str, bundle_digest: str) -> dict[str, Any]:
         self._db.execute(
             "UPDATE research_directions SET current_bundle_digest=:bundle, status='formulation', generation=generation+1, updated_at=:updated_at WHERE direction_id=:direction_id",
