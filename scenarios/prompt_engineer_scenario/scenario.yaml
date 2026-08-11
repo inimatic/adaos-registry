@@ -1,5 +1,5 @@
 id: prompt_engineer_scenario
-version: 0.3.7
+version: 0.3.8
 title: Prompt IDE
 description: Prompt engineering IDE workspace for dev skills and scenarios.
 type: desktop
@@ -9,5 +9,5 @@ supported_locales:
 depends:
 - prompt_engineer_skill
 - builder_automation_skill
-updated_at: '2026-07-08T16:01:47+00:00'
+updated_at: '2026-08-11T09:31:09+00:00'
 
