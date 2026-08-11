@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-11T09:31:34+00:00",
+  "updated_at": "2026-08-11T09:32:14+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1262,8 +1262,8 @@
       "kind": "scenario",
       "id": "streaming_recipe_book_eval",
       "name": "streaming_recipe_book_eval",
-      "version": "0.0.2",
-      "updated_at": "2026-07-20T22:50:10+00:00",
+      "version": "0.0.3",
+      "updated_at": "2026-08-11T09:32:14+00:00",
       "path": "scenarios/streaming_recipe_book_eval",
       "manifest": "scenarios/streaming_recipe_book_eval/scenario.yaml",
       "source": {
