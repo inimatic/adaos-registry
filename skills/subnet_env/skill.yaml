@@ -1,5 +1,5 @@
 name: subnet_env
-version: 0.8.3
+version: 0.8.4
 description: Local subnet environment operator skill for safe SDK-first web_desktop
   workflows.
 runtime:
@@ -79,13 +79,13 @@ tools:
   output_schema:
     type: object
 exports: {}
-updated_at: '2026-06-11T08:22:27+00:00'
+updated_at: '2026-08-11T09:29:30+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2802.6453edb2
-    recorded_at: '2026-06-11T08:22:27+00:00'
+    min_version: 0.1.741+4835.a49f9166
+    recorded_at: '2026-08-11T09:29:30+00:00'
     source: skill_push
-    min_commit: 6453edb2e5d91d83ea3526d7da4be313af29ff05
-    min_short_commit: 6453edb2
-    build_date: '2026-06-11T11:19:29+03:00'
+    min_commit: a49f9166fd42df8b3d371f22dc81239ebb000a10
+    min_short_commit: a49f9166
+    build_date: '2026-08-11T12:26:21+03:00'
 
