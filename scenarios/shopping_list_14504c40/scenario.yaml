@@ -3,7 +3,7 @@ name: shopping_list_14504c40
 type: desktop
 title: Книга рецептов
 description: Локальная книга рецептов со списком покупок.
-version: 0.0.1
+version: 0.0.2
 supported_locales:
 - en
 - ru
@@ -15,4 +15,5 @@ runtime:
     - shopping_list_14504c40_skill
 ui:
   manifest: webui.json
-updated_at: '2026-07-23T15:02:07+00:00'
+updated_at: '2026-08-11T09:31:34+00:00'
+
