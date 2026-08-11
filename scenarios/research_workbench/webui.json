@@ -15,11 +15,16 @@
             "researchConversationId": null,
             "researchGeneration": 0,
             "researchPrototypeDigest": null,
-            "builderUrl": null
+            "builderUrl": null,
+            "selectedArtifactId": null,
+            "selectedArtifactGroupId": null,
+            "selectedArtifactTitle": null,
+            "selectedArtifactPreviewKind": null
           },
           "layout": {
-            "type": "single",
-            "pattern": "stack",
+            "type": "split",
+            "pattern": "focus-detail",
+            "auxWidth": 460,
             "areas": [
               {
                 "id": "portfolio",
@@ -30,6 +35,11 @@
                 "id": "workspace",
                 "role": "main",
                 "label": "Selected direction"
+              },
+              {
+                "id": "context",
+                "role": "aux",
+                "label": "Research consensus"
               }
             ]
           },
@@ -86,6 +96,12 @@
                     "icon": "flask-outline",
                     "disabled": true,
                     "title": "Currently selected research direction."
+                  },
+                  {
+                    "id": "details",
+                    "label": "Details",
+                    "icon": "information-circle-outline",
+                    "title": "Show Project identity, formulation generation, artifact-set digest, and Development Session."
                   }
                 ]
               },
@@ -101,6 +117,13 @@
                     "researchPrototypeDigest": null,
                     "builderUrl": null,
                     "activeResearchTab": "overview"
+                  }
+                },
+                {
+                  "on": "click:details",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "research_direction_details"
                   }
                 }
               ]
@@ -169,6 +192,7 @@
                 "preserveLastValue": false
               },
               "inputs": {
+                "stateOnly": true,
                 "compact": true,
                 "fields": [
                   {
@@ -350,7 +374,26 @@
                 "subtitleKey": "subtitle",
                 "previewKey": "preview",
                 "emptyText": "No artifacts in part0. Upload the original sources used to formulate the task."
-              }
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "selectedArtifactId": "$event.artifact_id",
+                    "selectedArtifactGroupId": "$event.group_id",
+                    "selectedArtifactTitle": "$event.title",
+                    "selectedArtifactPreviewKind": "$event.preview_kind"
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "research_artifact_preview"
+                  }
+                }
+              ]
             },
             {
               "id": "artifact-policy",
@@ -363,14 +406,14 @@
               }
             },
             {
-              "id": "formulation-state",
+              "id": "research-consensus",
               "type": "static.markdown",
-              "area": "workspace",
-              "title": "Current ResearchPrototype",
+              "area": "context",
+              "title": "Current consensus",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation'",
               "dataSource": {
                 "kind": "skill",
-                "name": "research_orchestrator_skill.get_direction",
+                "name": "research_orchestrator_skill.get_consensus",
                 "params": {
                   "direction_id": "$state.selectedDirectionId"
                 },
@@ -482,7 +525,10 @@
                   "params": {
                     "direction_id": "$state.selectedDirectionId",
                     "builder_webspace_id": "desktop"
-                  }
+                  },
+                  "invalidates": [
+                    "builder.project.preview"
+                  ]
                 },
                 {
                   "on": "click:open-builder",
@@ -707,6 +753,192 @@
             "interaction": {
               "initialFocus": "widget:new-research-form"
             }
+          }
+        },
+        "research_direction_details": {
+          "title": "Research direction details",
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
+          "schema": {
+            "id": "research_direction_details",
+            "title": "Research direction details",
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "research-direction-details-content",
+                "type": "item.details",
+                "area": "main",
+                "title": "$state.selectedDirectionTitle",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "research_orchestrator_skill.get_direction",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "research.formulation",
+                    "research.activity",
+                    "research.automation_brief"
+                  ],
+                  "preserveLastValue": false
+                },
+                "inputs": {
+                  "fields": [
+                    {"key": "project.ref", "label": "Project"},
+                    {"key": "direction.primary_skill_ref", "label": "Primary skill"},
+                    {"key": "direction.status", "label": "Stage"},
+                    {"key": "direction.generation", "label": "Generation"},
+                    {"key": "source_bundle.digest", "label": "Artifact set"},
+                    {"key": "current_prototype.revision", "label": "Prototype revision"},
+                    {"key": "development_session.session_id", "label": "Development Session"}
+                  ]
+                }
+              },
+              {
+                "id": "research-direction-details-close",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "buttons": [
+                    {"id": "close", "label": "Close", "icon": "close-outline"}
+                  ]
+                },
+                "actions": [
+                  {"on": "click:close", "type": "closeModal"}
+                ]
+              }
+            ]
+          }
+        },
+        "research_artifact_preview": {
+          "title": "Artifact preview",
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
+          "schema": {
+            "id": "research_artifact_preview",
+            "title": "Artifact preview",
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {"id": "main", "role": "main"}
+              ]
+            },
+            "widgets": [
+              {
+                "id": "research-artifact-markdown-preview",
+                "type": "static.markdown",
+                "area": "main",
+                "title": "$state.selectedArtifactTitle",
+                "visibleIf": "$state.selectedArtifactPreviewKind === 'markdown'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "research_orchestrator_skill.preview_artifact",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "group_id": "$state.selectedArtifactGroupId",
+                    "artifact_id": "$state.selectedArtifactId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["research.artifacts"],
+                  "preserveLastValue": false
+                },
+                "inputs": {"bindField": "content"}
+              },
+              {
+                "id": "research-artifact-text-preview",
+                "type": "item.codeViewer",
+                "area": "main",
+                "title": "$state.selectedArtifactTitle",
+                "visibleIf": "$state.selectedArtifactPreviewKind === 'text'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "research_orchestrator_skill.preview_artifact",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "group_id": "$state.selectedArtifactGroupId",
+                    "artifact_id": "$state.selectedArtifactId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["research.artifacts"],
+                  "preserveLastValue": false
+                },
+                "inputs": {
+                  "bindField": "content",
+                  "languageField": "language",
+                  "copyButton": true
+                }
+              },
+              {
+                "id": "research-artifact-pdf-preview",
+                "type": "item.documentViewer",
+                "area": "main",
+                "title": "$state.selectedArtifactTitle",
+                "visibleIf": "$state.selectedArtifactPreviewKind === 'pdf'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "research_orchestrator_skill.preview_artifact",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "group_id": "$state.selectedArtifactGroupId",
+                    "artifact_id": "$state.selectedArtifactId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["research.artifacts"],
+                  "preserveLastValue": false
+                },
+                "inputs": {
+                  "pathField": "content_path",
+                  "mediaField": "media_type",
+                  "minHeight": 760
+                }
+              },
+              {
+                "id": "research-artifact-unsupported-preview",
+                "type": "static.markdown",
+                "area": "main",
+                "title": "$state.selectedArtifactTitle",
+                "visibleIf": "$state.selectedArtifactPreviewKind === 'unsupported'",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "research_orchestrator_skill.preview_artifact",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "group_id": "$state.selectedArtifactGroupId",
+                    "artifact_id": "$state.selectedArtifactId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": ["research.artifacts"],
+                  "preserveLastValue": false
+                },
+                "inputs": {"bindField": "content"}
+              },
+              {
+                "id": "research-artifact-preview-close",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "buttons": [
+                    {"id": "close", "label": "Close", "icon": "close-outline"}
+                  ]
+                },
+                "actions": [
+                  {"on": "click:close", "type": "closeModal"}
+                ]
+              }
+            ]
           }
         },
         "research_workbench_help": {
