@@ -1,0 +1,329 @@
+name: media_center_skill
+version: 0.1.1
+description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: chat
+runtime:
+  python: '3.11'
+capabilities:
+- storage.relational
+- media.catalog
+- media.playback_planning
+dependencies: []
+events:
+  subscribe: []
+  publish: []
+lifecycle:
+  after_activate: ensure_schema
+  rehydrate: rehydrate
+exports:
+  tools:
+  - ensure_schema
+  - rehydrate
+  - scan_sources
+  - library
+  - list_items
+  - get_item
+  - playback_plan
+  - set_favorite
+  - status
+  - next_steps
+  - chat
+tools:
+- name: ensure_schema
+  description: Apply the durable media-center catalog schema.
+  entry: handlers.main:ensure_schema
+  side_effects: local_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: rehydrate
+  description: Re-open durable catalog state after activation.
+  entry: handlers.main:rehydrate
+  side_effects: local_write
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: scan_sources
+  description: Reconcile SDK media resources from Media Server and legacy media_indexer into the durable catalog.
+  entry: handlers.main:scan_sources
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      source:
+        type: string
+        enum:
+        - all
+        - media_server
+        - media_indexer
+        default: all
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 5000
+        default: 5000
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: library
+  description: Return a widget-ready catalog projection with items, summary, facets, and playback descriptors.
+  entry: handlers.main:library
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      media_kind:
+        type: string
+        enum:
+        - ''
+        - video
+        - audio
+        - image
+        - other
+      source:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+      offset:
+        type: integer
+        minimum: 0
+        default: 0
+      include_missing:
+        type: boolean
+        default: false
+      sort:
+        type: string
+        enum:
+        - recent
+        - title
+        - size
+        - source
+        - favorite
+        default: recent
+      auto_scan:
+        type: boolean
+        default: true
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: list_items
+  description: Alias for library for generic catalog widgets.
+  entry: handlers.main:list_items
+  side_effects: none
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: get_item
+  description: Read one media-center catalog item.
+  entry: handlers.main:get_item
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - item_id
+    properties:
+      item_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: playback_plan
+  description: Return a playback plan based on the item's core MediaResource descriptor.
+  entry: handlers.main:playback_plan
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - item_id
+    properties:
+      item_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: set_favorite
+  description: Mark or unmark one catalog item as favorite.
+  entry: handlers.main:set_favorite
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - item_id
+    properties:
+      item_id:
+        type: string
+      favorite:
+        type: boolean
+        default: true
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: status
+  description: Return compact media-center catalog status.
+  entry: handlers.main:status
+  side_effects: none
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: next_steps
+  description: Return admitted MVP workflow steps and production roadmap boundary.
+  entry: handlers.main:next_steps
+  side_effects: none
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: chat
+  description: Small conversational control entrypoint for scan/search/help commands.
+  entry: handlers.main:chat
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      text:
+        type: string
+      source:
+        type: string
+      limit:
+        type: integer
+    additionalProperties: true
+  output_schema:
+    type: object
+data_routes:
+- surface: widget:media-center-summary
+  route: tool/details
+  tool: status
+  owner: skill:media_center_skill
+  first_paint: compact catalog status
+  recovery: repeat status after scan invalidation
+  guard_visibility: aggregate media counts and source facets only
+  budget:
+    max_payload_bytes: 65536
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    cache_ttl_ms: 1000
+    max_request_hz: 1
+    preserve_last_value: true
+- surface: widget:media-center-player
+  route: tool
+  tool: library
+  owner: skill:media_center_skill
+  first_paint: bounded catalog rows with core playback descriptors
+  recovery: repeat library after scan invalidation
+  guard_visibility: catalog metadata and safe content paths only
+  budget:
+    max_payload_bytes: 1048576
+    max_items: 500
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - media_center.catalog
+- surface: widget:media-center-details
+  route: tool/details
+  tool: get_item
+  owner: skill:media_center_skill
+  first_paint: no selected media item
+  recovery: select a catalog item again
+  guard_visibility: one catalog row and its MediaResource descriptor
+  budget:
+    max_payload_bytes: 262144
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - explicit_refresh
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 5
+    preserve_last_value: true
+- surface: widget:media-center-next-steps
+  route: tool/details
+  tool: next_steps
+  owner: skill:media_center_skill
+  first_paint: compact MVP workflow steps
+  recovery: repeat next_steps on explicit help
+  guard_visibility: workflow guidance only
+  budget:
+    max_payload_bytes: 65536
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    cache_ttl_ms: 60000
+    max_request_hz: 1
+    preserve_last_value: true
+- surface: media-center catalog store
+  route: skill-local
+  path: data/db/media_center.sqlite3
+  owner: skill:media_center_skill
+  first_paint: empty catalog
+  recovery: rehydrate schema and scan SDK media resources
+  guard_visibility: other skills receive tool projections only
+  budget:
+    max_payload_bytes: 1048576
+llm_hints:
+  description: Durable MVP media center catalog for local playback and future media-center workflows.
+  aliases:
+  - Media Center
+  - media center
+  - media library
+  primary_actions:
+  - id: media_center_skill.scan_sources
+    intent: media_center.scan
+    tool: scan_sources
+    side_effect_class: local_write
+    examples:
+    - Refresh media center catalog
+    - Scan media resources
+  - id: media_center_skill.library
+    intent: media_center.browse
+    tool: library
+    side_effect_class: read_only
+    examples:
+    - Show media center
+    - Browse videos
+  owner_hints:
+  - skill:media_center_skill
+nlu_hints:
+  aliases:
+  - Media Center
+  - media center
+  - media library
+  examples:
+  - refresh media center
+  - show media library
+  slot_schemas: {}
+  entities: []
+updated_at: '2026-08-11T19:03:33+00:00'

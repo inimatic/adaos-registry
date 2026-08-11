@@ -1,0 +1,77 @@
+id: media_center
+name: media_center
+version: 0.1.0
+title: Media Center
+description: MVP media-center workspace for catalog refresh, browsing, and playback over AdaOS media resource descriptors.
+type: desktop
+supported_locales:
+- en
+- ru
+depends:
+- media_center_skill
+- mediaserver
+runtime:
+  skills:
+    required:
+    - media_center_skill
+    - mediaserver
+    optional:
+    - media_indexer_skill
+ui:
+  manifest: webui.json
+trigger: manual
+vars: {}
+guidance:
+  schema: adaos.scenario.guidance.v1
+  readme: README.md
+  overview:
+    en: Browse and play local media through a durable catalog while keeping streaming and storage in the core media plane.
+  presentation:
+    channels:
+    - web
+    - text
+    - voice
+    modal_id: media_center_help
+  workflow:
+    state_source:
+      kind: skill
+      name: media_center_skill.status
+      params: {}
+    state_path: summary.available_count
+    actions_path: steps
+  conversational:
+    help_intent: media_center.help
+    next_steps_intent: media_center.next_steps
+llm_hints:
+  description: Media Center MVP scenario for local media catalog, filters, details, and playback.
+  aliases:
+  - Media Center
+  - media center
+  - media library
+  primary_actions:
+  - id: media_center.scan
+    intent: media_center.scan
+    tool: media_center_skill.scan_sources
+    side_effect_class: local_write
+  - id: media_center.next_steps
+    intent: media_center_skill.next_steps
+    tool: media_center_skill.next_steps
+    side_effect_class: read_only
+  examples:
+  - Open Media Center
+  - Refresh media catalog
+  owner_hints:
+  - skill:media_center_skill
+nlu:
+  nlu_hints:
+    aliases:
+    - Media Center
+    - media library
+    examples:
+    - open media center
+    - refresh media center
+    slot_schemas: {}
+    entities: []
+steps: []
+prototype: scenario_default
+updated_at: '2026-08-11T19:03:33+00:00'
