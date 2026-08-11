@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.58
+version: 0.1.59
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -44,6 +44,8 @@ tools:
       selected_object_id:
         type: string
       webspace_id:
+        type: string
+      conversation_id:
         type: string
       include_archived:
         type: boolean
@@ -394,6 +396,9 @@ tools:
         - candidate_accepted
         - candidate_rejected
         - candidate_stale
+        - reconcile_automation
+        - reconcile_verification
+        - reconcile_publication
         - publish
       object_type:
         type: string
@@ -595,6 +600,71 @@ tools:
         minimum: 0
   output_schema:
     type: object
+- name: split_change_issue
+  description: Split one ambiguous active Issue into explicit replacement Issues.
+  entry: handlers.main:split_change_issue
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - issue_id
+    - replacement_issues
+    properties:
+      issue_id:
+        type: string
+        minLength: 1
+      replacement_issues:
+        type: array
+        minItems: 2
+        maxItems: 50
+        items:
+          type: object
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+      change_id:
+        type: string
+      expected_generation:
+        type: integer
+        minimum: 0
+  output_schema:
+    type: object
+- name: merge_change_issues
+  description: Merge active Issues into one explicit replacement Issue.
+  entry: handlers.main:merge_change_issues
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - issue_ids
+    - replacement_issue
+    properties:
+      issue_ids:
+        type: array
+        minItems: 2
+        maxItems: 50
+        items:
+          type: string
+      replacement_issue:
+        type: object
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+      change_id:
+        type: string
+      expected_generation:
+        type: integer
+        minimum: 0
+  output_schema:
+    type: object
 - name: get_change_set
   description: Read the active Builder change set and its durable evidence.
   entry: handlers.main:get_change_set
@@ -626,66 +696,6 @@ tools:
       object_id:
         type: string
         minLength: 1
-  output_schema:
-    type: object
-- name: validate_conversational_package
-  description: Validate conversational sources and run deterministic stories for one DEV project.
-  entry: handlers.main:validate_conversational_package
-  input_schema:
-    type: object
-    properties:
-      object_type:
-        type: string
-        enum:
-        - scenario
-        - skill
-      object_id:
-        type: string
-        minLength: 1
-      run_stories:
-        type: boolean
-        default: true
-      build_static_report:
-        type: boolean
-        default: true
-  output_schema:
-    type: object
-- name: scaffold_conversational_package
-  description: Create a non-destructive conversational source package for one DEV project.
-  entry: handlers.main:scaffold_conversational_package
-  side_effects: local_write
-  input_schema:
-    type: object
-    properties:
-      object_type:
-        type: string
-        enum:
-        - scenario
-        - skill
-      object_id:
-        type: string
-        minLength: 1
-      locales:
-        type: array
-        minItems: 1
-        maxItems: 20
-        uniqueItems: true
-        items:
-          type: string
-          minLength: 2
-          maxLength: 40
-      include_matchers:
-        type: boolean
-        default: true
-      source_message_ids:
-        type: array
-        maxItems: 100
-        uniqueItems: true
-        items:
-          type: string
-          minLength: 1
-      webspace_id:
-        type: string
   output_schema:
     type: object
 - name: apply_semantic_ui_change
@@ -1001,6 +1011,8 @@ tools:
         minLength: 1
       webspace_id:
         type: string
+      conversation_id:
+        type: string
   output_schema:
     type: object
 - name: get_process
@@ -1256,6 +1268,8 @@ tools:
         type: string
       webspace_id:
         type: string
+      conversation_id:
+        type: string
   output_schema:
     type: object
 - name: push_project
@@ -1311,6 +1325,9 @@ tools:
         type: boolean
       force:
         type: boolean
+      confirmed:
+        type: boolean
+        description: Explicit user confirmation for Trial activation or Publication.
       webspace_id:
         type: string
   output_schema:
@@ -1359,7 +1376,138 @@ tools:
     - schema
     - project
     - checks
+- name: get_development_session
+  description: Read the least-write Development Session currently bound to this Builder
+    host.
+  entry: handlers.main:get_development_session
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - bound
+    - content
+- name: review_development_changes
+  description: Reject changed paths outside the bound Development Session write scope,
+    including read-only artifact inputs.
+  entry: handlers.main:review_development_changes
+  input_schema:
+    type: object
+    required:
+    - paths
+    properties:
+      paths:
+        type: array
+        minItems: 1
+        maxItems: 5000
+        items:
+          type: string
+          minLength: 1
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - session_id
+    - admitted
+    - violations
+- name: request_development_scope
+  description: Record a human-reviewable request for one extra skill or scenario target
+    without granting access.
+  entry: handlers.main:request_development_scope
+  input_schema:
+    type: object
+    required:
+    - target_ref
+    - reason
+    properties:
+      target_ref:
+        type: string
+        pattern: '^(skill|scenario):'
+      reason:
+        type: string
+        minLength: 1
+      webspace_id:
+        type: string
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - approved
+    - request
+- name: get_skill_preview
+  description: Describe the skill selected by the paired Builder host for the generic
+    preview scenario.
+  entry: handlers.main:get_skill_preview
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - selected
+    - content
 data_routes:
+- surface: widget:builder.skill_preview
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_skill_preview
+  first_paint: selected skill metadata or an explicit empty state
+  recovery: return to Builder and select a skill
+  budget:
+    max_payload_bytes: 524288
+    max_items: 1
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 0.5
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.preview
+  guard_visibility:
+    degraded_state: paired Builder selection is unavailable
+    metric: data_route.builder_skill_preview_read
+- surface: widget:builder.development_session
+  route: tool/details
+  owner: skill:builder_sdk_control_skill
+  tool: get_development_session
+  first_paint: no external Development Session bound
+  recovery: reload after a Research Workbench handoff binds a session
+  budget:
+    max_payload_bytes: 131072
+    max_items: 100
+  read_policy:
+    mode: cache_first
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 0.5
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.development_session
+  guard_visibility:
+    degraded_state: development session binding is stale
+    metric: data_route.builder_development_session_read
 - surface: widget:builder.interaction_frame
   route: tool/details
   owner: skill:builder_sdk_control_skill
@@ -1807,4 +1955,4 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-07-30T05:55:23+00:00'
+updated_at: '2026-08-11T10:44:31+00:00'

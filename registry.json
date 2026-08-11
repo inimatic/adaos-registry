@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-11T10:44:11+00:00",
+  "updated_at": "2026-08-11T10:44:31+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -114,8 +114,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.1.58",
-      "updated_at": "2026-07-30T05:55:23+00:00",
+      "version": "0.1.59",
+      "updated_at": "2026-08-11T10:44:31+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -130,7 +130,7 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 51
+      "tools_count": 55
     },
     {
       "kind": "skill",
