@@ -339,7 +339,8 @@
                     "path": "$event.path",
                     "name": "$event.file.name",
                     "role": "research_source",
-                    "cleanup_staging": true
+                    "cleanup_staging": true,
+                    "replace_existing": true
                   },
                   "invalidates": [
                     "research.artifacts",
