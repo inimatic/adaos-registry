@@ -321,7 +321,7 @@ class ResearchOrchestrator:
             source_webspace_id=builder_webspace_id,
             ensure_ready=True,
             wait_for_rebuild=True,
-            publish_event=False,
+            publish_event=True,
         )
         scope = navigation.runtime_scope()
         destination = navigation.webspace_destination(
