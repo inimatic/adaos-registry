@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.1.0
+version: 0.1.1
 description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
 supported_locales:
 - en
@@ -217,7 +217,15 @@ data_routes:
   guard_visibility: aggregate media counts and source facets only
   budget:
     max_payload_bytes: 65536
-    snapshot_policy: on_request
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    cache_ttl_ms: 1000
+    max_request_hz: 1
+    preserve_last_value: true
 - surface: widget:media-center-player
   route: tool
   tool: library
@@ -228,7 +236,7 @@ data_routes:
   budget:
     max_payload_bytes: 1048576
     max_items: 500
-    snapshot_policy: on_request
+    snapshot_policy: manual
   read_policy:
     mode: explicit
     triggers:
@@ -249,7 +257,15 @@ data_routes:
   guard_visibility: one catalog row and its MediaResource descriptor
   budget:
     max_payload_bytes: 262144
-    snapshot_policy: on_request
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - explicit_refresh
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 5
+    preserve_last_value: true
 - surface: widget:media-center-next-steps
   route: tool/details
   tool: next_steps
@@ -259,7 +275,15 @@ data_routes:
   guard_visibility: workflow guidance only
   budget:
     max_payload_bytes: 65536
-    snapshot_policy: on_request
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    cache_ttl_ms: 60000
+    max_request_hz: 1
+    preserve_last_value: true
 - surface: media-center catalog store
   route: skill-local
   path: data/db/media_center.sqlite3
