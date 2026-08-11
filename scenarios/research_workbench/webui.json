@@ -778,7 +778,7 @@
                 "id": "research-direction-details-content",
                 "type": "item.details",
                 "area": "main",
-                "title": "$state.selectedDirectionTitle",
+                "title": "Direction details",
                 "dataSource": {
                   "kind": "skill",
                   "name": "research_orchestrator_skill.get_direction",
@@ -841,7 +841,7 @@
                 "id": "research-artifact-markdown-preview",
                 "type": "static.markdown",
                 "area": "main",
-                "title": "$state.selectedArtifactTitle",
+                "title": "Artifact preview",
                 "visibleIf": "$state.selectedArtifactPreviewKind === 'markdown'",
                 "dataSource": {
                   "kind": "skill",
@@ -861,7 +861,7 @@
                 "id": "research-artifact-text-preview",
                 "type": "item.codeViewer",
                 "area": "main",
-                "title": "$state.selectedArtifactTitle",
+                "title": "Artifact preview",
                 "visibleIf": "$state.selectedArtifactPreviewKind === 'text'",
                 "dataSource": {
                   "kind": "skill",
@@ -885,7 +885,7 @@
                 "id": "research-artifact-pdf-preview",
                 "type": "item.documentViewer",
                 "area": "main",
-                "title": "$state.selectedArtifactTitle",
+                "title": "Artifact preview",
                 "visibleIf": "$state.selectedArtifactPreviewKind === 'pdf'",
                 "dataSource": {
                   "kind": "skill",
@@ -909,7 +909,7 @@
                 "id": "research-artifact-unsupported-preview",
                 "type": "static.markdown",
                 "area": "main",
-                "title": "$state.selectedArtifactTitle",
+                "title": "Artifact preview",
                 "visibleIf": "$state.selectedArtifactPreviewKind === 'unsupported'",
                 "dataSource": {
                   "kind": "skill",
