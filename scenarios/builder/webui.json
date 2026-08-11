@@ -2206,6 +2206,17 @@
                                                                       "title_i18n":  {
                                                                                          "key":  "builder.text.builder.development.workspace"
                                                                                      },
+                                                                      "initialStateQuery":  {
+                                                                                                "map":  {
+                                                                                                            "selectedProjectKind":  "builder_object_type",
+                                                                                                            "selectedProjectId":  "builder_object_id",
+                                                                                                            "selectedProjectRef":  "builder_object_ref",
+                                                                                                            "selectedProjectTitle":  "builder_object_title",
+                                                                                                            "selectedObjectKind":  "builder_object_type",
+                                                                                                            "selectedObjectId":  "builder_object_id",
+                                                                                                            "project.title":  "builder_object_title"
+                                                                                                        }
+                                                                                            },
                                                                       "initialStateSource":  {
                                                                                                  "kind":  "y",
                                                                                                  "path":  "data/builder/selection",
