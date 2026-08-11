@@ -5,7 +5,10 @@
       "id": "nlu_teacher_app",
       "title": "NLU Teacher",
       "icon": "school-outline",
-      "launchModal": "nlu_teacher_modal"
+      "launchModal": "nlu_teacher_modal",
+      "action": {
+        "navigate": "web_desktop_skill.nlu_teacher_modal"
+      }
     }
   ],
   "widgets": [],
@@ -15,10 +18,10 @@
         "title": "Available Apps",
         "schema": {
           "id": "apps_catalog",
-					"layout": {
-						"type": "single",
-						"pattern": "stack",
-						"areas": [
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
               {
                 "id": "main",
                 "role": "main"
@@ -54,10 +57,10 @@
         "title": "Available Widgets",
         "schema": {
           "id": "widgets_catalog",
-					"layout": {
-						"type": "single",
-						"pattern": "stack",
-						"areas": [
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
               {
                 "id": "main",
                 "role": "main"
@@ -94,10 +97,10 @@
         "schema": {
           "id": "nlu_teacher_modal",
           "title": "NLU Teacher",
-					"layout": {
-						"type": "single",
-						"pattern": "stack",
-						"areas": [
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
               {
                 "id": "main",
                 "role": "main"
@@ -324,11 +327,36 @@
               "visibleIf": "$state.nluTeacherTab === 'signals'",
               "actions": []
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "nlu_teacher": {
+                "view": "web_desktop_skill.nlu_teacher_modal"
+              }
+            },
+            "defaultRoute": "nlu_teacher"
+          }
+        },
+        "implements": [
+          "web_desktop_skill.nlu_teacher_modal"
+        ]
       }
     },
     "widgets": {}
   },
-  "ydoc_defaults": {}
+  "ydoc_defaults": {},
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "web_desktop_skill.nlu_teacher_modal": {
+        "title": "NLU Teacher",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "web_desktop_skill.nlu_teacher_modal"
+  }
 }

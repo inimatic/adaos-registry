@@ -129,7 +129,10 @@
       "id": "newface_vision_app",
       "title": "New Face Vision",
       "icon": "eye-outline",
-      "launchModal": "newface_vision_modal"
+      "launchModal": "newface_vision_modal",
+      "action": {
+        "navigate": "new_face_vision_skill.newface_vision_modal"
+      }
     }
   ],
   "widgets": [
@@ -192,10 +195,22 @@
                 "retainLastImageOnEmpty": true,
                 "emptyText": "Load frames, then press Play or Step Forward.",
                 "metrics": [
-                  { "label": "Pred", "path": "prediction.pred_ratio" },
-                  { "label": "True", "path": "prediction.true_ratio" },
-                  { "label": "Dice", "path": "metrics.dice" },
-                  { "label": "IoU", "path": "metrics.iou" }
+                  {
+                    "label": "Pred",
+                    "path": "prediction.pred_ratio"
+                  },
+                  {
+                    "label": "True",
+                    "path": "prediction.true_ratio"
+                  },
+                  {
+                    "label": "Dice",
+                    "path": "metrics.dice"
+                  },
+                  {
+                    "label": "IoU",
+                    "path": "metrics.iou"
+                  }
                 ]
               }
             },
@@ -246,8 +261,10 @@
               "actions": [
                 {
                   "on": "click",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "new_face_vision_skill.newface_metrics_modal",
+                    "surface": "modal",
                     "modalId": "newface_metrics_modal"
                   }
                 }
@@ -274,8 +291,10 @@
               "actions": [
                 {
                   "on": "click",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "new_face_vision_skill.newface_metrics_modal",
+                    "surface": "modal",
                     "modalId": "newface_metrics_modal"
                   }
                 }
@@ -289,21 +308,48 @@
               "inputs": {
                 "size": "small",
                 "buttons": [
-                  { "id": "upload", "label": "Upload" },
-                  { "id": "play", "label": "Play" },
-                  { "id": "step_back", "label": "Step Back" },
-                  { "id": "step_forward", "label": "Step Forward" },
-                  { "id": "pause", "label": "Pause" },
-                  { "id": "stop", "label": "Stop" },
-                  { "id": "replay", "label": "Replay" },
-                  { "id": "clear", "label": "Clear", "kind": "danger" }
+                  {
+                    "id": "upload",
+                    "label": "Upload"
+                  },
+                  {
+                    "id": "play",
+                    "label": "Play"
+                  },
+                  {
+                    "id": "step_back",
+                    "label": "Step Back"
+                  },
+                  {
+                    "id": "step_forward",
+                    "label": "Step Forward"
+                  },
+                  {
+                    "id": "pause",
+                    "label": "Pause"
+                  },
+                  {
+                    "id": "stop",
+                    "label": "Stop"
+                  },
+                  {
+                    "id": "replay",
+                    "label": "Replay"
+                  },
+                  {
+                    "id": "clear",
+                    "label": "Clear",
+                    "kind": "danger"
+                  }
                 ]
               },
               "actions": [
                 {
                   "on": "click:upload",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "new_face_vision_skill.newface_upload_modal",
+                    "surface": "modal",
                     "modalId": "newface_upload_modal"
                   }
                 },
@@ -430,8 +476,20 @@
                 "emptyText": "--"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "newface_vision": {
+                "view": "new_face_vision_skill.newface_vision_modal"
+              }
+            },
+            "defaultRoute": "newface_vision"
+          }
+        },
+        "implements": [
+          "new_face_vision_skill.newface_vision_modal"
+        ]
       },
       "newface_upload_modal": {
         "title": "Upload assets",
@@ -563,8 +621,20 @@
                 }
               ]
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "newface_upload": {
+                "view": "new_face_vision_skill.newface_upload_modal"
+              }
+            },
+            "defaultRoute": "newface_upload"
+          }
+        },
+        "implements": [
+          "new_face_vision_skill.newface_upload_modal"
+        ]
       },
       "newface_metrics_modal": {
         "title": "Frame metrics",
@@ -631,8 +701,20 @@
                 ]
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "newface_metrics": {
+                "view": "new_face_vision_skill.newface_metrics_modal"
+              }
+            },
+            "defaultRoute": "newface_metrics"
+          }
+        },
+        "implements": [
+          "new_face_vision_skill.newface_metrics_modal"
+        ]
       }
     },
     "widgets": {}
@@ -760,5 +842,32 @@
       "id": "newface_vision_widget",
       "autoInstall": true
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "new_face_vision_skill.newface_metrics_modal": {
+        "title": "Frame metrics",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      },
+      "new_face_vision_skill.newface_upload_modal": {
+        "title": "Upload assets",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      },
+      "new_face_vision_skill.newface_vision_modal": {
+        "title": "New Face Vision",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "new_face_vision_skill.newface_metrics_modal"
+  }
 }

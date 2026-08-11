@@ -217,8 +217,10 @@
               "actions": [
                 {
                   "on": "click",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "new_face_vision_scenario.newface_metrics_modal",
+                    "surface": "modal",
                     "modalId": "newface_metrics_modal"
                   }
                 }
@@ -245,8 +247,10 @@
               "actions": [
                 {
                   "on": "click",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "new_face_vision_scenario.newface_metrics_modal",
+                    "surface": "modal",
                     "modalId": "newface_metrics_modal"
                   }
                 }
@@ -298,8 +302,10 @@
               "actions": [
                 {
                   "on": "click:upload",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "new_face_vision_scenario.newface_upload_modal",
+                    "surface": "modal",
                     "modalId": "newface_upload_modal"
                   }
                 },
@@ -561,8 +567,20 @@
                   }
                 ]
               }
-            ]
-          }
+            ],
+            "interface": {
+              "schema": "adaos.ui.modal.interface.v1",
+              "routes": {
+                "newface_upload": {
+                  "view": "new_face_vision_scenario.newface_upload_modal"
+                }
+              },
+              "defaultRoute": "newface_upload"
+            }
+          },
+          "implements": [
+            "new_face_vision_scenario.newface_upload_modal"
+          ]
         },
         "newface_metrics_modal": {
           "title": "Frame metrics",
@@ -629,8 +647,42 @@
                   ]
                 }
               }
-            ]
-          }
+            ],
+            "interface": {
+              "schema": "adaos.ui.modal.interface.v1",
+              "routes": {
+                "newface_metrics": {
+                  "view": "new_face_vision_scenario.newface_metrics_modal"
+                }
+              },
+              "defaultRoute": "newface_metrics"
+            }
+          },
+          "implements": [
+            "new_face_vision_scenario.newface_metrics_modal"
+          ]
+        }
+      },
+      "interfaces": {
+        "new_face_vision_scenario": {
+          "schema": "adaos.ui.skill_interface.v1",
+          "views": {
+            "new_face_vision_scenario.newface_metrics_modal": {
+              "title": "Frame metrics",
+              "surfaces": [
+                "modal"
+              ],
+              "params": {}
+            },
+            "new_face_vision_scenario.newface_upload_modal": {
+              "title": "Upload assets",
+              "surfaces": [
+                "modal"
+              ],
+              "params": {}
+            }
+          },
+          "defaultView": "new_face_vision_scenario.newface_metrics_modal"
         }
       }
     }

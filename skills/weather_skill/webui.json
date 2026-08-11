@@ -5,7 +5,10 @@
       "id": "weather_app",
       "title": "Weather",
       "icon": "cloud-outline",
-      "launchModal": "weather_modal"
+      "launchModal": "weather_modal",
+      "action": {
+        "navigate": "weather_skill.weather_modal"
+      }
     }
   ],
   "widgets": [
@@ -37,8 +40,10 @@
       "actions": [
         {
           "on": "click",
-          "type": "openModal",
+          "type": "navigate",
           "params": {
+            "to": "weather_skill.weather_modal",
+            "surface": "modal",
             "modalId": "weather_modal"
           }
         }
@@ -128,7 +133,11 @@
                         "request_id": "$client.requestId",
                         "pending": false
                       },
-                      "advanceFields": ["request_id", "updated_at", "pending"]
+                      "advanceFields": [
+                        "request_id",
+                        "updated_at",
+                        "pending"
+                      ]
                     }
                   },
                   "params": {
@@ -146,7 +155,11 @@
                         "request_id": "$client.requestId",
                         "pending": false
                       },
-                      "advanceFields": ["request_id", "updated_at", "pending"]
+                      "advanceFields": [
+                        "request_id",
+                        "updated_at",
+                        "pending"
+                      ]
                     }
                   }
                 }
@@ -192,7 +205,11 @@
                         "request_id": "$client.requestId",
                         "pending": false
                       },
-                      "advanceFields": ["request_id", "updated_at", "pending"]
+                      "advanceFields": [
+                        "request_id",
+                        "updated_at",
+                        "pending"
+                      ]
                     }
                   },
                   "params": {
@@ -210,7 +227,11 @@
                         "request_id": "$client.requestId",
                         "pending": false
                       },
-                      "advanceFields": ["request_id", "updated_at", "pending"]
+                      "advanceFields": [
+                        "request_id",
+                        "updated_at",
+                        "pending"
+                      ]
                     }
                   }
                 }
@@ -255,7 +276,11 @@
                         "request_id": "$client.requestId",
                         "pending": false
                       },
-                      "advanceFields": ["request_id", "updated_at", "pending"]
+                      "advanceFields": [
+                        "request_id",
+                        "updated_at",
+                        "pending"
+                      ]
                     }
                   },
                   "params": {
@@ -273,7 +298,11 @@
                         "request_id": "$client.requestId",
                         "pending": false
                       },
-                      "advanceFields": ["request_id", "updated_at", "pending"]
+                      "advanceFields": [
+                        "request_id",
+                        "updated_at",
+                        "pending"
+                      ]
                     }
                   }
                 }
@@ -333,8 +362,20 @@
                 ]
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "weather": {
+                "view": "weather_skill.weather_modal"
+              }
+            },
+            "defaultRoute": "weather"
+          }
+        },
+        "implements": [
+          "weather_skill.weather_modal"
+        ]
       }
     },
     "widgets": {}
@@ -388,5 +429,18 @@
       "id": "weather",
       "autoInstall": true
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "weather_skill.weather_modal": {
+        "title": "Weather",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "weather_skill.weather_modal"
+  }
 }

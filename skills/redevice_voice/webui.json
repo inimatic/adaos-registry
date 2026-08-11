@@ -77,7 +77,10 @@
       "id": "redevice_voice_app",
       "title": "ReDevice Voice",
       "icon": "mic-outline",
-      "launchModal": "redevice_voice_modal"
+      "launchModal": "redevice_voice_modal",
+      "action": {
+        "navigate": "redevice_voice.redevice_voice_modal"
+      }
     }
   ],
   "registry": {
@@ -494,8 +497,20 @@
                 "maxHeight": "360px"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "redevice_voice": {
+                "view": "redevice_voice.redevice_voice_modal"
+              }
+            },
+            "defaultRoute": "redevice_voice"
+          }
+        },
+        "implements": [
+          "redevice_voice.redevice_voice_modal"
+        ]
       }
     }
   },
@@ -506,5 +521,18 @@
       "id": "redevice_voice_app",
       "autoInstall": true
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "redevice_voice.redevice_voice_modal": {
+        "title": "ReDevice Voice",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "redevice_voice.redevice_voice_modal"
+  }
 }

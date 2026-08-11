@@ -41,7 +41,10 @@
       "id": "redevice_list_app",
       "title": "ReDevice",
       "icon": "phone-portrait-outline",
-      "launchModal": "redevice_list_modal"
+      "launchModal": "redevice_list_modal",
+      "action": {
+        "navigate": "redevice_list.redevice_list_modal"
+      }
     }
   ],
   "registry": {
@@ -231,8 +234,10 @@
               "actions": [
                 {
                   "on": "click:details",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "redevice_list.redevice_details_modal",
+                    "surface": "modal",
                     "modalId": "redevice_details_modal"
                   }
                 },
@@ -264,8 +269,20 @@
                 }
               ]
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "redevice_list": {
+                "view": "redevice_list.redevice_list_modal"
+              }
+            },
+            "defaultRoute": "redevice_list"
+          }
+        },
+        "implements": [
+          "redevice_list.redevice_list_modal"
+        ]
       },
       "redevice_details_modal": {
         "title": "ReDevice details",
@@ -299,8 +316,20 @@
                 "emptyText": "No ReDevice details"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "redevice_details": {
+                "view": "redevice_list.redevice_details_modal"
+              }
+            },
+            "defaultRoute": "redevice_details"
+          }
+        },
+        "implements": [
+          "redevice_list.redevice_details_modal"
+        ]
       }
     }
   },
@@ -311,5 +340,25 @@
       "id": "redevice_list_app",
       "autoInstall": true
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "redevice_list.redevice_details_modal": {
+        "title": "ReDevice details",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      },
+      "redevice_list.redevice_list_modal": {
+        "title": "ReDevice endpoints",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "redevice_list.redevice_details_modal"
+  }
 }

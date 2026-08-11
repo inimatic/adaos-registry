@@ -31,7 +31,10 @@
           "owner": "skill:ai_event_analysis_skill",
           "firstPaint": "static benchmark defaults",
           "recovery": "snapshot requested on stream subscribe",
-          "updateSource": ["webio.stream.snapshot.requested", "ai_event_analysis.evaluate_requested"]
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "ai_event_analysis.evaluate_requested"
+          ]
         }
       }
     }
@@ -41,7 +44,10 @@
       "id": "ai_event_analysis_app",
       "title": "AI Event Analysis",
       "icon": "analytics-outline",
-      "launchModal": "ai_event_analysis_modal"
+      "launchModal": "ai_event_analysis_modal",
+      "action": {
+        "navigate": "ai_event_analysis_skill.ai_event_analysis_modal"
+      }
     }
   ],
   "widgets": [
@@ -57,8 +63,10 @@
       "actions": [
         {
           "on": "click:open",
-          "type": "openModal",
+          "type": "navigate",
           "params": {
+            "to": "ai_event_analysis_skill.ai_event_analysis_modal",
+            "surface": "modal",
             "modalId": "ai_event_analysis_modal"
           }
         },
@@ -667,8 +675,20 @@
                 "emptyText": "No evaluation result yet"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "ai_event_analysis": {
+                "view": "ai_event_analysis_skill.ai_event_analysis_modal"
+              }
+            },
+            "defaultRoute": "ai_event_analysis"
+          }
+        },
+        "implements": [
+          "ai_event_analysis_skill.ai_event_analysis_modal"
+        ]
       }
     },
     "widgets": {}
@@ -864,5 +884,18 @@
       "id": "ai_event_analysis_widget",
       "autoInstall": false
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "ai_event_analysis_skill.ai_event_analysis_modal": {
+        "title": "AI Event Analysis",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "ai_event_analysis_skill.ai_event_analysis_modal"
+  }
 }

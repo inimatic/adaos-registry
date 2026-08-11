@@ -5,7 +5,10 @@
       "id": "adaos_connect_app",
       "title": "AdaOS Connect",
       "icon": "git-network-outline",
-      "launchModal": "adaos_connect_modal"
+      "launchModal": "adaos_connect_modal",
+      "action": {
+        "navigate": "adaos_connect.adaos_connect_modal"
+      }
     }
   ],
   "registry": {
@@ -17,10 +20,10 @@
           "initialState": {
             "adaosConnectMode": "browser"
           },
-					"layout": {
-						"type": "single",
-						"pattern": "stack",
-						"areas": [
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
               {
                 "id": "main",
                 "role": "main"
@@ -275,8 +278,20 @@
               },
               "visibleIf": "$state.adaosConnectMode === 'node'"
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "adaos_connect": {
+                "view": "adaos_connect.adaos_connect_modal"
+              }
+            },
+            "defaultRoute": "adaos_connect"
+          }
+        },
+        "implements": [
+          "adaos_connect.adaos_connect_modal"
+        ]
       }
     },
     "widgets": {}
@@ -315,5 +330,18 @@
       "id": "adaos_connect_app",
       "autoInstall": true
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "adaos_connect.adaos_connect_modal": {
+        "title": "AdaOS Connect",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "adaos_connect.adaos_connect_modal"
+  }
 }

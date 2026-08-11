@@ -119,9 +119,11 @@
               "actions": [
                 {
                   "on": "select",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
-                    "modalId": "$event.action.openModal"
+                    "to": "$event.action.navigate",
+                    "surface": "modal",
+                    "modalId": "$event.launchModal"
                   }
                 }
               ],
@@ -475,11 +477,38 @@
                   "key": "web_desktop.nlu.signals"
                 }
               }
-            ]
+            ],
+            "interface": {
+              "schema": "adaos.ui.modal.interface.v1",
+              "routes": {
+                "nlu_teacher": {
+                  "view": "web_desktop.nlu_teacher_modal"
+                }
+              },
+              "defaultRoute": "nlu_teacher"
+            }
           },
           "title_i18n": {
             "key": "web_desktop.modal.nlu_teacher"
-          }
+          },
+          "implements": [
+            "web_desktop.nlu_teacher_modal"
+          ]
+        }
+      },
+      "interfaces": {
+        "web_desktop": {
+          "schema": "adaos.ui.skill_interface.v1",
+          "views": {
+            "web_desktop.nlu_teacher_modal": {
+              "title": "NLU Teacher",
+              "surfaces": [
+                "modal"
+              ],
+              "params": {}
+            }
+          },
+          "defaultView": "web_desktop.nlu_teacher_modal"
         }
       }
     }
@@ -506,6 +535,9 @@
         "origin": "system:nlu.teacher",
         "title_i18n": {
           "key": "web_desktop.modal.nlu_teacher"
+        },
+        "action": {
+          "navigate": "web_desktop.nlu_teacher_modal"
         }
       }
     ],

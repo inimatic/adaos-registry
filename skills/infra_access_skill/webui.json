@@ -5,7 +5,10 @@
       "id": "infra_access_app",
       "title": "Infra Access",
       "icon": "shield-checkmark-outline",
-      "launchModal": "infra_access_modal"
+      "launchModal": "infra_access_modal",
+      "action": {
+        "navigate": "infra_access_skill.infra_access_modal"
+      }
     }
   ],
   "widgets": [
@@ -220,8 +223,20 @@
                 "emptyText": "No infra_access events yet"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "infra_access": {
+                "view": "infra_access_skill.infra_access_modal"
+              }
+            },
+            "defaultRoute": "infra_access"
+          }
+        },
+        "implements": [
+          "infra_access_skill.infra_access_modal"
+        ]
       }
     }
   },
@@ -232,5 +247,18 @@
       "id": "infra_access_app",
       "autoInstall": false
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "infra_access_skill.infra_access_modal": {
+        "title": "Infra Access",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "infra_access_skill.infra_access_modal"
+  }
 }

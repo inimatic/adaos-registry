@@ -94,22 +94,28 @@
                 },
                 {
                   "on": "click:settings",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "redevice_settings.redevice_settings_modal",
+                    "surface": "modal",
                     "modalId": "redevice_settings_modal"
                   }
                 },
                 {
                   "on": "click:slideshow",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "slideshow_skill.slideshow_modal",
+                    "surface": "modal",
                     "modalId": "slideshow_modal"
                   }
                 },
                 {
                   "on": "click:voice",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "redevice_voice.redevice_voice_modal",
+                    "surface": "modal",
                     "modalId": "redevice_voice_modal"
                   }
                 }
@@ -235,8 +241,10 @@
                 },
                 {
                   "on": "click:slideshow",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "slideshow_skill.slideshow_modal",
+                    "surface": "modal",
                     "modalId": "slideshow_modal"
                   }
                 },
@@ -250,15 +258,19 @@
                 },
                 {
                   "on": "click:voice",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "redevice_voice.redevice_voice_modal",
+                    "surface": "modal",
                     "modalId": "redevice_voice_modal"
                   }
                 },
                 {
                   "on": "click:settings",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "redevice_settings.redevice_settings_modal",
+                    "surface": "modal",
                     "modalId": "redevice_settings_modal"
                   }
                 }
@@ -366,8 +378,10 @@
               "actions": [
                 {
                   "on": "click",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "redevice_voice.redevice_voice_modal",
+                    "surface": "modal",
                     "modalId": "redevice_voice_modal"
                   }
                 }
@@ -393,6 +407,10 @@
             }
           ]
         }
+      },
+      "modals": {},
+      "interfaces": {
+        "redevice_user_face": {}
       }
     }
   },
@@ -403,21 +421,30 @@
         "title": "ReDevice Settings",
         "icon": "settings-outline",
         "launchModal": "redevice_settings_modal",
-        "origin": "scenario:redevice_user_face"
+        "origin": "scenario:redevice_user_face",
+        "action": {
+          "navigate": "redevice_settings.redevice_settings_modal"
+        }
       },
       {
         "id": "slideshow_skill_app",
         "title": "Slideshow",
         "icon": "image-outline",
         "launchModal": "slideshow_modal",
-        "origin": "scenario:redevice_user_face"
+        "origin": "scenario:redevice_user_face",
+        "action": {
+          "navigate": "slideshow_skill.slideshow_modal"
+        }
       },
       {
         "id": "redevice_voice_app",
         "title": "ReDevice Voice",
         "icon": "mic-outline",
         "launchModal": "redevice_voice_modal",
-        "origin": "scenario:redevice_user_face"
+        "origin": "scenario:redevice_user_face",
+        "action": {
+          "navigate": "redevice_voice.redevice_voice_modal"
+        }
       }
     ],
     "widgets": [

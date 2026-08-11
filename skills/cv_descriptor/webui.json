@@ -40,7 +40,10 @@
         "version": 2,
         "alpha": 1.0,
         "inputSize": 224,
-        "inputRange": [0, 1],
+        "inputRange": [
+          0,
+          1
+        ],
         "modelUrl": "https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v2_1.0_224/model.json",
         "model_signature": "tfjs-mobilenet-v2-1.0-224@google-storage",
         "status": "trial"
@@ -54,7 +57,10 @@
           "version": 2,
           "alpha": 1.0,
           "inputSize": 224,
-          "inputRange": [0, 1],
+          "inputRange": [
+            0,
+            1
+          ],
           "modelUrl": "https://storage.googleapis.com/tfjs-models/savedmodel/mobilenet_v2_1.0_224/model.json",
           "model_signature": "tfjs-mobilenet-v2-1.0-224@google-storage"
         },
@@ -97,7 +103,10 @@
       "title": "CV Descriptor",
       "subtitle": "Text labels for visual objects",
       "icon": "scan-outline",
-      "launchModal": "cv_descriptor_setup_modal"
+      "launchModal": "cv_descriptor_setup_modal",
+      "action": {
+        "navigate": "cv_descriptor.cv_descriptor_setup_modal"
+      }
     }
   ],
   "widgets": [
@@ -117,8 +126,10 @@
       "actions": [
         {
           "on": "click",
-          "type": "openModal",
+          "type": "navigate",
           "params": {
+            "to": "cv_descriptor.cv_descriptor_setup_modal",
+            "surface": "modal",
             "modalId": "cv_descriptor_setup_modal"
           }
         }
@@ -139,9 +150,18 @@
             "type": "split",
             "pattern": "split",
             "areas": [
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" },
-              { "id": "bottom", "role": "footer" }
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
             ]
           },
           "widgets": [
@@ -189,11 +209,27 @@
                 "variant": "stack",
                 "size": "small",
                 "buttons": [
-                  { "id": "start", "label": "Start setup" },
-                  { "id": "stop", "label": "Stop" },
-                  { "id": "diagnostics", "label": "Diagnostics" },
-                  { "id": "work", "label": "Work mode" },
-                  { "id": "clear", "label": "Clear", "kind": "danger" }
+                  {
+                    "id": "start",
+                    "label": "Start setup"
+                  },
+                  {
+                    "id": "stop",
+                    "label": "Stop"
+                  },
+                  {
+                    "id": "diagnostics",
+                    "label": "Diagnostics"
+                  },
+                  {
+                    "id": "work",
+                    "label": "Work mode"
+                  },
+                  {
+                    "id": "clear",
+                    "label": "Clear",
+                    "kind": "danger"
+                  }
                 ]
               },
               "actions": [
@@ -226,8 +262,10 @@
                 },
                 {
                   "on": "click:work",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "cv_descriptor.cv_descriptor_work_modal",
+                    "surface": "modal",
                     "modalId": "cv_descriptor_work_modal"
                   }
                 },
@@ -335,8 +373,20 @@
                 "emptyText": "No runtime events"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "cv_descriptor_setup": {
+                "view": "cv_descriptor.cv_descriptor_setup_modal"
+              }
+            },
+            "defaultRoute": "cv_descriptor_setup"
+          }
+        },
+        "implements": [
+          "cv_descriptor.cv_descriptor_setup_modal"
+        ]
       },
       "cv_descriptor_work_modal": {
         "title": "CV Descriptor Work",
@@ -350,9 +400,18 @@
             "type": "split",
             "pattern": "split",
             "areas": [
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" },
-              { "id": "bottom", "role": "footer" }
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
             ]
           },
           "widgets": [
@@ -384,9 +443,18 @@
                 "variant": "stack",
                 "size": "small",
                 "buttons": [
-                  { "id": "start", "label": "Start work" },
-                  { "id": "stop", "label": "Stop" },
-                  { "id": "setup", "label": "Setup" }
+                  {
+                    "id": "start",
+                    "label": "Start work"
+                  },
+                  {
+                    "id": "stop",
+                    "label": "Stop"
+                  },
+                  {
+                    "id": "setup",
+                    "label": "Setup"
+                  }
                 ]
               },
               "actions": [
@@ -410,8 +478,10 @@
                 },
                 {
                   "on": "click:setup",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "cv_descriptor.cv_descriptor_setup_modal",
+                    "surface": "modal",
                     "modalId": "cv_descriptor_setup_modal"
                   }
                 }
@@ -460,8 +530,20 @@
                 "emptyText": "No match events"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "cv_descriptor_work": {
+                "view": "cv_descriptor.cv_descriptor_work_modal"
+              }
+            },
+            "defaultRoute": "cv_descriptor_work"
+          }
+        },
+        "implements": [
+          "cv_descriptor.cv_descriptor_work_modal"
+        ]
       }
     },
     "widgets": {}
@@ -479,5 +561,25 @@
       "id": "cv_descriptor_summary",
       "autoInstall": false
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "cv_descriptor.cv_descriptor_setup_modal": {
+        "title": "CV Descriptor Setup",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      },
+      "cv_descriptor.cv_descriptor_work_modal": {
+        "title": "CV Descriptor Work",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "cv_descriptor.cv_descriptor_setup_modal"
+  }
 }

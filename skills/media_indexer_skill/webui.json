@@ -13,7 +13,10 @@
         "медиа индекс",
         "индексер",
         "индекса"
-      ]
+      ],
+      "action": {
+        "navigate": "media_indexer_skill.media_indexer_modal"
+      }
     }
   ],
   "widgets": [],
@@ -513,8 +516,20 @@
                 "showDiagnostics": false
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "media_indexer": {
+                "view": "media_indexer_skill.media_indexer_modal"
+              }
+            },
+            "defaultRoute": "media_indexer"
+          }
+        },
+        "implements": [
+          "media_indexer_skill.media_indexer_modal"
+        ]
       }
     },
     "widgets": {}
@@ -617,5 +632,18 @@
       "id": "media_indexer_app",
       "autoInstall": true
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "media_indexer_skill.media_indexer_modal": {
+        "title": "Media Indexer",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "media_indexer_skill.media_indexer_modal"
+  }
 }

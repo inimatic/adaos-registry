@@ -256,13 +256,13 @@
       "icon": "image",
       "aliases": [
         "slideshow",
-        "\u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
-        "\u0441\u043b\u0430\u0439\u0434 \u0448\u043e\u0443",
-        "\u043f\u043e\u043a\u0430\u0437 \u0441\u043b\u0430\u0439\u0434\u043e\u0432"
+        "слайдшоу",
+        "слайд шоу",
+        "показ слайдов"
       ],
       "launchModal": "slideshow_modal",
       "action": {
-        "openModal": "slideshow_modal"
+        "navigate": "slideshow_skill.slideshow_modal"
       },
       "title_i18n": {
         "key": "slideshow.title"
@@ -713,8 +713,10 @@
                 },
                 {
                   "on": "click:folders",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "slideshow_skill.slideshow_folders_modal",
+                    "surface": "modal",
                     "modalId": "slideshow_folders_modal"
                   }
                 },
@@ -1506,11 +1508,23 @@
                 "key": "slideshow.last_command"
               }
             }
-          ]
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "slideshow": {
+                "view": "slideshow_skill.slideshow_modal"
+              }
+            },
+            "defaultRoute": "slideshow"
+          }
         },
         "title_i18n": {
           "key": "slideshow.redevice_slideshow"
-        }
+        },
+        "implements": [
+          "slideshow_skill.slideshow_modal"
+        ]
       },
       "slideshow_folders_modal": {
         "title": "Slideshow folders",
@@ -1647,11 +1661,23 @@
                 "key": "slideshow.folders"
               }
             }
-          ]
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "slideshow_folders": {
+                "view": "slideshow_skill.slideshow_folders_modal"
+              }
+            },
+            "defaultRoute": "slideshow_folders"
+          }
         },
         "title_i18n": {
           "key": "slideshow.folders_modal"
-        }
+        },
+        "implements": [
+          "slideshow_skill.slideshow_folders_modal"
+        ]
       }
     }
   },
@@ -1667,13 +1693,13 @@
           "play slideshow"
         ],
         "ru": [
-          "\u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0439 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
-          "\u043f\u043e\u043a\u0430\u0436\u0438 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
-          "\u0437\u0430\u043f\u0443\u0441\u0442\u0438 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443"
+          "показывай слайдшоу",
+          "покажи слайдшоу",
+          "запусти слайдшоу"
         ]
       },
       "examples": [
-        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0439 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
+        "Планшет, показывай слайдшоу",
         "Kitchen tablet start slideshow"
       ],
       "result_modes": [
@@ -1708,13 +1734,13 @@
           "pause slideshow"
         ],
         "ru": [
-          "\u043e\u0441\u0442\u0430\u043d\u043e\u0432\u0438 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
-          "\u0441\u0442\u043e\u043f \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
-          "\u043f\u0430\u0443\u0437\u0430 \u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443"
+          "останови слайдшоу",
+          "стоп слайдшоу",
+          "пауза слайдшоу"
         ]
       },
       "examples": [
-        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u0441\u0442\u043e\u043f",
+        "Планшет, стоп",
         "Kitchen tablet stop slideshow"
       ],
       "result_modes": [
@@ -1750,13 +1776,13 @@
           "slideshow next"
         ],
         "ru": [
-          "\u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f",
-          "\u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0438\u0439 \u0441\u043b\u0430\u0439\u0434",
-          "\u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0435 \u0444\u043e\u0442\u043e"
+          "следующая",
+          "следующий слайд",
+          "следующее фото"
         ]
       },
       "examples": [
-        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u0441\u043b\u0435\u0434\u0443\u044e\u0449\u0430\u044f",
+        "Планшет, следующая",
         "Kitchen tablet next photo"
       ],
       "result_modes": [
@@ -1792,13 +1818,13 @@
           "slideshow back"
         ],
         "ru": [
-          "\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0430\u044f",
-          "\u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0439 \u0441\u043b\u0430\u0439\u0434",
-          "\u043d\u0430\u0437\u0430\u0434"
+          "предыдущая",
+          "предыдущий слайд",
+          "назад"
         ]
       },
       "examples": [
-        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u043f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0430\u044f",
+        "Планшет, предыдущая",
         "Kitchen tablet previous photo"
       ],
       "result_modes": [
@@ -1833,13 +1859,13 @@
           "mark favorite"
         ],
         "ru": [
-          "\u0432 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435",
-          "\u0444\u0430\u0432\u043e\u0440\u0438\u0442",
-          "\u043e\u0442\u043c\u0435\u0442\u044c \u0444\u0430\u0432\u043e\u0440\u0438\u0442"
+          "в избранное",
+          "фаворит",
+          "отметь фаворит"
         ]
       },
       "examples": [
-        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u0432 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435",
+        "Планшет, в избранное",
         "Kitchen tablet favorite"
       ],
       "result_modes": [
@@ -1874,13 +1900,13 @@
           "telegram current photo"
         ],
         "ru": [
-          "\u043e\u0442\u043f\u0440\u0430\u0432\u044c \u0432 \u0442\u0435\u043b\u0435\u0433\u0440\u0430\u043c",
-          "\u0444\u043e\u0442\u043e \u0432 \u0442\u0435\u043b\u0435\u0433\u0440\u0430\u043c",
-          "\u043f\u0435\u0440\u0435\u0448\u043b\u0438 \u0432 \u0442\u0435\u043b\u0435\u0433\u0440\u0430\u043c"
+          "отправь в телеграм",
+          "фото в телеграм",
+          "перешли в телеграм"
         ]
       },
       "examples": [
-        "\u041f\u043b\u0430\u043d\u0448\u0435\u0442, \u043e\u0442\u043f\u0440\u0430\u0432\u044c \u0432 \u0442\u0435\u043b\u0435\u0433\u0440\u0430\u043c",
+        "Планшет, отправь в телеграм",
         "Kitchen tablet send to telegram"
       ],
       "result_modes": [
@@ -1916,13 +1942,13 @@
       "icon": "image",
       "aliases": [
         "slideshow",
-        "\u0441\u043b\u0430\u0439\u0434\u0448\u043e\u0443",
-        "\u0441\u043b\u0430\u0439\u0434 \u0448\u043e\u0443",
-        "\u043f\u043e\u043a\u0430\u0437 \u0441\u043b\u0430\u0439\u0434\u043e\u0432"
+        "слайдшоу",
+        "слайд шоу",
+        "показ слайдов"
       ],
       "launchModal": "slideshow_modal",
       "action": {
-        "openModal": "slideshow_modal"
+        "navigate": "slideshow_skill.slideshow_modal"
       },
       "autoInstall": true,
       "title_i18n": {
@@ -2041,92 +2067,112 @@
       "locale": "ru",
       "owner": "skill:slideshow_skill",
       "dictionary": {
-        "slideshow.title": "\u0421\u043b\u0430\u0439\u0434-\u0448\u043e\u0443",
-        "slideshow.subtitle": "\u041f\u043e\u043a\u0430\u0437 \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0438\u0439 \u0432 \u0432\u0438\u0434\u0436\u0435\u0442\u0435 \u0438, \u043f\u0440\u0438 \u043d\u0430\u043b\u0438\u0447\u0438\u0438, \u043d\u0430 ReDevice-\u0443\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u0430\u0445",
-        "slideshow.redevice_slideshow": "\u0421\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
-        "slideshow.empty.start": "\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u0435 \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443, \u0447\u0442\u043e\u0431\u044b \u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u0441\u043d\u0438\u043c\u043e\u043a.",
-        "slideshow.play": "\u041f\u0443\u0441\u043a",
-        "slideshow.stop": "\u0421\u0442\u043e\u043f",
-        "slideshow.previous": "\u041d\u0430\u0437\u0430\u0434",
-        "slideshow.next": "\u0412\u043f\u0435\u0440\u0435\u0434",
-        "slideshow.favorite": "\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435",
-        "slideshow.send_telegram": "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0432 Telegram",
-        "slideshow.close": "\u0417\u0430\u043a\u0440\u044b\u0442\u044c",
+        "slideshow.title": "Слайд-шоу",
+        "slideshow.subtitle": "Показ фотографий в виджете и, при наличии, на ReDevice-устройствах",
+        "slideshow.redevice_slideshow": "Слайд-шоу ReDevice",
+        "slideshow.empty.start": "Запустите слайд-шоу, чтобы показать текущий снимок.",
+        "slideshow.play": "Пуск",
+        "slideshow.stop": "Стоп",
+        "slideshow.previous": "Назад",
+        "slideshow.next": "Вперед",
+        "slideshow.favorite": "Избранное",
+        "slideshow.send_telegram": "Отправить в Telegram",
+        "slideshow.close": "Закрыть",
         "slideshow.telegram": "Telegram",
         "slideshow.endpoint": "Endpoint",
-        "slideshow.mode": "\u0420\u0435\u0436\u0438\u043c",
-        "slideshow.scope": "\u041e\u0431\u043b\u0430\u0441\u0442\u044c",
-        "slideshow.frame": "\u041a\u0430\u0434\u0440",
-        "slideshow.source_folder": "\u041f\u0430\u043f\u043a\u0430 \u0441 \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0438\u044f\u043c\u0438",
-        "slideshow.apply_source": "\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u0438\u0441\u0442\u043e\u0447\u043d\u0438\u043a",
-        "slideshow.source_helper": "\u0425\u0440\u0430\u043d\u0438\u0442\u0441\u044f \u0432 \u043f\u0430\u043c\u044f\u0442\u0438 \u043d\u0430\u0432\u044b\u043a\u0430. \u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u0438\u043d\u0434\u0435\u043a\u0441\u0430 \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f \u0432 \u0444\u043e\u043d\u0435 \u0438 \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u0442 \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435.",
-        "slideshow.actions": "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044f",
-        "slideshow.refresh_endpoints": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c endpoints",
-        "slideshow.refresh_index": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c \u0438\u043d\u0434\u0435\u043a\u0441",
-        "slideshow.cancel_index": "\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c \u0438\u043d\u0434\u0435\u043a\u0441",
-        "slideshow.folders": "\u041f\u0430\u043f\u043a\u0438",
-        "slideshow.cache": "\u041a\u0435\u0448",
-        "slideshow.cache_folder": "\u041a\u0435\u0448\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u0430\u043f\u043a\u0443",
-        "slideshow.preview_photos": "\u041f\u0440\u0435\u0434\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440 \u0444\u043e\u0442\u043e",
-        "slideshow.prev": "\u041d\u0430\u0437\u0430\u0434",
-        "slideshow.fav": "\u0418\u0437\u0431\u0440.",
+        "slideshow.mode": "Режим",
+        "slideshow.scope": "Область",
+        "slideshow.frame": "Кадр",
+        "slideshow.source_folder": "Папка с фотографиями",
+        "slideshow.apply_source": "Применить источник",
+        "slideshow.source_helper": "Хранится в памяти навыка. Обновление индекса выполняется в фоне и сохраняет избранное.",
+        "slideshow.actions": "Действия",
+        "slideshow.refresh_endpoints": "Обновить endpoints",
+        "slideshow.refresh_index": "Обновить индекс",
+        "slideshow.cancel_index": "Отменить индекс",
+        "slideshow.folders": "Папки",
+        "slideshow.cache": "Кеш",
+        "slideshow.cache_folder": "Кешировать папку",
+        "slideshow.preview_photos": "Предпросмотр фото",
+        "slideshow.prev": "Назад",
+        "slideshow.fav": "Избр.",
         "slideshow.endpoints": "ReDevice-endpoints",
-        "slideshow.empty.endpoints": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u0435 endpoints, \u0447\u0442\u043e\u0431\u044b \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c ReDevice-endpoints",
-        "slideshow.device": "\u0423\u0441\u0442\u0440\u043e\u0439\u0441\u0442\u0432\u043e",
-        "slideshow.online": "\u041e\u043d\u043b\u0430\u0439\u043d",
-        "slideshow.last_seen": "\u0411\u044b\u043b \u0432 \u0441\u0435\u0442\u0438",
-        "slideshow.code": "\u041a\u043e\u0434",
-        "slideshow.add_remove": "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c/\u0443\u0431\u0440\u0430\u0442\u044c",
-        "slideshow.only": "\u0422\u043e\u043b\u044c\u043a\u043e",
-        "slideshow.rename": "\u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c",
-        "slideshow.photo_index": "\u0418\u043d\u0434\u0435\u043a\u0441 \u0444\u043e\u0442\u043e",
-        "slideshow.run": "\u0417\u0430\u043f\u0443\u0441\u043a",
-        "slideshow.running": "\u0412\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f",
-        "slideshow.stopped": "\u041e\u0441\u0442\u0430\u043d\u043e\u0432\u043b\u0435\u043d\u043e",
-        "slideshow.order": "\u041f\u043e\u0440\u044f\u0434\u043e\u043a",
-        "slideshow.sequential": "\u041f\u043e\u0441\u043b\u0435\u0434\u043e\u0432\u0430\u0442\u0435\u043b\u044c\u043d\u043e",
-        "slideshow.random": "\u0421\u043b\u0443\u0447\u0430\u0439\u043d\u043e",
-        "slideshow.all_photos": "\u0412\u0441\u0435 \u0444\u043e\u0442\u043e",
-        "slideshow.favorites": "\u0418\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435",
-        "slideshow.endpoint_sync": "\u0421\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0430\u0446\u0438\u044f endpoints",
-        "slideshow.synchronous": "\u0421\u0438\u043d\u0445\u0440\u043e\u043d\u043d\u043e",
-        "slideshow.independent": "\u041d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e",
-        "slideshow.interval": "\u0418\u043d\u0442\u0435\u0440\u0432\u0430\u043b",
-        "slideshow.display": "\u041e\u0442\u043e\u0431\u0440\u0430\u0436\u0435\u043d\u0438\u0435",
-        "slideshow.fit": "\u0412\u043f\u0438\u0441\u0430\u0442\u044c",
-        "slideshow.crop": "\u041e\u0431\u0440\u0435\u0437\u0430\u0442\u044c",
-        "slideshow.surface": "\u041f\u043e\u0432\u0435\u0440\u0445\u043d\u043e\u0441\u0442\u044c",
-        "slideshow.fullscreen": "\u041f\u043e\u043b\u043d\u044b\u0439 \u044d\u043a\u0440\u0430\u043d",
-        "slideshow.panel": "\u041f\u0430\u043d\u0435\u043b\u044c",
-        "slideshow.current_photo": "\u0422\u0435\u043a\u0443\u0449\u0435\u0435 \u0444\u043e\u0442\u043e",
-        "slideshow.selected_endpoints": "\u0412\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0435 endpoints",
-        "slideshow.empty.no_endpoint": "Endpoint \u043d\u0435 \u0432\u044b\u0431\u0440\u0430\u043d",
-        "slideshow.display_name_for_rename": "\u0418\u043c\u044f \u0434\u043b\u044f \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u044f",
-        "slideshow.tablet": "\u041f\u043b\u0430\u043d\u0448\u0435\u0442",
-        "slideshow.use_name": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u0438\u043c\u044f",
-        "slideshow.rename_helper": "\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0435, \u0437\u0430\u0442\u0435\u043c \u043d\u0430\u0436\u043c\u0438\u0442\u0435 \u041f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u0442\u044c \u0432 \u0441\u0442\u0440\u043e\u043a\u0435 endpoint.",
-        "slideshow.aliases_for_rename": "\u041f\u0441\u0435\u0432\u0434\u043e\u043d\u0438\u043c\u044b \u0434\u043b\u044f \u043f\u0435\u0440\u0435\u0438\u043c\u0435\u043d\u043e\u0432\u0430\u043d\u0438\u044f",
-        "slideshow.aliases_placeholder": "\u041a\u0443\u0445\u043e\u043d\u043d\u044b\u0439 \u043f\u043b\u0430\u043d\u0448\u0435\u0442, TF201",
-        "slideshow.use_aliases": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c \u043f\u0441\u0435\u0432\u0434\u043e\u043d\u0438\u043c\u044b",
-        "slideshow.aliases_helper": "\u0418\u043c\u0435\u043d\u0430 \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043f\u044f\u0442\u0443\u044e \u0434\u043b\u044f \u0433\u043e\u043b\u043e\u0441\u043e\u0432\u043e\u0433\u043e \u0438 UI-\u0441\u043e\u043f\u043e\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u0438\u044f.",
-        "slideshow.empty.preview": "\u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u043f\u0440\u0435\u0434\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440 \u0444\u043e\u0442\u043e, \u0447\u0442\u043e\u0431\u044b \u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c \u043f\u0440\u043e\u0438\u043d\u0434\u0435\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u044b\u0435 \u0444\u0430\u0439\u043b\u044b. \u041e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0438\u0435 \u0438\u043d\u0434\u0435\u043a\u0441\u0430 \u0432\u044b\u043f\u043e\u043b\u043d\u044f\u0435\u0442\u0441\u044f \u0432 \u0444\u043e\u043d\u0435.",
-        "slideshow.file": "\u0424\u0430\u0439\u043b",
-        "slideshow.size": "\u0420\u0430\u0437\u043c\u0435\u0440",
-        "slideshow.modified": "\u0418\u0437\u043c\u0435\u043d\u0435\u043d",
-        "slideshow.last_command": "\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u044f\u044f \u043a\u043e\u043c\u0430\u043d\u0434\u0430",
-        "slideshow.empty.command": "\u041a\u043e\u043c\u0430\u043d\u0434 \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442",
-        "slideshow.folder": "\u041f\u0430\u043f\u043a\u0430",
-        "slideshow.photos": "\u0424\u043e\u0442\u043e",
-        "slideshow.use": "\u0418\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u0442\u044c",
-        "slideshow.empty.folders": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u0435 \u0438\u043d\u0434\u0435\u043a\u0441, \u0447\u0442\u043e\u0431\u044b \u0437\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u043f\u0430\u043f\u043a\u0438 \u0432\u0435\u0440\u0445\u043d\u0435\u0433\u043e \u0443\u0440\u043e\u0432\u043d\u044f. \u0411\u043e\u043b\u044c\u0448\u0438\u0435 \u043d\u0430\u0431\u043e\u0440\u044b \u043f\u0430\u043f\u043e\u043a \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u044b \u0432 \u044d\u0442\u043e\u043c \u043f\u0440\u0435\u0434\u0441\u0442\u0430\u0432\u043b\u0435\u043d\u0438\u0438.",
-        "slideshow.folders_modal": "\u041f\u0430\u043f\u043a\u0438 \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443",
-        "slideshow.voice.start": "\u0417\u0430\u043f\u0443\u0441\u0442\u0438\u0442\u044c \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
-        "slideshow.voice.stop": "\u041e\u0441\u0442\u0430\u043d\u043e\u0432\u0438\u0442\u044c \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
-        "slideshow.voice.next": "\u0421\u043b\u0435\u0434\u0443\u044e\u0449\u0435\u0435 \u0444\u043e\u0442\u043e \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
-        "slideshow.voice.previous": "\u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0435\u0435 \u0444\u043e\u0442\u043e \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice",
-        "slideshow.voice.favorite": "\u041f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u044c \u0438\u0437\u0431\u0440\u0430\u043d\u043d\u043e\u0435 \u0444\u043e\u0442\u043e ReDevice",
-        "slideshow.voice.telegram": "\u041e\u0442\u043f\u0440\u0430\u0432\u0438\u0442\u044c \u0444\u043e\u0442\u043e \u0441\u043b\u0430\u0439\u0434-\u0448\u043e\u0443 ReDevice \u0432 Telegram"
+        "slideshow.empty.endpoints": "Обновите endpoints, чтобы загрузить ReDevice-endpoints",
+        "slideshow.device": "Устройство",
+        "slideshow.online": "Онлайн",
+        "slideshow.last_seen": "Был в сети",
+        "slideshow.code": "Код",
+        "slideshow.add_remove": "Добавить/убрать",
+        "slideshow.only": "Только",
+        "slideshow.rename": "Переименовать",
+        "slideshow.photo_index": "Индекс фото",
+        "slideshow.run": "Запуск",
+        "slideshow.running": "Выполняется",
+        "slideshow.stopped": "Остановлено",
+        "slideshow.order": "Порядок",
+        "slideshow.sequential": "Последовательно",
+        "slideshow.random": "Случайно",
+        "slideshow.all_photos": "Все фото",
+        "slideshow.favorites": "Избранное",
+        "slideshow.endpoint_sync": "Синхронизация endpoints",
+        "slideshow.synchronous": "Синхронно",
+        "slideshow.independent": "Независимо",
+        "slideshow.interval": "Интервал",
+        "slideshow.display": "Отображение",
+        "slideshow.fit": "Вписать",
+        "slideshow.crop": "Обрезать",
+        "slideshow.surface": "Поверхность",
+        "slideshow.fullscreen": "Полный экран",
+        "slideshow.panel": "Панель",
+        "slideshow.current_photo": "Текущее фото",
+        "slideshow.selected_endpoints": "Выбранные endpoints",
+        "slideshow.empty.no_endpoint": "Endpoint не выбран",
+        "slideshow.display_name_for_rename": "Имя для переименования",
+        "slideshow.tablet": "Планшет",
+        "slideshow.use_name": "Использовать имя",
+        "slideshow.rename_helper": "Заполните значение, затем нажмите Переименовать в строке endpoint.",
+        "slideshow.aliases_for_rename": "Псевдонимы для переименования",
+        "slideshow.aliases_placeholder": "Кухонный планшет, TF201",
+        "slideshow.use_aliases": "Использовать псевдонимы",
+        "slideshow.aliases_helper": "Имена через запятую для голосового и UI-сопоставления.",
+        "slideshow.empty.preview": "Нажмите предпросмотр фото, чтобы показать проиндексированные файлы. Обновление индекса выполняется в фоне.",
+        "slideshow.file": "Файл",
+        "slideshow.size": "Размер",
+        "slideshow.modified": "Изменен",
+        "slideshow.last_command": "Последняя команда",
+        "slideshow.empty.command": "Команд слайд-шоу пока нет",
+        "slideshow.folder": "Папка",
+        "slideshow.photos": "Фото",
+        "slideshow.use": "Использовать",
+        "slideshow.empty.folders": "Обновите индекс, чтобы загрузить папки верхнего уровня. Большие наборы папок ограничены в этом представлении.",
+        "slideshow.folders_modal": "Папки слайд-шоу",
+        "slideshow.voice.start": "Запустить слайд-шоу ReDevice",
+        "slideshow.voice.stop": "Остановить слайд-шоу ReDevice",
+        "slideshow.voice.next": "Следующее фото слайд-шоу ReDevice",
+        "slideshow.voice.previous": "Предыдущее фото слайд-шоу ReDevice",
+        "slideshow.voice.favorite": "Переключить избранное фото ReDevice",
+        "slideshow.voice.telegram": "Отправить фото слайд-шоу ReDevice в Telegram"
       }
     }
+  },
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "slideshow_skill.slideshow_folders_modal": {
+        "title": "Slideshow folders",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      },
+      "slideshow_skill.slideshow_modal": {
+        "title": "ReDevice slideshow",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "slideshow_skill.slideshow_folders_modal"
   }
 }

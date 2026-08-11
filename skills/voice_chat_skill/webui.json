@@ -1,223 +1,276 @@
 {
-	"$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
-	"webio": {
-		"receivers": {
-			"voice_chat.messages": {
-				"mode": "replace",
-				"transport": "hub",
-				"snapshotPolicy": "on_subscribe",
-				"sequenceField": "last_refresh_ts",
-				"updatedAtField": "last_refresh_ts",
-				"budget": {
-					"maxPayloadBytes": 16384,
-					"maxFanout": 3,
-					"maxPublishHz": 8,
-					"maxSnapshotHz": 1,
-					"maxItems": 8
-				},
-				"guardVisibility": {
-					"degradedState": "Keep last local chat tail; YJS only carries compact voice status.",
-					"log": "service.voice_chat_skill.runtime.log",
-					"quarantine": false,
-					"metric": "webio_stream_guard.voice_chat.messages"
-				},
-				"route": {
-					"kind": "stream",
-					"owner": "skill:voice_chat_skill",
-					"surface": "scenario:web_desktop.voice_chat.messages",
-					"firstPaint": "Empty chat list until stream snapshot arrives.",
-					"recovery": "snapshot requested on stream subscribe"
-				},
-				"initialState": {
-					"messages": [],
-					"last_refresh_ts": 0,
-					"message_count": 0
-				}
-			}
-		}
-	},
-	"apps": [
-		{
-			"id": "voice_chat_app",
-			"title": "Voice",
-			"icon": "mic-outline",
-			"launchModal": "voice_chat_modal"
-		}
-	],
-	"registry": {
-		"modals": {
-			"voice_chat_modal": {
-				"title": "Voice",
-				"schema": {
-					"id": "voice_chat_modal",
-					"interaction": {
-						"initialFocus": "widget:chat"
-					},
-				"layout": {
-					"type": "single",
-					"pattern": "stack",
-					"areas": [
-							{
-								"id": "main",
-								"role": "main"
-							}
-						]
-					},
-					"widgets": [
-						{
-							"id": "voice-input",
-							"type": "ui.voiceInput",
-							"area": "main",
-							"inputs": {
-								"lang": "ru-RU",
-								"startLabel": "🎙️ Слушать",
-								"stopLabel": "⏹️ Стоп",
-								"sendCommand": "voice.chat.user",
-								"scope": "shared",
-								"voiceDiagnostics": false,
-								"nonBlocking": true,
-								"meta": { "route_id": "voice_chat", "voice_chat_scope": "shared" },
-								"ttsProfiles": {
-									"core": { "agent_id": "agent:core:general", "gender": "female", "voice": "ru-female" },
-									"arseni": { "agent_id": "agent:conversation_companions:arseni", "gender": "male", "voice": "ru-male" },
-									"nika": { "agent_id": "agent:conversation_companions:nika", "gender": "female", "voice": "ru-female" },
-									"mira": { "agent_id": "agent:conversation_companions:mira", "gender": "female", "voice": "ru-female" }
-								},
-								"voiceSession": {
-									"noInputTimeoutMs": 5000,
-									"bargeIn": true,
-									"ttsCache": {
-										"provider": "openai",
-										"enabled": false,
-										"scope": "node"
-									}
-								},
-								"stt": {
-									"provider": "phone",
-									"pushToTalk": false,
-									"vad": true,
-									"vadSilenceMs": 900,
-									"autoSend": true
-								}
-							}
-						},
-						{
-							"id": "voice-debug",
-							"type": "ui.voiceDebug",
-							"area": "main",
-							"inputs": {
-								"tracePath": "data/nlu_trace",
-								"flagsPath": "data/nlu_runtime",
-								"stages": [
-									{
-										"id": "regex",
-										"label": "RegExp",
-										"flag": "regex_enabled"
-									},
-									{
-										"id": "neuro_lite",
-										"label": "Neuro Lite",
-										"flag": "neuro_lite_enabled"
-									},
-									{
-										"id": "neural",
-										"label": "Neural",
-										"flag": "neural_enabled"
-									},
-									{
-										"id": "rasa",
-										"label": "RASA",
-										"flag": "rasa_enabled"
-									},
-									{
-										"id": "nlu_teacher",
-										"label": "Use NLU Teacher",
-										"flag": "nlu_teacher_enabled"
-									}
-								]
-							}
-						},
-						{
-							"id": "chat",
-							"type": "ui.chat",
-							"area": "main",
-							"title": "Voice chat",
-							"dataSource": {
-								"kind": "stream",
-								"receiver": "voice_chat.messages",
-								"transport": "hub",
-								"scope": "shared"
-							},
-							"inputs": {
-								"openCommand": "voice.chat.open",
-								"sendCommand": "voice.chat.user",
-								"scope": "shared",
-								"meta": { "route_id": "voice_chat", "voice_chat_scope": "shared" },
-								"alignRightFrom": "user",
-								"autoSpeak": true,
-								"autoSpeakFrom": "hub",
-								"autoSpeakLang": "ru-RU"
-							}
-						}
-					]
-				}
-			}
-		},
-		"widgets": {}
-	},
-	"ydoc_defaults": {
-		"data/voice_chat": {
-			"status": "empty",
-			"message_count": 0,
-			"last_message": null,
-			"last_refresh_ts": 0,
-			"stream_ref": "voice_chat.messages"
-		},
-		"data/nlu_runtime": {
-			"flags": {
-				"regex_enabled": true,
-				"neuro_lite_enabled": true,
-				"neural_enabled": true,
-				"rasa_enabled": true,
-				"nlu_teacher_enabled": true
-			},
-			"updated_at": 0,
-			"updated_by": "webui.default"
-		}
-	},
-	"widgets": [
-		{
-			"id": "voice_chat_widget",
-			"title": "Voice Chat",
-			"subtitle": "Shared voice discussion",
-			"icon": "mic-outline",
-			"type": "ui.chat",
-			"source": "skill:voice_chat_skill",
-			"dataSource": {
-				"kind": "stream",
-				"receiver": "voice_chat.messages",
-				"transport": "hub",
-				"scope": "shared"
-			},
-			"inputs": {
-				"openCommand": "voice.chat.open",
-				"sendCommand": "voice.chat.user",
-				"scope": "shared",
-				"nonBlocking": true,
-				"meta": { "route_id": "voice_chat", "voice_chat_scope": "shared" },
-				"alignRightFrom": "user",
-				"autoSpeak": false,
-				"autoSpeakFrom": "hub",
-				"autoSpeakLang": "ru-RU"
-			}
-		}
-	],
-	"contributions": [
-		{
-			"extensionPoint": "desktop.apps",
-			"type": "app",
-			"id": "voice_chat_app",
-			"autoInstall": true
-		}
-	]
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "webio": {
+    "receivers": {
+      "voice_chat.messages": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "sequenceField": "last_refresh_ts",
+        "updatedAtField": "last_refresh_ts",
+        "budget": {
+          "maxPayloadBytes": 16384,
+          "maxFanout": 3,
+          "maxPublishHz": 8,
+          "maxSnapshotHz": 1,
+          "maxItems": 8
+        },
+        "guardVisibility": {
+          "degradedState": "Keep last local chat tail; YJS only carries compact voice status.",
+          "log": "service.voice_chat_skill.runtime.log",
+          "quarantine": false,
+          "metric": "webio_stream_guard.voice_chat.messages"
+        },
+        "route": {
+          "kind": "stream",
+          "owner": "skill:voice_chat_skill",
+          "surface": "scenario:web_desktop.voice_chat.messages",
+          "firstPaint": "Empty chat list until stream snapshot arrives.",
+          "recovery": "snapshot requested on stream subscribe"
+        },
+        "initialState": {
+          "messages": [],
+          "last_refresh_ts": 0,
+          "message_count": 0
+        }
+      }
+    }
+  },
+  "apps": [
+    {
+      "id": "voice_chat_app",
+      "title": "Voice",
+      "icon": "mic-outline",
+      "launchModal": "voice_chat_modal",
+      "action": {
+        "navigate": "voice_chat_skill.voice_chat_modal"
+      }
+    }
+  ],
+  "registry": {
+    "modals": {
+      "voice_chat_modal": {
+        "title": "Voice",
+        "schema": {
+          "id": "voice_chat_modal",
+          "interaction": {
+            "initialFocus": "widget:chat"
+          },
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "voice-input",
+              "type": "ui.voiceInput",
+              "area": "main",
+              "inputs": {
+                "lang": "ru-RU",
+                "startLabel": "🎙️ Слушать",
+                "stopLabel": "⏹️ Стоп",
+                "sendCommand": "voice.chat.user",
+                "scope": "shared",
+                "voiceDiagnostics": false,
+                "nonBlocking": true,
+                "meta": {
+                  "route_id": "voice_chat",
+                  "voice_chat_scope": "shared"
+                },
+                "ttsProfiles": {
+                  "core": {
+                    "agent_id": "agent:core:general",
+                    "gender": "female",
+                    "voice": "ru-female"
+                  },
+                  "arseni": {
+                    "agent_id": "agent:conversation_companions:arseni",
+                    "gender": "male",
+                    "voice": "ru-male"
+                  },
+                  "nika": {
+                    "agent_id": "agent:conversation_companions:nika",
+                    "gender": "female",
+                    "voice": "ru-female"
+                  },
+                  "mira": {
+                    "agent_id": "agent:conversation_companions:mira",
+                    "gender": "female",
+                    "voice": "ru-female"
+                  }
+                },
+                "voiceSession": {
+                  "noInputTimeoutMs": 5000,
+                  "bargeIn": true,
+                  "ttsCache": {
+                    "provider": "openai",
+                    "enabled": false,
+                    "scope": "node"
+                  }
+                },
+                "stt": {
+                  "provider": "phone",
+                  "pushToTalk": false,
+                  "vad": true,
+                  "vadSilenceMs": 900,
+                  "autoSend": true
+                }
+              }
+            },
+            {
+              "id": "voice-debug",
+              "type": "ui.voiceDebug",
+              "area": "main",
+              "inputs": {
+                "tracePath": "data/nlu_trace",
+                "flagsPath": "data/nlu_runtime",
+                "stages": [
+                  {
+                    "id": "regex",
+                    "label": "RegExp",
+                    "flag": "regex_enabled"
+                  },
+                  {
+                    "id": "neuro_lite",
+                    "label": "Neuro Lite",
+                    "flag": "neuro_lite_enabled"
+                  },
+                  {
+                    "id": "neural",
+                    "label": "Neural",
+                    "flag": "neural_enabled"
+                  },
+                  {
+                    "id": "rasa",
+                    "label": "RASA",
+                    "flag": "rasa_enabled"
+                  },
+                  {
+                    "id": "nlu_teacher",
+                    "label": "Use NLU Teacher",
+                    "flag": "nlu_teacher_enabled"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "chat",
+              "type": "ui.chat",
+              "area": "main",
+              "title": "Voice chat",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "voice_chat.messages",
+                "transport": "hub",
+                "scope": "shared"
+              },
+              "inputs": {
+                "openCommand": "voice.chat.open",
+                "sendCommand": "voice.chat.user",
+                "scope": "shared",
+                "meta": {
+                  "route_id": "voice_chat",
+                  "voice_chat_scope": "shared"
+                },
+                "alignRightFrom": "user",
+                "autoSpeak": true,
+                "autoSpeakFrom": "hub",
+                "autoSpeakLang": "ru-RU"
+              }
+            }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "voice_chat": {
+                "view": "voice_chat_skill.voice_chat_modal"
+              }
+            },
+            "defaultRoute": "voice_chat"
+          }
+        },
+        "implements": [
+          "voice_chat_skill.voice_chat_modal"
+        ]
+      }
+    },
+    "widgets": {}
+  },
+  "ydoc_defaults": {
+    "data/voice_chat": {
+      "status": "empty",
+      "message_count": 0,
+      "last_message": null,
+      "last_refresh_ts": 0,
+      "stream_ref": "voice_chat.messages"
+    },
+    "data/nlu_runtime": {
+      "flags": {
+        "regex_enabled": true,
+        "neuro_lite_enabled": true,
+        "neural_enabled": true,
+        "rasa_enabled": true,
+        "nlu_teacher_enabled": true
+      },
+      "updated_at": 0,
+      "updated_by": "webui.default"
+    }
+  },
+  "widgets": [
+    {
+      "id": "voice_chat_widget",
+      "title": "Voice Chat",
+      "subtitle": "Shared voice discussion",
+      "icon": "mic-outline",
+      "type": "ui.chat",
+      "source": "skill:voice_chat_skill",
+      "dataSource": {
+        "kind": "stream",
+        "receiver": "voice_chat.messages",
+        "transport": "hub",
+        "scope": "shared"
+      },
+      "inputs": {
+        "openCommand": "voice.chat.open",
+        "sendCommand": "voice.chat.user",
+        "scope": "shared",
+        "nonBlocking": true,
+        "meta": {
+          "route_id": "voice_chat",
+          "voice_chat_scope": "shared"
+        },
+        "alignRightFrom": "user",
+        "autoSpeak": false,
+        "autoSpeakFrom": "hub",
+        "autoSpeakLang": "ru-RU"
+      }
+    }
+  ],
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "voice_chat_app",
+      "autoInstall": true
+    }
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "voice_chat_skill.voice_chat_modal": {
+        "title": "Voice",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "voice_chat_skill.voice_chat_modal"
+  }
 }

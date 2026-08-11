@@ -226,8 +226,10 @@
                             "actions": [
                                 {
                                     "on": "click:show-process",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.process",
+                                        "surface": "modal",
                                         "modalId": "process"
                                     }
                                 },
@@ -270,22 +272,28 @@
                                 },
                                 {
                                     "on": "click:start-implementation",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.automation",
+                                        "surface": "modal",
                                         "modalId": "automation"
                                     }
                                 },
                                 {
                                     "on": "click:prepare-trial",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.publication",
+                                        "surface": "modal",
                                         "modalId": "publication"
                                     }
                                 },
                                 {
                                     "on": "click:publication",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.publication",
+                                        "surface": "modal",
                                         "modalId": "publication"
                                     }
                                 }
@@ -432,8 +440,10 @@
                             "actions": [
                                 {
                                     "on": "click:choose-file",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.file-picker",
+                                        "surface": "modal",
                                         "modalId": "file-picker"
                                     }
                                 }
@@ -540,9 +550,25 @@
                                 "variant": "toolbar",
                                 "size": "small",
                                 "buttons": [
-                                    {"id": "initialize", "label": "Initialize", "icon": "flask-outline", "title": "Связать выбранный research-direction skill с durable ledger ОИ."},
-                                    {"id": "sync", "label": "Sync sources", "icon": "sync-outline", "title": "Сверить текущий immutable SourceBundle после загрузки файлов."},
-                                    {"id": "accept", "label": "Accept prototype", "icon": "shield-checkmark-outline", "enabledIf": "$state.researchPrototypeDigest !== null", "title": "Принять точную ревизию, создать Forge checkpoint и Automation Brief. Codex не запускается."}
+                                    {
+                                        "id": "initialize",
+                                        "label": "Initialize",
+                                        "icon": "flask-outline",
+                                        "title": "Связать выбранный research-direction skill с durable ledger ОИ."
+                                    },
+                                    {
+                                        "id": "sync",
+                                        "label": "Sync sources",
+                                        "icon": "sync-outline",
+                                        "title": "Сверить текущий immutable SourceBundle после загрузки файлов."
+                                    },
+                                    {
+                                        "id": "accept",
+                                        "label": "Accept prototype",
+                                        "icon": "shield-checkmark-outline",
+                                        "enabledIf": "$state.researchPrototypeDigest !== null",
+                                        "title": "Принять точную ревизию, создать Forge checkpoint и Automation Brief. Codex не запускается."
+                                    }
                                 ]
                             },
                             "actions": [
@@ -550,15 +576,24 @@
                                     "on": "click:initialize",
                                     "type": "callSkill",
                                     "target": "research_orchestrator_skill.initialize_direction",
-                                    "params": {"direction_id": "$state.selectedProjectId", "title": "$state.selectedProjectTitle"},
-                                    "invalidates": ["research.formulation"]
+                                    "params": {
+                                        "direction_id": "$state.selectedProjectId",
+                                        "title": "$state.selectedProjectTitle"
+                                    },
+                                    "invalidates": [
+                                        "research.formulation"
+                                    ]
                                 },
                                 {
                                     "on": "click:sync",
                                     "type": "callSkill",
                                     "target": "research_orchestrator_skill.sync_source_bundle",
-                                    "params": {"direction_id": "$state.selectedProjectId"},
-                                    "invalidates": ["research.formulation"]
+                                    "params": {
+                                        "direction_id": "$state.selectedProjectId"
+                                    },
+                                    "invalidates": [
+                                        "research.formulation"
+                                    ]
                                 },
                                 {
                                     "on": "click:accept",
@@ -570,7 +605,11 @@
                                         "expected_generation": "$state.researchGeneration",
                                         "idempotency_key": "builder-accept-$state.selectedProjectId-$state.researchGeneration"
                                     },
-                                    "invalidates": ["research.formulation", "research.activity", "research.automation_brief"]
+                                    "invalidates": [
+                                        "research.formulation",
+                                        "research.activity",
+                                        "research.automation_brief"
+                                    ]
                                 }
                             ]
                         },
@@ -594,14 +633,22 @@
                                     "on": "uploaded",
                                     "type": "callSkill",
                                     "target": "research_orchestrator_skill.initialize_direction",
-                                    "params": {"direction_id": "$state.selectedProjectId", "title": "$state.selectedProjectTitle"}
+                                    "params": {
+                                        "direction_id": "$state.selectedProjectId",
+                                        "title": "$state.selectedProjectTitle"
+                                    }
                                 },
                                 {
                                     "on": "uploaded",
                                     "type": "callSkill",
                                     "target": "research_orchestrator_skill.sync_source_bundle",
-                                    "params": {"direction_id": "$state.selectedProjectId"},
-                                    "invalidates": ["research.formulation", "research.activity"]
+                                    "params": {
+                                        "direction_id": "$state.selectedProjectId"
+                                    },
+                                    "invalidates": [
+                                        "research.formulation",
+                                        "research.activity"
+                                    ]
                                 }
                             ]
                         },
@@ -614,18 +661,34 @@
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "research_orchestrator_skill.get_direction",
-                                "params": {"direction_id": "$state.selectedProjectId"},
+                                "params": {
+                                    "direction_id": "$state.selectedProjectId"
+                                },
                                 "cacheTtlMs": 0,
-                                "invalidationTags": ["research.formulation"],
+                                "invalidationTags": [
+                                    "research.formulation"
+                                ],
                                 "preserveLastValue": true
                             },
                             "inputs": {
                                 "compact": true,
                                 "fields": [
-                                    {"key": "direction.status", "label": "Stage"},
-                                    {"key": "direction.generation", "label": "Generation"},
-                                    {"key": "source_bundle.generation", "label": "Source bundle"},
-                                    {"key": "current_prototype.revision", "label": "Prototype"}
+                                    {
+                                        "key": "direction.status",
+                                        "label": "Stage"
+                                    },
+                                    {
+                                        "key": "direction.generation",
+                                        "label": "Generation"
+                                    },
+                                    {
+                                        "key": "source_bundle.generation",
+                                        "label": "Source bundle"
+                                    },
+                                    {
+                                        "key": "current_prototype.revision",
+                                        "label": "Prototype"
+                                    }
                                 ],
                                 "stateBindings": {
                                     "researchGeneration": "direction.generation",
@@ -642,12 +705,18 @@
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "research_orchestrator_skill.get_direction",
-                                "params": {"direction_id": "$state.selectedProjectId"},
+                                "params": {
+                                    "direction_id": "$state.selectedProjectId"
+                                },
                                 "cacheTtlMs": 0,
-                                "invalidationTags": ["research.formulation"],
+                                "invalidationTags": [
+                                    "research.formulation"
+                                ],
                                 "preserveLastValue": true
                             },
-                            "inputs": {"bindField": "content"}
+                            "inputs": {
+                                "bindField": "content"
+                            }
                         },
                         {
                             "area": "center",
@@ -660,7 +729,11 @@
                                 "receiver": "voice_chat.messages",
                                 "scope": "shared",
                                 "transport": "hub",
-                                "params": {"conversation_id": "$state.researchConversationId", "conversation_topic_id": "research:$state.selectedProjectId", "dialog_channel_id": "research_orchestrator"}
+                                "params": {
+                                    "conversation_id": "$state.researchConversationId",
+                                    "conversation_topic_id": "research:$state.selectedProjectId",
+                                    "dialog_channel_id": "research_orchestrator"
+                                }
                             },
                             "inputs": {
                                 "autoGrow": true,
@@ -694,12 +767,20 @@
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "research_orchestrator_skill.get_activity",
-                                "params": {"direction_id": "$state.selectedProjectId", "limit": 100},
+                                "params": {
+                                    "direction_id": "$state.selectedProjectId",
+                                    "limit": 100
+                                },
                                 "cacheTtlMs": 0,
-                                "invalidationTags": ["research.activity", "research.formulation"],
+                                "invalidationTags": [
+                                    "research.activity",
+                                    "research.formulation"
+                                ],
                                 "preserveLastValue": true
                             },
-                            "inputs": {"bindField": "content"}
+                            "inputs": {
+                                "bindField": "content"
+                            }
                         },
                         {
                             "area": "right",
@@ -710,12 +791,20 @@
                             "dataSource": {
                                 "kind": "skill",
                                 "name": "research_orchestrator_skill.get_automation_brief",
-                                "params": {"direction_id": "$state.selectedProjectId"},
+                                "params": {
+                                    "direction_id": "$state.selectedProjectId"
+                                },
                                 "cacheTtlMs": 0,
-                                "invalidationTags": ["research.automation_brief"],
+                                "invalidationTags": [
+                                    "research.automation_brief"
+                                ],
                                 "preserveLastValue": true
                             },
-                            "inputs": {"bindField": "content", "languageField": "language", "copyButton": true}
+                            "inputs": {
+                                "bindField": "content",
+                                "languageField": "language",
+                                "copyButton": true
+                            }
                         },
                         {
                             "area": "center",
@@ -1172,16 +1261,20 @@
                                 },
                                 {
                                     "on": "click:publish",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.confirm-publish",
+                                        "surface": "modal",
                                         "modalId": "confirm-publish"
                                     },
                                     "enabledIf": "$state.canAcceptCandidate === true"
                                 },
                                 {
                                     "on": "click:delete",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.confirm-delete",
+                                        "surface": "modal",
                                         "modalId": "confirm-delete"
                                     }
                                 }
@@ -1547,8 +1640,10 @@
                             "actions": [
                                 {
                                     "on": "click:review-update",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.confirm-subscription-update",
+                                        "surface": "modal",
                                         "modalId": "confirm-subscription-update"
                                     }
                                 }
@@ -1578,8 +1673,10 @@
                                 {
                                     "enabledIf": "$state.projectArchived !== true",
                                     "on": "click:archive",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.confirm-archive",
+                                        "surface": "modal",
                                         "modalId": "confirm-archive"
                                     }
                                 }
@@ -1687,15 +1784,19 @@
                                 },
                                 {
                                     "on": "click:choose-project",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.project-picker",
+                                        "surface": "modal",
                                         "modalId": "project-picker"
                                     }
                                 },
                                 {
                                     "on": "click:show-process",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.process",
+                                        "surface": "modal",
                                         "modalId": "process"
                                     }
                                 }
@@ -1881,15 +1982,19 @@
                                 },
                                 {
                                     "on": "click:go-automation",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.automation",
+                                        "surface": "modal",
                                         "modalId": "automation"
                                     }
                                 },
                                 {
                                     "on": "click:go-publication",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.publication",
+                                        "surface": "modal",
                                         "modalId": "publication"
                                     }
                                 },
@@ -2191,8 +2296,10 @@
                                 },
                                 {
                                     "on": "click:show-qr",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.preview-qr",
+                                        "surface": "modal",
                                         "modalId": "preview-qr"
                                     }
                                 },
@@ -2290,8 +2397,10 @@
                             "actions": [
                                 {
                                     "on": "click:add-addendum",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "builder.technical-addendum",
+                                        "surface": "modal",
                                         "modalId": "technical-addendum"
                                     }
                                 }
@@ -2561,11 +2670,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.confirm.archive"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "confirm-archive": {
+                                    "view": "builder.confirm-archive"
+                                }
+                            },
+                            "defaultRoute": "confirm-archive"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.confirm.archive"
-                    }
+                    },
+                    "implements": [
+                        "builder.confirm-archive"
+                    ]
                 },
                 "file-picker": {
                     "title": "Файлы проекта",
@@ -2677,11 +2798,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.project.files"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "file-picker": {
+                                    "view": "builder.file-picker"
+                                }
+                            },
+                            "defaultRoute": "file-picker"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.project.files"
-                    }
+                    },
+                    "implements": [
+                        "builder.file-picker"
+                    ]
                 },
                 "preview-qr": {
                     "title": "QR для открытия preview",
@@ -2764,11 +2897,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.qr.to.open.preview"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "preview-qr": {
+                                    "view": "builder.preview-qr"
+                                }
+                            },
+                            "defaultRoute": "preview-qr"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.qr.to.open.preview"
-                    }
+                    },
+                    "implements": [
+                        "builder.preview-qr"
+                    ]
                 },
                 "project-picker": {
                     "title": "Выбор проекта",
@@ -2924,8 +3069,10 @@
                                     },
                                     {
                                         "on": "add",
-                                        "type": "openModal",
+                                        "type": "navigate",
                                         "params": {
+                                            "to": "builder.new-project",
+                                            "surface": "modal",
                                             "modalId": "new-project"
                                         }
                                     }
@@ -2943,11 +3090,23 @@
                         },
                         "interaction": {
                             "initialFocus": "widget:project-picker-list"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "project-picker": {
+                                    "view": "builder.project-picker"
+                                }
+                            },
+                            "defaultRoute": "project-picker"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.select.project"
-                    }
+                    },
+                    "implements": [
+                        "builder.project-picker"
+                    ]
                 },
                 "new-project": {
                     "title": "Новый DEV-проект",
@@ -3134,11 +3293,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.new.project"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "new-project": {
+                                    "view": "builder.new-project"
+                                }
+                            },
+                            "defaultRoute": "new-project"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.new.dev.project"
-                    }
+                    },
+                    "implements": [
+                        "builder.new-project"
+                    ]
                 },
                 "technical-addendum": {
                     "title": "Дополнение к ТЗ",
@@ -3218,11 +3389,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.technical.addendum"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "technical-addendum": {
+                                    "view": "builder.technical-addendum"
+                                }
+                            },
+                            "defaultRoute": "technical-addendum"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.specification.addendum"
-                    }
+                    },
+                    "implements": [
+                        "builder.technical-addendum"
+                    ]
                 },
                 "automation": {
                     "title": "Автоматизация Builder",
@@ -3441,11 +3624,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.automation"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "automation": {
+                                    "view": "builder.automation"
+                                }
+                            },
+                            "defaultRoute": "automation"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.builder.automation"
-                    }
+                    },
+                    "implements": [
+                        "builder.automation"
+                    ]
                 },
                 "publication": {
                     "title": "Публикация",
@@ -3601,16 +3796,20 @@
                                     },
                                     {
                                         "on": "click:publish",
-                                        "type": "openModal",
+                                        "type": "navigate",
                                         "params": {
+                                            "to": "builder.confirm-publish",
+                                            "surface": "modal",
                                             "modalId": "confirm-publish"
                                         },
                                         "enabledIf": "$state.canAcceptCandidate === true"
                                     },
                                     {
                                         "on": "click:delete",
-                                        "type": "openModal",
+                                        "type": "navigate",
                                         "params": {
+                                            "to": "builder.confirm-delete",
+                                            "surface": "modal",
                                             "modalId": "confirm-delete"
                                         }
                                     }
@@ -3654,11 +3853,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.publication.2ff2febe"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "publication": {
+                                    "view": "builder.publication"
+                                }
+                            },
+                            "defaultRoute": "publication"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.publication"
-                    }
+                    },
+                    "implements": [
+                        "builder.publication"
+                    ]
                 },
                 "confirm-subscription-update": {
                     "title": "Review stable update",
@@ -3848,11 +4059,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.review.stable.update"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "confirm-subscription-update": {
+                                    "view": "builder.confirm-subscription-update"
+                                }
+                            },
+                            "defaultRoute": "confirm-subscription-update"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.review.stable.update"
-                    }
+                    },
+                    "implements": [
+                        "builder.confirm-subscription-update"
+                    ]
                 },
                 "confirm-publish": {
                     "title": "Подтверждение публикации",
@@ -3953,11 +4176,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.confirm.publish"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "confirm-publish": {
+                                    "view": "builder.confirm-publish"
+                                }
+                            },
+                            "defaultRoute": "confirm-publish"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.confirm.publication"
-                    }
+                    },
+                    "implements": [
+                        "builder.confirm-publish"
+                    ]
                 },
                 "confirm-delete": {
                     "title": "Удаление проекта",
@@ -4057,11 +4292,23 @@
                         ],
                         "title_i18n": {
                             "key": "builder.text.confirm.delete"
+                        },
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "confirm-delete": {
+                                    "view": "builder.confirm-delete"
+                                }
+                            },
+                            "defaultRoute": "confirm-delete"
                         }
                     },
                     "title_i18n": {
                         "key": "builder.text.delete.project"
-                    }
+                    },
+                    "implements": [
+                        "builder.confirm-delete"
+                    ]
                 },
                 "process": {
                     "title": "Development process",
@@ -4165,8 +4412,20 @@
                                     }
                                 ]
                             }
-                        ]
-                    }
+                        ],
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "process": {
+                                    "view": "builder.process"
+                                }
+                            },
+                            "defaultRoute": "process"
+                        }
+                    },
+                    "implements": [
+                        "builder.process"
+                    ]
                 }
             },
             "resources": {
@@ -4185,6 +4444,98 @@
                     "path": "assets/i18n/ru.json",
                     "mime": "application/json",
                     "delivery": "core"
+                }
+            },
+            "interfaces": {
+                "builder": {
+                    "schema": "adaos.ui.skill_interface.v1",
+                    "views": {
+                        "builder.automation": {
+                            "title": "Автоматизация Builder",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.confirm-archive": {
+                            "title": "Подтвердите архивирование",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.confirm-delete": {
+                            "title": "Удаление проекта",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.confirm-publish": {
+                            "title": "Подтверждение публикации",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.confirm-subscription-update": {
+                            "title": "Review stable update",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.file-picker": {
+                            "title": "Файлы проекта",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.new-project": {
+                            "title": "Новый DEV-проект",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.preview-qr": {
+                            "title": "QR для открытия preview",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.process": {
+                            "title": "Development process",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.project-picker": {
+                            "title": "Выбор проекта",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.publication": {
+                            "title": "Публикация",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        },
+                        "builder.technical-addendum": {
+                            "title": "Дополнение к ТЗ",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        }
+                    },
+                    "defaultView": "builder.automation"
                 }
             }
         },

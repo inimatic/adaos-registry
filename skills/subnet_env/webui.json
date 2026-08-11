@@ -6,21 +6,51 @@
       "kind": "queryable_ui_section",
       "title": "Subnet environment variables",
       "labels": {
-        "en": ["subnet environment variables", "subnet env", "environment variables"],
-        "ru": ["переменные окружения подсети", "переменные подсети", "окружение подсети"]
+        "en": [
+          "subnet environment variables",
+          "subnet env",
+          "environment variables"
+        ],
+        "ru": [
+          "переменные окружения подсети",
+          "переменные подсети",
+          "окружение подсети"
+        ]
       },
-      "result_modes": ["open_ui", "voice_summary", "voice_and_ui"],
+      "result_modes": [
+        "open_ui",
+        "voice_summary",
+        "voice_and_ui"
+      ],
       "default_result_mode": "open_ui",
       "side_effect_class": "read_only",
       "query_contract": {
         "dataset": "subnet_env.effective_environment",
-        "fields": ["name", "value_state", "source", "scope"]
+        "fields": [
+          "name",
+          "value_state",
+          "source",
+          "scope"
+        ]
       },
       "activation": [
-        { "type": "desktop.open_modal", "params": { "modal_id": "subnet_env_modal" } },
-        { "type": "ui.affordance.activate", "params": { "affordance_id": "subnet_env.environment.effective" } }
+        {
+          "type": "desktop.open_modal",
+          "params": {
+            "modal_id": "subnet_env_modal"
+          }
+        },
+        {
+          "type": "ui.affordance.activate",
+          "params": {
+            "affordance_id": "subnet_env.environment.effective"
+          }
+        }
       ],
-      "verify": { "modal_id": "subnet_env_modal", "widget_id": "subnet-env-effective" }
+      "verify": {
+        "modal_id": "subnet_env_modal",
+        "widget_id": "subnet-env-effective"
+      }
     }
   ],
   "voice_affordances": [
@@ -30,15 +60,34 @@
       "parent": "subnet_env_modal",
       "title": "Effective environment",
       "labels": {
-        "en": ["effective environment", "subnet environment variables"],
-        "ru": ["эффективные переменные окружения", "переменные окружения подсети"]
+        "en": [
+          "effective environment",
+          "subnet environment variables"
+        ],
+        "ru": [
+          "эффективные переменные окружения",
+          "переменные окружения подсети"
+        ]
       },
       "side_effect_class": "ui_navigation",
       "activation": [
-        { "type": "desktop.open_modal", "params": { "modal_id": "subnet_env_modal" } },
-        { "type": "ui.focus_widget", "params": { "widget_id": "subnet-env-effective" } }
+        {
+          "type": "desktop.open_modal",
+          "params": {
+            "modal_id": "subnet_env_modal"
+          }
+        },
+        {
+          "type": "ui.focus_widget",
+          "params": {
+            "widget_id": "subnet-env-effective"
+          }
+        }
       ],
-      "verify": { "modal_id": "subnet_env_modal", "widget_id": "subnet-env-effective" }
+      "verify": {
+        "modal_id": "subnet_env_modal",
+        "widget_id": "subnet-env-effective"
+      }
     }
   ],
   "apps": [
@@ -53,7 +102,10 @@
         "subnet env"
       ],
       "icon": "git-network-outline",
-      "launchModal": "subnet_env_modal"
+      "launchModal": "subnet_env_modal",
+      "action": {
+        "navigate": "subnet_env.subnet_env_modal"
+      }
     }
   ],
   "widgets": [
@@ -356,9 +408,34 @@
                 }
               ]
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "subnet_env": {
+                "view": "subnet_env.subnet_env_modal"
+              }
+            },
+            "defaultRoute": "subnet_env"
+          }
+        },
+        "implements": [
+          "subnet_env.subnet_env_modal"
+        ]
       }
     }
+  },
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "subnet_env.subnet_env_modal": {
+        "title": "Subnet Environment",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "subnet_env.subnet_env_modal"
   }
 }

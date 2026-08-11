@@ -13,7 +13,10 @@
         "медиасервер",
         "медиа библиотека",
         "медиатека"
-      ]
+      ],
+      "action": {
+        "navigate": "mediaserver.mediaserver_modal"
+      }
     },
     {
       "id": "mediaserver_diagnostics_app",
@@ -25,7 +28,10 @@
         "mediaserver diagnostics",
         "media projection diagnostics",
         "media yjs guard"
-      ]
+      ],
+      "action": {
+        "navigate": "mediaserver.mediaserver_diagnostics_modal"
+      }
     }
   ],
   "widgets": [
@@ -92,8 +98,20 @@
                 "showDiagnostics": true
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "mediaserver": {
+                "view": "mediaserver.mediaserver_modal"
+              }
+            },
+            "defaultRoute": "mediaserver"
+          }
+        },
+        "implements": [
+          "mediaserver.mediaserver_modal"
+        ]
       },
       "mediaserver_diagnostics_modal": {
         "title": "Media Diagnostics",
@@ -168,8 +186,20 @@
                 "emptyText": "No diagnostic payload yet"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "mediaserver_diagnostics": {
+                "view": "mediaserver.mediaserver_diagnostics_modal"
+              }
+            },
+            "defaultRoute": "mediaserver_diagnostics"
+          }
+        },
+        "implements": [
+          "mediaserver.mediaserver_diagnostics_modal"
+        ]
       }
     },
     "widgets": {}
@@ -218,5 +248,25 @@
       "id": "mediaserver_widget",
       "autoInstall": true
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "mediaserver.mediaserver_diagnostics_modal": {
+        "title": "Media Diagnostics",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      },
+      "mediaserver.mediaserver_modal": {
+        "title": "Media Server",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "mediaserver.mediaserver_diagnostics_modal"
+  }
 }

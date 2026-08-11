@@ -25,11 +25,26 @@
       "label": "Demo metrics",
       "description": "Neutral semantic Web UI control task",
       "buttons": [
-        { "id": "open-demo", "label": "Open modal" },
-        { "id": "open-workspace", "label": "Workspace" },
-        { "id": "open-operations", "label": "Operations" },
-        { "id": "emit-skill", "label": "Skill event" },
-        { "id": "emit-host", "label": "Host event" }
+        {
+          "id": "open-demo",
+          "label": "Open modal"
+        },
+        {
+          "id": "open-workspace",
+          "label": "Workspace"
+        },
+        {
+          "id": "open-operations",
+          "label": "Operations"
+        },
+        {
+          "id": "emit-skill",
+          "label": "Skill event"
+        },
+        {
+          "id": "emit-host",
+          "label": "Host event"
+        }
       ]
     },
     "data/demo_metrics/table": {
@@ -120,38 +135,86 @@
           "metric_id": "cpu",
           "title": "CPU Load",
           "points": [
-            { "ts": "10:00", "value": 31 },
-            { "ts": "10:05", "value": 34 },
-            { "ts": "10:10", "value": 39 },
-            { "ts": "10:15", "value": 42 }
+            {
+              "ts": "10:00",
+              "value": 31
+            },
+            {
+              "ts": "10:05",
+              "value": 34
+            },
+            {
+              "ts": "10:10",
+              "value": 39
+            },
+            {
+              "ts": "10:15",
+              "value": 42
+            }
           ]
         },
         "memory": {
           "metric_id": "memory",
           "title": "Memory Pressure",
           "points": [
-            { "ts": "10:00", "value": 62 },
-            { "ts": "10:05", "value": 68 },
-            { "ts": "10:10", "value": 74 },
-            { "ts": "10:15", "value": 76 }
+            {
+              "ts": "10:00",
+              "value": 62
+            },
+            {
+              "ts": "10:05",
+              "value": 68
+            },
+            {
+              "ts": "10:10",
+              "value": 74
+            },
+            {
+              "ts": "10:15",
+              "value": 76
+            }
           ]
         },
         "queue": {
           "metric_id": "queue",
           "title": "Queue Depth",
           "points": [
-            { "ts": "10:00", "value": 4 },
-            { "ts": "10:05", "value": 6 },
-            { "ts": "10:10", "value": 5 },
-            { "ts": "10:15", "value": 7 }
+            {
+              "ts": "10:00",
+              "value": 4
+            },
+            {
+              "ts": "10:05",
+              "value": 6
+            },
+            {
+              "ts": "10:10",
+              "value": 5
+            },
+            {
+              "ts": "10:15",
+              "value": 7
+            }
           ]
         }
       },
       "points": [
-        { "ts": "10:00", "value": 31 },
-        { "ts": "10:05", "value": 34 },
-        { "ts": "10:10", "value": 39 },
-        { "ts": "10:15", "value": 42 }
+        {
+          "ts": "10:00",
+          "value": 31
+        },
+        {
+          "ts": "10:05",
+          "value": 34
+        },
+        {
+          "ts": "10:10",
+          "value": 39
+        },
+        {
+          "ts": "10:15",
+          "value": 42
+        }
       ]
     },
     "data/demo_metrics/chat": {
@@ -181,7 +244,10 @@
       "id": "demo_metrics_app",
       "title": "Demo Metrics",
       "icon": "bar-chart-outline",
-      "launchModal": "demo_metrics_modal"
+      "launchModal": "demo_metrics_modal",
+      "action": {
+        "navigate": "demo_metrics_skill.demo_metrics_modal"
+      }
     }
   ],
   "widgets": [
@@ -196,8 +262,12 @@
       "actions": [
         {
           "on": "click:open-demo",
-          "type": "openModal",
-          "params": { "modalId": "demo_metrics_modal" }
+          "type": "navigate",
+          "params": {
+            "to": "demo_metrics_skill.demo_metrics_modal",
+            "surface": "modal",
+            "modalId": "demo_metrics_modal"
+          }
         },
         {
           "on": "click:open-workspace",
@@ -210,8 +280,12 @@
         },
         {
           "on": "click:open-operations",
-          "type": "openModal",
-          "params": { "modalId": "demo_metrics_operations_modal" }
+          "type": "navigate",
+          "params": {
+            "to": "demo_metrics_skill.demo_metrics_operations_modal",
+            "surface": "modal",
+            "modalId": "demo_metrics_operations_modal"
+          }
         },
         {
           "on": "click:emit-skill",
@@ -244,9 +318,18 @@
             "type": "split",
             "pattern": "split",
             "areas": [
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" },
-              { "id": "bottom", "role": "footer" }
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
             ]
           },
           "widgets": [
@@ -261,11 +344,31 @@
               },
               "inputs": {
                 "columns": [
-                  { "key": "title", "label": "Metric" },
-                  { "key": "status", "label": "Status", "width": "120px" },
-                  { "key": "value", "label": "Value", "width": "100px" },
-                  { "key": "unit", "label": "Unit", "width": "90px" },
-                  { "key": "updated_at", "label": "Updated", "width": "180px", "mono": true }
+                  {
+                    "key": "title",
+                    "label": "Metric"
+                  },
+                  {
+                    "key": "status",
+                    "label": "Status",
+                    "width": "120px"
+                  },
+                  {
+                    "key": "value",
+                    "label": "Value",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "unit",
+                    "label": "Unit",
+                    "width": "90px"
+                  },
+                  {
+                    "key": "updated_at",
+                    "label": "Updated",
+                    "width": "180px",
+                    "mono": true
+                  }
                 ],
                 "emptyText": "No demo metrics yet"
               }
@@ -279,8 +382,14 @@
                 "variant": "stack",
                 "size": "small",
                 "buttons": [
-                  { "id": "emit-skill", "label": "Skill event" },
-                  { "id": "emit-host", "label": "Host event" }
+                  {
+                    "id": "emit-skill",
+                    "label": "Skill event"
+                  },
+                  {
+                    "id": "emit-host",
+                    "label": "Host event"
+                  }
                 ]
               },
               "actions": [
@@ -398,9 +507,18 @@
             "layout": {
               "pattern": "split",
               "areas": [
-                { "id": "main", "role": "main" },
-                { "id": "right", "role": "aux" },
-                { "id": "bottom", "role": "footer" }
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                },
+                {
+                  "id": "bottom",
+                  "role": "footer"
+                }
               ]
             },
             "viewState": [
@@ -421,9 +539,15 @@
                 "area": "main",
                 "title": "Metrics table",
                 "when": {
-                  "requiredCapabilities": ["listable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "listable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -437,12 +561,30 @@
                 },
                 "config": {
                   "columns": [
-                    { "key": "title", "label": "Metric" },
-                    { "key": "status", "label": "Status" },
-                    { "key": "value", "label": "Value" },
-                    { "key": "unit", "label": "Unit" },
-                    { "key": "updated_at", "label": "Updated" },
-                    { "key": "group", "label": "Group" }
+                    {
+                      "key": "title",
+                      "label": "Metric"
+                    },
+                    {
+                      "key": "status",
+                      "label": "Status"
+                    },
+                    {
+                      "key": "value",
+                      "label": "Value"
+                    },
+                    {
+                      "key": "unit",
+                      "label": "Unit"
+                    },
+                    {
+                      "key": "updated_at",
+                      "label": "Updated"
+                    },
+                    {
+                      "key": "group",
+                      "label": "Group"
+                    }
                   ]
                 },
                 "actions": [
@@ -462,9 +604,15 @@
                 "area": "right",
                 "title": "Metric trend",
                 "when": {
-                  "requiredCapabilities": ["inspectable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "inspectable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -488,9 +636,15 @@
                 "area": "right",
                 "title": "Metric tree",
                 "when": {
-                  "requiredCapabilities": ["listable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "listable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -524,9 +678,15 @@
                 "area": "bottom",
                 "title": "Events",
                 "when": {
-                  "requiredCapabilities": ["eventful"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "eventful"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "stream",
@@ -541,9 +701,15 @@
                 "area": "bottom",
                 "title": "Operator notes",
                 "when": {
-                  "requiredCapabilities": ["streamable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "streamable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -556,8 +722,20 @@
                 }
               }
             ]
+          },
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "demo_metrics": {
+                "view": "demo_metrics_skill.demo_metrics_modal"
+              }
+            },
+            "defaultRoute": "demo_metrics"
           }
-        }
+        },
+        "implements": [
+          "demo_metrics_skill.demo_metrics_modal"
+        ]
       },
       "demo_metrics_operations_modal": {
         "title": "Demo Operations",
@@ -567,9 +745,18 @@
             "type": "split",
             "pattern": "split",
             "areas": [
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" },
-              { "id": "bottom", "role": "footer" }
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
             ]
           },
           "widgets": [
@@ -599,9 +786,18 @@
                 "variant": "stack",
                 "size": "small",
                 "buttons": [
-                  { "id": "workspace", "label": "Workspace" },
-                  { "id": "emit-skill", "label": "Skill event" },
-                  { "id": "emit-host", "label": "Host event" }
+                  {
+                    "id": "workspace",
+                    "label": "Workspace"
+                  },
+                  {
+                    "id": "emit-skill",
+                    "label": "Skill event"
+                  },
+                  {
+                    "id": "emit-host",
+                    "label": "Host event"
+                  }
                 ]
               },
               "actions": [
@@ -683,9 +879,18 @@
             "layout": {
               "pattern": "split",
               "areas": [
-                { "id": "main", "role": "main" },
-                { "id": "right", "role": "aux" },
-                { "id": "bottom", "role": "footer" }
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                },
+                {
+                  "id": "bottom",
+                  "role": "footer"
+                }
               ]
             },
             "viewState": [
@@ -706,9 +911,15 @@
                 "area": "main",
                 "title": "Live events",
                 "when": {
-                  "requiredCapabilities": ["eventful"],
-                  "surfaceClasses": ["operations"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "eventful"
+                  ],
+                  "surfaceClasses": [
+                    "operations"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "stream",
@@ -723,9 +934,15 @@
                 "area": "right",
                 "title": "Selected metric",
                 "when": {
-                  "requiredCapabilities": ["inspectable"],
-                  "surfaceClasses": ["operations"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "inspectable"
+                  ],
+                  "surfaceClasses": [
+                    "operations"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -749,9 +966,15 @@
                 "area": "bottom",
                 "title": "Operator notes",
                 "when": {
-                  "requiredCapabilities": ["streamable"],
-                  "surfaceClasses": ["operations"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "streamable"
+                  ],
+                  "surfaceClasses": [
+                    "operations"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -769,9 +992,15 @@
                 "area": "main",
                 "title": "Workspace-only grid",
                 "when": {
-                  "requiredCapabilities": ["listable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "listable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -785,13 +1014,28 @@
                 },
                 "config": {
                   "columns": [
-                    { "key": "title", "label": "Metric" }
+                    {
+                      "key": "title",
+                      "label": "Metric"
+                    }
                   ]
                 }
               }
             ]
+          },
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "demo_metrics_operations": {
+                "view": "demo_metrics_skill.demo_metrics_operations_modal"
+              }
+            },
+            "defaultRoute": "demo_metrics_operations"
           }
-        }
+        },
+        "implements": [
+          "demo_metrics_skill.demo_metrics_operations_modal"
+        ]
       }
     }
   },
@@ -808,5 +1052,25 @@
       "id": "demo_metrics_summary",
       "autoInstall": false
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "demo_metrics_skill.demo_metrics_modal": {
+        "title": "Demo Metrics",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      },
+      "demo_metrics_skill.demo_metrics_operations_modal": {
+        "title": "Demo Operations",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "demo_metrics_skill.demo_metrics_modal"
+  }
 }

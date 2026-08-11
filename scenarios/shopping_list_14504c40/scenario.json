@@ -541,8 +541,10 @@
                                 },
                                 {
                                     "on": "click:filter",
-                                    "type": "openModal",
+                                    "type": "navigate",
                                     "params": {
+                                        "to": "shopping_list_14504c40.filters_modal",
+                                        "surface": "modal",
                                         "modalId": "filters_modal"
                                     }
                                 }
@@ -705,11 +707,38 @@
                                     }
                                 ]
                             }
-                        ]
-                    }
+                        ],
+                        "interface": {
+                            "schema": "adaos.ui.modal.interface.v1",
+                            "routes": {
+                                "filters": {
+                                    "view": "shopping_list_14504c40.filters_modal"
+                                }
+                            },
+                            "defaultRoute": "filters"
+                        }
+                    },
+                    "implements": [
+                        "shopping_list_14504c40.filters_modal"
+                    ]
                 }
             },
-            "version": "0.1"
+            "version": "0.1",
+            "interfaces": {
+                "shopping_list_14504c40": {
+                    "schema": "adaos.ui.skill_interface.v1",
+                    "views": {
+                        "shopping_list_14504c40.filters_modal": {
+                            "title": "Фильтры рецептов",
+                            "surfaces": [
+                                "modal"
+                            ],
+                            "params": {}
+                        }
+                    },
+                    "defaultView": "shopping_list_14504c40.filters_modal"
+                }
+            }
         }
     }
 }

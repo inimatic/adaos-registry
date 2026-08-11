@@ -5,7 +5,10 @@
       "id": "release_validation_app",
       "title": "Release Validation",
       "icon": "shield-checkmark-outline",
-      "launchModal": "release_validation_modal"
+      "launchModal": "release_validation_modal",
+      "action": {
+        "navigate": "release_validation_skill.release_validation_modal"
+      }
     }
   ],
   "widgets": [
@@ -29,8 +32,10 @@
       "actions": [
         {
           "on": "click:open",
-          "type": "openModal",
+          "type": "navigate",
           "params": {
+            "to": "release_validation_skill.release_validation_modal",
+            "surface": "modal",
             "modalId": "release_validation_modal"
           }
         },
@@ -55,9 +60,18 @@
             "type": "split",
             "pattern": "split",
             "areas": [
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" },
-              { "id": "bottom", "role": "footer" }
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
             ]
           },
           "widgets": [
@@ -88,10 +102,22 @@
                 "size": "small",
                 "variant": "stack",
                 "buttons": [
-                  { "id": "refresh", "label": "Refresh" },
-                  { "id": "register", "label": "Register contracts" },
-                  { "id": "run-latest", "label": "Run latest pending" },
-                  { "id": "retry-latest", "label": "Retry latest" }
+                  {
+                    "id": "refresh",
+                    "label": "Refresh"
+                  },
+                  {
+                    "id": "register",
+                    "label": "Register contracts"
+                  },
+                  {
+                    "id": "run-latest",
+                    "label": "Run latest pending"
+                  },
+                  {
+                    "id": "retry-latest",
+                    "label": "Retry latest"
+                  }
                 ]
               },
               "actions": [
@@ -99,25 +125,33 @@
                   "on": "click:refresh",
                   "type": "callSkill",
                   "target": "release_validation_skill.refresh_snapshot",
-                  "params": { "webspace_id": "$runtime.webspace_id" }
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  }
                 },
                 {
                   "on": "click:register",
                   "type": "callSkill",
                   "target": "release_validation_skill.register_default_observe_contracts",
-                  "params": { "webspace_id": "$runtime.webspace_id" }
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  }
                 },
                 {
                   "on": "click:run-latest",
                   "type": "callSkill",
                   "target": "release_validation_skill.run_latest_campaign",
-                  "params": { "webspace_id": "$runtime.webspace_id" }
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  }
                 },
                 {
                   "on": "click:retry-latest",
                   "type": "callSkill",
                   "target": "release_validation_skill.retry_latest_campaign",
-                  "params": { "webspace_id": "$runtime.webspace_id" }
+                  "params": {
+                    "webspace_id": "$runtime.webspace_id"
+                  }
                 }
               ]
             },
@@ -170,10 +204,26 @@
               "inputs": {
                 "emptyText": "No test nodes registered",
                 "columns": [
-                  { "key": "display_name", "label": "Node" },
-                  { "key": "host", "label": "Host", "width": "150px", "mono": true },
-                  { "key": "profile", "label": "Profile", "width": "100px" },
-                  { "key": "enabled_label", "label": "Enabled", "width": "90px" }
+                  {
+                    "key": "display_name",
+                    "label": "Node"
+                  },
+                  {
+                    "key": "host",
+                    "label": "Host",
+                    "width": "150px",
+                    "mono": true
+                  },
+                  {
+                    "key": "profile",
+                    "label": "Profile",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "enabled_label",
+                    "label": "Enabled",
+                    "width": "90px"
+                  }
                 ]
               }
             },
@@ -189,11 +239,33 @@
               "inputs": {
                 "emptyText": "No validation campaigns",
                 "columns": [
-                  { "key": "campaign_id", "label": "Campaign", "mono": true },
-                  { "key": "state", "label": "State", "width": "110px" },
-                  { "key": "target_build", "label": "Target", "width": "210px", "mono": true },
-                  { "key": "nodes", "label": "Nodes", "width": "150px" },
-                  { "key": "finished_at", "label": "Finished", "width": "185px", "mono": true }
+                  {
+                    "key": "campaign_id",
+                    "label": "Campaign",
+                    "mono": true
+                  },
+                  {
+                    "key": "state",
+                    "label": "State",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "target_build",
+                    "label": "Target",
+                    "width": "210px",
+                    "mono": true
+                  },
+                  {
+                    "key": "nodes",
+                    "label": "Nodes",
+                    "width": "150px"
+                  },
+                  {
+                    "key": "finished_at",
+                    "label": "Finished",
+                    "width": "185px",
+                    "mono": true
+                  }
                 ]
               }
             },
@@ -209,10 +281,26 @@
               "inputs": {
                 "emptyText": "No assignments",
                 "columns": [
-                  { "key": "node_id", "label": "Node", "width": "110px" },
-                  { "key": "state", "label": "State", "width": "75px" },
-                  { "key": "checks_text", "label": "Checks", "width": "65px", "mono": true },
-                  { "key": "reason_label", "label": "Reason" }
+                  {
+                    "key": "node_id",
+                    "label": "Node",
+                    "width": "110px"
+                  },
+                  {
+                    "key": "state",
+                    "label": "State",
+                    "width": "75px"
+                  },
+                  {
+                    "key": "checks_text",
+                    "label": "Checks",
+                    "width": "65px",
+                    "mono": true
+                  },
+                  {
+                    "key": "reason_label",
+                    "label": "Reason"
+                  }
                 ]
               }
             },
@@ -245,8 +333,20 @@
                 "emptyText": "No validation events"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "release_validation": {
+                "view": "release_validation_skill.release_validation_modal"
+              }
+            },
+            "defaultRoute": "release_validation"
+          }
+        },
+        "implements": [
+          "release_validation_skill.release_validation_modal"
+        ]
       }
     },
     "widgets": {}
@@ -264,6 +364,18 @@
       "id": "release_validation_widget",
       "autoInstall": true
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "release_validation_skill.release_validation_modal": {
+        "title": "Release Validation",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "release_validation_skill.release_validation_modal"
+  }
 }
-

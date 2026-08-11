@@ -63,7 +63,10 @@
         "conversation companions diagnostics",
         "character diagnostics",
         "persona diagnostics"
-      ]
+      ],
+      "action": {
+        "navigate": "conversation_companions.conversation_companions_diagnostics_modal"
+      }
     }
   ],
   "widgets": [],
@@ -145,8 +148,20 @@
                 "emptyText": "No diagnostic payload yet"
               }
             }
-          ]
-        }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "conversation_companions_diagnostics": {
+                "view": "conversation_companions.conversation_companions_diagnostics_modal"
+              }
+            },
+            "defaultRoute": "conversation_companions_diagnostics"
+          }
+        },
+        "implements": [
+          "conversation_companions.conversation_companions_diagnostics_modal"
+        ]
       }
     },
     "widgets": {}
@@ -158,5 +173,18 @@
       "id": "conversation_companions_diagnostics_app",
       "autoInstall": true
     }
-  ]
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "conversation_companions.conversation_companions_diagnostics_modal": {
+        "title": "Conversation Diagnostics",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "conversation_companions.conversation_companions_diagnostics_modal"
+  }
 }

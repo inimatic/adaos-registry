@@ -131,8 +131,10 @@
               "actions": [
                 {
                   "on": "click:select-project",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "prompt_engineer_scenario.project_selector",
+                    "surface": "modal",
                     "modalId": "project_selector"
                   }
                 }
@@ -320,8 +322,10 @@
               "actions": [
                 {
                   "on": "click:add-addendum",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "prompt_engineer_scenario.tz_addendum_modal",
+                    "surface": "modal",
                     "modalId": "tz_addendum_modal"
                   }
                 }
@@ -489,7 +493,7 @@
                   "conversation_topic_id": "$state.builderTopicId",
                   "thread_id": "$state.builderTopicId",
                   "active_agent_id": "agent:builder_skill:builder",
-                  "active_agent_label": "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440",
+                  "active_agent_label": "Конструктор",
                   "builder_llm_model": "$state.builderLlmModel"
                 },
                 "placeholder_i18n": {
@@ -527,22 +531,28 @@
               "actions": [
                 {
                   "on": "click:current-object",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "prompt_engineer_scenario.project_meta_modal",
+                    "surface": "modal",
                     "modalId": "project_meta_modal"
                   }
                 },
                 {
                   "on": "click:llm-status",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "prompt_engineer_scenario.llm_status_modal",
+                    "surface": "modal",
                     "modalId": "llm_status_modal"
                   }
                 },
                 {
                   "on": "click:llm-profile",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "prompt_engineer_scenario.llm_profile_modal",
+                    "surface": "modal",
                     "modalId": "llm_profile_modal"
                   }
                 },
@@ -783,11 +793,23 @@
                   }
                 ]
               }
-            ]
+            ],
+            "interface": {
+              "schema": "adaos.ui.modal.interface.v1",
+              "routes": {
+                "project_selector": {
+                  "view": "prompt_engineer_scenario.project_selector"
+                }
+              },
+              "defaultRoute": "project_selector"
+            }
           },
           "title_i18n": {
             "key": "prompt_ide.select_project"
-          }
+          },
+          "implements": [
+            "prompt_engineer_scenario.project_selector"
+          ]
         },
         "project_git_modal": {
           "title": "Project git",
@@ -1082,11 +1104,23 @@
                   }
                 ]
               }
-            ]
+            ],
+            "interface": {
+              "schema": "adaos.ui.modal.interface.v1",
+              "routes": {
+                "project_meta": {
+                  "view": "prompt_engineer_scenario.project_meta_modal"
+                }
+              },
+              "defaultRoute": "project_meta"
+            }
           },
           "title_i18n": {
             "key": "prompt_ide.project_details"
-          }
+          },
+          "implements": [
+            "prompt_engineer_scenario.project_meta_modal"
+          ]
         },
         "tz_addendum_modal": {
           "title": "Add TZ addendum",
@@ -1141,11 +1175,23 @@
                   "key": "prompt_ide.add_tz_addendum"
                 }
               }
-            ]
+            ],
+            "interface": {
+              "schema": "adaos.ui.modal.interface.v1",
+              "routes": {
+                "tz_addendum": {
+                  "view": "prompt_engineer_scenario.tz_addendum_modal"
+                }
+              },
+              "defaultRoute": "tz_addendum"
+            }
           },
           "title_i18n": {
             "key": "prompt_ide.add_tz_addendum"
-          }
+          },
+          "implements": [
+            "prompt_engineer_scenario.tz_addendum_modal"
+          ]
         },
         "llm_profile_modal": {
           "title": "LLM profile",
@@ -1239,11 +1285,23 @@
                   "key": "prompt_ide.available_llm_models"
                 }
               }
-            ]
+            ],
+            "interface": {
+              "schema": "adaos.ui.modal.interface.v1",
+              "routes": {
+                "llm_profile": {
+                  "view": "prompt_engineer_scenario.llm_profile_modal"
+                }
+              },
+              "defaultRoute": "llm_profile"
+            }
           },
           "title_i18n": {
             "key": "prompt_ide.llm_profile"
-          }
+          },
+          "implements": [
+            "prompt_engineer_scenario.llm_profile_modal"
+          ]
         },
         "llm_status_modal": {
           "title": "LLM status",
@@ -1273,11 +1331,23 @@
                   "key": "prompt_ide.llm_status"
                 }
               }
-            ]
+            ],
+            "interface": {
+              "schema": "adaos.ui.modal.interface.v1",
+              "routes": {
+                "llm_status": {
+                  "view": "prompt_engineer_scenario.llm_status_modal"
+                }
+              },
+              "defaultRoute": "llm_status"
+            }
           },
           "title_i18n": {
             "key": "prompt_ide.llm_status"
-          }
+          },
+          "implements": [
+            "prompt_engineer_scenario.llm_status_modal"
+          ]
         }
       },
       "resources": {
@@ -1351,61 +1421,104 @@
           "locale": "ru",
           "owner": "scenario:prompt_engineer_scenario",
           "dictionary": {
-            "prompt_ide.workspace": "\u0420\u0430\u0431\u043e\u0447\u0430\u044f \u043e\u0431\u043b\u0430\u0441\u0442\u044c Prompt IDE",
+            "prompt_ide.workspace": "Рабочая область Prompt IDE",
             "prompt_ide.title": "Prompt IDE",
-            "prompt_ide.description": "\u0420\u0430\u0431\u043e\u0447\u0430\u044f \u043e\u0431\u043b\u0430\u0441\u0442\u044c Prompt IDE \u0434\u043b\u044f \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0438 \u043d\u0430\u0432\u044b\u043a\u043e\u0432 \u0438 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u0435\u0432.",
-            "prompt_ide.stage.tz": "\u042d\u0442\u0430\u043f: \u0422\u0417",
-            "prompt_ide.stage.tz_addenda": "\u042d\u0442\u0430\u043f: \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f \u043a \u0422\u0417",
-            "prompt_ide.execute": "\u0412\u044b\u043f\u043e\u043b\u043d\u0438\u0442\u044c",
-            "prompt_ide.reset": "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c",
-            "prompt_ide.project": "\u041f\u0440\u043e\u0435\u043a\u0442",
-            "prompt_ide.select_project": "\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0440\u043e\u0435\u043a\u0442",
-            "prompt_ide.files": "\u0424\u0430\u0439\u043b\u044b",
-            "prompt_ide.technical_specification": "\u0422\u0435\u0445\u043d\u0438\u0447\u0435\u0441\u043a\u043e\u0435 \u0437\u0430\u0434\u0430\u043d\u0438\u0435",
-            "prompt_ide.tz_addenda": "\u0414\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u044f \u043a \u0422\u0417",
-            "prompt_ide.tz_tools": "\u0418\u043d\u0441\u0442\u0440\u0443\u043c\u0435\u043d\u0442\u044b \u0422\u0417",
-            "prompt_ide.add_addendum": "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435",
-            "prompt_ide.project_file": "\u0424\u0430\u0439\u043b \u043f\u0440\u043e\u0435\u043a\u0442\u0430",
-            "prompt_ide.project_file_title_template": "\u0424\u0430\u0439\u043b \u043f\u0440\u043e\u0435\u043a\u0442\u0430: {filename}",
-            "prompt_ide.file_help.builder_memory": "\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u0443\u0435\u043c\u0430\u044f \u043f\u0430\u043c\u044f\u0442\u044c \u043f\u0440\u043e\u0435\u043a\u0442\u0430, \u043a\u043e\u0442\u043e\u0440\u0443\u044e \u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440 \u0432\u043a\u043b\u044e\u0447\u0430\u0435\u0442 \u0432 \u043a\u0430\u0436\u0434\u044b\u0439 LLM-\u0437\u0430\u043f\u0440\u043e\u0441 \u043d\u0430 \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0435 UI. \u0424\u0438\u043a\u0441\u0438\u0440\u0443\u0439\u0442\u0435 \u0437\u0434\u0435\u0441\u044c \u0443\u0441\u0442\u043e\u0439\u0447\u0438\u0432\u044b\u0435 \u043f\u0440\u043e\u0434\u0443\u043a\u0442\u043e\u0432\u044b\u0435 \u0440\u0435\u0448\u0435\u043d\u0438\u044f, \u0442\u0435\u0440\u043c\u0438\u043d\u044b \u0434\u043e\u043c\u0435\u043d\u0430, UX-\u043f\u0440\u0435\u0434\u043f\u043e\u0447\u0442\u0435\u043d\u0438\u044f \u0438 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0438\u044f.",
-            "prompt_ide.file_help.builder_system_prompt": "\u041e\u043f\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u044b\u0435 project-specific \u0438\u043d\u0441\u0442\u0440\u0443\u043a\u0446\u0438\u0438 \u0434\u043b\u044f LLM. \u042d\u0442\u043e\u0442 \u0444\u0430\u0439\u043b \u0440\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u043d \u043d\u0430 \u0431\u0443\u0434\u0443\u0449\u0438\u0439 owner/admin \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c; \u043e\u0441\u0442\u0430\u0432\u043b\u044f\u0439\u0442\u0435 \u0435\u0433\u043e \u043f\u0443\u0441\u0442\u044b\u043c, \u0435\u0441\u043b\u0438 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f\u0443 \u043d\u0435 \u043d\u0443\u0436\u043d\u044b \u0443\u0441\u0442\u043e\u0439\u0447\u0438\u0432\u044b\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u0430 \u0434\u043b\u044f \u0432\u0441\u0435\u0445 \u0431\u0443\u0434\u0443\u0449\u0438\u0445 Builder-\u0442\u0440\u0430\u043d\u0441\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u0439.",
-            "prompt_ide.file_help.base_tz": "Legacy-\u043c\u043e\u0441\u0442 \u0434\u043b\u044f Technical Specification \u0438 \u0441\u0442\u0430\u0440\u043e\u0433\u043e Prompt IDE flow. \u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440 \u043e\u0441\u0442\u0430\u0432\u043b\u044f\u0435\u0442 \u0435\u0433\u043e \u0434\u043b\u044f \u0441\u043e\u0432\u043c\u0435\u0441\u0442\u0438\u043c\u043e\u0441\u0442\u0438; \u0434\u043b\u044f \u043d\u043e\u0432\u043e\u0433\u043e \u043a\u043e\u043d\u0442\u0435\u043a\u0441\u0442\u0430 \u043f\u0440\u043e\u0442\u043e\u0442\u0438\u043f\u0430 \u043f\u0440\u0435\u0434\u043f\u043e\u0447\u0438\u0442\u0430\u0439\u0442\u0435 builder_memory.md.",
-            "prompt_ide.source_file": "\u0418\u0441\u0445\u043e\u0434\u043d\u044b\u0439 \u0444\u0430\u0439\u043b",
-            "prompt_ide.workflow": "\u041f\u0440\u043e\u0446\u0435\u0441\u0441",
-            "prompt_ide.builder": "\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440",
-            "prompt_ide.builder_placeholder": "\u0417\u0430\u043f\u0440\u043e\u0441 \u0432 \u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440...",
-            "prompt_ide.builder_hint": "\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0435 UI \u0434\u043b\u044f \u0430\u043a\u0442\u0438\u0432\u043d\u043e\u0433\u043e \u0447\u0435\u0440\u043d\u043e\u0432\u0438\u043a\u0430.",
-            "prompt_ide.builder_history_more": "\u0415\u0449\u0435 \u0438\u0441\u0442\u043e\u0440\u0438\u0438",
-            "prompt_ide.builder_history_loading": "\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430...",
-            "prompt_ide.builder_history_unavailable": "\u0414\u043e\u043b\u0433\u0430\u044f \u0438\u0441\u0442\u043e\u0440\u0438\u044f \u0431\u0443\u0434\u0435\u0442 \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u0430 \u043f\u043e\u0441\u043b\u0435 \u043f\u043e\u0434\u043a\u043b\u044e\u0447\u0435\u043d\u0438\u044f conversation ledger.",
-            "prompt_ide.dev_projects": "Dev-\u043f\u0440\u043e\u0435\u043a\u0442\u044b",
-            "prompt_ide.create_type": "\u0421\u043e\u0437\u0434\u0430\u0442\u044c: \u0442\u0438\u043f",
-            "prompt_ide.create_name": "\u0421\u043e\u0437\u0434\u0430\u0442\u044c: \u0438\u043c\u044f",
+            "prompt_ide.description": "Рабочая область Prompt IDE для разработки навыков и сценариев.",
+            "prompt_ide.stage.tz": "Этап: ТЗ",
+            "prompt_ide.stage.tz_addenda": "Этап: дополнения к ТЗ",
+            "prompt_ide.execute": "Выполнить",
+            "prompt_ide.reset": "Сбросить",
+            "prompt_ide.project": "Проект",
+            "prompt_ide.select_project": "Выберите проект",
+            "prompt_ide.files": "Файлы",
+            "prompt_ide.technical_specification": "Техническое задание",
+            "prompt_ide.tz_addenda": "Дополнения к ТЗ",
+            "prompt_ide.tz_tools": "Инструменты ТЗ",
+            "prompt_ide.add_addendum": "Добавить дополнение",
+            "prompt_ide.project_file": "Файл проекта",
+            "prompt_ide.project_file_title_template": "Файл проекта: {filename}",
+            "prompt_ide.file_help.builder_memory": "Редактируемая память проекта, которую Конструктор включает в каждый LLM-запрос на изменение UI. Фиксируйте здесь устойчивые продуктовые решения, термины домена, UX-предпочтения и ограничения.",
+            "prompt_ide.file_help.builder_system_prompt": "Опциональные project-specific инструкции для LLM. Этот файл рассчитан на будущий owner/admin контроль; оставляйте его пустым, если прототипу не нужны устойчивые правила для всех будущих Builder-трансформаций.",
+            "prompt_ide.file_help.base_tz": "Legacy-мост для Technical Specification и старого Prompt IDE flow. Конструктор оставляет его для совместимости; для нового контекста прототипа предпочитайте builder_memory.md.",
+            "prompt_ide.source_file": "Исходный файл",
+            "prompt_ide.workflow": "Процесс",
+            "prompt_ide.builder": "Конструктор",
+            "prompt_ide.builder_placeholder": "Запрос в Конструктор...",
+            "prompt_ide.builder_hint": "Опишите изменение UI для активного черновика.",
+            "prompt_ide.builder_history_more": "Еще истории",
+            "prompt_ide.builder_history_loading": "Загрузка...",
+            "prompt_ide.builder_history_unavailable": "Долгая история будет доступна после подключения conversation ledger.",
+            "prompt_ide.dev_projects": "Dev-проекты",
+            "prompt_ide.create_type": "Создать: тип",
+            "prompt_ide.create_name": "Создать: имя",
             "prompt_ide.new_project_placeholder": "my_new_project",
-            "prompt_ide.create_template": "\u0421\u043e\u0437\u0434\u0430\u0442\u044c: \u0448\u0430\u0431\u043b\u043e\u043d",
-            "prompt_ide.template": "\u0428\u0430\u0431\u043b\u043e\u043d",
-            "prompt_ide.create": "\u0421\u043e\u0437\u0434\u0430\u0442\u044c",
-            "prompt_ide.project_git": "Git \u043f\u0440\u043e\u0435\u043a\u0442\u0430",
-            "prompt_ide.current_object": "\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u043e\u0431\u044a\u0435\u043a\u0442",
+            "prompt_ide.create_template": "Создать: шаблон",
+            "prompt_ide.template": "Шаблон",
+            "prompt_ide.create": "Создать",
+            "prompt_ide.project_git": "Git проекта",
+            "prompt_ide.current_object": "Текущий объект",
             "prompt_ide.git": "Git",
             "prompt_ide.push": "Push",
-            "prompt_ide.update": "\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c",
-            "prompt_ide.publish": "\u041e\u043f\u0443\u0431\u043b\u0438\u043a\u043e\u0432\u0430\u0442\u044c",
-            "prompt_ide.delete": "\u0423\u0434\u0430\u043b\u0438\u0442\u044c",
+            "prompt_ide.update": "Обновить",
+            "prompt_ide.publish": "Опубликовать",
+            "prompt_ide.delete": "Удалить",
             "prompt_ide.git_log": "Git log",
-            "prompt_ide.project_details": "\u0414\u0435\u0442\u0430\u043b\u0438 \u043f\u0440\u043e\u0435\u043a\u0442\u0430",
-            "prompt_ide.current_metadata": "\u0422\u0435\u043a\u0443\u0449\u0438\u0435 \u043c\u0435\u0442\u0430\u0434\u0430\u043d\u043d\u044b\u0435",
-            "prompt_ide.project_title": "\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435",
-            "prompt_ide.project_description": "\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435",
-            "prompt_ide.type": "\u0422\u0438\u043f",
-            "prompt_ide.save": "\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c",
-            "prompt_ide.add_tz_addendum": "\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0434\u043e\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435 \u043a \u0422\u0417",
-            "prompt_ide.llm_profile": "\u041f\u0440\u043e\u0444\u0438\u043b\u044c LLM",
-            "prompt_ide.llm_profile_model": "\u041c\u043e\u0434\u0435\u043b\u044c \u0434\u043b\u044f \u0440\u0430\u0437\u0440\u0430\u0431\u043e\u0442\u043a\u0438",
-            "prompt_ide.available_llm_models": "\u0414\u043e\u0441\u0442\u0443\u043f\u043d\u044b\u0435 \u043c\u043e\u0434\u0435\u043b\u0438 LLM",
-            "prompt_ide.llm_status": "\u0421\u0442\u0430\u0442\u0443\u0441 LLM",
-            "prompt_ide.description_draft": "\u0420\u0430\u0431\u043e\u0447\u0430\u044f \u043e\u0431\u043b\u0430\u0441\u0442\u044c Prompt IDE (\u0447\u0435\u0440\u043d\u043e\u0432\u043e\u0439 layout)."
+            "prompt_ide.project_details": "Детали проекта",
+            "prompt_ide.current_metadata": "Текущие метаданные",
+            "prompt_ide.project_title": "Название",
+            "prompt_ide.project_description": "Описание",
+            "prompt_ide.type": "Тип",
+            "prompt_ide.save": "Сохранить",
+            "prompt_ide.add_tz_addendum": "Добавить дополнение к ТЗ",
+            "prompt_ide.llm_profile": "Профиль LLM",
+            "prompt_ide.llm_profile_model": "Модель для разработки",
+            "prompt_ide.available_llm_models": "Доступные модели LLM",
+            "prompt_ide.llm_status": "Статус LLM",
+            "prompt_ide.description_draft": "Рабочая область Prompt IDE (черновой layout)."
           }
+        }
+      },
+      "interfaces": {
+        "prompt_engineer_scenario": {
+          "schema": "adaos.ui.skill_interface.v1",
+          "views": {
+            "prompt_engineer_scenario.llm_profile_modal": {
+              "title": "LLM profile",
+              "surfaces": [
+                "modal"
+              ],
+              "params": {}
+            },
+            "prompt_engineer_scenario.llm_status_modal": {
+              "title": "LLM status",
+              "surfaces": [
+                "modal"
+              ],
+              "params": {}
+            },
+            "prompt_engineer_scenario.project_meta_modal": {
+              "title": "Project details",
+              "surfaces": [
+                "modal"
+              ],
+              "params": {}
+            },
+            "prompt_engineer_scenario.project_selector": {
+              "title": "Select project",
+              "surfaces": [
+                "modal"
+              ],
+              "params": {}
+            },
+            "prompt_engineer_scenario.tz_addendum_modal": {
+              "title": "Add TZ addendum",
+              "surfaces": [
+                "modal"
+              ],
+              "params": {}
+            }
+          },
+          "defaultView": "prompt_engineer_scenario.llm_profile_modal"
         }
       }
     }

@@ -10,69 +10,362 @@
           "title": "Книга рецептов",
           "layout": {
             "type": "split",
-            "areas": [{"id": "main", "role": "main"}, {"id": "right", "role": "aux"}],
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              }
+            ],
             "auxWidth": 360
           },
           "initialState": {
-            "status": "loading", "selectedRecipeId": "caesar", "searchQuery": "",
-            "filterCategory": "", "filterDifficulty": "", "filterMaxTime": 120,
-            "favoritesOnly": false, "quantityMultiplier": 1, "confirmation": ""
+            "status": "loading",
+            "selectedRecipeId": "caesar",
+            "searchQuery": "",
+            "filterCategory": "",
+            "filterDifficulty": "",
+            "filterMaxTime": 120,
+            "favoritesOnly": false,
+            "quantityMultiplier": 1,
+            "confirmation": ""
           },
           "widgets": [
             {
-              "id": "recipe-filters", "area": "main", "type": "ui.form", "title": "Поиск и фильтры",
+              "id": "recipe-filters",
+              "area": "main",
+              "type": "ui.form",
+              "title": "Поиск и фильтры",
               "inputs": {
-                "autoCommit": true, "showSubmit": false, "layout": "responsiveGrid", "minFieldWidth": 180,
+                "autoCommit": true,
+                "showSubmit": false,
+                "layout": "responsiveGrid",
+                "minFieldWidth": 180,
                 "fields": [
-                  {"id": "searchQuery", "name": "searchQuery", "type": "shortText", "label": "Поиск", "stateKey": "searchQuery"},
-                  {"id": "filterCategory", "name": "filterCategory", "type": "select", "label": "Категория", "stateKey": "filterCategory", "options": [{"label": "Все", "value": ""}, {"label": "Салаты", "value": "Салаты"}, {"label": "Супы", "value": "Супы"}, {"label": "Десерты", "value": "Десерты"}]},
-                  {"id": "filterDifficulty", "name": "filterDifficulty", "type": "select", "label": "Сложность", "stateKey": "filterDifficulty", "options": [{"label": "Любая", "value": ""}, {"label": "Легко", "value": "Легко"}, {"label": "Средне", "value": "Средне"}, {"label": "Сложно", "value": "Сложно"}]},
-                  {"id": "filterMaxTime", "name": "filterMaxTime", "type": "number", "label": "До, минут", "stateKey": "filterMaxTime", "min": 1},
-                  {"id": "favoritesOnly", "name": "favoritesOnly", "type": "toggle", "label": "Только избранное", "stateKey": "favoritesOnly"}
+                  {
+                    "id": "searchQuery",
+                    "name": "searchQuery",
+                    "type": "shortText",
+                    "label": "Поиск",
+                    "stateKey": "searchQuery"
+                  },
+                  {
+                    "id": "filterCategory",
+                    "name": "filterCategory",
+                    "type": "select",
+                    "label": "Категория",
+                    "stateKey": "filterCategory",
+                    "options": [
+                      {
+                        "label": "Все",
+                        "value": ""
+                      },
+                      {
+                        "label": "Салаты",
+                        "value": "Салаты"
+                      },
+                      {
+                        "label": "Супы",
+                        "value": "Супы"
+                      },
+                      {
+                        "label": "Десерты",
+                        "value": "Десерты"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "filterDifficulty",
+                    "name": "filterDifficulty",
+                    "type": "select",
+                    "label": "Сложность",
+                    "stateKey": "filterDifficulty",
+                    "options": [
+                      {
+                        "label": "Любая",
+                        "value": ""
+                      },
+                      {
+                        "label": "Легко",
+                        "value": "Легко"
+                      },
+                      {
+                        "label": "Средне",
+                        "value": "Средне"
+                      },
+                      {
+                        "label": "Сложно",
+                        "value": "Сложно"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "filterMaxTime",
+                    "name": "filterMaxTime",
+                    "type": "number",
+                    "label": "До, минут",
+                    "stateKey": "filterMaxTime",
+                    "min": 1
+                  },
+                  {
+                    "id": "favoritesOnly",
+                    "name": "favoritesOnly",
+                    "type": "toggle",
+                    "label": "Только избранное",
+                    "stateKey": "favoritesOnly"
+                  }
                 ]
               }
             },
             {
-              "id": "recipe-list", "area": "main", "type": "ui.list", "title": "Рецепты",
+              "id": "recipe-list",
+              "area": "main",
+              "type": "ui.list",
+              "title": "Рецепты",
               "dataSource": {
-                "kind": "skill", "name": "shopping_list_14504c40_skill.list_recipes",
-                "params": {"query": "$state.searchQuery", "category": "$state.filterCategory", "difficulty": "$state.filterDifficulty", "max_time_minutes": "$state.filterMaxTime", "favorites_only": "$state.favoritesOnly"},
-                "cacheTtlMs": 1000, "invalidationTags": ["recipes"]
+                "kind": "skill",
+                "name": "shopping_list_14504c40_skill.list_recipes",
+                "params": {
+                  "query": "$state.searchQuery",
+                  "category": "$state.filterCategory",
+                  "difficulty": "$state.filterDifficulty",
+                  "max_time_minutes": "$state.filterMaxTime",
+                  "favorites_only": "$state.favoritesOnly"
+                },
+                "cacheTtlMs": 1000,
+                "invalidationTags": [
+                  "recipes"
+                ]
               },
-              "inputs": {"titleKey": "title", "subtitleKey": "category", "previewKey": "description", "emptyText": "Рецепты не найдены"},
-              "actions": [{"on": "select", "type": "updateState", "params": {"selectedRecipeId": "$event.id"}}]
-            },
-            {
-              "id": "recipe-detail", "area": "right", "type": "item.details", "title": "Рецепт",
-              "dataSource": {"kind": "skill", "name": "shopping_list_14504c40_skill.get_recipe", "params": {"recipe_id": "$state.selectedRecipeId"}, "cacheTtlMs": 1000, "invalidationTags": ["recipes"]},
-              "inputs": {"fields": [{"key": "title", "label": "Название"}, {"key": "description", "label": "Описание"}, {"key": "ingredients", "label": "Ингредиенты"}, {"key": "steps", "label": "Шаги"}, {"key": "time_minutes", "label": "Время, мин"}, {"key": "servings", "label": "Порции"}]}
-            },
-            {
-              "id": "recipe-actions", "area": "right", "type": "ui.actions",
-              "inputs": {"buttons": [{"id": "favorite", "label": "В избранное"}, {"id": "shopping", "label": "В список покупок"}]},
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "category",
+                "previewKey": "description",
+                "emptyText": "Рецепты не найдены"
+              },
               "actions": [
-                {"on": "click:favorite", "type": "callSkill", "target": "shopping_list_14504c40_skill.set_favorite", "params": {"recipe_id": "$state.selectedRecipeId", "favorite": true}, "invalidates": ["recipes"]},
-                {"on": "click:shopping", "type": "openModal", "params": {"modalId": "quantity_modal"}}
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "selectedRecipeId": "$event.id"
+                  }
+                }
               ]
             },
             {
-              "id": "create-recipe", "area": "main", "type": "ui.form", "title": "Новый рецепт",
-              "inputs": {"submitLabel": "Создать", "fields": [
-                {"id": "title", "name": "title", "type": "shortText", "label": "Название", "required": true},
-                {"id": "category", "name": "category", "type": "shortText", "label": "Категория", "required": true},
-                {"id": "time_minutes", "name": "time_minutes", "type": "number", "label": "Время, мин", "required": true, "min": 1},
-                {"id": "difficulty", "name": "difficulty", "type": "select", "label": "Сложность", "required": true, "options": [{"label": "Легко", "value": "Легко"}, {"label": "Средне", "value": "Средне"}, {"label": "Сложно", "value": "Сложно"}]},
-                {"id": "servings", "name": "servings", "type": "number", "label": "Порции", "required": true, "min": 1, "default": 2},
-                {"id": "description", "name": "description", "type": "textarea", "label": "Описание"},
-                {"id": "ingredients", "name": "ingredients", "type": "textarea", "label": "Ингредиенты — по одному на строке", "required": true},
-                {"id": "steps", "name": "steps", "type": "textarea", "label": "Шаги — по одному на строке", "required": true},
-                {"id": "favorite", "name": "favorite", "type": "toggle", "label": "Добавить в избранное", "default": false}
-              ]},
-              "actions": [{"on": "submit", "type": "callSkill", "target": "shopping_list_14504c40_skill.create_recipe", "params": {"title": "$form.title", "category": "$form.category", "time_minutes": "$form.time_minutes", "difficulty": "$form.difficulty", "servings": "$form.servings", "description": "$form.description", "ingredients": "$form.ingredients", "steps": "$form.steps", "favorite": "$form.favorite"}, "invalidates": ["recipes"]}]
+              "id": "recipe-detail",
+              "area": "right",
+              "type": "item.details",
+              "title": "Рецепт",
+              "dataSource": {
+                "kind": "skill",
+                "name": "shopping_list_14504c40_skill.get_recipe",
+                "params": {
+                  "recipe_id": "$state.selectedRecipeId"
+                },
+                "cacheTtlMs": 1000,
+                "invalidationTags": [
+                  "recipes"
+                ]
+              },
+              "inputs": {
+                "fields": [
+                  {
+                    "key": "title",
+                    "label": "Название"
+                  },
+                  {
+                    "key": "description",
+                    "label": "Описание"
+                  },
+                  {
+                    "key": "ingredients",
+                    "label": "Ингредиенты"
+                  },
+                  {
+                    "key": "steps",
+                    "label": "Шаги"
+                  },
+                  {
+                    "key": "time_minutes",
+                    "label": "Время, мин"
+                  },
+                  {
+                    "key": "servings",
+                    "label": "Порции"
+                  }
+                ]
+              }
             },
             {
-              "id": "safe-state", "area": "main", "type": "feedback.statusBar",
-              "dataSource": {"kind": "static", "value": {"status": "$state.status", "loading": "Загрузка рецептов…", "empty": "Рецептов пока нет", "error": "Не удалось прочитать локальное хранилище", "detail": "$state.confirmation"}}
+              "id": "recipe-actions",
+              "area": "right",
+              "type": "ui.actions",
+              "inputs": {
+                "buttons": [
+                  {
+                    "id": "favorite",
+                    "label": "В избранное"
+                  },
+                  {
+                    "id": "shopping",
+                    "label": "В список покупок"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:favorite",
+                  "type": "callSkill",
+                  "target": "shopping_list_14504c40_skill.set_favorite",
+                  "params": {
+                    "recipe_id": "$state.selectedRecipeId",
+                    "favorite": true
+                  },
+                  "invalidates": [
+                    "recipes"
+                  ]
+                },
+                {
+                  "on": "click:shopping",
+                  "type": "navigate",
+                  "params": {
+                    "to": "shopping_list_14504c40.quantity_modal",
+                    "surface": "modal",
+                    "modalId": "quantity_modal"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "create-recipe",
+              "area": "main",
+              "type": "ui.form",
+              "title": "Новый рецепт",
+              "inputs": {
+                "submitLabel": "Создать",
+                "fields": [
+                  {
+                    "id": "title",
+                    "name": "title",
+                    "type": "shortText",
+                    "label": "Название",
+                    "required": true
+                  },
+                  {
+                    "id": "category",
+                    "name": "category",
+                    "type": "shortText",
+                    "label": "Категория",
+                    "required": true
+                  },
+                  {
+                    "id": "time_minutes",
+                    "name": "time_minutes",
+                    "type": "number",
+                    "label": "Время, мин",
+                    "required": true,
+                    "min": 1
+                  },
+                  {
+                    "id": "difficulty",
+                    "name": "difficulty",
+                    "type": "select",
+                    "label": "Сложность",
+                    "required": true,
+                    "options": [
+                      {
+                        "label": "Легко",
+                        "value": "Легко"
+                      },
+                      {
+                        "label": "Средне",
+                        "value": "Средне"
+                      },
+                      {
+                        "label": "Сложно",
+                        "value": "Сложно"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "servings",
+                    "name": "servings",
+                    "type": "number",
+                    "label": "Порции",
+                    "required": true,
+                    "min": 1,
+                    "default": 2
+                  },
+                  {
+                    "id": "description",
+                    "name": "description",
+                    "type": "textarea",
+                    "label": "Описание"
+                  },
+                  {
+                    "id": "ingredients",
+                    "name": "ingredients",
+                    "type": "textarea",
+                    "label": "Ингредиенты — по одному на строке",
+                    "required": true
+                  },
+                  {
+                    "id": "steps",
+                    "name": "steps",
+                    "type": "textarea",
+                    "label": "Шаги — по одному на строке",
+                    "required": true
+                  },
+                  {
+                    "id": "favorite",
+                    "name": "favorite",
+                    "type": "toggle",
+                    "label": "Добавить в избранное",
+                    "default": false
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "shopping_list_14504c40_skill.create_recipe",
+                  "params": {
+                    "title": "$form.title",
+                    "category": "$form.category",
+                    "time_minutes": "$form.time_minutes",
+                    "difficulty": "$form.difficulty",
+                    "servings": "$form.servings",
+                    "description": "$form.description",
+                    "ingredients": "$form.ingredients",
+                    "steps": "$form.steps",
+                    "favorite": "$form.favorite"
+                  },
+                  "invalidates": [
+                    "recipes"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "safe-state",
+              "area": "main",
+              "type": "feedback.statusBar",
+              "dataSource": {
+                "kind": "static",
+                "value": {
+                  "status": "$state.status",
+                  "loading": "Загрузка рецептов…",
+                  "empty": "Рецептов пока нет",
+                  "error": "Не удалось прочитать локальное хранилище",
+                  "detail": "$state.confirmation"
+                }
+              }
             }
           ]
         }
@@ -80,15 +373,87 @@
       "modals": {
         "quantity_modal": {
           "title": "Подтвердите количество",
-          "presentation": {"kind": "modal"},
+          "presentation": {
+            "kind": "modal"
+          },
           "schema": {
-            "id": "quantity_modal_schema", "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
-            "widgets": [{
-              "id": "quantity-form", "area": "main", "type": "ui.form",
-              "inputs": {"submitLabel": "Добавить ингредиенты", "fields": [{"id": "quantity_multiplier", "name": "quantity_multiplier", "type": "number", "label": "Количество порций (множитель)", "required": true, "min": 0.1, "default": 1}]},
-              "actions": [{"on": "submit", "type": "callSkill", "target": "shopping_list_14504c40_skill.add_ingredients_to_shopping_list", "params": {"recipe_id": "$state.selectedRecipeId", "quantity_multiplier": "$form.quantity_multiplier"}, "invalidates": ["shopping-list"]}, {"on": "cancel", "type": "closeModal"}]
-            }]
-          }
+            "id": "quantity_modal_schema",
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "quantity-form",
+                "area": "main",
+                "type": "ui.form",
+                "inputs": {
+                  "submitLabel": "Добавить ингредиенты",
+                  "fields": [
+                    {
+                      "id": "quantity_multiplier",
+                      "name": "quantity_multiplier",
+                      "type": "number",
+                      "label": "Количество порций (множитель)",
+                      "required": true,
+                      "min": 0.1,
+                      "default": 1
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "callSkill",
+                    "target": "shopping_list_14504c40_skill.add_ingredients_to_shopping_list",
+                    "params": {
+                      "recipe_id": "$state.selectedRecipeId",
+                      "quantity_multiplier": "$form.quantity_multiplier"
+                    },
+                    "invalidates": [
+                      "shopping-list"
+                    ]
+                  },
+                  {
+                    "on": "cancel",
+                    "type": "closeModal"
+                  }
+                ]
+              }
+            ],
+            "interface": {
+              "schema": "adaos.ui.modal.interface.v1",
+              "routes": {
+                "quantity": {
+                  "view": "shopping_list_14504c40.quantity_modal"
+                }
+              },
+              "defaultRoute": "quantity"
+            }
+          },
+          "implements": [
+            "shopping_list_14504c40.quantity_modal"
+          ]
+        }
+      },
+      "interfaces": {
+        "shopping_list_14504c40": {
+          "schema": "adaos.ui.skill_interface.v1",
+          "views": {
+            "shopping_list_14504c40.quantity_modal": {
+              "title": "Подтвердите количество",
+              "surfaces": [
+                "modal"
+              ],
+              "params": {}
+            }
+          },
+          "defaultView": "shopping_list_14504c40.quantity_modal"
         }
       }
     }
