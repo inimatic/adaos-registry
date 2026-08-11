@@ -525,7 +525,7 @@
                   "background": true,
                   "params": {
                     "direction_id": "$state.selectedDirectionId",
-                    "builder_webspace_id": "desktop"
+                    "builder_webspace_id": "desktop-dev"
                   },
                   "invalidates": [
                     "builder.project.preview"
