@@ -101,11 +101,13 @@
                                                                                           "type":  "ui.actions",
                                                                                           "title":  "Project",
                                                                                           "inputs":  {
-                                                                                                         "buttons":  {
+                                                                                                         "buttons":  [
+                                                                                                                         {
                                                                                                                          "id":  "project-label",
                                                                                                                          "label":  "$state.selectedProjectTitle",
                                                                                                                          "icon":  "folder-outline"
-                                                                                                                     },
+                                                                                                                         }
+                                                                                                                     ],
                                                                                                          "size":  "medium",
                                                                                                          "variant":  "toolbar",
                                                                                                          "stretch":  true
@@ -392,13 +394,15 @@
                                                                                                          "selectedStateKey":  "activeView",
                                                                                                          "variant":  "segmented"
                                                                                                      },
-                                                                                          "actions":  {
+                                                                                           "actions":  [
+                                                                                                           {
                                                                                                           "on":  "click",
                                                                                                           "type":  "updateState",
                                                                                                           "params":  {
                                                                                                                          "activeView":  "$event.id"
                                                                                                                      }
-                                                                                                      },
+                                                                                                           }
+                                                                                                       ],
                                                                                           "title_i18n":  {
                                                                                                              "key":  "builder.text.views"
                                                                                                          }
@@ -600,8 +604,9 @@
                                                                                                                                   "key":  "builder.text.start"
                                                                                                                               }
                                                                                                      },
-                                                                                          "actions":  {
-                                                                                                          "on":  "submit",
+                                                                                           "actions":  [
+                                                                                                           {
+                                                                                                               "on":  "submit",
                                                                                                           "type":  "callSkill",
                                                                                                           "target":  "builder_sdk_control_skill.start_automation",
                                                                                                           "params":  {
@@ -613,11 +618,12 @@
                                                                                                                                        "current_scenario":  "builder"
                                                                                                                                    }
                                                                                                                      },
-                                                                                                          "invalidates":  [
-                                                                                                                              "builder.project.automation",
-                                                                                                                              "builder.project.lifecycle"
-                                                                                                                          ]
-                                                                                                      },
+                                                                                                           "invalidates":  [
+                                                                                                                               "builder.project.automation",
+                                                                                                                               "builder.project.lifecycle"
+                                                                                                                           ]
+                                                                                                           }
+                                                                                                       ],
                                                                                           "title_i18n":  {
                                                                                                              "key":  "builder.text.start.autonomous.development"
                                                                                                          },
@@ -643,8 +649,9 @@
                                                                                                                                   "key":  "builder.text.submit.a.new.iteration"
                                                                                                                               }
                                                                                                      },
-                                                                                          "actions":  {
-                                                                                                          "on":  "submit",
+                                                                                           "actions":  [
+                                                                                                           {
+                                                                                                               "on":  "submit",
                                                                                                           "type":  "callSkill",
                                                                                                           "target":  "builder_sdk_control_skill.submit_automation",
                                                                                                           "params":  {
@@ -655,11 +662,12 @@
                                                                                                                                        "current_scenario":  "builder"
                                                                                                                                    }
                                                                                                                      },
-                                                                                                          "invalidates":  [
-                                                                                                                              "builder.project.automation",
-                                                                                                                              "builder.project.lifecycle"
-                                                                                                                          ]
-                                                                                                      },
+                                                                                                           "invalidates":  [
+                                                                                                                               "builder.project.automation",
+                                                                                                                               "builder.project.lifecycle"
+                                                                                                                           ]
+                                                                                                           }
+                                                                                                       ],
                                                                                           "title_i18n":  {
                                                                                                              "key":  "builder.text.clarification.or.retry.after.an.error"
                                                                                                          },
@@ -1883,10 +1891,11 @@
                                                                                                              "invalidationTags":  "builder.project.llm",
                                                                                                              "preserveLastValue":  true
                                                                                                          },
-                                                                                          "actions":  {
-                                                                                                          "on":  "submit",
-                                                                                                          "type":  "callSkill",
-                                                                                                          "target":  "builder_sdk_control_skill.set_llm_profile",
+                                                                                           "actions":  [
+                                                                                                           {
+                                                                                                               "on":  "submit",
+                                                                                                               "type":  "callSkill",
+                                                                                                               "target":  "builder_sdk_control_skill.set_llm_profile",
                                                                                                           "params":  {
                                                                                                                          "model":  "$event.values.llmModel",
                                                                                                                          "object_type":  "$state.selectedProjectKind",
@@ -1895,8 +1904,9 @@
                                                                                                                                        "current_scenario":  "builder"
                                                                                                                                    }
                                                                                                                      },
-                                                                                                          "invalidates":  "builder.project.llm"
-                                                                                                      },
+                                                                                                               "invalidates":  "builder.project.llm"
+                                                                                                           }
+                                                                                                       ],
                                                                                           "title_i18n":  {
                                                                                                              "key":  "builder.text.development.settings"
                                                                                                          }
@@ -2226,10 +2236,12 @@
                                                                                          "title":  "Подтвердите архивирование",
                                                                                          "layout":  {
                                                                                                         "type":  "stack",
-                                                                                                        "areas":  {
+                                                                                                        "areas":  [
+                                                                                                                        {
                                                                                                                       "id":  "main",
                                                                                                                       "role":  "main"
-                                                                                                                  }
+                                                                                                                        }
+                                                                                                                    ]
                                                                                                     },
                                                                                          "widgets":  [
                                                                                                          {
@@ -2335,10 +2347,12 @@
                                                                                      "title":  "Файлы проекта",
                                                                                      "layout":  {
                                                                                                     "type":  "stack",
-                                                                                                    "areas":  {
-                                                                                                                  "id":  "main",
-                                                                                                                  "role":  "main"
-                                                                                                              }
+                                                                                                        "areas":  [
+                                                                                                                        {
+                                                                                                                            "id":  "main",
+                                                                                                                            "role":  "main"
+                                                                                                                        }
+                                                                                                                    ]
                                                                                                 },
                                                                                      "widgets":  [
                                                                                                      {
@@ -2527,7 +2541,8 @@
                                                                                                                      "role":  "main"
                                                                                                                  }
                                                                                                    },
-                                                                                        "widgets":  {
+                                                                                         "widgets":  [
+                                                                                                         {
                                                                                                         "area":  "main",
                                                                                                         "id":  "project-picker-list",
                                                                                                         "type":  "ui.list",
@@ -2663,10 +2678,11 @@
                                                                                                                                        }
                                                                                                                         }
                                                                                                                     ],
-                                                                                                        "title_i18n":  {
-                                                                                                                           "key":  "builder.text.projects"
-                                                                                                                       }
-                                                                                                    },
+                                                                                                         "title_i18n":  {
+                                                                                                                            "key":  "builder.text.projects"
+                                                                                                                        }
+                                                                                                         }
+                                                                                                     ],
                                                                                         "title_i18n":  {
                                                                                                            "key":  "builder.text.select.project"
                                                                                                        },
@@ -2742,8 +2758,8 @@
                                                                                                          "title_i18n":  {
                                                                                                                             "key":  "builder.text.template"
                                                                                                                         }
-                                                                                                     },
-                                                                                                     {
+                                                                                                          },
+                                                                                                      {
                                                                                                          "area":  "main",
                                                                                                          "id":  "new-project-form",
                                                                                                          "type":  "ui.form",
@@ -2888,10 +2904,12 @@
                                                                                             "title":  "technical-addendum",
                                                                                             "layout":  {
                                                                                                            "type":  "stack",
-                                                                                                           "areas":  {
-                                                                                                                         "id":  "main",
-                                                                                                                         "role":  "main"
-                                                                                                                     }
+                                                                                                        "areas":  [
+                                                                                                                        {
+                                                                                                                            "id":  "main",
+                                                                                                                            "role":  "main"
+                                                                                                                        }
+                                                                                                                    ]
                                                                                                        },
                                                                                             "widgets":  {
                                                                                                             "area":  "main",
@@ -3578,10 +3596,12 @@
                                                                                          "title":  "confirm-publish",
                                                                                          "layout":  {
                                                                                                         "type":  "stack",
-                                                                                                        "areas":  {
-                                                                                                                      "id":  "main",
-                                                                                                                      "role":  "main"
-                                                                                                                  }
+                                                                                                        "areas":  [
+                                                                                                                        {
+                                                                                                                            "id":  "main",
+                                                                                                                            "role":  "main"
+                                                                                                                        }
+                                                                                                                    ]
                                                                                                     },
                                                                                          "widgets":  [
                                                                                                          {
@@ -3598,8 +3618,8 @@
                                                                                                                                                                 "key":  "builder.text.a.new.version.of.the.selected.project.will.be.published"
                                                                                                                                                             }
                                                                                                                                        }
-                                                                                                                        },
-                                                                                                             "title_i18n":  {
+                                                                                                         },
+                                                                                         "title_i18n":  {
                                                                                                                                 "key":  "builder.text.external.change"
                                                                                                                             }
                                                                                                          },
