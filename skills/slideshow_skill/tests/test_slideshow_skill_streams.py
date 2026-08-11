@@ -1561,3 +1561,16 @@ def test_redevice_auto_refresh_requires_selected_endpoint():
     assert auto_action["intervalMs"] >= 15_000
     assert "$state.slideshowDeviceCode" in auto_action["enabledIf"]
     assert "!!" in auto_action["enabledIf"]
+
+
+def test_redevice_modal_primes_state_once_on_mount():
+    webui_path = Path(__file__).resolve().parents[1] / "webui.json"
+    webui = json.loads(webui_path.read_text(encoding="utf-8"))
+    modal = webui["registry"]["modals"]["slideshow_modal"]["schema"]
+    auto_action = next(
+        item for item in modal["autoActions"] if item["id"] == "slideshow_redevice_initial_refresh"
+    )
+
+    assert auto_action["once"] is True
+    assert auto_action["action"]["on"] == "mount"
+    assert auto_action["action"]["target"] == "slideshow_skill.refresh_redevice_slideshow_state"
