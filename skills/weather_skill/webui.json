@@ -19,8 +19,7 @@
       "icon": "cloud-outline",
       "dataSource": {
         "kind": "y",
-        "path": "data/weather/current",
-        "observeRoot": true
+        "path": "data/weather/current"
       },
       "loading": {
         "loadingText": "Loading weather...",
@@ -81,8 +80,7 @@
               "title": "Current weather",
               "dataSource": {
                 "kind": "y",
-                "path": "data/weather/current",
-                "observeRoot": true
+                "path": "data/weather/current"
               },
               "loading": {
                 "loadingText": "Loading weather...",
@@ -172,8 +170,7 @@
               "title": "City",
               "dataSource": {
                 "kind": "y",
-                "path": "data/weather/current",
-                "observeRoot": true
+                "path": "data/weather/current"
               },
               "inputs": {
                 "bindField": "city",
@@ -254,8 +251,7 @@
               },
               "dataSource": {
                 "kind": "y",
-                "path": "data/weather/current",
-                "observeRoot": true
+                "path": "data/weather/current"
               },
               "actions": [
                 {
@@ -315,8 +311,7 @@
               "title": "Temperature",
               "dataSource": {
                 "kind": "y",
-                "path": "data/weather/hourly_chart",
-                "observeRoot": true
+                "path": "data/weather/hourly_chart"
               },
               "inputs": {
                 "emptyText": "No hourly forecast yet"
@@ -329,8 +324,7 @@
               "title": "Forecast",
               "dataSource": {
                 "kind": "y",
-                "path": "data/weather/daily",
-                "observeRoot": true
+                "path": "data/weather/daily"
               },
               "inputs": {
                 "emptyText": "No forecast yet",

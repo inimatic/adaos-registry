@@ -37,6 +37,34 @@ def _load_weather_module():
     return module
 
 
+def test_weather_webui_uses_targeted_projection_observers():
+    webui_path = Path(__file__).resolve().parents[1] / "webui.json"
+    contract = json.loads(webui_path.read_text(encoding="utf-8"))
+    data_sources: list[dict] = []
+
+    def _collect(value):
+        if isinstance(value, dict):
+            source = value.get("dataSource")
+            if isinstance(source, dict) and str(source.get("path", "")).startswith("data/weather/"):
+                data_sources.append(source)
+            for child in value.values():
+                _collect(child)
+        elif isinstance(value, list):
+            for child in value:
+                _collect(child)
+
+    _collect(contract)
+
+    assert data_sources
+    assert all(source.get("observeRoot") is not True for source in data_sources)
+    modal_widgets = contract["registry"]["modals"]["weather_modal"]["schema"]["widgets"]
+    selector = next(widget for widget in modal_widgets if widget["id"] == "weather-city-selector")
+    action = selector["actions"][0]
+    assert action["on"] == "change"
+    assert action["params"]["payload"]["city"] == "$event.value"
+    assert action["feedback"]["observe"]["match"]["request_id"] == "$client.requestId"
+
+
 def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch):
     mod = _load_weather_module()
     projected: list[tuple[str, dict, str | None]] = []
