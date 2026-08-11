@@ -5,7 +5,7 @@
   "name": "Taiga UI Demo Scenario",
   "type": "desktop",
   "title": "Taiga UI Demo",
-  "description": "Control scenario for the first semantic Web UI slice with a shared metrics table, chart payload, and event stream.",
+  "description": "Control scenario for semantic Web UI and native Taiga tree, collection grid, metric chart, and shared runtime widgets.",
   "depends": [
     "web_desktop_skill",
     "demo_metrics_skill"
@@ -21,10 +21,22 @@
             "type": "split",
             "pattern": "split",
             "areas": [
-              { "id": "sidebar", "role": "sidebar" },
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" },
-              { "id": "bottom", "role": "footer" }
+              {
+                "id": "sidebar",
+                "role": "sidebar"
+              },
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
             ]
           },
           "widgets": [
@@ -65,8 +77,10 @@
               "actions": [
                 {
                   "on": "click:open-demo",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "demo_metrics_skill.demo_metrics_modal",
+                    "surface": "modal",
                     "modalId": "demo_metrics_modal"
                   }
                 },
@@ -125,8 +139,10 @@
               "actions": [
                 {
                   "on": "click:open-demo",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
+                    "to": "demo_metrics_skill.demo_metrics_modal",
+                    "surface": "modal",
                     "modalId": "demo_metrics_modal"
                   }
                 },
@@ -174,6 +190,57 @@
               ]
             },
             {
+              "id": "demo-component-tree",
+              "type": "collection.tree",
+              "area": "sidebar",
+              "title": "Taiga components",
+              "dataSource": {
+                "kind": "static",
+                "value": [
+                  {
+                    "id": "data-display",
+                    "title": "Data display",
+                    "status": "ready",
+                    "children": [
+                      {
+                        "id": "collection-grid",
+                        "title": "Collection grid",
+                        "status": "ready"
+                      },
+                      {
+                        "id": "metric-chart",
+                        "title": "Metric chart",
+                        "status": "ready"
+                      }
+                    ]
+                  },
+                  {
+                    "id": "interaction",
+                    "title": "Interaction",
+                    "status": "ready",
+                    "children": [
+                      {
+                        "id": "command-bar",
+                        "title": "Command bar",
+                        "status": "ready"
+                      },
+                      {
+                        "id": "modal-navigation",
+                        "title": "Typed modal navigation",
+                        "status": "ready"
+                      }
+                    ]
+                  }
+                ]
+              },
+              "inputs": {
+                "expandedByDefault": true,
+                "compactIndent": true,
+                "wrapTitles": true,
+                "emptyText": "No component groups"
+              }
+            },
+            {
               "id": "demo-table",
               "type": "ui.table",
               "area": "main",
@@ -184,12 +251,59 @@
               },
               "inputs": {
                 "columns": [
-                  { "key": "title", "label": "Metric" },
-                  { "key": "status", "label": "Status", "width": "120px" },
-                  { "key": "value", "label": "Value", "width": "100px" },
-                  { "key": "unit", "label": "Unit", "width": "90px" }
+                  {
+                    "key": "title",
+                    "label": "Metric"
+                  },
+                  {
+                    "key": "status",
+                    "label": "Status",
+                    "width": "120px"
+                  },
+                  {
+                    "key": "value",
+                    "label": "Value",
+                    "width": "100px"
+                  },
+                  {
+                    "key": "unit",
+                    "label": "Unit",
+                    "width": "90px"
+                  }
                 ],
                 "emptyText": "No demo metrics yet"
+              }
+            },
+            {
+              "id": "demo-taiga-grid",
+              "type": "visual.taigaCollectionGrid",
+              "area": "main",
+              "title": "Taiga collection grid",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/demo_metrics/table"
+              },
+              "inputs": {
+                "stateKey": "demo_metrics.taigaSelection",
+                "columns": [
+                  {
+                    "key": "title",
+                    "label": "Metric"
+                  },
+                  {
+                    "key": "status",
+                    "label": "Status"
+                  },
+                  {
+                    "key": "value",
+                    "label": "Value"
+                  },
+                  {
+                    "key": "unit",
+                    "label": "Unit"
+                  }
+                ],
+                "emptyText": "No Taiga grid rows yet"
               }
             },
             {
@@ -206,6 +320,22 @@
                 "xKey": "ts",
                 "yKey": "value",
                 "emptyText": "No chart payload yet"
+              }
+            },
+            {
+              "id": "demo-taiga-chart",
+              "type": "visual.taigaMetricChart",
+              "area": "right",
+              "title": "Taiga metric chart",
+              "dataSource": {
+                "kind": "y",
+                "path": "data/demo_metrics/chart"
+              },
+              "inputs": {
+                "stateKey": "demo_metrics.selection",
+                "xKey": "ts",
+                "yKey": "value",
+                "emptyText": "No Taiga chart payload yet"
               }
             },
             {
@@ -259,9 +389,18 @@
             "layout": {
               "pattern": "split",
               "areas": [
-                { "id": "main", "role": "main" },
-                { "id": "right", "role": "aux" },
-                { "id": "bottom", "role": "footer" }
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                },
+                {
+                  "id": "bottom",
+                  "role": "footer"
+                }
               ]
             },
             "load": {
@@ -288,9 +427,15 @@
                 "area": "main",
                 "title": "Metrics table",
                 "when": {
-                  "requiredCapabilities": ["listable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "listable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -304,11 +449,26 @@
                 },
                 "config": {
                   "columns": [
-                    { "key": "title", "label": "Metric" },
-                    { "key": "status", "label": "Status" },
-                    { "key": "value", "label": "Value" },
-                    { "key": "unit", "label": "Unit" },
-                    { "key": "group", "label": "Group" }
+                    {
+                      "key": "title",
+                      "label": "Metric"
+                    },
+                    {
+                      "key": "status",
+                      "label": "Status"
+                    },
+                    {
+                      "key": "value",
+                      "label": "Value"
+                    },
+                    {
+                      "key": "unit",
+                      "label": "Unit"
+                    },
+                    {
+                      "key": "group",
+                      "label": "Group"
+                    }
                   ]
                 },
                 "actions": [
@@ -328,9 +488,15 @@
                 "area": "right",
                 "title": "Metric trend",
                 "when": {
-                  "requiredCapabilities": ["inspectable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "inspectable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -353,9 +519,15 @@
                 "area": "bottom",
                 "title": "Events",
                 "when": {
-                  "requiredCapabilities": ["eventful"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "eventful"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "stream",
@@ -370,9 +542,15 @@
                 "area": "bottom",
                 "title": "Operator notes",
                 "when": {
-                  "requiredCapabilities": ["streamable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "streamable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -392,13 +570,22 @@
         "pageSchema": {
           "id": "taiga_ui_demo_workspace",
           "title": "Demo Metrics Workspace",
-              "layout": {
-                "type": "split",
-                "pattern": "split",
-                "areas": [
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" },
-              { "id": "bottom", "role": "footer" }
+          "layout": {
+            "type": "split",
+            "pattern": "split",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
             ]
           },
           "widgets": [],
@@ -421,9 +608,18 @@
             "layout": {
               "pattern": "split",
               "areas": [
-                { "id": "main", "role": "main" },
-                { "id": "right", "role": "aux" },
-                { "id": "bottom", "role": "footer" }
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                },
+                {
+                  "id": "bottom",
+                  "role": "footer"
+                }
               ]
             },
             "load": {
@@ -450,9 +646,15 @@
                 "area": "main",
                 "title": "Metrics table",
                 "when": {
-                  "requiredCapabilities": ["listable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "listable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -466,11 +668,26 @@
                 },
                 "config": {
                   "columns": [
-                    { "key": "title", "label": "Metric" },
-                    { "key": "status", "label": "Status" },
-                    { "key": "value", "label": "Value" },
-                    { "key": "unit", "label": "Unit" },
-                    { "key": "group", "label": "Group" }
+                    {
+                      "key": "title",
+                      "label": "Metric"
+                    },
+                    {
+                      "key": "status",
+                      "label": "Status"
+                    },
+                    {
+                      "key": "value",
+                      "label": "Value"
+                    },
+                    {
+                      "key": "unit",
+                      "label": "Unit"
+                    },
+                    {
+                      "key": "group",
+                      "label": "Group"
+                    }
                   ]
                 },
                 "actions": [
@@ -490,9 +707,15 @@
                 "area": "right",
                 "title": "Metric trend",
                 "when": {
-                  "requiredCapabilities": ["inspectable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "inspectable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -515,9 +738,15 @@
                 "area": "bottom",
                 "title": "Events",
                 "when": {
-                  "requiredCapabilities": ["eventful"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "eventful"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "stream",
@@ -532,9 +761,15 @@
                 "area": "bottom",
                 "title": "Operator notes",
                 "when": {
-                  "requiredCapabilities": ["streamable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "streamable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -554,13 +789,22 @@
         "pageSchema": {
           "id": "taiga_ui_demo_operations",
           "title": "Demo Metrics Operations",
-              "layout": {
-                "type": "split",
-                "pattern": "split",
-                "areas": [
-              { "id": "main", "role": "main" },
-              { "id": "right", "role": "aux" },
-              { "id": "bottom", "role": "footer" }
+          "layout": {
+            "type": "split",
+            "pattern": "split",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "right",
+                "role": "aux"
+              },
+              {
+                "id": "bottom",
+                "role": "footer"
+              }
             ]
           },
           "widgets": [],
@@ -582,9 +826,18 @@
             "layout": {
               "pattern": "split",
               "areas": [
-                { "id": "main", "role": "main" },
-                { "id": "right", "role": "aux" },
-                { "id": "bottom", "role": "footer" }
+                {
+                  "id": "main",
+                  "role": "main"
+                },
+                {
+                  "id": "right",
+                  "role": "aux"
+                },
+                {
+                  "id": "bottom",
+                  "role": "footer"
+                }
               ]
             },
             "load": {
@@ -611,9 +864,15 @@
                 "area": "main",
                 "title": "Live events",
                 "when": {
-                  "requiredCapabilities": ["eventful"],
-                  "surfaceClasses": ["operations"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "eventful"
+                  ],
+                  "surfaceClasses": [
+                    "operations"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "stream",
@@ -628,9 +887,15 @@
                 "area": "right",
                 "title": "Selected metric",
                 "when": {
-                  "requiredCapabilities": ["inspectable"],
-                  "surfaceClasses": ["operations"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "inspectable"
+                  ],
+                  "surfaceClasses": [
+                    "operations"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -653,9 +918,15 @@
                 "area": "bottom",
                 "title": "Operator notes",
                 "when": {
-                  "requiredCapabilities": ["streamable"],
-                  "surfaceClasses": ["operations"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "streamable"
+                  ],
+                  "surfaceClasses": [
+                    "operations"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -673,9 +944,15 @@
                 "area": "main",
                 "title": "Workspace-only grid",
                 "when": {
-                  "requiredCapabilities": ["listable"],
-                  "surfaceClasses": ["workspace"],
-                  "lifecycleStages": ["active"]
+                  "requiredCapabilities": [
+                    "listable"
+                  ],
+                  "surfaceClasses": [
+                    "workspace"
+                  ],
+                  "lifecycleStages": [
+                    "active"
+                  ]
                 },
                 "source": {
                   "kind": "y",
@@ -689,13 +966,20 @@
                 },
                 "config": {
                   "columns": [
-                    { "key": "title", "label": "Metric" }
+                    {
+                      "key": "title",
+                      "label": "Metric"
+                    }
                   ]
                 }
               }
             ]
           }
         }
+      },
+      "modals": {},
+      "interfaces": {
+        "taiga_ui_demo_scenario": {}
       }
     }
   }
