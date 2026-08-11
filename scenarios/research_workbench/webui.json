@@ -1,701 +1,754 @@
 {
-    "schema":  "adaos.webui.v1",
-    "generated_by":  "research_workbench",
-    "ui":  {
-               "application":  {
-                                   "desktop":  {
-                                                   "pageSchema":  {
-                                                                      "id":  "research_workbench",
-                                                                      "title":  "Research Workbench",
-                                                                      "initialState":  {
-                                                                                           "activeResearchTab":  "overview",
-                                                                                           "selectedDirectionId":  null,
-                                                                                           "selectedDirectionTitle":  null,
-                                                                                           "researchGeneration":  0,
-                                                                                           "researchPrototypeDigest":  null,
-                                                                                           "builderUrl":  null
-                                                                                       },
-                                                                      "layout":  {
-                                                                                     "type":  "split",
-                                                                                     "pattern":  "focus-detail",
-                                                                                     "areas":  [
-                                                                                                   {
-                                                                                                       "id":  "portfolio",
-                                                                                                       "role":  "main",
-                                                                                                       "label":  "Research directions"
-                                                                                                   },
-                                                                                                   {
-                                                                                                       "id":  "workspace",
-                                                                                                       "role":  "secondary",
-                                                                                                       "label":  "Selected direction"
-                                                                                                   }
-                                                                                               ]
-                                                                                 },
-                                                                      "widgets":  [
-                                                                                      {
-                                                                                          "id":  "research-focus",
-                                                                                          "type":  "item.details",
-                                                                                          "area":  "portfolio",
-                                                                                          "title":  "Workbench focus",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "skill",
-                                                                                                             "name":  "research_orchestrator_skill.resolve_focus",
-                                                                                                             "params":  {
-                                                                                                                            "_meta":  {
-                                                                                                                                          "current_scenario":  "research_workbench"
-                                                                                                                                      }
-                                                                                                                        },
-                                                                                                             "cacheTtlMs":  0,
-                                                                                                             "invalidationTags":  [
-                                                                                                                                      "research.portfolio",
-                                                                                                                                      "builder.project.preview"
-                                                                                                                                  ],
-                                                                                                             "preserveLastValue":  true
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "compact":  true,
-                                                                                                         "fields":  [
-                                                                                                                        {
-                                                                                                                            "key":  "message",
-                                                                                                                            "label":  "Context"
-                                                                                                                        }
-                                                                                                                    ],
-                                                                                                         "stateBindings":  {
-                                                                                                                               "selectedDirectionId":  "direction_id",
-                                                                                                                               "selectedDirectionTitle":  "title",
-                                                                                                                               "researchConversationId":  "conversation_id"
-                                                                                                                           }
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "create-direction",
-                                                                                          "type":  "ui.form",
-                                                                                          "area":  "portfolio",
-                                                                                          "title":  "New research direction",
-                                                                                          "inputs":  {
-                                                                                                         "layout":  "stack",
-                                                                                                         "submitLabel":  "Create direction",
-                                                                                                         "fields":  [
-                                                                                                                        {
-                                                                                                                            "id":  "project_id",
-                                                                                                                            "type":  "shortText",
-                                                                                                                            "label":  "Project ID",
-                                                                                                                            "required":  true,
-                                                                                                                            "placeholder":  "my_research",
-                                                                                                                            "help":  "Stable lowercase ID: letters, digits, dot, underscore, or hyphen. The Project and its primary skill are created together."
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "id":  "title",
-                                                                                                                            "type":  "shortText",
-                                                                                                                            "label":  "Title",
-                                                                                                                            "required":  true,
-                                                                                                                            "placeholder":  "Human-readable research direction"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "id":  "description",
-                                                                                                                            "type":  "longText",
-                                                                                                                            "label":  "Initial intent",
-                                                                                                                            "required":  true,
-                                                                                                                            "placeholder":  "What should be understood, reproduced, compared, or falsified?"
-                                                                                                                        }
-                                                                                                                    ]
-                                                                                                     },
-                                                                                          "actions":  [
-                                                                                                          {
-                                                                                                              "on":  "submit",
-                                                                                                              "type":  "callSkill",
-                                                                                                              "target":  "research_orchestrator_skill.create_direction",
-                                                                                                              "params":  {
-                                                                                                                             "project_id":  "$event.values.project_id",
-                                                                                                                             "title":  "$event.values.title",
-                                                                                                                             "description":  "$event.values.description"
-                                                                                                                         },
-                                                                                                              "invalidates":  [
-                                                                                                                                  "research.portfolio",
-                                                                                                                                  "research.formulation",
-                                                                                                                                  "research.activity"
-                                                                                                                              ]
-                                                                                                          },
-                                                                                                          {
-                                                                                                              "on":  "submit",
-                                                                                                              "type":  "updateState",
-                                                                                                              "params":  {
-                                                                                                                             "selectedDirectionId":  "$event.values.project_id",
-                                                                                                                             "selectedDirectionTitle":  "$event.values.title",
-                                                                                                                             "activeResearchTab":  "overview"
-                                                                                                                         }
-                                                                                                          }
-                                                                                                      ]
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "directions",
-                                                                                          "type":  "ui.list",
-                                                                                          "area":  "portfolio",
-                                                                                          "title":  "Directions",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "skill",
-                                                                                                             "name":  "research_orchestrator_skill.list_directions",
-                                                                                                             "params":  {
-                                                                                                                            "limit":  500
-                                                                                                                        },
-                                                                                                             "cacheTtlMs":  0,
-                                                                                                             "invalidationTags":  [
-                                                                                                                                      "research.portfolio",
-                                                                                                                                      "research.formulation"
-                                                                                                                                  ],
-                                                                                                             "preserveLastValue":  true
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "variant":  "cards",
-                                                                                                         "search":  true,
-                                                                                                         "titleKey":  "title",
-                                                                                                         "subtitleKey":  "status",
-                                                                                                         "previewKey":  "description",
-                                                                                                         "emptyText":  "No research directions yet. Create the first Project above."
-                                                                                                     },
-                                                                                          "actions":  [
-                                                                                                          {
-                                                                                                              "on":  "select",
-                                                                                                              "type":  "updateState",
-                                                                                                              "params":  {
-                                                                                                                             "selectedDirectionId":  "$event.direction_id",
-                                                                                                                             "selectedDirectionTitle":  "$event.title",
-                                                                                                                             "activeResearchTab":  "overview",
-                                                                                                                             "researchConversationId":  "conv.skill.research_orchestrator_skill.$event.direction_id.desktop"
-                                                                                                                         }
-                                                                                                          }
-                                                                                                      ]
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "no-direction",
-                                                                                          "type":  "static.markdown",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Select a direction",
-                                                                                          "visibleIf":  "$state.selectedDirectionId == null",
-                                                                                          "inputs":  {
-                                                                                                         "content":  "Choose a research direction from the portfolio or create a new one. The Workbench will keep artifacts, formulation revisions, acceptance, and the pre-Codex handoff connected by exact identities."
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "direction-status",
-                                                                                          "type":  "item.details",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Direction status",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "skill",
-                                                                                                             "name":  "research_orchestrator_skill.get_direction",
-                                                                                                             "params":  {
-                                                                                                                            "direction_id":  "$state.selectedDirectionId"
-                                                                                                                        },
-                                                                                                             "cacheTtlMs":  0,
-                                                                                                             "invalidationTags":  [
-                                                                                                                                      "research.formulation",
-                                                                                                                                      "research.activity",
-                                                                                                                                      "research.automation_brief"
-                                                                                                                                  ],
-                                                                                                             "preserveLastValue":  true
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "compact":  true,
-                                                                                                         "fields":  [
-                                                                                                                        {
-                                                                                                                            "key":  "project.ref",
-                                                                                                                            "label":  "Project"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "direction.primary_skill_ref",
-                                                                                                                            "label":  "Primary skill"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "direction.status",
-                                                                                                                            "label":  "Stage"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "direction.generation",
-                                                                                                                            "label":  "Generation"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "source_bundle.digest",
-                                                                                                                            "label":  "Artifact set"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "current_prototype.revision",
-                                                                                                                            "label":  "Prototype revision"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "development_session.session_id",
-                                                                                                                            "label":  "Development Session"
-                                                                                                                        }
-                                                                                                                    ],
-                                                                                                         "stateBindings":  {
-                                                                                                                               "researchGeneration":  "direction.generation",
-                                                                                                                               "researchPrototypeDigest":  "current_prototype.digest",
-                                                                                                                               "builderUrl":  "builder_url",
-                                                                                                                               "selectedDirectionTitle":  "direction.title",
-                                                                                                                               "researchConversationId":  "conversation_id"
-                                                                                                                           }
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "direction-tabs",
-                                                                                          "type":  "ui.actions",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Research workflow",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null",
-                                                                                          "inputs":  {
-                                                                                                         "variant":  "segmented",
-                                                                                                         "size":  "small",
-                                                                                                         "selectedStateKey":  "activeResearchTab",
-                                                                                                         "buttons":  [
-                                                                                                                         {
-                                                                                                                             "id":  "overview",
-                                                                                                                             "label":  "Overview",
-                                                                                                                             "icon":  "information-circle-outline",
-                                                                                                                             "title":  "Project identity, current formulation, and admitted next steps."
-                                                                                                                         },
-                                                                                                                         {
-                                                                                                                             "id":  "artifacts",
-                                                                                                                             "label":  "Artifacts",
-                                                                                                                             "icon":  "file-tray-stacked-outline",
-                                                                                                                             "title":  "Source material physically owned by the direction skill."
-                                                                                                                         },
-                                                                                                                         {
-                                                                                                                             "id":  "formulation",
-                                                                                                                             "label":  "Formulation",
-                                                                                                                             "icon":  "chatbubbles-outline",
-                                                                                                                             "title":  "Human–LLM discussion that materializes typed ResearchPrototype revisions."
-                                                                                                                         },
-                                                                                                                         {
-                                                                                                                             "id":  "development",
-                                                                                                                             "label":  "Development",
-                                                                                                                             "icon":  "construct-outline",
-                                                                                                                             "title":  "Exact acceptance, AutomationBrief, and least-write Builder session."
-                                                                                                                         },
-                                                                                                                         {
-                                                                                                                             "id":  "activity",
-                                                                                                                             "label":  "Activity",
-                                                                                                                             "icon":  "pulse-outline",
-                                                                                                                             "title":  "Durable stage journal for observable autonomous work."
-                                                                                                                         },
-                                                                                                                         {
-                                                                                                                             "id":  "help",
-                                                                                                                             "label":  "Help",
-                                                                                                                             "icon":  "help-circle-outline",
-                                                                                                                             "title":  "Capabilities, workflow, and milestone boundary."
-                                                                                                                         }
-                                                                                                                     ]
-                                                                                                     },
-                                                                                          "actions":  [
-                                                                                                          {
-                                                                                                              "on":  "click",
-                                                                                                              "type":  "updateState",
-                                                                                                              "params":  {
-                                                                                                                             "activeResearchTab":  "$event.id"
-                                                                                                                         }
-                                                                                                          }
-                                                                                                      ]
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "overview",
-                                                                                          "type":  "static.markdown",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Research direction",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027overview\u0027",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "skill",
-                                                                                                             "name":  "research_orchestrator_skill.get_direction",
-                                                                                                             "params":  {
-                                                                                                                            "direction_id":  "$state.selectedDirectionId"
-                                                                                                                        },
-                                                                                                             "cacheTtlMs":  0,
-                                                                                                             "invalidationTags":  [
-                                                                                                                                      "research.formulation"
-                                                                                                                                  ],
-                                                                                                             "preserveLastValue":  true
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "bindField":  "content"
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "artifact-upload",
-                                                                                          "type":  "input.fileUpload",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Add source material to artifacts/part0",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027artifacts\u0027",
-                                                                                          "inputs":  {
-                                                                                                         "label":  "Upload notebook, Markdown, text, code, JSON, YAML, or PDF",
-                                                                                                         "accept":  ".ipynb,.md,.txt,.py,.json,.yaml,.yml,.pdf",
-                                                                                                         "maxBytes":  134217728,
-                                                                                                         "target":  "skill",
-                                                                                                         "skill":  "research_orchestrator_skill",
-                                                                                                         "purpose":  "research_direction_intake"
-                                                                                                     },
-                                                                                          "actions":  [
-                                                                                                          {
-                                                                                                              "on":  "uploaded",
-                                                                                                              "type":  "callSkill",
-                                                                                                              "target":  "research_orchestrator_skill.attach_source",
-                                                                                                              "params":  {
-                                                                                                                             "direction_id":  "$state.selectedDirectionId",
-                                                                                                                             "group_id":  "part0",
-                                                                                                                             "path":  "$event.path",
-                                                                                                                             "name":  "$event.file.name",
-                                                                                                                             "role":  "research_source",
-                                                                                                                             "cleanup_staging":  true
-                                                                                                                         },
-                                                                                                              "invalidates":  [
-                                                                                                                                  "research.artifacts",
-                                                                                                                                  "research.formulation",
-                                                                                                                                  "research.activity"
-                                                                                                                              ]
-                                                                                                          }
-                                                                                                      ]
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "artifact-list",
-                                                                                          "type":  "ui.list",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Manifested artifacts",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027artifacts\u0027",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "skill",
-                                                                                                             "name":  "research_orchestrator_skill.list_artifacts",
-                                                                                                             "params":  {
-                                                                                                                            "direction_id":  "$state.selectedDirectionId"
-                                                                                                                        },
-                                                                                                             "cacheTtlMs":  0,
-                                                                                                             "invalidationTags":  [
-                                                                                                                                      "research.artifacts",
-                                                                                                                                      "research.formulation"
-                                                                                                                                  ],
-                                                                                                             "preserveLastValue":  true
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "variant":  "list",
-                                                                                                         "titleKey":  "title",
-                                                                                                         "subtitleKey":  "subtitle",
-                                                                                                         "previewKey":  "preview",
-                                                                                                         "emptyText":  "No artifacts in part0. Upload the original sources used to formulate the task."
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "artifact-policy",
-                                                                                          "type":  "static.markdown",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Artifact boundary",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027artifacts\u0027",
-                                                                                          "inputs":  {
-                                                                                                         "content":  "Files here are **untrusted source material**, not scientific evidence. They live in the selected direction skill\u0027s source tree and are distinct from runtime experiment data under `.adaos/workspace/skills/.runtime/\u003cskill\u003e/\u003cversion\u003e/data/`."
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "formulation-state",
-                                                                                          "type":  "static.markdown",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Current formulation",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027formulation\u0027",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "skill",
-                                                                                                             "name":  "research_orchestrator_skill.get_direction",
-                                                                                                             "params":  {
-                                                                                                                            "direction_id":  "$state.selectedDirectionId"
-                                                                                                                        },
-                                                                                                             "cacheTtlMs":  0,
-                                                                                                             "invalidationTags":  [
-                                                                                                                                      "research.formulation"
-                                                                                                                                  ],
-                                                                                                             "preserveLastValue":  true
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "bindField":  "content"
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "research-chat",
-                                                                                          "type":  "ui.chat",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Discuss and revise the ResearchPrototype",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027formulation\u0027",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "stream",
-                                                                                                             "receiver":  "voice_chat.messages",
-                                                                                                             "scope":  "shared",
-                                                                                                             "transport":  "hub",
-                                                                                                             "params":  {
-                                                                                                                            "conversation_id":  "$state.researchConversationId",
-                                                                                                                            "conversation_topic_id":  "research:$state.selectedDirectionId",
-                                                                                                                            "dialog_channel_id":  "research_orchestrator"
-                                                                                                                        }
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "autoGrow":  true,
-                                                                                                         "compact":  true,
-                                                                                                         "enterToSend":  true,
-                                                                                                         "shiftEnterNewline":  true,
-                                                                                                         "showTimestamps":  true,
-                                                                                                         "placeholder":  "Discuss the research question, falsifiable hypotheses, protocol, estimands, uncertainty, constraints, and unresolved decisions…",
-                                                                                                         "sendCommand":  "voice.chat.user",
-                                                                                                         "receiver":  "voice_chat.messages",
-                                                                                                         "scope":  "shared",
-                                                                                                         "meta":  {
-                                                                                                                      "active_agent_id":  "agent:research_orchestrator_skill:researcher",
-                                                                                                                      "active_agent_label":  "Researcher",
-                                                                                                                      "conversation_id":  "$state.researchConversationId",
-                                                                                                                      "conversation_topic_id":  "research:$state.selectedDirectionId",
-                                                                                                                      "thread_id":  "research:$state.selectedDirectionId",
-                                                                                                                      "dialog_channel_id":  "research_orchestrator",
-                                                                                                                      "direction_id":  "$state.selectedDirectionId",
-                                                                                                                      "route_id":  "voice_chat"
-                                                                                                                  }
-                                                                                                     },
-                                                                                          "actions":  [
-
-                                                                                                      ]
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "development-actions",
-                                                                                          "type":  "ui.actions",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Pre-Codex gate",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027development\u0027",
-                                                                                          "inputs":  {
-                                                                                                         "variant":  "toolbar",
-                                                                                                         "size":  "small",
-                                                                                                         "buttons":  [
-                                                                                                                         {
-                                                                                                                             "id":  "accept",
-                                                                                                                             "label":  "Accept exact prototype",
-                                                                                                                             "icon":  "shield-checkmark-outline",
-                                                                                                                             "enabledIf":  "$state.researchPrototypeDigest != null",
-                                                                                                                             "title":  "Checkpoint the exact Project-owned skill and artifact set, then create the AutomationBrief and scoped Development Session. Codex is not started."
-                                                                                                                         },
-                                                                                                                         {
-                                                                                                                             "id":  "open-builder",
-                                                                                                                             "label":  "Open Builder session",
-                                                                                                                             "icon":  "open-outline",
-                                                                                                                             "enabledIf":  "$state.builderUrl != null",
-                                                                                                                             "title":  "Bind this exact Development Session to Builder, then open Builder. The target skill is read-write; Workbench, orchestrator, and artifact groups are read-only context."
-                                                                                                                         },
-                                                                                                                         {
-                                                                                                                             "id":  "help-modal",
-                                                                                                                             "label":  "How this works",
-                                                                                                                             "icon":  "help-circle-outline",
-                                                                                                                             "title":  "Open the Research Workbench help modal."
-                                                                                                                         }
-                                                                                                                     ]
-                                                                                                     },
-                                                                                          "actions":  [
-                                                                                                          {
-                                                                                                              "on":  "click:accept",
-                                                                                                              "type":  "callSkill",
-                                                                                                              "target":  "research_orchestrator_skill.accept_prototype",
-                                                                                                              "params":  {
-                                                                                                                             "direction_id":  "$state.selectedDirectionId",
-                                                                                                                             "prototype_digest":  "$state.researchPrototypeDigest",
-                                                                                                                             "expected_generation":  "$state.researchGeneration",
-                                                                                                                             "idempotency_key":  "workbench-accept-$state.selectedDirectionId-$state.researchGeneration"
-                                                                                                                         },
-                                                                                                              "invalidates":  [
-                                                                                                                                  "research.portfolio",
-                                                                                                                                  "research.formulation",
-                                                                                                                                  "research.activity",
-                                                                                                                                  "research.automation_brief"
-                                                                                                                              ]
-                                                                                                          },
-                                                                                                          {
-                                                                                                              "on":  "click:open-builder",
-                                                                                                              "type":  "callSkill",
-                                                                                                              "target":  "research_orchestrator_skill.open_builder_session",
-                                                                                                              "params":  {
-                                                                                                                             "direction_id":  "$state.selectedDirectionId",
-                                                                                                                             "builder_webspace_id":  "desktop"
-                                                                                                                         }
-                                                                                                          },
-                                                                                                          {
-                                                                                                              "on":  "click:open-builder",
-                                                                                                              "type":  "openUrl",
-                                                                                                              "params":  {
-                                                                                                                             "url":  "$state.builderUrl",
-                                                                                                                             "target":  "_self"
-                                                                                                                         }
-                                                                                                          },
-                                                                                                          {
-                                                                                                              "on":  "click:help-modal",
-                                                                                                              "type":  "openModal",
-                                                                                                              "params":  {
-                                                                                                                             "modalId":  "research_workbench_help"
-                                                                                                                         }
-                                                                                                          }
-                                                                                                      ]
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "automation-brief",
-                                                                                          "type":  "item.codeViewer",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "AutomationBrief",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027development\u0027",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "skill",
-                                                                                                             "name":  "research_orchestrator_skill.get_automation_brief",
-                                                                                                             "params":  {
-                                                                                                                            "direction_id":  "$state.selectedDirectionId"
-                                                                                                                        },
-                                                                                                             "cacheTtlMs":  0,
-                                                                                                             "invalidationTags":  [
-                                                                                                                                      "research.automation_brief"
-                                                                                                                                  ],
-                                                                                                             "preserveLastValue":  true
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "bindField":  "content",
-                                                                                                         "languageField":  "language",
-                                                                                                         "copyButton":  true
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "development-scope",
-                                                                                          "type":  "item.details",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Builder Development Session",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027development\u0027",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "skill",
-                                                                                                             "name":  "research_orchestrator_skill.get_direction",
-                                                                                                             "params":  {
-                                                                                                                            "direction_id":  "$state.selectedDirectionId"
-                                                                                                                        },
-                                                                                                             "cacheTtlMs":  0,
-                                                                                                             "invalidationTags":  [
-                                                                                                                                      "research.automation_brief"
-                                                                                                                                  ],
-                                                                                                             "preserveLastValue":  true
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "fields":  [
-                                                                                                                        {
-                                                                                                                            "key":  "development_session.session_id",
-                                                                                                                            "label":  "Session"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "development_session.project_ref",
-                                                                                                                            "label":  "Project"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "development_session.focus.ref",
-                                                                                                                            "label":  "Focus"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "development_session.targets.primary.0.ref",
-                                                                                                                            "label":  "Read-write target"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "development_session.artifact_inputs.0.ref",
-                                                                                                                            "label":  "Read-only artifacts"
-                                                                                                                        },
-                                                                                                                        {
-                                                                                                                            "key":  "development_session.status",
-                                                                                                                            "label":  "State"
-                                                                                                                        }
-                                                                                                                    ]
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "activity",
-                                                                                          "type":  "static.markdown",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Durable activity journal",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027activity\u0027",
-                                                                                          "dataSource":  {
-                                                                                                             "kind":  "skill",
-                                                                                                             "name":  "research_orchestrator_skill.get_activity",
-                                                                                                             "params":  {
-                                                                                                                            "direction_id":  "$state.selectedDirectionId",
-                                                                                                                            "limit":  200
-                                                                                                                        },
-                                                                                                             "cacheTtlMs":  0,
-                                                                                                             "invalidationTags":  [
-                                                                                                                                      "research.activity",
-                                                                                                                                      "research.formulation"
-                                                                                                                                  ],
-                                                                                                             "preserveLastValue":  true
-                                                                                                         },
-                                                                                          "inputs":  {
-                                                                                                         "bindField":  "content"
-                                                                                                     }
-                                                                                      },
-                                                                                      {
-                                                                                          "id":  "help",
-                                                                                          "type":  "static.markdown",
-                                                                                          "area":  "workspace",
-                                                                                          "title":  "Using Research Workbench",
-                                                                                          "visibleIf":  "$state.selectedDirectionId != null \u0026\u0026 $state.activeResearchTab === \u0027help\u0027",
-                                                                                          "inputs":  {
-                                                                                                         "content":  "## From sources to a Codex-ready task\n\n1. **Overview** shows the durable Project, primary skill, stage, and next admitted step.\n2. **Artifacts** copies source material into the direction skill\u0027s `artifacts/part0/` with a digest manifest.\n3. **Formulation** discusses the task; the typed ResearchPrototype, not the transcript, is canonical.\n4. **Development** accepts one exact revision and creates AutomationBrief + Development Session.\n5. **Activity** exposes work performed under the hood.\n\nAcceptance does **not** run Codex or an experiment."
-                                                                                                     }
-                                                                                      }
-                                                                                  ],
-                                                                      "initialStateSource":  {
-                                                                                                 "kind":  "y",
-                                                                                                 "path":  "data/builder/preview_state",
-                                                                                                 "mapping":  {
-                                                                                                                 "selectedDirectionId":  "selected_component_id"
-                                                                                                             }
-                                                                                             }
-                                                                  }
-                                               },
-                                   "modals":  {
-                                                  "research_workbench_help":  {
-                                                                                  "title":  "Research Workbench — usage and capabilities",
-                                                                                  "presentation":  {
-                                                                                                       "kind":  "modal"
-                                                                                                   },
-                                                                                  "schema":  {
-                                                                                                 "id":  "research_workbench_help",
-                                                                                                 "title":  "Research Workbench — usage and capabilities",
-                                                                                                 "layout":  {
-                                                                                                                "type":  "stack",
-                                                                                                                "areas":  [
-                                                                                                                              {
-                                                                                                                                  "id":  "main",
-                                                                                                                                  "role":  "main"
-                                                                                                                              }
-                                                                                                                          ]
-                                                                                                            },
-                                                                                                 "widgets":  [
-                                                                                                                 {
-                                                                                                                     "id":  "research-workbench-help-content",
-                                                                                                                     "type":  "static.markdown",
-                                                                                                                     "area":  "main",
-                                                                                                                     "inputs":  {
-                                                                                                                                    "content":  "# Research Workbench\n\nThis shared application manages many research directions; it does not create a scenario per direction.\n\n- A direction is an `adaos.project.v1` Project with one primary research skill.\n- Source artifacts belong to that skill and stay readable by normal filesystem tools.\n- LLM discussion proposes typed ResearchPrototype revisions.\n- Human acceptance binds the exact Project, skill checkpoint, artifacts, and prototype.\n- Builder receives one explicit read-write target and read-only context.\n- Codex, experiment execution, Ray, and article generation are outside this milestone."
-                                                                                                                                }
-                                                                                                                 },
-                                                                                                                 {
-                                                                                                                     "id":  "research-workbench-help-close",
-                                                                                                                     "type":  "ui.actions",
-                                                                                                                     "area":  "main",
-                                                                                                                     "inputs":  {
-                                                                                                                                    "buttons":  [
-                                                                                                                                                    {
-                                                                                                                                                        "id":  "close",
-                                                                                                                                                        "label":  "Close",
-                                                                                                                                                        "icon":  "close-outline"
-                                                                                                                                                    }
-                                                                                                                                                ]
-                                                                                                                                },
-                                                                                                                     "actions":  [
-                                                                                                                                     {
-                                                                                                                                         "on":  "click:close",
-                                                                                                                                         "type":  "closeModal"
-                                                                                                                                     }
-                                                                                                                                 ]
-                                                                                                                 }
-                                                                                                             ]
-                                                                                             }
-                                                                              }
-                                              }
-                               }
-           }
+  "schema": "adaos.webui.v1",
+  "generated_by": "research_workbench",
+  "ui": {
+    "application": {
+      "desktop": {
+        "pageSchema": {
+          "id": "research_workbench",
+          "title": "Research Workbench",
+          "surfaceClass": "workspace",
+          "initialState": {
+            "activeResearchTab": "overview",
+            "selectedDirectionId": null,
+            "selectedDirectionTitle": null,
+            "researchConversationId": null,
+            "researchGeneration": 0,
+            "researchPrototypeDigest": null,
+            "builderUrl": null
+          },
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "portfolio",
+                "role": "main",
+                "label": "Research directions"
+              },
+              {
+                "id": "workspace",
+                "role": "main",
+                "label": "Selected direction"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "portfolio-actions",
+              "type": "ui.actions",
+              "area": "portfolio",
+              "title": "Research portfolio",
+              "visibleIf": "$state.selectedDirectionId == null",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "medium",
+                "stretch": true,
+                "buttons": [
+                  {
+                    "id": "new-research",
+                    "label": "New research",
+                    "icon": "add-circle-outline",
+                    "title": "Create a Project and its primary research-direction skill."
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:new-research",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "research_new_direction"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "direction-navigation",
+              "type": "ui.actions",
+              "area": "workspace",
+              "title": "$state.selectedDirectionTitle",
+              "visibleIf": "$state.selectedDirectionId != null",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "stretch": true,
+                "buttons": [
+                  {
+                    "id": "back",
+                    "label": "Research directions",
+                    "icon": "arrow-back-outline",
+                    "title": "Return to the research portfolio without changing this direction."
+                  },
+                  {
+                    "id": "current",
+                    "label": "$state.selectedDirectionTitle",
+                    "icon": "flask-outline",
+                    "disabled": true,
+                    "title": "Currently selected research direction."
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:back",
+                  "type": "updateState",
+                  "params": {
+                    "selectedDirectionId": null,
+                    "selectedDirectionTitle": null,
+                    "researchConversationId": null,
+                    "researchGeneration": 0,
+                    "researchPrototypeDigest": null,
+                    "builderUrl": null,
+                    "activeResearchTab": "overview"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "directions",
+              "type": "ui.list",
+              "area": "portfolio",
+              "title": "Research directions",
+              "visibleIf": "$state.selectedDirectionId == null",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.list_directions",
+                "params": {
+                  "limit": 500
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.portfolio",
+                  "research.formulation"
+                ],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "variant": "cards",
+                "search": true,
+                "titleKey": "title",
+                "subtitleKey": "status",
+                "previewKey": "description",
+                "emptyText": "No research directions yet. Choose New research to create the first Project."
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "selectedDirectionId": "$event.direction_id",
+                    "selectedDirectionTitle": "$event.title",
+                    "activeResearchTab": "overview",
+                    "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
+                    "researchGeneration": 0,
+                    "researchPrototypeDigest": null,
+                    "builderUrl": null
+                  }
+                }
+              ]
+            },
+            {
+              "id": "direction-status",
+              "type": "item.details",
+              "area": "workspace",
+              "title": "Direction status",
+              "visibleIf": "$state.selectedDirectionId != null",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_direction",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.formulation",
+                  "research.activity",
+                  "research.automation_brief"
+                ],
+                "preserveLastValue": false
+              },
+              "inputs": {
+                "compact": true,
+                "fields": [
+                  {
+                    "key": "project.ref",
+                    "label": "Project"
+                  },
+                  {
+                    "key": "direction.primary_skill_ref",
+                    "label": "Primary skill"
+                  },
+                  {
+                    "key": "direction.status",
+                    "label": "Stage"
+                  },
+                  {
+                    "key": "direction.generation",
+                    "label": "Generation"
+                  },
+                  {
+                    "key": "source_bundle.digest",
+                    "label": "Artifact set"
+                  },
+                  {
+                    "key": "current_prototype.revision",
+                    "label": "Prototype revision"
+                  },
+                  {
+                    "key": "development_session.session_id",
+                    "label": "Development Session"
+                  }
+                ],
+                "stateBindings": {
+                  "researchGeneration": "direction.generation",
+                  "researchPrototypeDigest": "current_prototype.digest",
+                  "builderUrl": "builder_url",
+                  "selectedDirectionTitle": "direction.title",
+                  "researchConversationId": "conversation_id"
+                }
+              }
+            },
+            {
+              "id": "direction-tabs",
+              "type": "ui.actions",
+              "area": "workspace",
+              "title": "Research workflow",
+              "visibleIf": "$state.selectedDirectionId != null",
+              "inputs": {
+                "variant": "segmented",
+                "size": "small",
+                "selectedStateKey": "activeResearchTab",
+                "buttons": [
+                  {
+                    "id": "overview",
+                    "label": "Overview",
+                    "icon": "information-circle-outline",
+                    "title": "Project identity, current formulation, and admitted next steps."
+                  },
+                  {
+                    "id": "artifacts",
+                    "label": "Artifacts",
+                    "icon": "file-tray-stacked-outline",
+                    "title": "Source material physically owned by the direction skill."
+                  },
+                  {
+                    "id": "formulation",
+                    "label": "Discussion",
+                    "icon": "chatbubbles-outline",
+                    "title": "Discuss artifacts and decisions with the Researcher; accepted answers materialize typed ResearchPrototype revisions."
+                  },
+                  {
+                    "id": "development",
+                    "label": "Development",
+                    "icon": "construct-outline",
+                    "title": "Exact acceptance, AutomationBrief, and least-write Builder session."
+                  },
+                  {
+                    "id": "activity",
+                    "label": "Activity",
+                    "icon": "pulse-outline",
+                    "title": "Durable stage journal for observable autonomous work."
+                  },
+                  {
+                    "id": "help",
+                    "label": "Help",
+                    "icon": "help-circle-outline",
+                    "title": "Capabilities, workflow, and milestone boundary."
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click",
+                  "type": "updateState",
+                  "params": {
+                    "activeResearchTab": "$event.id"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "overview",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Research direction",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'overview'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_direction",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.formulation"
+                ],
+                "preserveLastValue": false
+              },
+              "inputs": {
+                "bindField": "content"
+              }
+            },
+            {
+              "id": "artifact-upload",
+              "type": "input.fileUpload",
+              "area": "workspace",
+              "title": "Add source material to artifacts/part0",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
+              "inputs": {
+                "label": "Upload notebook, Markdown, text, code, JSON, YAML, or PDF",
+                "accept": ".ipynb,.md,.txt,.py,.json,.yaml,.yml,.pdf",
+                "maxBytes": 134217728,
+                "target": "skill",
+                "skill": "research_orchestrator_skill",
+                "purpose": "research_direction_intake"
+              },
+              "actions": [
+                {
+                  "on": "uploaded",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.attach_source",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "group_id": "part0",
+                    "path": "$event.path",
+                    "name": "$event.file.name",
+                    "role": "research_source",
+                    "cleanup_staging": true
+                  },
+                  "invalidates": [
+                    "research.artifacts",
+                    "research.formulation",
+                    "research.activity"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "artifact-list",
+              "type": "ui.list",
+              "area": "workspace",
+              "title": "Manifested artifacts",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.list_artifacts",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.artifacts",
+                  "research.formulation"
+                ],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "variant": "list",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "previewKey": "preview",
+                "emptyText": "No artifacts in part0. Upload the original sources used to formulate the task."
+              }
+            },
+            {
+              "id": "artifact-policy",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Artifact boundary",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
+              "inputs": {
+                "content": "Files are copied into the selected direction skill under `artifacts/part0/` and recorded in its manifest. They are readable by ordinary filesystem tools now and by a future typed artifact capability without moving ownership to the orchestrator."
+              }
+            },
+            {
+              "id": "formulation-state",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Current ResearchPrototype",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_direction",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.formulation"
+                ],
+                "preserveLastValue": false
+              },
+              "inputs": {
+                "bindField": "content"
+              }
+            },
+            {
+              "id": "research-chat",
+              "type": "ui.chat",
+              "area": "workspace",
+              "title": "Research discussion",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation'",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "voice_chat.messages",
+                "scope": "shared",
+                "transport": "hub",
+                "params": {
+                  "conversation_id": "$state.researchConversationId",
+                  "conversation_topic_id": "research:$state.selectedDirectionId",
+                  "dialog_channel_id": "research_orchestrator"
+                }
+              },
+              "inputs": {
+                "autoGrow": true,
+                "compact": false,
+                "enterToSend": true,
+                "shiftEnterNewline": true,
+                "showTimestamps": true,
+                "placeholder": "Discuss the research question, falsifiable hypotheses, protocol, estimands, uncertainty, constraints, and unresolved decisions...",
+                "sendCommand": "voice.chat.user",
+                "receiver": "voice_chat.messages",
+                "scope": "shared",
+                "meta": {
+                  "active_agent_id": "agent:research_orchestrator_skill:researcher",
+                  "active_agent_label": "Researcher",
+                  "conversation_id": "$state.researchConversationId",
+                  "conversation_topic_id": "research:$state.selectedDirectionId",
+                  "thread_id": "research:$state.selectedDirectionId",
+                  "dialog_channel_id": "research_orchestrator",
+                  "direction_id": "$state.selectedDirectionId",
+                  "route_id": "voice_chat"
+                }
+              },
+              "actions": []
+            },
+            {
+              "id": "development-actions",
+              "type": "ui.actions",
+              "area": "workspace",
+              "title": "Pre-Codex gate",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development'",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "accept",
+                    "label": "Accept exact prototype",
+                    "icon": "shield-checkmark-outline",
+                    "enabledIf": "$state.researchPrototypeDigest != null",
+                    "title": "Checkpoint the exact Project-owned skill and artifact set, then create the AutomationBrief and scoped Development Session. Codex is not started."
+                  },
+                  {
+                    "id": "open-builder",
+                    "label": "Open Builder session",
+                    "icon": "open-outline",
+                    "enabledIf": "$state.builderUrl != null",
+                    "title": "Open a named Builder window and bind this exact Development Session. The target skill is read-write; Workbench, orchestrator, and artifact groups are read-only context."
+                  },
+                  {
+                    "id": "help-modal",
+                    "label": "How this works",
+                    "icon": "help-circle-outline",
+                    "title": "Open the Research Workbench help modal."
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:accept",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.accept_prototype",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "prototype_digest": "$state.researchPrototypeDigest",
+                    "expected_generation": "$state.researchGeneration",
+                    "idempotency_key": "workbench-accept-$state.selectedDirectionId-$state.researchGeneration"
+                  },
+                  "invalidates": [
+                    "research.portfolio",
+                    "research.formulation",
+                    "research.activity",
+                    "research.automation_brief"
+                  ]
+                },
+                {
+                  "on": "click:open-builder",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.open_builder_session",
+                  "background": true,
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "builder_webspace_id": "desktop"
+                  }
+                },
+                {
+                  "on": "click:open-builder",
+                  "type": "openUrl",
+                  "params": {
+                    "url": "$state.builderUrl",
+                    "target": "adaos-builder"
+                  }
+                },
+                {
+                  "on": "click:help-modal",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "research_workbench_help"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "automation-brief",
+              "type": "item.codeViewer",
+              "area": "workspace",
+              "title": "AutomationBrief",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_automation_brief",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.automation_brief"
+                ],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "bindField": "content",
+                "languageField": "language",
+                "copyButton": true
+              }
+            },
+            {
+              "id": "development-scope",
+              "type": "item.details",
+              "area": "workspace",
+              "title": "Builder Development Session",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_direction",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.formulation",
+                  "research.automation_brief"
+                ],
+                "preserveLastValue": false
+              },
+              "inputs": {
+                "fields": [
+                  {
+                    "key": "development_session.session_id",
+                    "label": "Session"
+                  },
+                  {
+                    "key": "development_session.focus",
+                    "label": "Focus"
+                  },
+                  {
+                    "key": "development_session.write_scope",
+                    "label": "Write scope"
+                  },
+                  {
+                    "key": "development_session.read_scope",
+                    "label": "Read-only context"
+                  },
+                  {
+                    "key": "development_session.source_bundle_digest",
+                    "label": "SourceBundle"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "activity",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Durable activity journal",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'activity'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_activity",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId",
+                  "limit": 200
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.activity",
+                  "research.formulation"
+                ],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "bindField": "content"
+              }
+            },
+            {
+              "id": "help",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Using Research Workbench",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'help'",
+              "inputs": {
+                "content": "# Research Workbench\n\n1. Add exact source artifacts.\n2. Open **Discussion** and reach a human-readable consensus with the Researcher.\n3. Inspect the typed ResearchPrototype and unresolved decisions.\n4. Accept an exact digest only when the formulation is ready.\n5. Open the named Builder window for scoped implementation.\n\nThe Workbench owns orchestration state. Each research-direction skill owns its source artifacts and remains the only write target during development."
+              }
+            }
+          ]
+        }
+      },
+      "modals": {
+        "research_new_direction": {
+          "title": "New research direction",
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
+          "schema": {
+            "id": "research_new_direction",
+            "title": "New research direction",
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "new-research-form",
+                "type": "ui.form",
+                "area": "main",
+                "inputs": {
+                  "layout": "stack",
+                  "submitLabel": "Create research",
+                  "resetOnSuccess": true,
+                  "secondaryActions": [
+                    {
+                      "id": "cancel",
+                      "label": "Cancel",
+                      "variant": "secondary"
+                    }
+                  ],
+                  "fields": [
+                    {
+                      "id": "project_id",
+                      "type": "shortText",
+                      "label": "Project ID",
+                      "required": true,
+                      "placeholder": "my_research",
+                      "help": "Stable lowercase ID: letters, digits, dot, underscore, or hyphen. The Project and its primary skill are created together."
+                    },
+                    {
+                      "id": "title",
+                      "type": "shortText",
+                      "label": "Title",
+                      "required": true,
+                      "placeholder": "Human-readable research direction"
+                    },
+                    {
+                      "id": "description",
+                      "type": "longText",
+                      "label": "Initial intent",
+                      "required": true,
+                      "placeholder": "What should be understood, reproduced, compared, or falsified?"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "callSkill",
+                    "target": "research_orchestrator_skill.create_direction",
+                    "params": {
+                      "project_id": "$event.values.project_id",
+                      "title": "$event.values.title",
+                      "description": "$event.values.description"
+                    },
+                    "invalidates": [
+                      "research.portfolio",
+                      "research.formulation",
+                      "research.activity"
+                    ]
+                  },
+                  {
+                    "on": "submit",
+                    "type": "closeModal"
+                  },
+                  {
+                    "on": "click:cancel",
+                    "type": "closeModal"
+                  }
+                ]
+              }
+            ],
+            "interaction": {
+              "initialFocus": "widget:new-research-form"
+            }
+          }
+        },
+        "research_workbench_help": {
+          "title": "Research Workbench — usage and capabilities",
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
+          "schema": {
+            "id": "research_workbench_help",
+            "title": "Research Workbench — usage and capabilities",
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "research-workbench-help-content",
+                "type": "static.markdown",
+                "area": "main",
+                "inputs": {
+                  "content": "# Research Workbench\n\nThis shared application manages many research directions; it does not create a scenario per direction.\n\n- A direction is an `adaos.project.v1` Project with one primary research skill.\n- Source artifacts belong to that skill and stay readable by normal filesystem tools.\n- LLM discussion proposes typed ResearchPrototype revisions.\n- Human acceptance binds the exact Project, skill checkpoint, artifacts, and prototype.\n- Builder receives one explicit read-write target and read-only context.\n- Codex, experiment execution, Ray, and article generation are outside this milestone."
+                }
+              },
+              {
+                "id": "research-workbench-help-close",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "close",
+                      "label": "Close",
+                      "icon": "close-outline"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
 }
