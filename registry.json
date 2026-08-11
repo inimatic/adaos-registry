@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-11T09:24:45+00:00",
+  "updated_at": "2026-08-11T09:25:02+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -265,8 +265,8 @@
       "kind": "skill",
       "id": "infra_access_skill",
       "name": "infra_access_skill",
-      "version": "0.21.3",
-      "updated_at": "2026-05-22T14:17:57+00:00",
+      "version": "0.21.4",
+      "updated_at": "2026-08-11T09:25:02+00:00",
       "path": "skills/infra_access_skill",
       "manifest": "skills/infra_access_skill/skill.yaml",
       "source": {
