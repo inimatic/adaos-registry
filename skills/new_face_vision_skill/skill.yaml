@@ -1,5 +1,5 @@
 name: new_face_vision_skill
-version: 0.2.25
+version: 0.2.26
 description: Анализ дефектов камней на видео с помощью нейросети (сегментация DeepLabV3)
 entry: handlers/main.py
 runtime:
@@ -393,13 +393,13 @@ data_projections:
   targets:
   - backend: yjs
     path: data/new_face_vision/history
-updated_at: '2026-07-05T04:54:43+00:00'
+updated_at: '2026-08-11T09:26:13+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.465+3499.72fbb554
-    recorded_at: '2026-07-05T04:54:43+00:00'
+    min_version: 0.1.741+4834.2acb1c5b
+    recorded_at: '2026-08-11T09:26:13+00:00'
     source: skill_push
-    min_commit: 72fbb55442ff1991220c39cba2a81aa51efd353f
-    min_short_commit: 72fbb554
-    build_date: '2026-07-05T07:33:57+03:00'
+    min_commit: 2acb1c5b81b7eda3e8584e87efa9b75eebbc202e
+    min_short_commit: 2acb1c5b
+    build_date: '2026-08-11T12:20:36+03:00'
 
