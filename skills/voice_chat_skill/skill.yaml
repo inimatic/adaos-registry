@@ -1,5 +1,5 @@
 name: voice_chat_skill
-version: 0.6.17
+version: 0.6.18
 description: Voice chat bridge for web_desktop (text in -> materialize replies through
   the node conversation ledger; shared chat history is exposed as a bounded compatibility
   stream, with YJS kept as a compact status projection).
@@ -187,13 +187,13 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
-updated_at: '2026-07-02T14:31:37+00:00'
+updated_at: '2026-08-11T09:29:46+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+3433.b11d1612
-    recorded_at: '2026-07-02T14:31:37+00:00'
+    min_version: 0.1.741+4835.a49f9166
+    recorded_at: '2026-08-11T09:29:46+00:00'
     source: skill_push
-    min_commit: b11d1612d408699e104da51e831cf1bc62939013
-    min_short_commit: b11d1612
-    build_date: '2026-07-02T17:31:02+03:00'
+    min_commit: a49f9166fd42df8b3d371f22dc81239ebb000a10
+    min_short_commit: a49f9166
+    build_date: '2026-08-11T12:26:21+03:00'
 
