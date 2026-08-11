@@ -192,14 +192,17 @@ def test_infrastate_node_tabs_keep_offline_member_selected():
     assert member_tab["node_status"] == "offline"
 
 
-def test_infrastate_compact_summary_keeps_full_description():
+def test_infrastate_compact_summary_bounds_description_to_yjs_budget():
     mod = _load_infrastate_module()
 
     description = "state=" + ("ready|" * 1000)
     compact = mod._compact_summary_for_yjs({"description": description})
 
-    assert compact["description"] == description
-    assert "truncated; full diagnostics" not in compact["description"]
+    assert compact["description"] != description
+    assert compact["description"].startswith("state=ready|")
+    assert "truncated; full diagnostics" in compact["description"]
+    assert len(compact["description"].encode("utf-8")) <= 1200
+    assert len(mod._stable_json_bytes(compact)) < 4096
 
 
 def test_infrastate_compact_summary_keeps_runtime_identity():

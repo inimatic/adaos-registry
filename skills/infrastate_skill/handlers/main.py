@@ -736,7 +736,16 @@ def _compact_ui_state_for_yjs(value: Any) -> dict[str, Any]:
 
 
 def _truncate_text(text: str, limit: int | None = None) -> str:
-    return text
+    max_bytes = _SNAPSHOT_CONTENT_MAX_BYTES if limit is None else max(0, int(limit))
+    encoded = text.encode("utf-8", errors="ignore")
+    if max_bytes <= 0 or len(encoded) <= max_bytes:
+        return text
+
+    marker = b"\n... truncated; full diagnostics available through dedicated runtime endpoints ..."
+    if max_bytes <= len(marker):
+        return marker[:max_bytes].decode("utf-8", errors="ignore")
+    head = encoded[: max_bytes - len(marker)].decode("utf-8", errors="ignore")
+    return head + marker.decode("ascii")
 
 
 def _compact_card_item(item: Any, *, include_content: bool = True) -> Any:
