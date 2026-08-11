@@ -1,0 +1,67 @@
+id: skill_preview
+name: skill_preview
+version: 0.0.1
+title: Skill Preview
+description: Generic metadata and README projection for a Builder-selected skill without
+  an explicit presentation.
+type: desktop
+supported_locales:
+- en
+- ru
+depends:
+- builder_sdk_control_skill
+runtime:
+  skills:
+    required:
+    - builder_sdk_control_skill
+    optional: []
+ui:
+  manifest: webui.json
+trigger: manual
+vars: {}
+guidance:
+  schema: adaos.scenario.guidance.v1
+  readme: README.md
+  overview:
+    en: Read-only generic preview for a skill that does not declare a scenario presentation.
+    ru: Универсальный read-only просмотр навыка без явно объявленного сценария представления.
+  presentation:
+    channels:
+    - web
+    - text
+    - voice
+    modal_id: skill_preview_help
+  workflow:
+    state_source:
+      kind: skill
+      name: builder_sdk_control_skill.get_skill_preview
+      params: {}
+    state_path: state
+    actions_path: next_steps
+  conversational:
+    help_intent: skill_preview.help
+    next_steps_intent: skill_preview.next_steps
+llm_hints:
+  description: Read-only generic preview for skills without a declared Project presentation.
+  aliases:
+  - skill preview
+  - preview навыка
+  primary_actions:
+  - id: skill_preview.inspect
+    intent: skill_preview.inspect
+    tool: builder_sdk_control_skill.get_skill_preview
+    side_effect_class: read_only
+  examples:
+  - show the selected skill README
+  owner_hints:
+  - skill:builder_sdk_control_skill
+nlu:
+  nlu_hints:
+    aliases:
+    - skill preview
+    examples:
+    - show selected skill
+    slot_schemas: {}
+    entities: []
+steps: []
+updated_at: '2026-08-11T10:45:02+00:00'

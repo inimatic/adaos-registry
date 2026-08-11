@@ -1,0 +1,72 @@
+{
+  "schema": "adaos.webui.v1",
+  "generated_by": "skill_preview",
+  "ui": {
+    "application": {
+      "desktop": {
+        "pageSchema": {
+          "id": "skill_preview",
+          "title": "Skill Preview",
+          "surfaceClass": "workspace",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {"id": "main", "role": "main", "label": "Selected skill"}
+            ]
+          },
+          "widgets": [
+            {
+              "id": "selected-skill-readme",
+              "type": "static.markdown",
+              "area": "main",
+              "title": "Selected skill",
+              "dataSource": {
+                "kind": "skill",
+                "name": "builder_sdk_control_skill.get_skill_preview",
+                "params": {"_meta": {"current_scenario": "skill_preview"}},
+                "cacheTtlMs": 0,
+                "invalidationTags": ["builder.project.preview"],
+                "preserveLastValue": true
+              },
+              "inputs": {"bindField": "content"}
+            },
+            {
+              "id": "preview-boundary",
+              "type": "static.markdown",
+              "area": "main",
+              "title": "Preview boundary",
+              "inputs": {
+                "content": "This is a read-only projection. Return to Builder to change the skill. A Project may declare a domain-specific scenario presentation instead of this fallback."
+              }
+            }
+          ],
+          "meta": {"builder": {"generic_skill_preview": true, "read_only": true}}
+        }
+      },
+      "modals": {
+        "skill_preview_help": {
+          "title": "About Skill Preview",
+          "presentation": {"kind": "modal", "restoreFocus": true},
+          "schema": {
+            "id": "skill_preview_help",
+            "title": "About Skill Preview",
+            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "widgets": [
+              {
+                "id": "skill-preview-help-text",
+                "type": "static.markdown",
+                "area": "main",
+                "inputs": {
+                  "content": "# Skill Preview\n\nThis shared read-only surface is used when a skill has no domain-specific Project presentation. Return to Builder to edit the selected skill."
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "version": "0.1.0",
+    "manifest": "webui.json"
+  }
+}

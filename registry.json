@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-11T10:44:49+00:00",
+  "updated_at": "2026-08-11T10:45:02+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1281,6 +1281,32 @@
       "skills": {
         "required": [
           "shopping_list_14504c40_skill"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "skill_preview",
+      "name": "skill_preview",
+      "version": "0.0.1",
+      "updated_at": "2026-08-11T10:45:02+00:00",
+      "path": "scenarios/skill_preview",
+      "manifest": "scenarios/skill_preview/scenario.yaml",
+      "source": {
+        "path": "scenarios/skill_preview",
+        "manifest": "scenarios/skill_preview/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "skill_preview",
+        "id": "skill_preview"
+      },
+      "title": "Skill Preview",
+      "description": "Generic metadata and README projection for a Builder-selected skill without an explicit presentation.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "builder_sdk_control_skill"
         ]
       }
     },

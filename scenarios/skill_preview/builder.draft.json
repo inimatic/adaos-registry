@@ -1,0 +1,61 @@
+{
+  "$schema": "../../abi/builder.draft.v1.schema.json",
+  "draft_id": "template.scenario_default",
+  "task_id": "template",
+  "status": "draft",
+  "source": {
+    "type": "template",
+    "text": "Default Builder scenario template."
+  },
+  "artifact": {
+    "kind": "scenario",
+    "id": "skill_preview",
+    "template_id": "scenario_default",
+    "draft_root": ".",
+    "files": [
+      { "path": "scenario.yaml", "role": "manifest", "required": true },
+      { "path": "scenario.json", "role": "manifest", "required": true },
+      { "path": "webui.json", "role": "webui", "required": true }
+    ]
+  },
+  "metadata": {
+    "source_idea": "Replace with the Builder task idea before publishing a draft.",
+    "assumptions": [
+      "Scenario triggers, steps, bindings, and skill dependencies must be filled from the Builder task.",
+      "Scenario drafts should prefer existing skills unless the task explicitly requires new capability work."
+    ],
+    "risk_notes": [
+      "New skill dependencies, endpoint control, broad NLU triggers, and external IO require human review."
+    ],
+    "expected_tests": [
+      "scenario schema validation",
+      "webui schema validation",
+      "scenario dependency bootstrap preview"
+    ],
+    "route_plan_required": false,
+    "human_review_required": true
+  },
+  "quality_gates": {
+    "schemas": [
+      "scenario.schema.json",
+      "webui.v1.schema.json"
+    ],
+    "tests": [
+      "scenario validation",
+      "dependency bootstrap preview"
+    ],
+    "previews": [
+      "empty canvas materialization",
+      "action preview",
+      "NLU phrase probe"
+    ],
+    "requires_human_approval": [
+      "new skill dependencies",
+      "endpoint control",
+      "broad NLU triggers",
+      "external IO",
+      "destructive actions"
+    ]
+  },
+  "links": {}
+}
