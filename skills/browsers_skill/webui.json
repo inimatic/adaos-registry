@@ -39,6 +39,15 @@
         "route": { "kind": "stream", "owner": "skill:browsers_skill", "surface": "app:browsers.current_summary", "firstPaint": "no selected browser summary", "recovery": "snapshot requested on stream subscribe" },
         "initialState": []
       },
+      "browsers.current_device_name": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "budget": { "maxPayloadBytes": 4096, "maxPublishHz": 2, "maxSnapshotHz": 1, "maxItems": 1 },
+        "guardVisibility": { "degradedState": "Keep last selected browser device name.", "log": "service.browsers_skill.runtime.log", "quarantine": false, "metric": "webio_stream_guard.browsers.current_device_name" },
+        "route": { "kind": "stream", "owner": "skill:browsers_skill", "surface": "app:browsers.current_device_name", "firstPaint": "empty selected browser device name", "recovery": "snapshot requested on stream subscribe" },
+        "initialState": { "value": "", "device_id": "", "suggestions": [] }
+      },
       "browsers.current_name": {
         "mode": "replace",
         "transport": "hub",
@@ -47,6 +56,27 @@
         "guardVisibility": { "degradedState": "Keep last selected browser title.", "log": "service.browsers_skill.runtime.log", "quarantine": false, "metric": "webio_stream_guard.browsers.current_name" },
         "route": { "kind": "stream", "owner": "skill:browsers_skill", "surface": "app:browsers.current_name", "firstPaint": "empty selected browser title", "recovery": "snapshot requested on stream subscribe" },
         "initialState": { "value": "", "device_id": "" }
+      }
+    }
+  },
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "defaultView": "browsers.overview",
+    "views": {
+      "browsers.overview": {
+        "title": "Browsers",
+        "surfaces": ["modal"],
+        "params": {}
+      },
+      "browsers.settings": {
+        "title": "Browser settings",
+        "surfaces": ["modal"],
+        "params": {
+          "device_id": {
+            "type": "string",
+            "required": true
+          }
+        }
       }
     }
   },
@@ -59,7 +89,7 @@
       "icon": "browsers-outline",
       "launchModal": "browsers_modal",
       "action": {
-        "openModal": "browsers_modal"
+        "navigate": "browsers.overview"
       }
     }
   ],
@@ -75,7 +105,7 @@
       "icon": "browsers-outline",
       "launchModal": "browsers_modal",
       "action": {
-        "openModal": "browsers_modal"
+        "navigate": "browsers.overview"
       }
     }
   ],
@@ -84,8 +114,18 @@
       "browsers_modal": {
         "title": "Browsers",
         "aliases": ["браузеры", "браузер", "browser sessions"],
+        "implements": ["browsers.overview"],
         "schema": {
           "id": "browsers_modal",
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "defaultRoute": "overview",
+            "routes": {
+              "overview": {
+                "view": "browsers.overview"
+              }
+            }
+          },
           "initialState": {
             "browsersOnlineOnly": true
           },
@@ -187,9 +227,14 @@
                 },
                 {
                   "on": "click:settings",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
-                    "modalId": "browser_link_settings_modal"
+                    "to": "browsers.settings",
+                    "surface": "modal",
+                    "modalId": "browser_link_settings_modal",
+                    "params": {
+                      "device_id": "$event.device_id"
+                    }
                   }
                 }
               ]
@@ -233,9 +278,14 @@
                 },
                 {
                   "on": "click:settings",
-                  "type": "openModal",
+                  "type": "navigate",
                   "params": {
-                    "modalId": "browser_link_settings_modal"
+                    "to": "browsers.settings",
+                    "surface": "modal",
+                    "modalId": "browser_link_settings_modal",
+                    "params": {
+                      "device_id": "$event.device_id"
+                    }
                   }
                 }
               ]
@@ -245,8 +295,27 @@
       },
       "browser_link_settings_modal": {
         "title": "Browser settings",
+        "implements": ["browsers.settings"],
         "schema": {
           "id": "browser_link_settings_modal",
+			"interface": {
+				"schema": "adaos.ui.modal.interface.v1",
+				"defaultRoute": "settings",
+				"routes": {
+					"settings": {
+						"view": "browsers.settings",
+						"params": {
+							"device_id": {
+								"type": "string",
+								"required": true
+							}
+						},
+						"state": {
+							"browsersSelectedDeviceId": "$params.device_id"
+						}
+					}
+				}
+			},
 					"layout": {
 						"type": "single",
 						"pattern": "stack",
@@ -265,7 +334,10 @@
               "title": "Browser",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "browsers.current_summary"
+                "receiver": "browsers.current_summary",
+                "params": {
+                  "device_id": "$state.browsersSelectedDeviceId"
+                }
               },
               "inputs": {
                 "titleKey": "title",
@@ -281,7 +353,10 @@
               "title": "Device name",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "browsers.current_device_name"
+                "receiver": "browsers.current_device_name",
+                "params": {
+                  "device_id": "$state.browsersSelectedDeviceId"
+                }
               },
               "inputs": {
                 "bindField": "value",
@@ -309,7 +384,10 @@
               "title": "Endpoint name",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "browsers.current_name"
+                "receiver": "browsers.current_name",
+                "params": {
+                  "device_id": "$state.browsersSelectedDeviceId"
+                }
               },
               "inputs": {
                 "bindField": "value",

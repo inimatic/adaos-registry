@@ -484,6 +484,34 @@ def test_browsers_skill_selected_browser_summary_uses_selected_live_entry(monkey
     assert current_name == {"value": "Online browser", "device_id": "browser-online::tab-1"}
 
 
+def test_browsers_skill_current_stream_prefers_explicit_device_parameter(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    mod._SELECTED_BROWSER_BY_WS.clear()
+
+    entries = [
+        {"id": "browser-stale", "display_name": "Browser on iOS", "access_class": "device", "online": False},
+        {"id": "browser-current", "display_name": "Chrome on Windows", "access_class": "device", "online": True},
+    ]
+    monkeypatch.setattr(mod.sdk_access_links, "list_browser_links", lambda: [dict(item) for item in entries])
+    monkeypatch.setattr(
+        mod.sdk_access_links,
+        "get_browser_link",
+        lambda device_id: next((dict(item) for item in entries if item["id"] == device_id), None),
+    )
+    monkeypatch.setattr(mod.sdk_access_links, "lifetime_label", lambda _entry: "Permanent")
+    mod._SELECTED_BROWSER_BY_WS["desktop"] = "browser-stale"
+
+    summary = mod._build_stream_payload(
+        "browsers.current_summary",
+        "desktop",
+        params={"device_id": "browser-current"},
+    )
+
+    assert {"title": "Endpoint", "description": "Chrome on Windows"} in summary
+    assert {"title": "Status", "description": "online"} in summary
+    assert mod._SELECTED_BROWSER_BY_WS["desktop"] == "browser-stale"
+
+
 def test_browsers_skill_rename_browser_device_name_refreshes_without_renaming_endpoint(monkeypatch) -> None:
     mod = _load_browsers_skill_module()
     seen: list[tuple[str, str]] = []

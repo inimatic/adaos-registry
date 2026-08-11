@@ -603,7 +603,8 @@ def _build_stream_payload(
 ) -> Any | None:
     payload, effective_ws = _build_snapshot(webspace_id)
     available_entries = list(payload["devices"]) + list(payload["clients"])
-    current_id = _resolve_current_browser_id(available_entries, effective_ws)
+    requested_id = str((params or {}).get("device_id") or "").strip()
+    current_id = requested_id or _resolve_current_browser_id(available_entries, effective_ws)
     current_summary, current_name, current_device_name = _current_browser_payload(current_id)
     data_by_receiver = {
         "browsers.summary": payload["summary"],
