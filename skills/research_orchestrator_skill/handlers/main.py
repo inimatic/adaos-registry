@@ -107,6 +107,7 @@ def attach_source(
     role: str = "source",
     actor: str = "user:local",
     cleanup_staging: bool = False,
+    replace_existing: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
     return _orchestrator().attach_source(
@@ -117,6 +118,7 @@ def attach_source(
         role=role,
         actor=actor,
         cleanup_staging=cleanup_staging,
+        replace_existing=replace_existing,
     )
 
 

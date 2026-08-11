@@ -190,6 +190,7 @@ class ResearchOrchestrator:
         role: str = "source",
         actor: str = "user:local",
         cleanup_staging: bool = False,
+        replace_existing: bool = False,
     ) -> dict[str, Any]:
         token = _direction_id(direction_id)
         current = self.repository.get_direction(token)
@@ -230,6 +231,7 @@ class ResearchOrchestrator:
             name=name,
             role=role,
             origin={"kind": "orchestrator_intake", "actor": actor},
+            replace_existing=replace_existing,
         )
         staging_cleanup = {"requested": bool(cleanup_staging), "removed": False}
         if staging_source is not None:
@@ -245,9 +247,19 @@ class ResearchOrchestrator:
         self.repository.activity(
             token,
             "intake",
-            "source_added" if not result.get("idempotent") else "source_reused",
+            "source_replaced"
+            if result.get("replaced")
+            else "source_added"
+            if not result.get("idempotent")
+            else "source_reused",
             f"Artifact {result['artifact']['path']} is bound to {result['group']['ref']} generation {result['group']['generation']}.",
-            {"artifact_digest": result["artifact"]["digest"], "artifact_group_digest": result["group"]["digest"], "bundle_digest": bundle["digest"], "actor": actor},
+            {
+                "artifact_digest": result["artifact"]["digest"],
+                "replaced_artifact_digest": (result.get("previous_artifact") or {}).get("digest"),
+                "artifact_group_digest": result["group"]["digest"],
+                "bundle_digest": bundle["digest"],
+                "actor": actor,
+            },
         )
         return {
             "ok": True,
