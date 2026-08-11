@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.62
+version: 0.75.63
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -649,4 +649,3 @@ compatibility:
     min_commit: 2acb1c5b81b7eda3e8584e87efa9b75eebbc202e
     min_short_commit: 2acb1c5b
     build_date: '2026-08-11T12:20:36+03:00'
-

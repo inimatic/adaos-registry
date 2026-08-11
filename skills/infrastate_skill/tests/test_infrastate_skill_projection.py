@@ -1257,6 +1257,48 @@ def test_infrastate_summary_highlights_against_previous_render(monkeypatch):
     assert "countdown completed" in second["description"]
     assert "𝐩𝐞𝐧𝐝𝐢𝐧𝐠_𝐚𝐜𝐤𝐬=𝟐" in second["description"]
 
+def test_infrastate_idle_summary_does_not_surface_historical_failure(monkeypatch):
+    mod = _load_infrastate_module()
+    memory: dict[str, object] = {}
+
+    monkeypatch.setattr(mod, "skill_memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(mod, "skill_memory_set", lambda key, value: memory.__setitem__(key, value))
+    monkeypatch.setattr(mod, "_node_tabs", lambda conf, ui_state, reliability: ([], {"kind": "local", "node_id": "hub-1", "label": "hub"}))
+    monkeypatch.setattr(mod, "_skill_runtime_migration_report", lambda status, last_result: {})
+    monkeypatch.setattr(mod, "_skill_runtime_migration_note", lambda report: "")
+    monkeypatch.setattr(mod, "_skill_runtime_rollback_report", lambda status, last_result: {})
+    monkeypatch.setattr(mod, "_skill_runtime_rollback_note", lambda report: "")
+    monkeypatch.setattr(mod, "_skill_post_commit_checks_report", lambda status, last_result: {})
+    monkeypatch.setattr(mod, "_skill_post_commit_checks_note", lambda report: "")
+    monkeypatch.setattr(mod, "_supervisor_transition_note", lambda status: {})
+    monkeypatch.setattr(mod, "_reliability_summary_note", lambda reliability, transport_diag: "")
+    monkeypatch.setattr(mod, "_hub_root_strategy", lambda reliability, transport_diag: {})
+    monkeypatch.setattr(mod, "_effective_channel_view", lambda *args, **kwargs: ("ready", "stable", {}))
+    monkeypatch.setattr(mod, "_selected_yjs_webspace_id", lambda ui_state, reliability: "default")
+
+    summary = mod._summary(
+        status={"state": "idle", "message": "autostart runner boot"},
+        last_result={
+            "state": "failed",
+            "phase": "prepare",
+            "message": "core update slot preparation failed: very large traceback",
+        },
+        slots_payload={"active_slot": "A"},
+        lifecycle={},
+        conf=SimpleNamespace(role="hub", node_id="hub-1"),
+        build={"runtime_git_short_commit": "77fab7d"},
+        ui_state={},
+        reliability={"runtime": {}},
+        transport_diag={},
+        selected_member=None,
+    )
+
+    assert summary["value"] == "idle"
+    assert summary["description"] == "autostart runner boot"
+    assert "last=failed" not in summary["description"]
+    assert "traceback" not in summary["description"]
+
+
 def test_infrastate_summary_exposes_semantic_state_plane_contracts(monkeypatch):
     mod = _load_infrastate_module()
     memory: dict[str, object] = {}
@@ -3333,13 +3375,19 @@ def test_infrastate_manifest_admits_boot_and_background_status_events():
     assert admitted["allowed"] is True
 
 
-def test_infrastate_marketplace_action_opens_modal_without_host_roundtrip():
+def test_infrastate_marketplace_action_navigates_to_declared_modal_without_host_roundtrip():
     webui = json.loads((Path(__file__).resolve().parents[1] / "webui.json").read_text(encoding="utf-8"))
     widgets = webui["registry"]["modals"]["infrastate_modal"]["schema"]["widgets"]
     update_actions = next(widget for widget in widgets if widget.get("id") == "infrastate-update-actions")
     actions = update_actions["actions"]
 
-    assert any(action.get("on") == "click:marketplace" and action.get("type") == "openModal" for action in actions)
+    marketplace = next(action for action in actions if action.get("on") == "click:marketplace")
+    assert marketplace.get("type") == "navigate"
+    assert marketplace.get("params") == {
+        "to": "infrastate_skill.marketplace_modal",
+        "surface": "modal",
+        "modalId": "marketplace_modal",
+    }
     assert not any(action.get("on") == "click" and action.get("target") == "infrastate.action" for action in actions)
 
 
@@ -3362,7 +3410,8 @@ def test_infrastate_inventory_toolbar_wires_bulk_action_buttons():
         assert action.get("type") == "callHost"
         assert action.get("target") == "infrastate.action"
         assert (action.get("params") or {}).get("id") == "$event.id"
-    assert action_by_on["click:marketplace"].get("type") == "openModal"
+    assert action_by_on["click:marketplace"].get("type") == "navigate"
+    assert (action_by_on["click:marketplace"].get("params") or {}).get("to") == "infrastate_skill.marketplace_modal"
 
 
 def test_infrastate_yjs_balancer_tab_uses_y_projection():

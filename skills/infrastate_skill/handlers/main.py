@@ -7033,18 +7033,10 @@ def _summary(
     message = str(status.get("message") or lifecycle.get("reason") or "No update in progress")
     last_result_state = str(last_result.get("state") or "").strip()
     last_result_phase = str(last_result.get("phase") or "").strip()
-    last_result_message = str(
-        last_result.get("validation_error_summary")
-        or last_result.get("message")
-        or ""
-    ).strip()
-    if state == "idle" and last_result_state and last_result_state != "idle":
-        suffix = f"last={last_result_state}"
-        if last_result_phase:
-            suffix += f"/{last_result_phase}"
-        if last_result_message:
-            suffix += f": {last_result_message}"
-        message += f" | {suffix}"
+    # Current state describes the active operation only. The previous terminal
+    # result remains available in the dedicated diagnostics payload; mixing it
+    # into an idle state makes a historical failure look active and can copy an
+    # unbounded preparation traceback into this compact card.
     skill_migration_note = _skill_runtime_migration_note(_skill_runtime_migration_report(status, last_result))
     if skill_migration_note:
         message += f" | {skill_migration_note}"
