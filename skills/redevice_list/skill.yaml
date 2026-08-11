@@ -1,5 +1,5 @@
 name: redevice_list
-version: 0.1.4
+version: 0.1.5
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -86,13 +86,13 @@ tools:
         type: boolean
     required:
     - ok
-updated_at: '2026-06-07T04:36:34+00:00'
+updated_at: '2026-08-11T09:27:40+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.0+2756.5eb6ebda
-    recorded_at: '2026-06-07T04:36:34+00:00'
+    min_version: 0.1.741+4835.a49f9166
+    recorded_at: '2026-08-11T09:27:43+00:00'
     source: skill_push
-    min_commit: 5eb6ebda2a7ecfc77284a8351e1f738afdcec071
-    min_short_commit: 5eb6ebda
-    build_date: '2026-06-07T07:33:44+03:00'
+    min_commit: a49f9166fd42df8b3d371f22dc81239ebb000a10
+    min_short_commit: a49f9166
+    build_date: '2026-08-11T12:26:21+03:00'
 
