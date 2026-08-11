@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from urllib.parse import parse_qs, urlsplit
+
 from research.contracts import materialize_automation_brief, materialize_prototype, validate
+from research.orchestrator import _address_builder_url
 
 
 def _candidate() -> dict:
@@ -63,3 +66,19 @@ def test_prototype_and_automation_brief_bind_exact_inputs() -> None:
     assert brief["development_scope"]["context_members"][0]["access"] == "read-only"
     assert any("direction-specific scenario" in item for item in brief["acceptance_checks"])
     assert any("three-epoch" in item.lower() for item in brief["prohibited_actions"])
+
+
+def test_builder_url_carries_a_declared_first_paint_address() -> None:
+    addressed = _address_builder_url(
+        "https://inimatic.com/?intent=webspace.open&webspace_id=desktop-dev",
+        direction_id="tlp_research_03",
+        title="TLP direction",
+    )
+    query = parse_qs(urlsplit(addressed).query)
+
+    assert query["intent"] == ["webspace.open"]
+    assert query["webspace_id"] == ["desktop-dev"]
+    assert query["builder_object_type"] == ["skill"]
+    assert query["builder_object_id"] == ["tlp_research_03"]
+    assert query["builder_object_ref"] == ["skill:tlp_research_03"]
+    assert query["builder_object_title"] == ["TLP direction"]

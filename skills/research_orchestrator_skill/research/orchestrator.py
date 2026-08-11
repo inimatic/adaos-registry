@@ -288,11 +288,6 @@ class ResearchOrchestrator:
             prototype
             and str(prototype.get("source_bundle_digest") or "") != str(bundle.get("digest") or "")
         )
-        builder_url = _address_builder_url(
-            navigation.build_url(destination, base_url=base_url or builder_preview.public_app_base()),
-            direction_id=direction_id,
-            title=str(state["direction"].get("title") or direction_id),
-        )
         return {
             "ok": True,
             "direction": {**state, "project_ref": project["ref"], "primary_skill_ref": f"skill:{token}"},
@@ -356,6 +351,11 @@ class ResearchOrchestrator:
             webspace_id=builder_webspace_id,
             space_kind="workspace",
             expected_scenario_id="builder",
+        )
+        builder_url = _address_builder_url(
+            navigation.build_url(destination, base_url=base_url or builder_preview.public_app_base()),
+            direction_id=direction_id,
+            title=str(state["direction"].get("title") or direction_id),
         )
         return {
             "ok": True,
