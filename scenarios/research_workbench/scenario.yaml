@@ -1,0 +1,70 @@
+id: research_workbench
+name: research_workbench
+version: 0.0.1
+title: Research Workbench
+description: Shared portfolio, intake, formulation, and pre-Codex handoff for AdaOS
+  research directions.
+type: desktop
+supported_locales:
+- en
+- ru
+depends:
+- research_orchestrator_skill
+runtime:
+  skills:
+    required:
+    - research_orchestrator_skill
+    optional: []
+ui:
+  manifest: webui.json
+trigger: manual
+vars: {}
+guidance:
+  schema: adaos.scenario.guidance.v1
+  readme: README.md
+  overview:
+    en: Create research Projects, attach source artifacts, formulate an exact research
+      task, and hand it to a scoped Builder session.
+    ru: Создание исследовательских проектов, добавление исходных артефактов, формализация
+      задачи и передача в ограниченную сессию Builder.
+  presentation:
+    channels:
+    - web
+    - text
+    - voice
+    modal_id: research_workbench_help
+  workflow:
+    state_source:
+      kind: skill
+      name: research_orchestrator_skill.get_direction
+      params:
+        direction_id: $state.selectedDirectionId
+    state_path: direction.status
+    actions_path: next_steps
+  conversational:
+    help_intent: research_workbench.help
+    next_steps_intent: research_workbench.next_steps
+llm_hints:
+  description: Shared AdaOS Research Workbench for pre-Codex direction formulation.
+  aliases:
+  - Research Workbench
+  - aResearcher
+  primary_actions:
+  - id: research_workbench.next_steps
+    intent: research_orchestrator_skill.next_steps
+    tool: research_orchestrator_skill.next_steps
+    side_effect_class: read_only
+  examples:
+  - Создай новое направление исследования
+  - Покажи следующий шаг выбранного исследования
+  owner_hints:
+  - skill:research_orchestrator_skill
+nlu:
+  nlu_hints:
+    aliases: []
+    examples: []
+    slot_schemas: {}
+    entities: []
+steps: []
+prototype: scenario_default
+updated_at: '2026-08-11T10:44:49+00:00'

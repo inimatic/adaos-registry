@@ -1,0 +1,83 @@
+{
+    "id": "research_workbench",
+    "name": "research_workbench",
+    "version": "0.1.0",
+    "title": "Research Workbench",
+    "description": "Empty AdaOS desktop canvas ready for Builder authoring.",
+    "type": "desktop",
+    "supported_locales": [
+        "en",
+        "ru"
+    ],
+    "depends": [],
+    "runtime": {
+        "skills": {
+            "required": [],
+            "optional": []
+        }
+    },
+    "ui": {
+        "application": {
+            "desktop": {
+                "pageSchema": {
+                    "id": "research_workbench",
+                    "title": "Research Workbench",
+                    "layout": {
+                        "type": "single",
+                        "pattern": "stack",
+                        "areas": [
+                            {
+                                "id": "main",
+                                "role": "main"
+                            }
+                        ]
+                    },
+                    "widgets": [
+                        {
+                            "id": "builder-empty-canvas",
+                            "type": "ui.form",
+                            "area": "main",
+                            "inputs": {
+                                "fields": [
+                                    {
+                                        "id": "builder-empty-canvas-message",
+                                        "type": "staticContent",
+                                        "title": "Empty prototype canvas",
+                                        "content": "Describe the interface in Builder to create the first prototype revision."
+                                    }
+                                ]
+                            }
+                        }
+                    ],
+                    "meta": {
+                        "builder": {
+                            "empty_canvas": true
+                        }
+                    }
+                }
+            }
+        },
+        "version": "0.1.0",
+        "manifest": "webui.json"
+    },
+    "trigger": "manual",
+    "vars": {},
+    "llm_hints": {
+        "description": "Empty desktop scenario ready for Builder authoring.",
+        "aliases": [],
+        "primary_actions": [],
+        "examples": [],
+        "owner_hints": []
+    },
+    "nlu": {
+        "nlu_hints": {
+            "aliases": [],
+            "examples": [],
+            "slot_schemas": {},
+            "entities": []
+        }
+    },
+    "steps": [],
+    "prototype": "scenario_default",
+    "updated_at": "2026-08-11T09:34:07+00:00"
+}

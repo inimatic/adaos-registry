@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-11T10:44:31+00:00",
+  "updated_at": "2026-08-11T10:44:49+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1230,6 +1230,32 @@
         "required": [
           "root_mgmnt",
           "release_validation_skill"
+        ]
+      }
+    },
+    {
+      "kind": "scenario",
+      "id": "research_workbench",
+      "name": "research_workbench",
+      "version": "0.0.1",
+      "updated_at": "2026-08-11T10:44:49+00:00",
+      "path": "scenarios/research_workbench",
+      "manifest": "scenarios/research_workbench/scenario.yaml",
+      "source": {
+        "path": "scenarios/research_workbench",
+        "manifest": "scenarios/research_workbench/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "research_workbench",
+        "id": "research_workbench"
+      },
+      "title": "Research Workbench",
+      "description": "Shared portfolio, intake, formulation, and pre-Codex handoff for AdaOS research directions.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "research_orchestrator_skill"
         ]
       }
     },
