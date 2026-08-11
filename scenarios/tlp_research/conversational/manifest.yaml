@@ -4,7 +4,7 @@ package_kind: scenario
 owner_ref:
   kind: scenario
   id: tlp_research
-version: 0.3.3
+version: 0.3.4
 workflow_refs:
 - workflow_type: research.study
   definition_ref: ../workflow.json
