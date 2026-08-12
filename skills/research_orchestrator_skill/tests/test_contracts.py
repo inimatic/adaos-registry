@@ -323,13 +323,24 @@ def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> Non
         {
             "title": "Study",
             "rules": ["instruction, not candidate data"],
+            "hypotheses": [
+                {
+                    "id": "H1",
+                    "source_grounding": {
+                        "claim_id": "H1",
+                        "stance": "hypothesis",
+                    },
+                }
+            ],
             "experimental_plan": {
                 "comparators": ["a", "b"],
-                "evaluation_plan": {"primary_estimand": {"name": "delta"}},
-                "constraints": ["CPU"],
-                "readiness": {
-                    "decision": "needs_discussion",
-                    "blocking_questions": ["review"],
+                "evaluation_plan": {
+                    "primary_estimand": {"name": "delta"},
+                    "constraints": ["CPU"],
+                    "readiness": {
+                        "decision": "needs_discussion",
+                        "blocking_questions": ["review"],
+                    },
                 },
                 "domain_extension": {"preserved": True},
             },
@@ -340,4 +351,6 @@ def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> Non
     assert normalized["evaluation_plan"]["primary_estimand"]["name"] == "delta"
     assert normalized["constraints"] == ["CPU"]
     assert normalized["readiness"]["decision"] == "needs_discussion"
+    assert normalized["source_grounding"][0]["claim_id"] == "H1"
+    assert "source_grounding" not in normalized["hypotheses"][0]
     assert normalized["experimental_plan"]["domain_extension"] == {"preserved": True}

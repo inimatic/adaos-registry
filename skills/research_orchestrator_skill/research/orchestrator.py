@@ -129,11 +129,25 @@ def _normalize_candidate_shape(value: Mapping[str, Any]) -> dict[str, Any]:
         for key in top_level:
             if key not in candidate and key in experimental:
                 candidate[key] = experimental.pop(key)
-        nested_evaluation = experimental.get("evaluation_plan")
-        if isinstance(nested_evaluation, dict):
-            for key in top_level[1:]:
-                if key not in candidate and key in nested_evaluation:
-                    candidate[key] = nested_evaluation.pop(key)
+    evaluation = candidate.get("evaluation_plan")
+    if isinstance(evaluation, dict):
+        for key in top_level[1:]:
+            if key not in candidate and key in evaluation:
+                candidate[key] = evaluation.pop(key)
+
+    lifted_grounding: list[Any] = []
+    hypotheses = candidate.get("hypotheses")
+    if isinstance(hypotheses, list):
+        for hypothesis in hypotheses:
+            if not isinstance(hypothesis, dict):
+                continue
+            nested = hypothesis.pop("source_grounding", None)
+            if isinstance(nested, list):
+                lifted_grounding.extend(nested)
+            elif isinstance(nested, Mapping):
+                lifted_grounding.append(dict(nested))
+    if lifted_grounding and "source_grounding" not in candidate:
+        candidate["source_grounding"] = lifted_grounding
     return candidate
 
 
