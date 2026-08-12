@@ -265,7 +265,9 @@ def test_placeholder_gate_distinguishes_unknown_outcomes_from_unknown_values() -
     )
     assert accepted["admission_review"]["decision"] == "admitted"
 
-    candidate["implementation_requirements"][0]["requirement"] = "unknown"
+    # Keep the value schema-valid so this assertion reaches the semantic
+    # admission gate instead of being rejected by the string-length guard.
+    candidate["implementation_requirements"][0]["requirement"] = "not specified"
     rejected = materialize_prototype(
         candidate,
         direction_id="tlp_direction_skill",
