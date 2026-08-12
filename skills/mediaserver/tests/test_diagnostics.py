@@ -45,8 +45,19 @@ def _load_webui_schema() -> dict:
         raise FileNotFoundError("Cannot find adaos.abi webui.v1.schema.json")
 
 
+def _load_skill_schema() -> dict:
+    if REPO_SCHEMA_PATH is not None:
+        path = REPO_SCHEMA_PATH.parents[3] / "src" / "adaos" / "services" / "skill" / "skill_schema.json"
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))
+    from adaos.services.skill.validation import SCHEMA_PATH
+
+    return json.loads(pathlib.Path(SCHEMA_PATH).read_text(encoding="utf-8"))
+
+
 def test_manifest_declares_diagnostics_tool() -> None:
     manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    Draft202012Validator(_load_skill_schema()).validate(manifest)
 
     tools = {item["name"]: item for item in manifest["tools"]}
     routes = {item["surface"]: item for item in manifest["data_routes"]}
@@ -56,10 +67,11 @@ def test_manifest_declares_diagnostics_tool() -> None:
     assert "reliability" in tools["get_diagnostics"]["output_schema"]["required"]
     assert tools["get_snapshot"]["entry"] == "handlers.main:get_snapshot"
     assert tools["list_library_page"]["entry"] == "handlers.main:list_library_page"
-    assert routes["widget:mediaserver.summary"]["budget"]["max_items"] == 0
+    assert "max_items" not in routes["widget:mediaserver.summary"]["budget"]
     assert routes["widget:mediaserver.summary"]["projection_slot"] == "mediaserver.library_summary"
     assert routes["widget:mediaserver.summary"]["path"] == "data/media/library_summary"
     assert routes["modal:mediaserver.library_page"]["budget"]["max_items"] == 100
+    assert routes["modal:mediaserver.library_page"]["budget"]["snapshot_policy"] == "manual"
 
 
 def test_webui_declares_diagnostics_modal_without_full_library_source() -> None:
