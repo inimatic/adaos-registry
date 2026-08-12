@@ -47,13 +47,28 @@ def _json_object(text: str) -> dict[str, Any]:
     if raw.startswith("```"):
         raw = re.sub(r"^```(?:json)?\s*", "", raw, flags=re.I)
         raw = re.sub(r"\s*```$", "", raw)
-    try:
-        value = json.loads(raw)
-    except ValueError:
-        start, end = raw.find("{"), raw.rfind("}")
+    start, end = raw.find("{"), raw.rfind("}")
+    candidates = [raw]
+    if start >= 0 and end > start:
+        candidates.append(raw[start : end + 1])
+    parse_error: ValueError | None = None
+    value: Any = None
+    for candidate in candidates:
+        for normalized in (
+            candidate,
+            re.sub(r",\s*([}\]])", r"\1", candidate),
+        ):
+            try:
+                value = json.loads(normalized)
+                break
+            except ValueError as exc:
+                parse_error = exc
+        if value is not None:
+            break
+    if value is None:
         if start < 0 or end <= start:
             raise ValueError("LLM response does not contain a JSON object") from None
-        value = json.loads(raw[start : end + 1])
+        raise ValueError(f"LLM response contains invalid JSON: {parse_error}") from None
     if not isinstance(value, dict):
         raise ValueError("LLM response must be a JSON object")
     return value

@@ -8,6 +8,7 @@ from jsonschema import Draft202012Validator
 from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues, prototype_candidate_schema, validate
 from research.orchestrator import (
     _address_builder_url,
+    _json_object,
     _llm_failure,
     _normalize_candidate_shape,
     _repair_prompt,
@@ -316,6 +317,16 @@ def test_repair_prompt_keeps_the_candidate_out_of_an_instruction_envelope() -> N
     assert not prompt.lstrip().startswith("{")
     assert 'CANDIDATE JSON TO CORRECT AND RETURN:\n{"title": "candidate"}' in prompt
     assert '"validation_error"' not in prompt
+
+
+def test_json_object_conservatively_repairs_trailing_commas_only() -> None:
+    assert _json_object('```json\n{"title": "Study", "items": [1, 2,],}\n```') == {
+        "title": "Study",
+        "items": [1, 2],
+    }
+
+    with pytest.raises(ValueError, match="invalid JSON"):
+        _json_object('{"title": unquoted}')
 
 
 def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> None:
