@@ -148,6 +148,34 @@ def _normalize_candidate_shape(value: Mapping[str, Any]) -> dict[str, Any]:
                 lifted_grounding.append(dict(nested))
     if lifted_grounding and "source_grounding" not in candidate:
         candidate["source_grounding"] = lifted_grounding
+
+    def canonical_enum(raw: Any) -> Any:
+        if not isinstance(raw, str):
+            return raw
+        return re.sub(r"[\s-]+", "_", raw.strip().lower())
+
+    for item in candidate.get("source_grounding") or []:
+        if isinstance(item, dict) and "stance" in item:
+            item["stance"] = canonical_enum(item["stance"])
+    experimental = candidate.get("experimental_plan")
+    if isinstance(experimental, dict):
+        for stage in experimental.get("stages") or []:
+            if isinstance(stage, dict) and "evidence_class" in stage:
+                stage["evidence_class"] = canonical_enum(stage["evidence_class"])
+        reproducibility = experimental.get("reproducibility")
+        pairing = reproducibility.get("pairing") if isinstance(reproducibility, dict) else None
+        allocation = pairing.get("allocation") if isinstance(pairing, dict) else None
+        if isinstance(allocation, dict) and "strategy" in allocation:
+            allocation["strategy"] = canonical_enum(allocation["strategy"])
+    for item in candidate.get("implementation_requirements") or []:
+        if isinstance(item, dict) and "category" in item:
+            item["category"] = canonical_enum(item["category"])
+    for item in candidate.get("acceptance_checks") or []:
+        if isinstance(item, dict) and "category" in item:
+            item["category"] = canonical_enum(item["category"])
+    readiness = candidate.get("readiness")
+    if isinstance(readiness, dict) and "decision" in readiness:
+        readiness["decision"] = canonical_enum(readiness["decision"])
     return candidate
 
 

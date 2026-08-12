@@ -342,8 +342,18 @@ def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> Non
                         "blocking_questions": ["review"],
                     },
                 },
+                "reproducibility": {
+                    "pairing": {
+                        "allocation": {
+                            "strategy": "Enumerated Units",
+                        }
+                    }
+                },
                 "domain_extension": {"preserved": True},
             },
+            "acceptance_checks": [
+                {"id": "AC-1", "category": "data integrity"}
+            ],
         }
     )
 
@@ -353,4 +363,11 @@ def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> Non
     assert normalized["readiness"]["decision"] == "needs_discussion"
     assert normalized["source_grounding"][0]["claim_id"] == "H1"
     assert "source_grounding" not in normalized["hypotheses"][0]
+    assert normalized["acceptance_checks"][0]["category"] == "data_integrity"
+    assert (
+        normalized["experimental_plan"]["reproducibility"]["pairing"][
+            "allocation"
+        ]["strategy"]
+        == "enumerated_units"
+    )
     assert normalized["experimental_plan"]["domain_extension"] == {"preserved": True}
