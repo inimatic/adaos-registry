@@ -1,5 +1,5 @@
 name: browsers_skill
-version: 0.15.21
+version: 0.15.22
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -380,6 +380,35 @@ tools:
         type: string
   output_schema:
     type: object
+- name: set_device_voice_listening
+  description: Set the persistent voice listening mode for a Hub or member node.
+  entry: handlers.main:set_device_voice_listening
+  input_schema:
+    type: object
+    required:
+    - listening_mode
+    properties:
+      listening_mode:
+        type: string
+        enum:
+        - 'off'
+        - push-to-talk
+        - continuous
+        - activation
+      device_ref:
+        type: string
+      node_id:
+        type: string
+      target_node_id:
+        type: string
+      device_id:
+        type: string
+      source:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
 - name: adopt_device
   description: Adopt a temporary browser, member, or device link into a stable access
     profile.
@@ -417,4 +446,3 @@ compatibility:
     min_commit: 2acb1c5b81b7eda3e8584e87efa9b75eebbc202e
     min_short_commit: 2acb1c5b
     build_date: '2026-08-11T12:20:36+03:00'
-

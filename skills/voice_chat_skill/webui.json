@@ -77,6 +77,16 @@
                 "stopLabel": "⏹️ Стоп",
                 "sendCommand": "voice.chat.user",
                 "scope": "shared",
+                "autoSpeak": true,
+                "autoSpeakFrom": "hub",
+                "autoSpeakLang": "ru-RU",
+                "listeningMode": "activation",
+                "activationAliases": [
+                  "Ада",
+                  "AdaOS",
+                  "ассистент"
+                ],
+                "autoStart": true,
                 "voiceDiagnostics": false,
                 "nonBlocking": true,
                 "meta": {
@@ -117,6 +127,14 @@
                 "stt": {
                   "provider": "phone",
                   "pushToTalk": false,
+                  "listeningMode": "activation",
+                  "activationAliases": [
+                    "Ада",
+                    "AdaOS",
+                    "ассистент"
+                  ],
+                  "autoStart": true,
+                  "readyCue": false,
                   "vad": true,
                   "vadSilenceMs": 900,
                   "autoSend": true

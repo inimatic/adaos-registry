@@ -767,6 +767,38 @@ def test_browsers_skill_set_browser_media_control_uses_sdk_device_access(monkeyp
     ]
 
 
+def test_browsers_skill_sets_member_voice_listening_mode(monkeypatch) -> None:
+    mod = _load_browsers_skill_module()
+    seen: list[tuple[str, str, str]] = []
+
+    monkeypatch.setattr(
+        mod,
+        "_refresh_snapshot_sync",
+        lambda webspace_id=None: {"ok": True, "webspace_id": webspace_id},
+    )
+
+    def _fake_set(device_ref: str, listening_mode: str, *, source: str):
+        seen.append((device_ref, listening_mode, source))
+        return {"ok": True, "device_ref": device_ref, "mode": listening_mode}
+
+    monkeypatch.setattr(mod.sdk_device_access, "set_device_voice_listening", _fake_set)
+
+    result = mod.set_device_voice_listening(
+        node_id="android-node-1",
+        listening_mode="activation",
+        webspace_id="desktop",
+    )
+
+    assert result == {
+        "ok": True,
+        "device_ref": "member:android-node-1",
+        "mode": "activation",
+    }
+    assert seen == [
+        ("member:android-node-1", "activation", "device_registry")
+    ]
+
+
 def test_browsers_skill_adopt_link_uses_sdk_device_access(monkeypatch) -> None:
     mod = _load_browsers_skill_module()
     seen: list[tuple[str, str | None, str]] = []

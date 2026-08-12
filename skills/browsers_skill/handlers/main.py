@@ -902,6 +902,34 @@ def set_browser_media_control(
 
 
 @tool
+def set_device_voice_listening(
+    listening_mode: str,
+    device_ref: str | None = None,
+    node_id: str | None = None,
+    target_node_id: str | None = None,
+    device_id: str | None = None,
+    source: str = "device_registry",
+    webspace_id: str | None = None,
+) -> dict[str, Any]:
+    resolved = _coerce_device_ref(
+        device_ref=device_ref,
+        node_id=node_id,
+        target_node_id=target_node_id,
+        device_id=device_id,
+        webspace_id=webspace_id,
+    )
+    if not resolved:
+        return {"ok": False, "error": "device_ref_required"}
+    result = sdk_device_access.set_device_voice_listening(
+        resolved,
+        str(listening_mode or "").strip(),
+        source=str(source or "device_registry").strip() or "device_registry",
+    )
+    _refresh_snapshot_sync(webspace_id)
+    return result
+
+
+@tool
 def set_device_lifetime(
     preset: str,
     device_ref: str | None = None,
