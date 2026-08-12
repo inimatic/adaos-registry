@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-12T12:46:50+00:00",
+  "updated_at": "2026-08-12T13:20:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -359,8 +359,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.1.3",
-      "updated_at": "2026-08-12T12:30:00+00:00",
+      "version": "0.1.4",
+      "updated_at": "2026-08-12T13:20:00+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -1150,8 +1150,8 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.1.2",
-      "updated_at": "2026-08-12T12:30:00+00:00",
+      "version": "0.1.3",
+      "updated_at": "2026-08-12T13:20:00+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {

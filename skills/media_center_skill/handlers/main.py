@@ -269,7 +269,7 @@ def import_folder(path: str = "", label: str = "", include_images: bool = False,
 @tool(summary="Return the media-center library projection for widgets and playback.", side_effects="none")
 def library(
     query: str = "",
-    media_kind: str = "",
+    media_kind: str = "playable",
     source: str = "",
     limit: int = 100,
     offset: int = 0,

@@ -458,7 +458,13 @@
                 "name": "media_center_skill.library",
                 "params": {
                   "query": "$state.mediaSearch",
-                  "media_kind": "$state.mediaKind",
+                  "media_kind": {
+                    "kind": "expression",
+                    "op": "if",
+                    "condition": "$state.mediaKind",
+                    "then": "$state.mediaKind",
+                    "else": "playable"
+                  },
                   "source": "$state.mediaSource",
                   "sort": "$state.mediaSort",
                   "limit": "$state.mediaPageSize",

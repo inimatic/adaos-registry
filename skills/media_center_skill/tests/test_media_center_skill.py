@@ -87,6 +87,17 @@ def test_playable_filter_excludes_images_by_default(monkeypatch, tmp_path):
     assert {item["resource_id"] for item in playable} == {"clip.mp4", "song.mp3"}
 
 
+def test_library_defaults_to_playable_media(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repo = MediaCenterRepository()
+
+    repo.scan_resources([_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")])
+    payload = main.library(auto_scan=False, sort="title", limit=20)
+
+    assert [item["media_kind"] for item in payload["items"]] == ["video", "audio"]
+    assert {item["resource_id"] for item in payload["items"]} == {"clip.mp4", "song.mp3"}
+
+
 def test_incremental_root_scan_does_not_mark_existing_media_server_rows_missing(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()

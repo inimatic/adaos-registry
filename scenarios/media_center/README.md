@@ -21,6 +21,8 @@ The **Catalog** is intentionally broader than the configured **Media folders** l
 An empty folders list only means that no new import roots were configured through
 Media Center yet. The catalog may still contain resources already known to the
 core Media Server or compatibility `media_indexer_skill`.
+The primary library view requests `playable` media by default, so image
+descriptors from slideshow/legacy sources do not crowd the playback catalog.
 
 Folder import actions are long-running skill calls. The scenario requests a
 bounded 600 second timeout, and `media_center_skill` declares the same runtime

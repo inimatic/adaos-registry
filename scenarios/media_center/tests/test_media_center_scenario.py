@@ -32,6 +32,20 @@ def test_media_center_ui_declares_runtime_i18n_resources_and_long_import_timeout
         "media_center_skill.scan_roots": 600000,
     }
 
+    library_sources = [
+        widget["dataSource"]
+        for widget in page["widgets"]
+        if widget.get("dataSource", {}).get("name") == "media_center_skill.library"
+    ]
+    catalog_source = next(source for source in library_sources if source["params"].get("query") == "$state.mediaSearch")
+    assert catalog_source["params"]["media_kind"] == {
+        "kind": "expression",
+        "op": "if",
+        "condition": "$state.mediaKind",
+        "then": "$state.mediaKind",
+        "else": "playable",
+    }
+
     en = json.loads((SCENARIO_ROOT / "assets" / "i18n" / "en.json").read_text(encoding="utf-8"))
     ru = json.loads((SCENARIO_ROOT / "assets" / "i18n" / "ru.json").read_text(encoding="utf-8"))
     key = "runtime.media_center.error.no_active_media_roots"

@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.1.3
+version: 0.1.4
 description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
 supported_locales:
 - en
@@ -452,4 +452,4 @@ nlu_hints:
   - show media library
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-12T12:30:00+00:00'
+updated_at: '2026-08-12T13:20:00+00:00'
