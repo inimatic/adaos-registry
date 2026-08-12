@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-12T08:41:13+00:00",
+  "updated_at": "2026-08-12T08:40:52+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -737,7 +737,7 @@
       "kind": "skill",
       "id": "research_orchestrator_skill",
       "name": "research_orchestrator_skill",
-      "version": "0.7.0",
+      "version": "0.8.0",
       "updated_at": "2026-08-12T08:40:52+00:00",
       "path": "skills/research_orchestrator_skill",
       "manifest": "skills/research_orchestrator_skill/skill.yaml",
@@ -794,7 +794,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-08-11T20:00:04+00:00",
+      "updated_at": "2026-08-12T09:35:56+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
