@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlsplit
 
-from research.contracts import materialize_automation_brief, materialize_prototype, validate
+import pytest
+from jsonschema import Draft202012Validator
+
+from research.contracts import materialize_automation_brief, materialize_prototype, prototype_candidate_schema, validate
 from research.orchestrator import _address_builder_url
 
 
@@ -66,6 +69,30 @@ def test_prototype_and_automation_brief_bind_exact_inputs() -> None:
     assert brief["development_scope"]["context_members"][0]["access"] == "read-only"
     assert any("direction-specific scenario" in item for item in brief["acceptance_checks"])
     assert any("three-epoch" in item.lower() for item in brief["prohibited_actions"])
+
+
+def test_llm_candidate_schema_matches_the_typed_contract_and_reports_all_violations() -> None:
+    schema = prototype_candidate_schema()
+    Draft202012Validator(schema).validate(_candidate())
+    assert "digest" not in schema["properties"]
+    assert schema["properties"]["implementation_requirements"]["minItems"] == 5
+    assert schema["properties"]["acceptance_checks"]["minItems"] == 4
+
+    invalid = _candidate()
+    invalid["evaluation_plan"]["primary_estimand"] = "Accuracy"
+    invalid["acceptance_checks"] = ["only one"]
+    with pytest.raises(ValueError) as raised:
+        materialize_prototype(
+            invalid,
+            direction_id="tlp_direction_skill",
+            source_bundle_digest="sha256:" + "1" * 64,
+            revision=1,
+            parent_digest=None,
+            actor="user:test",
+        )
+    detail = str(raised.value)
+    assert "acceptance_checks" in detail
+    assert "evaluation_plan.primary_estimand" in detail
 
 
 def test_builder_url_carries_a_declared_first_paint_address() -> None:

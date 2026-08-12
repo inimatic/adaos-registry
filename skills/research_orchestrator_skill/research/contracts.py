@@ -10,6 +10,19 @@ from typing import Any, Mapping
 from jsonschema import Draft202012Validator
 
 
+_PROTOTYPE_MANAGED_FIELDS = {
+    "schema",
+    "schema_version",
+    "direction",
+    "revision",
+    "parent_digest",
+    "source_bundle_digest",
+    "created_at",
+    "created_by",
+    "digest",
+}
+
+
 def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
@@ -24,14 +37,34 @@ def digest(value: Mapping[str, Any]) -> str:
     return f"sha256:{hashlib.sha256(canonical_json(payload).encode('utf-8')).hexdigest()}"
 
 
-def validate(schema_name: str, value: Mapping[str, Any]) -> dict[str, Any]:
+def load_schema(schema_name: str) -> dict[str, Any]:
     schema_path = Path(__file__).resolve().parents[1] / "schemas" / schema_name
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    return json.loads(schema_path.read_text(encoding="utf-8"))
+
+
+def prototype_candidate_schema() -> dict[str, Any]:
+    """Return the exact LLM-owned subset of ResearchPrototype's schema."""
+
+    schema = copy.deepcopy(load_schema("research.prototype.v1.schema.json"))
+    properties = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
+    for field in _PROTOTYPE_MANAGED_FIELDS:
+        properties.pop(field, None)
+    schema["required"] = [
+        field for field in schema.get("required") or [] if field not in _PROTOTYPE_MANAGED_FIELDS
+    ]
+    return schema
+
+
+def validate(schema_name: str, value: Mapping[str, Any]) -> dict[str, Any]:
+    schema = load_schema(schema_name)
     errors = sorted(Draft202012Validator(schema).iter_errors(dict(value)), key=lambda item: list(item.absolute_path))
     if errors:
-        error = errors[0]
-        location = ".".join(str(item) for item in error.absolute_path) or "$"
-        raise ValueError(f"{schema_name} invalid at {location}: {error.message}")
+        issues = []
+        for error in errors[:20]:
+            location = ".".join(str(item) for item in error.absolute_path) or "$"
+            issues.append(f"{location}: {error.message}")
+        suffix = f"; plus {len(errors) - 20} more" if len(errors) > 20 else ""
+        raise ValueError(f"{schema_name} invalid: {'; '.join(issues)}{suffix}")
     return dict(value)
 
 
@@ -182,4 +215,4 @@ def materialize_automation_brief(
     return validate("research.automation_brief.v1.schema.json", brief)
 
 
-__all__ = ["canonical_json", "digest", "materialize_automation_brief", "materialize_prototype", "now", "prototype_admission_issues", "validate"]
+__all__ = ["canonical_json", "digest", "load_schema", "materialize_automation_brief", "materialize_prototype", "now", "prototype_admission_issues", "prototype_candidate_schema", "validate"]

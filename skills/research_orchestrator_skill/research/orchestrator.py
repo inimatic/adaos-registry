@@ -21,7 +21,7 @@ from adaos.sdk.llm import llm_client
 from adaos.services.agent_context import get_ctx
 from adaos.services.skill.artifacts import skill_upload_dir
 
-from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues
+from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues, prototype_candidate_schema
 from research.repository import OrchestratorRepository
 
 
@@ -539,6 +539,7 @@ class ResearchOrchestrator:
                 "acceptance_checks": ["at least 4 distinct observable checks"],
                 "readiness": {"decision": "needs_discussion|ready_for_automation", "blocking_questions": ["..."]},
             },
+            "validation_schema": prototype_candidate_schema(),
             "rules": [
                 "Return JSON only.",
                 "Cardinality is contractual: hypotheses >= 1, experimental_plan.stages >= 1, evaluation_plan.outcomes >= 1, constraints >= 1, assumptions >= 1, implementation_requirements >= 5, and acceptance_checks >= 4.",
@@ -613,6 +614,7 @@ class ResearchOrchestrator:
                         "validation_error": str(validation_error),
                         "rejected_candidate": candidate,
                         "output_contract": instructions["output_contract"],
+                        "validation_schema": instructions["validation_schema"],
                         "rules": instructions["rules"],
                         "user_request": instructions["task"],
                     }
