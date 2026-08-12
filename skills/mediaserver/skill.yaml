@@ -1,5 +1,5 @@
 name: mediaserver
-version: 0.9.12
+version: 0.9.13
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -33,7 +33,7 @@ data_routes:
     quarantine: true
 - surface: modal:mediaserver.library_page
   route: tool
-  tool: mediaserver.list_library_page
+  tool: list_library_page
   first_paint: first bounded page of media rows
   recovery: browser requests another bounded page; rows are not replayed from Yjs
   update_source:
@@ -42,6 +42,17 @@ data_routes:
     max_payload_bytes: 65536
     max_items: 100
     snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - mediaserver.library
   guard_visibility:
     degraded_state: media browser shows page-route error without mutating Yjs
     log: skill:mediaserver.runtime
@@ -115,7 +126,7 @@ tools:
     - items
     - media
     - reliability
-updated_at: '2026-08-12T18:18:46+00:00'
+updated_at: '2026-08-12T18:21:10+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4834.2acb1c5b

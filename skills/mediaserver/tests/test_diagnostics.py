@@ -70,8 +70,17 @@ def test_manifest_declares_diagnostics_tool() -> None:
     assert "max_items" not in routes["widget:mediaserver.summary"]["budget"]
     assert routes["widget:mediaserver.summary"]["projection_slot"] == "mediaserver.library_summary"
     assert routes["widget:mediaserver.summary"]["path"] == "data/media/library_summary"
+    assert routes["modal:mediaserver.library_page"]["tool"] == "list_library_page"
     assert routes["modal:mediaserver.library_page"]["budget"]["max_items"] == 100
     assert routes["modal:mediaserver.library_page"]["budget"]["snapshot_policy"] == "manual"
+    assert routes["modal:mediaserver.library_page"]["read_policy"] == {
+        "mode": "explicit",
+        "triggers": ["mount", "explicit_refresh", "targeted_invalidation"],
+        "cache_ttl_ms": 0,
+        "max_request_hz": 2,
+        "preserve_last_value": True,
+        "invalidation_tags": ["mediaserver.library"],
+    }
 
 
 def test_webui_declares_diagnostics_modal_without_full_library_source() -> None:
