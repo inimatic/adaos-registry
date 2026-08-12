@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.1.6
+version: 0.1.7
 description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
 supported_locales:
 - en
@@ -325,6 +325,8 @@ data_routes:
     cache_ttl_ms: 1000
     max_request_hz: 1
     preserve_last_value: true
+    invalidation_tags:
+    - media_center.catalog
 - surface: widget:media-center-player
   route: tool
   tool: library
@@ -364,7 +366,9 @@ data_routes:
     - state_dependency_changed
     cache_ttl_ms: 0
     max_request_hz: 5
-    preserve_last_value: true
+    preserve_last_value: false
+    invalidation_tags:
+    - media_center.catalog
 - surface: widget:media-center-roots
   route: tool
   tool: list_roots
@@ -405,6 +409,8 @@ data_routes:
     cache_ttl_ms: 60000
     max_request_hz: 1
     preserve_last_value: true
+    invalidation_tags:
+    - media_center.catalog
 - surface: media-center catalog store
   route: skill-local
   path: data/db/media_center.sqlite3
@@ -454,4 +460,4 @@ nlu_hints:
   - show media library
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-12T13:40:00+00:00'
+updated_at: '2026-08-12T13:50:00+00:00'

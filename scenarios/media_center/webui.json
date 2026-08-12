@@ -127,7 +127,8 @@
                 "invalidationTags": [
                   "media_center.catalog"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 1
               },
               "inputs": {
                 "valuePath": "summary.available_count",
@@ -303,7 +304,8 @@
                 "invalidationTags": [
                   "media_center.roots"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "pagination": false,
@@ -475,7 +477,8 @@
                 "invalidationTags": [
                   "media_center.catalog"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "pagination": false,
@@ -624,7 +627,8 @@
                 "invalidationTags": [
                   "media_center.catalog"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "compact": false,
@@ -648,7 +652,8 @@
                 "invalidationTags": [
                   "media_center.catalog"
                 ],
-                "preserveLastValue": false
+                "preserveLastValue": false,
+                "maxRequestHz": 5
               },
               "inputs": {
                 "fields": [
@@ -721,7 +726,8 @@
                 "invalidationTags": [
                   "media_center.catalog"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 1
               },
               "inputs": {
                 "bindField": "message"
