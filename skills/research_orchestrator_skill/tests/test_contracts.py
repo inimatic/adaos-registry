@@ -44,6 +44,12 @@ def _candidate() -> dict:
                     "unit": "seed",
                     "invariant_fields": ["initial weights", "data order", "augmentation draws"],
                     "varied_fields": ["pooling operator"],
+                    "allocation": {
+                        "strategy": "enumerated_units",
+                        "planned_units": [17, 23, 29, 31, 37, 41, 43, 47, 53, 59],
+                        "sample_size": 10,
+                        "predeclared": True,
+                    },
                 },
                 "environment": {
                     "capture": ["code digest", "dependency lock", "hardware fingerprint"],
@@ -71,17 +77,17 @@ def _candidate() -> dict:
         "assumptions": ["dataset acquisition will be declared before execution"],
         "open_questions": [],
         "implementation_requirements": [
-            {"id": "REQ-1", "requirement": "Implement a deterministic paired CPU runner.", "verification": "Run the paired smoke conformance test."},
-            {"id": "REQ-2", "requirement": "Use typed immutable experiment configs.", "verification": "Validate and digest the serialized RunSpec."},
-            {"id": "REQ-3", "requirement": "Record every named RNG stream identity.", "verification": "Inspect the emitted reproducibility manifest."},
-            {"id": "REQ-4", "requirement": "Emit ContentRef-bound artifacts and evidence.", "verification": "Resolve every result reference by digest."},
-            {"id": "REQ-5", "requirement": "Keep primary data in owner-scoped skill storage.", "verification": "Resolve storage capability ownership in the run report."},
+            {"id": "REQ-1", "category": "execution", "requirement": "Implement a deterministic paired CPU runner.", "verification": "Run the paired smoke conformance test."},
+            {"id": "REQ-2", "category": "data", "requirement": "Use typed immutable experiment configs.", "verification": "Validate and digest the serialized RunSpec."},
+            {"id": "REQ-3", "category": "reproducibility", "requirement": "Record every named RNG stream identity.", "verification": "Inspect the emitted reproducibility manifest."},
+            {"id": "REQ-4", "category": "evidence", "requirement": "Emit ContentRef-bound artifacts and evidence.", "verification": "Resolve every result reference by digest."},
+            {"id": "REQ-5", "category": "observability", "requirement": "Keep primary data in owner-scoped skill storage.", "verification": "Resolve storage capability ownership in the run report."},
         ],
         "acceptance_checks": [
-            {"id": "AC-1", "check": "Three-epoch smoke produces both paired arms with shared initialization.", "evidence": "paired smoke report"},
-            {"id": "AC-2", "check": "Notebook output is classified as non-confirmatory source material.", "evidence": "evidence manifest"},
-            {"id": "AC-3", "check": "The test split remains sealed throughout implementation and smoke.", "evidence": "data seal log"},
-            {"id": "AC-4", "check": "Native AdaOS validation and skill tests pass.", "evidence": "CLI test report"},
+            {"id": "AC-1", "category": "workflow", "check": "Three-epoch smoke produces both paired arms with shared initialization.", "evidence": "paired smoke report"},
+            {"id": "AC-2", "category": "evidence", "check": "Notebook output is classified as non-confirmatory source material.", "evidence": "evidence manifest"},
+            {"id": "AC-3", "category": "data_integrity", "check": "The test split remains sealed throughout implementation and smoke.", "evidence": "data seal log"},
+            {"id": "AC-4", "category": "reproducibility", "check": "Native AdaOS validation and skill tests pass.", "evidence": "CLI test report"},
         ],
         "readiness": {"decision": "ready_for_automation", "blocking_questions": []},
     }
@@ -213,6 +219,52 @@ def test_deterministic_admission_review_cannot_be_self_asserted_or_cite_omitted_
     assert prototype_admission_issues(prototype) == [
         "admission_review does not match the deterministic AdaOS review"
     ]
+
+
+def test_admission_rejects_hypothesis_as_observation_and_template_language() -> None:
+    candidate = _candidate()
+    candidate["source_grounding"][1]["stance"] = "observed"
+    candidate["experimental_plan"]["stages"][0]["stop_conditions"] = [
+        "bounded operational condition"
+    ]
+
+    prototype = materialize_prototype(
+        candidate,
+        direction_id="tlp_direction_skill",
+        source_bundle_digest="sha256:" + "1" * 64,
+        context_coverage=_coverage(),
+        revision=1,
+        parent_digest=None,
+        actor="user:test",
+    )
+    issues = "; ".join(prototype_admission_issues(prototype))
+
+    assert "stance=hypothesis" in issues
+    assert "unresolved placeholders" in issues
+
+
+def test_admission_requires_predeclared_pairing_units_and_category_coverage() -> None:
+    candidate = _candidate()
+    candidate["experimental_plan"]["reproducibility"]["pairing"]["allocation"][
+        "sample_size"
+    ] = 9
+    candidate["implementation_requirements"][4]["category"] = "execution"
+    candidate["acceptance_checks"][3]["category"] = "workflow"
+
+    prototype = materialize_prototype(
+        candidate,
+        direction_id="tlp_direction_skill",
+        source_bundle_digest="sha256:" + "1" * 64,
+        context_coverage=_coverage(),
+        revision=1,
+        parent_digest=None,
+        actor="user:test",
+    )
+    issues = "; ".join(prototype_admission_issues(prototype))
+
+    assert "sample_size must equal" in issues
+    assert "observability" in issues
+    assert "data integrity" in issues
 
 
 def test_builder_url_carries_a_declared_first_paint_address() -> None:

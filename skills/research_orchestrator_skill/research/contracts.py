@@ -25,7 +25,13 @@ _PROTOTYPE_MANAGED_FIELDS = {
     "digest",
 }
 
-_PLACEHOLDER_RE = re.compile(r"\b(?:tbd|todo|unspecified|unknown|уточнить|не определено)\b", re.I)
+_PLACEHOLDER_RE = re.compile(
+    r"(?:\b(?:tbd|todo|unspecified|unknown|placeholder)\b|"
+    r"bounded operational condition|predeclared fixed or sequential condition|"
+    r"exact dataset and version|consistent metrics|specific operational|"
+    r"уточнить|не определено|заполнить|заменить)",
+    re.I,
+)
 
 
 def now() -> str:
@@ -107,6 +113,15 @@ def build_admission_review(value: Mapping[str, Any]) -> dict[str, Any]:
     invariant = {str(item).strip().lower() for item in pairing.get("invariant_fields") or [] if str(item).strip()}
     varied = {str(item).strip().lower() for item in pairing.get("varied_fields") or [] if str(item).strip()}
     _check(checks, "reproducibility.pairing", "quality", bool(invariant) and bool(varied) and invariant.isdisjoint(varied), "paired design must declare disjoint invariant_fields and varied_fields")
+    allocation = pairing.get("allocation") if isinstance(pairing.get("allocation"), Mapping) else {}
+    planned_units = list(allocation.get("planned_units") or [])
+    sample_size = int(allocation.get("sample_size") or 0)
+    allocation_valid = (
+        allocation.get("predeclared") is True
+        and bool(planned_units)
+        and sample_size == len(planned_units)
+    )
+    _check(checks, "reproducibility.allocation", "quality", allocation_valid, "paired units must be predeclared and sample_size must equal the distinct planned_units")
 
     evaluation = value.get("evaluation_plan") if isinstance(value.get("evaluation_plan"), Mapping) else {}
     outcomes = [item for item in evaluation.get("outcomes") or [] if isinstance(item, Mapping)]
@@ -130,16 +145,32 @@ def build_admission_review(value: Mapping[str, Any]) -> dict[str, Any]:
     cited_refs = {str(ref) for item in grounding for ref in item.get("source_refs") or []}
     hypothesis_ids = {str(item.get("id") or "") for item in value.get("hypotheses") or [] if isinstance(item, Mapping)}
     grounded_ids = {str(item.get("claim_id") or "") for item in grounding}
+    hypothesis_grounding = {
+        str(item.get("claim_id") or "")
+        for item in grounding
+        if item.get("stance") == "hypothesis"
+    }
+    observed_claims = [
+        item
+        for item in grounding
+        if item.get("stance") == "observed"
+        and str(item.get("claim_id") or "") not in hypothesis_ids
+    ]
     _check(checks, "sources.provenance", "quality", bool(cited_refs) and cited_refs.issubset(admitted_refs), "source_grounding may cite only context fragments actually supplied to the formulation model")
     _check(checks, "sources.hypotheses_grounded", "quality", bool(hypothesis_ids) and hypothesis_ids.issubset(grounded_ids), "every hypothesis id must have an explicit source-grounding record")
-    _check(checks, "sources.observations_separated", "quality", any(item.get("stance") == "observed" for item in grounding), "at least one source-grounded observation must be separated from hypotheses and interpretations")
+    _check(checks, "sources.hypothesis_stance", "quality", bool(hypothesis_ids) and hypothesis_ids.issubset(hypothesis_grounding), "every hypothesis must be grounded with stance=hypothesis, never promoted to an observed source fact")
+    _check(checks, "sources.observations_separated", "quality", bool(observed_claims), "at least one independent observed source claim must be separated from hypothesis identifiers")
 
     requirements = [item for item in value.get("implementation_requirements") or [] if isinstance(item, Mapping)]
     requirement_ids = [str(item.get("id") or "") for item in requirements]
+    requirement_categories = {str(item.get("category") or "") for item in requirements}
     acceptance = [item for item in value.get("acceptance_checks") or [] if isinstance(item, Mapping)]
     acceptance_ids = [str(item.get("id") or "") for item in acceptance]
+    acceptance_categories = {str(item.get("category") or "") for item in acceptance}
     _check(checks, "automation.requirements", "quality", len(requirements) >= 5 and len(requirement_ids) == len(set(requirement_ids)), "implementation requirements must be typed, independently verifiable, and uniquely identified")
+    _check(checks, "automation.requirement_coverage", "quality", {"execution", "data", "reproducibility", "observability", "evidence"}.issubset(requirement_categories), "implementation requirements must cover execution, data, reproducibility, observability, and evidence")
     _check(checks, "automation.acceptance", "quality", len(acceptance) >= 4 and len(acceptance_ids) == len(set(acceptance_ids)), "acceptance checks must be typed, observable, and uniquely identified")
+    _check(checks, "automation.acceptance_coverage", "quality", {"workflow", "data_integrity", "reproducibility", "evidence"}.issubset(acceptance_categories), "acceptance checks must cover workflow, data integrity, reproducibility, and evidence")
 
     critical_text = json.dumps(
         {
@@ -198,7 +229,7 @@ def materialize_prototype(
     candidate.update(
         {
             "schema": "adaos.research.prototype.v1",
-            "schema_version": "1.1.0",
+            "schema_version": "1.2.0",
             "direction": {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"},
             "revision": int(revision),
             "parent_digest": parent_digest,

@@ -35,17 +35,20 @@ digests `context_coverage` and `admission_review`; neither can be self-asserted
 by the model. The deterministic review rejects or downgrades a handoff unless
 it has:
 
-- exact provenance references for source-grounded observations and every
-  hypothesis;
+- exact provenance references for independent observations and every
+  hypothesis, with hypothesis claims forbidden from masquerading as observed
+  source facts;
 - separate workflow-smoke and confirmatory stages with correct evidence
   classes;
-- explicit comparators, paired invariants/varied factors, named RNG streams,
-  data sealing, and leakage controls;
+- explicit comparators, paired invariants/varied factors, a predeclared
+  allocation of paired units, named RNG streams, data sealing, and leakage
+  controls;
 - one operationalized primary estimand, one primary outcome, uncertainty,
   multiplicity, practical significance, stopping, and a negative-result
   policy;
-- uniquely identified implementation requirements and observable acceptance
-  evidence.
+- uniquely identified implementation requirements covering execution, data,
+  reproducibility, observability and evidence, plus acceptance evidence that
+  covers workflow, data integrity, reproducibility and evidence.
 
 Schema repair and semantic-quality repair are bounded. If a schema-valid
 candidate still fails the hard gate after repair, it remains a visible draft;
