@@ -166,6 +166,26 @@ def test_llm_candidate_schema_matches_the_typed_contract_and_reports_all_violati
     assert "evaluation_plan.primary_estimand" in detail
 
 
+def test_contract_accepts_compact_scientific_units_and_one_declared_pairing_invariant() -> None:
+    candidate = _candidate()
+    candidate["evaluation_plan"]["outcomes"][0]["unit"] = "%"
+    candidate["experimental_plan"]["reproducibility"]["pairing"]["invariant_fields"] = [
+        "architecture"
+    ]
+
+    prototype = materialize_prototype(
+        candidate,
+        direction_id="tlp_direction_skill",
+        source_bundle_digest="sha256:" + "1" * 64,
+        context_coverage=_coverage(),
+        revision=1,
+        parent_digest=None,
+        actor="user:test",
+    )
+
+    assert prototype["admission_review"]["decision"] == "admitted"
+
+
 def test_deterministic_admission_review_cannot_be_self_asserted_or_cite_omitted_context() -> None:
     candidate = _candidate()
     candidate["source_grounding"][0]["source_refs"] = [
