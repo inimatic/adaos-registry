@@ -13,13 +13,15 @@ from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION
 
 
 def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") -> dict:
+    suffix = Path(resource_id).suffix.lower()
+    mime = "audio/mpeg" if suffix == ".mp3" else "image/jpeg" if suffix in {".jpg", ".jpeg"} else "video/mp4"
     return {
         "schema": "adaos.media.resource.v1",
         "id": resource_id,
         "resource_id": resource_id,
         "source": source,
-        "name": "demo_clip.mp4",
-        "mime_type": "video/mp4",
+        "name": resource_id,
+        "mime_type": mime,
         "size_bytes": 1024,
         "modified_at": "2026-08-11T10:00:00+00:00",
         "content_path": f"/api/node/media/files/content/{resource_id}",
@@ -72,3 +74,48 @@ def test_catalog_marks_previous_rows_missing_for_scanned_source(monkeypatch, tmp
     assert [item["resource_id"] for item in available] == ["new.mp4"]
     assert {item["resource_id"] for item in all_items} == {"old.mp4", "new.mp4"}
     assert any(item["resource_id"] == "old.mp4" and item["missing"] for item in all_items)
+
+
+def test_playable_filter_excludes_images_by_default(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repo = MediaCenterRepository()
+
+    repo.scan_resources([_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")])
+    playable = repo.list_items(media_kind="playable", sort="title", limit=20)["items"]
+
+    assert [item["media_kind"] for item in playable] == ["video", "audio"]
+    assert {item["resource_id"] for item in playable} == {"clip.mp4", "song.mp3"}
+
+
+def test_incremental_root_scan_does_not_mark_existing_media_server_rows_missing(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repo = MediaCenterRepository()
+
+    repo.scan_resources([_resource("old.mp4")], source="media_server")
+    repo.scan_resources([_resource("new.mp4")], source="media_server", mark_missing=False)
+    available = repo.list_items(sort="title")["items"]
+
+    assert {item["resource_id"] for item in available} == {"old.mp4", "new.mp4"}
+
+
+def test_import_folder_publishes_playable_files_through_media_server(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    media_dir = tmp_path / "media"
+    media_dir.mkdir()
+    movie = media_dir / "movie.mp4"
+    image = media_dir / "poster.jpg"
+    movie.write_bytes(b"video")
+    image.write_bytes(b"image")
+
+    def publish(path: Path, *, root: dict):
+        return _resource(path.name), None
+
+    monkeypatch.setattr(main, "_publish_media_file_descriptor", publish)
+
+    result = main.import_folder(path=str(media_dir), limit=20)
+    listing = main.library(media_kind="playable", auto_scan=False, limit=20)
+
+    assert result["ok"] is True
+    assert result["published_count"] == 1
+    assert result["roots"][0]["path"] == str(media_dir.resolve())
+    assert [item["resource_id"] for item in listing["items"]] == ["movie.mp4"]

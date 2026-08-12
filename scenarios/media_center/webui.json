@@ -9,12 +9,14 @@
           "title": "Media Center",
           "surfaceClass": "workspace",
           "initialState": {
-            "mediaKind": "all",
+            "mediaKind": "playable",
             "mediaSource": "all",
             "mediaSort": "recent",
             "mediaSearch": "",
-            "selectedMediaItemId": null,
-            "selectedMediaTitle": null
+            "mediaOffset": 0,
+            "mediaPageSize": 100,
+            "mediaRootPath": "",
+            "selectedMediaItemId": null
           },
           "layout": {
             "type": "split",
@@ -28,7 +30,7 @@
               },
               {
                 "id": "playback",
-                "role": "main",
+                "role": "footer",
                 "label": "Playback"
               },
               {
@@ -89,11 +91,18 @@
                   }
                 },
                 {
+                  "on": "click:scan",
+                  "type": "updateState",
+                  "params": {
+                    "mediaOffset": 0,
+                    "selectedMediaItemId": null
+                  }
+                },
+                {
                   "on": "click:clear-selection",
                   "type": "updateState",
                   "params": {
-                    "selectedMediaItemId": null,
-                    "selectedMediaTitle": null
+                    "selectedMediaItemId": null
                   }
                 },
                 {
@@ -133,19 +142,187 @@
               "type": "input.text",
               "area": "catalog",
               "title": "Search",
+              "dataSource": {
+                "kind": "static",
+                "value": {
+                  "value": "$state.mediaSearch"
+                }
+              },
               "inputs": {
                 "placeholder": "Title, filename, or path",
-                "initialValue": ""
+                "initialValue": "",
+                "commitMode": "manual",
+                "saveLabel": "Search"
               },
               "actions": [
                 {
                   "on": "change",
                   "type": "updateState",
                   "params": {
-                    "mediaSearch": "$event.value"
+                    "mediaSearch": "$event.value",
+                    "mediaOffset": 0,
+                    "selectedMediaItemId": null
                   }
                 }
               ]
+            },
+            {
+              "id": "media-search-actions",
+              "type": "ui.actions",
+              "area": "catalog",
+              "title": "Search actions",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "clear-search",
+                    "label": "Clear search",
+                    "icon": "close-outline"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:clear-search",
+                  "type": "updateState",
+                  "params": {
+                    "mediaSearch": "",
+                    "mediaOffset": 0,
+                    "selectedMediaItemId": null
+                  }
+                }
+              ]
+            },
+            {
+              "id": "media-root-path",
+              "type": "input.text",
+              "area": "catalog",
+              "title": "Folder path",
+              "dataSource": {
+                "kind": "static",
+                "value": {
+                  "value": "$state.mediaRootPath"
+                }
+              },
+              "inputs": {
+                "placeholder": "/mnt/media",
+                "initialValue": "",
+                "commitMode": "manual",
+                "saveLabel": "Add folder"
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "mediaRootPath": "$event.value",
+                    "mediaOffset": 0,
+                    "selectedMediaItemId": null
+                  }
+                },
+                {
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "media_center_skill.import_folder",
+                  "params": {
+                    "path": "$event.value",
+                    "include_images": false,
+                    "limit": 1000
+                  },
+                  "invalidates": [
+                    "media_center.catalog",
+                    "media_center.roots"
+                  ],
+                  "feedback": {
+                    "pending": {
+                      "label": "Importing",
+                      "disable": true
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "id": "media-roots-actions",
+              "type": "ui.actions",
+              "area": "catalog",
+              "title": "Folders",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "scan-roots",
+                    "label": "Import folders",
+                    "icon": "folder-open-outline"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:scan-roots",
+                  "type": "callSkill",
+                  "target": "media_center_skill.scan_roots",
+                  "params": {
+                    "limit": 1000
+                  },
+                  "invalidates": [
+                    "media_center.catalog",
+                    "media_center.roots"
+                  ],
+                  "feedback": {
+                    "pending": {
+                      "label": "Importing",
+                      "disable": true
+                    }
+                  }
+                },
+                {
+                  "on": "click:scan-roots",
+                  "type": "updateState",
+                  "params": {
+                    "mediaOffset": 0,
+                    "selectedMediaItemId": null
+                  }
+                }
+              ]
+            },
+            {
+              "id": "media-roots-table",
+              "type": "ui.table",
+              "area": "catalog",
+              "title": "Media folders",
+              "dataSource": {
+                "kind": "skill",
+                "name": "media_center_skill.list_roots",
+                "params": {},
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "media_center.roots"
+                ],
+                "preserveLastValue": true
+              },
+              "inputs": {
+                "pagination": false,
+                "emptyText": "No folders configured.",
+                "columns": [
+                  {
+                    "key": "label",
+                    "label": "Label",
+                    "width": "140px"
+                  },
+                  {
+                    "key": "path",
+                    "label": "Path"
+                  },
+                  {
+                    "key": "last_status",
+                    "label": "Status",
+                    "width": "100px"
+                  }
+                ]
+              }
             },
             {
               "id": "media-kind-tabs",
@@ -158,9 +335,9 @@
                 "selectedStateKey": "mediaKind",
                 "buttons": [
                   {
-                    "id": "all",
-                    "label": "All",
-                    "icon": "albums-outline"
+                    "id": "playable",
+                    "label": "Playable",
+                    "icon": "play-circle-outline"
                   },
                   {
                     "id": "video",
@@ -173,9 +350,9 @@
                     "icon": "musical-notes-outline"
                   },
                   {
-                    "id": "image",
-                    "label": "Images",
-                    "icon": "image-outline"
+                    "id": "all",
+                    "label": "All",
+                    "icon": "albums-outline"
                   }
                 ]
               },
@@ -184,7 +361,9 @@
                   "on": "click",
                   "type": "updateState",
                   "params": {
-                    "mediaKind": "$event.id"
+                    "mediaKind": "$event.id",
+                    "mediaOffset": 0,
+                    "selectedMediaItemId": null
                   }
                 }
               ]
@@ -221,7 +400,9 @@
                   "on": "click",
                   "type": "updateState",
                   "params": {
-                    "mediaSource": "$event.id"
+                    "mediaSource": "$event.id",
+                    "mediaOffset": 0,
+                    "selectedMediaItemId": null
                   }
                 }
               ]
@@ -258,7 +439,9 @@
                   "on": "click",
                   "type": "updateState",
                   "params": {
-                    "mediaSort": "$event.id"
+                    "mediaSort": "$event.id",
+                    "mediaOffset": 0,
+                    "selectedMediaItemId": null
                   }
                 }
               ]
@@ -276,7 +459,8 @@
                   "media_kind": "$state.mediaKind",
                   "source": "$state.mediaSource",
                   "sort": "$state.mediaSort",
-                  "limit": 200,
+                  "limit": "$state.mediaPageSize",
+                  "offset": "$state.mediaOffset",
                   "auto_scan": true
                 },
                 "cacheTtlMs": 0,
@@ -286,14 +470,7 @@
                 "preserveLastValue": true
               },
               "inputs": {
-                "pagination": true,
-                "pageSize": 25,
-                "pageSizeOptions": [
-                  10,
-                  25,
-                  50,
-                  100
-                ],
+                "pagination": false,
                 "emptyText": "No media items in the catalog.",
                 "columns": [
                   {
@@ -340,8 +517,81 @@
                   "on": "select",
                   "type": "updateState",
                   "params": {
-                    "selectedMediaItemId": "$event.id",
-                    "selectedMediaTitle": "$event.title"
+                    "selectedMediaItemId": "$event.id"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "media-page-actions",
+              "type": "ui.actions",
+              "area": "catalog",
+              "title": "Pages",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "first",
+                    "label": "First",
+                    "icon": "play-skip-back-outline"
+                  },
+                  {
+                    "id": "prev",
+                    "label": "Previous",
+                    "icon": "chevron-back-outline"
+                  },
+                  {
+                    "id": "next",
+                    "label": "Next",
+                    "icon": "chevron-forward-outline"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:first",
+                  "type": "updateState",
+                  "params": {
+                    "mediaOffset": 0,
+                    "selectedMediaItemId": null
+                  }
+                },
+                {
+                  "on": "click:prev",
+                  "type": "updateState",
+                  "params": {
+                    "mediaOffset": {
+                      "kind": "expression",
+                      "op": "max",
+                      "args": [
+                        0,
+                        {
+                          "kind": "expression",
+                          "op": "subtract",
+                          "args": [
+                            "$state.mediaOffset",
+                            "$state.mediaPageSize"
+                          ]
+                        }
+                      ]
+                    },
+                    "selectedMediaItemId": null
+                  }
+                },
+                {
+                  "on": "click:next",
+                  "type": "updateState",
+                  "params": {
+                    "mediaOffset": {
+                      "kind": "expression",
+                      "op": "add",
+                      "args": [
+                        "$state.mediaOffset",
+                        "$state.mediaPageSize"
+                      ]
+                    },
+                    "selectedMediaItemId": null
                   }
                 }
               ]
@@ -356,7 +606,7 @@
                 "name": "media_center_skill.library",
                 "params": {
                   "query": "$state.mediaSearch",
-                  "media_kind": "$state.mediaKind",
+                  "media_kind": "playable",
                   "source": "$state.mediaSource",
                   "sort": "$state.mediaSort",
                   "limit": 100,
@@ -378,7 +628,7 @@
               "id": "selected-media-details",
               "type": "item.details",
               "area": "context",
-              "title": "$state.selectedMediaTitle",
+              "title": "{item.title}",
               "visibleIf": "$state.selectedMediaItemId != null",
               "dataSource": {
                 "kind": "skill",

@@ -9,15 +9,17 @@ It intentionally starts with the correct boundary:
 
 ## MVP Workflow
 
-1. Run **Refresh catalog** to reconcile `media_server` and compatibility `media_indexer` resources.
-2. Browse the durable catalog by kind, source, sort order, or text query.
-3. Select an item to inspect its resource descriptor and playback path.
-4. Use the player surface to preview playable video/audio resources through core media routes.
+1. Add one or more media folders. The scenario stores folder roots in `media_center_skill`.
+2. Import folders. The skill publishes playable video/audio files through `adaos.sdk.io.media.publish_media_file`, then indexes the resulting Media Server descriptors.
+3. Run **Refresh catalog** to reconcile existing `media_server` and compatibility `media_indexer` resources.
+4. Browse the durable catalog by playable kind, source, sort order, or explicit text search.
+5. Move through large libraries with server-backed `limit`/`offset` pages.
+6. Select an item to inspect its resource descriptor and playback path.
+7. Use the player surface to preview playable video/audio resources through core media routes.
 
 ## Deliberate Non-Goals For This Milestone
 
 The MVP does not implement movie/episode metadata enrichment, recommendations,
-watch queues, remote TV/player control, transcoding, subtitles, or full media
-library source management. Those belong in the later production media-center
+watch queues, remote TV/player control, transcoding, subtitles, or rich media
+library source policies. Those belong in the later production media-center
 scenario and skills built on top of this catalog foundation.
-

@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.1.1
+version: 0.1.2
 description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
 supported_locales:
 - en
@@ -24,6 +24,11 @@ exports:
   - ensure_schema
   - rehydrate
   - scan_sources
+  - list_roots
+  - add_root
+  - remove_root
+  - scan_roots
+  - import_folder
   - library
   - list_items
   - get_item
@@ -73,6 +78,95 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: list_roots
+  description: List configured media-center library folders.
+  entry: handlers.main:list_roots
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      include_disabled:
+        type: boolean
+        default: false
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: add_root
+  description: Add a local folder to the media-center import set.
+  entry: handlers.main:add_root
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - path
+    properties:
+      path:
+        type: string
+      label:
+        type: string
+      include_images:
+        type: boolean
+        default: false
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: remove_root
+  description: Disable a configured media-center library folder.
+  entry: handlers.main:remove_root
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      root_id:
+        type: string
+      path:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: scan_roots
+  description: Import playable files from configured folders into Media Server-backed resources.
+  entry: handlers.main:scan_roots
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      root_id:
+        type: string
+      path:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 5000
+        default: 1000
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: import_folder
+  description: Add a folder and import playable files through Media Server.
+  entry: handlers.main:import_folder
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - path
+    properties:
+      path:
+        type: string
+      label:
+        type: string
+      include_images:
+        type: boolean
+        default: false
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 5000
+        default: 1000
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: library
   description: Return a widget-ready catalog projection with items, summary, facets, and playback descriptors.
   entry: handlers.main:library
@@ -86,6 +180,7 @@ tools:
         type: string
         enum:
         - ''
+        - playable
         - video
         - audio
         - image
@@ -266,6 +361,28 @@ data_routes:
     cache_ttl_ms: 0
     max_request_hz: 5
     preserve_last_value: true
+- surface: widget:media-center-roots
+  route: tool
+  tool: list_roots
+  owner: skill:media_center_skill
+  first_paint: configured media folders
+  recovery: repeat list_roots after folder import
+  guard_visibility: local folder paths visible to the local user
+  budget:
+    max_payload_bytes: 262144
+    max_items: 100
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - media_center.roots
 - surface: widget:media-center-next-steps
   route: tool/details
   tool: next_steps
@@ -307,6 +424,13 @@ llm_hints:
     examples:
     - Refresh media center catalog
     - Scan media resources
+  - id: media_center_skill.import_folder
+    intent: media_center.import_folder
+    tool: import_folder
+    side_effect_class: local_write
+    examples:
+    - Add media folder
+    - Import videos from a folder
   - id: media_center_skill.library
     intent: media_center.browse
     tool: library
@@ -326,4 +450,4 @@ nlu_hints:
   - show media library
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-11T19:03:33+00:00'
+updated_at: '2026-08-12T00:00:00+00:00'

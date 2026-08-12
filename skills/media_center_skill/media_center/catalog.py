@@ -14,6 +14,7 @@ SCHEMA_VERSION = "adaos.media_center.catalog.v1"
 SKILL_NAME = "media_center_skill"
 MAX_LIST_LIMIT = 500
 DEFAULT_LIST_LIMIT = 100
+PLAYABLE_KINDS = {"video", "audio"}
 
 
 def now_iso() -> str:
@@ -113,13 +114,34 @@ class MediaCenterRepository:
                 """
             )
             connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS library_roots (
+                    id TEXT PRIMARY KEY,
+                    path TEXT NOT NULL UNIQUE,
+                    label TEXT NOT NULL DEFAULT '',
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    include_images INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    last_scan_at TEXT NOT NULL DEFAULT '',
+                    last_status TEXT NOT NULL DEFAULT ''
+                )
+                """
+            )
+            connection.execute(
                 "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)",
                 (SCHEMA_VERSION,),
             )
             connection.commit()
         return {"ok": True, "schema": SCHEMA_VERSION, "db_path": str(self.db_path)}
 
-    def scan_resources(self, resources: Iterable[Mapping[str, Any]], *, source: str = "all") -> dict[str, Any]:
+    def scan_resources(
+        self,
+        resources: Iterable[Mapping[str, Any]],
+        *,
+        source: str = "all",
+        mark_missing: bool = True,
+    ) -> dict[str, Any]:
         started_at = now_iso()
         started_monotonic = time.monotonic()
         normalized = [_normalize_resource(item) for item in resources]
@@ -194,7 +216,7 @@ class MediaCenterRepository:
                 )
 
             missing_count = 0
-            if scan_sources:
+            if mark_missing and scan_sources:
                 rows = connection.execute(
                     f"SELECT source, resource_id FROM catalog_items WHERE missing = 0 AND source IN ({','.join('?' for _ in scan_sources)})",
                     tuple(sorted(scan_sources)),
@@ -255,7 +277,10 @@ class MediaCenterRepository:
             filters.append("(lower(title) LIKE ? OR lower(name) LIKE ? OR lower(source_path) LIKE ?)")
             params.extend([like, like, like])
         kind_token = _normalize_kind(media_kind)
-        if kind_token:
+        if kind_token == "playable":
+            filters.append("media_kind IN (?, ?)")
+            params.extend(sorted(PLAYABLE_KINDS))
+        elif kind_token:
             filters.append("media_kind = ?")
             params.append(kind_token)
         source_token = _normalize_source(source)
@@ -349,6 +374,97 @@ class MediaCenterRepository:
             connection.commit()
         return self.get_item(token)
 
+    def add_root(self, path: str, *, label: str = "", include_images: bool = False) -> dict[str, Any]:
+        path_token = _text(path)
+        if not path_token:
+            return {"ok": False, "error": "root_path_required", "roots": self.list_roots()["items"]}
+        root_path = Path(path_token).expanduser()
+        try:
+            resolved = root_path.resolve(strict=True)
+        except Exception:
+            return {"ok": False, "error": "root_path_not_found", "path": path_token, "roots": self.list_roots()["items"]}
+        if not resolved.is_dir():
+            return {"ok": False, "error": "root_path_not_directory", "path": str(resolved), "roots": self.list_roots()["items"]}
+
+        now = now_iso()
+        root_id = _root_id(str(resolved))
+        root_label = _text(label) or resolved.name or str(resolved)
+        with self.connect() as connection:
+            existing = connection.execute(
+                "SELECT created_at FROM library_roots WHERE id = ? OR path = ?",
+                (root_id, str(resolved)),
+            ).fetchone()
+            created_at = str(existing["created_at"]) if existing else now
+            connection.execute(
+                """
+                INSERT INTO library_roots (
+                    id, path, label, enabled, include_images, created_at, updated_at
+                ) VALUES (?, ?, ?, 1, ?, ?, ?)
+                ON CONFLICT(path) DO UPDATE SET
+                    label = excluded.label,
+                    enabled = 1,
+                    include_images = excluded.include_images,
+                    updated_at = excluded.updated_at
+                """,
+                (root_id, str(resolved), root_label, 1 if include_images else 0, created_at, now),
+            )
+            connection.commit()
+        roots = self.list_roots()["items"]
+        root = next((item for item in roots if item["id"] == root_id), None)
+        return {"ok": True, "schema": SCHEMA_VERSION, "root": root, "roots": roots, "summary": self.summary()}
+
+    def remove_root(self, *, root_id: str = "", path: str = "") -> dict[str, Any]:
+        id_token = _text(root_id)
+        path_token = _text(path)
+        if not id_token and path_token:
+            try:
+                id_token = _root_id(str(Path(path_token).expanduser().resolve(strict=False)))
+            except Exception:
+                id_token = ""
+        if not id_token:
+            return {"ok": False, "error": "root_id_required", "roots": self.list_roots()["items"]}
+        with self.connect() as connection:
+            row = connection.execute("SELECT id FROM library_roots WHERE id = ?", (id_token,)).fetchone()
+            if not row:
+                return {"ok": False, "error": "root_not_found", "root_id": id_token, "roots": self.list_roots()["items"]}
+            connection.execute(
+                "UPDATE library_roots SET enabled = 0, updated_at = ? WHERE id = ?",
+                (now_iso(), id_token),
+            )
+            connection.commit()
+        return {"ok": True, "schema": SCHEMA_VERSION, "roots": self.list_roots()["items"], "summary": self.summary()}
+
+    def list_roots(self, *, include_disabled: bool = False) -> dict[str, Any]:
+        where = "" if include_disabled else "WHERE enabled = 1"
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM library_roots {where} ORDER BY lower(label) ASC, path ASC"
+            ).fetchall()
+        items = [_public_root(row) for row in rows]
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "items": items,
+            "roots": items,
+            "count": len(items),
+            "summary": {
+                "title": "Media folders",
+                "value": len(items),
+                "subtitle": f"{len(items)} active folders",
+            },
+        }
+
+    def mark_root_scanned(self, root_id: str, *, status: str) -> None:
+        token = _text(root_id)
+        if not token:
+            return
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE library_roots SET last_scan_at = ?, last_status = ?, updated_at = ? WHERE id = ?",
+                (now_iso(), _text(status), now_iso(), token),
+            )
+            connection.commit()
+
     def summary(self) -> dict[str, Any]:
         with self.connect() as connection:
             row = connection.execute(
@@ -389,8 +505,12 @@ class MediaCenterRepository:
             source_rows = connection.execute(
                 "SELECT source AS id, COUNT(*) AS count FROM catalog_items WHERE missing = 0 GROUP BY source ORDER BY count DESC, id ASC"
             ).fetchall()
+        media_kind = [{"id": str(row["id"]), "label": _label(str(row["id"])), "count": int(row["count"])} for row in kind_rows]
+        playable_count = sum(item["count"] for item in media_kind if item["id"] in PLAYABLE_KINDS)
+        if playable_count:
+            media_kind.insert(0, {"id": "playable", "label": "Playable", "count": playable_count})
         return {
-            "media_kind": [{"id": str(row["id"]), "label": _label(str(row["id"])), "count": int(row["count"])} for row in kind_rows],
+            "media_kind": media_kind,
             "source": [{"id": str(row["id"]), "label": _label(str(row["id"])), "count": int(row["count"])} for row in source_rows],
         }
 
@@ -502,7 +622,12 @@ def _media_kind(mime_type: str, name: str) -> str:
 
 def _normalize_kind(value: Any) -> str:
     token = _text(value).lower()
-    return token if token in {"video", "audio", "image", "other"} else ""
+    return token if token in {"playable", "video", "audio", "image", "other"} else ""
+
+
+def _root_id(path: str) -> str:
+    digest = hashlib.sha256(_text(path).encode("utf-8", errors="replace")).hexdigest()[:20]
+    return f"root_{digest}"
 
 
 def _normalize_source(value: Any) -> str:
@@ -528,6 +653,21 @@ def _kind_icon(kind: str) -> str:
         "audio": "musical-notes-outline",
         "image": "image-outline",
     }.get(kind, "document-outline")
+
+
+def _public_root(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "id": str(row["id"]),
+        "schema": SCHEMA_VERSION,
+        "path": str(row["path"]),
+        "label": str(row["label"] or row["path"]),
+        "enabled": bool(row["enabled"]),
+        "include_images": bool(row["include_images"]),
+        "created_at": str(row["created_at"] or ""),
+        "updated_at": str(row["updated_at"] or ""),
+        "last_scan_at": str(row["last_scan_at"] or ""),
+        "last_status": str(row["last_status"] or ""),
+    }
 
 
 def _item_markdown(item: Mapping[str, Any]) -> str:
@@ -579,4 +719,3 @@ def _json_loads(value: Any) -> Any:
         return json.loads(str(value or "null"))
     except Exception:
         return None
-
