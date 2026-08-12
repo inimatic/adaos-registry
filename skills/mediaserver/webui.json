@@ -50,7 +50,8 @@
       "inputs": {
         "compact": true,
         "modalId": "mediaserver_modal",
-        "showDiagnostics": true
+        "showDiagnostics": false,
+        "autoSelectFirst": false
       }
     }
   ],
@@ -95,7 +96,8 @@
               "inputs": {
                 "compact": false,
                 "modalId": "mediaserver_modal",
-                "showDiagnostics": true
+                "showDiagnostics": false,
+                "autoSelectFirst": false
               }
             }
           ],

@@ -79,6 +79,12 @@ most 100 rows, supports cursor pagination, and keeps the browser off Yjs paths
 for row data. Offset remains accepted for small diagnostic jumps, but cursor is
 the intended path for large libraries.
 
+The Media Server browser opens as a catalog surface. It does not auto-select or
+preload the first media row, and the normal browser widgets do not render live
+diagnostic preview streams. Operators can still select a file explicitly for
+playback and open the diagnostics app when they need transport/media-channel
+evidence.
+
 ## Core Protection Contract
 
 The runtime owns safety even when a skill is wrong:

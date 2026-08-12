@@ -14,7 +14,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 
-def _find_repo_schema_path() -> pathlib.Path:
+def _find_repo_schema_path() -> pathlib.Path | None:
     marker = pathlib.Path("src") / "adaos" / "abi" / "webui.v1.schema.json"
     candidates = [
         pathlib.Path.cwd(),
@@ -25,16 +25,24 @@ def _find_repo_schema_path() -> pathlib.Path:
     for root in candidates:
         if (root / marker).exists():
             return root / marker
-    raise FileNotFoundError(f"Cannot find repo root containing {marker}")
+    return None
+
+
+REPO_SCHEMA_PATH = _find_repo_schema_path()
+if REPO_SCHEMA_PATH is not None:
+    repo_src = REPO_SCHEMA_PATH.parents[2]
+    if str(repo_src) not in sys.path:
+        sys.path.insert(0, str(repo_src))
 
 
 def _load_webui_schema() -> dict:
+    if REPO_SCHEMA_PATH is not None:
+        return json.loads(REPO_SCHEMA_PATH.read_text(encoding="utf-8"))
     try:
         path = resources.files("adaos.abi").joinpath("webui.v1.schema.json")
         return json.loads(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, ModuleNotFoundError):
-        path = _find_repo_schema_path()
-    return json.loads(path.read_text(encoding="utf-8"))
+        raise FileNotFoundError("Cannot find adaos.abi webui.v1.schema.json")
 
 
 def test_manifest_declares_diagnostics_tool() -> None:
@@ -65,6 +73,8 @@ def test_webui_declares_diagnostics_modal_without_full_library_source() -> None:
         "name": "mediaserver.list_library_page",
         "params": {"limit": 50, "source": "webui.widget"},
     }
+    assert webui["widgets"][0]["inputs"]["showDiagnostics"] is False
+    assert webui["widgets"][0]["inputs"]["autoSelectFirst"] is False
 
     media_modal = webui["registry"]["modals"]["mediaserver_modal"]["schema"]
     media_widget = media_modal["widgets"][0]
@@ -73,6 +83,8 @@ def test_webui_declares_diagnostics_modal_without_full_library_source() -> None:
         "name": "mediaserver.list_library_page",
         "params": {"limit": 50, "source": "webui.modal"},
     }
+    assert media_widget["inputs"]["showDiagnostics"] is False
+    assert media_widget["inputs"]["autoSelectFirst"] is False
 
     modal = webui["registry"]["modals"]["mediaserver_diagnostics_modal"]["schema"]
     widgets = {item["id"]: item for item in modal["widgets"]}
