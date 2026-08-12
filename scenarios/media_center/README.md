@@ -28,8 +28,9 @@ Folder import actions are long-running skill calls. The scenario requests a
 bounded 600 second timeout, and `media_center_skill` declares the same runtime
 budget for `scan_roots` and `import_folder`. Skill-specific user-facing errors
 are represented as structured machine codes plus `human_message_i18n` keys; the
-Media Center dictionaries live in this scenario and in `media_center_skill/i18n`,
-not in bundled core client translations.
+Media Center dictionaries are declared by `media_center_skill` and live in
+`media_center_skill/i18n`, not in the scenario or bundled core client
+translations.
 
 ## Deliberate Non-Goals For This Milestone
 

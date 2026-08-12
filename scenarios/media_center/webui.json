@@ -781,43 +781,7 @@
             ]
           }
         }
-      },
-      "resources": {
-        "media_center.i18n.en": {
-          "kind": "data",
-          "role": "i18n",
-          "locale": "en",
-          "path": "assets/i18n/en.json",
-          "mime": "application/json",
-          "delivery": "core"
-        },
-        "media_center.i18n.ru": {
-          "kind": "data",
-          "role": "i18n",
-          "locale": "ru",
-          "path": "assets/i18n/ru.json",
-          "mime": "application/json",
-          "delivery": "core"
-        }
       }
-    }
-  },
-  "resources": {
-    "media_center.i18n.en": {
-      "kind": "data",
-      "role": "i18n",
-      "locale": "en",
-      "path": "assets/i18n/en.json",
-      "mime": "application/json",
-      "delivery": "core"
-    },
-    "media_center.i18n.ru": {
-      "kind": "data",
-      "role": "i18n",
-      "locale": "ru",
-      "path": "assets/i18n/ru.json",
-      "mime": "application/json",
-      "delivery": "core"
     }
   }
 }

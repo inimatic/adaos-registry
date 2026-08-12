@@ -7,15 +7,12 @@ from pathlib import Path
 SCENARIO_ROOT = Path(__file__).resolve().parents[1]
 
 
-def test_media_center_ui_declares_runtime_i18n_resources_and_long_import_timeouts() -> None:
+def test_media_center_ui_keeps_runtime_i18n_in_skill_and_declares_long_import_timeouts() -> None:
     webui = json.loads((SCENARIO_ROOT / "webui.json").read_text(encoding="utf-8"))
     app = webui["ui"]["application"]
-    resources = app["resources"]
 
-    assert resources["media_center.i18n.en"]["role"] == "i18n"
-    assert resources["media_center.i18n.en"]["locale"] == "en"
-    assert resources["media_center.i18n.ru"]["role"] == "i18n"
-    assert resources["media_center.i18n.ru"]["locale"] == "ru"
+    assert "resources" not in app
+    assert "resources" not in webui
 
     page = app["desktop"]["pageSchema"]
     actions = [
@@ -45,9 +42,3 @@ def test_media_center_ui_declares_runtime_i18n_resources_and_long_import_timeout
         "then": "$state.mediaKind",
         "else": "playable",
     }
-
-    en = json.loads((SCENARIO_ROOT / "assets" / "i18n" / "en.json").read_text(encoding="utf-8"))
-    ru = json.loads((SCENARIO_ROOT / "assets" / "i18n" / "ru.json").read_text(encoding="utf-8"))
-    key = "runtime.media_center.error.no_active_media_roots"
-    assert en[key]
-    assert ru[key]

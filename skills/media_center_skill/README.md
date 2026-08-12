@@ -17,8 +17,8 @@ requests `media_kind="image"`.
 
 Tools return stable machine codes in `error`/`code` and may include
 `human_message_i18n` for UI presentation. Media Center translations live in
-`i18n/*.json` and in the scenario browser-resource dictionaries, not in bundled
-core client translations.
+`i18n/*.json` and are exported as skill resources from `skill.yaml`, not in the
+scenario or bundled core client translations.
 
 Example:
 
