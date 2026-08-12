@@ -225,6 +225,7 @@
                   "on": "change",
                   "type": "callSkill",
                   "target": "media_center_skill.import_folder",
+                  "timeoutMs": 600000,
                   "params": {
                     "path": "$event.value",
                     "include_images": false,
@@ -264,6 +265,7 @@
                   "on": "click:scan-roots",
                   "type": "callSkill",
                   "target": "media_center_skill.scan_roots",
+                  "timeoutMs": 600000,
                   "params": {
                     "limit": 1000
                   },
@@ -747,7 +749,7 @@
                 "type": "static.markdown",
                 "area": "main",
                 "inputs": {
-                  "content": "# Media Center\n\nThe MVP keeps playback infrastructure in the core media plane and keeps catalog/product semantics in `media_center_skill`.\n\n- Refresh catalog scans SDK `adaos.media.resource.v1` descriptors from Media Server and legacy media_indexer.\n- The catalog stores durable rows, filters, favorites, and the original playback descriptor.\n- Streaming remains delegated to the existing core media routes.\n- Production media-center features such as rich metadata, queues, recommendations, remote players, subtitles, and transcoding are intentionally deferred to the next layer."
+                  "content": "# Media Center\n\nThe MVP keeps playback infrastructure in the core media plane and keeps catalog/product semantics in `media_center_skill`.\n\n- Refresh catalog scans SDK `adaos.media.resource.v1` descriptors from Media Server and legacy media_indexer.\n- The catalog can show existing Media Server/media_indexer resources before any Media folders are configured.\n- Media folders are import roots for new video/audio files; images are not imported by default because playback is delegated to the current Media Server.\n- Large folder imports may run for several minutes and use a bounded long-running skill timeout.\n- The catalog stores durable rows, filters, favorites, and the original playback descriptor.\n- Streaming remains delegated to the existing core media routes.\n- Production media-center features such as rich metadata, queues, recommendations, remote players, subtitles, and transcoding are intentionally deferred to the next layer."
                 }
               },
               {
@@ -773,7 +775,43 @@
             ]
           }
         }
+      },
+      "resources": {
+        "media_center.i18n.en": {
+          "kind": "data",
+          "role": "i18n",
+          "locale": "en",
+          "path": "assets/i18n/en.json",
+          "mime": "application/json",
+          "delivery": "core"
+        },
+        "media_center.i18n.ru": {
+          "kind": "data",
+          "role": "i18n",
+          "locale": "ru",
+          "path": "assets/i18n/ru.json",
+          "mime": "application/json",
+          "delivery": "core"
+        }
       }
+    }
+  },
+  "resources": {
+    "media_center.i18n.en": {
+      "kind": "data",
+      "role": "i18n",
+      "locale": "en",
+      "path": "assets/i18n/en.json",
+      "mime": "application/json",
+      "delivery": "core"
+    },
+    "media_center.i18n.ru": {
+      "kind": "data",
+      "role": "i18n",
+      "locale": "ru",
+      "path": "assets/i18n/ru.json",
+      "mime": "application/json",
+      "delivery": "core"
     }
   }
 }

@@ -119,3 +119,18 @@ def test_import_folder_publishes_playable_files_through_media_server(monkeypatch
     assert result["published_count"] == 1
     assert result["roots"][0]["path"] == str(media_dir.resolve())
     assert [item["resource_id"] for item in listing["items"]] == ["movie.mp4"]
+
+
+def test_scan_roots_without_active_roots_returns_human_i18n_error(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+
+    result = main.scan_roots(limit=20)
+
+    assert result["ok"] is False
+    assert result["error"] == "no_active_media_roots"
+    assert result["message"] == "No active media folders are configured."
+    assert result["human_message_i18n"] == {
+        "key": "runtime.media_center.error.no_active_media_roots",
+    }
+    assert result["human_message"]
+    assert result["roots"] == []

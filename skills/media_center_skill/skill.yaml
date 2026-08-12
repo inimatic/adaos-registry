@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.1.2
+version: 0.1.3
 description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
 supported_locales:
 - en
@@ -128,6 +128,7 @@ tools:
   description: Import playable files from configured folders into Media Server-backed resources.
   entry: handlers.main:scan_roots
   side_effects: local_write
+  timeout_seconds: 600
   input_schema:
     type: object
     properties:
@@ -147,6 +148,7 @@ tools:
   description: Add a folder and import playable files through Media Server.
   entry: handlers.main:import_folder
   side_effects: local_write
+  timeout_seconds: 600
   input_schema:
     type: object
     required:
@@ -450,4 +452,4 @@ nlu_hints:
   - show media library
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-12T00:00:00+00:00'
+updated_at: '2026-08-12T12:30:00+00:00'

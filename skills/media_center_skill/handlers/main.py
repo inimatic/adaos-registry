@@ -4,9 +4,10 @@ import hashlib
 import mimetypes
 import sys
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 from adaos.sdk.core.decorators import tool
+from adaos.sdk.data.i18n import _
 
 
 _SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +32,37 @@ def _bool(value: Any, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _skill_error(
+    code: str,
+    *,
+    message: str = "",
+    human_message: str = "",
+    i18n_key: str = "",
+    **extra: Any,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "ok": False,
+        "schema": SCHEMA_VERSION,
+        "error": str(code or "").strip() or "skill_error",
+    }
+    if message:
+        payload["message"] = message
+    if human_message:
+        payload["human_message"] = human_message
+    if i18n_key:
+        payload["human_message_i18n"] = {"key": i18n_key}
+    payload.update({key: value for key, value in extra.items() if value is not None})
+    return payload
+
+
+def _skill_text(key: str, fallback: str) -> str:
+    try:
+        translated = str(_(key) or "").strip()
+    except Exception:
+        translated = ""
+    return translated if translated and translated != key else fallback
 
 
 def _discover_resources(source: str = "all", limit: int | None = 5000) -> tuple[list[dict[str, Any]], dict[str, Any]]:
@@ -82,21 +114,24 @@ def _publish_media_file_descriptor(path: Path, *, root: Mapping[str, Any]) -> tu
         return None, {"error": "media_file_publication_failed", "detail": str(exc), "path": str(path)}
 
 
-def _root_media_files(root: Mapping[str, Any]) -> list[Path]:
+def _iter_root_media_files(root: Mapping[str, Any]) -> Iterator[Path]:
     root_path = Path(str(root.get("path") or "")).expanduser()
     include_images = _bool(root.get("include_images"), False)
     suffixes = set(VIDEO_EXTENSIONS) | set(AUDIO_EXTENSIONS)
     if include_images:
         suffixes |= IMAGE_EXTENSIONS
     if not root_path.exists() or not root_path.is_dir():
-        return []
-    files: list[Path] = []
+        return
     for path in root_path.rglob("*"):
         if not path.is_file():
             continue
         if path.suffix.lower() not in suffixes:
             continue
-        files.append(path)
+        yield path
+
+
+def _root_media_files(root: Mapping[str, Any]) -> list[Path]:
+    files = list(_iter_root_media_files(root))
     return sorted(files, key=lambda item: str(item).lower())
 
 
@@ -156,25 +191,36 @@ def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -
         roots = [root for root in roots if str(root.get("path") or "") == str(Path(path_token).expanduser().resolve(strict=False))]
 
     if not roots:
-        return {"ok": False, "schema": SCHEMA_VERSION, "error": "no_active_media_roots", "roots": repo.list_roots()["items"]}
+        return _skill_error(
+            "no_active_media_roots",
+            message="No active media folders are configured.",
+            human_message=_skill_text(
+                "runtime.media_center.error.no_active_media_roots",
+                "Add a media folder first, then run import.",
+            ),
+            i18n_key="runtime.media_center.error.no_active_media_roots",
+            roots=repo.list_roots()["items"],
+        )
 
     descriptors: list[dict[str, Any]] = []
     errors: list[dict[str, Any]] = []
     skipped = 0
     visited = 0
     for root in roots:
-        root_files = _root_media_files(root)
-        if not root_files:
-            repo.mark_root_scanned(str(root.get("id") or ""), status="no_playable_files")
+        if len(descriptors) >= limit_value:
+            skipped += 1
+            repo.mark_root_scanned(str(root.get("id") or ""), status="limit_reached")
             continue
         root_published = 0
         root_errors = 0
         root_skipped = 0
-        for file_path in root_files:
+        found = False
+        for file_path in _iter_root_media_files(root):
+            found = True
             if len(descriptors) >= limit_value:
                 skipped += 1
                 root_skipped += 1
-                continue
+                break
             visited += 1
             descriptor, error = _publish_media_file_descriptor(file_path, root=root)
             if descriptor:
@@ -183,6 +229,9 @@ def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -
             elif error:
                 errors.append(error)
                 root_errors += 1
+        if not found:
+            repo.mark_root_scanned(str(root.get("id") or ""), status="no_playable_files")
+            continue
         status = "ok" if root_published else ("error" if root_errors else "limit_reached" if root_skipped else "empty")
         repo.mark_root_scanned(str(root.get("id") or ""), status=status)
 

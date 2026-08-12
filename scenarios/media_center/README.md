@@ -17,6 +17,18 @@ It intentionally starts with the correct boundary:
 6. Select an item to inspect its resource descriptor and playback path.
 7. Use the player surface to preview playable video/audio resources through core media routes.
 
+The **Catalog** is intentionally broader than the configured **Media folders** list.
+An empty folders list only means that no new import roots were configured through
+Media Center yet. The catalog may still contain resources already known to the
+core Media Server or compatibility `media_indexer_skill`.
+
+Folder import actions are long-running skill calls. The scenario requests a
+bounded 600 second timeout, and `media_center_skill` declares the same runtime
+budget for `scan_roots` and `import_folder`. Skill-specific user-facing errors
+are represented as structured machine codes plus `human_message_i18n` keys; the
+Media Center dictionaries live in this scenario and in `media_center_skill/i18n`,
+not in bundled core client translations.
+
 ## Deliberate Non-Goals For This Milestone
 
 The MVP does not implement movie/episode metadata enrichment, recommendations,
