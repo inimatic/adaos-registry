@@ -145,7 +145,8 @@
                   "research.portfolio",
                   "research.formulation"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "variant": "cards",
@@ -153,7 +154,9 @@
                 "titleKey": "title",
                 "subtitleKey": "status",
                 "previewKey": "description",
-                "emptyText": "No research directions yet. Choose New research to create the first Project."
+                "emptyText": "No research directions yet. Choose New research to create the first Project.",
+                "errorText": "Research directions are temporarily unavailable. Check the Hub connection or retry.",
+                "staleText": "Showing the last loaded research directions while the Hub reconnects."
               },
               "actions": [
                 {
@@ -189,7 +192,8 @@
                   "research.activity",
                   "research.automation_brief"
                 ],
-                "preserveLastValue": false
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "stateOnly": true,
@@ -306,9 +310,12 @@
                 },
                 "cacheTtlMs": 0,
                 "invalidationTags": [
-                  "research.formulation"
+                  "research.formulation",
+                  "research.activity",
+                  "research.automation_brief"
                 ],
-                "preserveLastValue": false
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "bindField": "content"
@@ -367,7 +374,8 @@
                   "research.artifacts",
                   "research.formulation"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "variant": "list",
@@ -420,9 +428,11 @@
                 },
                 "cacheTtlMs": 0,
                 "invalidationTags": [
-                  "research.formulation"
+                  "research.formulation",
+                  "research.automation_brief"
                 ],
-                "preserveLastValue": false
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "bindField": "content"
@@ -575,7 +585,8 @@
                 "invalidationTags": [
                   "research.automation_brief"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 1
               },
               "inputs": {
                 "bindField": "content",
@@ -598,9 +609,11 @@
                 "cacheTtlMs": 0,
                 "invalidationTags": [
                   "research.formulation",
+                  "research.activity",
                   "research.automation_brief"
                 ],
-                "preserveLastValue": false
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "fields": [
@@ -645,7 +658,8 @@
                   "research.activity",
                   "research.formulation"
                 ],
-                "preserveLastValue": true
+                "preserveLastValue": true,
+                "maxRequestHz": 2
               },
               "inputs": {
                 "bindField": "content"
@@ -792,7 +806,8 @@
                     "research.activity",
                     "research.automation_brief"
                   ],
-                  "preserveLastValue": false
+                  "preserveLastValue": true,
+                  "maxRequestHz": 2
                 },
                 "inputs": {
                   "fields": [
@@ -854,7 +869,8 @@
                   },
                   "cacheTtlMs": 0,
                   "invalidationTags": ["research.artifacts"],
-                  "preserveLastValue": false
+                  "preserveLastValue": false,
+                  "maxRequestHz": 2
                 },
                 "inputs": {"bindField": "content"}
               },
@@ -874,7 +890,8 @@
                   },
                   "cacheTtlMs": 0,
                   "invalidationTags": ["research.artifacts"],
-                  "preserveLastValue": false
+                  "preserveLastValue": false,
+                  "maxRequestHz": 2
                 },
                 "inputs": {
                   "bindField": "content",
@@ -898,7 +915,8 @@
                   },
                   "cacheTtlMs": 0,
                   "invalidationTags": ["research.artifacts"],
-                  "preserveLastValue": false
+                  "preserveLastValue": false,
+                  "maxRequestHz": 2
                 },
                 "inputs": {
                   "pathField": "content_path",
@@ -922,7 +940,8 @@
                   },
                   "cacheTtlMs": 0,
                   "invalidationTags": ["research.artifacts"],
-                  "preserveLastValue": false
+                  "preserveLastValue": false,
+                  "maxRequestHz": 2
                 },
                 "inputs": {"bindField": "content"}
               },
