@@ -249,6 +249,37 @@ def test_admission_rejects_hypothesis_as_observation_and_template_language() -> 
     assert "unresolved placeholders" in issues
 
 
+def test_placeholder_gate_distinguishes_unknown_outcomes_from_unknown_values() -> None:
+    candidate = _candidate()
+    candidate["implementation_requirements"][0]["requirement"] = (
+        "Reconcile retries after unknown outcomes without duplicate runs."
+    )
+    accepted = materialize_prototype(
+        candidate,
+        direction_id="tlp_direction_skill",
+        source_bundle_digest="sha256:" + "1" * 64,
+        context_coverage=_coverage(),
+        revision=1,
+        parent_digest=None,
+        actor="user:test",
+    )
+    assert accepted["admission_review"]["decision"] == "admitted"
+
+    candidate["implementation_requirements"][0]["requirement"] = "unknown"
+    rejected = materialize_prototype(
+        candidate,
+        direction_id="tlp_direction_skill",
+        source_bundle_digest="sha256:" + "1" * 64,
+        context_coverage=_coverage(),
+        revision=1,
+        parent_digest=None,
+        actor="user:test",
+    )
+    assert "unresolved placeholders" in "; ".join(
+        prototype_admission_issues(rejected)
+    )
+
+
 def test_admission_requires_predeclared_pairing_units_and_category_coverage() -> None:
     candidate = _candidate()
     candidate["experimental_plan"]["reproducibility"]["pairing"]["allocation"][

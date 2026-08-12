@@ -26,12 +26,30 @@ _PROTOTYPE_MANAGED_FIELDS = {
 }
 
 _PLACEHOLDER_RE = re.compile(
-    r"(?:\b(?:tbd|todo|unspecified|unknown|placeholder)\b|"
+    r"(?:\b(?:tbd|todo|placeholder)\b|"
     r"bounded operational condition|predeclared fixed or sequential condition|"
     r"exact dataset and version|consistent metrics|specific operational|"
     r"уточнить|не определено|заполнить|заменить)",
     re.I,
 )
+_EXACT_PLACEHOLDER_RE = re.compile(
+    r"^(?:unknown|unspecified|not specified|уточнить|не определено)$",
+    re.I,
+)
+
+
+def _has_placeholder(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        return any(_has_placeholder(item) for item in value.values())
+    if isinstance(value, list):
+        return any(_has_placeholder(item) for item in value)
+    if not isinstance(value, str):
+        return False
+    normalized = value.strip().strip(".?!:;—–-").strip()
+    return bool(
+        _PLACEHOLDER_RE.search(value)
+        or _EXACT_PLACEHOLDER_RE.fullmatch(normalized)
+    )
 
 
 def now() -> str:
@@ -172,17 +190,14 @@ def build_admission_review(value: Mapping[str, Any]) -> dict[str, Any]:
     _check(checks, "automation.acceptance", "quality", len(acceptance) >= 4 and len(acceptance_ids) == len(set(acceptance_ids)), "acceptance checks must be typed, observable, and uniquely identified")
     _check(checks, "automation.acceptance_coverage", "quality", {"workflow", "data_integrity", "reproducibility", "evidence"}.issubset(acceptance_categories), "acceptance checks must cover workflow, data integrity, reproducibility, and evidence")
 
-    critical_text = json.dumps(
-        {
-            "question": value.get("research_question"),
-            "plan": plan,
-            "evaluation": evaluation,
-            "requirements": requirements,
-            "acceptance": acceptance,
-        },
-        ensure_ascii=False,
-    )
-    _check(checks, "automation.no_placeholders", "quality", not bool(_PLACEHOLDER_RE.search(critical_text)), "automation-critical fields cannot contain unresolved placeholders")
+    critical_fields = {
+        "question": value.get("research_question"),
+        "plan": plan,
+        "evaluation": evaluation,
+        "requirements": requirements,
+        "acceptance": acceptance,
+    }
+    _check(checks, "automation.no_placeholders", "quality", not _has_placeholder(critical_fields), "automation-critical fields cannot contain unresolved placeholders")
 
     readiness = value.get("readiness") if isinstance(value.get("readiness"), Mapping) else {}
     open_questions = list(value.get("open_questions") or [])
