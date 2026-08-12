@@ -828,6 +828,7 @@ class ResearchOrchestrator:
                 max_tokens=7000,
                 request_id=request_id,
                 profile_scope="research.formulation",
+                text={"format": {"type": "json_object"}},
                 stream=True,
                 timeout=30,
             )
@@ -922,6 +923,7 @@ class ResearchOrchestrator:
                         max_tokens=9000,
                         request_id=repair_request_id,
                         profile_scope="research.formulation.repair",
+                        text={"format": {"type": "json_object"}},
                         stream=True,
                         timeout=30,
                     )

@@ -50,9 +50,11 @@ it has:
   reproducibility, observability and evidence, plus acceptance evidence that
   covers workflow, data integrity, reproducibility and evidence.
 
-Schema repair and semantic-quality repair are bounded. If a schema-valid
-candidate still fails the hard gate after repair, it remains a visible draft;
-it cannot silently become an AutomationBrief.
+Generation and bounded repair request the Root provider's native JSON-object
+output mode. Contract normalization may correct transport-only shape and enum
+spelling, but never invents domain content. If a schema-valid candidate still
+fails the hard gate after repair, it remains a visible draft; it cannot
+silently become an AutomationBrief.
 
 ## Ownership
 
