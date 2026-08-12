@@ -366,7 +366,10 @@ def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> Non
                 "domain_extension": {"preserved": True},
             },
             "acceptance_checks": [
-                {"id": "AC-1", "category": "data integrity"}
+                {"category": "data integrity"}
+            ],
+            "implementation_requirements": [
+                {"category": "storage", "requirement": "Keep data scoped."}
             ],
         }
     )
@@ -381,6 +384,9 @@ def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> Non
     assert normalized["source_grounding"][0]["claim_id"] == "H1"
     assert "source_grounding" not in normalized["hypotheses"][0]
     assert normalized["acceptance_checks"][0]["category"] == "data_integrity"
+    assert normalized["acceptance_checks"][0]["id"] == "AC-1"
+    assert normalized["implementation_requirements"][0]["id"] == "REQ-1"
+    assert normalized["implementation_requirements"][0]["category"] == "data"
     assert (
         normalized["experimental_plan"]["reproducibility"]["pairing"][
             "allocation"
@@ -388,3 +394,30 @@ def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> Non
         == "enumerated_units"
     )
     assert normalized["experimental_plan"]["domain_extension"] == {"preserved": True}
+
+
+def test_candidate_shape_lifts_explicit_confirmatory_units_into_allocation() -> None:
+    normalized = _normalize_candidate_shape(
+        {
+            "experimental_plan": {
+                "stages": [
+                    {
+                        "evidence_class": "confirmatory",
+                        "budget": {"planned_seeds": [17, 23, 29]},
+                    }
+                ],
+                "reproducibility": {
+                    "pairing": {"unit": "seed"},
+                },
+            }
+        }
+    )
+
+    assert normalized["experimental_plan"]["reproducibility"]["pairing"][
+        "allocation"
+    ] == {
+        "strategy": "enumerated_units",
+        "planned_units": [17, 23, 29],
+        "sample_size": 3,
+        "predeclared": True,
+    }

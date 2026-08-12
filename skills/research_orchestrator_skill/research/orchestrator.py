@@ -191,6 +191,8 @@ def _normalize_candidate_shape(value: Mapping[str, Any]) -> dict[str, Any]:
     readiness = candidate.get("readiness")
     if isinstance(readiness, dict) and "decision" in readiness:
         readiness["decision"] = canonical_enum(readiness["decision"])
+        if "open_questions" not in candidate and "open_questions" in readiness:
+            candidate["open_questions"] = readiness.pop("open_questions")
     evaluation = candidate.get("evaluation_plan")
     if isinstance(evaluation, dict):
         normalized_rules: list[Any] = []
@@ -208,6 +210,42 @@ def _normalize_candidate_shape(value: Mapping[str, Any]) -> dict[str, Any]:
                 normalized_rules.append(rule)
         if "decision_rules" in evaluation:
             evaluation["decision_rules"] = normalized_rules
+
+    category_aliases = {
+        "storage": "data",
+        "documentation": "observability",
+        "initialization": "reproducibility",
+        "logging": "observability",
+        "tracking": "observability",
+    }
+    for index, item in enumerate(candidate.get("implementation_requirements") or [], 1):
+        if not isinstance(item, dict):
+            continue
+        item.setdefault("id", f"REQ-{index}")
+        category = str(item.get("category") or "")
+        if category in category_aliases:
+            item["category"] = category_aliases[category]
+    for index, item in enumerate(candidate.get("acceptance_checks") or [], 1):
+        if isinstance(item, dict):
+            item.setdefault("id", f"AC-{index}")
+
+    if isinstance(experimental, dict):
+        reproducibility = experimental.get("reproducibility")
+        pairing = reproducibility.get("pairing") if isinstance(reproducibility, dict) else None
+        if isinstance(pairing, dict) and not isinstance(pairing.get("allocation"), Mapping):
+            for stage in experimental.get("stages") or []:
+                if not isinstance(stage, Mapping) or stage.get("evidence_class") != "confirmatory":
+                    continue
+                budget = stage.get("budget") if isinstance(stage.get("budget"), Mapping) else {}
+                units = budget.get("seed_values") or budget.get("planned_seeds") or budget.get("seeds")
+                if isinstance(units, list) and units:
+                    pairing["allocation"] = {
+                        "strategy": "enumerated_units",
+                        "planned_units": units,
+                        "sample_size": len(units),
+                        "predeclared": True,
+                    }
+                break
     return candidate
 
 
