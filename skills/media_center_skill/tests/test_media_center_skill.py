@@ -149,9 +149,11 @@ def test_scan_roots_without_active_roots_returns_human_i18n_error(monkeypatch, t
 
 def test_skill_declares_media_center_i18n_resources() -> None:
     manifest = (SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8")
+    webui = (SKILL_ROOT / "webui.json").read_text(encoding="utf-8")
 
-    assert "resources:" in manifest
-    assert "media_center.i18n.en:" in manifest
-    assert "path: i18n/en.json" in manifest
-    assert "media_center.i18n.ru:" in manifest
-    assert "path: i18n/ru.json" in manifest
+    assert "webui:" in manifest
+    assert "file: webui.json" in manifest
+    assert '"media_center.i18n.en"' in webui
+    assert '"path": "i18n/en.json"' in webui
+    assert '"media_center.i18n.ru"' in webui
+    assert '"path": "i18n/ru.json"' in webui

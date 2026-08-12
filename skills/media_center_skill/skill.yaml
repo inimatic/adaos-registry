@@ -1,26 +1,13 @@
 name: media_center_skill
-version: 0.1.5
+version: 0.1.6
 description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
 supported_locales:
 - en
 - ru
-resources:
-  media_center.i18n.en:
-    kind: data
-    role: i18n
-    locale: en
-    path: i18n/en.json
-    mime: application/json
-    delivery: core
-  media_center.i18n.ru:
-    kind: data
-    role: i18n
-    locale: ru
-    path: i18n/ru.json
-    mime: application/json
-    delivery: core
 entry: handlers/main.py
 default_tool: chat
+webui:
+  file: webui.json
 runtime:
   python: '3.11'
 capabilities:
@@ -467,4 +454,4 @@ nlu_hints:
   - show media library
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-12T13:30:00+00:00'
+updated_at: '2026-08-12T13:40:00+00:00'
