@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -550,7 +551,12 @@ class ResearchOrchestrator:
             ],
             "source_bundle": {"digest": bundle["digest"], "sources": self._source_context(bundle)},
         }
-        request_id = f"adaos-research-{token}-{bundle['digest'].removeprefix('sha256:')[:16]}-{int(state['generation']) + 1}"
+        # A transport retry of the same dialog turn must be idempotent, while
+        # a deliberate retry after a rejected candidate must start a fresh
+        # Root LLM job even though the artifact generation is unchanged.
+        turn_identity = str(dialog.get("request_id") or "").strip() or uuid.uuid4().hex
+        turn_token = re.sub(r"[^A-Za-z0-9_.-]+", "-", turn_identity).strip("-._")[:48] or uuid.uuid4().hex
+        request_id = f"adaos-research-{token}-{bundle['digest'].removeprefix('sha256:')[:16]}-{int(state['generation']) + 1}-{turn_token}"
         try:
             submitted = llm_client.submit_response_job(
                 [{"role": "system", "content": "Return one JSON object matching the supplied output_contract."}, {"role": "user", "content": json.dumps(instructions, ensure_ascii=False)}],
