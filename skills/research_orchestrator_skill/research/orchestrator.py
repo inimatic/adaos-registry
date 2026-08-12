@@ -74,6 +74,28 @@ def _llm_failure(result: Mapping[str, Any], *, operation: str) -> RuntimeError:
     return RuntimeError(f"Root LLM {operation} ended with status={status}{suffix}")
 
 
+def _repair_prompt(
+    *,
+    validation_error: str,
+    candidate: Mapping[str, Any],
+    rules: list[str],
+    user_request: str,
+    allowed_provenance_refs: list[str],
+) -> str:
+    """Keep repair instructions outside the JSON object the model must return."""
+
+    return "\n\n".join(
+        [
+            "Repair the candidate below. Return the corrected candidate JSON object only; do not return this instruction envelope.",
+            f"VALIDATION ERRORS:\n{validation_error}",
+            f"USER REVISION REQUEST:\n{user_request}",
+            "RULES:\n- " + "\n- ".join(rules),
+            "ALLOWED PROVENANCE REFS:\n- " + "\n- ".join(allowed_provenance_refs),
+            "CANDIDATE JSON TO CORRECT AND RETURN:\n" + json.dumps(dict(candidate), ensure_ascii=False),
+        ]
+    )
+
+
 def _address_builder_url(url: str, *, direction_id: str, title: str) -> str:
     """Attach a declared first-paint address; the Yjs binding remains canonical."""
 
@@ -763,22 +785,21 @@ class ResearchOrchestrator:
                         status="working",
                         seq=900000 + repair_attempt,
                     )
-                    repair_payload = {
-                        "task": "Repair the rejected candidate. Fix every listed issue, apply the user's requested revision, preserve scientifically correct content, and return only one complete candidate JSON object (not a patch or an envelope).",
-                        "validation_error": str(validation_error),
-                        "candidate": candidate,
-                        "rules": instructions["rules"],
-                        "user_request": instructions["task"],
-                        "allowed_provenance_refs": [
+                    repair_prompt = _repair_prompt(
+                        validation_error=str(validation_error),
+                        candidate=candidate,
+                        rules=instructions["rules"],
+                        user_request=instructions["task"],
+                        allowed_provenance_refs=[
                             ref
                             for item in source_context["coverage"].get("items") or []
                             for ref in item.get("provenance_refs") or []
                         ],
-                    }
+                    )
                     repaired_submit = llm_client.submit_response_job(
                         [
                             {"role": "system", "content": "You repair one research candidate. Return the corrected candidate JSON only. Never return an envelope, input keys, a schema, a contract, Markdown fences, or commentary. Keep all required nested fields and satisfy every stated cardinality."},
-                            {"role": "user", "content": json.dumps(repair_payload, ensure_ascii=False)},
+                            {"role": "user", "content": repair_prompt},
                         ],
                         model=model,
                         max_tokens=9000,

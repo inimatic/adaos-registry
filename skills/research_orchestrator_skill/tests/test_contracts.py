@@ -6,7 +6,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues, prototype_candidate_schema, validate
-from research.orchestrator import _address_builder_url, _llm_failure
+from research.orchestrator import _address_builder_url, _llm_failure, _repair_prompt
 
 
 def _candidate() -> dict:
@@ -297,3 +297,17 @@ def test_llm_failure_is_bounded_and_does_not_dump_provider_payload() -> None:
         "Root LLM repair ended with status=incomplete: max_output_tokens"
     )
     assert "sensitive" not in str(failure)
+
+
+def test_repair_prompt_keeps_the_candidate_out_of_an_instruction_envelope() -> None:
+    prompt = _repair_prompt(
+        validation_error="readiness must be ready_for_automation",
+        candidate={"title": "candidate"},
+        rules=["Return JSON only."],
+        user_request="Make the protocol operational.",
+        allowed_provenance_refs=["artifact://skill/example/part0/a#lines=1-2"],
+    )
+
+    assert not prompt.lstrip().startswith("{")
+    assert 'CANDIDATE JSON TO CORRECT AND RETURN:\n{"title": "candidate"}' in prompt
+    assert '"validation_error"' not in prompt
