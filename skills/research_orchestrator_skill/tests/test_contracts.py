@@ -6,7 +6,12 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues, prototype_candidate_schema, validate
-from research.orchestrator import _address_builder_url, _llm_failure, _repair_prompt
+from research.orchestrator import (
+    _address_builder_url,
+    _llm_failure,
+    _normalize_candidate_shape,
+    _repair_prompt,
+)
 
 
 def _candidate() -> dict:
@@ -311,3 +316,28 @@ def test_repair_prompt_keeps_the_candidate_out_of_an_instruction_envelope() -> N
     assert not prompt.lstrip().startswith("{")
     assert 'CANDIDATE JSON TO CORRECT AND RETURN:\n{"title": "candidate"}' in prompt
     assert '"validation_error"' not in prompt
+
+
+def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> None:
+    normalized = _normalize_candidate_shape(
+        {
+            "title": "Study",
+            "rules": ["instruction, not candidate data"],
+            "experimental_plan": {
+                "comparators": ["a", "b"],
+                "evaluation_plan": {"primary_estimand": {"name": "delta"}},
+                "constraints": ["CPU"],
+                "readiness": {
+                    "decision": "needs_discussion",
+                    "blocking_questions": ["review"],
+                },
+                "domain_extension": {"preserved": True},
+            },
+        }
+    )
+
+    assert "rules" not in normalized
+    assert normalized["evaluation_plan"]["primary_estimand"]["name"] == "delta"
+    assert normalized["constraints"] == ["CPU"]
+    assert normalized["readiness"]["decision"] == "needs_discussion"
+    assert normalized["experimental_plan"]["domain_extension"] == {"preserved": True}

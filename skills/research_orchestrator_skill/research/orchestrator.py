@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -94,6 +95,46 @@ def _repair_prompt(
             "CANDIDATE JSON TO CORRECT AND RETURN:\n" + json.dumps(dict(candidate), ensure_ascii=False),
         ]
     )
+
+
+def _normalize_candidate_shape(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Correct transport-shaped LLM output without inventing domain content."""
+
+    candidate = copy.deepcopy(dict(value))
+    envelope_keys = {
+        "allowed_provenance_refs",
+        "output_contract",
+        "rejected_candidate",
+        "rules",
+        "task",
+        "user_request",
+        "validation_error",
+        "validation_schema",
+    }
+    for key in envelope_keys:
+        candidate.pop(key, None)
+
+    top_level = (
+        "evaluation_plan",
+        "constraints",
+        "assumptions",
+        "open_questions",
+        "implementation_requirements",
+        "acceptance_checks",
+        "readiness",
+        "assistant_message",
+    )
+    experimental = candidate.get("experimental_plan")
+    if isinstance(experimental, dict):
+        for key in top_level:
+            if key not in candidate and key in experimental:
+                candidate[key] = experimental.pop(key)
+        nested_evaluation = experimental.get("evaluation_plan")
+        if isinstance(nested_evaluation, dict):
+            for key in top_level[1:]:
+                if key not in candidate and key in nested_evaluation:
+                    candidate[key] = nested_evaluation.pop(key)
+    return candidate
 
 
 def _address_builder_url(url: str, *, direction_id: str, title: str) -> str:
@@ -736,7 +777,9 @@ class ResearchOrchestrator:
             completed = llm_client.wait_response_job(job_id, base_url=base_url, timeout_s=280, poll_interval_s=1.5, progress_callback=progress)
             if str(completed.get("status") or "").lower() != "succeeded":
                 raise _llm_failure(completed, operation="formulation")
-            candidate = _json_object(str(completed.get("output_text") or ""))
+            candidate = _normalize_candidate_shape(
+                _json_object(str(completed.get("output_text") or ""))
+            )
             recorded: dict[str, Any] | None = None
             repair_attempt = 0
             while recorded is None:
@@ -816,7 +859,9 @@ class ResearchOrchestrator:
                     repaired = llm_client.wait_response_job(job_id, base_url=base_url, timeout_s=180, poll_interval_s=1.5, progress_callback=progress)
                     if str(repaired.get("status") or "").lower() != "succeeded":
                         raise _llm_failure(repaired, operation="repair")
-                    candidate = _json_object(str(repaired.get("output_text") or ""))
+                    candidate = _normalize_candidate_shape(
+                        _json_object(str(repaired.get("output_text") or ""))
+                    )
             message = str(recorded["prototype"].get("assistant_message") or f"ResearchPrototype revision {recorded['prototype']['revision']} is ready.")
             self.repository.activity(token, "formulation", "llm_completed", message, {"job_id": job_id, "prototype_digest": recorded["prototype"]["digest"]})
             self._emit(message, dialog, group_id=group_id, phase="completed", status="succeeded", seq=999999)
