@@ -534,12 +534,14 @@ class ResearchOrchestrator:
                 "constraints": ["..."],
                 "assumptions": ["..."],
                 "open_questions": ["..."],
-                "implementation_requirements": ["concrete requirements for Codex"],
-                "acceptance_checks": ["observable checks"],
+                "implementation_requirements": ["at least 5 concrete and independently testable requirements for Codex"],
+                "acceptance_checks": ["at least 4 distinct observable checks"],
                 "readiness": {"decision": "needs_discussion|ready_for_automation", "blocking_questions": ["..."]},
             },
             "rules": [
                 "Return JSON only.",
+                "Cardinality is contractual: hypotheses >= 1, experimental_plan.stages >= 1, evaluation_plan.outcomes >= 1, constraints >= 1, assumptions >= 1, implementation_requirements >= 5, and acceptance_checks >= 4.",
+                "Every acceptance check must be distinct and observable; do not merge checks merely to shorten the list.",
                 "Do not invent facts absent from sources; put uncertainty into assumptions/open_questions.",
                 "Historical notebook outputs are exploratory source material, never confirmation.",
                 "Separate workflow smoke execution from scientific confirmation.",
@@ -601,7 +603,7 @@ class ResearchOrchestrator:
                         seq=900000 + repair_attempt,
                     )
                     repair_payload = {
-                        "task": "Repair the rejected candidate. Preserve its scientifically correct content, apply the user's requested corrections, and return a complete JSON object matching output_contract.",
+                        "task": "Repair the rejected candidate. Fix the exact validation error, preserve scientifically correct content, and return one complete candidate JSON object (not a patch). Before returning, count every required array and verify all hard constraints.",
                         "validation_error": str(validation_error),
                         "rejected_candidate": candidate,
                         "output_contract": instructions["output_contract"],
@@ -610,7 +612,7 @@ class ResearchOrchestrator:
                     }
                     repaired_submit = llm_client.submit_response_job(
                         [
-                            {"role": "system", "content": "You are a strict JSON contract repairer. Return JSON only and never omit required nested fields."},
+                            {"role": "system", "content": "You are a strict JSON contract repairer. Return JSON only, never omit required nested fields, and satisfy every stated minimum cardinality."},
                             {"role": "user", "content": json.dumps(repair_payload, ensure_ascii=False)},
                         ],
                         model=model,
