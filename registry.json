@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-12T08:40:52+00:00",
+  "updated_at": "2026-08-12T11:08:16+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1288,8 +1288,8 @@
       "kind": "scenario",
       "id": "research_workbench",
       "name": "research_workbench",
-      "version": "0.0.8",
-      "updated_at": "2026-08-12T08:41:13+00:00",
+      "version": "0.0.10",
+      "updated_at": "2026-08-12T11:08:16+00:00",
       "path": "scenarios/research_workbench",
       "manifest": "scenarios/research_workbench/scenario.yaml",
       "source": {
