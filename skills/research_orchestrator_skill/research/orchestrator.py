@@ -176,6 +176,23 @@ def _normalize_candidate_shape(value: Mapping[str, Any]) -> dict[str, Any]:
     readiness = candidate.get("readiness")
     if isinstance(readiness, dict) and "decision" in readiness:
         readiness["decision"] = canonical_enum(readiness["decision"])
+    evaluation = candidate.get("evaluation_plan")
+    if isinstance(evaluation, dict):
+        normalized_rules: list[Any] = []
+        for rule in evaluation.get("decision_rules") or []:
+            if isinstance(rule, Mapping):
+                normalized_rules.append(
+                    str(
+                        rule.get("description")
+                        or rule.get("rule")
+                        or rule.get("text")
+                        or ""
+                    ).strip()
+                )
+            else:
+                normalized_rules.append(rule)
+        if "decision_rules" in evaluation:
+            evaluation["decision_rules"] = normalized_rules
     return candidate
 
 

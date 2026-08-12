@@ -336,6 +336,9 @@ def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> Non
                 "comparators": ["a", "b"],
                 "evaluation_plan": {
                     "primary_estimand": {"name": "delta"},
+                    "decision_rules": [
+                        {"id": "DR-1", "description": "Report the interval."}
+                    ],
                     "constraints": ["CPU"],
                     "readiness": {
                         "decision": "needs_discussion",
@@ -359,6 +362,9 @@ def test_candidate_shape_normalization_only_lifts_known_contract_fields() -> Non
 
     assert "rules" not in normalized
     assert normalized["evaluation_plan"]["primary_estimand"]["name"] == "delta"
+    assert normalized["evaluation_plan"]["decision_rules"] == [
+        "Report the interval."
+    ]
     assert normalized["constraints"] == ["CPU"]
     assert normalized["readiness"]["decision"] == "needs_discussion"
     assert normalized["source_grounding"][0]["claim_id"] == "H1"
