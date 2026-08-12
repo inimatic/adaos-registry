@@ -9,12 +9,15 @@
           "title": "Research Workbench",
           "surfaceClass": "workspace",
           "initialState": {
+            "researchViewMode": "portfolio",
             "activeResearchTab": "overview",
             "selectedDirectionId": null,
             "selectedDirectionTitle": null,
             "researchConversationId": null,
             "researchGeneration": 0,
             "researchPrototypeDigest": null,
+            "researchAdmissionDecision": "needs_discussion",
+            "researchCanAccept": false,
             "builderUrl": null,
             "selectedArtifactId": null,
             "selectedArtifactGroupId": null,
@@ -22,24 +25,47 @@
             "selectedArtifactPreviewKind": null
           },
           "layout": {
-            "type": "split",
-            "pattern": "focus-detail",
-            "auxWidth": 460,
+            "type": "single",
+            "pattern": "stack",
             "areas": [
               {
                 "id": "portfolio",
                 "role": "main",
                 "label": "Research directions"
+              }
+            ],
+            "variants": [
+              {
+                "id": "direction",
+                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null",
+                "type": "split",
+                "pattern": "focus-detail",
+                "auxWidth": 520,
+                "areas": [
+                  {
+                    "id": "workspace",
+                    "role": "main",
+                    "label": "Selected direction"
+                  },
+                  {
+                    "id": "context",
+                    "role": "aux",
+                    "label": "Research formulation"
+                  }
+                ]
               },
               {
-                "id": "workspace",
-                "role": "main",
-                "label": "Selected direction"
-              },
-              {
-                "id": "context",
-                "role": "aux",
-                "label": "Research consensus"
+                "id": "portfolio",
+                "default": true,
+                "type": "single",
+                "pattern": "stack",
+                "areas": [
+                  {
+                    "id": "portfolio",
+                    "role": "main",
+                    "label": "Research directions"
+                  }
+                ]
               }
             ]
           },
@@ -110,11 +136,14 @@
                   "on": "click:back",
                   "type": "updateState",
                   "params": {
+                    "researchViewMode": "portfolio",
                     "selectedDirectionId": null,
                     "selectedDirectionTitle": null,
                     "researchConversationId": null,
                     "researchGeneration": 0,
                     "researchPrototypeDigest": null,
+                    "researchAdmissionDecision": "needs_discussion",
+                    "researchCanAccept": false,
                     "builderUrl": null,
                     "activeResearchTab": "overview"
                   }
@@ -163,12 +192,15 @@
                   "on": "select",
                   "type": "updateState",
                   "params": {
+                    "researchViewMode": "direction",
                     "selectedDirectionId": "$event.direction_id",
                     "selectedDirectionTitle": "$event.title",
                     "activeResearchTab": "overview",
                     "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
                     "researchGeneration": 0,
                     "researchPrototypeDigest": null,
+                    "researchAdmissionDecision": "needs_discussion",
+                    "researchCanAccept": false,
                     "builderUrl": null
                   }
                 }
@@ -231,6 +263,8 @@
                 "stateBindings": {
                   "researchGeneration": "direction.generation",
                   "researchPrototypeDigest": "current_prototype.digest",
+                  "researchAdmissionDecision": "formulation.admission_decision",
+                  "researchCanAccept": "formulation.can_accept",
                   "builderUrl": "builder_url",
                   "selectedDirectionTitle": "direction.title",
                   "researchConversationId": "conversation_id"
@@ -418,7 +452,7 @@
               "id": "research-consensus",
               "type": "static.markdown",
               "area": "context",
-              "title": "Current consensus",
+              "title": "Current draft and AdaOS review",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation'",
               "dataSource": {
                 "kind": "skill",
@@ -492,8 +526,8 @@
                     "id": "accept",
                     "label": "Accept exact prototype",
                     "icon": "shield-checkmark-outline",
-                    "enabledIf": "$state.researchPrototypeDigest != null",
-                    "title": "Checkpoint the exact Project-owned skill and artifact set, then create the AutomationBrief and scoped Development Session. Codex is not started."
+                    "enabledIf": "$state.researchCanAccept === true && $state.researchAdmissionDecision === 'admitted'",
+                    "title": "Enabled only after the deterministic AdaOS admission review passes. Checkpoint the exact Project-owned skill and artifact set, then create the AutomationBrief and scoped Development Session. Codex is not started."
                   },
                   {
                     "id": "open-builder",

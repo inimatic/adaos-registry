@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.7.0
+version: 0.8.0
 description: Durable pre-Codex orchestration for reusable AdaOS research-direction
   skill projects.
 supported_locales:
@@ -253,7 +253,8 @@ tools:
   output_schema:
     type: object
 - name: record_prototype
-  description: Record one schema-valid ResearchPrototype candidate revision.
+  description: Record one typed ResearchPrototype draft with core-owned source coverage
+    and deterministic admission review.
   entry: handlers.main:record_prototype
   side_effects: local_write
   input_schema:
@@ -273,7 +274,8 @@ tools:
     type: object
 - name: chat
   description: Discuss a research direction with the configured Root LLM and materialize
-    a ResearchPrototype revision.
+    a provenance-grounded ResearchPrototype revision through bounded schema and semantic
+    repair.
   entry: handlers.main:chat
   side_effects: local_write
   timeout_seconds: 300
@@ -662,4 +664,3 @@ compatibility:
     min_commit: b621cb26fe030d9f9451139cab6ddce58a221897
     min_short_commit: b621cb26
     build_date: '2026-08-12T11:29:43+03:00'
-

@@ -5,39 +5,106 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 from jsonschema import Draft202012Validator
 
-from research.contracts import materialize_automation_brief, materialize_prototype, prototype_candidate_schema, validate
+from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues, prototype_candidate_schema, validate
 from research.orchestrator import _address_builder_url
 
 
 def _candidate() -> dict:
+    source_ref = "artifact://skill/tlp_direction_skill/part0/s1#cell=1"
     return {
         "title": "TLP paired workflow study",
         "background": "The historical notebook motivates a clean paired experiment but is not confirmatory evidence.",
         "research_question": "Under a locked CPU protocol, how does TLP validation accuracy differ from MaxPool?",
         "hypotheses": [{"id": "H1", "statement": "TLP changes paired validation accuracy.", "falsification": "The interval and decision rule do not support the declared effect.", "status": "exploratory"}],
+        "source_grounding": [
+            {"claim_id": "OBS-1", "claim": "The source notebook contains a TLP implementation prototype.", "stance": "observed", "source_refs": [source_ref]},
+            {"claim_id": "H1", "claim": "The historical artifact motivates but does not confirm a paired TLP contrast.", "stance": "hypothesis", "source_refs": [source_ref]},
+        ],
+        "evidence_policy": {"historical_results": "exploratory_source_only", "workflow_smoke": "workflow_evidence_only", "negative_results": "retain_and_report"},
         "experimental_plan": {
             "comparators": ["maxpool", "tlp"],
             "stages": [
                 {"id": "smoke", "purpose": "validate the complete local workflow", "evidence_class": "workflow_smoke", "execution_profile": {"device": "cpu", "epochs": 3}, "budget": {"epochs": 3, "seeds": 1}, "inference_allowed": False, "stop_conditions": ["both paired arms finish or one fails"]},
                 {"id": "series", "purpose": "estimate the locked paired scientific contrasts", "evidence_class": "confirmatory", "execution_profile": {"device": "declared member"}, "budget": {"seeds": 10}, "inference_allowed": True, "stop_conditions": ["enumerated trials complete or budget exhausts"]},
             ],
-            "data_policy": {"dataset": "STL-10", "splits": "train and validation locked; test sealed"},
-            "reproducibility": {"rng_streams": ["initialization", "sampling", "augmentation", "analysis"], "pairing": "same initialization and stochastic streams within pair", "environment": "digest-bound AdaOS execution environment"},
+            "data_policy": {
+                "dataset": "STL-10 pinned release",
+                "split_strategy": "fixed train/validation split declared before any run",
+                "evaluation_seal": "test labels and metrics remain sealed until the series is locked",
+                "leakage_controls": ["split digest is immutable", "no test-guided tuning"],
+            },
+            "reproducibility": {
+                "rng_streams": [
+                    {"id": "initialization", "controls": "shared arm initialization per seed"},
+                    {"id": "sampling", "controls": "shared data order per paired seed"},
+                    {"id": "augmentation", "controls": "shared transform draws per sample"},
+                    {"id": "analysis", "controls": "declared paired resampling stream"},
+                ],
+                "pairing": {
+                    "unit": "seed",
+                    "invariant_fields": ["initial weights", "data order", "augmentation draws"],
+                    "varied_fields": ["pooling operator"],
+                },
+                "environment": {
+                    "capture": ["code digest", "dependency lock", "hardware fingerprint"],
+                    "requirements": ["CPU smoke must run on current or member node"],
+                },
+            },
         },
         "evaluation_plan": {
-            "primary_estimand": "paired validation accuracy delta between TLP and MaxPool",
-            "outcomes": [{"name": "paired_accuracy_delta", "role": "primary", "measurement": "TLP minus MaxPool validation top-1 accuracy"}],
-            "uncertainty": "paired interval across enumerated seeds; none for smoke",
+            "primary_estimand": {
+                "name": "validation_top1_accuracy_tlp_minus_maxpool",
+                "population": "locked STL-10 validation examples and enumerated training seeds",
+                "contrast": "TLP minus MaxPool within paired seed",
+                "metric": "top-1 accuracy",
+                "aggregation": "mean of paired seed-level deltas",
+            },
+            "outcomes": [{"name": "paired_accuracy_delta", "role": "primary", "measurement": "TLP minus MaxPool validation top-1 accuracy", "unit": "paired seed"}],
+            "uncertainty": {"method": "paired bootstrap over seed-level deltas", "resampling_unit": "paired seed", "interval": "two-sided percentile interval", "confidence_level": 0.95},
+            "stopping_rule": {"kind": "fixed_budget", "criterion": "finish every declared seed or exhaust the predeclared infrastructure budget", "adaptation_predeclared": True},
             "decision_rules": ["smoke makes no inferential decision", "report estimate and interval for the locked series"],
-            "multiplicity": "secondary outcomes are labelled and adjusted as declared",
+            "multiplicity": {"family": "single primary contrast", "strategy": "secondary outcomes remain descriptive"},
+            "practical_significance": "report the paired accuracy effect against a predeclared one percentage-point reference",
             "negative_result_policy": "negative and inconclusive outcomes are valid completions",
         },
         "constraints": ["Ray deferred", "current/member node execution"],
         "assumptions": ["dataset acquisition will be declared before execution"],
         "open_questions": [],
-        "implementation_requirements": ["Implement a deterministic paired CPU runner.", "Use typed immutable configs.", "Record named RNG streams.", "Emit ContentRef artifacts.", "Keep primary data skill-scoped."],
-        "acceptance_checks": ["Three-epoch smoke produces both paired arms with shared initialization.", "Notebook output is not evidence.", "Test split remains sealed.", "Native AdaOS validation passes."],
+        "implementation_requirements": [
+            {"id": "REQ-1", "requirement": "Implement a deterministic paired CPU runner.", "verification": "Run the paired smoke conformance test."},
+            {"id": "REQ-2", "requirement": "Use typed immutable experiment configs.", "verification": "Validate and digest the serialized RunSpec."},
+            {"id": "REQ-3", "requirement": "Record every named RNG stream identity.", "verification": "Inspect the emitted reproducibility manifest."},
+            {"id": "REQ-4", "requirement": "Emit ContentRef-bound artifacts and evidence.", "verification": "Resolve every result reference by digest."},
+            {"id": "REQ-5", "requirement": "Keep primary data in owner-scoped skill storage.", "verification": "Resolve storage capability ownership in the run report."},
+        ],
+        "acceptance_checks": [
+            {"id": "AC-1", "check": "Three-epoch smoke produces both paired arms with shared initialization.", "evidence": "paired smoke report"},
+            {"id": "AC-2", "check": "Notebook output is classified as non-confirmatory source material.", "evidence": "evidence manifest"},
+            {"id": "AC-3", "check": "The test split remains sealed throughout implementation and smoke.", "evidence": "data seal log"},
+            {"id": "AC-4", "check": "Native AdaOS validation and skill tests pass.", "evidence": "CLI test report"},
+        ],
         "readiness": {"decision": "ready_for_automation", "blocking_questions": []},
+    }
+
+
+def _coverage() -> dict:
+    source_ref = "artifact://skill/tlp_direction_skill/part0/s1"
+    return {
+        "sources_total": 1,
+        "sources_represented": 1,
+        "selected_characters": 1000,
+        "truncated_sources": [],
+        "unreadable_sources": [],
+        "items": [
+            {
+                "artifact_ref": source_ref,
+                "digest": "sha256:" + "2" * 64,
+                "strategy": "notebook_source_cells_without_outputs",
+                "selected_characters": 1000,
+                "truncated": False,
+                "provenance_refs": [source_ref + "#cell=1"],
+            }
+        ],
     }
 
 
@@ -47,11 +114,14 @@ def test_prototype_and_automation_brief_bind_exact_inputs() -> None:
         _candidate(),
         direction_id="tlp_direction_skill",
         source_bundle_digest=source_digest,
+        context_coverage=_coverage(),
         revision=1,
         parent_digest=None,
         actor="user:test",
     )
     assert validate("research.prototype.v1.schema.json", prototype)["digest"] == prototype["digest"]
+    assert prototype["admission_review"]["decision"] == "admitted"
+    assert prototype_admission_issues(prototype) == []
     brief = materialize_automation_brief(
         direction_id="tlp_direction_skill",
         project={"id": "tlp_research", "ref": "project:tlp_research", "version": "0.1.0", "manifest_digest": "sha256:" + "6" * 64, "source_path": "/dev/projects/tlp_research"},
@@ -67,7 +137,7 @@ def test_prototype_and_automation_brief_bind_exact_inputs() -> None:
     assert brief["project"]["manifest_digest"] == "sha256:" + "6" * 64
     assert brief["development_scope"]["targets"][0]["access"] == "read-write"
     assert brief["development_scope"]["context_members"][0]["access"] == "read-only"
-    assert any("direction-specific scenario" in item for item in brief["acceptance_checks"])
+    assert any("direction-specific scenario" in item["check"] for item in brief["acceptance_checks"])
     assert any("three-epoch" in item.lower() for item in brief["prohibited_actions"])
 
 
@@ -79,13 +149,14 @@ def test_llm_candidate_schema_matches_the_typed_contract_and_reports_all_violati
     assert schema["properties"]["acceptance_checks"]["minItems"] == 4
 
     invalid = _candidate()
-    invalid["evaluation_plan"]["primary_estimand"] = "Accuracy"
-    invalid["acceptance_checks"] = ["only one"]
+    invalid["evaluation_plan"]["primary_estimand"] = {"name": "x"}
+    invalid["acceptance_checks"] = [{"id": "one", "check": "only one acceptance check", "evidence": "report"}]
     with pytest.raises(ValueError) as raised:
         materialize_prototype(
             invalid,
             direction_id="tlp_direction_skill",
             source_bundle_digest="sha256:" + "1" * 64,
+            context_coverage=_coverage(),
             revision=1,
             parent_digest=None,
             actor="user:test",
@@ -93,6 +164,35 @@ def test_llm_candidate_schema_matches_the_typed_contract_and_reports_all_violati
     detail = str(raised.value)
     assert "acceptance_checks" in detail
     assert "evaluation_plan.primary_estimand" in detail
+
+
+def test_deterministic_admission_review_cannot_be_self_asserted_or_cite_omitted_context() -> None:
+    candidate = _candidate()
+    candidate["source_grounding"][0]["source_refs"] = [
+        "artifact://skill/tlp_direction_skill/part0/s1#cell=999"
+    ]
+    prototype = materialize_prototype(
+        candidate,
+        direction_id="tlp_direction_skill",
+        source_bundle_digest="sha256:" + "1" * 64,
+        context_coverage=_coverage(),
+        revision=1,
+        parent_digest=None,
+        actor="user:test",
+    )
+
+    assert "source_grounding may cite only context fragments" in "; ".join(
+        prototype_admission_issues(prototype)
+    )
+
+    prototype["admission_review"] = {
+        **prototype["admission_review"],
+        "decision": "admitted",
+        "blockers": [],
+    }
+    assert prototype_admission_issues(prototype) == [
+        "admission_review does not match the deterministic AdaOS review"
+    ]
 
 
 def test_builder_url_carries_a_declared_first_paint_address() -> None:

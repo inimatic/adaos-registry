@@ -4,14 +4,15 @@
   "type": "object",
   "required": [
     "schema", "schema_version", "direction", "revision", "parent_digest",
-    "source_bundle_digest", "title", "background", "research_question",
-    "hypotheses", "experimental_plan", "evaluation_plan", "constraints",
-    "assumptions", "open_questions", "implementation_requirements",
-    "acceptance_checks", "readiness", "created_at", "created_by", "digest"
+    "source_bundle_digest", "context_coverage", "title", "background",
+    "research_question", "hypotheses", "source_grounding", "evidence_policy",
+    "experimental_plan", "evaluation_plan", "constraints", "assumptions",
+    "open_questions", "implementation_requirements", "acceptance_checks",
+    "readiness", "admission_review", "created_at", "created_by", "digest"
   ],
   "properties": {
     "schema": {"const": "adaos.research.prototype.v1"},
-    "schema_version": {"const": "1.0.0"},
+    "schema_version": {"const": "1.1.0"},
     "direction": {
       "type": "object",
       "required": ["kind", "id", "ref"],
@@ -21,99 +22,266 @@
     "revision": {"type": "integer", "minimum": 1},
     "parent_digest": {"type": ["string", "null"]},
     "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "context_coverage": {
+      "type": "object",
+      "required": ["sources_total", "sources_represented", "selected_characters", "truncated_sources", "unreadable_sources", "items"],
+      "properties": {
+        "sources_total": {"type": "integer", "minimum": 0},
+        "sources_represented": {"type": "integer", "minimum": 0},
+        "selected_characters": {"type": "integer", "minimum": 0},
+        "truncated_sources": {"type": "array", "items": {"type": "string"}},
+        "unreadable_sources": {"type": "array", "items": {"type": "string"}},
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["artifact_ref", "digest", "strategy", "selected_characters", "truncated", "provenance_refs"],
+            "properties": {
+              "artifact_ref": {"type": "string", "pattern": "^artifact://"},
+              "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "strategy": {"type": "string"},
+              "selected_characters": {"type": "integer", "minimum": 0},
+              "truncated": {"type": "boolean"},
+              "provenance_refs": {"type": "array", "items": {"type": "string", "pattern": "^artifact://"}}
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
     "title": {"type": "string", "minLength": 3},
     "background": {"type": "string", "minLength": 20},
     "research_question": {"type": "string", "minLength": 10},
     "hypotheses": {
       "type": "array", "minItems": 1, "maxItems": 30,
       "items": {
-        "type": "object", "required": ["id", "statement", "falsification"],
+        "type": "object", "required": ["id", "statement", "falsification", "status"],
         "properties": {
           "id": {"type": "string", "minLength": 1},
-          "statement": {"type": "string", "minLength": 5},
-          "falsification": {"type": "string", "minLength": 5},
+          "statement": {"type": "string", "minLength": 10},
+          "falsification": {"type": "string", "minLength": 10},
           "status": {"enum": ["proposed", "exploratory", "confirmatory"]}
         },
-        "additionalProperties": true
+        "additionalProperties": false
       }
+    },
+    "source_grounding": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "required": ["claim_id", "claim", "stance", "source_refs"],
+        "properties": {
+          "claim_id": {"type": "string", "minLength": 1},
+          "claim": {"type": "string", "minLength": 10},
+          "stance": {"enum": ["observed", "interpretation", "hypothesis", "constraint"]},
+          "source_refs": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^artifact://"}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "evidence_policy": {
+      "type": "object",
+      "required": ["historical_results", "workflow_smoke", "negative_results"],
+      "properties": {
+        "historical_results": {"const": "exploratory_source_only"},
+        "workflow_smoke": {"const": "workflow_evidence_only"},
+        "negative_results": {"const": "retain_and_report"}
+      },
+      "additionalProperties": false
     },
     "experimental_plan": {
       "type": "object",
-      "required": ["stages", "data_policy", "reproducibility"],
+      "required": ["comparators", "stages", "data_policy", "reproducibility"],
       "properties": {
-        "comparators": {"type": "array", "items": {"type": "string"}},
+        "comparators": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"type": "string", "minLength": 2}},
         "stages": {
-          "type": "array", "minItems": 1,
+          "type": "array", "minItems": 2,
           "items": {
             "type": "object",
             "required": ["id", "purpose", "evidence_class", "execution_profile", "budget", "inference_allowed", "stop_conditions"],
             "properties": {
-              "id": {"type": "string"},
+              "id": {"type": "string", "minLength": 1},
               "purpose": {"type": "string", "minLength": 10},
               "evidence_class": {"enum": ["workflow_smoke", "exploratory", "confirmatory"]},
               "execution_profile": {"type": "object", "minProperties": 1},
               "budget": {"type": "object", "minProperties": 1},
               "inference_allowed": {"type": "boolean"},
-              "stop_conditions": {"type": "array", "minItems": 1, "items": {"type": "string"}}
+              "stop_conditions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 5}}
             },
             "additionalProperties": true
           }
         },
-        "data_policy": {"type": "object", "minProperties": 1},
+        "data_policy": {
+          "type": "object",
+          "required": ["dataset", "split_strategy", "evaluation_seal", "leakage_controls"],
+          "properties": {
+            "dataset": {"type": "string", "minLength": 3},
+            "split_strategy": {"type": "string", "minLength": 10},
+            "evaluation_seal": {"type": "string", "minLength": 10},
+            "leakage_controls": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 5}}
+          },
+          "additionalProperties": true
+        },
         "reproducibility": {
           "type": "object",
           "required": ["rng_streams", "pairing", "environment"],
           "properties": {
-            "rng_streams": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-            "pairing": {"type": "string", "minLength": 5},
-            "environment": {"type": "string", "minLength": 5}
+            "rng_streams": {
+              "type": "array", "minItems": 4,
+              "items": {
+                "type": "object", "required": ["id", "controls"],
+                "properties": {
+                  "id": {"type": "string", "minLength": 1},
+                  "controls": {"type": "string", "minLength": 5}
+                },
+                "additionalProperties": false
+              }
+            },
+            "pairing": {
+              "type": "object", "required": ["unit", "invariant_fields", "varied_fields"],
+              "properties": {
+                "unit": {"type": "string", "minLength": 3},
+                "invariant_fields": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 2}},
+                "varied_fields": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 2}}
+              },
+              "additionalProperties": false
+            },
+            "environment": {
+              "type": "object", "required": ["capture", "requirements"],
+              "properties": {
+                "capture": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 2}},
+                "requirements": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 2}}
+              },
+              "additionalProperties": true
+            }
           },
-          "additionalProperties": true
+          "additionalProperties": false
         }
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
     "evaluation_plan": {
       "type": "object",
-      "required": ["primary_estimand", "outcomes", "uncertainty", "decision_rules", "multiplicity", "negative_result_policy"],
+      "required": ["primary_estimand", "outcomes", "uncertainty", "stopping_rule", "decision_rules", "multiplicity", "practical_significance", "negative_result_policy"],
       "properties": {
-        "primary_estimand": {"type": "string", "minLength": 10},
+        "primary_estimand": {
+          "type": "object", "required": ["name", "population", "contrast", "metric", "aggregation"],
+          "properties": {
+            "name": {"type": "string", "minLength": 3},
+            "population": {"type": "string", "minLength": 5},
+            "contrast": {"type": "string", "minLength": 5},
+            "metric": {"type": "string", "minLength": 3},
+            "aggregation": {"type": "string", "minLength": 5}
+          },
+          "additionalProperties": false
+        },
         "outcomes": {
           "type": "array", "minItems": 1,
           "items": {
-            "type": "object", "required": ["name", "role", "measurement"],
+            "type": "object", "required": ["name", "role", "measurement", "unit"],
             "properties": {
-              "name": {"type": "string"},
+              "name": {"type": "string", "minLength": 2},
               "role": {"enum": ["primary", "secondary", "diagnostic"]},
-              "measurement": {"type": "string", "minLength": 5}
+              "measurement": {"type": "string", "minLength": 5},
+              "unit": {"type": "string", "minLength": 2}
             },
-            "additionalProperties": true
+            "additionalProperties": false
           }
         },
-        "uncertainty": {"type": "string", "minLength": 10},
-        "decision_rules": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-        "multiplicity": {"type": "string", "minLength": 5},
-        "negative_result_policy": {"type": "string", "minLength": 5}
+        "uncertainty": {
+          "type": "object", "required": ["method", "resampling_unit", "interval", "confidence_level"],
+          "properties": {
+            "method": {"type": "string", "minLength": 5},
+            "resampling_unit": {"type": "string", "minLength": 3},
+            "interval": {"type": "string", "minLength": 3},
+            "confidence_level": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 1}
+          },
+          "additionalProperties": false
+        },
+        "stopping_rule": {
+          "type": "object", "required": ["kind", "criterion", "adaptation_predeclared"],
+          "properties": {
+            "kind": {"enum": ["fixed_budget", "sequential_predeclared"]},
+            "criterion": {"type": "string", "minLength": 10},
+            "adaptation_predeclared": {"const": true}
+          },
+          "additionalProperties": false
+        },
+        "decision_rules": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 10}},
+        "multiplicity": {
+          "type": "object", "required": ["family", "strategy"],
+          "properties": {
+            "family": {"type": "string", "minLength": 3},
+            "strategy": {"type": "string", "minLength": 5}
+          },
+          "additionalProperties": false
+        },
+        "practical_significance": {"type": "string", "minLength": 10},
+        "negative_result_policy": {"type": "string", "minLength": 20}
       },
-      "additionalProperties": true
+      "additionalProperties": false
     },
-    "constraints": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-    "assumptions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-    "open_questions": {"type": "array", "items": {"type": "string"}},
-    "implementation_requirements": {"type": "array", "minItems": 5, "items": {"type": "string"}},
-    "acceptance_checks": {"type": "array", "minItems": 4, "items": {"type": "string"}},
+    "constraints": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 3}},
+    "assumptions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 3}},
+    "open_questions": {"type": "array", "items": {"type": "string", "minLength": 3}},
+    "implementation_requirements": {
+      "type": "array", "minItems": 5,
+      "items": {
+        "type": "object", "required": ["id", "requirement", "verification"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "requirement": {"type": "string", "minLength": 10},
+          "verification": {"type": "string", "minLength": 10}
+        },
+        "additionalProperties": false
+      }
+    },
+    "acceptance_checks": {
+      "type": "array", "minItems": 4,
+      "items": {
+        "type": "object", "required": ["id", "check", "evidence"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "check": {"type": "string", "minLength": 10},
+          "evidence": {"type": "string", "minLength": 5}
+        },
+        "additionalProperties": false
+      }
+    },
     "readiness": {
       "type": "object", "required": ["decision", "blocking_questions"],
       "properties": {
         "decision": {"enum": ["needs_discussion", "ready_for_automation"]},
-        "blocking_questions": {"type": "array", "items": {"type": "string"}}
+        "blocking_questions": {"type": "array", "items": {"type": "string", "minLength": 3}}
       },
-      "additionalProperties": true
+      "additionalProperties": false
+    },
+    "admission_review": {
+      "type": "object", "required": ["schema", "decision", "checks", "blockers"],
+      "properties": {
+        "schema": {"const": "adaos.research.admission_review.v1"},
+        "decision": {"enum": ["admitted", "needs_discussion"]},
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object", "required": ["id", "gate", "passed", "message"],
+            "properties": {
+              "id": {"type": "string"},
+              "gate": {"enum": ["quality", "admission"]},
+              "passed": {"type": "boolean"},
+              "message": {"type": "string"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "blockers": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
     },
     "created_at": {"type": "string"},
     "created_by": {"type": "string"},
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "assistant_message": {"type": "string"}
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

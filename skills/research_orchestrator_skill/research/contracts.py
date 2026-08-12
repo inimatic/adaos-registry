@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
@@ -17,10 +18,14 @@ _PROTOTYPE_MANAGED_FIELDS = {
     "revision",
     "parent_digest",
     "source_bundle_digest",
+    "context_coverage",
+    "admission_review",
     "created_at",
     "created_by",
     "digest",
 }
+
+_PLACEHOLDER_RE = re.compile(r"\b(?:tbd|todo|unspecified|unknown|уточнить|не определено)\b", re.I)
 
 
 def now() -> str:
@@ -68,27 +73,115 @@ def validate(schema_name: str, value: Mapping[str, Any]) -> dict[str, Any]:
     return dict(value)
 
 
-def prototype_admission_issues(value: Mapping[str, Any]) -> list[str]:
-    issues: list[str] = []
-    try:
-        validate("research.prototype.v1.schema.json", value)
-    except ValueError as exc:
-        issues.append(str(exc))
-        return issues
+def _check(checks: list[dict[str, Any]], check_id: str, gate: str, passed: bool, message: str) -> None:
+    checks.append({"id": check_id, "gate": gate, "passed": bool(passed), "message": message})
+
+
+def build_admission_review(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the deterministic scientific/automation gate owned by AdaOS.
+
+    The LLM proposes content; it cannot author or waive these checks.
+    """
+
+    checks: list[dict[str, Any]] = []
     plan = value.get("experimental_plan") if isinstance(value.get("experimental_plan"), Mapping) else {}
     stages = [item for item in plan.get("stages") or [] if isinstance(item, Mapping)]
     smoke = [item for item in stages if item.get("evidence_class") == "workflow_smoke"]
-    if not smoke:
-        issues.append("experimental_plan requires an explicit workflow_smoke stage before scientific execution")
-    if any(item.get("inference_allowed") is not False for item in smoke):
-        issues.append("workflow_smoke stages must set inference_allowed=false")
     confirmatory = [item for item in stages if item.get("evidence_class") == "confirmatory"]
-    if confirmatory and any(item.get("inference_allowed") is not True for item in confirmatory):
-        issues.append("confirmatory stages must explicitly set inference_allowed=true")
+    _check(checks, "stages.workflow_smoke", "quality", bool(smoke), "experimental_plan requires an explicit workflow_smoke stage")
+    _check(checks, "stages.smoke_no_inference", "quality", bool(smoke) and all(item.get("inference_allowed") is False for item in smoke), "workflow_smoke stages must set inference_allowed=false")
+    _check(checks, "stages.confirmatory", "quality", bool(confirmatory), "experimental_plan requires an explicit confirmatory stage")
+    _check(checks, "stages.confirmatory_inference", "quality", bool(confirmatory) and all(item.get("inference_allowed") is True for item in confirmatory), "confirmatory stages must set inference_allowed=true")
+
+    comparators = [str(item).strip().lower() for item in plan.get("comparators") or [] if str(item).strip()]
+    _check(checks, "design.comparators", "quality", len(set(comparators)) >= 2, "at least two distinct comparators are required")
+    reproducibility = plan.get("reproducibility") if isinstance(plan.get("reproducibility"), Mapping) else {}
+    streams = {
+        str(item.get("id") or "").strip().lower()
+        for item in reproducibility.get("rng_streams") or []
+        if isinstance(item, Mapping)
+    }
+    required_streams = {"initialization", "sampling", "augmentation", "analysis"}
+    _check(checks, "reproducibility.rng_streams", "quality", required_streams.issubset(streams), "named RNG streams must cover initialization, sampling, augmentation, and analysis")
+    pairing = reproducibility.get("pairing") if isinstance(reproducibility.get("pairing"), Mapping) else {}
+    invariant = {str(item).strip().lower() for item in pairing.get("invariant_fields") or [] if str(item).strip()}
+    varied = {str(item).strip().lower() for item in pairing.get("varied_fields") or [] if str(item).strip()}
+    _check(checks, "reproducibility.pairing", "quality", bool(invariant) and bool(varied) and invariant.isdisjoint(varied), "paired design must declare disjoint invariant_fields and varied_fields")
+
+    evaluation = value.get("evaluation_plan") if isinstance(value.get("evaluation_plan"), Mapping) else {}
+    outcomes = [item for item in evaluation.get("outcomes") or [] if isinstance(item, Mapping)]
+    primary = [item for item in outcomes if item.get("role") == "primary"]
+    _check(checks, "evaluation.one_primary", "quality", len(primary) == 1, "evaluation_plan must declare exactly one primary outcome")
+    stopping = evaluation.get("stopping_rule") if isinstance(evaluation.get("stopping_rule"), Mapping) else {}
+    _check(checks, "evaluation.predeclared_stopping", "quality", stopping.get("adaptation_predeclared") is True, "stopping and adaptation rules must be predeclared")
+
+    coverage = value.get("context_coverage") if isinstance(value.get("context_coverage"), Mapping) else {}
+    total_sources = int(coverage.get("sources_total") or 0)
+    represented_sources = int(coverage.get("sources_represented") or 0)
+    unreadable = list(coverage.get("unreadable_sources") or [])
+    _check(checks, "sources.coverage", "quality", total_sources > 0 and represented_sources == total_sources and not unreadable, "every source artifact must be represented by readable, disclosed context")
+    admitted_refs = {
+        str(ref)
+        for item in coverage.get("items") or []
+        if isinstance(item, Mapping)
+        for ref in item.get("provenance_refs") or []
+    }
+    grounding = [item for item in value.get("source_grounding") or [] if isinstance(item, Mapping)]
+    cited_refs = {str(ref) for item in grounding for ref in item.get("source_refs") or []}
+    hypothesis_ids = {str(item.get("id") or "") for item in value.get("hypotheses") or [] if isinstance(item, Mapping)}
+    grounded_ids = {str(item.get("claim_id") or "") for item in grounding}
+    _check(checks, "sources.provenance", "quality", bool(cited_refs) and cited_refs.issubset(admitted_refs), "source_grounding may cite only context fragments actually supplied to the formulation model")
+    _check(checks, "sources.hypotheses_grounded", "quality", bool(hypothesis_ids) and hypothesis_ids.issubset(grounded_ids), "every hypothesis id must have an explicit source-grounding record")
+    _check(checks, "sources.observations_separated", "quality", any(item.get("stance") == "observed" for item in grounding), "at least one source-grounded observation must be separated from hypotheses and interpretations")
+
+    requirements = [item for item in value.get("implementation_requirements") or [] if isinstance(item, Mapping)]
+    requirement_ids = [str(item.get("id") or "") for item in requirements]
+    acceptance = [item for item in value.get("acceptance_checks") or [] if isinstance(item, Mapping)]
+    acceptance_ids = [str(item.get("id") or "") for item in acceptance]
+    _check(checks, "automation.requirements", "quality", len(requirements) >= 5 and len(requirement_ids) == len(set(requirement_ids)), "implementation requirements must be typed, independently verifiable, and uniquely identified")
+    _check(checks, "automation.acceptance", "quality", len(acceptance) >= 4 and len(acceptance_ids) == len(set(acceptance_ids)), "acceptance checks must be typed, observable, and uniquely identified")
+
+    critical_text = json.dumps(
+        {
+            "question": value.get("research_question"),
+            "plan": plan,
+            "evaluation": evaluation,
+            "requirements": requirements,
+            "acceptance": acceptance,
+        },
+        ensure_ascii=False,
+    )
+    _check(checks, "automation.no_placeholders", "quality", not bool(_PLACEHOLDER_RE.search(critical_text)), "automation-critical fields cannot contain unresolved placeholders")
+
     readiness = value.get("readiness") if isinstance(value.get("readiness"), Mapping) else {}
-    if readiness.get("decision") == "ready_for_automation" and readiness.get("blocking_questions"):
-        issues.append("ready_for_automation cannot retain blocking_questions")
-    return issues
+    open_questions = list(value.get("open_questions") or [])
+    blocking_questions = list(readiness.get("blocking_questions") or [])
+    _check(checks, "readiness.decision", "admission", readiness.get("decision") == "ready_for_automation", "readiness.decision must be ready_for_automation")
+    _check(checks, "readiness.blockers", "admission", not blocking_questions, "ready_for_automation cannot retain blocking_questions")
+    _check(checks, "readiness.open_questions", "admission", not open_questions, "ready_for_automation cannot retain unresolved open_questions")
+    blockers = [item["message"] for item in checks if not item["passed"]]
+    return {
+        "schema": "adaos.research.admission_review.v1",
+        "decision": "admitted" if not blockers else "needs_discussion",
+        "checks": checks,
+        "blockers": blockers,
+    }
+
+
+def prototype_quality_issues(value: Mapping[str, Any]) -> list[str]:
+    review = build_admission_review(value)
+    return [item["message"] for item in review["checks"] if item["gate"] == "quality" and not item["passed"]]
+
+
+def prototype_admission_issues(value: Mapping[str, Any]) -> list[str]:
+    try:
+        validate("research.prototype.v1.schema.json", value)
+    except ValueError as exc:
+        return [str(exc)]
+    expected = build_admission_review(value)
+    if value.get("admission_review") != expected:
+        return ["admission_review does not match the deterministic AdaOS review"]
+    return list(expected["blockers"])
 
 
 def materialize_prototype(
@@ -96,6 +189,7 @@ def materialize_prototype(
     *,
     direction_id: str,
     source_bundle_digest: str,
+    context_coverage: Mapping[str, Any],
     revision: int,
     parent_digest: str | None,
     actor: str,
@@ -104,15 +198,17 @@ def materialize_prototype(
     candidate.update(
         {
             "schema": "adaos.research.prototype.v1",
-            "schema_version": "1.0.0",
+            "schema_version": "1.1.0",
             "direction": {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"},
             "revision": int(revision),
             "parent_digest": parent_digest,
             "source_bundle_digest": source_bundle_digest,
+            "context_coverage": copy.deepcopy(dict(context_coverage)),
             "created_at": now(),
             "created_by": str(actor or "user:local"),
         }
     )
+    candidate["admission_review"] = build_admission_review(candidate)
     candidate["digest"] = digest(candidate)
     return validate("research.prototype.v1.schema.json", candidate)
 
@@ -193,12 +289,12 @@ def materialize_automation_brief(
         },
         "implementation_requirements": implementation_requirements,
         "acceptance_checks": [
-            "Preserve the Project-owned direction-skill boundary; do not create a direction-specific scenario.",
-            "Keep primary experimental data in this direction skill's scoped runtime data bucket.",
-            "Implement the declared runner contract and deterministic CPU smoke profile.",
-            "Bind experiment inputs, code, environment, metrics and evidence by digest.",
-            "Treat imported notebook outputs as untrusted exploratory source material.",
-            "Pass native AdaOS skill validation, package tests and research runner conformance checks.",
+            {"id": "adaos.direction_boundary", "check": "Preserve the Project-owned direction-skill boundary; do not create a direction-specific scenario.", "evidence": "Project manifest and package inventory"},
+            {"id": "adaos.data_ownership", "check": "Keep primary experimental data in this direction skill's scoped runtime data bucket.", "evidence": "Resolved capability bindings and runtime paths"},
+            {"id": "adaos.runner_contract", "check": "Implement the declared runner contract and deterministic CPU smoke profile.", "evidence": "Native runner conformance and smoke reports"},
+            {"id": "adaos.content_identity", "check": "Bind experiment inputs, code, environment, metrics and evidence by digest.", "evidence": "ContentRef and tracker records"},
+            {"id": "adaos.historical_evidence", "check": "Treat imported notebook outputs as untrusted exploratory source material.", "evidence": "Evidence classification in produced records"},
+            {"id": "adaos.native_validation", "check": "Pass native AdaOS skill validation, package tests and research runner conformance checks.", "evidence": "CLI validation and test reports"},
             *list(prototype.get("acceptance_checks") or []),
         ],
         "prohibited_actions": [
@@ -215,4 +311,4 @@ def materialize_automation_brief(
     return validate("research.automation_brief.v1.schema.json", brief)
 
 
-__all__ = ["canonical_json", "digest", "load_schema", "materialize_automation_brief", "materialize_prototype", "now", "prototype_admission_issues", "prototype_candidate_schema", "validate"]
+__all__ = ["build_admission_review", "canonical_json", "digest", "load_schema", "materialize_automation_brief", "materialize_prototype", "now", "prototype_admission_issues", "prototype_candidate_schema", "prototype_quality_issues", "validate"]

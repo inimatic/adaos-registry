@@ -14,6 +14,8 @@ experimental data or scientific governance records.
    target skill's `artifacts/part0/` and updates its digest-bound manifest.
 3. Use `chat` to discuss the sources. Every meaningful response is validated
    and stored as a ResearchPrototype revision; the transcript is not truth.
+   Notebook source cells are extracted before bounding, outputs are omitted,
+   and every supplied fragment has an `artifact://...#cell/lines` reference.
 4. Inspect `get_direction` and resolve blocking questions.
 5. Call `accept_prototype` with the exact prototype digest, current generation,
    and an idempotency key. The command creates a private local Builder
@@ -25,6 +27,29 @@ experimental data or scientific governance records.
 `get_activity` exposes the same durable stages used by grouped chat progress
 and future Research Workbench widgets. `next_steps` is suitable for text and
 voice channels.
+
+## Hard formulation boundary
+
+The Root LLM proposes only the candidate-owned fields. AdaOS materializes and
+digests `context_coverage` and `admission_review`; neither can be self-asserted
+by the model. The deterministic review rejects or downgrades a handoff unless
+it has:
+
+- exact provenance references for source-grounded observations and every
+  hypothesis;
+- separate workflow-smoke and confirmatory stages with correct evidence
+  classes;
+- explicit comparators, paired invariants/varied factors, named RNG streams,
+  data sealing, and leakage controls;
+- one operationalized primary estimand, one primary outcome, uncertainty,
+  multiplicity, practical significance, stopping, and a negative-result
+  policy;
+- uniquely identified implementation requirements and observable acceptance
+  evidence.
+
+Schema repair and semantic-quality repair are bounded. If a schema-valid
+candidate still fails the hard gate after repair, it remains a visible draft;
+it cannot silently become an AutomationBrief.
 
 ## Ownership
 

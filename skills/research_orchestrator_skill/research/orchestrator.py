@@ -21,7 +21,13 @@ from adaos.sdk.llm import llm_client
 from adaos.services.agent_context import get_ctx
 from adaos.services.skill.artifacts import skill_upload_dir
 
-from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues, prototype_candidate_schema
+from research.contracts import (
+    materialize_automation_brief,
+    materialize_prototype,
+    prototype_admission_issues,
+    prototype_candidate_schema,
+    prototype_quality_issues,
+)
 from research.repository import OrchestratorRepository
 
 
@@ -301,6 +307,7 @@ class ResearchOrchestrator:
             prototype
             and str(prototype.get("source_bundle_digest") or "") != str(bundle.get("digest") or "")
         )
+        admission_review = prototype.get("admission_review") if isinstance((prototype or {}).get("admission_review"), Mapping) else {}
         return {
             "ok": True,
             "direction": {**state, "project_ref": project["ref"], "primary_skill_ref": f"skill:{token}"},
@@ -309,6 +316,12 @@ class ResearchOrchestrator:
             "source_bundle": bundle,
             "current_prototype": prototype,
             "prototype_stale": prototype_stale,
+            "formulation": {
+                "admission_decision": admission_review.get("decision") or "needs_discussion",
+                "admission_blockers": list(admission_review.get("blockers") or []),
+                "can_accept": bool(prototype) and not prototype_stale and admission_review.get("decision") == "admitted",
+                "context_coverage": (prototype or {}).get("context_coverage") or {},
+            },
             "accepted_prototype": accepted,
             "automation_brief": brief,
             "development_session": sessions[-1] if sessions else None,
@@ -394,11 +407,19 @@ class ResearchOrchestrator:
         if not prototype:
             return [{"id": "discuss", "label": "Обсудить постановку", "reason": "ОИ создаст первую структурированную ревизию ResearchPrototype."}]
         readiness = prototype.get("readiness") if isinstance(prototype.get("readiness"), Mapping) else {}
-        if readiness.get("decision") != "ready_for_automation" or readiness.get("blocking_questions"):
+        review = prototype.get("admission_review") if isinstance(prototype.get("admission_review"), Mapping) else {}
+        if review.get("decision") != "admitted" or readiness.get("decision") != "ready_for_automation" or readiness.get("blocking_questions"):
             return [{"id": "resolve_questions", "label": "Снять блокирующие вопросы", "reason": "Принять можно только готовую к автоматизации ревизию."}]
         return [{"id": "accept_prototype", "label": "Принять точную ревизию", "reason": "Acceptance создаст приватный локальный checkpoint и digest-bound Automation Brief; исходные материалы не публикуются."}]
 
-    def record_prototype(self, direction_id: str, value: Mapping[str, Any], *, actor: str = "user:local") -> dict[str, Any]:
+    def record_prototype(
+        self,
+        direction_id: str,
+        value: Mapping[str, Any],
+        *,
+        actor: str = "user:local",
+        context_coverage: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         token = _direction_id(direction_id)
         state = self.repository.get_direction(token)
         if not state:
@@ -409,22 +430,30 @@ class ResearchOrchestrator:
         if not bundle.get("sources"):
             raise ValueError("at least one source artifact is required")
         previous = self.repository.get_prototype(state.get("current_prototype_digest"))
+        source_context = self._source_context(bundle) if context_coverage is None else None
+        coverage = dict(context_coverage or (source_context or {}).get("coverage") or {})
         prototype = materialize_prototype(
             value,
             direction_id=token,
             source_bundle_digest=str(bundle["digest"]),
+            context_coverage=coverage,
             revision=int(previous.get("revision") or 0) + 1 if previous else 1,
             parent_digest=str(previous["digest"]) if previous else None,
             actor=actor,
         )
         admission_issues = prototype_admission_issues(prototype)
-        if admission_issues:
+        readiness = value.get("readiness") if isinstance(value.get("readiness"), Mapping) else {}
+        if admission_issues and readiness.get("decision") == "ready_for_automation":
             revised_value = dict(value)
-            revised_value["readiness"] = {"decision": "needs_discussion", "blocking_questions": admission_issues}
+            revised_value["readiness"] = {
+                "decision": "needs_discussion",
+                "blocking_questions": list(dict.fromkeys([*list(readiness.get("blocking_questions") or []), *admission_issues])),
+            }
             prototype = materialize_prototype(
                 revised_value,
                 direction_id=token,
                 source_bundle_digest=str(bundle["digest"]),
+                context_coverage=coverage,
                 revision=int(previous.get("revision") or 0) + 1 if previous else 1,
                 parent_digest=str(previous["digest"]) if previous else None,
                 actor=actor,
@@ -433,36 +462,80 @@ class ResearchOrchestrator:
         self.repository.activity(
             token,
             "formulation",
-            "candidate_ready",
-            f"ResearchPrototype revision {stored['revision']} is ready for review.",
-            {"prototype_digest": stored["digest"], "source_bundle_digest": stored["source_bundle_digest"], "actor": actor},
+            "candidate_admitted" if stored.get("admission_review", {}).get("decision") == "admitted" else "candidate_draft",
+            f"ResearchPrototype revision {stored['revision']} passed the automation gate." if stored.get("admission_review", {}).get("decision") == "admitted" else f"ResearchPrototype revision {stored['revision']} remains a reviewable draft.",
+            {
+                "prototype_digest": stored["digest"],
+                "source_bundle_digest": stored["source_bundle_digest"],
+                "admission_decision": stored.get("admission_review", {}).get("decision"),
+                "admission_blockers": stored.get("admission_review", {}).get("blockers") or [],
+                "actor": actor,
+            },
         )
         return {"ok": True, "prototype": stored, "direction": self.repository.get_direction(token), "next_steps": self._next_steps(self.repository.get_direction(token) or {}, bundle, stored)}
 
-    def _source_context(self, bundle: Mapping[str, Any]) -> list[dict[str, Any]]:
+    def _source_context(self, bundle: Mapping[str, Any]) -> dict[str, Any]:
         selected: list[dict[str, Any]] = []
-        remaining = 50_000
-        for source in bundle.get("sources") or []:
+        sources = [item for item in bundle.get("sources") or [] if isinstance(item, Mapping)]
+        remaining = 80_000
+        per_source = min(40_000, max(8_000, remaining // max(1, len(sources))))
+        unreadable: list[str] = []
+        coverage_items: list[dict[str, Any]] = []
+        for source in sources:
             if remaining <= 0:
                 break
             media = str(source.get("media_type") or "")
             name = str(source.get("name") or "source")
             excerpt = ""
+            artifact_ref = str(source.get("artifact_ref") or "")
             try:
                 artifact_id = str(source.get("source_id") or "")
                 group_id = str(source.get("group_id") or "")
-                raw = artifact_context.read_text(
+                extracted = artifact_context.extract_text(
                     str(bundle.get("skill_ref") or "skill:research").partition(":")[2],
                     group_id,
                     artifact_id,
-                    max_characters=min(30_000, remaining),
+                    max_characters=min(per_source, remaining),
                 )
-                excerpt = _notebook_excerpt(raw, max_characters=min(30_000, remaining)) if name.lower().endswith(".ipynb") else raw
-            except (UnicodeDecodeError, ValueError):
+                excerpt = str(extracted.get("content") or "")
+                item_coverage = extracted.get("coverage") if isinstance(extracted.get("coverage"), Mapping) else {}
+                provenance_refs = [str(item.get("ref")) for item in extracted.get("provenance") or [] if isinstance(item, Mapping) and item.get("ref")]
+                coverage_items.append(
+                    {
+                        "artifact_ref": artifact_ref or extracted.get("artifact_ref"),
+                        "digest": source.get("digest"),
+                        "strategy": item_coverage.get("strategy") or "unknown",
+                        "selected_characters": int(item_coverage.get("selected_characters") or 0),
+                        "truncated": bool(item_coverage.get("truncated")),
+                        "provenance_refs": provenance_refs,
+                        "detail": dict(item_coverage),
+                    }
+                )
+            except (artifact_context.ArtifactContextError, UnicodeDecodeError, ValueError):
                 excerpt = "[binary source; use structural inventory]"
+                unreadable.append(artifact_ref or name)
             remaining -= len(excerpt)
-            selected.append({"name": name, "digest": source.get("digest"), "media_type": media, "role": source.get("role"), "analysis": source.get("analysis"), "excerpt": excerpt})
-        return selected
+            selected.append(
+                {
+                    "name": name,
+                    "artifact_ref": artifact_ref,
+                    "digest": source.get("digest"),
+                    "media_type": media,
+                    "role": source.get("role"),
+                    "analysis": source.get("analysis"),
+                    "excerpt": excerpt,
+                }
+            )
+        truncated_sources = [str(item["artifact_ref"]) for item in coverage_items if item.get("truncated")]
+        coverage = {
+            "sources_total": len(sources),
+            "sources_represented": len(selected),
+            "selected_characters": sum(int(item.get("selected_characters") or 0) for item in coverage_items),
+            "truncated_sources": truncated_sources,
+            "unreadable_sources": unreadable,
+            "items": coverage_items,
+        }
+        return {"sources": selected, "coverage": coverage}
 
     @staticmethod
     def _dialog(payload: Mapping[str, Any]) -> dict[str, str | None]:
@@ -510,6 +583,7 @@ class ResearchOrchestrator:
         dialog = self._dialog({"direction_id": token, **dict(dialog_payload or {})})
         self.repository.activity(token, "formulation", "llm_submitted", "Research formulation sent to the configured Root LLM.", {"group_id": group_id, "actor": actor})
         self._emit("Анализирую artifact groups и текущую постановку…", dialog, group_id=group_id, phase="submitted", status="working")
+        source_context = self._source_context(bundle)
         instructions = {
             "role": "You are a rigorous research-design collaborator. Discuss, but output a machine-valid candidate rather than treating chat as truth.",
             "task": str(text or "").strip(),
@@ -521,36 +595,58 @@ class ResearchOrchestrator:
                 "background": "string >= 20 chars",
                 "research_question": "falsifiable question",
                 "hypotheses": [{"id": "H1", "statement": "...", "falsification": "...", "status": "proposed|exploratory|confirmatory"}],
+                "source_grounding": [{"claim_id": "H1", "claim": "...", "stance": "observed|interpretation|hypothesis|constraint", "source_refs": ["exact artifact://...#cell/lines ref from source_bundle"]}],
+                "evidence_policy": {"historical_results": "exploratory_source_only", "workflow_smoke": "workflow_evidence_only", "negative_results": "retain_and_report"},
                 "experimental_plan": {
-                    "comparators": ["..."],
-                    "stages": [{"id": "smoke", "purpose": "...", "evidence_class": "workflow_smoke|exploratory|confirmatory", "execution_profile": {"node": "..."}, "budget": {"epochs": 3}, "inference_allowed": False, "stop_conditions": ["..."]}],
-                    "data_policy": {"dataset": "...", "splits": "...", "unblinding": "..."},
-                    "reproducibility": {"rng_streams": ["initialization", "sampling", "augmentation", "analysis"], "pairing": "...", "environment": "..."},
+                    "comparators": ["control", "intervention"],
+                    "stages": [
+                        {"id": "smoke", "purpose": "...", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current_or_member", "device": "cpu"}, "budget": {"epochs": 3, "seeds": 1}, "inference_allowed": False, "stop_conditions": ["bounded operational condition"]},
+                        {"id": "confirmatory", "purpose": "...", "evidence_class": "confirmatory", "execution_profile": {"node": "declared_member"}, "budget": {"seeds": 10}, "inference_allowed": True, "stop_conditions": ["predeclared fixed or sequential condition"]}
+                    ],
+                    "data_policy": {"dataset": "exact dataset and version", "split_strategy": "...", "evaluation_seal": "...", "leakage_controls": ["..."]},
+                    "reproducibility": {
+                        "rng_streams": [
+                            {"id": "initialization", "controls": "..."},
+                            {"id": "sampling", "controls": "..."},
+                            {"id": "augmentation", "controls": "..."},
+                            {"id": "analysis", "controls": "..."}
+                        ],
+                        "pairing": {"unit": "seed or other paired unit", "invariant_fields": ["..."], "varied_fields": ["..."]},
+                        "environment": {"capture": ["code digest", "dependency lock", "hardware"], "requirements": ["..."]}
+                    },
                 },
                 "evaluation_plan": {
-                    "primary_estimand": "...",
-                    "outcomes": [{"name": "...", "role": "primary|secondary|diagnostic", "measurement": "..."}],
-                    "uncertainty": "...", "decision_rules": ["..."], "multiplicity": "...", "negative_result_policy": "..."
+                    "primary_estimand": {"name": "...", "population": "...", "contrast": "intervention minus control", "metric": "...", "aggregation": "paired mean or declared robust aggregation"},
+                    "outcomes": [{"name": "...", "role": "primary|secondary|diagnostic", "measurement": "...", "unit": "..."}],
+                    "uncertainty": {"method": "...", "resampling_unit": "paired unit", "interval": "two-sided interval", "confidence_level": 0.95},
+                    "stopping_rule": {"kind": "fixed_budget|sequential_predeclared", "criterion": "...", "adaptation_predeclared": True},
+                    "decision_rules": ["..."],
+                    "multiplicity": {"family": "...", "strategy": "..."},
+                    "practical_significance": "...",
+                    "negative_result_policy": "retain, report and interpret negative or inconclusive results without redefining the question"
                 },
                 "constraints": ["..."],
                 "assumptions": ["..."],
                 "open_questions": ["..."],
-                "implementation_requirements": ["at least 5 concrete and independently testable requirements for Codex"],
-                "acceptance_checks": ["at least 4 distinct observable checks"],
+                "implementation_requirements": [{"id": "REQ-1", "requirement": "concrete implementation obligation", "verification": "independent command/report/assertion"}],
+                "acceptance_checks": [{"id": "AC-1", "check": "observable pass condition", "evidence": "expected report, artifact or test"}],
                 "readiness": {"decision": "needs_discussion|ready_for_automation", "blocking_questions": ["..."]},
             },
             "validation_schema": prototype_candidate_schema(),
             "rules": [
                 "Return JSON only.",
-                "Cardinality is contractual: hypotheses >= 1, experimental_plan.stages >= 1, evaluation_plan.outcomes >= 1, constraints >= 1, assumptions >= 1, implementation_requirements >= 5, and acceptance_checks >= 4.",
+                "Cardinality is contractual: hypotheses >= 1, experimental_plan.stages >= 2, evaluation_plan.outcomes >= 1, constraints >= 1, assumptions >= 1, implementation_requirements >= 5, and acceptance_checks >= 4.",
                 "Every acceptance check must be distinct and observable; do not merge checks merely to shorten the list.",
                 "Do not invent facts absent from sources; put uncertainty into assumptions/open_questions.",
+                "Cite exact provenance refs supplied in source_bundle. Never invent an artifact ref or cite an omitted fragment.",
+                "Every hypothesis id needs a source_grounding record, and observations must be explicitly separated from interpretations and hypotheses.",
                 "Historical notebook outputs are exploratory source material, never confirmation.",
                 "Separate workflow smoke execution from scientific confirmation.",
+                "Declare exactly one primary outcome, one operationalized estimand, uncertainty unit/method, multiplicity, practical significance, and a predeclared stopping rule.",
                 "The direction is one AdaOS skill; do not request a direction-specific scenario.",
                 "The first implementation must run a bounded deterministic CPU profile on the current/member node; Ray is deferred.",
             ],
-            "source_bundle": {"digest": bundle["digest"], "sources": self._source_context(bundle)},
+            "source_bundle": {"digest": bundle["digest"], **source_context},
         }
         # A transport retry of the same dialog turn must be idempotent, while
         # a deliberate retry after a rejected candidate must start a fresh
@@ -573,11 +669,16 @@ class ResearchOrchestrator:
                 raise RuntimeError("Root LLM did not return a job_id")
             base_url = str((submitted.get("_client") or {}).get("base_url") or "") or None
             self.repository.activity(token, "formulation", "llm_running", "Root LLM job accepted.", {"job_id": job_id, "request_id": request_id})
+            durable_progress_phase = ""
 
             def progress(value: Mapping[str, Any]) -> None:
+                nonlocal durable_progress_phase
                 seq = int(value.get("seq") or 0)
                 label = str(value.get("label") or value.get("phase") or "LLM working")
-                self.repository.activity(token, "formulation", "llm_progress", label, {"job_id": job_id, "progress": dict(value)})
+                phase = str(value.get("phase") or value.get("status") or label).strip().lower()
+                if phase != durable_progress_phase:
+                    durable_progress_phase = phase
+                    self.repository.activity(token, "formulation", "llm_progress", label, {"job_id": job_id, "progress": dict(value), "coalesced": True})
                 self._emit(label, dialog, group_id=group_id, phase="progress", status="working", seq=seq)
 
             completed = llm_client.wait_response_job(job_id, base_url=base_url, timeout_s=280, poll_interval_s=1.5, progress_callback=progress)
@@ -588,10 +689,33 @@ class ResearchOrchestrator:
             repair_attempt = 0
             while recorded is None:
                 try:
-                    recorded = self.record_prototype(token, candidate, actor=f"llm:{model or 'root-default'}")
+                    preview = materialize_prototype(
+                        candidate,
+                        direction_id=token,
+                        source_bundle_digest=str(bundle["digest"]),
+                        context_coverage=source_context["coverage"],
+                        revision=int(current.get("revision") or 0) + 1 if current else 1,
+                        parent_digest=str(current["digest"]) if current else None,
+                        actor=f"llm:{model or 'root-default'}",
+                    )
+                    quality_issues = prototype_quality_issues(preview)
+                    if quality_issues:
+                        raise ValueError("semantic quality gate: " + "; ".join(quality_issues))
+                    recorded = self.record_prototype(
+                        token,
+                        candidate,
+                        actor=f"llm:{model or 'root-default'}",
+                        context_coverage=source_context["coverage"],
+                    )
                 except ValueError as validation_error:
                     if repair_attempt >= 2:
-                        raise
+                        recorded = self.record_prototype(
+                            token,
+                            candidate,
+                            actor=f"llm:{model or 'root-default'}",
+                            context_coverage=source_context["coverage"],
+                        )
+                        break
                     repair_attempt += 1
                     repair_request_id = f"{request_id}-repair-{repair_attempt}"
                     self.repository.activity(
@@ -617,6 +741,7 @@ class ResearchOrchestrator:
                         "validation_schema": instructions["validation_schema"],
                         "rules": instructions["rules"],
                         "user_request": instructions["task"],
+                        "source_bundle": instructions["source_bundle"],
                     }
                     repaired_submit = llm_client.submit_response_job(
                         [
@@ -634,7 +759,8 @@ class ResearchOrchestrator:
                     if not job_id:
                         raise RuntimeError("Root LLM repair did not return a job_id")
                     base_url = str((repaired_submit.get("_client") or {}).get("base_url") or "") or None
-                    repaired = llm_client.wait_response_job(job_id, base_url=base_url, timeout_s=60, poll_interval_s=1.5, progress_callback=progress)
+                    durable_progress_phase = ""
+                    repaired = llm_client.wait_response_job(job_id, base_url=base_url, timeout_s=180, poll_interval_s=1.5, progress_callback=progress)
                     if str(repaired.get("status") or "").lower() != "succeeded":
                         raise RuntimeError(str(repaired.get("error") or "Root LLM repair failed"))
                     candidate = _json_object(str(repaired.get("output_text") or ""))

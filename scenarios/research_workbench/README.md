@@ -16,8 +16,9 @@ scenario per direction.
 4. Use Formulation chat to discuss the question, hypotheses, experiment stages,
    evaluation plan, uncertainty, constraints, and unresolved decisions. Chat is
    not canonical state; each candidate is a typed ResearchPrototype revision.
-5. Review the current exact prototype and accept it only when its readiness is
-   `ready_for_automation` and blocking questions are empty.
+5. Review the current exact prototype, source-context coverage, provenance,
+   inference contract, and deterministic AdaOS admission review. The accept
+   action is enabled only when the review decision is `admitted`.
 6. Acceptance checkpoints the skill source and creates a digest-bound
    AutomationBrief plus a Builder Development Session. Codex is not started.
 7. Open Builder. Only Project-owned targets are read-write; the Workbench,
@@ -55,6 +56,11 @@ After every turn, review the consensus panel. It is a projection of the current
 typed candidate; chat history itself is not the accepted task. Only **Accept
 exact prototype** creates the digest-bound AutomationBrief and unopened Builder
 Development Session.
+
+The portfolio and selected direction are separate full-surface layout variants
+selected by local page state. Reload starts from the portfolio, a partially
+materialized state cannot expose an empty detail view, and the detail workspace
+can grow independently without being constrained to a permanent side panel.
 
 ## What this milestone does not do
 

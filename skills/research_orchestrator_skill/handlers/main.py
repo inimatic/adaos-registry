@@ -247,41 +247,58 @@ def get_consensus(direction_id: str, **_: Any) -> dict[str, Any]:
             "ok": True,
             "direction_id": direction_id,
             "status": "not_formulated",
-            "content": "## Согласованная постановка\n\nПока не сформирована. Начните обсуждение: сформулируйте вопрос, проверяемые гипотезы, протокол и критерии решения.",
+            "accepted": False,
+            "can_accept": False,
+            "admission_decision": "needs_discussion",
+            "content": "## Current draft\n\nNo ResearchPrototype has been formulated yet. Discuss the question, falsifiable hypotheses, protocol, estimand, uncertainty, and unresolved decisions.",
         }
-    hypotheses = [
-        f"**{item.get('id', 'H')}** — {item.get('statement', '')}  \n  Опровержение: {item.get('falsification', 'не задано')}"
-        for item in prototype.get("hypotheses") or []
-        if isinstance(item, Mapping)
-    ]
+    hypotheses = [f"**{item.get('id', 'H')}** — {item.get('statement', '')}  \nFalsified when: {item.get('falsification', 'not declared')}" for item in prototype.get("hypotheses") or [] if isinstance(item, Mapping)]
+    grounding = [f"**{item.get('claim_id', 'claim')}** `{item.get('stance', 'unknown')}` — {item.get('claim', '')}  \nSources: {', '.join(f'`{ref}`' for ref in item.get('source_refs') or [])}" for item in prototype.get("source_grounding") or [] if isinstance(item, Mapping)]
     plan = prototype.get("experimental_plan") if isinstance(prototype.get("experimental_plan"), Mapping) else {}
-    stages = [
-        f"**{item.get('id', 'stage')}** — {item.get('purpose', '')} (`{item.get('execution_profile', 'unspecified')}`)"
-        for item in plan.get("stages") or []
-        if isinstance(item, Mapping)
-    ]
+    stages = [f"**{item.get('id', 'stage')}** `{item.get('evidence_class', 'unknown')}` — {item.get('purpose', '')}  \nInference: `{item.get('inference_allowed')}` · budget: `{item.get('budget', {})}`" for item in plan.get("stages") or [] if isinstance(item, Mapping)]
     evaluation = prototype.get("evaluation_plan") if isinstance(prototype.get("evaluation_plan"), Mapping) else {}
     readiness = prototype.get("readiness") if isinstance(prototype.get("readiness"), Mapping) else {}
+    review = prototype.get("admission_review") if isinstance(prototype.get("admission_review"), Mapping) else {}
+    coverage = prototype.get("context_coverage") if isinstance(prototype.get("context_coverage"), Mapping) else {}
     requirements = brief.get("implementation_requirements") or prototype.get("implementation_requirements") or []
     checks = brief.get("acceptance_checks") or prototype.get("acceptance_checks") or []
     accepted = bool(state.get("automation_brief"))
-    status = "accepted" if accepted else str(readiness.get("decision") or "draft")
+    admission_decision = str(review.get("decision") or "needs_discussion")
+    status = "accepted" if accepted else "admitted draft" if admission_decision == "admitted" else "draft — needs discussion"
+    estimand = evaluation.get("primary_estimand") if isinstance(evaluation.get("primary_estimand"), Mapping) else {}
+    uncertainty = evaluation.get("uncertainty") if isinstance(evaluation.get("uncertainty"), Mapping) else {}
+    stopping = evaluation.get("stopping_rule") if isinstance(evaluation.get("stopping_rule"), Mapping) else {}
+    multiplicity = evaluation.get("multiplicity") if isinstance(evaluation.get("multiplicity"), Mapping) else {}
+    open_questions = list(prototype.get("open_questions") or [])
+    blocking_questions = list(readiness.get("blocking_questions") or [])
+    blockers = list(review.get("blockers") or [])
+    requirement_lines = [f"**{item.get('id', 'REQ')}** — {item.get('requirement', '')}  \nVerify: {item.get('verification', '')}" if isinstance(item, Mapping) else str(item) for item in requirements]
+    check_lines = [f"**{item.get('id', 'AC')}** — {item.get('check', '')}  \nEvidence: {item.get('evidence', '')}" if isinstance(item, Mapping) else str(item) for item in checks]
     content = (
-        f"## Согласованная постановка\n\n"
-        f"**Статус:** `{status}` · **ревизия:** `{prototype.get('revision', '—')}`\n\n"
-        f"### Исследовательский вопрос\n\n{prototype.get('research_question') or '—'}\n\n"
-        f"### Проверяемые гипотезы\n\n{_markdown_lines(hypotheses)}\n\n"
-        f"### Экспериментальный протокол\n\n{_markdown_lines(stages)}\n\n"
-        f"**Primary estimand:** {evaluation.get('primary_estimand') or '—'}\n\n"
-        f"### Нерешённые вопросы\n\n{_markdown_lines(readiness.get('blocking_questions') or prototype.get('open_questions'))}\n\n"
-        f"### Требования к автоматизации\n\n{_markdown_lines(requirements)}\n\n"
-        f"### Критерии приёмки\n\n{_markdown_lines(checks)}"
+        f"## {'Accepted formulation' if accepted else 'Current draft'}\n\n"
+        f"**Status:** `{status}` · **revision:** `{prototype.get('revision', '—')}` · **AdaOS gate:** `{admission_decision}`\n\n"
+        f"### Source-context coverage\n\nRepresented `{coverage.get('sources_represented', 0)}/{coverage.get('sources_total', 0)}` artifacts; selected `{coverage.get('selected_characters', 0)}` characters.  \nTruncated: `{coverage.get('truncated_sources') or []}` · unreadable: `{coverage.get('unreadable_sources') or []}`\n\n"
+        f"### Research question\n\n{prototype.get('research_question') or '—'}\n\n"
+        f"### Source-grounded claims\n\n{_markdown_lines(grounding)}\n\n"
+        f"### Falsifiable hypotheses\n\n{_markdown_lines(hypotheses)}\n\n"
+        f"### Experimental stages\n\n{_markdown_lines(stages)}\n\n"
+        f"### Primary estimand\n\n**{estimand.get('name', '—')}** — {estimand.get('contrast', '—')} on {estimand.get('population', '—')}; metric `{estimand.get('metric', '—')}`, aggregation `{estimand.get('aggregation', '—')}`.\n\n"
+        f"### Inference contract\n\nUncertainty: `{uncertainty}`  \nStopping: `{stopping}`  \nMultiplicity: `{multiplicity}`  \nPractical significance: {evaluation.get('practical_significance') or '—'}  \nNegative results: {evaluation.get('negative_result_policy') or '—'}\n\n"
+        f"### Constraints and assumptions\n\n**Constraints**\n{_markdown_lines(prototype.get('constraints'))}\n\n**Assumptions**\n{_markdown_lines(prototype.get('assumptions'))}\n\n"
+        f"### Open questions\n\n{_markdown_lines(open_questions)}\n\n"
+        f"### Readiness blockers\n\n{_markdown_lines([*blocking_questions, *blockers])}\n\n"
+        f"### Automation requirements\n\n{_markdown_lines(requirement_lines)}\n\n"
+        f"### Acceptance checks\n\n{_markdown_lines(check_lines)}"
     )
     return {
         "ok": True,
         "direction_id": direction_id,
         "status": status,
         "accepted": accepted,
+        "can_accept": not accepted and admission_decision == "admitted",
+        "admission_decision": admission_decision,
+        "admission_blockers": blockers,
+        "context_coverage": coverage,
         "prototype_digest": prototype.get("digest"),
         "automation_brief_digest": direction.get("automation_brief_digest"),
         "content": content,

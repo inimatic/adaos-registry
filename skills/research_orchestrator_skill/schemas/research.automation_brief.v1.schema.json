@@ -52,8 +52,8 @@
       },
       "additionalProperties": false
     },
-    "implementation_requirements": {"type": "array", "minItems": 1, "items": {"type": "string"}},
-    "acceptance_checks": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "implementation_requirements": {"type": "array", "minItems": 1, "items": {"type": "object"}},
+    "acceptance_checks": {"type": "array", "minItems": 1, "items": {"type": "object"}},
     "prohibited_actions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
     "handoff_state": {"const": "ready_for_codex"},
     "created_at": {"type": "string"},
