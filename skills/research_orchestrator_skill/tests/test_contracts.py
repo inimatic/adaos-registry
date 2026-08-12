@@ -6,7 +6,7 @@ import pytest
 from jsonschema import Draft202012Validator
 
 from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues, prototype_candidate_schema, validate
-from research.orchestrator import _address_builder_url
+from research.orchestrator import _address_builder_url, _llm_failure
 
 
 def _candidate() -> dict:
@@ -281,3 +281,19 @@ def test_builder_url_carries_a_declared_first_paint_address() -> None:
     assert query["builder_object_id"] == ["tlp_research_03"]
     assert query["builder_object_ref"] == ["skill:tlp_research_03"]
     assert query["builder_object_title"] == ["TLP direction"]
+
+
+def test_llm_failure_is_bounded_and_does_not_dump_provider_payload() -> None:
+    failure = _llm_failure(
+        {
+            "status": "incomplete",
+            "incomplete_details": {"reason": "max_output_tokens"},
+            "output": [{"text": "sensitive and very large provider payload"}],
+        },
+        operation="repair",
+    )
+
+    assert str(failure) == (
+        "Root LLM repair ended with status=incomplete: max_output_tokens"
+    )
+    assert "sensitive" not in str(failure)

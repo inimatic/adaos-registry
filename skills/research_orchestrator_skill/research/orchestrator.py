@@ -58,6 +58,22 @@ def _json_object(text: str) -> dict[str, Any]:
     return value
 
 
+def _llm_failure(result: Mapping[str, Any], *, operation: str) -> RuntimeError:
+    status = str(result.get("status") or "failed")
+    error = result.get("error")
+    detail = ""
+    if isinstance(error, Mapping):
+        detail = str(error.get("message") or error.get("code") or "")
+    elif error:
+        detail = str(error)
+    if not detail:
+        incomplete = result.get("incomplete_details")
+        if isinstance(incomplete, Mapping):
+            detail = str(incomplete.get("reason") or "")
+    suffix = f": {detail[:300]}" if detail else ""
+    return RuntimeError(f"Root LLM {operation} ended with status={status}{suffix}")
+
+
 def _address_builder_url(url: str, *, direction_id: str, title: str) -> str:
     """Attach a declared first-paint address; the Yjs binding remains canonical."""
 
@@ -697,7 +713,7 @@ class ResearchOrchestrator:
 
             completed = llm_client.wait_response_job(job_id, base_url=base_url, timeout_s=280, poll_interval_s=1.5, progress_callback=progress)
             if str(completed.get("status") or "").lower() != "succeeded":
-                raise RuntimeError(str(completed.get("error") or "Root LLM job failed"))
+                raise _llm_failure(completed, operation="formulation")
             candidate = _json_object(str(completed.get("output_text") or ""))
             recorded: dict[str, Any] | None = None
             repair_attempt = 0
@@ -748,22 +764,24 @@ class ResearchOrchestrator:
                         seq=900000 + repair_attempt,
                     )
                     repair_payload = {
-                        "task": "Repair the rejected candidate. Fix the exact validation error, preserve scientifically correct content, and return one complete candidate JSON object (not a patch). Before returning, count every required array and verify all hard constraints.",
+                        "task": "Repair the rejected candidate. Fix every listed issue, apply the user's requested revision, preserve scientifically correct content, and return only one complete candidate JSON object (not a patch or an envelope).",
                         "validation_error": str(validation_error),
-                        "rejected_candidate": candidate,
-                        "output_contract": instructions["output_contract"],
-                        "validation_schema": instructions["validation_schema"],
+                        "candidate": candidate,
                         "rules": instructions["rules"],
                         "user_request": instructions["task"],
-                        "source_bundle": instructions["source_bundle"],
+                        "allowed_provenance_refs": [
+                            ref
+                            for item in source_context["coverage"].get("items") or []
+                            for ref in item.get("provenance_refs") or []
+                        ],
                     }
                     repaired_submit = llm_client.submit_response_job(
                         [
-                            {"role": "system", "content": "You are a strict JSON contract repairer. Return JSON only, never omit required nested fields, and satisfy every stated minimum cardinality."},
+                            {"role": "system", "content": "You repair one research candidate. Return the corrected candidate JSON only. Never return an envelope, input keys, a schema, a contract, Markdown fences, or commentary. Keep all required nested fields and satisfy every stated cardinality."},
                             {"role": "user", "content": json.dumps(repair_payload, ensure_ascii=False)},
                         ],
                         model=model,
-                        max_tokens=7000,
+                        max_tokens=9000,
                         request_id=repair_request_id,
                         profile_scope="research.formulation.repair",
                         stream=True,
@@ -776,7 +794,7 @@ class ResearchOrchestrator:
                     durable_progress_phase = ""
                     repaired = llm_client.wait_response_job(job_id, base_url=base_url, timeout_s=180, poll_interval_s=1.5, progress_callback=progress)
                     if str(repaired.get("status") or "").lower() != "succeeded":
-                        raise RuntimeError(str(repaired.get("error") or "Root LLM repair failed"))
+                        raise _llm_failure(repaired, operation="repair")
                     candidate = _json_object(str(repaired.get("output_text") or ""))
             message = str(recorded["prototype"].get("assistant_message") or f"ResearchPrototype revision {recorded['prototype']['revision']} is ready.")
             self.repository.activity(token, "formulation", "llm_completed", message, {"job_id": job_id, "prototype_digest": recorded["prototype"]["digest"]})
