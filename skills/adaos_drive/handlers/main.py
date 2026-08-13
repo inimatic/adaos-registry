@@ -1211,6 +1211,7 @@ def _create_public_link(source: Mapping[str, Any], source_path: Path, *, downloa
         "view_url": root_view_url,
         "download_url": app_download_url,
         "root_download_url": root_download_url,
+        "open_url": root_download_url if download else "",
         "root_registration": root_result,
         "registration_status": "registered" if registration_ok else "pending_root_registration",
         "registration_error": "" if registration_ok else _root_registration_error_text(root_result),
@@ -1400,6 +1401,25 @@ def select_item(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     return {"ok": True, "panel": panel, "selected_path": rel, "snapshot": snapshot}
 
 
+@tool("activate_item")
+def activate_item(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
+    data = _payload(evt, **kwargs)
+    ws = _webspace_id(data.get("webspace_id"))
+    state = _load_state(ws)
+    panel = _panel_name(data.get("panel"), state)
+    panel_state = _panel_state(state, panel)
+    raw = data.get("path") or data.get("id") or ""
+    if str(raw or "").strip() in {"__parent__", ".."}:
+        current = _clean_rel(panel_state.get("path") or "")
+        return open_folder({"panel": panel, "path": "/".join(current.split("/")[:-1]), "webspace_id": ws})
+    rel = _clean_rel(raw)
+    source = _source_for_panel(state, panel)
+    target = _resolve_entry(source, rel)
+    if target.is_dir():
+        return open_folder({"panel": panel, "path": rel, "webspace_id": ws})
+    return select_item({"panel": panel, "path": rel, "webspace_id": ws})
+
+
 @tool("open_folder")
 def open_folder(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     data = _payload(evt, **kwargs)
@@ -1407,11 +1427,12 @@ def open_folder(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     state = _load_state(ws)
     panel = _panel_name(data.get("panel"), state)
     panel_state = _panel_state(state, panel)
+    has_path = "path" in data
     rel = data.get("path")
     if str(rel or "").strip() in {"__parent__", ".."}:
         current = _clean_rel(panel_state.get("path") or "")
         rel = "/".join(current.split("/")[:-1])
-    rel = _clean_rel(rel or panel_state.get("selected_path") or "")
+    rel = _clean_rel((rel if has_path else panel_state.get("selected_path")) or "")
     source = _source_for_panel(state, panel)
     target = _resolve_entry(source, rel)
     if not target.is_dir():
@@ -1550,6 +1571,7 @@ def create_guest_link(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
         "view_url": link["view_url"],
         "download_url": link["download_url"],
         "root_download_url": link.get("root_download_url", ""),
+        "open_url": link.get("open_url", ""),
         "registration_status": link.get("registration_status", ""),
         "registration_error": link.get("registration_error", ""),
         "zone": link.get("zone", ""),

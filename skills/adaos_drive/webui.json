@@ -464,6 +464,9 @@
                   "on": "click:download",
                   "type": "callSkill",
                   "target": "adaos_drive.download_selected",
+                  "openResultUrl": true,
+                  "resultUrlPath": "open_url",
+                  "resultUrlTarget": "_blank",
                   "params": {
                     "side_effect_class": "local_write"
                   },
@@ -684,6 +687,9 @@
                   "on": "click:download",
                   "type": "callSkill",
                   "target": "adaos_drive.download_selected",
+                  "openResultUrl": true,
+                  "resultUrlPath": "open_url",
+                  "resultUrlTarget": "_blank",
                   "params": {
                     "panel": "left",
                     "path": "$state.adaosDriveLeftSelectedPath",
@@ -739,7 +745,7 @@
                 {
                   "on": "select",
                   "type": "callSkill",
-                  "target": "adaos_drive.select_item",
+                  "target": "adaos_drive.activate_item",
                   "params": {
                     "panel": "left",
                     "path": "$event.path",
@@ -835,7 +841,7 @@
                 {
                   "on": "select",
                   "type": "callSkill",
-                  "target": "adaos_drive.select_item",
+                  "target": "adaos_drive.activate_item",
                   "params": {
                     "panel": "left",
                     "path": "$event.path",
@@ -1089,6 +1095,9 @@
                   "on": "click:download",
                   "type": "callSkill",
                   "target": "adaos_drive.download_selected",
+                  "openResultUrl": true,
+                  "resultUrlPath": "open_url",
+                  "resultUrlTarget": "_blank",
                   "params": {
                     "panel": "right",
                     "path": "$state.adaosDriveRightSelectedPath",
@@ -1144,7 +1153,7 @@
                 {
                   "on": "select",
                   "type": "callSkill",
-                  "target": "adaos_drive.select_item",
+                  "target": "adaos_drive.activate_item",
                   "params": {
                     "panel": "right",
                     "path": "$event.path",
@@ -1240,7 +1249,7 @@
                 {
                   "on": "select",
                   "type": "callSkill",
-                  "target": "adaos_drive.select_item",
+                  "target": "adaos_drive.activate_item",
                   "params": {
                     "panel": "right",
                     "path": "$event.path",

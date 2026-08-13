@@ -190,6 +190,31 @@ tools:
         type: boolean
       snapshot:
         type: object
+- name: activate_item
+  entry: handlers.main:activate_item
+  description: Select files and open folders, including parent folder rows.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      path:
+        type: string
+      id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
 - name: navigate_up
   entry: handlers.main:navigate_up
   description: Navigate one panel to the parent folder.

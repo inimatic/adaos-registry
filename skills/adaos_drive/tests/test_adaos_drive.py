@@ -94,6 +94,24 @@ def test_path_traversal_is_rejected(monkeypatch, tmp_path):
         mod.make_folder({"panel": "left", "name": "..\\escape", "webspace_id": "test"})
 
 
+def test_activate_item_opens_folders_and_parent_rows(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    nested = root / "scenarios"
+    nested.mkdir(parents=True)
+    (nested / "scenario.yaml").write_text("name: demo\n", encoding="utf-8")
+    mod, _streams = load_module(monkeypatch)
+    mod.reset_drive({"root": str(root), "webspace_id": "test"})
+
+    opened = mod.activate_item({"panel": "left", "path": "scenarios", "webspace_id": "test"})
+    assert opened["snapshot"]["panels"]["left"]["path"] == "scenarios"
+
+    selected = mod.activate_item({"panel": "left", "path": "scenarios/scenario.yaml", "webspace_id": "test"})
+    assert selected["snapshot"]["panels"]["left"]["selected_path"] == "scenarios/scenario.yaml"
+
+    parent = mod.activate_item({"panel": "left", "path": "__parent__", "webspace_id": "test"})
+    assert parent["snapshot"]["panels"]["left"]["path"] == ""
+
+
 def test_copy_rename_upload_preview_and_link(monkeypatch, tmp_path):
     for key in (
         "ADAOS_PUBLIC_APP_URL",
@@ -153,6 +171,11 @@ def test_copy_rename_upload_preview_and_link(monkeypatch, tmp_path):
     assert "subnet_id=" not in link["link"]["download_url"]
     assert link["link"]["root_download_url"].startswith("https://ru.api.inimatic.com/v1/drive/public-links/")
     assert not (skills_root / ".runtime" / "adaos_drive" / "v0.0" / "data" / "files" / "public_links").exists()
+
+    downloaded = mod.download_selected({"panel": "left", "path": "alpha.txt", "webspace_id": "test"})
+    assert downloaded["ok"] is True
+    assert downloaded["link"]["open_url"].startswith("https://ru.api.inimatic.com/v1/drive/public-links/")
+    assert "download=1" in downloaded["link"]["open_url"]
 
 
 def test_guest_link_public_app_base_can_be_overridden(monkeypatch, tmp_path):
