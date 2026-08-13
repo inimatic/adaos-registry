@@ -1,0 +1,1445 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "webio": {
+    "receivers": {
+      "adaos_drive.browser": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": true,
+          "status": "loading",
+          "message": "Loading AdaOS Drive",
+          "sources": [],
+          "source_options": [],
+          "selectors": {
+            "left_source": {
+              "options": [],
+              "current": ""
+            },
+            "right_source": {
+              "options": [],
+              "current": ""
+            }
+          },
+          "active_panel": "left",
+          "panels": {
+            "left": {
+              "id": "left",
+              "items": [],
+              "tree_view": {
+                "root": {
+                  "id": "__root__",
+                  "title": "Left",
+                  "children": []
+                }
+              }
+            },
+            "right": {
+              "id": "right",
+              "items": [],
+              "tree_view": {
+                "root": {
+                  "id": "__root__",
+                  "title": "Right",
+                  "children": []
+                }
+              }
+            }
+          },
+          "preview": {
+            "mode": "empty",
+            "content": "",
+            "language": "text"
+          },
+          "recent_links": {
+            "items": []
+          },
+          "messages": [],
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 262144,
+          "maxPublishHz": 2,
+          "maxSnapshotHz": 1,
+          "maxItems": 500
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last file browser snapshot.",
+          "log": "skill:adaos_drive.runtime",
+          "quarantine": false,
+          "metric": "webio_stream_guard.adaos_drive.browser"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:adaos_drive_modal",
+          "owner": "skill:adaos_drive",
+          "firstPaint": "two panel browser snapshot",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "adaos_drive.action"
+          ]
+        }
+      }
+    }
+  },
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "defaultView": "adaos_drive.files.two_panel",
+    "views": {
+      "adaos_drive.files.two_panel": {
+        "title": "AdaOS Drive",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {},
+        "data": {
+          "snapshot": {
+            "source": "adaos_drive.browser",
+            "path": ""
+          }
+        }
+      }
+    },
+    "transitions": []
+  },
+  "apps": [
+    {
+      "id": "adaos_drive_app",
+      "title": "AdaOS Drive",
+      "subtitle": "Two-panel local file manager",
+      "icon": "folder-open-outline",
+      "aliases": [
+        "adaos drive",
+        "drive",
+        "files",
+        "file manager"
+      ],
+      "launchModal": "adaos_drive_modal",
+      "action": {
+        "navigate": "adaos_drive.files.two_panel",
+        "openModal": "adaos_drive_modal"
+      }
+    }
+  ],
+  "registry": {
+    "modals": {
+      "adaos_drive_modal": {
+        "title": "AdaOS Drive",
+        "implements": [
+          "adaos_drive.files.two_panel"
+        ],
+        "presentation": {
+          "kind": "modal",
+          "size": "fullscreen",
+          "restoreFocus": true
+        },
+        "schema": {
+          "id": "adaos_drive",
+          "title": "AdaOS Drive",
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "defaultRoute": "files.two_panel",
+            "history": {
+              "url": true,
+              "mode": "replace"
+            },
+            "domain": {
+              "schema": "adaos.ui.modal_domain.v1",
+              "defaultState": "files.two_panel",
+              "stateKey": "adaosDriveRoute",
+              "states": {
+                "files.two_panel": {
+                  "kind": "custom",
+                  "route": "files.two_panel",
+                  "view": "adaos_drive.files.two_panel",
+                  "state": {
+                    "adaosDriveActivePanel": "left"
+                  }
+                }
+              }
+            },
+            "ownership": {
+              "schema": "adaos.ui.state_ownership.v1",
+              "domainState": {
+                "owner": "skill:adaos_drive",
+                "store": "skill_memory",
+                "projection": "webio:adaos_drive.browser"
+              },
+              "routeState": {
+                "owner": "browser",
+                "scope": "modal",
+                "keys": [
+                  "adaosDriveRoute",
+                  "adaosDriveActivePanel",
+                  "adaosDriveLeftSelectedPath",
+                  "adaosDriveRightSelectedPath"
+                ]
+              },
+              "viewState": {
+                "owner": "browser",
+                "scope": "modal"
+              },
+              "persistence": {
+                "owner": "skill:adaos_drive",
+                "ack": "tool:adaos_drive.persist_state",
+                "durability": "skill_local_memory"
+              }
+            },
+            "routes": {
+              "files.two_panel": {
+                "view": "adaos_drive.files.two_panel",
+                "params": {},
+                "state": {
+                  "adaosDriveActivePanel": "left"
+                }
+              }
+            }
+          },
+          "surfaceClass": "workspace",
+          "layout": {
+            "type": "split",
+            "pattern": "focus-detail",
+            "areas": [
+              {
+                "id": "left",
+                "role": "sidebar",
+                "label": "Left panel"
+              },
+              {
+                "id": "right",
+                "role": "main",
+                "label": "Right panel"
+              },
+              {
+                "id": "preview",
+                "role": "aux",
+                "label": "Preview and links"
+              },
+              {
+                "id": "bottom",
+                "role": "footer",
+                "label": "Commands and sources"
+              }
+            ]
+          },
+          "initialState": {
+            "adaosDriveActivePanel": "left",
+            "adaosDriveLeftSelectedPath": "",
+            "adaosDriveRightSelectedPath": "",
+            "adaosDriveAddPanel": "left",
+            "adaosDriveNewName": "",
+            "adaosDriveNewFolder": ""
+          },
+          "interaction": {
+            "initialFocus": "widget:adaos-drive-left-files"
+          },
+          "widgets": [
+            {
+              "id": "adaos-drive-active-panel",
+              "type": "input.commandBar",
+              "area": "bottom",
+              "title": "Active panel",
+              "inputs": {
+                "variant": "segmented",
+                "stretch": true,
+                "selectedStateKey": "adaosDriveActivePanel",
+                "buttons": [
+                  {
+                    "id": "left",
+                    "label": "Left",
+                    "icon": "albums-outline"
+                  },
+                  {
+                    "id": "right",
+                    "label": "Right",
+                    "icon": "albums-outline"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:left",
+                  "type": "updateState",
+                  "params": {
+                    "adaosDriveActivePanel": "left"
+                  }
+                },
+                {
+                  "on": "click:left",
+                  "type": "callSkill",
+                  "target": "adaos_drive.set_active_panel",
+                  "params": {
+                    "panel": "left",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:right",
+                  "type": "updateState",
+                  "params": {
+                    "adaosDriveActivePanel": "right"
+                  }
+                },
+                {
+                  "on": "click:right",
+                  "type": "callSkill",
+                  "target": "adaos_drive.set_active_panel",
+                  "params": {
+                    "panel": "right",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-refresh",
+              "type": "input.commandBar",
+              "area": "bottom",
+              "title": "Refresh",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "refresh",
+                    "label": "Refresh",
+                    "icon": "refresh-outline"
+                  },
+                  {
+                    "id": "expand-left-root",
+                    "label": "Load left tree",
+                    "icon": "git-branch-outline"
+                  },
+                  {
+                    "id": "expand-right-root",
+                    "label": "Load right tree",
+                    "icon": "git-branch-outline"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:refresh",
+                  "type": "callSkill",
+                  "target": "adaos_drive.refresh",
+                  "params": {
+                    "panel": "$state.adaosDriveActivePanel"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:expand-left-root",
+                  "type": "callSkill",
+                  "target": "adaos_drive.expand_tree",
+                  "params": {
+                    "panel": "left",
+                    "path": ""
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:expand-right-root",
+                  "type": "callSkill",
+                  "target": "adaos_drive.expand_tree",
+                  "params": {
+                    "panel": "right",
+                    "path": ""
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-active-actions",
+              "type": "input.commandBar",
+              "area": "bottom",
+              "title": "Active item commands",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "up",
+                    "label": "Up",
+                    "icon": "arrow-up-outline"
+                  },
+                  {
+                    "id": "open",
+                    "label": "Open",
+                    "icon": "folder-open-outline"
+                  },
+                  {
+                    "id": "preview",
+                    "label": "Preview other",
+                    "icon": "eye-outline"
+                  },
+                  {
+                    "id": "copy",
+                    "label": "Copy other",
+                    "icon": "copy-outline"
+                  },
+                  {
+                    "id": "link",
+                    "label": "Copy link",
+                    "icon": "link-outline"
+                  },
+                  {
+                    "id": "download",
+                    "label": "Download",
+                    "icon": "download-outline"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:up",
+                  "type": "callSkill",
+                  "target": "adaos_drive.navigate_up",
+                  "params": {
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:open",
+                  "type": "callSkill",
+                  "target": "adaos_drive.open_selected",
+                  "params": {
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:preview",
+                  "type": "callSkill",
+                  "target": "adaos_drive.preview_in_other_panel",
+                  "params": {
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:copy",
+                  "type": "callSkill",
+                  "target": "adaos_drive.copy_to_other_panel",
+                  "params": {
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:link",
+                  "type": "callSkill",
+                  "target": "adaos_drive.create_guest_link",
+                  "params": {
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:download",
+                  "type": "callSkill",
+                  "target": "adaos_drive.download_selected",
+                  "params": {
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-add-source",
+              "type": "ui.form",
+              "area": "bottom",
+              "title": "Add local source",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "minFieldWidth": 220,
+                "submitLabel": "Add source",
+                "fields": [
+                  {
+                    "id": "label",
+                    "type": "shortText",
+                    "label": "Label",
+                    "placeholder": "Projects",
+                    "span": 3
+                  },
+                  {
+                    "id": "path",
+                    "type": "shortText",
+                    "label": "Local folder",
+                    "placeholder": "D:\\\\git\\\\inimatic",
+                    "required": true,
+                    "span": 7
+                  },
+                  {
+                    "id": "panel",
+                    "type": "dropdown",
+                    "label": "Open in",
+                    "defaultValue": "left",
+                    "options": [
+                      {
+                        "label": "Left",
+                        "value": "left"
+                      },
+                      {
+                        "label": "Right",
+                        "value": "right"
+                      }
+                    ],
+                    "span": 2
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "adaos_drive.add_source",
+                  "params": {
+                    "label": "$event.values.label",
+                    "path": "$event.values.path",
+                    "panel": "$event.values.panel",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-left-source",
+              "type": "input.selector",
+              "area": "left",
+              "title": "Left source",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "selectors.left_source"
+              },
+              "inputs": {
+                "label": "Source",
+                "placeholder": "Choose source",
+                "bindField": "current",
+                "optionLabelPath": "label",
+                "optionValuePath": "id",
+                "optionDescriptionPath": "description",
+                "optionMetaPaths": [
+                  "kind",
+                  "path"
+                ]
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "adaos_drive.select_source",
+                  "params": {
+                    "panel": "left",
+                    "source_id": "$event.value",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-left-actions",
+              "type": "input.commandBar",
+              "area": "left",
+              "title": "Left commands",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "up",
+                    "label": "Up",
+                    "icon": "arrow-up-outline"
+                  },
+                  {
+                    "id": "open",
+                    "label": "Open",
+                    "icon": "folder-open-outline"
+                  },
+                  {
+                    "id": "preview",
+                    "label": "Preview",
+                    "icon": "eye-outline"
+                  },
+                  {
+                    "id": "copy",
+                    "label": "Copy ->",
+                    "icon": "copy-outline"
+                  },
+                  {
+                    "id": "link",
+                    "label": "Link",
+                    "icon": "link-outline"
+                  },
+                  {
+                    "id": "download",
+                    "label": "Download",
+                    "icon": "download-outline"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:up",
+                  "type": "callSkill",
+                  "target": "adaos_drive.navigate_up",
+                  "params": {
+                    "panel": "left",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:open",
+                  "type": "callSkill",
+                  "target": "adaos_drive.open_selected",
+                  "params": {
+                    "panel": "left",
+                    "path": "$state.adaosDriveLeftSelectedPath",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:preview",
+                  "type": "callSkill",
+                  "target": "adaos_drive.preview_in_other_panel",
+                  "params": {
+                    "panel": "left",
+                    "path": "$state.adaosDriveLeftSelectedPath",
+                    "preview_panel": "right",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:copy",
+                  "type": "callSkill",
+                  "target": "adaos_drive.copy_to_other_panel",
+                  "params": {
+                    "panel": "left",
+                    "to_panel": "right",
+                    "path": "$state.adaosDriveLeftSelectedPath",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:link",
+                  "type": "callSkill",
+                  "target": "adaos_drive.create_guest_link",
+                  "params": {
+                    "panel": "left",
+                    "path": "$state.adaosDriveLeftSelectedPath",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:download",
+                  "type": "callSkill",
+                  "target": "adaos_drive.download_selected",
+                  "params": {
+                    "panel": "left",
+                    "path": "$state.adaosDriveLeftSelectedPath",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-left-tree",
+              "type": "collection.tree",
+              "area": "left",
+              "title": "Left tree",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "panels.left.tree_view"
+              },
+              "inputs": {
+                "titleKey": "name",
+                "subtitleKey": "subtitle",
+                "childrenKey": "children",
+                "stateKey": "adaosDriveLeftSelectedPath",
+                "expandedByDefault": false,
+                "compactIndent": true,
+                "buttons": [
+                  {
+                    "id": "expand",
+                    "label": "Expand",
+                    "icon": "chevron-forward-outline",
+                    "whenKey": "is_dir"
+                  },
+                  {
+                    "id": "open",
+                    "label": "Open",
+                    "icon": "folder-open-outline",
+                    "whenKey": "is_dir"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "adaosDriveActivePanel": "left",
+                    "adaosDriveLeftSelectedPath": "$event.path"
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "callSkill",
+                  "target": "adaos_drive.select_item",
+                  "params": {
+                    "panel": "left",
+                    "path": "$event.path",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:expand",
+                  "type": "callSkill",
+                  "target": "adaos_drive.expand_tree",
+                  "params": {
+                    "panel": "left",
+                    "path": "$event.path"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:open",
+                  "type": "callSkill",
+                  "target": "adaos_drive.open_folder",
+                  "params": {
+                    "panel": "left",
+                    "path": "$event.path",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-left-files",
+              "type": "ui.table",
+              "area": "left",
+              "title": "Left files",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "panels.left"
+              },
+              "inputs": {
+                "columns": [
+                  {
+                    "key": "icon",
+                    "label": "",
+                    "kind": "icon",
+                    "width": "44px",
+                    "tooltipKey": "kind"
+                  },
+                  {
+                    "key": "name",
+                    "label": "Name"
+                  },
+                  {
+                    "key": "extension",
+                    "label": "Ext",
+                    "width": "72px"
+                  },
+                  {
+                    "key": "size",
+                    "label": "Size",
+                    "width": "96px"
+                  },
+                  {
+                    "key": "modified_label",
+                    "label": "Modified",
+                    "width": "176px"
+                  }
+                ],
+                "pageSize": 100,
+                "pageSizeOptions": [
+                  50,
+                  100,
+                  250,
+                  500
+                ]
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "adaosDriveActivePanel": "left",
+                    "adaosDriveLeftSelectedPath": "$event.path"
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "callSkill",
+                  "target": "adaos_drive.select_item",
+                  "params": {
+                    "panel": "left",
+                    "path": "$event.path",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-left-upload",
+              "type": "input.fileUpload",
+              "area": "left",
+              "title": "Upload",
+              "inputs": {
+                "skill": "adaos_drive",
+                "purpose": "uploads",
+                "accept": "*/*",
+                "label": "Upload to left",
+                "maxBytes": 1073741824
+              },
+              "actions": [
+                {
+                  "on": "uploaded",
+                  "type": "callSkill",
+                  "target": "adaos_drive.upload_to_panel",
+                  "params": {
+                    "panel": "left",
+                    "side_effect_class": "local_write",
+                    "artifact_ref": "$event.artifact_ref",
+                    "file": "$event.file"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-left-forms",
+              "type": "ui.form",
+              "area": "left",
+              "title": "Left create or rename",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "minFieldWidth": 180,
+                "submitLabel": "Rename selected",
+                "secondaryActions": [
+                  {
+                    "id": "save_draft",
+                    "label": "New folder",
+                    "variant": "secondary"
+                  }
+                ],
+                "fields": [
+                  {
+                    "id": "new_name",
+                    "type": "shortText",
+                    "label": "New name",
+                    "stateKey": "adaosDriveLeftNewName",
+                    "span": 6
+                  },
+                  {
+                    "id": "folder_name",
+                    "type": "shortText",
+                    "label": "New folder",
+                    "stateKey": "adaosDriveLeftNewFolder",
+                    "span": 6
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "adaos_drive.rename_selected",
+                  "params": {
+                    "panel": "left",
+                    "path": "$state.adaosDriveLeftSelectedPath",
+                    "new_name": "$event.values.new_name",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "save_draft",
+                  "type": "callSkill",
+                  "target": "adaos_drive.make_folder",
+                  "params": {
+                    "panel": "left",
+                    "name": "$event.values.folder_name",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-right-source",
+              "type": "input.selector",
+              "area": "right",
+              "title": "Right source",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "selectors.right_source"
+              },
+              "inputs": {
+                "label": "Source",
+                "placeholder": "Choose source",
+                "bindField": "current",
+                "optionLabelPath": "label",
+                "optionValuePath": "id",
+                "optionDescriptionPath": "description",
+                "optionMetaPaths": [
+                  "kind",
+                  "path"
+                ]
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "callSkill",
+                  "target": "adaos_drive.select_source",
+                  "params": {
+                    "panel": "right",
+                    "source_id": "$event.value",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-right-actions",
+              "type": "input.commandBar",
+              "area": "right",
+              "title": "Right commands",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "up",
+                    "label": "Up",
+                    "icon": "arrow-up-outline"
+                  },
+                  {
+                    "id": "open",
+                    "label": "Open",
+                    "icon": "folder-open-outline"
+                  },
+                  {
+                    "id": "preview",
+                    "label": "Preview",
+                    "icon": "eye-outline"
+                  },
+                  {
+                    "id": "copy",
+                    "label": "<- Copy",
+                    "icon": "copy-outline"
+                  },
+                  {
+                    "id": "link",
+                    "label": "Link",
+                    "icon": "link-outline"
+                  },
+                  {
+                    "id": "download",
+                    "label": "Download",
+                    "icon": "download-outline"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:up",
+                  "type": "callSkill",
+                  "target": "adaos_drive.navigate_up",
+                  "params": {
+                    "panel": "right",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:open",
+                  "type": "callSkill",
+                  "target": "adaos_drive.open_selected",
+                  "params": {
+                    "panel": "right",
+                    "path": "$state.adaosDriveRightSelectedPath",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:preview",
+                  "type": "callSkill",
+                  "target": "adaos_drive.preview_in_other_panel",
+                  "params": {
+                    "panel": "right",
+                    "path": "$state.adaosDriveRightSelectedPath",
+                    "preview_panel": "left",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:copy",
+                  "type": "callSkill",
+                  "target": "adaos_drive.copy_to_other_panel",
+                  "params": {
+                    "panel": "right",
+                    "to_panel": "left",
+                    "path": "$state.adaosDriveRightSelectedPath",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:link",
+                  "type": "callSkill",
+                  "target": "adaos_drive.create_guest_link",
+                  "params": {
+                    "panel": "right",
+                    "path": "$state.adaosDriveRightSelectedPath",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:download",
+                  "type": "callSkill",
+                  "target": "adaos_drive.download_selected",
+                  "params": {
+                    "panel": "right",
+                    "path": "$state.adaosDriveRightSelectedPath",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-right-tree",
+              "type": "collection.tree",
+              "area": "right",
+              "title": "Right tree",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "panels.right.tree_view"
+              },
+              "inputs": {
+                "titleKey": "name",
+                "subtitleKey": "subtitle",
+                "childrenKey": "children",
+                "stateKey": "adaosDriveRightSelectedPath",
+                "expandedByDefault": false,
+                "compactIndent": true,
+                "buttons": [
+                  {
+                    "id": "expand",
+                    "label": "Expand",
+                    "icon": "chevron-forward-outline",
+                    "whenKey": "is_dir"
+                  },
+                  {
+                    "id": "open",
+                    "label": "Open",
+                    "icon": "folder-open-outline",
+                    "whenKey": "is_dir"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "adaosDriveActivePanel": "right",
+                    "adaosDriveRightSelectedPath": "$event.path"
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "callSkill",
+                  "target": "adaos_drive.select_item",
+                  "params": {
+                    "panel": "right",
+                    "path": "$event.path",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:expand",
+                  "type": "callSkill",
+                  "target": "adaos_drive.expand_tree",
+                  "params": {
+                    "panel": "right",
+                    "path": "$event.path"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "click:open",
+                  "type": "callSkill",
+                  "target": "adaos_drive.open_folder",
+                  "params": {
+                    "panel": "right",
+                    "path": "$event.path",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-right-files",
+              "type": "ui.table",
+              "area": "right",
+              "title": "Right files",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "panels.right"
+              },
+              "inputs": {
+                "columns": [
+                  {
+                    "key": "icon",
+                    "label": "",
+                    "kind": "icon",
+                    "width": "44px",
+                    "tooltipKey": "kind"
+                  },
+                  {
+                    "key": "name",
+                    "label": "Name"
+                  },
+                  {
+                    "key": "extension",
+                    "label": "Ext",
+                    "width": "72px"
+                  },
+                  {
+                    "key": "size",
+                    "label": "Size",
+                    "width": "96px"
+                  },
+                  {
+                    "key": "modified_label",
+                    "label": "Modified",
+                    "width": "176px"
+                  }
+                ],
+                "pageSize": 100,
+                "pageSizeOptions": [
+                  50,
+                  100,
+                  250,
+                  500
+                ]
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "adaosDriveActivePanel": "right",
+                    "adaosDriveRightSelectedPath": "$event.path"
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "callSkill",
+                  "target": "adaos_drive.select_item",
+                  "params": {
+                    "panel": "right",
+                    "path": "$event.path",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-right-upload",
+              "type": "input.fileUpload",
+              "area": "right",
+              "title": "Upload",
+              "inputs": {
+                "skill": "adaos_drive",
+                "purpose": "uploads",
+                "accept": "*/*",
+                "label": "Upload to right",
+                "maxBytes": 1073741824
+              },
+              "actions": [
+                {
+                  "on": "uploaded",
+                  "type": "callSkill",
+                  "target": "adaos_drive.upload_to_panel",
+                  "params": {
+                    "panel": "right",
+                    "side_effect_class": "local_write",
+                    "artifact_ref": "$event.artifact_ref",
+                    "file": "$event.file"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-right-forms",
+              "type": "ui.form",
+              "area": "right",
+              "title": "Right create or rename",
+              "inputs": {
+                "layout": "responsiveGrid",
+                "minFieldWidth": 180,
+                "submitLabel": "Rename selected",
+                "secondaryActions": [
+                  {
+                    "id": "save_draft",
+                    "label": "New folder",
+                    "variant": "secondary"
+                  }
+                ],
+                "fields": [
+                  {
+                    "id": "new_name",
+                    "type": "shortText",
+                    "label": "New name",
+                    "stateKey": "adaosDriveRightNewName",
+                    "span": 6
+                  },
+                  {
+                    "id": "folder_name",
+                    "type": "shortText",
+                    "label": "New folder",
+                    "stateKey": "adaosDriveRightNewFolder",
+                    "span": 6
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "adaos_drive.rename_selected",
+                  "params": {
+                    "panel": "right",
+                    "path": "$state.adaosDriveRightSelectedPath",
+                    "new_name": "$event.values.new_name",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                },
+                {
+                  "on": "save_draft",
+                  "type": "callSkill",
+                  "target": "adaos_drive.make_folder",
+                  "params": {
+                    "panel": "right",
+                    "name": "$event.values.folder_name",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-preview",
+              "type": "item.codeViewer",
+              "area": "preview",
+              "title": "Preview",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "preview"
+              },
+              "inputs": {
+                "bindField": "content",
+                "languageField": "language",
+                "copyButton": true
+              }
+            },
+            {
+              "id": "adaos-drive-recent-links",
+              "type": "ui.list",
+              "area": "preview",
+              "title": "Recent link",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "recent_links"
+              },
+              "inputs": {
+                "collectionKey": "items",
+                "variant": "list",
+                "titleKey": "label",
+                "subtitleKey": "summary",
+                "detailsPath": "download_url",
+                "showDetails": true,
+                "itemAccordion": false,
+                "buttons": [
+                  {
+                    "id": "open",
+                    "label": "Open",
+                    "icon": "open-outline",
+                    "whenKey": "url"
+                  },
+                  {
+                    "id": "download",
+                    "label": "Download",
+                    "icon": "download-outline",
+                    "whenKey": "download_url"
+                  },
+                  {
+                    "id": "copy",
+                    "label": "Copy",
+                    "icon": "copy-outline",
+                    "whenKey": "download_url"
+                  }
+                ],
+                "emptyText": "No link created yet"
+              },
+              "actions": [
+                {
+                  "on": "click:open",
+                  "type": "openUrl",
+                  "params": {
+                    "url": "$event.url",
+                    "target": "_blank"
+                  }
+                },
+                {
+                  "on": "click:download",
+                  "type": "openUrl",
+                  "params": {
+                    "url": "$event.download_url",
+                    "target": "_blank",
+                    "download": true
+                  }
+                },
+                {
+                  "on": "click:copy",
+                  "type": "copyToClipboard",
+                  "params": {
+                    "text": "$event.download_url",
+                    "successMessage": "Link copied."
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "adaos_drive_app",
+      "autoInstall": true
+    }
+  ],
+  "resources": {}
+}

@@ -1,0 +1,556 @@
+name: adaos_drive
+version: 0.1.0
+description: Two-panel browser file manager for explicitly connected local folders.
+supported_locales:
+- en
+- ru
+runtime:
+  python: '3.11'
+webui_owner: shared
+default_tool: get_snapshot
+events:
+  subscribe:
+  - webio.stream.snapshot.requested
+  - webio.stream.subscription.changed
+data_routes:
+- surface: modal:adaos_drive_modal
+  route: stream
+  receiver: adaos_drive.browser
+  first_paint: two panel file browser state with connected local sources
+  recovery: skill republishes durable state on stream subscribe
+  update_source:
+  - webio.stream.snapshot.requested
+  - adaos_drive.action
+  budget:
+    max_payload_bytes: 262144
+    max_publish_hz: 2
+    max_items: 500
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: browser keeps the last drive snapshot
+    log: skill:adaos_drive.runtime
+    quarantine: false
+memory_budget:
+  expected_rss_mb: 96
+  caches:
+  - name: adaos_drive.state
+    storage: skill_memory
+    max_items: 8
+    cleanup_hook: reset_drive
+  - name: STATE_BY_WEBSPACE
+    storage: process_memory
+    max_items: 8
+    cleanup_hook: reset_drive
+lifecycle:
+  persist_before_switch: persist_state
+  rehydrate: rehydrate
+tools:
+- name: get_snapshot
+  entry: handlers.main:get_snapshot
+  description: Return and publish the current AdaOS Drive snapshot.
+  side_effects: read_only
+  side_effect_class: read_only
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - snapshot
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: add_source
+  entry: handlers.main:add_source
+  description: Connect an existing local folder as a file source.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - path
+    properties:
+      label:
+        type: string
+      path:
+        type: string
+      panel:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      source:
+        type: object
+      snapshot:
+        type: object
+- name: select_source
+  entry: handlers.main:select_source
+  description: Switch one panel to a connected source.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - source_id
+    properties:
+      source_id:
+        type: string
+      panel:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: set_active_panel
+  entry: handlers.main:set_active_panel
+  description: Mark one file panel as active.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      active_panel:
+        type: string
+      snapshot:
+        type: object
+- name: select_item
+  entry: handlers.main:select_item
+  description: Select an item in one panel.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      path:
+        type: string
+      id:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: open_folder
+  entry: handlers.main:open_folder
+  description: Navigate a panel into a folder.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      path:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: navigate_up
+  entry: handlers.main:navigate_up
+  description: Navigate one panel to the parent folder.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: expand_tree
+  entry: handlers.main:expand_tree
+  description: Lazily load one tree branch for a panel.
+  side_effects: read_only
+  side_effect_class: read_only
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      path:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - children
+    properties:
+      ok:
+        type: boolean
+      children:
+        type: array
+      snapshot:
+        type: object
+- name: open_selected
+  entry: handlers.main:open_selected
+  description: Open a selected folder or preview a selected file.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      path:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: rename_selected
+  entry: handlers.main:rename_selected
+  description: Rename the active selected file or folder within its source root.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - new_name
+    properties:
+      panel:
+        type: string
+      path:
+        type: string
+      new_name:
+        type: string
+      name:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: copy_to_other_panel
+  entry: handlers.main:copy_to_other_panel
+  description: Copy the selected file or folder from one panel to the other panel folder.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      from_panel:
+        type: string
+      to_panel:
+        type: string
+      path:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: create_guest_link
+  entry: handlers.main:create_guest_link
+  description: Register a Root-mediated guest download link for the selected file.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      path:
+        type: string
+      download:
+        type: boolean
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - link
+    properties:
+      ok:
+        type: boolean
+      link:
+        type: object
+      snapshot:
+        type: object
+- name: download_selected
+  entry: handlers.main:download_selected
+  description: Create a download link for the selected file.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      path:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - link
+    properties:
+      ok:
+        type: boolean
+      link:
+        type: object
+      snapshot:
+        type: object
+- name: preview_in_other_panel
+  entry: handlers.main:preview_in_other_panel
+  description: Preview the selected file in the opposite panel preview area when supported.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      path:
+        type: string
+      preview_panel:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - preview
+    properties:
+      ok:
+        type: boolean
+      preview:
+        type: object
+      snapshot:
+        type: object
+- name: upload_to_panel
+  entry: handlers.main:upload_to_panel
+  description: Copy an uploaded browser artifact into the current panel folder.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      artifact_ref:
+        type: object
+      file:
+        type: object
+      filename:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: make_folder
+  entry: handlers.main:make_folder
+  description: Create a folder in the current panel folder.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      name:
+        type: string
+      folder_name:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: refresh
+  entry: handlers.main:refresh
+  description: Refresh the drive snapshot.
+  side_effects: read_only
+  side_effect_class: read_only
+  input_schema:
+    type: object
+    properties:
+      panel:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: persist_state
+  entry: handlers.main:persist_state
+  description: Persist current drive state for runtime handoff.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+- name: rehydrate
+  entry: handlers.main:rehydrate
+  description: Restore drive state from skill memory and publish it.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+- name: reset_drive
+  entry: handlers.main:reset_drive
+  description: Reset drive state, primarily for tests and local development.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    properties:
+      root:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+      snapshot:
+        type: object
+llm_hints:
+  description: Browser-accessible two-panel file manager for local folders.
+  aliases:
+  - adaos drive
+  - drive
+  - file manager
+  primary_actions:
+  - id: adaos_drive.open
+    intent: adaos_drive.open
+    tool: adaos_drive.get_snapshot
+    side_effect_class: read_only
+  - id: adaos_drive.add_source
+    intent: adaos_drive.add_source
+    tool: adaos_drive.add_source
+    side_effect_class: local_write
+nlu:
+  nlu_hints:
+    aliases:
+    - adaos drive
+    - drive
+    - file manager
+    examples:
+    - open adaos drive
+    - show files
+    slot_schemas: {}
+    entities: []
