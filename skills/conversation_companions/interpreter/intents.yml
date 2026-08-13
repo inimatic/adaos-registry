@@ -1,0 +1,33 @@
+intents:
+- intent: conversation.start
+  description: null
+  skill: conversation_companions
+  examples:
+  - поговорим
+  - создай персонажа
+  - хочу разговорного помощника
+  - выбери собеседника
+- intent: conversation.talk
+  description: null
+  skill: conversation_companions
+  examples:
+  - дай совет
+  - что думаешь
+  - помоги разобраться
+  - развлеки меня
+- intent: conversation.switch_character
+  description: null
+  skill: conversation_companions
+  examples:
+  - позови Нику
+  - переключись на Арсения
+  - пусть ответит рассказчик
+  - ответь как скептик
+- intent: conversation.update_profile
+  description: null
+  skill: conversation_companions
+  examples:
+  - говори короче
+  - будь теплее
+  - не задавай вопросы в конце
+  - не спорь так резко

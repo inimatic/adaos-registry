@@ -1,0 +1,165 @@
+name: test03_recipes_skill
+version: 0.2.5
+description: Durable node-local recipe catalog and favorite selections for the Test03
+  Recipes scenario.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: list_recipes
+runtime:
+  python: '3.11'
+dependencies: []
+events:
+  subscribe: []
+  publish: []
+exports:
+  tools:
+  - list_recipes
+  - add_recipe
+  - toggle_favorite
+tools:
+- name: list_recipes
+  description: Return all persisted recipes and favorite recipe identifiers.
+  entry: handlers.main:list_recipes
+  side_effects: read_only
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - recipes
+    - favoriteIds
+    - count
+    properties:
+      ok:
+        type: boolean
+      recipes:
+        type: array
+        items:
+          type: object
+      favoriteIds:
+        type: array
+        items:
+          type: string
+      count:
+        type: integer
+- name: add_recipe
+  description: Validate and persist a new recipe in skill-local storage.
+  entry: handlers.main:add_recipe
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - title
+    - category
+    - time
+    - difficulty
+    additionalProperties: false
+    properties:
+      title:
+        type: string
+        minLength: 1
+      category:
+        type: string
+        minLength: 1
+      time:
+        type: integer
+        minimum: 1
+      difficulty:
+        type: string
+        minLength: 1
+      ingredients:
+        type: string
+      steps:
+        type: string
+      image:
+        type: string
+      preview:
+        type: string
+      added_at:
+        type: string
+        format: date
+  output_schema:
+    type: object
+    required:
+    - ok
+    - recipe
+    - recipes
+    - favoriteIds
+    - count
+- name: toggle_favorite
+  description: Toggle and persist the favorite state of an existing recipe.
+  entry: handlers.main:toggle_favorite
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - recipe_id
+    additionalProperties: false
+    properties:
+      recipe_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+    required:
+    - ok
+    - recipeId
+    - isFavorite
+    - recipes
+    - favoriteIds
+    - count
+data_routes:
+- surface: widget:recipes-list
+  route: tool/details
+  tool: list_recipes
+  read_policy:
+    mode: stale_while_revalidate
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - reconnect
+    cache_ttl_ms: 300000
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - test03-recipes:catalog
+  owner: skill:test03_recipes_skill
+  update_source: list_recipes
+  first_paint: Prototype 002 static recipe cards and favorite r2
+  recovery: Re-run list_recipes from durable skill-local storage
+  budget:
+    max_payload_bytes: 262144
+    max_items: 256
+    ttl_ms: 300000
+  guard_visibility: Render the approved static mock when the skill is unavailable
+- surface: mutation:add-recipe
+  route: skill-local
+  path: skill_memory:recipes.v1
+  owner: skill:test03_recipes_skill
+  update_source: add_recipe
+  first_paint: Existing recipe snapshot
+  recovery: Reload list_recipes after the mutation
+  budget:
+    max_payload_bytes: 262144
+    max_items: 256
+    ttl_ms: 300000
+  guard_visibility: Keep the form open and show action feedback on failure
+- surface: mutation:favorite-selection
+  route: skill-local
+  path: skill_memory:favorites.v1
+  owner: skill:test03_recipes_skill
+  update_source: toggle_favorite
+  first_paint: Favorite r2 from the approved prototype
+  recovery: Reload list_recipes after the mutation
+  budget:
+    max_payload_bytes: 16384
+    max_items: 256
+    ttl_ms: 300000
+  guard_visibility: Preserve current browser state and show action feedback on failure
+prototype: skill_default
+updated_at: '2026-07-28T08:38:38+00:00'

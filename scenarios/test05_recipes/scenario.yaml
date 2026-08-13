@@ -1,0 +1,56 @@
+id: test05_recipes
+name: test05_recipes
+version: 0.1.4
+title: Домашняя книга рецептов
+description: Локальная книга рецептов с поиском, добавлением и избранным.
+type: desktop
+supported_locales:
+- en
+- ru
+depends:
+- test05_recipes_skill
+runtime:
+  skills:
+    required:
+    - test05_recipes_skill
+    optional: []
+ui:
+  manifest: webui.json
+trigger: manual
+vars:
+  query: ''
+  favorites_only: false
+llm_hints:
+  description: Локальная книга рецептов с поиском, добавлением и избранным.
+  aliases: []
+  primary_actions:
+  - id: test05_recipes.list
+    intent: test05_recipes.list
+    tool: test05_recipes_skill.list_recipes
+    side_effect_class: read_only
+  - id: test05_recipes.add
+    intent: test05_recipes.add
+    tool: test05_recipes_skill.add_recipe
+    side_effect_class: local_write
+  examples:
+  - Покажи рецепты
+  - Добавь рецепт
+  owner_hints:
+  - skill:test05_recipes_skill
+nlu:
+  nlu_hints:
+    aliases: []
+    examples: []
+    slot_schemas: {}
+    entities: []
+steps:
+- name: list_recipes
+  call: test05_recipes_skill.list_recipes
+  args:
+    query: ''
+    favorites_only: false
+prototype: scenario_default
+updated_at: '2026-07-29T17:25:37+00:00'
+title_i18n:
+  fallback: Домашняя книга рецептов
+  key: scenario.test05_recipes.title

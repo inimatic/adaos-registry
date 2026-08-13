@@ -26,6 +26,27 @@
     },
     {
       "kind": "skill",
+      "id": "adaos_drive",
+      "name": "adaos_drive",
+      "version": "0.1.0",
+      "updated_at": "2026-08-13T18:50:24+00:00",
+      "path": "skills/adaos_drive",
+      "manifest": "skills/adaos_drive/skill.yaml",
+      "source": {
+        "path": "skills/adaos_drive",
+        "manifest": "skills/adaos_drive/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "adaos_drive",
+        "id": "adaos_drive"
+      },
+      "description": "Two-panel browser file manager for explicitly connected local folders.",
+      "runtime_python": "3.11",
+      "tools_count": 21
+    },
+    {
+      "kind": "skill",
       "id": "ai_event_analysis_skill",
       "name": "ai_event_analysis_skill",
       "version": "0.2.21",
@@ -49,7 +70,7 @@
       "kind": "skill",
       "id": "browsers_skill",
       "name": "browsers_skill",
-      "version": "0.15.21",
+      "version": "0.15.22",
       "updated_at": "2026-08-11T09:23:14+00:00",
       "path": "skills/browsers_skill",
       "manifest": "skills/browsers_skill/skill.yaml",
@@ -64,7 +85,7 @@
       },
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 11
+      "tools_count": 12
     },
     {
       "kind": "skill",
@@ -794,7 +815,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-08-12T09:35:56+00:00",
+      "updated_at": "2026-08-13T18:50:26+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
@@ -987,7 +1008,7 @@
       "kind": "skill",
       "id": "voice_chat_skill",
       "name": "voice_chat_skill",
-      "version": "0.6.18",
+      "version": "0.6.19",
       "updated_at": "2026-08-11T09:29:46+00:00",
       "path": "skills/voice_chat_skill",
       "manifest": "skills/voice_chat_skill/skill.yaml",
@@ -1071,6 +1092,32 @@
     }
   ],
   "scenarios": [
+    {
+      "kind": "scenario",
+      "id": "adaos_drive",
+      "name": "adaos_drive",
+      "version": "0.1.0",
+      "updated_at": "2026-08-12T00:00:00+00:00",
+      "path": "scenarios/adaos_drive",
+      "manifest": "scenarios/adaos_drive/scenario.yaml",
+      "source": {
+        "path": "scenarios/adaos_drive",
+        "manifest": "scenarios/adaos_drive/scenario.yaml"
+      },
+      "install": {
+        "kind": "scenario",
+        "name": "adaos_drive",
+        "id": "adaos_drive"
+      },
+      "title": "AdaOS Drive",
+      "description": "Two-panel browser file manager for connected local folders.",
+      "trigger": "manual",
+      "skills": {
+        "required": [
+          "adaos_drive"
+        ]
+      }
+    },
     {
       "kind": "scenario",
       "id": "builder",

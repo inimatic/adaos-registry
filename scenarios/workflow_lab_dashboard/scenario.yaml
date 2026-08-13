@@ -1,0 +1,63 @@
+id: workflow_lab_dashboard
+name: workflow_lab_dashboard
+version: 0.1.2
+updated_at: '2026-08-05T20:24:26+00:00'
+title: Workflow Lab Dashboard • Панель заявок
+description: Compact bilingual request-state dashboard backed only by deterministic
+  local fixtures.
+type: desktop
+supported_locales:
+- en
+- ru
+depends:
+- workflow_lab_dashboard_skill
+runtime:
+  skills:
+    required:
+    - workflow_lab_dashboard_skill
+    optional: []
+ui:
+  manifest: webui.json
+trigger: manual
+vars:
+  selected_request_id: req-101
+steps:
+- name: load_dashboard
+  call: workflow_lab_dashboard_skill.get_dashboard
+  args:
+    selected_request_id: req-101
+- name: preview_action
+  call: workflow_lab_dashboard_skill.apply_action
+  args:
+    request_id: req-101
+    action: approve
+llm_hints:
+  description: Open the bilingual Workflow Lab request dashboard.
+  aliases:
+  - workflow lab
+  - request dashboard
+  - панель заявок
+  primary_actions:
+  - id: workflow_lab_dashboard.open
+    intent: workflow_lab_dashboard.open
+    tool: workflow_lab_dashboard_skill.get_dashboard
+    side_effect_class: read_only
+  examples:
+  - Open Workflow Lab
+  - Открой панель заявок
+  owner_hints:
+  - scenario:workflow_lab_dashboard
+nlu:
+  nlu_hints:
+    aliases:
+    - workflow lab
+    - панель заявок
+    examples:
+    - open workflow lab
+    - открой панель заявок
+    slot_schemas: {}
+    entities: []
+prototype: scenario_default
+title_i18n:
+  key: scenario.workflow_lab_dashboard.title
+  fallback: Workflow Lab Dashboard

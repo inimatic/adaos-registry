@@ -1,0 +1,167 @@
+name: workflow_lab_dashboard_skill
+version: 0.1.1
+updated_at: '2026-08-05T20:24:22+00:00'
+description: Deterministic local request-state tools for the bilingual Workflow Lab
+  dashboard.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: get_dashboard
+runtime:
+  python: '3.11'
+dependencies: []
+permissions: []
+events:
+  subscribe: []
+  publish: []
+exports:
+  tools:
+  - get_dashboard
+  - apply_action
+tools:
+- name: get_dashboard
+  description: Return all local sample requests and the selected request's allowed
+    actions.
+  entry: handlers.main:get_dashboard
+  side_effects: none
+  input_schema:
+    type: object
+    additionalProperties: false
+    properties:
+      selected_request_id:
+        type: string
+        enum:
+        - req-101
+        - req-102
+        - req-103
+        - req-104
+        default: req-101
+  output_schema:
+    type: object
+    additionalProperties: false
+    required:
+    - ok
+    - source
+    - requests
+    - selectedRequest
+    - nextActions
+    properties:
+      ok:
+        type: boolean
+      source:
+        type: string
+        const: local_fixture
+      requests:
+        type: array
+        items:
+          type: object
+      selectedRequest:
+        type: object
+      nextActions:
+        type: array
+        items:
+          type: object
+- name: apply_action
+  description: Validate and preview a context-dependent transition against local sample
+    data.
+  entry: handlers.main:apply_action
+  side_effects: none
+  input_schema:
+    type: object
+    additionalProperties: false
+    required:
+    - request_id
+    - action
+    properties:
+      request_id:
+        type: string
+        enum:
+        - req-101
+        - req-102
+        - req-103
+        - req-104
+      action:
+        type: string
+        enum:
+        - approve
+        - request_changes
+        - unblock
+        - start_work
+        - assign
+        - send_review
+  output_schema:
+    type: object
+    required:
+    - ok
+    - request
+    - nextActions
+    properties:
+      ok:
+        type: boolean
+      source:
+        type: string
+      appliedAction:
+        type: string
+      error:
+        type: string
+      request:
+        type: object
+      nextActions:
+        type: array
+        items:
+          type: object
+data_routes:
+- surface: widget:request-list
+  route: tool/details
+  tool: get_dashboard
+  owner: skill:workflow_lab_dashboard_skill
+  first_paint: deterministic local fixture
+  recovery: repeat get_dashboard with the selected request id
+  guard_visibility: read-only mock data; no external or sensitive data
+  budget:
+    max_payload_bytes: 32768
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - workflow-lab-dashboard
+llm_hints:
+  description: Inspect local workflow request states and preview valid next actions.
+  aliases:
+  - workflow lab
+  - request dashboard
+  primary_actions:
+  - id: workflow_lab_dashboard_skill.get_dashboard
+    intent: workflow_lab_dashboard_skill.get_dashboard
+    tool: get_dashboard
+    side_effect_class: read_only
+    examples:
+    - Show the workflow requests
+    - Покажи заявки
+  - id: workflow_lab_dashboard_skill.apply_action
+    intent: workflow_lab_dashboard_skill.apply_action
+    tool: apply_action
+    side_effect_class: read_only
+    examples:
+    - Preview the next request action
+    - Покажи результат действия
+  examples: []
+  owner_hints:
+  - skill:workflow_lab_dashboard_skill
+nlu_hints:
+  aliases:
+  - workflow lab
+  - панель заявок
+  examples:
+  - show workflow requests
+  - покажи заявки
+  slot_schemas: {}
+  entities: []
+prototype: workflow_lab_dashboard_skill

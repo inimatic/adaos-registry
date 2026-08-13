@@ -1,0 +1,130 @@
+{
+  "schema": "adaos.webui.v1",
+  "generated_by": "workflow_lab_dashboard_revision_001",
+  "ui": {
+    "application": {
+      "desktop": {
+        "pageSchema": {
+          "id": "workflow_lab_dashboard",
+          "title": "Workflow Lab Dashboard • Панель заявок",
+          "layout": {
+            "type": "split",
+            "pattern": "focus-detail",
+            "areas": [
+              {"id": "main", "role": "main"},
+              {"id": "details", "role": "aux"}
+            ],
+            "auxWidth": 320
+          },
+          "widgets": [
+            {
+              "area": "main",
+              "id": "request-list",
+              "type": "ui.list",
+              "title": "Requests • Заявки",
+              "inputs": {
+                "variant": "cards",
+                "search": true,
+                "searchPlaceholder": "Search requests • Поиск заявок",
+                "titleKey": "title",
+                "subtitleKey": "statusLabel",
+                "previewKey": "summary",
+                "meta": [
+                  {"key": "ownerLabel", "label": "Owner • Ответственный", "kind": "text"},
+                  {"key": "updatedAtLabel", "label": "Updated • Обновлено", "kind": "text"}
+                ],
+                "buttons": [
+                  {"id": "details", "label": "Details • Подробнее", "icon": "document-text-outline"}
+                ]
+              },
+              "dataSource": {
+                "kind": "skill",
+                "name": "workflow_lab_dashboard_skill.get_dashboard",
+                "params": {"selected_request_id": "$state.selectedRequestId"},
+                "transform": "requests",
+                "cacheTtlMs": 0,
+                "invalidationTags": ["workflow-lab-dashboard"],
+                "preserveLastValue": true
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "selectedRequestId": "$event.id",
+                    "selectedRequestStatus": "$event.status"
+                  }
+                },
+                {
+                  "on": "click:details",
+                  "type": "updateState",
+                  "params": {
+                    "selectedRequestId": "$event.id",
+                    "selectedRequestStatus": "$event.status"
+                  }
+                }
+              ]
+            },
+            {
+              "area": "details",
+              "id": "request-detail",
+              "type": "item.details",
+              "title": "Current request • Текущая заявка",
+              "inputs": {
+                "fields": [
+                  {"label": "Status • Статус", "path": "statusLabel"},
+                  {"label": "Why • Пояснение", "path": "summary"},
+                  {"label": "Owner • Ответственный", "path": "ownerLabel"},
+                  {"label": "Updated • Обновлено", "path": "updatedAtLabel"}
+                ]
+              },
+              "dataSource": {
+                "kind": "skill",
+                "name": "workflow_lab_dashboard_skill.get_dashboard",
+                "params": {"selected_request_id": "$state.selectedRequestId"},
+                "transform": "selectedRequest",
+                "cacheTtlMs": 0,
+                "invalidationTags": ["workflow-lab-dashboard"],
+                "preserveLastValue": true
+              }
+            },
+            {
+              "area": "details",
+              "id": "next-actions",
+              "type": "ui.actions",
+              "title": "Next actions • Следующие действия",
+              "inputs": {
+                "variant": "toolbar",
+                "buttons": [
+                  {"id": "approve", "label": "Approve • Утвердить", "kind": "primary"},
+                  {"id": "request_changes", "label": "Request changes • Запросить правки", "kind": "secondary"},
+                  {"id": "unblock", "label": "Unblock • Разблокировать", "kind": "primary"},
+                  {"id": "start_work", "label": "Start work • Начать работу", "kind": "primary"},
+                  {"id": "assign", "label": "Assign approver • Назначить согласующего", "kind": "secondary"},
+                  {"id": "send_review", "label": "Send to review • Отправить на проверку", "kind": "primary"}
+                ]
+              },
+              "actions": [
+                {"on": "click:approve", "type": "callSkill", "target": "workflow_lab_dashboard_skill.apply_action", "params": {"request_id": "$state.selectedRequestId", "action": "approve"}, "enabledIf": "$state.selectedRequestStatus === 'in_review'", "invalidates": ["workflow-lab-dashboard"], "allowOffline": true},
+                {"on": "click:request_changes", "type": "callSkill", "target": "workflow_lab_dashboard_skill.apply_action", "params": {"request_id": "$state.selectedRequestId", "action": "request_changes"}, "enabledIf": "$state.selectedRequestStatus === 'in_review'", "invalidates": ["workflow-lab-dashboard"], "allowOffline": true},
+                {"on": "click:unblock", "type": "callSkill", "target": "workflow_lab_dashboard_skill.apply_action", "params": {"request_id": "$state.selectedRequestId", "action": "unblock"}, "enabledIf": "$state.selectedRequestStatus === 'blocked'", "invalidates": ["workflow-lab-dashboard"], "allowOffline": true},
+                {"on": "click:start_work", "type": "callSkill", "target": "workflow_lab_dashboard_skill.apply_action", "params": {"request_id": "$state.selectedRequestId", "action": "start_work"}, "enabledIf": "$state.selectedRequestStatus === 'pending' || $state.selectedRequestStatus === 'changes_requested'", "invalidates": ["workflow-lab-dashboard"], "allowOffline": true},
+                {"on": "click:assign", "type": "callSkill", "target": "workflow_lab_dashboard_skill.apply_action", "params": {"request_id": "$state.selectedRequestId", "action": "assign"}, "enabledIf": "$state.selectedRequestStatus === 'pending'", "invalidates": ["workflow-lab-dashboard"], "allowOffline": true},
+                {"on": "click:send_review", "type": "callSkill", "target": "workflow_lab_dashboard_skill.apply_action", "params": {"request_id": "$state.selectedRequestId", "action": "send_review"}, "enabledIf": "$state.selectedRequestStatus === 'in_progress'", "invalidates": ["workflow-lab-dashboard"], "allowOffline": true}
+              ]
+            }
+          ],
+          "initialState": {
+            "selectedRequestId": "req-101",
+            "selectedRequestStatus": "in_review"
+          },
+          "meta": {"builder": {"empty_canvas": false}},
+          "title_i18n": {
+            "key": "scenario.workflow_lab_dashboard.title",
+            "fallback": "Workflow Lab Dashboard"
+          }
+        }
+      }
+    }
+  }
+}

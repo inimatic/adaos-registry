@@ -1,0 +1,21 @@
+id: test03_recipes
+name: test03_recipes
+type: desktop
+title: Кулинарные рецепты
+description: Durable local recipe catalog with favorite selections.
+version: 0.2.12
+title_i18n:
+  key: scenario.test03_recipes.title
+  fallback: Test03 Recipes
+supported_locales:
+- en
+- ru
+depends:
+- test03_recipes_skill
+runtime:
+  skills:
+    required:
+    - test03_recipes_skill
+ui:
+  manifest: webui.json
+updated_at: '2026-07-28T08:38:41+00:00'

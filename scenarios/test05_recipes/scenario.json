@@ -1,0 +1,336 @@
+{
+    "id": "test05_recipes",
+    "name": "test05_recipes",
+    "version": "0.1.4",
+    "title": "Домашняя книга рецептов",
+    "title_i18n": {
+        "fallback": "Домашняя книга рецептов",
+        "key": "scenario.test05_recipes.title"
+    },
+    "description": "Локальная книга рецептов с поиском, добавлением и избранным.",
+    "type": "desktop",
+    "supported_locales": [
+        "en",
+        "ru"
+    ],
+    "depends": [
+        "test05_recipes_skill"
+    ],
+    "runtime": {
+        "skills": {
+            "required": [
+                "test05_recipes_skill"
+            ],
+            "optional": []
+        }
+    },
+    "ui": {
+        "application": {
+            "version": "0.1.0",
+            "desktop": {
+                "pageSchema": {
+                    "id": "test05_recipes",
+                    "title": "Домашняя книга рецептов",
+                    "title_i18n": {
+                        "fallback": "Домашняя книга рецептов",
+                        "key": "scenario.test05_recipes.title"
+                    },
+                    "initialState": {
+                        "searchQuery": "",
+                        "onlyFavorites": false,
+                        "selectedRecipeId": null
+                    },
+                    "layout": {
+                        "type": "single",
+                        "pattern": "stack",
+                        "areas": [
+                            {
+                                "id": "main",
+                                "role": "main"
+                            }
+                        ]
+                    },
+                    "widgets": [
+                        {
+                            "id": "recipe-search",
+                            "type": "ui.form",
+                            "area": "main",
+                            "title": "Поиск",
+                            "inputs": {
+                                "showSubmit": false,
+                                "fields": [
+                                    {
+                                        "id": "query",
+                                        "type": "shortText",
+                                        "label": "Поиск рецептов",
+                                        "placeholder": "Название, описание или ингредиент",
+                                        "stateKey": "searchQuery"
+                                    },
+                                    {
+                                        "id": "favorites",
+                                        "type": "toggle",
+                                        "label": "Только избранные",
+                                        "stateKey": "onlyFavorites"
+                                    }
+                                ]
+                            },
+                            "actions": []
+                        },
+                        {
+                            "id": "recipe-list",
+                            "type": "ui.list",
+                            "area": "main",
+                            "title": "Рецепты",
+                            "dataSource": {
+                                "kind": "skill",
+                                "name": "test05_recipes_skill.list_recipes",
+                                "params": {
+                                    "query": "$state.searchQuery",
+                                    "favorites_only": "$state.onlyFavorites"
+                                },
+                                "transform": "return value.recipes || [];",
+                                "cacheTtlMs": 0,
+                                "invalidationTags": [
+                                    "test05_recipes.recipes"
+                                ],
+                                "preserveLastValue": true
+                            },
+                            "inputs": {
+                                "variant": "cards",
+                                "cardMinWidth": 220,
+                                "titleKey": "title",
+                                "subtitleKey": "time",
+                                "previewKey": "preview",
+                                "buttons": [
+                                    {
+                                        "id": "open",
+                                        "label": "Открыть",
+                                        "icon": "create-outline"
+                                    },
+                                    {
+                                        "id": "favorite",
+                                        "label": "{favoriteLabel}",
+                                        "icon": "{favoriteIcon}"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "select",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedRecipeId": "$event.id"
+                                    }
+                                },
+                                {
+                                    "on": "click:open",
+                                    "type": "updateState",
+                                    "params": {
+                                        "selectedRecipeId": "$event.id"
+                                    }
+                                },
+                                {
+                                    "on": "click:open",
+                                    "type": "openModal",
+                                    "params": {
+                                        "modalId": "recipe_detail_modal"
+                                    }
+                                },
+                                {
+                                    "on": "click:favorite",
+                                    "type": "callSkill",
+                                    "target": "test05_recipes_skill.set_favorite",
+                                    "params": {
+                                        "recipe_id": "$event.id"
+                                    },
+                                    "invalidates": [
+                                        "test05_recipes.recipes"
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "id": "add-recipe",
+                            "type": "ui.form",
+                            "area": "main",
+                            "title": "Добавить рецепт",
+                            "inputs": {
+                                "submitLabel": "Сохранить рецепт",
+                                "fields": [
+                                    {
+                                        "id": "title",
+                                        "type": "shortText",
+                                        "label": "Название",
+                                        "required": true
+                                    },
+                                    {
+                                        "id": "cooking_time_minutes",
+                                        "type": "number",
+                                        "label": "Время приготовления, мин",
+                                        "required": true,
+                                        "min": 1
+                                    },
+                                    {
+                                        "id": "description",
+                                        "type": "longText",
+                                        "label": "Описание"
+                                    },
+                                    {
+                                        "id": "ingredients",
+                                        "type": "longText",
+                                        "label": "Ингредиенты (по одному в строке)"
+                                    },
+                                    {
+                                        "id": "steps",
+                                        "type": "longText",
+                                        "label": "Шаги (по одному в строке)"
+                                    }
+                                ]
+                            },
+                            "actions": [
+                                {
+                                    "on": "submit",
+                                    "type": "callSkill",
+                                    "target": "test05_recipes_skill.add_recipe",
+                                    "params": {
+                                        "title": "$event.title",
+                                        "cooking_time_minutes": "$event.cooking_time_minutes",
+                                        "description": "$event.description",
+                                        "ingredients": "$event.ingredients",
+                                        "steps": "$event.steps"
+                                    },
+                                    "invalidates": [
+                                        "test05_recipes.recipes"
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            },
+            "modals": {
+                "recipe_detail_modal": {
+                    "title": "Рецепт",
+                    "presentation": {
+                        "kind": "modal"
+                    },
+                    "schema": {
+                        "id": "recipe_detail_schema",
+                        "layout": {
+                            "type": "single",
+                            "pattern": "stack",
+                            "areas": [
+                                {
+                                    "id": "main",
+                                    "role": "main"
+                                }
+                            ]
+                        },
+                        "widgets": [
+                            {
+                                "id": "recipe-detail",
+                                "type": "item.details",
+                                "area": "main",
+                                "dataSource": {
+                                    "kind": "skill",
+                                    "name": "test05_recipes_skill.get_recipe",
+                                    "params": {
+                                        "recipe_id": "$state.selectedRecipeId"
+                                    },
+                                    "transform": "return value.recipe || {};",
+                                    "cacheTtlMs": 0,
+                                    "invalidationTags": [
+                                        "test05_recipes.recipes"
+                                    ]
+                                },
+                                "inputs": {
+                                    "fields": [
+                                        {
+                                            "key": "title",
+                                            "label": "Название"
+                                        },
+                                        {
+                                            "key": "time",
+                                            "label": "Время приготовления"
+                                        },
+                                        {
+                                            "key": "description",
+                                            "label": "Описание"
+                                        },
+                                        {
+                                            "key": "ingredients",
+                                            "label": "Ингредиенты"
+                                        },
+                                        {
+                                            "key": "steps",
+                                            "label": "Шаги"
+                                        }
+                                    ]
+                                },
+                                "actions": [
+                                    {
+                                        "on": "details",
+                                        "type": "closeModal",
+                                        "label": "Закрыть"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        "version": "0.1.4",
+        "manifest": "webui.json"
+    },
+    "trigger": "manual",
+    "vars": {
+        "query": "",
+        "favorites_only": false
+    },
+    "steps": [
+        {
+            "name": "list_recipes",
+            "call": "test05_recipes_skill.list_recipes",
+            "args": {
+                "query": "",
+                "favorites_only": false
+            }
+        }
+    ],
+    "prototype": "scenario_default",
+    "updated_at": "2026-07-29T17:25:37+00:00",
+    "llm_hints": {
+        "description": "Локальная книга рецептов с поиском, добавлением и избранным.",
+        "aliases": [],
+        "primary_actions": [
+            {
+                "id": "test05_recipes.list",
+                "intent": "test05_recipes.list",
+                "tool": "test05_recipes_skill.list_recipes",
+                "side_effect_class": "read_only"
+            },
+            {
+                "id": "test05_recipes.add",
+                "intent": "test05_recipes.add",
+                "tool": "test05_recipes_skill.add_recipe",
+                "side_effect_class": "local_write"
+            }
+        ],
+        "examples": [
+            "Покажи рецепты",
+            "Добавь рецепт"
+        ],
+        "owner_hints": [
+            "skill:test05_recipes_skill"
+        ]
+    },
+    "nlu": {
+        "nlu_hints": {
+            "aliases": [],
+            "examples": [],
+            "slot_schemas": {},
+            "entities": []
+        }
+    }
+}

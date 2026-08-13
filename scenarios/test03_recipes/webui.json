@@ -1,0 +1,703 @@
+{
+  "schema": "adaos.webui.v1",
+  "generated_by": "scenario_default",
+  "ui": {
+    "application": {
+      "desktop": {
+        "pageSchema": {
+          "id": "test03_recipes",
+          "title": "Кулинарные рецепты",
+          "layout": {
+            "type": "split",
+            "pattern": "focus-detail",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              },
+              {
+                "id": "details",
+                "role": "aux"
+              }
+            ],
+            "auxWidth": 320
+          },
+          "widgets": [
+            {
+              "area": "main",
+              "id": "onboarding-note",
+              "type": "item.details",
+              "title": "Добро пожаловать в каталог рецептов",
+              "dataSource": {
+                "kind": "static",
+                "value": {
+                  "tip": "Воспользуйтесь поиском или откройте карточку, чтобы посмотреть детали. Добавляйте любимые через кнопку «В избранное»."
+                }
+              },
+              "inputs": {
+                "fields": [
+                  {
+                    "label": "Подсказка",
+                    "path": "tip"
+                  }
+                ]
+              }
+            },
+            {
+              "id": "recipes-toolbar",
+              "type": "input.commandBar",
+              "area": "main",
+              "inputs": {
+                "variant": "segmented",
+                "buttons": [
+                  {
+                    "id": "overview",
+                    "label": "Обзор"
+                  },
+                  {
+                    "id": "favorites",
+                    "label": "Избранное"
+                  }
+                ],
+                "selectedStateKey": "activeTab"
+              },
+              "actions": [
+                {
+                  "on": "click",
+                  "type": "updateState",
+                  "params": {
+                    "activeTab": "$event.id"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "recipes-sort",
+              "type": "input.selector",
+              "area": "main",
+              "inputs": {
+                "stateKey": "sortMode",
+                "options": [
+                  {
+                    "label": "Популярные сначала",
+                    "value": "popular"
+                  },
+                  {
+                    "label": "Самые новые",
+                    "value": "new"
+                  },
+                  {
+                    "label": "По времени приготовления",
+                    "value": "time"
+                  }
+                ],
+                "placeholder": "Сортировка"
+              }
+            },
+            {
+              "id": "recipes-list",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Рецепты",
+              "inputs": {
+                "variant": "cards",
+                "cardMinWidth": 220,
+                "cardImageRatio": "4 / 3",
+                "search": true,
+                "searchPlaceholder": "Поиск рецептов",
+                "addButton": true,
+                "addButtonLabel": "Добавить рецепт",
+                "titleKey": "title",
+                "subtitleKey": "category",
+                "previewKey": "preview",
+                "imageKey": "image",
+                "imageAltKey": "title",
+                "meta": [
+                  {
+                    "key": "time",
+                    "label": "Время"
+                  },
+                  {
+                    "key": "difficulty",
+                    "label": "Сложность"
+                  },
+                  {
+                    "key": "popularity",
+                    "label": "Популярность",
+                    "kind": "badge"
+                  },
+                  {
+                    "key": "time",
+                    "label": "Время",
+                    "kind": "text"
+                  }
+                ],
+                "filters": [
+                  {
+                    "key": "id",
+                    "operator": "in",
+                    "stateKey": "favoriteIds",
+                    "enabledIf": "$state.activeTab === 'favorites'"
+                  },
+                  {
+                    "enabledIf": "$state.activeTab === 'favorites'",
+                    "key": "id",
+                    "operator": "in",
+                    "stateKey": "favoriteIds"
+                  }
+                ],
+                "sort": {
+                  "stateKey": "sortMode",
+                  "options": {
+                    "popular": {
+                      "key": "popularity",
+                      "direction": "desc",
+                      "numeric": true
+                    },
+                    "new": {
+                      "key": "addedAt",
+                      "direction": "desc"
+                    },
+                    "time": {
+                      "key": "timeMinutes",
+                      "direction": "asc",
+                      "numeric": true
+                    }
+                  }
+                },
+                "buttons": [
+                  {
+                    "id": "fav",
+                    "icon": "star-outline",
+                    "label": "В избранное",
+                    "whenKey": "id"
+                  }
+                ]
+              },
+              "dataSource": {
+                "kind": "skill",
+                "scope": "workspace",
+                "name": "test03_recipes_skill.list_recipes",
+                "resultPath": "recipes",
+                "cacheTtlMs": 300000,
+                "readPolicy": {
+                  "mode": "stale_while_revalidate",
+                  "triggers": [
+                    "mount",
+                    "explicit_refresh",
+                    "targeted_invalidation",
+                    "reconnect"
+                  ],
+                  "maxRequestHz": 1,
+                  "maxPayloadBytes": 262144,
+                  "maxItems": 256,
+                  "preserveLastValue": true
+                },
+                "invalidationTags": [
+                  "test03-recipes:catalog"
+                ],
+                "fallbackKind": "static",
+                "value": [
+                  {
+                    "addedAt": "2026-06-15",
+                    "category": "Салаты",
+                    "difficulty": "Легко",
+                    "id": "r1",
+                    "image": "mock-recipe-salad",
+                    "popularity": 97,
+                    "preview": "Лёгкий и питательный салат с киноа, авокадо и свежими овощами.",
+                    "time": "20 мин",
+                    "timeMinutes": 20,
+                    "title": "Салат с киноа и авокадо"
+                  },
+                  {
+                    "addedAt": "2026-07-01",
+                    "category": "Основные блюда",
+                    "difficulty": "Средне",
+                    "id": "r2",
+                    "image": "mock-recipe-carbonara",
+                    "popularity": 92,
+                    "preview": "Классическая итальянская паста с беконом, яйцом и сыром.",
+                    "time": "25 мин",
+                    "timeMinutes": 25,
+                    "title": "Паста карбонара"
+                  },
+                  {
+                    "addedAt": "2026-07-10",
+                    "category": "Основные блюда",
+                    "difficulty": "Средне",
+                    "id": "r3",
+                    "image": "mock-recipe-curry",
+                    "popularity": 88,
+                    "preview": "Ароматное карри на кокосовом молоке с рисом басмати.",
+                    "time": "40 мин",
+                    "timeMinutes": 40,
+                    "title": "Куриное карри с кокосом"
+                  },
+                  {
+                    "addedAt": "2026-07-20",
+                    "category": "Десерты",
+                    "difficulty": "Легко",
+                    "id": "r4",
+                    "image": "mock-recipe-cheesecake",
+                    "popularity": 90,
+                    "preview": "Нежный чизкейк с ягодным соусом без выпечки.",
+                    "time": "15 мин + охлаждение",
+                    "timeMinutes": 75,
+                    "title": "Чизкейк без выпечки"
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "selectedRecipeId": "$event.id"
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "recipe_detail_modal"
+                  }
+                },
+                {
+                  "on": "click:add",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "recipe_add_modal"
+                  }
+                },
+                {
+                  "on": "click:fav",
+                  "type": "callSkill",
+                  "target": "test03_recipes_skill.toggle_favorite",
+                  "params": {
+                    "recipe_id": "$event.id"
+                  },
+                  "invalidates": [
+                    "test03-recipes:catalog"
+                  ],
+                  "allowOffline": false
+                },
+                {
+                  "on": "click:fav",
+                  "type": "mutateState",
+                  "params": {
+                    "operations": [
+                      {
+                        "op": "toggleArrayItem",
+                        "path": "favoriteIds",
+                        "value": "$event.id"
+                      },
+                      {
+                        "op": "set",
+                        "path": "persist.favorites.ids",
+                        "value": "$state.favoriteIds"
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "id": "favorites-hint",
+              "type": "item.details",
+              "area": "main",
+              "visibleIf": "$state.activeTab === 'favorites'",
+              "title": "Избранные рецепты",
+              "dataSource": {
+                "kind": "static",
+                "value": {
+                  "note": "Показываются только рецепты, добавленные в избранное."
+                }
+              },
+              "inputs": {
+                "fields": [
+                  {
+                    "label": "Пояснение",
+                    "path": "note"
+                  }
+                ]
+              }
+            }
+          ],
+          "meta": {
+            "builder": {
+              "empty_canvas": true,
+              "proto": "005",
+              "ui_revision": "005",
+              "scenario_id": "test03_recipes",
+              "lifecycle": "prototype",
+              "data_mode": "skill_with_bounded_fallback",
+              "production_bindings": true
+            }
+          },
+          "title_i18n": {
+            "key": "scenario.test03_recipes.title",
+            "fallback": "Test03 Recipes"
+          },
+          "initialState": {
+            "activeTab": "overview",
+            "selectedRecipeId": "r1",
+            "sortMode": "popular",
+            "favoriteIds": [
+              "r2"
+            ],
+            "persist": {
+              "favorites": {
+                "ids": [
+                  "r2"
+                ]
+              }
+            }
+          },
+          "autoActions": [
+            {
+              "intervalMs": 1,
+              "action": {
+                "type": "updateState",
+                "params": {
+                  "favoriteIds": {
+                    "kind": "or",
+                    "args": [
+                      {
+                        "kind": "if",
+                        "args": [
+                          {
+                            "kind": "and",
+                            "args": [
+                              {
+                                "kind": "truthy",
+                                "args": [
+                                  "$state.persist.favorites.ids"
+                                ]
+                              }
+                            ]
+                          },
+                          "$state.persist.favorites.ids",
+                          [
+                            "r2"
+                          ]
+                        ]
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          ]
+        }
+      },
+      "modals": {
+        "recipe_detail_modal": {
+          "title": "Детали рецепта",
+          "presentation": {
+            "kind": "modal"
+          },
+          "schema": {
+            "id": "recipe_detail_modal_schema",
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "modal",
+                  "role": "main"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "recipe-details",
+                "type": "item.details",
+                "area": "modal",
+                "title": "{title}",
+                "inputs": {
+                  "selectedStateKey": "selectedRecipeId",
+                  "imageKey": "image",
+                  "imageAltKey": "title",
+                  "imageRatio": "16 / 9",
+                  "fields": [
+                    {
+                      "label": "Категория",
+                      "key": "category"
+                    },
+                    {
+                      "label": "Время приготовления",
+                      "key": "time"
+                    },
+                    {
+                      "label": "Сложность",
+                      "key": "difficulty"
+                    },
+                    {
+                      "label": "Короткое описание",
+                      "key": "preview"
+                    }
+                  ]
+                },
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "r1": {
+                      "id": "r1",
+                      "title": "Салат с киноа и авокадо",
+                      "category": "Салаты",
+                      "preview": "Лёгкий и питательный салат с киноа, авокадо и свежими овощами.",
+                      "image": "mock-recipe-salad",
+                      "time": "20 мин",
+                      "difficulty": "Легко"
+                    },
+                    "r2": {
+                      "id": "r2",
+                      "title": "Паста карбонара",
+                      "category": "Основные блюда",
+                      "preview": "Классическая итальянская паста с беконом, яйцом и сыром.",
+                      "image": "mock-recipe-carbonara",
+                      "time": "25 мин",
+                      "difficulty": "Средне"
+                    },
+                    "r3": {
+                      "id": "r3",
+                      "title": "Куриное карри с кокосом",
+                      "category": "Основные блюда",
+                      "preview": "Ароматное карри на кокосовом молоке с рисом басмати.",
+                      "image": "mock-recipe-curry",
+                      "time": "40 мин",
+                      "difficulty": "Средне"
+                    },
+                    "r4": {
+                      "id": "r4",
+                      "title": "Чизкейк без выпечки",
+                      "category": "Десерты",
+                      "preview": "Нежный чизкейк с ягодным соусом без выпечки.",
+                      "image": "mock-recipe-cheesecake",
+                      "time": "15 мин + охлаждение",
+                      "difficulty": "Легко"
+                    }
+                  }
+                }
+              },
+              {
+                "id": "recipe-detail-actions",
+                "type": "ui.actions",
+                "area": "modal",
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "fav",
+                      "label": "В избранное",
+                      "icon": "star-outline"
+                    },
+                    {
+                      "id": "close",
+                      "label": "Закрыть",
+                      "icon": "close-outline"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:fav",
+                    "type": "callSkill",
+                    "target": "test03_recipes_skill.toggle_favorite",
+                    "params": {
+                      "recipe_id": "$state.selectedRecipeId"
+                    },
+                    "invalidates": [
+                      "test03-recipes:catalog"
+                    ],
+                    "allowOffline": false
+                  },
+                  {
+                    "on": "click:fav",
+                    "type": "mutateState",
+                    "params": {
+                      "operations": [
+                        {
+                          "op": "toggleArrayItem",
+                          "path": "favoriteIds",
+                          "value": "$state.selectedRecipeId"
+                        }
+                      ]
+                    }
+                  },
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
+                ]
+              }
+            ]
+          }
+        },
+        "recipe_add_modal": {
+          "title": "Новый рецепт",
+          "presentation": {
+            "kind": "modal"
+          },
+          "schema": {
+            "id": "recipe_add_modal_schema",
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "modal",
+                  "role": "main"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "recipe-form",
+                "type": "ui.form",
+                "area": "modal",
+                "title": "Добавить рецепт",
+                "inputs": {
+                  "layout": "responsiveGrid",
+                  "minFieldWidth": 220,
+                  "submitLabel": "Сохранить",
+                  "fields": [
+                    {
+                      "id": "title",
+                      "type": "shortText",
+                      "label": "Название рецепта",
+                      "required": true
+                    },
+                    {
+                      "id": "category",
+                      "type": "select",
+                      "label": "Категория",
+                      "options": [
+                        {
+                          "label": "Салаты",
+                          "value": "Салаты"
+                        },
+                        {
+                          "label": "Супы",
+                          "value": "Супы"
+                        },
+                        {
+                          "label": "Основные блюда",
+                          "value": "Основные блюда"
+                        },
+                        {
+                          "label": "Десерты",
+                          "value": "Десерты"
+                        },
+                        {
+                          "label": "Напитки",
+                          "value": "Напитки"
+                        }
+                      ],
+                      "required": true
+                    },
+                    {
+                      "id": "time",
+                      "type": "number",
+                      "label": "Время (мин)",
+                      "min": 1,
+                      "required": true
+                    },
+                    {
+                      "id": "difficulty",
+                      "type": "select",
+                      "label": "Сложность",
+                      "options": [
+                        {
+                          "label": "Легко",
+                          "value": "Легко"
+                        },
+                        {
+                          "label": "Средне",
+                          "value": "Средне"
+                        },
+                        {
+                          "label": "Сложно",
+                          "value": "Сложно"
+                        }
+                      ],
+                      "required": true
+                    },
+                    {
+                      "id": "ingredients",
+                      "type": "longText",
+                      "label": "Ингредиенты",
+                      "placeholder": "Перечислите ингредиенты построчно"
+                    },
+                    {
+                      "id": "steps",
+                      "type": "longText",
+                      "label": "Шаги приготовления",
+                      "placeholder": "Опишите шаги приготовления"
+                    },
+                    {
+                      "id": "image",
+                      "type": "url",
+                      "label": "Изображение (URL)"
+                    }
+                  ],
+                  "secondaryActions": [
+                    {
+                      "id": "cancel",
+                      "label": "Отмена"
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "submit",
+                    "type": "callSkill",
+                    "target": "test03_recipes_skill.add_recipe",
+                    "params": {
+                      "title": "$event.values.title",
+                      "category": "$event.values.category",
+                      "time": "$event.values.time",
+                      "difficulty": "$event.values.difficulty",
+                      "ingredients": "$event.values.ingredients",
+                      "steps": "$event.values.steps",
+                      "image": "$event.values.image"
+                    },
+                    "invalidates": [
+                      "test03-recipes:catalog"
+                    ],
+                    "allowOffline": false
+                  },
+                  {
+                    "on": "submit",
+                    "type": "closeModal"
+                  },
+                  {
+                    "on": "click:cancel",
+                    "type": "closeModal"
+                  },
+                  {
+                    "on": "submit",
+                    "type": "mutateState",
+                    "params": {
+                      "operations": [
+                        {
+                          "op": "set",
+                          "path": "persist.recipes",
+                          "value": "$state.persist.recipes"
+                        },
+                        {
+                          "op": "set",
+                          "path": "persist.favorites.ids",
+                          "value": "$state.favoriteIds"
+                        }
+                      ]
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,8 @@
+intents:
+  - intent: test05_recipes_skill.list_recipes
+    description: "Поиск и просмотр локальных рецептов"
+    tool: list_recipes
+    examples:
+      - "покажи рецепты"
+      - "найди рецепт с томатами"
+      - "покажи избранные рецепты"

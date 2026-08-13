@@ -1,0 +1,67 @@
+id: adaos_drive
+name: adaos_drive
+version: 0.1.0
+title: AdaOS Drive
+description: Two-panel browser file manager for connected local folders.
+type: desktop
+supported_locales:
+- en
+- ru
+depends:
+- adaos_drive
+runtime:
+  skills:
+    required:
+    - adaos_drive
+    optional: []
+ui:
+  manifest: webui.json
+trigger: manual
+vars: {}
+guidance:
+  schema: adaos.scenario.guidance.v1
+  readme: README.md
+  overview:
+    en: Open a Total Commander style two-panel browser file manager for local folders.
+    ru: Open a Total Commander style two-panel browser file manager for local folders.
+  presentation:
+    channels:
+    - web
+    modal_id: adaos_drive_modal
+  workflow:
+    state_source:
+      kind: skill
+      name: adaos_drive.get_snapshot
+      params: {}
+    state_path: snapshot
+    actions_path: actions
+  conversational:
+    help_intent: adaos_drive.open
+    next_steps_intent: adaos_drive.next_steps
+llm_hints:
+  description: Open AdaOS Drive for local file browsing, upload, download, preview, rename and cross-panel copy.
+  aliases:
+  - adaos drive
+  - drive
+  - file manager
+  primary_actions:
+  - id: adaos_drive.open
+    intent: adaos_drive.open
+    tool: adaos_drive.get_snapshot
+    side_effect_class: read_only
+  owner_hints:
+  - skill:adaos_drive
+nlu:
+  nlu_hints:
+    aliases:
+    - adaos drive
+    - drive
+    - files
+    examples:
+    - open adaos drive
+    - show file manager
+    - browse local files
+    slot_schemas: {}
+    entities: []
+steps: []
+updated_at: '2026-08-12T00:00:00+00:00'

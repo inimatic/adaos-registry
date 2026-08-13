@@ -1,0 +1,186 @@
+name: test05_recipes_skill
+version: 0.1.1
+description: Локальная книга рецептов с поиском и избранным.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: list_recipes
+runtime:
+  python: '3.11'
+dependencies: []
+events:
+  subscribe: []
+  publish: []
+exports:
+  tools:
+  - list_recipes
+  - get_recipe
+  - add_recipe
+  - set_favorite
+tools:
+- name: list_recipes
+  description: List locally stored recipes, optionally searching text and filtering
+    favorites.
+  entry: handlers.main:list_recipes
+  side_effects: read_only
+  input_schema:
+    type: object
+    properties:
+      query:
+        type: string
+      favorites_only:
+        type: boolean
+        default: false
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - recipes
+    - count
+    properties:
+      ok:
+        type: boolean
+      recipes:
+        type: array
+        items:
+          type: object
+      count:
+        type: integer
+        minimum: 0
+- name: get_recipe
+  description: Get a locally stored recipe by identifier.
+  entry: handlers.main:get_recipe
+  side_effects: read_only
+  input_schema:
+    type: object
+    required:
+    - recipe_id
+    properties:
+      recipe_id:
+        type: string
+        minLength: 1
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    additionalProperties: true
+- name: add_recipe
+  description: Add a validated recipe to local storage.
+  entry: handlers.main:add_recipe
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - title
+    - cooking_time_minutes
+    properties:
+      title:
+        type: string
+        minLength: 1
+      cooking_time_minutes:
+        type: integer
+        minimum: 1
+      description:
+        type: string
+      ingredients:
+        oneOf:
+        - type: string
+        - type: array
+          items:
+            type: string
+      steps:
+        oneOf:
+        - type: string
+        - type: array
+          items:
+            type: string
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - recipe
+    properties:
+      ok:
+        type: boolean
+      recipe:
+        type: object
+- name: set_favorite
+  description: Toggle or set the favorite flag of a locally stored recipe.
+  entry: handlers.main:set_favorite
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - recipe_id
+    properties:
+      recipe_id:
+        type: string
+        minLength: 1
+      favorite:
+        type: boolean
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    additionalProperties: true
+data_routes:
+- tool: list_recipes
+  surface: scenario:test05_recipes recipe list
+  route: skill-local
+  path: local-json:test05_recipes_skill/recipes.json
+  owner: skill:test05_recipes_skill
+  first_paint: bundled starter recipes
+  recovery: reload the node-local JSON document
+  guard_visibility: read errors are returned to the calling surface
+  budget:
+    max_payload_bytes: 65536
+- tool: get_recipe
+  surface: scenario:test05_recipes recipe details
+  route: skill-local
+  path: local-json:test05_recipes_skill/recipes.json
+  owner: skill:test05_recipes_skill
+  first_paint: selected locally stored recipe
+  recovery: reload the node-local JSON document
+  guard_visibility: missing recipes return a structured not_found result
+  budget:
+    max_payload_bytes: 65536
+llm_hints:
+  description: Хранит рецепты локально, ищет их и управляет избранным.
+  aliases:
+  - книга рецептов
+  - рецепты
+  primary_actions:
+  - id: test05_recipes_skill.list_recipes
+    intent: test05_recipes_skill.list_recipes
+    tool: list_recipes
+    side_effect_class: read_only
+    examples:
+    - Покажи рецепты
+    - Найди рецепт с авокадо
+  - id: test05_recipes_skill.add_recipe
+    intent: test05_recipes_skill.add_recipe
+    tool: add_recipe
+    side_effect_class: local_write
+    examples:
+    - Добавь новый рецепт
+  examples:
+  - Покажи избранные рецепты
+  owner_hints:
+  - skill:test05_recipes_skill
+nlu_hints:
+  aliases:
+  - рецепты
+  - книга рецептов
+  examples:
+  - покажи рецепты
+  - найди рецепт
+  - добавь рецепт
+  slot_schemas: {}
+  entities: []
+prototype: skill_default
+updated_at: '2026-07-29T17:25:33+00:00'
