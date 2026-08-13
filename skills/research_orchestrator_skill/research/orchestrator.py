@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import os
 import re
@@ -33,6 +34,7 @@ from research.repository import OrchestratorRepository
 
 
 _DIRECTION_RE = re.compile(r"^[a-z0-9_.-]+$")
+_DIRECTIVE_TEXT_LIMIT = 6000
 
 
 def _direction_id(value: str) -> str:
@@ -40,6 +42,105 @@ def _direction_id(value: str) -> str:
     if not _DIRECTION_RE.fullmatch(token):
         raise ValueError("direction_id must match ^[a-z0-9_.-]+$")
     return token
+
+
+def _bounded_text(value: Any, limit: int) -> str:
+    text = str(value or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _directive_trace(
+    text: str,
+    *,
+    actor: str | None,
+    payload: Mapping[str, Any] | None,
+) -> dict[str, Any]:
+    """Describe the caller-visible directive without recording hidden prompts."""
+
+    values = dict(payload or {})
+    meta = values.get("_meta") if isinstance(values.get("_meta"), Mapping) else {}
+    explicit_actor = str(actor or "").strip()
+    actor_id = (
+        explicit_actor
+        or str(values.get("actor_id") or meta.get("actor_id") or "").strip()
+        or str(meta.get("principal_id") or meta.get("user_id") or "").strip()
+    )
+    has_conversation_origin = bool(
+        values.get("conversation_id")
+        or values.get("thread_id")
+        or meta.get("conversation_id")
+        or meta.get("thread_id")
+        or meta.get("turn_trace_id")
+    )
+    origin = str(
+        values.get("invocation_origin")
+        or meta.get("invocation_origin")
+        or ("conversation" if has_conversation_origin else "api")
+    ).strip().lower()
+    if not actor_id:
+        actor_id = "user:conversation" if origin == "conversation" else "api:local"
+    actor_label = str(values.get("actor_label") or meta.get("actor_label") or actor_id).strip()
+    directive_text = _bounded_text(text, _DIRECTIVE_TEXT_LIMIT)
+    return {
+        "schema": "adaos.research.directive.v1",
+        "actor_id": actor_id[:200],
+        "actor_label": actor_label[:200],
+        "origin": origin[:80] or "api",
+        "text": directive_text,
+        "text_digest": "sha256:" + hashlib.sha256(str(text or "").strip().encode("utf-8")).hexdigest(),
+        "truncated": directive_text != str(text or "").strip(),
+        "project_to_chat": origin != "conversation",
+        "request_id": str(meta.get("request_id") or values.get("request_id") or "").strip() or None,
+        "turn_trace_id": str(meta.get("turn_trace_id") or values.get("turn_trace_id") or "").strip() or None,
+    }
+
+
+def _completion_projection(prototype: Mapping[str, Any]) -> tuple[str, dict[str, Any]]:
+    revision = int(prototype.get("revision") or 0)
+    review = prototype.get("admission_review") if isinstance(prototype.get("admission_review"), Mapping) else {}
+    decision = str(review.get("decision") or "draft")
+    blockers = [_bounded_text(item, 280) for item in list(review.get("blockers") or [])]
+    explanation = _bounded_text(prototype.get("assistant_message"), 1800)
+    if decision == "admitted":
+        lead = f"ResearchPrototype revision {revision} passed the automation admission gate and is ready for human acceptance."
+    else:
+        lead = f"ResearchPrototype revision {revision} was recorded as a reviewable draft; it is not ready for automation."
+        if blockers:
+            lead += " Blocking issues: " + "; ".join(blockers[:4])
+    message = f"{lead}\n\n{explanation}" if explanation else lead
+    return message, {
+        "candidate_status": "admitted" if decision == "admitted" else "draft",
+        "admission_decision": decision,
+        "admission_blockers": blockers,
+        "model_explanation": explanation,
+    }
+
+
+def _failure_projection(error: BaseException, *, repairs: int) -> tuple[str, dict[str, Any]]:
+    raw = _bounded_text(f"{type(error).__name__}: {error}", 2400)
+    if "research.prototype.v1.schema.json invalid:" in raw:
+        code = "prototype_contract_validation_failed"
+        lead = (
+            "The generated candidate was rejected by the typed ResearchPrototype contract "
+            f"after {repairs} bounded repair attempt(s); no invalid revision was accepted."
+        )
+    elif "semantic quality gate:" in raw:
+        code = "prototype_semantic_gate_failed"
+        lead = (
+            "The generated candidate matched the JSON shape but failed the deterministic "
+            f"research-quality gate after {repairs} bounded repair attempt(s)."
+        )
+    else:
+        code = "formulation_failed"
+        lead = "Research formulation did not complete."
+    return f"{lead} Technical detail: {raw}", {
+        "error_code": code,
+        "error_type": type(error).__name__,
+        "error": raw,
+        "repair_attempts": repairs,
+    }
 
 
 def _json_object(text: str) -> dict[str, Any]:
@@ -761,7 +862,52 @@ class ResearchOrchestrator:
         except Exception:
             pass
 
-    def discuss(self, direction_id: str, text: str, *, model: str | None = None, actor: str = "user:local", dialog_payload: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    @staticmethod
+    def _emit_directive(
+        directive: Mapping[str, Any],
+        dialog: Mapping[str, Any],
+        *,
+        group_id: str,
+    ) -> None:
+        try:
+            sdk_chat.send(
+                (
+                    f"External research directive · {directive['actor_id']} · {directive['origin']}\n\n"
+                    f"{directive['text']}"
+                ),
+                conversation_id=str(dialog["conversation_id"]),
+                webspace_id=str(dialog["webspace_id"]),
+                channel_id="research_orchestrator",
+                owner="skill:research_orchestrator_skill",
+                route_id="voice_chat",
+                actor_id=str(directive["actor_id"]),
+                actor_label=str(directive["actor_label"]),
+                request_id=directive.get("request_id") or dialog.get("request_id"),
+                turn_trace_id=directive.get("turn_trace_id") or dialog.get("turn_trace_id"),
+                thread_id=str(dialog.get("thread_id") or "") or None,
+                meta={
+                    "message_kind": "research.directive",
+                    "invocation_origin": directive["origin"],
+                    "directive_digest": directive["text_digest"],
+                    "progress_group_id": group_id,
+                    "progress_phase": "directive",
+                    "progress_status": "recorded",
+                    "progress_seq": -1,
+                    "progress_label": "Research directive",
+                },
+            )
+        except Exception:
+            pass
+
+    def discuss(
+        self,
+        direction_id: str,
+        text: str,
+        *,
+        model: str | None = None,
+        actor: str | None = None,
+        dialog_payload: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         token = _direction_id(direction_id)
         state = self.repository.get_direction(token)
         if not state:
@@ -771,8 +917,31 @@ class ResearchOrchestrator:
             raise ValueError("attach at least one source before discussion")
         current = self.repository.get_prototype(state.get("current_prototype_digest"))
         group_id = f"research-formulation-{token}-{int(state['generation']) + 1}"
-        dialog = self._dialog({"direction_id": token, **dict(dialog_payload or {})})
-        self.repository.activity(token, "formulation", "llm_submitted", "Research formulation sent to the configured Root LLM.", {"group_id": group_id, "actor": actor})
+        caller_payload = {"direction_id": token, **dict(dialog_payload or {})}
+        dialog = self._dialog(caller_payload)
+        directive = _directive_trace(text, actor=actor, payload=caller_payload)
+        actor = str(directive["actor_id"])
+        self.repository.activity(
+            token,
+            "formulation",
+            "directive_received",
+            f"Research directive recorded from {actor} via {directive['origin']}.",
+            {"group_id": group_id, "directive": directive},
+        )
+        if bool(directive.get("project_to_chat")):
+            self._emit_directive(directive, dialog, group_id=group_id)
+        self.repository.activity(
+            token,
+            "formulation",
+            "llm_submitted",
+            "Research formulation sent to the configured Root LLM.",
+            {
+                "group_id": group_id,
+                "actor": actor,
+                "invocation_origin": directive["origin"],
+                "directive_digest": directive["text_digest"],
+            },
+        )
         self._emit("Анализирую artifact groups и текущую постановку…", dialog, group_id=group_id, phase="submitted", status="working")
         source_context = self._source_context(bundle)
         instructions = {
@@ -859,6 +1028,7 @@ class ResearchOrchestrator:
         turn_identity = str(dialog.get("request_id") or "").strip() or uuid.uuid4().hex
         turn_token = re.sub(r"[^A-Za-z0-9_.-]+", "-", turn_identity).strip("-._")[:48] or uuid.uuid4().hex
         request_id = f"adaos-research-{token}-{bundle['digest'].removeprefix('sha256:')[:16]}-{int(state['generation']) + 1}-{turn_token}"
+        repair_attempt = 0
         try:
             submitted = llm_client.submit_response_job(
                 [{"role": "system", "content": "Return one JSON object matching the supplied output_contract."}, {"role": "user", "content": json.dumps(instructions, ensure_ascii=False)}],
@@ -894,7 +1064,6 @@ class ResearchOrchestrator:
                 _json_object(str(completed.get("output_text") or ""))
             )
             recorded: dict[str, Any] | None = None
-            repair_attempt = 0
             while recorded is None:
                 try:
                     preview = materialize_prototype(
@@ -976,13 +1145,35 @@ class ResearchOrchestrator:
                     candidate = _normalize_candidate_shape(
                         _json_object(str(repaired.get("output_text") or ""))
                     )
-            message = str(recorded["prototype"].get("assistant_message") or f"ResearchPrototype revision {recorded['prototype']['revision']} is ready.")
-            self.repository.activity(token, "formulation", "llm_completed", message, {"job_id": job_id, "prototype_digest": recorded["prototype"]["digest"]})
+            message, completion = _completion_projection(recorded["prototype"])
+            self.repository.activity(
+                token,
+                "formulation",
+                "llm_completed",
+                message,
+                {
+                    "job_id": job_id,
+                    "prototype_digest": recorded["prototype"]["digest"],
+                    "directive_digest": directive["text_digest"],
+                    **completion,
+                },
+            )
             self._emit(message, dialog, group_id=group_id, phase="completed", status="succeeded", seq=999999)
             return {**recorded, "message": message, "llm_job": {"job_id": job_id, "request_id": request_id, "status": "succeeded"}}
         except Exception as exc:
-            self.repository.activity(token, "formulation", "failed", f"Formulation failed: {type(exc).__name__}: {exc}", {"request_id": request_id})
-            self._emit(f"Не удалось сформировать ревизию: {exc}", dialog, group_id=group_id, phase="failed", status="failed", seq=999999)
+            failure_message, failure_detail = _failure_projection(exc, repairs=repair_attempt)
+            self.repository.activity(
+                token,
+                "formulation",
+                "failed",
+                failure_message,
+                {
+                    "request_id": request_id,
+                    "directive_digest": directive["text_digest"],
+                    **failure_detail,
+                },
+            )
+            self._emit(failure_message, dialog, group_id=group_id, phase="failed", status="failed", seq=999999)
             raise
 
     def accept(self, direction_id: str, prototype_digest: str, *, expected_generation: int, idempotency_key: str, actor: str = "user:local") -> dict[str, Any]:

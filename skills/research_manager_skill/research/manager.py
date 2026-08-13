@@ -1677,10 +1677,22 @@ class ResearchManager:
             or "research_manager_skill"
         )
         if runner_provider:
-            data_status = invoke_skill(runner_provider, "dataset_status", {}, timeout=30)
-            if not isinstance(data_status, Mapping):
-                raise RuntimeError("runner provider returned a non-object data status")
-            data_projection = dict(data_status)
+            try:
+                data_status = invoke_skill(runner_provider, "dataset_status", {}, timeout=30)
+                if not isinstance(data_status, Mapping):
+                    raise RuntimeError("runner provider returned a non-object data status")
+                data_projection = dict(data_status)
+            except Exception as exc:
+                data_projection = {
+                    "owner_ref": f"skill:{data_owner_skill_id}",
+                    "logical_name": str(dataset.get("name") or "dataset"),
+                    "ready": False,
+                    "state": "unavailable",
+                    "error": {
+                        "type": type(exc).__name__,
+                        "message": str(exc)[:500],
+                    },
+                }
         else:
             data_root_value = str(dataset.get("data_root") or "").strip()
             data_root = Path(data_root_value) if data_root_value else self._runtime_data_root() / "files" / "datasets"
@@ -1701,7 +1713,18 @@ class ResearchManager:
                 "legacy": True,
             }
         tracker_provider = str(dict(dict(revision.payload["conditions"]).get("tracker") or {}).get("provider") or "local-tracker")
-        tracker_health = self._tracker_provider(tracker_provider).health()
+        try:
+            tracker_health = dict(self._tracker_provider(tracker_provider).health())
+        except Exception as exc:
+            tracker_health = {
+                "ok": False,
+                "state": "unavailable",
+                "provider_id": tracker_provider,
+                "error": {
+                    "type": type(exc).__name__,
+                    "message": str(exc)[:500],
+                },
+            }
         return {
             "schema": "adaos.research.experiment_workbench.v1",
             "experiment": value.to_dict(),

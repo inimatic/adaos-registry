@@ -316,8 +316,27 @@ def record_prototype(direction_id: str, prototype: Mapping[str, Any], actor: str
 
 
 @tool(summary="Discuss and materialize a ResearchPrototype through the configured Root LLM.", side_effects="local_write")
-def chat(direction_id: str, text: str, model: str | None = None, actor: str = "user:local", **payload: Any) -> dict[str, Any]:
-    return _orchestrator().discuss(direction_id, text, model=model, actor=actor, dialog_payload=payload)
+def chat(
+    direction_id: str,
+    text: str,
+    model: str | None = None,
+    actor: str | None = None,
+    invocation_origin: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+    **payload: Any,
+) -> dict[str, Any]:
+    dialog_payload = dict(payload)
+    if invocation_origin:
+        dialog_payload["invocation_origin"] = invocation_origin
+    if _meta:
+        dialog_payload["_meta"] = dict(_meta)
+    return _orchestrator().discuss(
+        direction_id,
+        text,
+        model=model,
+        actor=actor,
+        dialog_payload=dialog_payload,
+    )
 
 
 @tool(summary="Accept an exact ResearchPrototype and produce the pre-Codex AutomationBrief.", side_effects="external_write")

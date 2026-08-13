@@ -8,6 +8,9 @@ from jsonschema import Draft202012Validator
 from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues, prototype_candidate_schema, validate
 from research.orchestrator import (
     _address_builder_url,
+    _completion_projection,
+    _directive_trace,
+    _failure_projection,
     _json_object,
     _llm_failure,
     _normalize_candidate_shape,
@@ -454,3 +457,61 @@ def test_candidate_shape_lifts_explicit_confirmatory_units_into_allocation() -> 
         "sample_size": 3,
         "predeclared": True,
     }
+
+
+def test_directive_trace_distinguishes_conversation_and_external_api_calls() -> None:
+    conversation = _directive_trace(
+        "Review the sources.",
+        actor=None,
+        payload={
+            "conversation_id": "conv-1",
+            "_meta": {"actor_id": "user:42", "request_id": "req-1"},
+        },
+    )
+    external = _directive_trace(
+        "Tighten the acceptance checks.",
+        actor="codex:operator-assistant",
+        payload={"invocation_origin": "codex_api"},
+    )
+
+    assert conversation["actor_id"] == "user:42"
+    assert conversation["origin"] == "conversation"
+    assert conversation["project_to_chat"] is False
+    assert conversation["request_id"] == "req-1"
+    assert external["actor_id"] == "codex:operator-assistant"
+    assert external["origin"] == "codex_api"
+    assert external["project_to_chat"] is True
+    assert external["text_digest"].startswith("sha256:")
+
+
+def test_completion_projection_never_calls_a_blocked_draft_ready() -> None:
+    message, detail = _completion_projection(
+        {
+            "revision": 3,
+            "assistant_message": "The candidate was revised.",
+            "admission_review": {
+                "decision": "draft",
+                "blockers": ["readiness must be ready_for_automation"],
+            },
+        }
+    )
+
+    assert "reviewable draft" in message
+    assert "not ready for automation" in message
+    assert detail["candidate_status"] == "draft"
+    assert detail["admission_blockers"] == ["readiness must be ready_for_automation"]
+
+
+def test_failure_projection_classifies_typed_contract_rejection() -> None:
+    message, detail = _failure_projection(
+        ValueError(
+            "research.prototype.v1.schema.json invalid: "
+            "evaluation_plan.decision_rules: [] should be non-empty"
+        ),
+        repairs=2,
+    )
+
+    assert "typed ResearchPrototype contract" in message
+    assert "no invalid revision was accepted" in message
+    assert detail["error_code"] == "prototype_contract_validation_failed"
+    assert detail["repair_attempts"] == 2

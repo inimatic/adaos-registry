@@ -185,7 +185,7 @@
                   },
                   "enabledIf": "$state.experimentState === 'draft'",
                   "invalidates": [
-                    "tlp-experiment"
+                    "research-experiment"
                   ]
                 },
                 {
@@ -199,7 +199,7 @@
                   },
                   "enabledIf": "$state.experimentState === 'review'",
                   "invalidates": [
-                    "tlp-experiment"
+                    "research-experiment"
                   ]
                 },
                 {
@@ -214,8 +214,8 @@
                   },
                   "enabledIf": "$state.experimentState === 'locked'",
                   "invalidates": [
-                    "tlp-experiment",
-                    "tlp-tracking"
+                    "research-experiment",
+                    "research-tracking"
                   ]
                 },
                 {
@@ -227,9 +227,9 @@
                     "actor": "user:desktop"
                   },
                   "invalidates": [
-                    "tlp-experiment",
-                    "tlp-tracking",
-                    "tlp-evidence"
+                    "research-experiment",
+                    "research-tracking",
+                    "research-evidence"
                   ]
                 },
                 {
@@ -252,8 +252,8 @@
                   },
                   "enabledIf": "$state.experimentState === 'running'",
                   "invalidates": [
-                    "tlp-experiment",
-                    "tlp-tracking"
+                    "research-experiment",
+                    "research-tracking"
                   ]
                 },
                 {
@@ -267,8 +267,8 @@
                   },
                   "enabledIf": "$state.experimentState === 'results_ready'",
                   "invalidates": [
-                    "tlp-experiment",
-                    "tlp-evidence"
+                    "research-experiment",
+                    "research-evidence"
                   ]
                 }
               ]
@@ -285,10 +285,11 @@
                   "experiment_id": "$state.experimentId"
                 },
                 "cacheTtlMs": 0,
+                "maxRequestHz": 2,
                 "invalidationTags": [
-                  "tlp-experiment",
-                  "tlp-tracking",
-                  "tlp-evidence"
+                  "research-experiment",
+                  "research-tracking",
+                  "research-evidence"
                 ],
                 "preserveLastValue": true
               },
@@ -357,8 +358,11 @@
                   "experiment_id": "$state.experimentId"
                 },
                 "cacheTtlMs": 0,
+                "maxRequestHz": 2,
                 "invalidationTags": [
-                  "tlp-experiment"
+                  "research-experiment",
+                  "research-tracking",
+                  "research-evidence"
                 ],
                 "preserveLastValue": true
               },
@@ -382,7 +386,7 @@
                   },
                   "enabledIf": "$state.experimentState === 'draft' || $state.experimentState === 'review'",
                   "invalidates": [
-                    "tlp-experiment"
+                    "research-experiment"
                   ]
                 }
               ]
@@ -410,9 +414,10 @@
                   "experiment_id": "$state.experimentId"
                 },
                 "cacheTtlMs": 0,
+                "maxRequestHz": 2,
                 "invalidationTags": [
-                  "tlp-experiment",
-                  "tlp-tracking"
+                  "research-experiment",
+                  "research-tracking"
                 ],
                 "preserveLastValue": true
               },
@@ -493,8 +498,8 @@
                   },
                   "enabledIf": "$state.experimentState === 'failed' || $state.experimentState === 'cancelled'",
                   "invalidates": [
-                    "tlp-experiment",
-                    "tlp-tracking"
+                    "research-experiment",
+                    "research-tracking"
                   ]
                 }
               ]
@@ -522,9 +527,10 @@
                   "experiment_id": "$state.experimentId"
                 },
                 "cacheTtlMs": 0,
+                "maxRequestHz": 2,
                 "invalidationTags": [
-                  "tlp-experiment",
-                  "tlp-tracking"
+                  "research-experiment",
+                  "research-tracking"
                 ],
                 "preserveLastValue": true
               },
@@ -568,9 +574,11 @@
                   "experiment_id": "$state.experimentId"
                 },
                 "cacheTtlMs": 0,
+                "maxRequestHz": 2,
                 "invalidationTags": [
-                  "tlp-experiment",
-                  "tlp-tracking"
+                  "research-experiment",
+                  "research-tracking",
+                  "research-evidence"
                 ],
                 "preserveLastValue": true
               },
@@ -608,9 +616,10 @@
                   "experiment_id": "$state.experimentId"
                 },
                 "cacheTtlMs": 0,
+                "maxRequestHz": 2,
                 "invalidationTags": [
-                  "tlp-experiment",
-                  "tlp-evidence"
+                  "research-experiment",
+                  "research-evidence"
                 ],
                 "preserveLastValue": true
               },
@@ -657,9 +666,11 @@
                   "experiment_id": "$state.experimentId"
                 },
                 "cacheTtlMs": 0,
+                "maxRequestHz": 2,
                 "invalidationTags": [
-                  "tlp-experiment",
-                  "tlp-evidence"
+                  "research-experiment",
+                  "research-tracking",
+                  "research-evidence"
                 ],
                 "preserveLastValue": true
               },
@@ -750,10 +761,11 @@
                     ]
                   },
                   "cacheTtlMs": 0,
+                "maxRequestHz": 2,
                   "invalidationTags": [
-                    "tlp-experiment",
-                    "tlp-tracking",
-                    "tlp-evidence"
+                    "research-experiment",
+                    "research-tracking",
+                    "research-evidence"
                   ],
                   "preserveLastValue": true
                 },

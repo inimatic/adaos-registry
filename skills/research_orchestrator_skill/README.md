@@ -25,8 +25,14 @@ experimental data or scientific governance records.
    started by acceptance.
 
 `get_activity` exposes the same durable stages used by grouped chat progress
-and future Research Workbench widgets. `next_steps` is suitable for text and
-voice channels.
+and future Research Workbench widgets. Every formulation invocation first
+records an `adaos.research.directive.v1` event with caller identity, origin,
+visible directive text, and digest. A directive arriving through API, CLI, or
+Codex is also projected into the research chat; a normal conversation message
+is not duplicated because it is already in the transcript. Hidden system
+instructions and source excerpts are never copied into this directive record.
+Callers outside chat should pass stable `actor` and `invocation_origin` values.
+`next_steps` is suitable for text and voice channels.
 
 ## Hard formulation boundary
 
@@ -52,9 +58,11 @@ it has:
 
 Generation and bounded repair request the Root provider's native JSON-object
 output mode. Contract normalization may correct transport-only shape and enum
-spelling, but never invents domain content. If a schema-valid candidate still
-fails the hard gate after repair, it remains a visible draft; it cannot
-silently become an AutomationBrief.
+spelling, but never invents domain content. A structurally invalid candidate is
+rejected after the bounded repair budget and no revision is stored. If a
+schema-valid candidate still fails the hard gate after repair, it remains a
+visible draft; completion messages state that explicitly and never call the
+draft "ready". Neither case can silently become an AutomationBrief.
 
 ## Ownership
 

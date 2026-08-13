@@ -380,6 +380,44 @@ def test_experiment_revisions_lock_and_attempt_aware_tracker_contract() -> None:
     assert exported["events"][0]["payload"]["metric"]["name"] == "top1_accuracy"
 
 
+def test_experiment_status_degrades_dependency_health_without_losing_core_state(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager = ResearchManager()
+    created = _create(manager, f"status-degraded-{uuid.uuid4().hex}")
+    study_id = created["study"]["record_id"]
+    experiment_id = identity("experiment", {"study_id": study_id, "slug": "DEGRADED"})
+    manager.create_experiment(
+        study_id=study_id,
+        slug="DEGRADED",
+        title="Dependency degradation",
+        purpose="Keep the control-plane read model available",
+        conditions=_experiment_conditions(),
+        experiment_id=experiment_id,
+        idempotency_key=f"{experiment_id}:create",
+    )
+
+    def unavailable_runner(*_args, **_kwargs):
+        raise TimeoutError("runner did not answer")
+
+    class UnavailableTracker:
+        def health(self):
+            raise ConnectionError("tracker did not answer")
+
+    monkeypatch.setattr("research.manager.invoke_skill", unavailable_runner)
+    manager._trackers["local-tracker"] = UnavailableTracker()
+
+    status = manager.experiment_status(experiment_id)
+
+    assert status["schema"] == "adaos.research.experiment_workbench.v1"
+    assert status["experiment"]["record_id"] == experiment_id
+    assert status["lifecycle"]["state"] == "draft"
+    assert status["dataset"]["state"] == "unavailable"
+    assert status["dataset"]["error"]["type"] == "TimeoutError"
+    assert status["tracker"]["state"] == "unavailable"
+    assert status["tracker"]["error"]["type"] == "ConnectionError"
+
+
 def test_experiment_guidance_is_localized_channel_neutral_and_workflow_aware() -> None:
     manager = ResearchManager()
     created = _create(manager, f"guidance-{uuid.uuid4().hex}")

@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.10.2
+version: 0.10.3
 description: Durable pre-Codex orchestration for reusable AdaOS research-direction
   skill projects.
 supported_locales:
@@ -290,6 +290,17 @@ tools:
       text:
         type: string
       model:
+        type:
+        - string
+        - 'null'
+      actor:
+        description: Stable caller identity recorded in the durable directive trace.
+        type:
+        - string
+        - 'null'
+      invocation_origin:
+        description: Conversation, API, CLI, Codex, or another caller channel used
+          to decide whether the directive must also be projected into chat.
         type:
         - string
         - 'null'

@@ -82,8 +82,12 @@ def test_desktop_surface_is_an_operator_complete_single_experiment_workbench() -
     assert page["widgets"].index(views) < page["widgets"].index(editor)
     assert next(item for item in views["actions"] if item["on"] == "click:help") == {
         "on": "click:help",
-        "type": "openModal",
-        "params": {"modalId": "tlp_research_help"},
+        "type": "navigate",
+        "params": {
+            "to": "tlp_research.tlp_research_help",
+            "surface": "modal",
+            "modalId": "tlp_research_help",
+        },
     }
     readme = (ROOT / "README.md").read_text(encoding="utf-8").rstrip()
     modal_readme = next(
