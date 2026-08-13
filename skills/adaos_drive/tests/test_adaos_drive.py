@@ -167,7 +167,10 @@ def test_copy_rename_upload_preview_and_link(monkeypatch, tmp_path):
     assert registrations[0]["zone"] == "ru"
     assert registrations[0]["skill"] == "adaos_drive"
     assert "hub_token" in registrations[0]
-    assert link["link"]["download_url"].startswith("https://inimatic.com/?intent=drive.download&zone=ru&public_token=")
+    assert registrations[0]["resource_kind"] == "file"
+    assert registrations[0]["capabilities"] == ["read", "preview", "download"]
+    assert link["link"]["download_url"].startswith("https://inimatic.com/?intent=drive.view&zone=ru&public_token=")
+    assert link["link"]["view_url"].startswith("https://inimatic.com/?intent=drive.view&zone=ru&public_token=")
     assert "subnet_id=" not in link["link"]["download_url"]
     assert link["link"]["root_download_url"].startswith("https://ru.api.inimatic.com/v1/drive/public-links/")
     assert not (skills_root / ".runtime" / "adaos_drive" / "v0.0" / "data" / "files" / "public_links").exists()
@@ -176,6 +179,36 @@ def test_copy_rename_upload_preview_and_link(monkeypatch, tmp_path):
     assert downloaded["ok"] is True
     assert downloaded["link"]["open_url"].startswith("https://ru.api.inimatic.com/v1/drive/public-links/")
     assert "download=1" in downloaded["link"]["open_url"]
+
+
+def test_guest_link_can_share_folder_readonly(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    docs = root / "docs"
+    docs.mkdir(parents=True)
+    (docs / "note.md").write_text("# Note\n", encoding="utf-8")
+    registrations = []
+    mod, _streams = load_module(monkeypatch, skills_root=tmp_path / "skills", base_dir=tmp_path / "base")
+    monkeypatch.setattr(
+        mod,
+        "_register_root_drive_link",
+        lambda payload: registrations.append(dict(payload)) or {"ok": True, "link": {"public_token": payload["public_token"]}},
+    )
+
+    mod.reset_drive({"root": str(root), "webspace_id": "test"})
+    link = mod.create_guest_link({"panel": "left", "path": "docs", "webspace_id": "test"})
+
+    assert link["ok"] is True
+    assert link["link"]["resource_kind"] == "folder"
+    assert link["link"]["readonly"] is True
+    assert link["link"]["capabilities"] == ["read", "list", "preview", "download"]
+    assert link["link"]["url"].startswith("https://inimatic.com/?intent=drive.view&zone=ru&public_token=")
+    assert link["link"]["list_url"].startswith("https://ru.api.inimatic.com/v1/drive/public-links/")
+    assert registrations[0]["resource_kind"] == "folder"
+    assert registrations[0]["mime_type"] == "inode/directory"
+    assert registrations[0]["download_url"].startswith("https://inimatic.com/?intent=drive.view&zone=ru&public_token=")
+    public_links = mod.list_public_links()
+    assert public_links["ok"] is True
+    assert public_links["links"][0]["resource_kind"] == "folder"
 
 
 def test_guest_link_public_app_base_can_be_overridden(monkeypatch, tmp_path):
@@ -191,6 +224,19 @@ def test_guest_link_public_app_base_can_be_overridden(monkeypatch, tmp_path):
     assert "subnet_id=" not in url
 
 
+def test_guest_link_public_view_base_can_be_overridden(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADAOS_PUBLIC_APP_URL", "downloads.example.test/root/")
+    mod, _streams = load_module(monkeypatch, skills_root=tmp_path / "skills", base_dir=tmp_path / "base")
+
+    url = mod.sdk_navigation.build_url(
+        mod.sdk_navigation.drive_view_destination("pub_1234567890abcdef", zone="ru"),
+        base_url=mod._public_app_base_url(),
+    )
+
+    assert url == "https://downloads.example.test/root?intent=drive.view&zone=ru&public_token=pub_1234567890abcdef"
+    assert "subnet_id=" not in url
+
+
 def test_guest_link_builder_falls_back_when_sdk_helper_is_missing(monkeypatch, tmp_path):
     monkeypatch.setenv("ADAOS_PUBLIC_APP_URL", "https://inimatic.com")
     root = tmp_path / "root"
@@ -198,6 +244,7 @@ def test_guest_link_builder_falls_back_when_sdk_helper_is_missing(monkeypatch, t
     (root / "alpha.txt").write_text("hello", encoding="utf-8")
     mod, _streams = load_module(monkeypatch, skills_root=tmp_path / "skills", base_dir=tmp_path / "base")
     monkeypatch.delattr(mod.sdk_navigation, "drive_download_destination", raising=False)
+    monkeypatch.delattr(mod.sdk_navigation, "drive_view_destination", raising=False)
     monkeypatch.setattr(
         mod,
         "_register_root_drive_link",
@@ -210,7 +257,7 @@ def test_guest_link_builder_falls_back_when_sdk_helper_is_missing(monkeypatch, t
 
     assert url == "https://inimatic.com/?intent=drive.download&zone=ru&public_token=pub_1234567890abcdef"
     assert link["ok"] is True
-    assert link["link"]["download_url"].startswith("https://inimatic.com/?intent=drive.download&zone=ru&public_token=")
+    assert link["link"]["download_url"].startswith("https://inimatic.com/?intent=drive.view&zone=ru&public_token=")
     assert "subnet_id=" not in url
     assert "subnet_id=" not in link["link"]["download_url"]
 

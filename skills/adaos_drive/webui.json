@@ -55,6 +55,9 @@
           "recent_links": {
             "items": []
           },
+          "public_links": {
+            "items": []
+          },
           "messages": [],
           "updated_at": null
         },
@@ -1434,6 +1437,77 @@
                     "text": "$event.download_url",
                     "successMessage": "Link copied."
                   }
+                }
+              ]
+            },
+            {
+              "id": "adaos-drive-public-links",
+              "type": "ui.list",
+              "area": "preview",
+              "title": "Public shares",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "public_links"
+              },
+              "inputs": {
+                "collectionKey": "items",
+                "variant": "list",
+                "titleKey": "name",
+                "subtitleKey": "resource_kind",
+                "detailsPath": "status",
+                "showDetails": true,
+                "itemAccordion": false,
+                "buttons": [
+                  {
+                    "id": "open",
+                    "label": "Open",
+                    "icon": "open-outline",
+                    "whenKey": "view_url"
+                  },
+                  {
+                    "id": "copy",
+                    "label": "Copy",
+                    "icon": "copy-outline",
+                    "whenKey": "view_url"
+                  },
+                  {
+                    "id": "revoke",
+                    "label": "Revoke",
+                    "icon": "ban-outline",
+                    "whenKey": "public_token"
+                  }
+                ],
+                "emptyText": "No public shares"
+              },
+              "actions": [
+                {
+                  "on": "click:open",
+                  "type": "openUrl",
+                  "params": {
+                    "url": "$event.view_url",
+                    "target": "_blank"
+                  }
+                },
+                {
+                  "on": "click:copy",
+                  "type": "copyToClipboard",
+                  "params": {
+                    "text": "$event.view_url",
+                    "successMessage": "Public link copied."
+                  }
+                },
+                {
+                  "on": "click:revoke",
+                  "type": "callSkill",
+                  "target": "adaos_drive.revoke_public_link",
+                  "params": {
+                    "public_token": "$event.public_token",
+                    "side_effect_class": "local_write"
+                  },
+                  "invalidates": [
+                    "adaos_drive.snapshot"
+                  ]
                 }
               ]
             }

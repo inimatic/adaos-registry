@@ -343,7 +343,7 @@ tools:
         type: object
 - name: create_guest_link
   entry: handlers.main:create_guest_link
-  description: Register a Root-mediated guest download link for the selected file.
+  description: Register a Root-mediated readonly public link for the selected file or folder.
   side_effects: local_write
   side_effect_class: local_write
   input_schema:
@@ -371,7 +371,7 @@ tools:
         type: object
 - name: download_selected
   entry: handlers.main:download_selected
-  description: Create a download link for the selected file.
+  description: Create and open a direct download link for the selected file, or the public face for folders.
   side_effects: local_write
   side_effect_class: local_write
   input_schema:
@@ -394,6 +394,52 @@ tools:
       link:
         type: object
       snapshot:
+        type: object
+- name: list_public_links
+  entry: handlers.main:list_public_links
+  description: List readonly public Drive links registered on this hub for owner risk review.
+  side_effects: read_only
+  side_effect_class: read_only
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - links
+    properties:
+      ok:
+        type: boolean
+      links:
+        type: array
+- name: revoke_public_link
+  entry: handlers.main:revoke_public_link
+  description: Revoke a readonly public Drive link on the hub and Root registry.
+  side_effects: local_write
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - public_token
+    properties:
+      public_token:
+        type: string
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - link
+    properties:
+      ok:
+        type: boolean
+      link:
+        type: object
+      root_revoke:
         type: object
 - name: preview_in_other_panel
   entry: handlers.main:preview_in_other_panel

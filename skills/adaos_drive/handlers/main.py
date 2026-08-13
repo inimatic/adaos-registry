@@ -22,10 +22,13 @@ from adaos.sdk.data import skill_memory_get, skill_memory_set
 from adaos.sdk.io.out import stream_publish
 from adaos.services.drive_public_links import (
     build_root_public_content_url,
+    build_root_public_list_url,
     issue_hub_token,
     issue_public_token,
+    list_hub_public_links,
     register_hub_public_link,
     register_root_public_link,
+    revoke_hub_public_link,
 )
 from adaos.services.agent_context import get_ctx
 from adaos.services.node_config import load_config
@@ -247,8 +250,12 @@ def _empty_link() -> dict[str, Any]:
         "view_url": "",
         "download_url": "",
         "root_download_url": "",
+        "list_url": "",
         "zone": "",
         "expires_at": None,
+        "resource_kind": "",
+        "readonly": True,
+        "capabilities": [],
         "label": "",
         "summary": "",
         "created_at": None,
@@ -715,6 +722,34 @@ def _recent_link_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
     return [dict(link)]
 
 
+def _public_link_items() -> list[dict[str, Any]]:
+    try:
+        out: list[dict[str, Any]] = []
+        for item in list_hub_public_links(ctx=get_ctx()):
+            if not isinstance(item, Mapping):
+                continue
+            enriched = dict(item)
+            public_token = str(enriched.get("public_token") or "").strip()
+            zone_id = canonical_zone_id(enriched.get("zone")) or _current_zone_id()
+            if public_token:
+                app_view_url = _build_drive_app_view_url(public_token, zone_id)
+                if not str(enriched.get("url") or "").strip():
+                    enriched["url"] = app_view_url
+                if not str(enriched.get("view_url") or "").strip():
+                    enriched["view_url"] = str(enriched.get("url") or app_view_url)
+                root_base = _root_public_base_url(zone_id)
+                if not str(enriched.get("root_download_url") or "").strip():
+                    enriched["root_download_url"] = build_root_public_content_url(root_base, public_token, download=True)
+                if not str(enriched.get("list_url") or "").strip():
+                    enriched["list_url"] = build_root_public_list_url(root_base, public_token)
+                if not str(enriched.get("download_url") or "").strip():
+                    enriched["download_url"] = str(enriched.get("view_url") or enriched.get("url") or "")
+            out.append(enriched)
+        return out
+    except Exception:
+        return []
+
+
 def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
     sources = _source_options(state)
     left_source = _panel_snapshot(state, "left")
@@ -741,6 +776,7 @@ def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
         "preview": dict(state.get("preview") or _empty_preview()),
         "last_link": dict(state.get("last_link") or _empty_link()),
         "recent_links": {"items": _recent_link_items(state)},
+        "public_links": {"items": _public_link_items()},
         "messages": list(state.get("messages") or [])[-10:],
         "sequence": revision,
         "updated_at": _now_iso(state.get("updated_at") or _now()),
@@ -1140,15 +1176,35 @@ def _build_drive_app_download_url(public_token: str, zone_id: str) -> str:
     return f"{base_url.rstrip('/') or _DEFAULT_PUBLIC_DOWNLOAD_BASE_URL}/?{query}"
 
 
+def _build_drive_app_view_url(public_token: str, zone_id: str) -> str:
+    base_url = _public_app_base_url()
+    helper = getattr(sdk_navigation, "drive_view_destination", None)
+    if callable(helper):
+        try:
+            return sdk_navigation.build_url(helper(public_token, zone=zone_id), base_url=base_url)
+        except Exception as exc:
+            _LOG.warning("SDK drive view URL builder failed, using local fallback: %s", exc)
+    query = urlencode(
+        {
+            "intent": "drive.view",
+            "zone": str(zone_id or "").strip().lower() or "lo",
+            "public_token": str(public_token or "").strip(),
+        }
+    )
+    return f"{base_url.rstrip('/') or _DEFAULT_PUBLIC_DOWNLOAD_BASE_URL}/?{query}"
+
+
 def _create_public_link(source: Mapping[str, Any], source_path: Path, *, download: bool = False) -> dict[str, Any]:
-    if not source_path.exists() or not source_path.is_file():
-        raise FileNotFoundError("selected item is not a downloadable file")
+    if not source_path.exists() or not (source_path.is_file() or source_path.is_dir()):
+        raise FileNotFoundError("selected item is not available")
     zone_id = _current_zone_id()
     subnet_id = _current_subnet_id()
     if not subnet_id:
         raise RuntimeError("subnet_id is not available for Root public link registration")
     root = _resolve_source_root(source)
     rel_path = _rel_from_path(source, source_path)
+    resource_kind = "folder" if source_path.is_dir() else "file"
+    capabilities = ["read", "list", "preview", "download"] if resource_kind == "folder" else ["read", "preview", "download"]
     public_token = issue_public_token()
     hub_token = issue_hub_token()
     ttl_seconds = int(os.getenv("ADAOS_DRIVE_PUBLIC_LINK_TTL_SECONDS") or 7 * 24 * 3600)
@@ -1163,11 +1219,14 @@ def _create_public_link(source: Mapping[str, Any], source_path: Path, *, downloa
         node_id=_current_node_id(),
         zone=zone_id,
         ttl_seconds=ttl_seconds,
+        capabilities=capabilities,
+        ctx=get_ctx(),
     )
     root_base = _root_public_base_url(zone_id)
-    root_view_url = build_root_public_content_url(root_base, public_token, download=False)
+    root_content_url = build_root_public_content_url(root_base, public_token, download=False)
     root_download_url = build_root_public_content_url(root_base, public_token, download=True)
-    app_download_url = _build_drive_app_download_url(public_token, zone_id)
+    root_list_url = build_root_public_list_url(root_base, public_token)
+    app_view_url = _build_drive_app_view_url(public_token, zone_id)
     payload = {
         "public_token": public_token,
         "hub_token": hub_token,
@@ -1177,15 +1236,26 @@ def _create_public_link(source: Mapping[str, Any], source_path: Path, *, downloa
         "skill": _SKILL_NAME,
         "zone": zone_id,
         "zone_id": zone_id,
+        "grant_kind": "drive.files",
+        "face_id": "adaos_drive.files.public",
+        "resource_kind": resource_kind,
+        "readonly": True,
+        "capabilities": capabilities,
         "filename": source_path.name,
-        "size_bytes": int(hub_record.get("size_bytes") or source_path.stat().st_size),
-        "mime_type": str(hub_record.get("mime_type") or mimetypes.guess_type(source_path.name)[0] or "application/octet-stream"),
+        "size_bytes": int(hub_record.get("size_bytes") or (source_path.stat().st_size if source_path.is_file() else 0)),
+        "mime_type": str(
+            hub_record.get("mime_type")
+            or ("inode/directory" if source_path.is_dir() else mimetypes.guess_type(source_path.name)[0])
+            or "application/octet-stream"
+        ),
         "modified_at": hub_record.get("modified_at"),
         "expires_at": hub_record.get("expires_at"),
-        "url": root_view_url,
-        "view_url": root_view_url,
-        "download_url": app_download_url,
+        "url": app_view_url,
+        "view_url": app_view_url,
+        "content_url": root_content_url,
+        "download_url": app_view_url,
         "root_download_url": root_download_url,
+        "list_url": root_list_url,
         "root_base_url": root_base,
         "metadata": {
             "source_id": str(source.get("id") or ""),
@@ -1198,7 +1268,7 @@ def _create_public_link(source: Mapping[str, Any], source_path: Path, *, downloa
         local_payload = dict(payload)
         local_payload.pop("root_base_url", None)
         try:
-            root_result = {"ok": True, "link": register_root_public_link(local_payload)}
+            root_result = {"ok": True, "link": register_root_public_link(local_payload, ctx=get_ctx())}
         except Exception as exc:
             root_result = _root_registration_failure("local_root_registration_failed", str(exc), retryable=True)
     registration_ok = _root_registration_ok(root_result)
@@ -1207,17 +1277,22 @@ def _create_public_link(source: Mapping[str, Any], source_path: Path, *, downloa
     return {
         "id": public_token,
         "public_token": public_token,
-        "url": app_download_url if download else root_view_url,
-        "view_url": root_view_url,
-        "download_url": app_download_url,
+        "url": root_download_url if download and source_path.is_file() else app_view_url,
+        "view_url": app_view_url,
+        "content_url": root_content_url,
+        "download_url": app_view_url,
         "root_download_url": root_download_url,
-        "open_url": root_download_url if download else "",
+        "list_url": root_list_url,
+        "open_url": root_download_url if download and source_path.is_file() else (app_view_url if download else ""),
         "root_registration": root_result,
         "registration_status": "registered" if registration_ok else "pending_root_registration",
         "registration_error": "" if registration_ok else _root_registration_error_text(root_result),
         "name": source_path.name,
-        "size_bytes": int(source_path.stat().st_size),
-        "mime": mimetypes.guess_type(source_path.name)[0] or "application/octet-stream",
+        "resource_kind": resource_kind,
+        "readonly": True,
+        "capabilities": capabilities,
+        "size_bytes": int(source_path.stat().st_size) if source_path.is_file() else 0,
+        "mime": "inode/directory" if source_path.is_dir() else mimetypes.guess_type(source_path.name)[0] or "application/octet-stream",
         "zone": zone_id,
         "expires_at": hub_record.get("expires_at"),
     }
@@ -1558,7 +1633,7 @@ def create_guest_link(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel = _panel_name(data.get("panel"), state)
     selected = _selected_path_or_payload(state, panel, data)
     if not selected:
-        raise ValueError("select a file first")
+        raise ValueError("select an item first")
     source = _source_for_panel(state, panel)
     path = _resolve_entry(source, selected)
     link = _create_public_link(source, path, download=bool(data.get("download")))
@@ -1571,14 +1646,18 @@ def create_guest_link(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
         "view_url": link["view_url"],
         "download_url": link["download_url"],
         "root_download_url": link.get("root_download_url", ""),
+        "list_url": link.get("list_url", ""),
         "open_url": link.get("open_url", ""),
         "registration_status": link.get("registration_status", ""),
         "registration_error": link.get("registration_error", ""),
         "zone": link.get("zone", ""),
         "expires_at": link.get("expires_at"),
+        "resource_kind": link.get("resource_kind", item.get("kind", "")),
+        "readonly": True,
+        "capabilities": list(link.get("capabilities") or []),
         "label": item["name"],
         "summary": (
-            f"{item['name']} | {_human_size(link['size_bytes'])}"
+            f"{item['name']} | {item.get('kind', 'item')} | {_human_size(link['size_bytes']) if item.get('is_file') else 'readonly public access'}"
             if link.get("registration_status") == "registered"
             else f"{item['name']} | Root registration pending"
         ),
@@ -1586,7 +1665,7 @@ def create_guest_link(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     }
     state["active_panel"] = panel
     message = (
-        f"Created link for {path.name}."
+        f"Created public readonly link for {path.name}."
         if link.get("registration_status") == "registered"
         else f"Created local link token for {path.name}; Root registration is pending."
     )
@@ -1599,6 +1678,56 @@ def download_selected(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     data = _payload(evt, **kwargs)
     data["download"] = True
     return create_guest_link(data)
+
+
+@tool("list_public_links")
+def list_public_links(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
+    return {"ok": True, "links": _public_link_items()}
+
+
+@tool("revoke_public_link")
+def revoke_public_link(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
+    data = _payload(evt, **kwargs)
+    token = str(data.get("public_token") or data.get("id") or "").strip()
+    if not token:
+        raise ValueError("public_token is required")
+    revoked = revoke_hub_public_link(token, ctx=get_ctx())
+    root_base = _root_public_base_url(_current_zone_id())
+    root_result = _root_registration_failure("root_revoke_not_attempted", retryable=True)
+    auth_headers = _root_registration_auth_headers()
+    for auth_header in auth_headers:
+        try:
+            req = UrlRequest(
+                f"{root_base.rstrip('/')}/v1/drive/public-links/{token}/revoke",
+                data=b"{}",
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    **auth_header,
+                },
+                method="POST",
+            )
+            with urlopen(req, timeout=3.0) as resp:
+                raw = json.loads(resp.read().decode("utf-8") or "{}")
+            root_result = dict(raw) if isinstance(raw, Mapping) else {"ok": False, "error": "root_revoke_invalid_response"}
+            break
+        except HTTPError as exc:
+            detail = ""
+            try:
+                detail = exc.read().decode("utf-8", errors="replace")[:1000]
+            except Exception:
+                detail = ""
+            root_result = _root_registration_failure("root_revoke_http_error", detail or str(exc), status=int(exc.code or 0))
+            if int(exc.code or 0) not in {401, 403}:
+                break
+        except Exception as exc:
+            root_result = _root_registration_failure("root_revoke_request_failed", str(exc))
+            break
+    return {
+        "ok": True,
+        "link": revoked,
+        "root_revoke": root_result,
+    }
 
 
 @tool("preview_in_other_panel")
