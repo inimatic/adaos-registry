@@ -58,7 +58,7 @@ class RasaModel:
         self._mtime = mtime
 
     async def parse(self, text: str) -> dict:
-        self.load_if_needed()
+        await asyncio.to_thread(self.load_if_needed)
         if self._agent is None:
             raise RuntimeError("no model loaded")
         result = await self._agent.parse_message(text)
@@ -72,8 +72,11 @@ _MODEL = RasaModel()
 
 @app.get("/health")
 async def health(_: Request):
-    path = _model_path()
-    ok = path.exists()
+    def _status() -> tuple[Path, bool]:
+        path = _model_path()
+        return path, path.exists()
+
+    path, ok = await asyncio.to_thread(_status)
     return response.json(
         {
             "ok": True,
@@ -119,7 +122,13 @@ async def train(request: Request):
         str(out_dir),
     ]
     try:
-        proc = subprocess.run(cmd, cwd=str(project_dir), capture_output=True, text=True)
+        proc = await asyncio.to_thread(
+            subprocess.run,
+            cmd,
+            cwd=str(project_dir),
+            capture_output=True,
+            text=True,
+        )
     except Exception as exc:
         return response.json({"ok": False, "error": f"spawn_failed:{exc}"}, status=500)
     if proc.returncode != 0:
@@ -130,7 +139,7 @@ async def train(request: Request):
 
     # reload model if present
     try:
-        _MODEL.load_if_needed()
+        await asyncio.to_thread(_MODEL.load_if_needed)
     except Exception:
         pass
 
