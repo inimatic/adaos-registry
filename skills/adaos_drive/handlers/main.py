@@ -93,6 +93,7 @@ _DOC_EXTENSIONS = {".doc", ".docx", ".odt", ".pdf", ".ppt", ".pptx", ".rtf", ".x
 
 _STATE_BY_WEBSPACE: dict[str, dict[str, Any]] = {}
 _FALLBACK_MEMORY: dict[str, Any] = {}
+_GLOBAL_SOURCES_KEY = f"{_STATE_MEMORY_PREFIX}.sources"
 
 
 def _now() -> float:
@@ -191,6 +192,60 @@ def _source_payload(label: str, root: Path) -> dict[str, Any]:
     }
 
 
+def _normalize_sources(value: Any) -> list[dict[str, Any]]:
+    sources = [dict(item) for item in value or [] if isinstance(item, Mapping)]
+    return [item for item in sources if str(item.get("id") or "").strip() and str(item.get("path") or "").strip()]
+
+
+def _merge_sources(*source_lists: Any) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for source_list in source_lists:
+        for item in _normalize_sources(source_list):
+            source_id = str(item.get("id") or "").strip()
+            if not source_id:
+                continue
+            if source_id not in merged:
+                order.append(source_id)
+            merged[source_id] = item
+    return [merged[source_id] for source_id in order if source_id in merged]
+
+
+def _ensure_panel_sources(state: dict[str, Any]) -> None:
+    sources = _normalize_sources(state.get("sources"))
+    if not sources:
+        sources = _default_state()["sources"]
+    state["sources"] = sources
+    valid_source_ids = {str(item.get("id") or "") for item in sources}
+    panels = state.setdefault("panels", {})
+    for panel in ("left", "right"):
+        panel_state = dict(panels.get(panel) or {}) if isinstance(panels.get(panel), Mapping) else {}
+        source_id = str(panel_state.get("source_id") or "").strip()
+        if source_id not in valid_source_ids:
+            panel_state["source_id"] = sources[0]["id"]
+            panel_state["path"] = ""
+            panel_state["selected_path"] = ""
+            panel_state["selected_id"] = ""
+        panels[panel] = panel_state
+
+
+def _load_global_sources(webspace_id: str | None = None) -> list[dict[str, Any]]:
+    candidates: list[Any] = [_mem_get(_GLOBAL_SOURCES_KEY, None)]
+    ws = _webspace_id(webspace_id)
+    for candidate_ws in (ws, _DEFAULT_WEBSPACE_ID):
+        if candidate_ws:
+            persisted = _mem_get(_state_key(candidate_ws), None)
+            if isinstance(persisted, Mapping):
+                candidates.append(persisted.get("sources"))
+    return _merge_sources(*candidates)
+
+
+def _persist_global_sources(state: Mapping[str, Any]) -> None:
+    sources = _normalize_sources(state.get("sources"))
+    if sources:
+        _mem_set(_GLOBAL_SOURCES_KEY, sources)
+
+
 def _default_state() -> dict[str, Any]:
     root = _default_root()
     source = _source_payload(root.name or "Local folder", root)
@@ -265,8 +320,7 @@ def _empty_link() -> dict[str, Any]:
 def _coerce_state(value: Any) -> dict[str, Any] | None:
     if not isinstance(value, Mapping):
         return None
-    sources = [dict(item) for item in value.get("sources") or [] if isinstance(item, Mapping)]
-    sources = [item for item in sources if str(item.get("id") or "").strip() and str(item.get("path") or "").strip()]
+    sources = _normalize_sources(value.get("sources"))
     if not sources:
         return None
     state = _default_state()
@@ -297,7 +351,10 @@ def _coerce_state(value: Any) -> dict[str, Any] | None:
 
 
 def _load_persisted_state(webspace_id: str) -> dict[str, Any]:
-    return _coerce_state(_mem_get(_state_key(webspace_id), None)) or _default_state()
+    state = _coerce_state(_mem_get(_state_key(webspace_id), None)) or _default_state()
+    state["sources"] = _merge_sources(state.get("sources"), _load_global_sources(webspace_id))
+    _ensure_panel_sources(state)
+    return state
 
 
 def _load_state(webspace_id: str) -> dict[str, Any]:
@@ -313,6 +370,8 @@ def _load_state(webspace_id: str) -> dict[str, Any]:
 def _persist_state(webspace_id: str, state: dict[str, Any]) -> None:
     state["sequence"] = int(state.get("sequence") or 0) + 1
     state["updated_at"] = _now()
+    _ensure_panel_sources(state)
+    _persist_global_sources(state)
     _mem_set(_state_key(webspace_id), state)
 
 
@@ -696,8 +755,9 @@ def _panel_snapshot(state: Mapping[str, Any], panel: str) -> dict[str, Any]:
     }
 
 
-def _source_options(state: Mapping[str, Any]) -> list[dict[str, Any]]:
+def _source_options(state: Mapping[str, Any], webspace_id: str) -> list[dict[str, Any]]:
     out: list[dict[str, Any]] = []
+    ws = _webspace_id(webspace_id)
     for item in state.get("sources") or []:
         if not isinstance(item, Mapping):
             continue
@@ -705,6 +765,7 @@ def _source_options(state: Mapping[str, Any]) -> list[dict[str, Any]]:
             {
                 "id": str(item.get("id") or ""),
                 "value": str(item.get("id") or ""),
+                "webspace_id": ws,
                 "label": str(item.get("label") or "Local folder"),
                 "description": str(item.get("description") or item.get("path") or ""),
                 "kind": str(item.get("kind") or "local"),
@@ -750,8 +811,9 @@ def _public_link_items() -> list[dict[str, Any]]:
         return []
 
 
-def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
-    sources = _source_options(state)
+def _snapshot(state: dict[str, Any], webspace_id: str) -> dict[str, Any]:
+    ws = _webspace_id(webspace_id)
+    sources = _source_options(state, ws)
     left_source = _panel_snapshot(state, "left")
     right_source = _panel_snapshot(state, "right")
     revision = _state_revision(state)
@@ -760,6 +822,7 @@ def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
         "schema": "adaos_drive.snapshot.v1",
         "status": "ready",
         "receiver": _RECEIVER,
+        "webspace_id": ws,
         "_stream_rev": revision,
         "_stream_require_revision": True,
         "sources": sources,
@@ -784,7 +847,7 @@ def _snapshot(state: dict[str, Any]) -> dict[str, Any]:
 
 
 def _publish(state: dict[str, Any], webspace_id: str) -> dict[str, Any]:
-    payload = _snapshot(state)
+    payload = _snapshot(state, webspace_id)
     try:
         stream_publish(_RECEIVER, payload, _meta={"webspace_id": _webspace_id(webspace_id)})
     except Exception:
@@ -1432,7 +1495,16 @@ def select_source(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel = _panel_name(data.get("panel"), state)
     source_id = str(data.get("source_id") or data.get("value") or "").strip()
     if source_id not in _source_map(state):
-        raise ValueError("unknown source")
+        source_path = str(data.get("source_path") or data.get("path") or "").strip()
+        if source_path:
+            root = Path(source_path).expanduser().resolve()
+            if root.exists() and root.is_dir():
+                source = _source_payload(_safe_label(data.get("source_label"), root.name or str(root)), root)
+                existing = [item for item in state.get("sources") or [] if str(item.get("id")) != source["id"]]
+                state["sources"] = [*existing, source]
+                source_id = source["id"]
+        if source_id not in _source_map(state):
+            raise ValueError("unknown source")
     panel_state = _panel_state(state, panel)
     panel_state["source_id"] = source_id
     panel_state["path"] = ""

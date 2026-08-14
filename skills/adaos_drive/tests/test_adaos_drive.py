@@ -112,6 +112,49 @@ def test_activate_item_opens_folders_and_parent_rows(monkeypatch, tmp_path):
     assert parent["snapshot"]["panels"]["left"]["path"] == ""
 
 
+def test_sources_are_shared_across_drive_webspaces(monkeypatch, tmp_path):
+    left = tmp_path / "left"
+    extra = tmp_path / "extra"
+    left.mkdir()
+    extra.mkdir()
+    mod, _streams = load_module(monkeypatch)
+
+    mod.reset_drive({"root": str(left), "webspace_id": "desktop"})
+    added = mod.add_source({"label": "Extra", "path": str(extra), "panel": "right", "webspace_id": "desktop"})
+    source_id = added["source"]["id"]
+
+    home = mod.get_snapshot({"webspace_id": "Homepoint"})["snapshot"]
+    assert source_id in {item["id"] for item in home["sources"]}
+    assert {item["webspace_id"] for item in home["source_options"]} == {"Homepoint"}
+
+    selected = mod.select_source({"panel": "right", "source_id": source_id, "webspace_id": "Homepoint"})
+    assert selected["snapshot"]["selectors"]["right_source"]["current"] == source_id
+
+
+def test_select_source_recovers_from_option_payload(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    external = tmp_path / "external"
+    root.mkdir()
+    external.mkdir()
+    mod, _streams = load_module(monkeypatch)
+
+    mod.reset_drive({"root": str(root), "webspace_id": "Homepoint"})
+    source_id = mod._source_payload("External", external)["id"]
+    selected = mod.select_source(
+        {
+            "panel": "right",
+            "source_id": source_id,
+            "source_label": "External",
+            "source_path": str(external),
+            "webspace_id": "Homepoint",
+        }
+    )
+
+    assert selected["source_id"] == source_id
+    assert selected["snapshot"]["selectors"]["right_source"]["current"] == source_id
+    assert source_id in {item["id"] for item in selected["snapshot"]["sources"]}
+
+
 def test_copy_rename_upload_preview_and_link(monkeypatch, tmp_path):
     for key in (
         "ADAOS_PUBLIC_APP_URL",

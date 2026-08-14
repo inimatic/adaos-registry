@@ -570,6 +570,10 @@
                   "params": {
                     "panel": "left",
                     "source_id": "$event.value",
+                    "webspace_id": "$event.option.webspace_id",
+                    "source_path": "$event.option.path",
+                    "source_label": "$event.option.label",
+                    "source_kind": "$event.option.kind",
                     "side_effect_class": "local_write"
                   },
                   "invalidates": [
@@ -978,6 +982,10 @@
                   "params": {
                     "panel": "right",
                     "source_id": "$event.value",
+                    "webspace_id": "$event.option.webspace_id",
+                    "source_path": "$event.option.path",
+                    "source_label": "$event.option.label",
+                    "source_kind": "$event.option.kind",
                     "side_effect_class": "local_write"
                   },
                   "invalidates": [
