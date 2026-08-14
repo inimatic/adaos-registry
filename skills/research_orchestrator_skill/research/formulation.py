@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 from typing import Any, Mapping
 
 from jsonschema import Draft202012Validator
@@ -13,6 +14,17 @@ from research.contracts import prototype_candidate_schema
 STAGE_SCHEMA_VERSION = "1.0.0"
 REQUIREMENT_CATEGORIES = ("execution", "data", "reproducibility", "observability", "evidence", "recovery", "analysis", "security")
 CHECK_CATEGORIES = ("workflow", "data_integrity", "reproducibility", "evidence", "analysis", "failure_recovery", "security")
+PROTOCOL_DECISION_AREAS = (
+    "data",
+    "comparators",
+    "budget",
+    "pairing",
+    "outcomes",
+    "uncertainty",
+    "stopping",
+    "multiplicity",
+    "practical_significance",
+)
 
 
 def _object(properties: Mapping[str, Any], required: list[str]) -> dict[str, Any]:
@@ -48,7 +60,7 @@ def problem_frame_schema() -> dict[str, Any]:
     selected["hypotheses"] = {
         "type": "array",
         "minItems": 1,
-        "maxItems": 30,
+        "maxItems": 1,
         "items": hypothesis,
     }
     selected["source_assessment"] = _object(
@@ -149,36 +161,25 @@ def protocol_design_schema() -> dict[str, Any]:
     experimental_plan["properties"]["reproducibility"]["properties"]["environment"]["additionalProperties"] = False
     decision = _object(
         {
-            "id": {"type": "string", "minLength": 2},
-            "area": {
-                "enum": [
-                    "data",
-                    "comparators",
-                    "budget",
-                    "pairing",
-                    "outcomes",
-                    "uncertainty",
-                    "stopping",
-                    "multiplicity",
-                    "practical_significance",
-                ]
-            },
             "value_summary": {"type": "string", "minLength": 10},
             "status": {"enum": ["source_derived", "policy_default", "proposed", "unresolved"]},
             "rationale": {"type": "string", "minLength": 10},
             "source_refs": {"type": "array", "items": {"type": "string", "pattern": "^SRC-[0-9]{3}$"}},
         },
-        ["id", "area", "value_summary", "status", "rationale", "source_refs"],
+        ["value_summary", "status", "rationale", "source_refs"],
     )
     return _object(
         {
             "assistant_message": properties["assistant_message"],
             "experimental_plan": experimental_plan,
             "evaluation_plan": properties["evaluation_plan"],
-            "decision_register": {"type": "array", "minItems": 7, "items": decision},
+            "decisions_by_area": _object(
+                {area: decision for area in PROTOCOL_DECISION_AREAS},
+                list(PROTOCOL_DECISION_AREAS),
+            ),
             "open_questions": properties["open_questions"],
         },
-        ["assistant_message", "experimental_plan", "evaluation_plan", "decision_register", "open_questions"],
+        ["assistant_message", "experimental_plan", "evaluation_plan", "decisions_by_area", "open_questions"],
     )
 
 
@@ -303,18 +304,28 @@ def stage_quality_issues(stage: str, value: Mapping[str, Any], *, allowed_source
         allocation = pairing["allocation"]
         if int(allocation["sample_size"]) != len(allocation["planned_units"]):
             issues.append("pairing allocation sample_size must equal planned_units length")
+        outcome_dependent_stop = re.compile(
+            r"(?i)(?:statistically significant|significant (?:result|difference|improvement)|"
+            r"target (?:accuracy|metric|score)|desired (?:accuracy|metric|score))"
+        )
+        if any(
+            outcome_dependent_stop.search(str(condition))
+            for item in stages
+            for condition in item.get("stop_conditions") or []
+        ):
+            issues.append("stage stop conditions must not depend on a desired scientific outcome")
         outcomes = payload["evaluation_plan"]["outcomes"]
         if sum(1 for item in outcomes if item.get("role") == "primary") != 1:
             issues.append("evaluation_plan must contain exactly one primary outcome")
-        areas = {str(item.get("area") or "") for item in payload["decision_register"] if isinstance(item, Mapping)}
-        required_areas = {"data", "comparators", "budget", "pairing", "outcomes", "uncertainty", "stopping", "multiplicity", "practical_significance"}
-        if not required_areas.issubset(areas):
-            issues.append("decision_register must cover every protocol decision area")
-        for item in payload["decision_register"]:
+        decisions = payload["decisions_by_area"]
+        for area, item in decisions.items():
             if item.get("status") == "source_derived" and not item.get("source_refs"):
-                issues.append(f"source-derived decision {item.get('id')} requires source_refs")
+                issues.append(f"source-derived decision {area} requires source_refs")
             if item.get("status") == "unresolved" and not payload.get("open_questions"):
                 issues.append("unresolved decisions require an explicit open question")
+        vague_significance = re.compile(r"(?i)statistically significant|significant (?:difference|improvement|result)")
+        if any(vague_significance.search(str(item)) for item in payload["evaluation_plan"]["decision_rules"]):
+            issues.append("decision rules must use the predeclared estimand, uncertainty interval, and practical threshold rather than significance wording")
     return list(dict.fromkeys(issues))
 
 
@@ -326,9 +337,34 @@ def schema_text_format(stage: str, *, schema: Mapping[str, Any] | None = None) -
             "type": "json_schema",
             "name": f"research_{stage}_v1",
             "strict": True,
-            "schema": copy.deepcopy(dict(schema or STAGES[stage]())),
+            "schema": provider_schema(schema or STAGES[stage]()),
         }
     }
+
+
+def provider_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
+    """Project the full local contract onto the portable Structured Outputs subset.
+
+    The provider constrains shape and enums. AdaOS still applies the complete
+    JSON Schema plus semantic gates after generation. Keeping these contracts
+    separate prevents a provider keyword limitation from silently weakening
+    the accepted ResearchPrototype.
+    """
+
+    unsupported = {"uniqueItems", "minLength", "maxLength"}
+
+    def visit(value: Any) -> Any:
+        if isinstance(value, Mapping):
+            return {
+                str(key): visit(item)
+                for key, item in value.items()
+                if str(key) not in unsupported
+            }
+        if isinstance(value, list):
+            return [visit(item) for item in value]
+        return copy.deepcopy(value)
+
+    return visit(schema)
 
 
 def stage_digest(value: Mapping[str, Any]) -> str:
@@ -382,8 +418,8 @@ def assemble_candidate(
     implementation = validate_stage("implementation_contract", implementation_contract)
     questions = list(dict.fromkeys([*list(problem.get("open_questions") or []), *list(protocol.get("open_questions") or [])]))
     unresolved = [
-        str(item.get("value_summary") or item.get("id") or "unresolved protocol decision")
-        for item in protocol.get("decision_register") or []
+        str(item.get("value_summary") or area or "unresolved protocol decision")
+        for area, item in (protocol.get("decisions_by_area") or {}).items()
         if isinstance(item, Mapping) and item.get("status") == "unresolved"
     ]
     questions = list(dict.fromkeys([*questions, *unresolved]))
@@ -458,12 +494,14 @@ def assemble_candidate(
 
 __all__ = [
     "CHECK_CATEGORIES",
+    "PROTOCOL_DECISION_AREAS",
     "REQUIREMENT_CATEGORIES",
     "STAGES",
     "STAGE_SCHEMA_VERSION",
     "assemble_candidate",
     "implementation_contract_schema",
     "problem_frame_schema",
+    "provider_schema",
     "protocol_design_schema",
     "schema_text_format",
     "stage_schema",

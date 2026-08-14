@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from research.formulation import STAGES, assemble_candidate, stage_quality_issues, stage_schema, validate_stage
+from research.formulation import STAGES, assemble_candidate, provider_schema, stage_quality_issues, stage_schema, validate_stage
 
 
 REF = "SRC-001"
@@ -62,10 +62,10 @@ def _protocol(*, unresolved: bool = False) -> dict:
             "practical_significance": "Interpret magnitude against a predeclared one percentage point reference.",
             "negative_result_policy": "Retain and report negative or inconclusive results without redefining the question.",
         },
-        "decision_register": [
-            {"id": f"D-{index + 1}", "area": area, "value_summary": f"Declared protocol choice for {area}.", "status": "unresolved" if unresolved and area == "budget" else "proposed", "rationale": f"A reviewable bounded choice is required for {area}.", "source_refs": []}
-            for index, area in enumerate(decision_areas)
-        ],
+        "decisions_by_area": {
+            area: {"value_summary": f"Declared protocol choice for {area}.", "status": "unresolved" if unresolved and area == "budget" else "proposed", "rationale": f"A reviewable bounded choice is required for {area}.", "source_refs": []}
+            for area in decision_areas
+        },
         "open_questions": ["Какой confirmatory budget должен быть принят?"] if unresolved else [],
     }
 
@@ -112,6 +112,22 @@ def test_dynamic_stage_schema_limits_every_source_reference_to_supplied_short_id
     hypothesis_refs = schema["properties"]["hypotheses"]["items"]["properties"]["source_refs"]["items"]
     observation_refs = schema["properties"]["source_assessment"]["properties"]["observed_facts"]["items"]["properties"]["source_refs"]["items"]
     assert hypothesis_refs == observation_refs == {"type": "string", "enum": ["SRC-001", "SRC-002"]}
+
+
+def test_provider_schema_removes_unsupported_keywords_without_weakening_local_validation() -> None:
+    local = stage_schema("protocol_design", allowed_source_refs={"SRC-001"})
+    projected = provider_schema(local)
+
+    def keywords(value: object) -> set[str]:
+        if isinstance(value, Mapping):
+            return set(value) | {key for item in value.values() for key in keywords(item)}
+        if isinstance(value, list):
+            return {key for item in value for key in keywords(item)}
+        return set()
+
+    assert "uniqueItems" in keywords(local)
+    assert not {"uniqueItems", "minLength", "maxLength"} & keywords(projected)
+    _assert_strict_objects(projected)
 
 
 def test_unresolved_protocol_decision_is_a_deterministic_readiness_blocker() -> None:

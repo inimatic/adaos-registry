@@ -32,6 +32,7 @@ from research.contracts import (
 )
 from research.formulation import (
     assemble_candidate,
+    provider_schema,
     schema_text_format,
     stage_digest,
     stage_quality_issues,
@@ -869,8 +870,8 @@ class ResearchOrchestrator:
     def _source_context(self, bundle: Mapping[str, Any], *, query: str = "") -> dict[str, Any]:
         selected: list[dict[str, Any]] = []
         sources = [item for item in bundle.get("sources") or [] if isinstance(item, Mapping)]
-        remaining = 80_000
-        per_source = min(40_000, max(8_000, remaining // max(1, len(sources))))
+        remaining = 48_000
+        per_source = min(28_000, max(6_000, remaining // max(1, len(sources))))
         unreadable: list[str] = []
         coverage_items: list[dict[str, Any]] = []
         for source in sources:
@@ -1017,9 +1018,12 @@ class ResearchOrchestrator:
         max_tokens: int,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         schema = stage_schema(stage_name, allowed_source_refs=allowed_source_refs)
+        constrained_schema = provider_schema(schema)
         input_digest = stage_digest(stage_input)
         schema_digest = stage_digest(schema)
-        profile_scope = f"research.formulation.{stage_name}"
+        provider_schema_digest = stage_digest(constrained_schema)
+        task_scope = f"research.formulation.{stage_name}"
+        profile_scope = str(os.getenv("ADAOS_RESEARCH_LLM_PROFILE_SCOPE") or "development").strip().lower()
         base_prompt = {
             "schema": "adaos.research.formulation_stage_input.v1",
             "stage": stage_name,
@@ -1037,6 +1041,8 @@ class ResearchOrchestrator:
                 "stage_index": stage_index,
                 "input_digest": input_digest,
                 "schema_digest": schema_digest,
+                "provider_schema_digest": provider_schema_digest,
+                "model_profile_scope": profile_scope,
             },
         )
         self._emit(
@@ -1115,7 +1121,7 @@ class ResearchOrchestrator:
             completed = llm_client.wait_response_job(
                 job_id,
                 base_url=base_url,
-                timeout_s=300,
+                timeout_s=max(60, int(os.getenv("ADAOS_RESEARCH_LLM_STAGE_TIMEOUT_SECONDS") or "480")),
                 poll_interval_s=1.5,
                 progress_callback=progress,
             )
@@ -1127,6 +1133,8 @@ class ResearchOrchestrator:
             try:
                 submitted, completed, output_text = execute(base_prompt, suffix="", structured=True)
             except Exception as exc:
+                if not _structured_output_unsupported(exc):
+                    raise
                 structured_output = False
                 self.repository.activity(
                     direction_id,
@@ -1137,7 +1145,7 @@ class ResearchOrchestrator:
                         "run_id": run_id,
                         "stage": stage_name,
                         "error": _bounded_text(exc, 800),
-                        "classified_unsupported": _structured_output_unsupported(exc),
+                        "classified_unsupported": True,
                     },
                 )
                 submitted, completed, output_text = execute(base_prompt, suffix="-json-fallback", structured=False)
@@ -1173,7 +1181,7 @@ class ResearchOrchestrator:
                 try:
                     submitted, completed, output_text = execute(repair_prompt, suffix="-repair-1", structured=structured_output)
                 except Exception as exc:
-                    if not structured_output:
+                    if not structured_output or not _structured_output_unsupported(exc):
                         raise
                     structured_output = False
                     submitted, completed, output_text = execute(repair_prompt, suffix="-repair-1-json-fallback", structured=False)
@@ -1194,7 +1202,9 @@ class ResearchOrchestrator:
             telemetry.update(
                 {
                     "schema_digest": schema_digest,
+                    "provider_schema_digest": provider_schema_digest,
                     "input_digest": input_digest,
+                    "task_scope": task_scope,
                     "jobs": jobs,
                 }
             )
@@ -1224,7 +1234,9 @@ class ResearchOrchestrator:
                 "error": _bounded_text(exc, 2000),
                 "repair_attempts": repair_attempt,
                 "schema_digest": schema_digest,
+                "provider_schema_digest": provider_schema_digest,
                 "input_digest": input_digest,
+                "task_scope": task_scope,
             }
             if completed:
                 failure_telemetry.update(
@@ -1364,6 +1376,8 @@ class ResearchOrchestrator:
                 },
                 rules=[
                     "Produce one falsifiable question; do not design the execution protocol in this stage.",
+                    "Produce exactly one primary hypothesis for that question and no secondary research questions.",
+                    "Name the intervention, comparator, measurable outcome and paired comparison explicitly; avoid vague words such as effectiveness or significance.",
                     "Separate direct source observations, author interpretations, hypotheses and unresolved choices.",
                     "Give every hypothesis its motivating SRC-### ids. Keep source observations and author interpretations in source_assessment; AdaOS compiles provenance records deterministically.",
                     "Use exact supplied SRC-### ids only. Never treat historical notebook outputs as confirmation.",
@@ -1405,9 +1419,13 @@ class ResearchOrchestrator:
                 rules=[
                     "Design exactly separated workflow_smoke and confirmatory stages; smoke never supports a scientific claim.",
                     "Use the supplied CPU smoke policy. Mark other non-source choices as proposed or policy_default, never source_derived.",
-                    "Cover all nine decision areas in decision_register and cite refs only for source-derived choices.",
+                    "Populate all nine keys in decisions_by_area and cite refs only for source-derived choices; AdaOS owns decision ids.",
                     "Declare exact seed_values and make pairing allocation planned_units and sample_size identical to the confirmatory units.",
+                    "Use named RNG streams initialization, sampling, augmentation, and analysis; within each pair keep initialization, data order, sampling and augmentation invariant and vary only the intervention.",
+                    "Confirmatory stopping must depend only on predeclared budget or safety/failure conditions, never on a desired metric or significance.",
                     "Declare exactly one primary outcome, an operational estimand, uncertainty unit/method, stopping, multiplicity and practical significance.",
+                    "Decision rules must compare the estimate and uncertainty interval with the explicit practical threshold; never use statistical significance as the stopping or reporting rule.",
+                    "Prefer an exact confirmatory budget justified by the sources. If none is justified, make a bounded proposal or mark the decision unresolved; never reuse the one-seed smoke budget as confirmatory evidence.",
                     "If a safe, reviewable proposal cannot be made, mark the choice unresolved and state one concrete open question.",
                 ],
                 allowed_source_refs=allowed_refs,
