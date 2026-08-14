@@ -1389,7 +1389,10 @@ async def _background_refresh_worker() -> None:
     finally:
         _background_refresh_task = None
         if _background_refresh_pending_all or _background_refresh_webspace_ids:
-            _schedule_snapshot_refresh(reason="background.refresh.retry")
+            await asyncio.to_thread(
+                _schedule_snapshot_refresh,
+                reason="background.refresh.retry",
+            )
 
 
 def _schedule_snapshot_refresh(*, webspace_id: str | None = None, reason: str = "runtime.event") -> None:
