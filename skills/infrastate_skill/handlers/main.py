@@ -205,6 +205,17 @@ _projection_diag = {
     "snapshot_request_forced_total": 0,
     "snapshot_request_coalesced_total": 0,
     "tool_project_admitted_under_pressure_total": 0,
+    "lifecycle_refresh_deferred_total": 0,
+    "last_lifecycle_refresh_event": "",
+    "last_lifecycle_refresh_deferred_at": None,
+    "last_refresh_reason": "",
+    "last_refresh_started_at": None,
+    "last_refresh_finished_at": None,
+    "last_refresh_duration_ms": 0.0,
+    "last_refresh_payload_bytes": 0,
+    "max_refresh_payload_bytes": 0,
+    "last_refresh_projected_slots": [],
+    "last_refresh_error": "",
 }
 _PROJECTION_EXECUTOR: ThreadPoolExecutor | None = None
 _STREAM_SNAPSHOT_EXECUTOR: ThreadPoolExecutor | None = None
@@ -9079,20 +9090,42 @@ async def _refresh_live_infrastate_async(
     reason: str = "runtime.event",
     project_control: bool = True,
 ) -> dict[str, Any]:
+    started_at = time.time()
+    started = time.perf_counter()
+    _projection_diag["last_refresh_reason"] = str(reason or "runtime.event")
+    _projection_diag["last_refresh_started_at"] = started_at
+    _projection_diag["last_refresh_error"] = ""
     now = time.time()
-    await asyncio.to_thread(_write_ui_state, last_refresh_ts=now)
     sections: dict[str, Any] = {}
-    if project_control:
-        sections = await asyncio.to_thread(
-            _lightweight_projection_sections,
-            webspace_id=webspace_id,
+    try:
+        await asyncio.to_thread(_write_ui_state, last_refresh_ts=now)
+        if project_control:
+            sections = await asyncio.to_thread(
+                _lightweight_projection_sections,
+                webspace_id=webspace_id,
+            )
+            payload_bytes = sum(len(_stable_json_bytes(value)) for value in sections.values())
+            _projection_diag["last_refresh_payload_bytes"] = payload_bytes
+            _projection_diag["max_refresh_payload_bytes"] = max(
+                int(_projection_diag.get("max_refresh_payload_bytes") or 0),
+                payload_bytes,
+            )
+            _projection_diag["last_refresh_projected_slots"] = sorted(str(key) for key in sections)
+            await _project_sections_async(
+                sections,
+                webspace_id=webspace_id,
+                reason=f"infrastate_control_refresh:{reason}",
+            )
+        await asyncio.to_thread(_publish_active_stream_receiver_snapshots, webspace_id, reason=reason)
+    except BaseException as exc:
+        _projection_diag["last_refresh_error"] = f"{type(exc).__name__}: {exc}"
+        raise
+    finally:
+        _projection_diag["last_refresh_finished_at"] = time.time()
+        _projection_diag["last_refresh_duration_ms"] = round(
+            max(0.0, time.perf_counter() - started) * 1000.0,
+            3,
         )
-        await _project_sections_async(
-            sections,
-            webspace_id=webspace_id,
-            reason=f"infrastate_control_refresh:{reason}",
-        )
-    await asyncio.to_thread(_publish_active_stream_receiver_snapshots, webspace_id, reason=reason)
     return {
         "ok": True,
         "full_snapshot_removed": True,
@@ -9601,17 +9634,15 @@ async def on_runtime_event(evt: Any) -> None:
         or (state == "succeeded" and phase == "validate")
     )
     try:
-        if event_type == "sys.ready" or terminal_core_update:
-            # First paint and supervisor-finalized root restarts must be
-            # materialized before the lifecycle event completes. A detached
-            # debounce task can otherwise be cancelled with the dispatch loop,
-            # leaving the persisted Yjs card on its pre-restart value.
-            await _refresh_snapshot_async(webspace_id=webspace_id, allow_cache=False)
-            return
+        _projection_diag["lifecycle_refresh_deferred_total"] = int(
+            _projection_diag.get("lifecycle_refresh_deferred_total") or 0
+        ) + 1
+        _projection_diag["last_lifecycle_refresh_event"] = event_type
+        _projection_diag["last_lifecycle_refresh_deferred_at"] = time.time()
         await asyncio.to_thread(
             _schedule_snapshot_refresh,
             webspace_id=webspace_id,
-            reason=event_type,
+            reason=(f"{event_type}.terminal" if terminal_core_update else event_type),
         )
     except Exception:
         log = _log.warning if event_type == "sys.ready" or terminal_core_update else _log.debug
