@@ -5145,7 +5145,8 @@ async def _background_refresh_worker() -> None:
             _background_refresh_reason = ""
             _background_refresh_webspace_id = None
             started_at = time.time()
-            _write_ui_state(
+            await asyncio.to_thread(
+                _write_ui_state,
                 background_refresh_pending=False,
                 background_refresh_running=True,
                 background_refresh_reason=reason,
@@ -5161,21 +5162,24 @@ async def _background_refresh_worker() -> None:
             except (asyncio.CancelledError, RuntimeError) as exc:
                 if isinstance(exc, RuntimeError) and "Executor shutdown has been called" not in str(exc):
                     raise
-                _write_ui_state(
+                await asyncio.to_thread(
+                    _write_ui_state,
                     background_refresh_running=False,
                     background_refresh_finished_at=time.time(),
                     background_refresh_error="",
                 )
                 break
             except Exception as exc:
-                _write_ui_state(
+                await asyncio.to_thread(
+                    _write_ui_state,
                     background_refresh_running=False,
                     background_refresh_finished_at=time.time(),
                     background_refresh_error=f"{type(exc).__name__}: {exc}",
                 )
                 _log.warning("background infrastate refresh failed reason=%s webspace=%s", reason, webspace_id or "-", exc_info=True)
             else:
-                _write_ui_state(
+                await asyncio.to_thread(
+                    _write_ui_state,
                     background_refresh_running=False,
                     background_refresh_finished_at=time.time(),
                     background_refresh_error="",
@@ -5186,7 +5190,10 @@ async def _background_refresh_worker() -> None:
     finally:
         _background_refresh_task = None
         if _background_refresh_pending:
-            _schedule_snapshot_refresh(reason="background.refresh.retry")
+            await asyncio.to_thread(
+                _schedule_snapshot_refresh,
+                reason="background.refresh.retry",
+            )
 
 
 def _push_infrastate_skill_context() -> bool:
@@ -8916,7 +8923,7 @@ async def _project_async(snapshot: dict[str, Any], webspace_id: str | None = Non
     pressure_state = str(pressure_policy.get("policy_state") or "").strip().lower()
     if pressure_state == "block":
         _projection_diag["blocked_total"] = int(_projection_diag.get("blocked_total") or 0) + 1
-        _publish_snapshot_streams(snapshot, webspace_id=webspace_id)
+        await asyncio.to_thread(_publish_snapshot_streams, snapshot, webspace_id=webspace_id)
         return
     effective_min_interval_s = (
         _THROTTLED_YJS_PROJECTION_INTERVAL_S
@@ -8940,7 +8947,7 @@ async def _project_async(snapshot: dict[str, Any], webspace_id: str | None = Non
                 slot_pressure_state = str(slot_pressure_policy.get("policy_state") or "").strip().lower()
                 if slot_pressure_state == "block":
                     _projection_diag["blocked_total"] = int(_projection_diag.get("blocked_total") or 0) + 1
-                    _publish_snapshot_streams(snapshot, webspace_id=webspace_id)
+                    await asyncio.to_thread(_publish_snapshot_streams, snapshot, webspace_id=webspace_id)
                     return
                 pushed = False
                 try:
@@ -8966,7 +8973,7 @@ async def _project_async(snapshot: dict[str, Any], webspace_id: str | None = Non
             _projection_diag["apply_total"] = int(_projection_diag.get("apply_total") or 0) + 1
         else:
             _projection_diag["skip_total"] = int(_projection_diag.get("skip_total") or 0) + 1
-    _publish_snapshot_streams(snapshot, webspace_id=webspace_id)
+    await asyncio.to_thread(_publish_snapshot_streams, snapshot, webspace_id=webspace_id)
 
 
 def _project(snapshot: dict[str, Any], webspace_id: str | None = None) -> None:
@@ -9073,7 +9080,7 @@ async def _refresh_live_infrastate_async(
     project_control: bool = True,
 ) -> dict[str, Any]:
     now = time.time()
-    _write_ui_state(last_refresh_ts=now)
+    await asyncio.to_thread(_write_ui_state, last_refresh_ts=now)
     sections: dict[str, Any] = {}
     if project_control:
         sections = await asyncio.to_thread(
@@ -9085,7 +9092,7 @@ async def _refresh_live_infrastate_async(
             webspace_id=webspace_id,
             reason=f"infrastate_control_refresh:{reason}",
         )
-    _publish_active_stream_receiver_snapshots(webspace_id, reason=reason)
+    await asyncio.to_thread(_publish_active_stream_receiver_snapshots, webspace_id, reason=reason)
     return {
         "ok": True,
         "full_snapshot_removed": True,
@@ -9576,7 +9583,7 @@ async def on_runtime_event(evt: Any) -> None:
             exc_info=True,
         )
     try:
-        _append_event(event_type, payload)
+        await asyncio.to_thread(_append_event, event_type, payload)
     except Exception:
         # Event history is diagnostic state. It must never prevent the compact
         # first-paint control projection from being brought up to date.
@@ -9601,7 +9608,8 @@ async def on_runtime_event(evt: Any) -> None:
             # leaving the persisted Yjs card on its pre-restart value.
             await _refresh_snapshot_async(webspace_id=webspace_id, allow_cache=False)
             return
-        _schedule_snapshot_refresh(
+        await asyncio.to_thread(
+            _schedule_snapshot_refresh,
             webspace_id=webspace_id,
             reason=event_type,
         )

@@ -999,6 +999,41 @@ def test_infrastate_schedule_snapshot_refresh_starts_thread_without_running_loop
     assert mod._background_refresh_reason == "test.no_loop"
 
 
+def test_infrastate_background_refresh_memory_io_does_not_block_event_loop(monkeypatch):
+    mod = _load_infrastate_module()
+    io_thread_ids: list[int] = []
+
+    def _slow_ui_write(**_kwargs):
+        io_thread_ids.append(threading.get_ident())
+        time.sleep(0.2)
+
+    async def _refresh(*, webspace_id=None, allow_cache=True):
+        return {"ok": True, "webspace_id": webspace_id, "allow_cache": allow_cache}
+
+    monkeypatch.setattr(mod, "_BACKGROUND_REFRESH_DEBOUNCE_S", 0.0)
+    monkeypatch.setattr(mod, "_write_ui_state", _slow_ui_write)
+    monkeypatch.setattr(mod, "_refresh_snapshot_async", _refresh)
+    mod._background_refresh_pending = True
+    mod._background_refresh_reason = "test.non_blocking_io"
+    mod._background_refresh_webspace_id = "desktop"
+    mod._background_refresh_task = None
+
+    async def _run() -> tuple[float, int]:
+        loop_thread_id = threading.get_ident()
+        started = time.monotonic()
+        task = asyncio.create_task(mod._background_refresh_worker())
+        await asyncio.sleep(0.02)
+        tick_elapsed = time.monotonic() - started
+        await task
+        return tick_elapsed, loop_thread_id
+
+    tick_elapsed, loop_thread_id = asyncio.run(_run())
+
+    assert tick_elapsed < 0.12
+    assert io_thread_ids
+    assert all(thread_id != loop_thread_id for thread_id in io_thread_ids)
+
+
 def test_infrastate_forget_subnet_clears_directory_and_requests_member_refresh(monkeypatch):
     mod = _load_infrastate_module()
 
