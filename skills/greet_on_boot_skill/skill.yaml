@@ -1,5 +1,5 @@
 name: greet_on_boot_skill
-version: 0.2.1
+version: 0.2.2
 description: System greeting and infrastructure health-check skill used by the greet_on_boot
   scenario.
 runtime:
@@ -49,5 +49,13 @@ tools:
       message:
         type: string
         description: Human-readable summary used for notifications.
-updated_at: '2026-06-01T16:45:00+00:00'
+updated_at: '2026-08-14T19:39:29+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.774+4991.d0c42079
+    recorded_at: '2026-08-14T19:39:29+00:00'
+    source: skill_push
+    min_commit: d0c42079b61fba5df8dbcbb9c481abaee6218717
+    min_short_commit: d0c42079
+    build_date: '2026-08-14T22:38:55+03:00'
 

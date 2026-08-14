@@ -243,7 +243,7 @@ async def on_sys_ready(evt: Any) -> None:
     """
     ctx = get_ctx()
     _log.debug("greet_on_boot.on_sys_ready received")
-    caps = get_local_capacity() or {}
+    caps = await asyncio.to_thread(get_local_capacity) or {}
     skills = caps.get("skills") or []
     scenarios = caps.get("scenarios") or []
 
@@ -251,7 +251,7 @@ async def on_sys_ready(evt: Any) -> None:
     scenarios_root = ctx.paths.scenarios_dir()
     scenarios_root = scenarios_root() if callable(scenarios_root) else scenarios_root
     manifest_present = Path(scenarios_root) / "greet_on_boot" / "scenario.json"
-    scenario_allowed = _is_active("greet_on_boot", scenarios) or manifest_present.exists()
+    scenario_allowed = _is_active("greet_on_boot", scenarios) or await asyncio.to_thread(manifest_present.exists)
 
     if not scenario_allowed:
         _log.debug("greet_on_boot scenario not installed/active; skipping")
@@ -264,13 +264,13 @@ async def on_sys_ready(evt: Any) -> None:
     # desktop scenarios have not been rebuilt yet. First load defaults from
     # the skill manifest, then allow scenarios to override.
     try:
-        _load_skill_data_projections(ctx)
-        ctx.projections.load_from_scenario("greet_on_boot")
+        await asyncio.to_thread(_load_skill_data_projections, ctx)
+        await asyncio.to_thread(ctx.projections.load_from_scenario, "greet_on_boot")
     except Exception:
         _log.debug("greet_on_boot: failed to load data_projections", exc_info=True)
 
     runtime = ScenarioWorkflowRuntime(ctx)
-    webspaces = webspace_list(mode="workspace")
+    webspaces = await asyncio.to_thread(webspace_list, mode="workspace")
 
     for ws in webspaces:
         webspace_id = ws.id
