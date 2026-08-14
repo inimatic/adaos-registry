@@ -403,7 +403,7 @@ def _node_connect_command(*, code: str, root_base_url: str, hub_id: str | None) 
 
 
 async def _write_current(webspace_id: str, current: Dict[str, Any]) -> None:
-    _load_skill_data_projections()
+    await asyncio.to_thread(_load_skill_data_projections)
     pushed = False
     try:
         pushed = set_current_skill("adaos_connect")
@@ -743,7 +743,7 @@ async def prepare(
 async def _prepare_from_payload(payload: Dict[str, Any], *, wait: bool = False) -> dict[str, Any]:
     mode = str(payload.get("mode") or "browser").strip().lower() or "browser"
     webspace_id = _webspace_id(payload)
-    context = _resolve_context()
+    context = await asyncio.to_thread(_resolve_context)
     request_id = _next_request_id(webspace_id)
     refresh = bool(payload.get("refresh") or payload.get("force_new") or payload.get("renew"))
     if not refresh:
