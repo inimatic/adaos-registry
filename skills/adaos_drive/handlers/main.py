@@ -1035,6 +1035,42 @@ def _current_node_id() -> str:
     return ""
 
 
+def _public_display_label(value: Any) -> str:
+    text = re.sub(r"[\x00-\x1f\x7f]+", " ", str(value or "")).strip()
+    text = re.sub(r"\s+", " ", text)
+    return text[:120]
+
+
+def _current_public_owner_name() -> str:
+    cfg = None
+    try:
+        cfg = load_config(ctx=get_ctx())
+    except Exception:
+        try:
+            cfg = load_config()
+        except Exception:
+            cfg = None
+    candidates = [
+        os.getenv("ADAOS_ASSISTANT_NAME"),
+        os.getenv("ADAOS_SUBNET_NAME"),
+        _config_text_attr("assistant_name"),
+        _config_text_attr("subnet_name"),
+        _config_text_attr("primary_subnet_name"),
+        _config_text_attr("display_name"),
+        _config_text_attr("node_label"),
+        getattr(cfg, "assistant_name", None) if cfg is not None else None,
+        getattr(cfg, "subnet_name", None) if cfg is not None else None,
+        getattr(cfg, "primary_subnet_name", None) if cfg is not None else None,
+        getattr(cfg, "display_name", None) if cfg is not None else None,
+        getattr(cfg, "node_label", None) if cfg is not None else None,
+    ]
+    for candidate in candidates:
+        label = _public_display_label(candidate)
+        if label:
+            return label
+    return ""
+
+
 def _public_app_base_url() -> str:
     candidates = [
         os.getenv("ADAOS_PUBLIC_APP_URL") or "",
@@ -1268,6 +1304,7 @@ def _create_public_link(source: Mapping[str, Any], source_path: Path, *, downloa
     rel_path = _rel_from_path(source, source_path)
     resource_kind = "folder" if source_path.is_dir() else "file"
     capabilities = ["read", "list", "preview", "download"] if resource_kind == "folder" else ["read", "preview", "download"]
+    public_owner_name = _current_public_owner_name()
     public_token = issue_public_token()
     hub_token = issue_hub_token()
     ttl_seconds = int(os.getenv("ADAOS_DRIVE_PUBLIC_LINK_TTL_SECONDS") or 7 * 24 * 3600)
@@ -1281,6 +1318,8 @@ def _create_public_link(source: Mapping[str, Any], source_path: Path, *, downloa
         subnet_id=subnet_id,
         node_id=_current_node_id(),
         zone=zone_id,
+        assistant_name=public_owner_name,
+        subnet_name=public_owner_name,
         ttl_seconds=ttl_seconds,
         capabilities=capabilities,
         ctx=get_ctx(),
@@ -1326,6 +1365,14 @@ def _create_public_link(source: Mapping[str, Any], source_path: Path, *, downloa
             "rel_path": rel_path,
         },
     }
+    if public_owner_name:
+        payload["assistant_name"] = public_owner_name
+        payload["subnet_name"] = public_owner_name
+        payload["owner_name"] = public_owner_name
+        metadata = payload.get("metadata")
+        if isinstance(metadata, dict):
+            metadata["assistant_name"] = public_owner_name
+            metadata["subnet_name"] = public_owner_name
     root_result = _register_root_drive_link(payload)
     if not _root_registration_ok(root_result) and (zone_id == "lo" or _is_loopback_base_url(root_base)):
         local_payload = dict(payload)

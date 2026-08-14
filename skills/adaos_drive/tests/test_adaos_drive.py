@@ -41,6 +41,7 @@ def load_module(monkeypatch, memory=None, skills_root: Path | None = None, base_
                 root_token="root-secret",
                 subnet_id="sn_test",
                 default_hub="sn_test",
+                assistant_name="Homepoint",
             ),
             paths=SimpleNamespace(
                 base_dir=lambda: runtime_base,
@@ -51,7 +52,12 @@ def load_module(monkeypatch, memory=None, skills_root: Path | None = None, base_
         monkeypatch.setattr(
             mod,
             "load_config",
-            lambda ctx=None: SimpleNamespace(zone_id="ru", subnet_id="sn_test", node_id="node_test"),
+            lambda ctx=None: SimpleNamespace(
+                zone_id="ru",
+                subnet_id="sn_test",
+                node_id="node_test",
+                primary_subnet_name="Homepoint",
+            ),
         )
     return mod, streams
 
@@ -209,6 +215,8 @@ def test_copy_rename_upload_preview_and_link(monkeypatch, tmp_path):
     assert registrations[0]["subnet_id"] == "sn_test"
     assert registrations[0]["zone"] == "ru"
     assert registrations[0]["skill"] == "adaos_drive"
+    assert registrations[0]["assistant_name"] == "Homepoint"
+    assert registrations[0]["metadata"]["assistant_name"] == "Homepoint"
     assert "hub_token" in registrations[0]
     assert registrations[0]["resource_kind"] == "file"
     assert registrations[0]["capabilities"] == ["read", "preview", "download"]

@@ -21,6 +21,8 @@ sources.
   the file into skill storage.
 - Download guest links through `/v1/drive/public-links/<public_token>/content`
   with HTTP range streaming.
+- Public Drive face with readonly navigation, preview/download actions,
+  language/theme controls, route status, and a public owner display name.
 - New folder creation and refresh commands.
 
 ## Safety model
@@ -38,4 +40,6 @@ Current public access is token-scoped, readonly Drive access through the public
 face `adaos_drive.files.public`. It is not a full `guest` webspace/home profile
 yet. The public browser view uses the Root `/v1/drive/public-links/<token>/list`
 and `/content` endpoints and keeps a browser-local public device id for
-recipient-level statistics.
+recipient-level statistics. Public metadata may include `assistant_name` /
+`subnet_name` as display-only owner labels; routing fields remain omitted from
+guest metadata responses.
