@@ -8,6 +8,9 @@ The core media plane remains responsible for media registration and playback
 routes. Folder imports call `adaos.sdk.io.media.register_media_file`, then index
 the returned `adaos.media.resource.v1` descriptors. Registration stores only a
 root-bound reference in `.adaos`; media bytes stay at their original path.
+Catalog migration retires pre-reference `media-center-*-import.*` resources so
+playback cannot silently fall back to an old managed copy. Existing legacy bytes
+are left untouched for an explicit, separately reviewed cleanup operation.
 
 The default `library()` projection is `media_kind="playable"` so the main Media
 Center catalog stays focused on video/audio resources supported by the current

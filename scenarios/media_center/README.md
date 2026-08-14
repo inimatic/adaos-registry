@@ -13,6 +13,8 @@ It intentionally starts with the correct boundary:
 2. The skill registers playable video/audio files through
    `adaos.sdk.io.media.register_media_file`; files remain at their original
    paths and `.adaos` stores only catalog/reference metadata.
+   Legacy managed imports are hidden from discovery and retired from the active
+   catalog; their existing bytes are not deleted automatically.
 3. Use **Refresh catalog** in Settings to reconcile existing `media_server` and
    compatibility `media_indexer` resources.
 4. The main surface contains only playable type filters, explicit text search,

@@ -55,6 +55,7 @@ class MediaCenterRepository:
         return connection
 
     def ensure_schema(self) -> dict[str, Any]:
+        retired_legacy_count = 0
         with sqlite3.connect(str(self.db_path), timeout=30) as connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.execute("PRAGMA synchronous=NORMAL")
@@ -132,8 +133,27 @@ class MediaCenterRepository:
                 "INSERT OR REPLACE INTO meta(key, value) VALUES ('schema_version', ?)",
                 (SCHEMA_VERSION,),
             )
+            retired_legacy_count = connection.execute(
+                """
+                UPDATE catalog_items
+                SET missing = 1, last_seen_at = ?
+                WHERE source = 'media_server'
+                  AND missing = 0
+                  AND (
+                    (metadata_json LIKE '%"namespace":"media-center"%'
+                     AND metadata_json LIKE '%"variant":"import"%')
+                    OR name GLOB 'media-center-????????????????????????-import.*'
+                  )
+                """,
+                (now_iso(),),
+            ).rowcount
             connection.commit()
-        return {"ok": True, "schema": SCHEMA_VERSION, "db_path": str(self.db_path)}
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "db_path": str(self.db_path),
+            "retired_legacy_count": max(0, int(retired_legacy_count or 0)),
+        }
 
     def scan_resources(
         self,

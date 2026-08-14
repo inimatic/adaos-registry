@@ -109,6 +109,36 @@ def test_incremental_root_scan_does_not_mark_existing_media_server_rows_missing(
     assert {item["resource_id"] for item in available} == {"old.mp4", "new.mp4"}
 
 
+def test_discovery_excludes_legacy_media_center_copies(monkeypatch):
+    from adaos.sdk.io import media as media_sdk
+
+    legacy = _resource("media-center-0123456789abcdef01234567-import.mp4")
+    current = _resource("movie.mp4")
+    current["metadata"] = {"storage_mode": "reference"}
+    monkeypatch.setattr(media_sdk, "list_media_resources", lambda **_: [legacy, current])
+
+    resources, status = main._discover_resources()
+
+    assert status == {"ok": True}
+    assert [item["name"] for item in resources] == ["movie.mp4"]
+
+
+def test_schema_retires_pre_reference_media_center_catalog_rows(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    legacy = _resource("media-center-0123456789abcdef01234567-import.mp4")
+    legacy["metadata"] = {"namespace": "media-center", "variant": "import"}
+    repo = MediaCenterRepository()
+    repo.scan_resources([legacy], source="media_server", mark_missing=False)
+
+    migration = repo.ensure_schema()
+    available = repo.list_items()["items"]
+    all_items = repo.list_items(include_missing=True)["items"]
+
+    assert migration["retired_legacy_count"] == 1
+    assert available == []
+    assert all_items[0]["missing"] is True
+
+
 def test_import_folder_registers_playable_files_without_copying(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     media_dir = tmp_path / "media"

@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.1.8
+version: 0.1.9
 description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
 supported_locales:
 - en

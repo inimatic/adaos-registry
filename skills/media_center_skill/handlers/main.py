@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+import re
 import sys
 from pathlib import Path
 from typing import Any, Iterator, Mapping
@@ -19,6 +20,7 @@ from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".ogv"}
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".opus", ".ogg"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
+LEGACY_MANAGED_COPY_RE = re.compile(r"^media-center-[0-9a-f]{24}-import\.[^.]+$", re.IGNORECASE)
 
 
 def _repository() -> MediaCenterRepository:
@@ -71,11 +73,19 @@ def _discover_resources(source: str = "all", limit: int | None = 5000) -> tuple[
         return [], {"ok": False, "error": "sdk_media_discovery_unavailable", "detail": str(exc)}
 
     try:
-        return list_media_resources(source=source, limit=limit), {"ok": True}
+        resources = list_media_resources(source=source, limit=limit)
+        return [item for item in resources if not _is_legacy_managed_copy(item)], {"ok": True}
     except ValueError as exc:
         return [], {"ok": False, "error": str(exc)}
     except Exception as exc:
         return [], {"ok": False, "error": "media_discovery_failed", "detail": str(exc)}
+
+
+def _is_legacy_managed_copy(descriptor: Mapping[str, Any]) -> bool:
+    metadata = descriptor.get("metadata") if isinstance(descriptor.get("metadata"), Mapping) else {}
+    if metadata.get("namespace") == "media-center" and metadata.get("variant") == "import":
+        return True
+    return bool(LEGACY_MANAGED_COPY_RE.fullmatch(str(descriptor.get("name") or "")))
 
 
 def _register_media_file_descriptor(path: Path, *, root: Mapping[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
