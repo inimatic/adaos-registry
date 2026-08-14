@@ -56,7 +56,10 @@ def problem_frame_schema() -> dict[str, Any]:
         "minItems": 1,
         "items": {"type": "string", "pattern": "^SRC-[0-9]{3}$"},
     }
-    hypothesis["required"].append("source_refs")
+    hypothesis["properties"]["effect_direction"] = {
+        "enum": ["increase", "decrease", "difference"],
+    }
+    hypothesis["required"].extend(["source_refs", "effect_direction"])
     selected["hypotheses"] = {
         "type": "array",
         "minItems": 1,
@@ -169,17 +172,34 @@ def protocol_design_schema() -> dict[str, Any]:
         },
         ["value_summary", "status", "rationale", "source_refs", "blocking_question"],
     )
+    evaluation_plan = copy.deepcopy(properties["evaluation_plan"])
+    evaluation_plan["properties"].pop("decision_rules", None)
+    evaluation_plan["properties"].pop("practical_significance", None)
+    evaluation_plan["required"] = [
+        item
+        for item in evaluation_plan["required"]
+        if item not in {"decision_rules", "practical_significance"}
+    ]
+    decision_spec = _object(
+        {
+            "effect_direction": {"enum": ["increase", "decrease", "difference"]},
+            "practical_threshold": {"type": "number", "exclusiveMinimum": 0},
+            "unit": {"type": "string", "minLength": 1},
+        },
+        ["effect_direction", "practical_threshold", "unit"],
+    )
     return _object(
         {
             "assistant_message": properties["assistant_message"],
             "experimental_plan": experimental_plan,
-            "evaluation_plan": properties["evaluation_plan"],
+            "evaluation_plan": evaluation_plan,
+            "decision_spec": decision_spec,
             "decisions_by_area": _object(
                 {area: decision for area in PROTOCOL_DECISION_AREAS},
                 list(PROTOCOL_DECISION_AREAS),
             ),
         },
-        ["assistant_message", "experimental_plan", "evaluation_plan", "decisions_by_area"],
+        ["assistant_message", "experimental_plan", "evaluation_plan", "decision_spec", "decisions_by_area"],
     )
 
 
@@ -266,7 +286,13 @@ def stage_schema(stage: str, *, allowed_source_refs: set[str] | None = None) -> 
     return schema
 
 
-def stage_quality_issues(stage: str, value: Mapping[str, Any], *, allowed_source_refs: set[str] | None = None) -> list[str]:
+def stage_quality_issues(
+    stage: str,
+    value: Mapping[str, Any],
+    *,
+    allowed_source_refs: set[str] | None = None,
+    expected_effect_direction: str | None = None,
+) -> list[str]:
     payload = validate_stage(stage, value)
     issues: list[str] = []
     if stage == "problem_frame":
@@ -326,14 +352,11 @@ def stage_quality_issues(stage: str, value: Mapping[str, Any], *, allowed_source
                 issues.append(f"unresolved decision {area} requires its own concrete blocking_question")
             if item.get("status") != "unresolved" and question:
                 issues.append(f"resolved decision {area} must leave blocking_question empty")
-        vague_significance = re.compile(
-            r"(?i)statistically significant|significant (?:difference|improvement|result)|"
-            r"\u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u0447\w*\s+\u0437\u043d\u0430\u0447\u0438\u043c\w*"
-        )
-        if any(vague_significance.search(str(item)) for item in payload["evaluation_plan"]["decision_rules"]):
-            issues.append("decision rules must use the predeclared estimand, uncertainty interval, and practical threshold rather than significance wording")
-        if len(payload["evaluation_plan"]["decision_rules"]) != 1:
-            issues.append("evaluation_plan must contain exactly one primary decision rule; negative-result handling belongs in negative_result_policy")
+        if expected_effect_direction and payload["decision_spec"]["effect_direction"] != expected_effect_direction:
+            issues.append(
+                "decision_spec.effect_direction must match the primary hypothesis "
+                f"({expected_effect_direction})"
+            )
     return list(dict.fromkeys(issues))
 
 
@@ -435,6 +458,41 @@ def _flatten_checks(grouped: Mapping[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _format_number(value: float) -> str:
+    return f"{float(value):g}"
+
+
+def _compile_decision_rule(spec: Mapping[str, Any], evaluation: Mapping[str, Any]) -> tuple[str, str]:
+    direction = str(spec["effect_direction"])
+    threshold = float(spec["practical_threshold"])
+    threshold_text = _format_number(threshold)
+    unit = str(spec["unit"]).strip()
+    confidence = float(evaluation["uncertainty"]["confidence_level"]) * 100
+    confidence_text = _format_number(confidence)
+    if direction == "increase":
+        practical = f"Предзаданный минимальный практический рост: Δ > +{threshold_text} {unit}."
+        rule = (
+            f"Поддержано: нижняя граница {confidence_text}% ДИ для Δ выше +{threshold_text} {unit}; "
+            f"опровергнуто: верхняя граница не выше +{threshold_text} {unit}; "
+            "иначе результат неконклюзивен."
+        )
+    elif direction == "decrease":
+        practical = f"Предзаданное минимальное практическое снижение: Δ < -{threshold_text} {unit}."
+        rule = (
+            f"Поддержано: верхняя граница {confidence_text}% ДИ для Δ ниже -{threshold_text} {unit}; "
+            f"опровергнуто: нижняя граница не ниже -{threshold_text} {unit}; "
+            "иначе результат неконклюзивен."
+        )
+    else:
+        practical = f"Предзаданная область практической эквивалентности: [-{threshold_text}; +{threshold_text}] {unit}."
+        rule = (
+            f"Поддержано: {confidence_text}% ДИ для Δ целиком выше +{threshold_text} {unit} "
+            f"или целиком ниже -{threshold_text} {unit}; опровергнуто как практически эквивалентное: "
+            f"ДИ целиком внутри [-{threshold_text}; +{threshold_text}] {unit}; иначе результат неконклюзивен."
+        )
+    return rule, practical
+
+
 def assemble_candidate(
     problem_frame: Mapping[str, Any],
     protocol_design: Mapping[str, Any],
@@ -447,6 +505,10 @@ def assemble_candidate(
     problem = validate_stage("problem_frame", problem_frame)
     protocol = validate_stage("protocol_design", protocol_design)
     implementation = validate_stage("implementation_contract", implementation_contract)
+    hypothesis_direction = str(problem["hypotheses"][0]["effect_direction"])
+    decision_spec = protocol["decision_spec"]
+    if str(decision_spec["effect_direction"]) != hypothesis_direction:
+        raise ValueError("protocol decision_spec.effect_direction must match the primary hypothesis")
     # Problem-frame questions are discovery input for protocol_design, not final
     # blockers. The later stage must explicitly resolve them into a bounded
     # choice or carry one concrete blocker on the corresponding decision area.
@@ -463,7 +525,11 @@ def assemble_candidate(
     hypotheses = []
     grounding = []
     for item in problem["hypotheses"]:
-        hypothesis = {key: copy.deepcopy(value) for key, value in item.items() if key != "source_refs"}
+        hypothesis = {
+            key: copy.deepcopy(value)
+            for key, value in item.items()
+            if key not in {"source_refs", "effect_direction"}
+        }
         hypotheses.append(hypothesis)
         grounding.append(
             {
@@ -487,6 +553,10 @@ def assemble_candidate(
                     "source_refs": resolve_refs(item),
                 }
             )
+    evaluation_plan = copy.deepcopy(protocol["evaluation_plan"])
+    decision_rule, practical_significance = _compile_decision_rule(decision_spec, evaluation_plan)
+    evaluation_plan["decision_rules"] = [decision_rule]
+    evaluation_plan["practical_significance"] = practical_significance
     candidate = {
         "assistant_message": (
             f"Сформирована доказательно привязанная постановка «{problem['title']}»: "
@@ -509,7 +579,7 @@ def assemble_candidate(
             "negative_results": "retain_and_report",
         },
         "experimental_plan": protocol["experimental_plan"],
-        "evaluation_plan": protocol["evaluation_plan"],
+        "evaluation_plan": evaluation_plan,
         "constraints": problem["constraints"],
         "assumptions": problem["assumptions"],
         "open_questions": questions,

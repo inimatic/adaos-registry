@@ -15,7 +15,7 @@ def _problem() -> dict:
         "title": "TLP against MaxPool",
         "background": "Исторический notebook мотивирует новое парное сравнение, но не доказывает преимущество TLP.",
         "research_question": "Меняет ли TLP validation accuracy относительно MaxPool при парной инициализации?",
-        "hypotheses": [{"id": "H1", "statement": "TLP изменяет парную validation accuracy.", "falsification": "Парный контраст совместим с практически нулевым эффектом.", "status": "proposed", "source_refs": [REF]}],
+        "hypotheses": [{"id": "H1", "statement": "TLP изменяет парную validation accuracy.", "falsification": "Парный контраст совместим с практически нулевым эффектом.", "status": "proposed", "source_refs": [REF], "effect_direction": "difference"}],
         "constraints": ["Первый профиль исполняется на CPU."],
         "assumptions": ["STL-10 доступен через объявленный data capability."],
         "open_questions": [],
@@ -57,11 +57,10 @@ def _protocol(*, unresolved: bool = False) -> dict:
             "outcomes": [{"name": "validation accuracy delta", "role": "primary", "measurement": "paired TLP minus MaxPool top-1 accuracy", "unit": "proportion"}],
             "uncertainty": {"method": "paired bootstrap", "resampling_unit": "seed pair", "interval": "two-sided percentile", "confidence_level": 0.95},
             "stopping_rule": {"kind": "fixed_budget", "criterion": "Stop after every declared seed completes or fails terminally.", "adaptation_predeclared": True},
-            "decision_rules": ["Report the estimate and interval without redefining the primary outcome."],
             "multiplicity": {"family": "single primary outcome", "strategy": "No adjustment for one primary outcome."},
-            "practical_significance": "Interpret magnitude against a predeclared one percentage point reference.",
             "negative_result_policy": "Retain and report negative or inconclusive results without redefining the question.",
         },
+        "decision_spec": {"effect_direction": "difference", "practical_threshold": 1.0, "unit": "percentage point"},
         "decisions_by_area": {
             area: {
                 "value_summary": f"Declared protocol choice for {area}.",
@@ -109,6 +108,9 @@ def test_stage_schemas_are_provider_strict_and_candidate_is_deterministically_as
     assert all(item["source_refs"] == [EXACT_REF] for item in candidate["source_grounding"])
     assert [item["id"] for item in candidate["implementation_requirements"]] == [f"REQ-{index}" for index in range(1, 6)]
     assert [item["category"] for item in candidate["acceptance_checks"]] == ["workflow", "data_integrity", "reproducibility", "evidence"]
+    assert candidate["evaluation_plan"]["decision_rules"] == [
+        "Поддержано: 95% ДИ для Δ целиком выше +1 percentage point или целиком ниже -1 percentage point; опровергнуто как практически эквивалентное: ДИ целиком внутри [-1; +1] percentage point; иначе результат неконклюзивен."
+    ]
 
 
 def test_dynamic_stage_schema_limits_every_source_reference_to_supplied_short_ids() -> None:
@@ -160,6 +162,18 @@ def test_resolved_protocol_decision_cannot_retain_a_blocking_question() -> None:
     assert stage_quality_issues("protocol_design", protocol) == [
         "resolved decision budget must leave blocking_question empty"
     ]
+
+
+def test_hypothesis_and_decision_direction_must_match() -> None:
+    protocol = _protocol()
+    protocol["decision_spec"]["effect_direction"] = "increase"
+
+    try:
+        assemble_candidate(_problem(), protocol, _implementation(), source_ref_map={REF: EXACT_REF})
+    except ValueError as exc:
+        assert "effect_direction must match" in str(exc)
+    else:
+        raise AssertionError("expected a cross-stage direction mismatch")
 
 
 def test_problem_quality_gate_rejects_a_ref_not_supplied_to_the_stage() -> None:

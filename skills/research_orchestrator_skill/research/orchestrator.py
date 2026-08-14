@@ -1017,6 +1017,7 @@ class ResearchOrchestrator:
         group_id: str,
         request_id_prefix: str,
         max_tokens: int,
+        expected_effect_direction: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         schema = stage_schema(stage_name, allowed_source_refs=allowed_source_refs)
         constrained_schema = provider_schema(schema)
@@ -1155,7 +1156,12 @@ class ResearchOrchestrator:
             try:
                 candidate = _json_object(output_text)
                 candidate = validate_stage(stage_name, candidate)
-                quality = stage_quality_issues(stage_name, candidate, allowed_source_refs=allowed_source_refs)
+                quality = stage_quality_issues(
+                    stage_name,
+                    candidate,
+                    allowed_source_refs=allowed_source_refs,
+                    expected_effect_direction=expected_effect_direction,
+                )
                 if quality:
                     raise ValueError("; ".join(quality))
             except ValueError as exc:
@@ -1187,7 +1193,12 @@ class ResearchOrchestrator:
                     structured_output = False
                     submitted, completed, output_text = execute(repair_prompt, suffix="-repair-1-json-fallback", structured=False)
                 candidate = validate_stage(stage_name, _json_object(output_text))
-                quality = stage_quality_issues(stage_name, candidate, allowed_source_refs=allowed_source_refs)
+                quality = stage_quality_issues(
+                    stage_name,
+                    candidate,
+                    allowed_source_refs=allowed_source_refs,
+                    expected_effect_direction=expected_effect_direction,
+                )
                 if quality:
                     raise ValueError(f"{stage_name} semantic quality gate: " + "; ".join(quality))
 
@@ -1379,8 +1390,9 @@ class ResearchOrchestrator:
                     "Produce one falsifiable question; do not design the execution protocol in this stage.",
                     "Produce exactly one primary hypothesis for that question and no secondary research questions.",
                     "Name the intervention, comparator, measurable outcome and paired comparison explicitly; avoid vague words such as effectiveness or significance.",
-                    "Frame the hypothesis as a proposal to estimate against an explicit practical threshold, not as an already established advantage or a nil-null significance claim.",
-                    "Its falsification wording must distinguish evidence against the practical effect from an inconclusive interval; merely covering zero is not a complete falsification policy.",
+                    "Choose effect_direction deliberately: increase/decrease for a directional claim, difference for a two-sided change claim. Keep the statement and falsification wording consistent with it.",
+                    "Frame the hypothesis as a proposal to estimate against a later predeclared practical threshold, not as an already established advantage or a nil-null significance claim.",
+                    "Its falsification wording must distinguish evidence against the practical effect from an inconclusive interval; AdaOS will compile the exact decision inequalities after the threshold is chosen.",
                     "Separate direct source observations, author interpretations, hypotheses and unresolved choices.",
                     "Give every hypothesis its motivating SRC-### ids. Keep source observations and author interpretations in source_assessment; AdaOS compiles provenance records deterministically.",
                     "Use exact supplied SRC-### ids only. Never treat historical notebook outputs as confirmation.",
@@ -1428,8 +1440,8 @@ class ResearchOrchestrator:
                     "Declare exact seed_values and make pairing allocation planned_units and sample_size identical to the confirmatory units.",
                     "Use named RNG streams initialization, sampling, augmentation, and analysis; within each pair keep initialization, data order, sampling and augmentation invariant and vary only the intervention.",
                     "Confirmatory stopping must depend only on predeclared budget or safety/failure conditions, never on a desired metric or significance.",
-                    "Declare exactly one primary outcome, an operational estimand, uncertainty unit/method, stopping, multiplicity and practical significance.",
-                    "Provide exactly one primary decision rule that compares the estimate and uncertainty interval with the explicit practical threshold and distinguishes supported, contradicted and inconclusive outcomes; never use statistical significance as the stopping or reporting rule.",
+                    "Declare exactly one primary outcome, an operational estimand, uncertainty unit/method, stopping and multiplicity.",
+                    "Set decision_spec.effect_direction exactly equal to the primary hypothesis effect_direction and choose one positive numeric practical threshold with an unambiguous unit. AdaOS compiles supported, contradicted and inconclusive inequalities; do not write a competing free-text rule.",
                     "Prefer an exact confirmatory budget justified by the sources. If none is justified, make a bounded proposal or mark the decision unresolved; never reuse the one-seed smoke budget as confirmatory evidence.",
                     "If a safe, reviewable proposal cannot be made, mark that decision unresolved and state one concrete blocking_question on it.",
                     "Write substantive fields and assistant_message in Russian unless a precise technical identifier is clearer in English.",
@@ -1440,6 +1452,7 @@ class ResearchOrchestrator:
                 group_id=group_id,
                 request_id_prefix=request_prefix,
                 max_tokens=5_500,
+                expected_effect_direction=str(problem["hypotheses"][0]["effect_direction"]),
             )
             stage_telemetry["protocol_design"] = telemetry
             total_repairs += int(telemetry.get("repair_attempts") or 0)
