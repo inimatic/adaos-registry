@@ -3620,6 +3620,74 @@ def test_infrastate_inventory_row_patch_is_compact(monkeypatch):
     assert "rollout_quarantine_reason" not in item
 
 
+def test_infrastate_operation_patch_never_rebuilds_inventory(monkeypatch):
+    mod = _load_infrastate_module()
+    published: list[dict[str, object]] = []
+    mod._inventory_row_cache.clear()
+
+    monkeypatch.setattr(mod, "_stream_receiver_is_active", lambda webspace_id, receiver: True)
+    monkeypatch.setattr(
+        mod,
+        "_inventory_items_from",
+        lambda _builder: (_ for _ in ()).throw(AssertionError("operation patch must not rebuild inventory")),
+    )
+    monkeypatch.setattr(mod, "_publish_stream_payload", lambda **kwargs: published.append(dict(kwargs)))
+
+    mod._publish_inventory_row_patch_for_operation(
+        {
+            "operation_id": "op-1",
+            "target_kind": "scenario",
+            "target_id": "web_desktop",
+            "status": "running",
+            "webspace_id": "desktop",
+        }
+    )
+
+    item = published[0]["data"]["item"]
+    assert item == {
+        "name": "web_desktop",
+        "pending": True,
+        "operation_id": "op-1",
+        "operation_status": "running",
+        "updated_at": item["updated_at"],
+        "last_action_at": item["last_action_at"],
+    }
+
+
+def test_infrastate_inventory_snapshot_populates_row_patch_cache():
+    mod = _load_infrastate_module()
+    mod._inventory_row_cache.clear()
+
+    rows = mod._compact_inventory_stream_items(
+        "skill",
+        [{"name": "demo_skill", "workspace_display": "1.2.3", "catalog_commit": "ignored"}],
+    )
+
+    assert rows == [{"name": "demo_skill", "workspace_display": "1.2.3"}]
+    assert mod._inventory_item_for_kind("skill", "demo_skill") == rows[0]
+
+    mod._compact_inventory_stream_items("skill", [{"name": "replacement_skill"}])
+    assert mod._inventory_item_for_kind("skill", "demo_skill") is None
+    assert mod._inventory_item_for_kind("skill", "replacement_skill") == {"name": "replacement_skill"}
+
+
+def test_infrastate_operation_request_cache_is_bounded(monkeypatch):
+    mod = _load_infrastate_module()
+    mod._inventory_request_by_operation.clear()
+    monkeypatch.setattr(mod, "_INVENTORY_OPERATION_REQUEST_MAX_ITEMS", 2)
+
+    for index in range(3):
+        mod._remember_inventory_operation_request(
+            f"op-{index}",
+            kind="skill",
+            name=f"skill-{index}",
+            request_id=f"request-{index}",
+        )
+
+    assert mod._remembered_inventory_operation_request("op-0") == {}
+    assert set(mod._inventory_request_by_operation) == {"op-1", "op-2"}
+
+
 def test_infrastate_runtime_event_invalidates_snapshot_cache(monkeypatch):
     mod = _load_infrastate_module()
     invalidated: list[str | None] = []

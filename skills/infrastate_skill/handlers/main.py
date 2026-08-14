@@ -184,7 +184,10 @@ _stream_last_published_at: dict[str, float] = {}
 _stream_request_seen_at: dict[str, float] = {}
 _inventory_stream_patch_lock = threading.Lock()
 _inventory_stream_patch_rev = 0
+_INVENTORY_OPERATION_REQUEST_MAX_ITEMS = 256
+_INVENTORY_ROW_CACHE_MAX_ITEMS = 1024
 _inventory_request_by_operation: dict[str, dict[str, str]] = {}
+_inventory_row_cache: dict[tuple[str, str], dict[str, Any]] = {}
 _projection_diag = {
     "apply_total": 0,
     "skip_total": 0,
@@ -1256,24 +1259,14 @@ def _inventory_receiver_for_kind(kind: str) -> str:
     return ""
 
 
-def _inventory_builder_for_kind(kind: str):
-    token = str(kind or "").strip()
-    if token == "skill":
-        return _skills_items
-    if token == "scenario":
-        return _scenario_items
-    return None
-
-
 def _inventory_item_for_kind(kind: str, name: str) -> dict[str, Any] | None:
-    builder = _inventory_builder_for_kind(kind)
+    item_kind = str(kind or "").strip()
     token = str(name or "").strip()
-    if not builder or not token:
+    if item_kind not in {"skill", "scenario"} or not token:
         return None
-    for item in _inventory_items_from(builder):
-        if str(item.get("name") or "").strip() == token:
-            return dict(item)
-    return None
+    with _inventory_stream_patch_lock:
+        cached = _inventory_row_cache.get((item_kind, token))
+        return dict(cached) if isinstance(cached, dict) else None
 
 
 def _remember_inventory_operation_request(
@@ -1295,6 +1288,8 @@ def _remember_inventory_operation_request(
             "name": item_name,
             "request_id": req_id,
         }
+        while len(_inventory_request_by_operation) > _INVENTORY_OPERATION_REQUEST_MAX_ITEMS:
+            _inventory_request_by_operation.pop(next(iter(_inventory_request_by_operation)), None)
 
 
 def _remembered_inventory_operation_request(operation_id: str) -> dict[str, str]:
@@ -1357,6 +1352,10 @@ def _publish_inventory_row_patch(
     row["updated_at"] = now
     row["last_action_at"] = now
     row = _compact_inventory_stream_item(kind, row)
+    with _inventory_stream_patch_lock:
+        _inventory_row_cache[(str(kind or "").strip(), item_name)] = dict(row)
+        while len(_inventory_row_cache) > _INVENTORY_ROW_CACHE_MAX_ITEMS:
+            _inventory_row_cache.pop(next(iter(_inventory_row_cache)), None)
     patch = {
         "schema": "adaos.stream.patch.v1",
         "receiver": receiver,
@@ -1694,6 +1693,9 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle", wait: bool = False) -> 
     _marketplace_catalog_cache.clear()
     _registry_catalog_cache.clear()
     _registry_catalog_meta_cache.clear()
+    with _inventory_stream_patch_lock:
+        _inventory_row_cache.clear()
+        _inventory_request_by_operation.clear()
     receiver_total = sum(len(receivers) for receivers in _active_stream_receivers_by_webspace.values())
     _active_stream_receivers_by_webspace.clear()
     _stream_fingerprints.clear()
@@ -4992,7 +4994,18 @@ def _compact_inventory_stream_item(kind: str, item: dict[str, Any]) -> dict[str,
 
 
 def _compact_inventory_stream_items(kind: str, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    return [_compact_inventory_stream_item(kind, item) for item in items if isinstance(item, dict)]
+    item_kind = str(kind or "").strip().lower()
+    compact = [_compact_inventory_stream_item(item_kind, item) for item in items if isinstance(item, dict)]
+    with _inventory_stream_patch_lock:
+        for key in [key for key in _inventory_row_cache if key[0] == item_kind]:
+            _inventory_row_cache.pop(key, None)
+        for item in compact:
+            name = str(item.get("name") or "").strip()
+            if name:
+                _inventory_row_cache[(item_kind, name)] = dict(item)
+        while len(_inventory_row_cache) > _INVENTORY_ROW_CACHE_MAX_ITEMS:
+            _inventory_row_cache.pop(next(iter(_inventory_row_cache)), None)
+    return compact
 
 
 def _inventory_items_from(builder) -> list[dict[str, Any]]:

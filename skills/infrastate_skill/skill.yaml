@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.63
+version: 0.75.64
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -428,6 +428,7 @@ data_routes:
 - surface: debug:full_snapshot
   route: tool/details
   owner: skill:infrastate_skill
+  tool: get_snapshot
   path: get_snapshot
   first_paint: none
   recovery: explicit operator/debug request only
@@ -436,6 +437,12 @@ data_routes:
   budget:
     max_payload_bytes: 131072
     snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - explicit_refresh
+    max_request_hz: 0.2
+    preserve_last_value: false
   guard_visibility:
     degraded_state: Tool result includes quarantine or degraded context.
     log: service.infrastate_skill.runtime.log
@@ -516,6 +523,17 @@ data_projections:
   targets:
   - backend: yjs
     path: data/infrastate/yjs_balancer
+memory_budget:
+  expected_rss_mb: 256
+  caches:
+  - name: infrastate.inventory_row_cache
+    storage: process_memory
+    max_items: 1024
+    cleanup_hook: infrastate_runtime_dispose
+  - name: infrastate.inventory_request_by_operation
+    storage: process_memory
+    max_items: 256
+    cleanup_hook: infrastate_runtime_dispose
 lifecycle:
   drain: infrastate_runtime_drain
   dispose: infrastate_runtime_dispose
