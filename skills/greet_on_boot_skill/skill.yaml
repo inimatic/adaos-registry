@@ -1,5 +1,5 @@
 name: greet_on_boot_skill
-version: 0.2.2
+version: 0.2.3
 description: System greeting and infrastructure health-check skill used by the greet_on_boot
   scenario.
 runtime:
