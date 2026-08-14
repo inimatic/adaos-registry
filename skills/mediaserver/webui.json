@@ -1,120 +1,9 @@
 {
   "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
-  "apps": [
-    {
-      "id": "mediaserver_app",
-      "title": "Media Server",
-      "icon": "videocam-outline",
-      "launchModal": "mediaserver_modal",
-      "nlu_aliases": [
-        "media server",
-        "mediaserver",
-        "медиа сервер",
-        "медиасервер",
-        "медиа библиотека",
-        "медиатека"
-      ],
-      "action": {
-        "navigate": "mediaserver.mediaserver_modal"
-      }
-    },
-    {
-      "id": "mediaserver_diagnostics_app",
-      "title": "Media Diagnostics",
-      "icon": "pulse-outline",
-      "launchModal": "mediaserver_diagnostics_modal",
-      "nlu_aliases": [
-        "media diagnostics",
-        "mediaserver diagnostics",
-        "media projection diagnostics",
-        "media yjs guard"
-      ],
-      "action": {
-        "navigate": "mediaserver.mediaserver_diagnostics_modal"
-      }
-    }
-  ],
-  "widgets": [
-    {
-      "id": "mediaserver_widget",
-      "title": "Media Server",
-      "type": "media.videoBrowser",
-      "dataSource": {
-        "kind": "skill",
-        "name": "mediaserver.list_library_page",
-        "params": {
-          "limit": 50,
-          "source": "webui.widget"
-        }
-      },
-      "inputs": {
-        "compact": true,
-        "modalId": "mediaserver_modal",
-        "showDiagnostics": false,
-        "autoSelectFirst": false
-      }
-    }
-  ],
+  "apps": [],
+  "widgets": [],
   "registry": {
     "modals": {
-      "mediaserver_modal": {
-        "title": "Media Server",
-        "nlu_aliases": [
-          "media server",
-          "mediaserver",
-          "медиа сервер",
-          "медиасервер",
-          "медиа библиотека",
-          "медиатека"
-        ],
-        "schema": {
-          "id": "mediaserver_modal",
-          "layout": {
-            "type": "single",
-            "pattern": "stack",
-            "areas": [
-              {
-                "id": "main",
-                "role": "main"
-              }
-            ]
-          },
-          "widgets": [
-            {
-              "id": "mediaserver-modal-widget",
-              "type": "media.videoBrowser",
-              "area": "main",
-              "title": "Media Library",
-              "dataSource": {
-                "kind": "skill",
-                "name": "mediaserver.list_library_page",
-                "params": {
-                  "limit": 50,
-                  "source": "webui.modal"
-                }
-              },
-              "inputs": {
-                "compact": false,
-                "modalId": "mediaserver_modal",
-                "showDiagnostics": false,
-                "autoSelectFirst": false
-              }
-            }
-          ],
-          "interface": {
-            "schema": "adaos.ui.modal.interface.v1",
-            "routes": {
-              "mediaserver": {
-                "view": "mediaserver.mediaserver_modal"
-              }
-            },
-            "defaultRoute": "mediaserver"
-          }
-        },
-        "implements": [
-          "mediaserver.mediaserver_modal"
-        ]
-      },
       "mediaserver_diagnostics_modal": {
         "title": "Media Diagnostics",
         "nlu_aliases": [
@@ -231,38 +120,12 @@
       }
     }
   },
-  "contributions": [
-    {
-      "extensionPoint": "desktop.apps",
-      "type": "app",
-      "id": "mediaserver_app",
-      "autoInstall": true
-    },
-    {
-      "extensionPoint": "desktop.apps",
-      "type": "app",
-      "id": "mediaserver_diagnostics_app",
-      "autoInstall": true
-    },
-    {
-      "extensionPoint": "desktop.widgets",
-      "type": "widget",
-      "id": "mediaserver_widget",
-      "autoInstall": true
-    }
-  ],
+  "contributions": [],
   "interface": {
     "schema": "adaos.ui.skill_interface.v1",
     "views": {
       "mediaserver.mediaserver_diagnostics_modal": {
         "title": "Media Diagnostics",
-        "surfaces": [
-          "modal"
-        ],
-        "params": {}
-      },
-      "mediaserver.mediaserver_modal": {
-        "title": "Media Server",
         "surfaces": [
           "modal"
         ],

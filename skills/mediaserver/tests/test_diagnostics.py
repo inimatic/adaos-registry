@@ -87,29 +87,15 @@ def test_manifest_declares_diagnostics_tool() -> None:
     }
 
 
-def test_webui_declares_diagnostics_modal_without_full_library_source() -> None:
+def test_webui_keeps_user_library_surface_in_media_center_scenario() -> None:
     webui = json.loads((SKILL_ROOT / "webui.json").read_text(encoding="utf-8"))
     Draft202012Validator(_load_webui_schema()).validate(webui)
 
-    app_ids = {item["id"] for item in webui["apps"]}
-    assert "mediaserver_diagnostics_app" in app_ids
-    assert webui["widgets"][0]["dataSource"] == {
-        "kind": "skill",
-        "name": "mediaserver.list_library_page",
-        "params": {"limit": 50, "source": "webui.widget"},
-    }
-    assert webui["widgets"][0]["inputs"]["showDiagnostics"] is False
-    assert webui["widgets"][0]["inputs"]["autoSelectFirst"] is False
-
-    media_modal = webui["registry"]["modals"]["mediaserver_modal"]["schema"]
-    media_widget = media_modal["widgets"][0]
-    assert media_widget["dataSource"] == {
-        "kind": "skill",
-        "name": "mediaserver.list_library_page",
-        "params": {"limit": 50, "source": "webui.modal"},
-    }
-    assert media_widget["inputs"]["showDiagnostics"] is False
-    assert media_widget["inputs"]["autoSelectFirst"] is False
+    assert webui["apps"] == []
+    assert webui["widgets"] == []
+    assert webui["contributions"] == []
+    assert "mediaserver_modal" not in webui["registry"]["modals"]
+    assert "mediaserver.mediaserver_modal" not in webui["interface"]["views"]
 
     modal = webui["registry"]["modals"]["mediaserver_diagnostics_modal"]["schema"]
     widgets = {item["id"]: item for item in modal["widgets"]}
