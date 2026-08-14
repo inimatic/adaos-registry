@@ -283,6 +283,7 @@ def _structured_output_unsupported(error: BaseException) -> bool:
             "structured output",
             "structured_output",
             "text.format",
+            "invalid schema for response_format",
             "unsupported format",
             "unknown format",
         )

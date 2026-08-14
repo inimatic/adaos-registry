@@ -355,16 +355,39 @@ def provider_schema(schema: Mapping[str, Any]) -> dict[str, Any]:
 
     def visit(value: Any) -> Any:
         if isinstance(value, Mapping):
-            return {
+            projected = {
                 str(key): visit(item)
                 for key, item in value.items()
                 if str(key) not in unsupported
             }
+            if "type" not in projected and "const" in projected:
+                projected["type"] = _json_type(projected["const"])
+            if "type" not in projected and isinstance(projected.get("enum"), list):
+                types = {_json_type(item) for item in projected["enum"]}
+                if len(types) == 1:
+                    projected["type"] = types.pop()
+            return projected
         if isinstance(value, list):
             return [visit(item) for item in value]
         return copy.deepcopy(value)
 
     return visit(schema)
+
+
+def _json_type(value: Any) -> str:
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, int):
+        return "integer"
+    if isinstance(value, float):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, list):
+        return "array"
+    if isinstance(value, Mapping):
+        return "object"
+    return "null"
 
 
 def stage_digest(value: Mapping[str, Any]) -> str:

@@ -127,6 +127,8 @@ def test_provider_schema_removes_unsupported_keywords_without_weakening_local_va
 
     assert "uniqueItems" in keywords(local)
     assert not {"uniqueItems", "minLength", "maxLength"} & keywords(projected)
+    predeclared = projected["properties"]["experimental_plan"]["properties"]["reproducibility"]["properties"]["pairing"]["properties"]["allocation"]["properties"]["predeclared"]
+    assert predeclared == {"const": True, "type": "boolean"}
     _assert_strict_objects(projected)
 
 
