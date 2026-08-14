@@ -921,7 +921,7 @@ def dispose(**_: Any) -> Dict[str, Any]:
 
 @subscribe("nlp.intent.weather.get")
 async def on_weather_intent(payload) -> None:
-    api_entry_point, default_city = _load_config()
+    api_entry_point, default_city = await asyncio.to_thread(_load_config)
     payload = payload if isinstance(payload, dict) else {}
     meta = payload.get("_meta") if isinstance(payload.get("_meta"), dict) else {}
     extra = {"source": "weather_skill"}
@@ -929,7 +929,7 @@ async def on_weather_intent(payload) -> None:
     if isinstance(trace_id, str) and trace_id:
         extra["trace_id"] = trace_id
 
-    city = _resolve_city(payload.get("city")) or default_city
+    city = await asyncio.to_thread(_resolve_city, payload.get("city")) or default_city
     if not city:
         await _emit_weather_failure(_WEATHER_UNAVAILABLE_TEXT, meta, extra)
         return
@@ -1146,9 +1146,9 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
         city = _extract_city_from_payload(payload)
         location = _extract_location_from_payload(payload)
         request_id = _extract_request_id(payload)
-        api_entry_point, default_city = _load_config()
+        api_entry_point, default_city = await asyncio.to_thread(_load_config)
         if not city and not location:
-            city = _resolve_city(None) or default_city
+            city = await asyncio.to_thread(_resolve_city, None) or default_city
         if not city and not location:
             _log.info("weather request ignored: missing city/location payload_keys=%s", sorted(payload.keys()))
             return
