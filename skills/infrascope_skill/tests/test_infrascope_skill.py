@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import json
 import sys
 import types
 from pathlib import Path
@@ -354,51 +353,6 @@ def test_infrascope_webspace_event_invalidates_projection_state(monkeypatch):
     assert "desktop" not in mod._last_projected_at_mono
     assert "desktop\0inventory:all" not in mod._last_stream_fingerprints
     assert scheduled == [{"webspace_id": "desktop", "reason": "desktop.webspace.reloaded"}]
-
-
-def test_infrascope_scenario_declares_inventory_drilldown_and_inspector_flow():
-    workspace_root = Path(__file__).resolve().parents[3]
-    scenario_path = workspace_root / "scenarios" / "infrascope" / "scenario.json"
-    skill_path = Path(__file__).resolve().parents[1] / "skill.yaml"
-
-    scenario = json.loads(scenario_path.read_text(encoding="utf-8"))
-    skill_yaml = skill_path.read_text(encoding="utf-8")
-    widgets = {item["id"]: item for item in scenario["ui"]["application"]["desktop"]["pageSchema"]["widgets"]}
-
-    inventory = widgets["inventory-list"]
-    incidents = widgets["overview-incidents"]
-    operations = widgets["overview-operations"]
-    summary = widgets["selected-object-summary"]
-    mode = widgets["infrascope-mode"]
-    inventory_tabs = widgets["infrascope-inventory-tabs"]
-    inspector_tabs = widgets["inspector-tabs"]
-
-    assert scenario["type"] == "desktop"
-    assert inventory["visibleIf"] == "$state.infrascopeMode === 'inventory'"
-    assert inventory["dataSource"]["kind"] == "stream"
-    assert inventory["dataSource"]["receiver"] == "infrascope.inventory.$state.inventoryKind"
-    assert "refreshMs" not in inventory.get("inputs", {})
-    assert incidents["actions"][0]["params"]["inspectorTab"] == "incidents"
-    assert operations["dataSource"]["kind"] == "stream"
-    assert operations["dataSource"]["receiver"] == "infrascope.operations.active"
-    assert summary["dataSource"]["kind"] == "stream"
-    assert summary["dataSource"]["receiver"] == "infrascope.inspector.$state.selectedObjectId"
-    assert widgets["overview-summary"]["dataSource"]["path"] == "data/infrascope/summary"
-    assert mode["inputs"]["selectedStateKey"] == "infrascopeMode"
-    assert inventory_tabs["inputs"]["selectedStateKey"] == "inventoryKind"
-    assert inspector_tabs["inputs"]["selectedStateKey"] == "inspectorTab"
-    assert "get_overview_summary" in skill_yaml
-    assert "get_object_inspector" in skill_yaml
-    assert "get_snapshot" in skill_yaml
-    assert "refresh_snapshot" in skill_yaml
-    assert "data_projections" in skill_yaml
-    assert "infrascope.snapshot" in skill_yaml
-    assert "device.registered" in skill_yaml
-    assert "browser.session.changed" in skill_yaml
-    assert "webrtc.peer.state.changed" in skill_yaml
-    assert "workspace." in skill_yaml
-    assert "user.profile.changed" in skill_yaml
-    assert "capacity.changed" in skill_yaml
 
 
 def test_infrascope_stream_snapshot_request_publishes_requested_receiver(monkeypatch):

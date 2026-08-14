@@ -26,7 +26,7 @@ from adaos.services.system_model.service import (
     current_object_inspector,
     current_overview_projection,
 )
-from adaos.services.yjs.doc import get_ydoc, mutate_live_room, try_read_live_map_value
+from adaos.services.yjs.doc import try_read_live_map_value
 from adaos.services.yjs.webspace import default_webspace_id
 
 _log = logging.getLogger("skills.infrascope_skill")
@@ -1015,25 +1015,7 @@ def _project_snapshot(snapshot: dict[str, Any], *, webspace_id: str) -> bool:
     last_applied_at = float(_last_projected_at_mono.get(webspace_id) or 0.0)
     if last_applied_at > 0 and now - last_applied_at < _MIN_YJS_PROJECTION_INTERVAL_S:
         return False
-    def _mutator(ydoc: Any, txn: Any) -> None:
-        ydoc.get_map("data").set(txn, "infrascope", deepcopy(compact))
-
-    live_applied = mutate_live_room(
-        webspace_id,
-        _mutator,
-        root_names=["data"],
-        source="infrascope_skill.project_snapshot",
-        owner="skill:infrascope_skill",
-        channel="projection.yjs.live_room",
-        governed=True,
-    )
-    if not live_applied:
-        try:
-            with get_ydoc(webspace_id, load_mark_roots=["data"], governed=True) as ydoc:
-                with ydoc.begin_transaction() as txn:
-                    _mutator(ydoc, txn)
-        except RuntimeError:
-            ctx_subnet.set("infrascope.snapshot", compact, webspace_id=webspace_id)
+    ctx_subnet.set("infrascope.snapshot", deepcopy(compact), webspace_id=webspace_id)
     _last_projected_fingerprints[webspace_id] = fingerprint
     _last_projected_at_mono[webspace_id] = now
     return True

@@ -1,5 +1,5 @@
 name: infrascope_skill
-version: 0.28.12
+version: 0.28.13
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -379,4 +379,3 @@ compatibility:
     build_date: '2026-08-14T22:38:55+03:00'
     min_commit: d0c42079b61fba5df8dbcbb9c481abaee6218717
     min_short_commit: d0c42079
-
