@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Dict, Optional, Tuple
 
@@ -154,7 +155,7 @@ def setup(payload: Optional[dict] = None) -> Dict:
 
 @subscribe("nlp.intent.weather.get")
 async def on_weather_intent(evt) -> None:
-    api_key, api_entry_point, default_city = _load_config()
+    api_key, api_entry_point, default_city = await asyncio.to_thread(_load_config)
     if not api_key:
         await emit(
             "ui.notify",
@@ -165,7 +166,7 @@ async def on_weather_intent(evt) -> None:
         )
         return
 
-    city = _resolve_city((evt.payload or {}).get("city")) or default_city
+    city = await asyncio.to_thread(_resolve_city, (evt.payload or {}).get("city")) or default_city
     if not city:
         await emit(
             "ui.notify",
@@ -176,7 +177,7 @@ async def on_weather_intent(evt) -> None:
         )
         return
 
-    ok, data = _fetch_weather(api_entry_point, api_key, city)
+    ok, data = await asyncio.to_thread(_fetch_weather, api_entry_point, api_key, city)
     if not ok:
         await emit(
             "ui.notify",
