@@ -57,6 +57,12 @@ Detailed media data belongs behind bounded routes:
 - explicit details tool for diagnostics
 - disk/360log evidence for large failure artifacts
 
+Browser data sources invoke bounded page and diagnostic tools with governed
+read intent. Those tools therefore declare `side_effects: none`; summary
+refresh tools declare `side_effects: runtime_write` because they publish the
+compact Yjs projection. Keeping this distinction in the skill manifest lets
+the core reject accidental writes without blocking legitimate library reads.
+
 ## Scale Assumption
 
 The design target is a large household media library, not the current test

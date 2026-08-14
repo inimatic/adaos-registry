@@ -1,5 +1,5 @@
 name: mediaserver
-version: 0.9.13
+version: 0.9.14
 entry: handlers/main.py
 runtime:
   python: '3.11'
@@ -63,6 +63,7 @@ tools:
   description: Return current compact media library summary and media-channel capability
     diagnostics. Full rows are available only through list_library_page.
   entry: handlers.main:get_snapshot
+  side_effects: runtime_write
   input_schema:
     type: object
     additionalProperties: true
@@ -77,6 +78,7 @@ tools:
   description: Return a bounded page of media library rows with cursor pagination
     and optional name/mime filters.
   entry: handlers.main:list_library_page
+  side_effects: none
   input_schema:
     type: object
     additionalProperties: true
@@ -107,6 +109,7 @@ tools:
 - name: refresh_snapshot
   description: Refresh media library projection and return a lightweight acknowledgement.
   entry: handlers.main:refresh_snapshot
+  side_effects: runtime_write
   input_schema:
     type: object
     additionalProperties: true
@@ -116,6 +119,7 @@ tools:
   description: Return compact operator diagnostics for mediaserver projection pressure
     and media runtime readiness.
   entry: handlers.main:get_diagnostics
+  side_effects: none
   input_schema:
     type: object
     additionalProperties: true
@@ -126,7 +130,7 @@ tools:
     - items
     - media
     - reliability
-updated_at: '2026-08-12T18:21:10+00:00'
+updated_at: '2026-08-14T13:39:22+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4834.2acb1c5b

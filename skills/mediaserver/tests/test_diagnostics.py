@@ -66,7 +66,11 @@ def test_manifest_declares_diagnostics_tool() -> None:
     assert "media" in tools["get_diagnostics"]["output_schema"]["required"]
     assert "reliability" in tools["get_diagnostics"]["output_schema"]["required"]
     assert tools["get_snapshot"]["entry"] == "handlers.main:get_snapshot"
+    assert tools["get_snapshot"]["side_effects"] == "runtime_write"
     assert tools["list_library_page"]["entry"] == "handlers.main:list_library_page"
+    assert tools["list_library_page"]["side_effects"] == "none"
+    assert tools["refresh_snapshot"]["side_effects"] == "runtime_write"
+    assert tools["get_diagnostics"]["side_effects"] == "none"
     assert "max_items" not in routes["widget:mediaserver.summary"]["budget"]
     assert routes["widget:mediaserver.summary"]["projection_slot"] == "mediaserver.library_summary"
     assert routes["widget:mediaserver.summary"]["path"] == "data/media/library_summary"
