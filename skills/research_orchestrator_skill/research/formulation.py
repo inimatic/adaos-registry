@@ -33,12 +33,23 @@ def problem_frame_schema() -> dict[str, Any]:
             "title",
             "background",
             "research_question",
-            "hypotheses",
-            "source_grounding",
             "constraints",
             "assumptions",
             "open_questions",
         )
+    }
+    hypothesis = copy.deepcopy(properties["hypotheses"]["items"])
+    hypothesis["properties"]["source_refs"] = {
+        "type": "array",
+        "minItems": 1,
+        "items": {"type": "string", "pattern": "^SRC-[0-9]{3}$"},
+    }
+    hypothesis["required"].append("source_refs")
+    selected["hypotheses"] = {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 30,
+        "items": hypothesis,
     }
     selected["source_assessment"] = _object(
         {
@@ -58,7 +69,7 @@ def problem_frame_schema() -> dict[str, Any]:
                         "source_refs": {
                             "type": "array",
                             "minItems": 1,
-                            "items": {"type": "string", "pattern": "^artifact://"},
+                            "items": {"type": "string", "pattern": "^SRC-[0-9]{3}$"},
                         },
                     },
                     ["claim", "source_refs"],
@@ -72,7 +83,7 @@ def problem_frame_schema() -> dict[str, Any]:
                         "source_refs": {
                             "type": "array",
                             "minItems": 1,
-                            "items": {"type": "string", "pattern": "^artifact://"},
+                            "items": {"type": "string", "pattern": "^SRC-[0-9]{3}$"},
                         },
                     },
                     ["claim", "source_refs"],
@@ -155,7 +166,7 @@ def protocol_design_schema() -> dict[str, Any]:
             "value_summary": {"type": "string", "minLength": 10},
             "status": {"enum": ["source_derived", "policy_default", "proposed", "unresolved"]},
             "rationale": {"type": "string", "minLength": 10},
-            "source_refs": {"type": "array", "items": {"type": "string", "pattern": "^artifact://"}},
+            "source_refs": {"type": "array", "items": {"type": "string", "pattern": "^SRC-[0-9]{3}$"}},
         },
         ["id", "area", "value_summary", "status", "rationale", "source_refs"],
     )
@@ -232,20 +243,46 @@ def validate_stage(stage: str, value: Mapping[str, Any]) -> dict[str, Any]:
     return payload
 
 
+def stage_schema(stage: str, *, allowed_source_refs: set[str] | None = None) -> dict[str, Any]:
+    if stage not in STAGES:
+        raise ValueError(f"unknown formulation stage: {stage}")
+    schema = STAGES[stage]()
+    allowed = sorted(str(item) for item in (allowed_source_refs or set()) if str(item))
+    if not allowed:
+        return schema
+
+    def constrain(value: Any, *, key: str = "") -> None:
+        if isinstance(value, dict):
+            if key == "source_refs" and isinstance(value.get("items"), dict):
+                value["items"] = {"type": "string", "enum": allowed}
+            for child_key, child in value.items():
+                constrain(child, key=str(child_key))
+        elif isinstance(value, list):
+            for child in value:
+                constrain(child, key=key)
+
+    constrain(schema)
+    return schema
+
+
 def stage_quality_issues(stage: str, value: Mapping[str, Any], *, allowed_source_refs: set[str] | None = None) -> list[str]:
     payload = validate_stage(stage, value)
     issues: list[str] = []
     if stage == "problem_frame":
-        hypotheses = {str(item.get("id") or "") for item in payload.get("hypotheses") or [] if isinstance(item, Mapping)}
-        grounding = [item for item in payload.get("source_grounding") or [] if isinstance(item, Mapping)]
-        grounded_hypotheses = {str(item.get("claim_id") or "") for item in grounding if item.get("stance") == "hypothesis"}
-        if not hypotheses.issubset(grounded_hypotheses):
-            issues.append("every hypothesis id requires a source_grounding record with stance=hypothesis")
-        if not any(item.get("stance") == "observed" and str(item.get("claim_id") or "") not in hypotheses for item in grounding):
-            issues.append("at least one source observation must be separate from hypothesis ids")
-        cited = {str(ref) for item in grounding for ref in item.get("source_refs") or []}
+        assessment = payload["source_assessment"]
+        cited = {
+            str(ref)
+            for collection in (
+                payload.get("hypotheses") or [],
+                assessment.get("observed_facts") or [],
+                assessment.get("author_interpretations") or [],
+            )
+            for item in collection
+            if isinstance(item, Mapping)
+            for ref in item.get("source_refs") or []
+        }
         if allowed_source_refs is not None and (not cited or not cited.issubset(allowed_source_refs)):
-            issues.append("source_grounding must cite only provenance refs supplied to this stage")
+            issues.append("problem frame must cite only source ids supplied to this stage")
     elif stage == "protocol_design":
         plan = payload["experimental_plan"]
         stages = [item for item in plan["stages"] if isinstance(item, Mapping)]
@@ -281,7 +318,7 @@ def stage_quality_issues(stage: str, value: Mapping[str, Any], *, allowed_source
     return list(dict.fromkeys(issues))
 
 
-def schema_text_format(stage: str) -> dict[str, Any]:
+def schema_text_format(stage: str, *, schema: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Responses Structured Outputs envelope; callers may fall back to json_object."""
 
     return {
@@ -289,7 +326,7 @@ def schema_text_format(stage: str) -> dict[str, Any]:
             "type": "json_schema",
             "name": f"research_{stage}_v1",
             "strict": True,
-            "schema": STAGES[stage](),
+            "schema": copy.deepcopy(dict(schema or STAGES[stage]())),
         }
     }
 
@@ -335,6 +372,8 @@ def assemble_candidate(
     problem_frame: Mapping[str, Any],
     protocol_design: Mapping[str, Any],
     implementation_contract: Mapping[str, Any],
+    *,
+    source_ref_map: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Compile validated stage artifacts into the LLM-owned prototype subset."""
 
@@ -348,6 +387,37 @@ def assemble_candidate(
         if isinstance(item, Mapping) and item.get("status") == "unresolved"
     ]
     questions = list(dict.fromkeys([*questions, *unresolved]))
+    reference_map = dict(source_ref_map or {})
+    def resolve_refs(item: Mapping[str, Any]) -> list[str]:
+        return [reference_map.get(str(ref), str(ref)) for ref in item.get("source_refs") or []]
+
+    hypotheses = []
+    grounding = []
+    for item in problem["hypotheses"]:
+        hypothesis = {key: copy.deepcopy(value) for key, value in item.items() if key != "source_refs"}
+        hypotheses.append(hypothesis)
+        grounding.append(
+            {
+                "claim_id": str(hypothesis["id"]),
+                "claim": str(hypothesis["statement"]),
+                "stance": "hypothesis",
+                "source_refs": resolve_refs(item),
+            }
+        )
+    assessment = problem["source_assessment"]
+    for prefix, stance, collection in (
+        ("OBS", "observed", assessment["observed_facts"]),
+        ("INT", "interpretation", assessment["author_interpretations"]),
+    ):
+        for index, item in enumerate(collection, start=1):
+            grounding.append(
+                {
+                    "claim_id": f"{prefix}-{index}",
+                    "claim": str(item["claim"]),
+                    "stance": stance,
+                    "source_refs": resolve_refs(item),
+                }
+            )
     candidate = {
         "assistant_message": "\n\n".join(
             str(item).strip()
@@ -361,8 +431,8 @@ def assemble_candidate(
         "title": problem["title"],
         "background": problem["background"],
         "research_question": problem["research_question"],
-        "hypotheses": problem["hypotheses"],
-        "source_grounding": problem["source_grounding"],
+        "hypotheses": hypotheses,
+        "source_grounding": grounding,
         "evidence_policy": {
             "historical_results": "exploratory_source_only",
             "workflow_smoke": "workflow_evidence_only",
@@ -396,6 +466,7 @@ __all__ = [
     "problem_frame_schema",
     "protocol_design_schema",
     "schema_text_format",
+    "stage_schema",
     "stage_digest",
     "stage_quality_issues",
     "validate_stage",

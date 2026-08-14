@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 
-from research.formulation import STAGES, assemble_candidate, stage_quality_issues, validate_stage
+from research.formulation import STAGES, assemble_candidate, stage_quality_issues, stage_schema, validate_stage
 
 
-REF = "artifact://skill/tlp/part0/notebook#cell=5"
+REF = "SRC-001"
+EXACT_REF = "artifact://skill/tlp/part0/notebook#cell=5"
 
 
 def _problem() -> dict:
@@ -14,11 +15,7 @@ def _problem() -> dict:
         "title": "TLP against MaxPool",
         "background": "Исторический notebook мотивирует новое парное сравнение, но не доказывает преимущество TLP.",
         "research_question": "Меняет ли TLP validation accuracy относительно MaxPool при парной инициализации?",
-        "hypotheses": [{"id": "H1", "statement": "TLP изменяет парную validation accuracy.", "falsification": "Парный контраст совместим с практически нулевым эффектом.", "status": "proposed"}],
-        "source_grounding": [
-            {"claim_id": "OBS-1", "claim": "Notebook содержит реализации TLP и MaxPool.", "stance": "observed", "source_refs": [REF]},
-            {"claim_id": "H1", "claim": "Сравнение TLP и MaxPool требует нового контролируемого запуска.", "stance": "hypothesis", "source_refs": [REF]},
-        ],
+        "hypotheses": [{"id": "H1", "statement": "TLP изменяет парную validation accuracy.", "falsification": "Парный контраст совместим с практически нулевым эффектом.", "status": "proposed", "source_refs": [REF]}],
         "constraints": ["Первый профиль исполняется на CPU."],
         "assumptions": ["STL-10 доступен через объявленный data capability."],
         "open_questions": [],
@@ -100,20 +97,31 @@ def _assert_strict_objects(value: object) -> None:
 def test_stage_schemas_are_provider_strict_and_candidate_is_deterministically_assembled() -> None:
     for factory in STAGES.values():
         _assert_strict_objects(factory())
-    candidate = assemble_candidate(_problem(), _protocol(), _implementation())
+    candidate = assemble_candidate(_problem(), _protocol(), _implementation(), source_ref_map={REF: EXACT_REF})
     assert candidate["readiness"] == {"decision": "ready_for_automation", "blocking_questions": []}
+    assert candidate["hypotheses"][0].get("source_refs") is None
+    assert [item["stance"] for item in candidate["source_grounding"]] == ["hypothesis", "observed"]
+    assert all(item["source_refs"] == [EXACT_REF] for item in candidate["source_grounding"])
     assert [item["id"] for item in candidate["implementation_requirements"]] == [f"REQ-{index}" for index in range(1, 6)]
     assert [item["category"] for item in candidate["acceptance_checks"]] == ["workflow", "data_integrity", "reproducibility", "evidence"]
 
 
+def test_dynamic_stage_schema_limits_every_source_reference_to_supplied_short_ids() -> None:
+    schema = stage_schema("problem_frame", allowed_source_refs={"SRC-001", "SRC-002"})
+    _assert_strict_objects(schema)
+    hypothesis_refs = schema["properties"]["hypotheses"]["items"]["properties"]["source_refs"]["items"]
+    observation_refs = schema["properties"]["source_assessment"]["properties"]["observed_facts"]["items"]["properties"]["source_refs"]["items"]
+    assert hypothesis_refs == observation_refs == {"type": "string", "enum": ["SRC-001", "SRC-002"]}
+
+
 def test_unresolved_protocol_decision_is_a_deterministic_readiness_blocker() -> None:
-    candidate = assemble_candidate(_problem(), _protocol(unresolved=True), _implementation())
+    candidate = assemble_candidate(_problem(), _protocol(unresolved=True), _implementation(), source_ref_map={REF: EXACT_REF})
     assert candidate["readiness"]["decision"] == "needs_discussion"
     assert "Какой confirmatory budget" in candidate["readiness"]["blocking_questions"][0]
 
 
 def test_problem_quality_gate_rejects_a_ref_not_supplied_to_the_stage() -> None:
     value = validate_stage("problem_frame", _problem())
-    assert stage_quality_issues("problem_frame", value, allowed_source_refs={"artifact://other"}) == [
-        "source_grounding must cite only provenance refs supplied to this stage"
+    assert stage_quality_issues("problem_frame", value, allowed_source_refs={"SRC-999"}) == [
+        "problem frame must cite only source ids supplied to this stage"
     ]

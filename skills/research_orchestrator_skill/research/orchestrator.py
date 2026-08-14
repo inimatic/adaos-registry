@@ -31,11 +31,11 @@ from research.contracts import (
     prototype_quality_issues,
 )
 from research.formulation import (
-    STAGES,
     assemble_candidate,
     schema_text_format,
     stage_digest,
     stage_quality_issues,
+    stage_schema,
     validate_stage,
 )
 from research.repository import OrchestratorRepository
@@ -195,6 +195,13 @@ def _llm_failure(result: Mapping[str, Any], *, operation: str) -> RuntimeError:
         incomplete = result.get("incomplete_details")
         if isinstance(incomplete, Mapping):
             detail = str(incomplete.get("reason") or "")
+    if not detail:
+        progress = result.get("progress") if isinstance(result.get("progress"), Mapping) else {}
+        events = progress.get("events") if isinstance(progress.get("events"), list) else []
+        for event in reversed(events):
+            if isinstance(event, Mapping) and event.get("detail"):
+                detail = str(event["detail"])
+                break
     suffix = f": {detail[:300]}" if detail else ""
     return RuntimeError(f"Root LLM {operation} ended with status={status}{suffix}")
 
@@ -1009,7 +1016,7 @@ class ResearchOrchestrator:
         request_id_prefix: str,
         max_tokens: int,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
-        schema = STAGES[stage_name]()
+        schema = stage_schema(stage_name, allowed_source_refs=allowed_source_refs)
         input_digest = stage_digest(stage_input)
         schema_digest = stage_digest(schema)
         profile_scope = f"research.formulation.{stage_name}"
@@ -1043,6 +1050,10 @@ class ResearchOrchestrator:
         jobs: list[dict[str, Any]] = []
         repair_attempt = 0
         structured_output = True
+        submitted: dict[str, Any] = {}
+        completed: dict[str, Any] = {}
+        output_text = ""
+        candidate: dict[str, Any] = {}
 
         def execute(prompt: Mapping[str, Any], *, suffix: str, structured: bool) -> tuple[dict[str, Any], dict[str, Any], str]:
             payload = dict(prompt)
@@ -1066,8 +1077,8 @@ class ResearchOrchestrator:
                 max_tokens=max_tokens,
                 request_id=stage_request_id,
                 profile_scope=profile_scope,
-                text=schema_text_format(stage_name) if structured else {"format": {"type": "json_object"}},
-                prompt_cache_key=f"research:{direction_id}:{stage_name}:{input_digest.removeprefix('sha256:')[:24]}",
+                text=schema_text_format(stage_name, schema=schema) if structured else {"format": {"type": "json_object"}},
+                prompt_cache_key=f"research:{stage_name[:18]}:{input_digest.removeprefix('sha256:')[:24]}",
                 stream=True,
                 timeout=30,
             )
@@ -1116,19 +1127,21 @@ class ResearchOrchestrator:
             try:
                 submitted, completed, output_text = execute(base_prompt, suffix="", structured=True)
             except Exception as exc:
-                if not _structured_output_unsupported(exc):
-                    raise
                 structured_output = False
                 self.repository.activity(
                     direction_id,
                     "formulation",
                     "structured_output_fallback",
-                    f"{stage_name} provider does not support the requested JSON Schema; using explicit-schema JSON mode.",
-                    {"run_id": run_id, "stage": stage_name, "error": _bounded_text(exc, 800)},
+                    f"{stage_name} schema-constrained job failed; retrying once with the exact schema in JSON mode.",
+                    {
+                        "run_id": run_id,
+                        "stage": stage_name,
+                        "error": _bounded_text(exc, 800),
+                        "classified_unsupported": _structured_output_unsupported(exc),
+                    },
                 )
                 submitted, completed, output_text = execute(base_prompt, suffix="-json-fallback", structured=False)
 
-            candidate: dict[str, Any] = {}
             validation_error: Exception | None = None
             try:
                 candidate = _json_object(output_text)
@@ -1160,7 +1173,7 @@ class ResearchOrchestrator:
                 try:
                     submitted, completed, output_text = execute(repair_prompt, suffix="-repair-1", structured=structured_output)
                 except Exception as exc:
-                    if not structured_output or not _structured_output_unsupported(exc):
+                    if not structured_output:
                         raise
                     structured_output = False
                     submitted, completed, output_text = execute(repair_prompt, suffix="-repair-1-json-fallback", structured=False)
@@ -1206,6 +1219,25 @@ class ResearchOrchestrator:
             )
             return candidate, telemetry
         except Exception as exc:
+            failure_telemetry: dict[str, Any] = {
+                "jobs": jobs,
+                "error": _bounded_text(exc, 2000),
+                "repair_attempts": repair_attempt,
+                "schema_digest": schema_digest,
+                "input_digest": input_digest,
+            }
+            if completed:
+                failure_telemetry.update(
+                    _llm_telemetry(
+                        submitted,
+                        completed,
+                        requested_model=model,
+                        profile_scope=profile_scope,
+                        output_text=output_text,
+                        structured_output=structured_output,
+                        repair_attempts=repair_attempt,
+                    )
+                )
             self.repository.put_formulation_stage(
                 run_id=run_id,
                 direction_id=direction_id,
@@ -1214,9 +1246,13 @@ class ResearchOrchestrator:
                 status="failed",
                 input_digest=input_digest,
                 output_digest=None,
-                payload={},
-                telemetry={"jobs": jobs, "error": _bounded_text(exc, 2000), "repair_attempts": repair_attempt},
+                payload=candidate,
+                telemetry=failure_telemetry,
             )
+            try:
+                setattr(exc, "repair_attempts", repair_attempt)
+            except Exception:
+                pass
             raise
 
     def _discuss_staged(
@@ -1263,11 +1299,31 @@ class ResearchOrchestrator:
             if item
         )
         source_context = self._source_context(bundle, query=query)
-        allowed_refs = {
-            str(ref)
-            for item in source_context["coverage"].get("items") or []
-            for ref in item.get("provenance_refs") or []
-        }
+        exact_refs = sorted(
+            {
+                str(ref)
+                for item in source_context["coverage"].get("items") or []
+                for ref in item.get("provenance_refs") or []
+            }
+        )
+        source_ref_map = {f"SRC-{index:03d}": ref for index, ref in enumerate(exact_refs, start=1)}
+        exact_to_short = {ref: short for short, ref in source_ref_map.items()}
+        allowed_refs = set(source_ref_map)
+        llm_source_context = copy.deepcopy(source_context)
+        for source in llm_source_context.get("sources") or []:
+            if not isinstance(source, dict):
+                continue
+            excerpt = str(source.get("excerpt") or "")
+            for exact, short in exact_to_short.items():
+                excerpt = excerpt.replace(exact, short)
+            source["excerpt"] = excerpt
+        for item in llm_source_context.get("coverage", {}).get("items") or []:
+            if isinstance(item, dict):
+                item["provenance_refs"] = [
+                    exact_to_short[str(ref)]
+                    for ref in item.get("provenance_refs") or []
+                    if str(ref) in exact_to_short
+                ]
         self.repository.activity(
             token,
             "formulation",
@@ -1298,7 +1354,8 @@ class ResearchOrchestrator:
                     "directive": directive["text"],
                     "direction_id": token,
                     "current_problem_frame": current_problem,
-                    "source_bundle": {"digest": bundle["digest"], **source_context},
+                    "source_bundle": {"digest": bundle["digest"], **llm_source_context},
+                    "source_reference_policy": "Cite only the short SRC-### ids shown in excerpt headers and coverage; AdaOS resolves them to exact artifact refs after validation.",
                     "epistemic_policy": {
                         "historical_notebook_outputs": "exploratory_untrusted_not_confirmatory",
                         "source_silence": "unknown_not_false",
@@ -1308,8 +1365,8 @@ class ResearchOrchestrator:
                 rules=[
                     "Produce one falsifiable question; do not design the execution protocol in this stage.",
                     "Separate direct source observations, author interpretations, hypotheses and unresolved choices.",
-                    "Every hypothesis id needs stance=hypothesis grounding; include at least one independent observed claim.",
-                    "Use exact supplied provenance refs only. Never treat historical notebook outputs as confirmation.",
+                    "Give every hypothesis its motivating SRC-### ids. Keep source observations and author interpretations in source_assessment; AdaOS compiles provenance records deterministically.",
+                    "Use exact supplied SRC-### ids only. Never treat historical notebook outputs as confirmation.",
                     "Assess whether the supplied material is sufficient for a question versus an automation-ready protocol.",
                     "Write substantive fields in Russian unless a precise technical identifier is clearer in English.",
                 ],
@@ -1396,7 +1453,7 @@ class ResearchOrchestrator:
             stage_telemetry["implementation_contract"] = telemetry
             total_repairs += int(telemetry.get("repair_attempts") or 0)
 
-            candidate = assemble_candidate(problem, protocol, implementation)
+            candidate = assemble_candidate(problem, protocol, implementation, source_ref_map=source_ref_map)
             stage_values = {
                 "problem_frame": problem,
                 "protocol_design": protocol,
@@ -1467,6 +1524,7 @@ class ResearchOrchestrator:
                 },
             }
         except Exception as exc:
+            total_repairs += int(getattr(exc, "repair_attempts", 0) or 0)
             failure_message, failure_detail = _failure_projection(exc, repairs=total_repairs)
             self.repository.activity(
                 token,
