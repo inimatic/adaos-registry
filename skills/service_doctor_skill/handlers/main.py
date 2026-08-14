@@ -102,7 +102,7 @@ def _recommendations(issue_type: str | None, *, reason: str) -> list[str]:
 
 
 @subscribe("skill.service.doctor.request")
-async def on_doctor_request(evt: Any) -> None:
+def on_doctor_request(evt: Any) -> None:
     ctx = get_ctx()
     payload = _payload(evt)
 

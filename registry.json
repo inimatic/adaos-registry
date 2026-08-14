@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-14T19:39:58+00:00",
+  "updated_at": "2026-08-14T19:40:05+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -814,8 +814,8 @@
       "kind": "skill",
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
-      "version": "0.0.1",
-      "updated_at": "2026-08-14T03:19:44+00:00",
+      "version": "0.0.2",
+      "updated_at": "2026-08-14T19:40:05+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
