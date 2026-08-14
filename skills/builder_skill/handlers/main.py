@@ -1427,8 +1427,7 @@ def _event_payload(evt: Any) -> dict[str, Any]:
     return {}
 
 
-@subscribe("builder.pending_action.response")
-async def _on_builder_pending_action_response(evt: Any) -> None:
+def _handle_builder_pending_action_response(evt: Any) -> None:
     payload = _event_payload(evt)
     action = payload.get("pending_action") if isinstance(payload.get("pending_action"), Mapping) else {}
     response = payload.get("response") if isinstance(payload.get("response"), Mapping) else {}
@@ -1511,6 +1510,11 @@ async def _on_builder_pending_action_response(evt: Any) -> None:
             "\u0437\u0430\u0444\u0438\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043e. Rollback \u0434\u043b\u044f \u044d\u0442\u043e\u0439 \u0432\u0435\u0442\u043a\u0438 \u0435\u0449\u0435 \u043d\u0435 \u0440\u0435\u0430\u043b\u0438\u0437\u043e\u0432\u0430\u043d."
         )
     _safe_emit_chat(message, webspace_id=webspace_id, session=session, binding=binding, topic_ref=topic)
+
+
+@subscribe("builder.pending_action.response")
+async def _on_builder_pending_action_response(evt: Any) -> None:
+    await asyncio.to_thread(_handle_builder_pending_action_response, evt)
 
 
 def _build_fields(idea: str) -> list[dict[str, Any]]:
