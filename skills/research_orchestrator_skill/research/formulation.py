@@ -143,7 +143,6 @@ def protocol_design_schema() -> dict[str, Any]:
             "selection_source": {
                 "enum": ["validation", "fixed_predeclared_final_state", "not_applicable"],
             },
-            "selection_rule": {"type": "string", "minLength": 10},
             "final_test_policy": {
                 "enum": ["once_per_trained_unit_after_seal", "not_applicable"],
             },
@@ -152,7 +151,6 @@ def protocol_design_schema() -> dict[str, Any]:
         [
             "development_split",
             "selection_source",
-            "selection_rule",
             "final_test_policy",
             "test_feedback_prohibited",
         ],
@@ -540,6 +538,20 @@ def _compile_decision_rule(spec: Mapping[str, Any], evaluation: Mapping[str, Any
     return rule, practical
 
 
+def _compile_selection_rule(selection_source: str) -> str:
+    if selection_source == "validation":
+        return (
+            "Выбрать checkpoint с максимальной заранее объявленной primary validation-метрикой; "
+            "при равенстве выбрать более раннюю эпоху. Test-метрики не используются."
+        )
+    if selection_source == "fixed_predeclared_final_state":
+        return (
+            "Использовать final state после полного предзаданного бюджета без выбора по метрике; "
+            "test-метрики не используются."
+        )
+    return "Выбор checkpoint, модели или hyperparameter в этом протоколе не применяется."
+
+
 def assemble_candidate(
     problem_frame: Mapping[str, Any],
     protocol_design: Mapping[str, Any],
@@ -600,6 +612,11 @@ def assemble_candidate(
                     "source_refs": resolve_refs(item),
                 }
             )
+    experimental_plan = copy.deepcopy(protocol["experimental_plan"])
+    evaluation_access = experimental_plan["data_policy"]["evaluation_access"]
+    evaluation_access["selection_rule"] = _compile_selection_rule(
+        str(evaluation_access["selection_source"])
+    )
     evaluation_plan = copy.deepcopy(protocol["evaluation_plan"])
     decision_rule, practical_significance = _compile_decision_rule(decision_spec, evaluation_plan)
     evaluation_plan["decision_rules"] = [decision_rule]
@@ -625,7 +642,7 @@ def assemble_candidate(
             "workflow_smoke": "workflow_evidence_only",
             "negative_results": "retain_and_report",
         },
-        "experimental_plan": protocol["experimental_plan"],
+        "experimental_plan": experimental_plan,
         "evaluation_plan": evaluation_plan,
         "constraints": problem["constraints"],
         "assumptions": problem["assumptions"],

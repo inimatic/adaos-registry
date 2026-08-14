@@ -1093,7 +1093,13 @@ class ResearchOrchestrator:
             job_id = str(submitted.get("job_id") or "")
             if not job_id:
                 raise RuntimeError("Root LLM did not return a job_id")
-            jobs.append({"job_id": job_id, "request_id": stage_request_id, "structured_output": structured})
+            job_record: dict[str, Any] = {
+                "job_id": job_id,
+                "request_id": stage_request_id,
+                "structured_output": structured,
+                "status": "submitted",
+            }
+            jobs.append(job_record)
             base_url = str((submitted.get("_client") or {}).get("base_url") or "") or None
             durable_phase = ""
 
@@ -1127,9 +1133,30 @@ class ResearchOrchestrator:
                 poll_interval_s=1.5,
                 progress_callback=progress,
             )
+            job_output = str(completed.get("output_text") or "")
+            job_telemetry = _llm_telemetry(
+                submitted,
+                completed,
+                requested_model=model,
+                profile_scope=profile_scope,
+                output_text=job_output,
+                structured_output=structured,
+                repair_attempts=0,
+            )
+            job_record.update(
+                {
+                    "status": str(completed.get("status") or "unknown"),
+                    "resolved_model": job_telemetry["resolved_model"],
+                    "resolved_provider": job_telemetry["resolved_provider"],
+                    "usage": job_telemetry["usage"],
+                    "finish_reason": job_telemetry["finish_reason"],
+                    "output_characters": job_telemetry["output_characters"],
+                    "transport": job_telemetry["transport"],
+                }
+            )
             if str(completed.get("status") or "").lower() != "succeeded":
                 raise _llm_failure(completed, operation=stage_name)
-            return submitted, completed, str(completed.get("output_text") or "")
+            return submitted, completed, job_output
 
         try:
             try:
@@ -1218,6 +1245,14 @@ class ResearchOrchestrator:
                     "input_digest": input_digest,
                     "task_scope": task_scope,
                     "jobs": jobs,
+                    "aggregate_usage": {
+                        key: sum(
+                            int((item.get("usage") or {}).get(key) or 0)
+                            for item in jobs
+                            if isinstance(item, Mapping)
+                        )
+                        for key in ("input_tokens", "output_tokens", "total_tokens")
+                    },
                 }
             )
             output_digest = stage_digest(candidate)
@@ -1437,7 +1472,7 @@ class ResearchOrchestrator:
                     "Populate all nine keys in decisions_by_area and cite refs only for source-derived choices; AdaOS owns decision ids.",
                     "Resolve every candidate uncertainty from problem_frame into one of those nine decisions. A bounded proposed choice closes it; an optional extension is out of scope and is not a blocker.",
                     "For each decision use blocking_question only when status is unresolved; otherwise it must be the empty string. Do not repeat the same uncertainty in multiple areas.",
-                    "In data_policy.evaluation_access separate development/model selection from the final evaluation. Use validation or a predeclared final state for selection, expose final test only once per trained unit after the seal, and prohibit test feedback.",
+                    "In data_policy.evaluation_access separate development/model selection from the final evaluation. Choose selection_source truthfully; AdaOS compiles its exact selection rule. Expose final test only once per trained unit after the seal and prohibit test feedback.",
                     "Follow any source requirement for train/validation/untouched-test separation. Never evaluate final test per epoch or use it to choose checkpoints, hyperparameters, variants, or stopping.",
                     "Declare exact seed_values and make pairing allocation planned_units and sample_size identical to the confirmatory units.",
                     "Use named RNG streams initialization, sampling, augmentation, and analysis; within each pair keep initialization, data order, sampling and augmentation invariant and vary only the intervention.",

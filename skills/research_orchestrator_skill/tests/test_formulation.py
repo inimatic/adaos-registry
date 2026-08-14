@@ -48,7 +48,6 @@ def _protocol(*, unresolved: bool = False) -> dict:
                 "evaluation_access": {
                     "development_split": "Fixed train/validation partition.",
                     "selection_source": "validation",
-                    "selection_rule": "Choose the checkpoint by validation accuracy only.",
                     "final_test_policy": "once_per_trained_unit_after_seal",
                     "test_feedback_prohibited": True,
                 },
@@ -123,6 +122,9 @@ def test_stage_schemas_are_provider_strict_and_candidate_is_deterministically_as
     assert candidate["evaluation_plan"]["decision_rules"] == [
         "Поддержано: 95% ДИ для Δ целиком выше +1 percentage point или целиком ниже -1 percentage point; опровергнуто как практически эквивалентное: ДИ целиком внутри [-1; +1] percentage point; иначе результат неконклюзивен."
     ]
+    assert candidate["experimental_plan"]["data_policy"]["evaluation_access"]["selection_rule"].startswith(
+        "Выбрать checkpoint с максимальной"
+    )
 
 
 def test_dynamic_stage_schema_limits_every_source_reference_to_supplied_short_ids() -> None:

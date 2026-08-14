@@ -395,6 +395,7 @@ def get_activity(direction_id: str, limit: int = 200, **_: Any) -> dict[str, Any
             "resolved_provider": item["telemetry"].get("resolved_provider"),
             "structured_output": item["telemetry"].get("structured_output"),
             "repair_attempts": item["telemetry"].get("repair_attempts", 0),
+            "aggregate_usage": item["telemetry"].get("aggregate_usage") or item["telemetry"].get("usage") or {},
             "created_at": item["created_at"],
         }
         for item in stages
@@ -402,6 +403,7 @@ def get_activity(direction_id: str, limit: int = 200, **_: Any) -> dict[str, Any
     stage_lines = "\n".join(
         f"- `{item['run_id']}` · **{item['stage_index']}/3 {item['stage_name']}** · `{item['status']}` · "
         f"model `{item.get('resolved_model') or 'unknown'}` · structured `{item.get('structured_output')}` · repairs `{item.get('repair_attempts', 0)}`"
+        f" · tokens `{(item.get('aggregate_usage') or {}).get('total_tokens', 0)}`"
         for item in reversed(stage_summaries)
     )
     event_lines = "\n".join(f"- `{item['seq']:03d}` **{item['stage']} / {item['status']}** — {item['message']}" for item in events)
@@ -424,7 +426,8 @@ def get_formulation_run(direction_id: str, run_id: str | None = None, **_: Any) 
         f"- **{item['stage_index']}/3 {item['stage_name']}** · `{item['status']}` · "
         f"model `{item['telemetry'].get('resolved_model') or 'unknown'}` · "
         f"structured `{item['telemetry'].get('structured_output')}` · "
-        f"repairs `{item['telemetry'].get('repair_attempts', 0)}`"
+        f"repairs `{item['telemetry'].get('repair_attempts', 0)}` · "
+        f"tokens `{(item['telemetry'].get('aggregate_usage') or item['telemetry'].get('usage') or {}).get('total_tokens', 0)}`"
         for item in stages
     ]
     return {
