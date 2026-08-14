@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.11.4
+version: 0.11.5
 description: Durable pre-Codex orchestration for reusable AdaOS research-direction
   skill projects.
 supported_locales:
@@ -44,6 +44,7 @@ exports:
   - get_automation_brief
   - open_builder_session
   - get_activity
+  - get_formulation_run
   - next_steps
 tools:
 - name: ensure_schema
@@ -278,7 +279,7 @@ tools:
     repair.
   entry: handlers.main:chat
   side_effects: local_write
-  timeout_seconds: 300
+  timeout_seconds: 1800
   input_schema:
     type: object
     required:
@@ -387,6 +388,25 @@ tools:
         type: integer
         minimum: 1
         maximum: 500
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: get_formulation_run
+  description: Read exact persisted stage payloads and provider telemetry for one
+    formulation run, defaulting to the latest run.
+  entry: handlers.main:get_formulation_run
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      run_id:
+        type:
+        - string
+        - 'null'
     additionalProperties: true
   output_schema:
     type: object

@@ -63,10 +63,15 @@ def _protocol(*, unresolved: bool = False) -> dict:
             "negative_result_policy": "Retain and report negative or inconclusive results without redefining the question.",
         },
         "decisions_by_area": {
-            area: {"value_summary": f"Declared protocol choice for {area}.", "status": "unresolved" if unresolved and area == "budget" else "proposed", "rationale": f"A reviewable bounded choice is required for {area}.", "source_refs": []}
+            area: {
+                "value_summary": f"Declared protocol choice for {area}.",
+                "status": "unresolved" if unresolved and area == "budget" else "proposed",
+                "rationale": f"A reviewable bounded choice is required for {area}.",
+                "source_refs": [],
+                "blocking_question": "Какой confirmatory budget должен быть принят?" if unresolved and area == "budget" else "",
+            }
             for area in decision_areas
         },
-        "open_questions": ["Какой confirmatory budget должен быть принят?"] if unresolved else [],
     }
 
 
@@ -136,6 +141,25 @@ def test_unresolved_protocol_decision_is_a_deterministic_readiness_blocker() -> 
     candidate = assemble_candidate(_problem(), _protocol(unresolved=True), _implementation(), source_ref_map={REF: EXACT_REF})
     assert candidate["readiness"]["decision"] == "needs_discussion"
     assert "Какой confirmatory budget" in candidate["readiness"]["blocking_questions"][0]
+
+
+def test_problem_discovery_questions_do_not_survive_resolved_protocol_choices() -> None:
+    problem = _problem()
+    problem["open_questions"] = ["Какой confirmatory budget нужен?"]
+    problem["source_assessment"]["unresolved_decisions"] = ["Нужно выбрать confirmatory budget."]
+    candidate = assemble_candidate(problem, _protocol(), _implementation(), source_ref_map={REF: EXACT_REF})
+
+    assert candidate["open_questions"] == []
+    assert candidate["readiness"]["decision"] == "ready_for_automation"
+
+
+def test_resolved_protocol_decision_cannot_retain_a_blocking_question() -> None:
+    protocol = _protocol()
+    protocol["decisions_by_area"]["budget"]["blocking_question"] = "Нужно ещё раз выбрать budget."
+
+    assert stage_quality_issues("protocol_design", protocol) == [
+        "resolved decision budget must leave blocking_question empty"
+    ]
 
 
 def test_problem_quality_gate_rejects_a_ref_not_supplied_to_the_stage() -> None:

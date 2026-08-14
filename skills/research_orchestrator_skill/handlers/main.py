@@ -412,6 +412,30 @@ def get_activity(direction_id: str, limit: int = 200, **_: Any) -> dict[str, Any
     return {"ok": True, "direction_id": direction_id, "events": events, "formulation_stages": stage_summaries, "content": content}
 
 
+@tool(summary="Read the exact persisted artifacts and telemetry for one formulation run.", side_effects="none")
+def get_formulation_run(direction_id: str, run_id: str | None = None, **_: Any) -> dict[str, Any]:
+    repository = OrchestratorRepository()
+    selected_run = str(run_id or "").strip()
+    if not selected_run:
+        recent = repository.formulation_stages(direction_id, limit=1)
+        selected_run = str(recent[0]["run_id"]) if recent else ""
+    stages = repository.formulation_stages(direction_id, run_id=selected_run) if selected_run else []
+    lines = [
+        f"- **{item['stage_index']}/3 {item['stage_name']}** · `{item['status']}` · "
+        f"model `{item['telemetry'].get('resolved_model') or 'unknown'}` · "
+        f"structured `{item['telemetry'].get('structured_output')}` · "
+        f"repairs `{item['telemetry'].get('repair_attempts', 0)}`"
+        for item in stages
+    ]
+    return {
+        "ok": bool(stages),
+        "direction_id": direction_id,
+        "run_id": selected_run or None,
+        "stages": stages,
+        "content": "## Formulation run\n\n" + ("\n".join(lines) if lines else "No formulation run was found."),
+    }
+
+
 @tool(summary="Explain the next admitted steps for text or voice surfaces.", side_effects="none")
 def next_steps(direction_id: str, **_: Any) -> dict[str, Any]:
     state = _orchestrator().get(direction_id)

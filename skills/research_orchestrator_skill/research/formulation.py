@@ -165,8 +165,9 @@ def protocol_design_schema() -> dict[str, Any]:
             "status": {"enum": ["source_derived", "policy_default", "proposed", "unresolved"]},
             "rationale": {"type": "string", "minLength": 10},
             "source_refs": {"type": "array", "items": {"type": "string", "pattern": "^SRC-[0-9]{3}$"}},
+            "blocking_question": {"type": "string"},
         },
-        ["value_summary", "status", "rationale", "source_refs"],
+        ["value_summary", "status", "rationale", "source_refs", "blocking_question"],
     )
     return _object(
         {
@@ -177,9 +178,8 @@ def protocol_design_schema() -> dict[str, Any]:
                 {area: decision for area in PROTOCOL_DECISION_AREAS},
                 list(PROTOCOL_DECISION_AREAS),
             ),
-            "open_questions": properties["open_questions"],
         },
-        ["assistant_message", "experimental_plan", "evaluation_plan", "decisions_by_area", "open_questions"],
+        ["assistant_message", "experimental_plan", "evaluation_plan", "decisions_by_area"],
     )
 
 
@@ -321,11 +321,19 @@ def stage_quality_issues(stage: str, value: Mapping[str, Any], *, allowed_source
         for area, item in decisions.items():
             if item.get("status") == "source_derived" and not item.get("source_refs"):
                 issues.append(f"source-derived decision {area} requires source_refs")
-            if item.get("status") == "unresolved" and not payload.get("open_questions"):
-                issues.append("unresolved decisions require an explicit open question")
-        vague_significance = re.compile(r"(?i)statistically significant|significant (?:difference|improvement|result)")
+            question = str(item.get("blocking_question") or "").strip()
+            if item.get("status") == "unresolved" and len(question) < 5:
+                issues.append(f"unresolved decision {area} requires its own concrete blocking_question")
+            if item.get("status") != "unresolved" and question:
+                issues.append(f"resolved decision {area} must leave blocking_question empty")
+        vague_significance = re.compile(
+            r"(?i)statistically significant|significant (?:difference|improvement|result)|"
+            r"\u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u0447\w*\s+\u0437\u043d\u0430\u0447\u0438\u043c\w*"
+        )
         if any(vague_significance.search(str(item)) for item in payload["evaluation_plan"]["decision_rules"]):
             issues.append("decision rules must use the predeclared estimand, uncertainty interval, and practical threshold rather than significance wording")
+        if len(payload["evaluation_plan"]["decision_rules"]) != 1:
+            issues.append("evaluation_plan must contain exactly one primary decision rule; negative-result handling belongs in negative_result_policy")
     return list(dict.fromkeys(issues))
 
 
@@ -439,13 +447,15 @@ def assemble_candidate(
     problem = validate_stage("problem_frame", problem_frame)
     protocol = validate_stage("protocol_design", protocol_design)
     implementation = validate_stage("implementation_contract", implementation_contract)
-    questions = list(dict.fromkeys([*list(problem.get("open_questions") or []), *list(protocol.get("open_questions") or [])]))
-    unresolved = [
-        str(item.get("value_summary") or area or "unresolved protocol decision")
+    # Problem-frame questions are discovery input for protocol_design, not final
+    # blockers. The later stage must explicitly resolve them into a bounded
+    # choice or carry one concrete blocker on the corresponding decision area.
+    questions = [
+        str(item.get("blocking_question") or item.get("value_summary") or area or "unresolved protocol decision")
         for area, item in (protocol.get("decisions_by_area") or {}).items()
         if isinstance(item, Mapping) and item.get("status") == "unresolved"
     ]
-    questions = list(dict.fromkeys([*questions, *unresolved]))
+    questions = list(dict.fromkeys(item for item in questions if item.strip()))
     reference_map = dict(source_ref_map or {})
     def resolve_refs(item: Mapping[str, Any]) -> list[str]:
         return [reference_map.get(str(ref), str(ref)) for ref in item.get("source_refs") or []]
@@ -478,14 +488,15 @@ def assemble_candidate(
                 }
             )
     candidate = {
-        "assistant_message": "\n\n".join(
-            str(item).strip()
-            for item in (
-                problem.get("assistant_message"),
-                protocol.get("assistant_message"),
-                implementation.get("assistant_message"),
+        "assistant_message": (
+            f"Сформирована доказательно привязанная постановка «{problem['title']}»: "
+            f"один основной вопрос, раздельные smoke и confirmatory стадии, "
+            f"{len(_flatten_requirements(implementation['requirements_by_category']))} проверяемых инженерных требований. "
+            + (
+                f"Для автоматизации нужно разрешить ещё {len(questions)} блокирующих решений."
+                if questions
+                else "Блокирующих решений не осталось; кандидат готов к человеческому принятию."
             )
-            if str(item or "").strip()
         ),
         "title": problem["title"],
         "background": problem["background"],
