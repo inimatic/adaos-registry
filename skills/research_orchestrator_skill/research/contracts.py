@@ -142,6 +142,25 @@ def build_admission_review(value: Mapping[str, Any]) -> dict[str, Any]:
     )
     _check(checks, "reproducibility.allocation", "quality", allocation_valid, "paired units must be predeclared and sample_size must equal the distinct planned_units")
 
+    data_policy = plan.get("data_policy") if isinstance(plan.get("data_policy"), Mapping) else {}
+    evaluation_access = (
+        data_policy.get("evaluation_access")
+        if isinstance(data_policy.get("evaluation_access"), Mapping)
+        else {}
+    )
+    sealed_test_access = (
+        evaluation_access.get("selection_source") in {"validation", "fixed_predeclared_final_state", "not_applicable"}
+        and evaluation_access.get("final_test_policy") in {"once_per_trained_unit_after_seal", "not_applicable"}
+        and evaluation_access.get("test_feedback_prohibited") is True
+    )
+    _check(
+        checks,
+        "data.evaluation_access",
+        "quality",
+        sealed_test_access,
+        "data policy must separate model selection from sealed final-test access and prohibit test feedback",
+    )
+
     evaluation = value.get("evaluation_plan") if isinstance(value.get("evaluation_plan"), Mapping) else {}
     outcomes = [item for item in evaluation.get("outcomes") or [] if isinstance(item, Mapping)]
     primary = [item for item in outcomes if item.get("role") == "primary"]

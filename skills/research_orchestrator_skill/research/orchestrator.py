@@ -1437,6 +1437,8 @@ class ResearchOrchestrator:
                     "Populate all nine keys in decisions_by_area and cite refs only for source-derived choices; AdaOS owns decision ids.",
                     "Resolve every candidate uncertainty from problem_frame into one of those nine decisions. A bounded proposed choice closes it; an optional extension is out of scope and is not a blocker.",
                     "For each decision use blocking_question only when status is unresolved; otherwise it must be the empty string. Do not repeat the same uncertainty in multiple areas.",
+                    "In data_policy.evaluation_access separate development/model selection from the final evaluation. Use validation or a predeclared final state for selection, expose final test only once per trained unit after the seal, and prohibit test feedback.",
+                    "Follow any source requirement for train/validation/untouched-test separation. Never evaluate final test per epoch or use it to choose checkpoints, hyperparameters, variants, or stopping.",
                     "Declare exact seed_values and make pairing allocation planned_units and sample_size identical to the confirmatory units.",
                     "Use named RNG streams initialization, sampling, augmentation, and analysis; within each pair keep initialization, data order, sampling and augmentation invariant and vary only the intervention.",
                     "Confirmatory stopping must depend only on predeclared budget or safety/failure conditions, never on a desired metric or significance.",
@@ -1479,6 +1481,8 @@ class ResearchOrchestrator:
                     "Do not generate ids or enum variants; the AdaOS compiler owns ids and category flattening.",
                     "Verification must name an observable command, assertion, report or artifact rather than subjective review.",
                     "Include durable observability and content-addressed evidence without inventing external services.",
+                    "Never require final-test metrics per epoch. Training and validation may be observed during development; the sealed final test is evaluated only according to protocol_design.data_policy.evaluation_access.",
+                    "Optional security and recovery obligations must be relevant to the supplied protocol and portable to the declared execution node; do not invent unrelated isolation machinery.",
                     "Write substantive fields and assistant_message in Russian unless a precise technical identifier is clearer in English.",
                 ],
                 allowed_source_refs=allowed_refs,
@@ -1669,7 +1673,19 @@ class ResearchOrchestrator:
                         {"id": "smoke", "purpose": "...", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current_or_member", "device": "cpu"}, "budget": {"epochs": 3, "seeds": 1}, "inference_allowed": False, "stop_conditions": ["bounded operational condition"]},
                         {"id": "confirmatory", "purpose": "...", "evidence_class": "confirmatory", "execution_profile": {"node": "declared_member"}, "budget": {"seeds": 10}, "inference_allowed": True, "stop_conditions": ["predeclared fixed or sequential condition"]}
                     ],
-                    "data_policy": {"dataset": "exact dataset and version", "split_strategy": "...", "evaluation_seal": "...", "leakage_controls": ["..."]},
+                    "data_policy": {
+                        "dataset": "exact dataset and version",
+                        "split_strategy": "...",
+                        "evaluation_seal": "...",
+                        "leakage_controls": ["..."],
+                        "evaluation_access": {
+                            "development_split": "...",
+                            "selection_source": "validation|fixed_predeclared_final_state|not_applicable",
+                            "selection_rule": "...",
+                            "final_test_policy": "once_per_trained_unit_after_seal|not_applicable",
+                            "test_feedback_prohibited": True,
+                        },
+                    },
                     "reproducibility": {
                         "rng_streams": [
                             {"id": "initialization", "controls": "..."},

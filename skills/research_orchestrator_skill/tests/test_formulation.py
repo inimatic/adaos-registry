@@ -40,7 +40,19 @@ def _protocol(*, unresolved: bool = False) -> dict:
                 {"id": "smoke", "purpose": "Проверить исполнимость и сбор evidence.", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current", "device": "cpu"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30}, "inference_allowed": False, "stop_conditions": ["Остановить при нечисловом loss."]},
                 {"id": "confirmatory", "purpose": "Оценить заранее объявленный парный контраст.", "evidence_class": "confirmatory", "execution_profile": {"node": "member", "device": "cpu"}, "budget": {"epochs": 30, "seed_values": seed_values, "max_wall_time_minutes": 360}, "inference_allowed": True, "stop_conditions": ["Завершить фиксированный бюджет."]},
             ],
-            "data_policy": {"dataset": "STL-10 version torchvision", "split_strategy": "Фиксированный train/validation split до запуска.", "evaluation_seal": "Test labels не используются до финальной оценки.", "leakage_controls": ["Не выбирать конфигурацию по test metric."]},
+            "data_policy": {
+                "dataset": "STL-10 version torchvision",
+                "split_strategy": "Фиксированный train/validation split до запуска.",
+                "evaluation_seal": "Test labels не используются до финальной оценки.",
+                "leakage_controls": ["Не выбирать конфигурацию по test metric."],
+                "evaluation_access": {
+                    "development_split": "Fixed train/validation partition.",
+                    "selection_source": "validation",
+                    "selection_rule": "Choose the checkpoint by validation accuracy only.",
+                    "final_test_policy": "once_per_trained_unit_after_seal",
+                    "test_feedback_prohibited": True,
+                },
+            },
             "reproducibility": {
                 "rng_streams": [
                     {"id": "initialization", "controls": "Одинаковая инициализация внутри пары."},
@@ -164,6 +176,17 @@ def test_resolved_protocol_decision_cannot_retain_a_blocking_question() -> None:
     ]
 
 
+def test_implementation_contract_rejects_per_epoch_final_test_observation() -> None:
+    implementation = _implementation()
+    implementation["requirements_by_category"]["evidence"][0]["requirement"] = (
+        "Store train, validation, and test metrics after every epoch."
+    )
+
+    assert stage_quality_issues("implementation_contract", implementation) == [
+        "implementation contract must not observe final-test metrics per epoch"
+    ]
+
+
 def test_hypothesis_and_decision_direction_must_match() -> None:
     protocol = _protocol()
     protocol["decision_spec"]["effect_direction"] = "increase"
@@ -180,4 +203,15 @@ def test_problem_quality_gate_rejects_a_ref_not_supplied_to_the_stage() -> None:
     value = validate_stage("problem_frame", _problem())
     assert stage_quality_issues("problem_frame", value, allowed_source_refs={"SRC-999"}) == [
         "problem frame must cite only source ids supplied to this stage"
+    ]
+
+
+def test_two_sided_hypothesis_cannot_call_the_other_direction_falsification() -> None:
+    problem = _problem()
+    problem["hypotheses"][0]["falsification"] = (
+        "Гипотеза опровергается при эффекте в противоположную сторону."
+    )
+
+    assert stage_quality_issues("problem_frame", problem, allowed_source_refs={REF}) == [
+        "a two-sided difference hypothesis cannot treat the opposite direction as falsification"
     ]

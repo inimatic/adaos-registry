@@ -134,6 +134,29 @@ def protocol_design_schema() -> dict[str, Any]:
         },
         ["epochs", "seed_values", "max_wall_time_minutes"],
     )
+    data_policy_properties = copy.deepcopy(
+        properties["experimental_plan"]["properties"]["data_policy"]["properties"]
+    )
+    data_policy_properties["evaluation_access"] = _object(
+        {
+            "development_split": {"type": "string", "minLength": 10},
+            "selection_source": {
+                "enum": ["validation", "fixed_predeclared_final_state", "not_applicable"],
+            },
+            "selection_rule": {"type": "string", "minLength": 10},
+            "final_test_policy": {
+                "enum": ["once_per_trained_unit_after_seal", "not_applicable"],
+            },
+            "test_feedback_prohibited": {"const": True},
+        },
+        [
+            "development_split",
+            "selection_source",
+            "selection_rule",
+            "final_test_policy",
+            "test_feedback_prohibited",
+        ],
+    )
     experimental_plan = _object(
         {
             "comparators": properties["experimental_plan"]["properties"]["comparators"],
@@ -154,8 +177,8 @@ def protocol_design_schema() -> dict[str, Any]:
                 ),
             },
             "data_policy": _object(
-                properties["experimental_plan"]["properties"]["data_policy"]["properties"],
-                ["dataset", "split_strategy", "evaluation_seal", "leakage_controls"],
+                data_policy_properties,
+                ["dataset", "split_strategy", "evaluation_seal", "leakage_controls", "evaluation_access"],
             ),
             "reproducibility": properties["experimental_plan"]["properties"]["reproducibility"],
         },
@@ -310,6 +333,12 @@ def stage_quality_issues(
         }
         if allowed_source_refs is not None and (not cited or not cited.issubset(allowed_source_refs)):
             issues.append("problem frame must cite only source ids supplied to this stage")
+        primary = payload["hypotheses"][0]
+        if primary.get("effect_direction") == "difference" and re.search(
+            r"(?i)opposite direction|\u043f\u0440\u043e\u0442\u0438\u0432\u043e\u043f\u043e\u043b\u043e\u0436\w*\s+\u0441\u0442\u043e\u0440\u043e\u043d",
+            str(primary.get("falsification") or ""),
+        ):
+            issues.append("a two-sided difference hypothesis cannot treat the opposite direction as falsification")
     elif stage == "protocol_design":
         plan = payload["experimental_plan"]
         stages = [item for item in plan["stages"] if isinstance(item, Mapping)]
@@ -357,6 +386,24 @@ def stage_quality_issues(
                 "decision_spec.effect_direction must match the primary hypothesis "
                 f"({expected_effect_direction})"
             )
+    elif stage == "implementation_contract":
+        obligations = [
+            str(value)
+            for grouped in (
+                payload.get("requirements_by_category") or {},
+                payload.get("checks_by_category") or {},
+            )
+            for items in grouped.values()
+            for item in items or []
+            if isinstance(item, Mapping)
+            for value in item.values()
+        ]
+        per_epoch_test = re.compile(
+            r"(?i)(?:test.{0,40}(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445)|"
+            r"(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445).{0,40}test)"
+        )
+        if any(per_epoch_test.search(item) for item in obligations):
+            issues.append("implementation contract must not observe final-test metrics per epoch")
     return list(dict.fromkeys(issues))
 
 

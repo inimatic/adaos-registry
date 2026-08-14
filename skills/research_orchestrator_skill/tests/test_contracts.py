@@ -41,6 +41,13 @@ def _candidate() -> dict:
                 "split_strategy": "fixed train/validation split declared before any run",
                 "evaluation_seal": "test labels and metrics remain sealed until the series is locked",
                 "leakage_controls": ["split digest is immutable", "no test-guided tuning"],
+                "evaluation_access": {
+                    "development_split": "fixed train/validation split",
+                    "selection_source": "validation",
+                    "selection_rule": "choose checkpoints using validation accuracy only",
+                    "final_test_policy": "once_per_trained_unit_after_seal",
+                    "test_feedback_prohibited": True,
+                },
             },
             "reproducibility": {
                 "rng_streams": [
@@ -307,6 +314,25 @@ def test_admission_requires_predeclared_pairing_units_and_category_coverage() ->
     assert "sample_size must equal" in issues
     assert "observability" in issues
     assert "data integrity" in issues
+
+
+def test_admission_requires_a_sealed_final_evaluation_access_policy() -> None:
+    candidate = _candidate()
+    candidate["experimental_plan"]["data_policy"].pop("evaluation_access")
+
+    prototype = materialize_prototype(
+        candidate,
+        direction_id="tlp_direction_skill",
+        source_bundle_digest="sha256:" + "1" * 64,
+        context_coverage=_coverage(),
+        revision=1,
+        parent_digest=None,
+        actor="user:test",
+    )
+
+    assert "separate model selection from sealed final-test access" in "; ".join(
+        prototype_admission_issues(prototype)
+    )
 
 
 def test_builder_url_carries_a_declared_first_paint_address() -> None:
