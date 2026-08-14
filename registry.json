@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-14T03:19:42+00:00",
+  "updated_at": "2026-08-12T08:40:52+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -758,7 +758,7 @@
       "kind": "skill",
       "id": "research_orchestrator_skill",
       "name": "research_orchestrator_skill",
-      "version": "0.10.3",
+      "version": "0.11.8",
       "updated_at": "2026-08-12T08:40:52+00:00",
       "path": "skills/research_orchestrator_skill",
       "manifest": "skills/research_orchestrator_skill/skill.yaml",
@@ -774,7 +774,7 @@
       "description": "Durable pre-Codex orchestration for reusable AdaOS research-direction skill projects.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 19
+      "tools_count": 20
     },
     {
       "kind": "skill",
