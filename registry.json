@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-13T18:24:45+00:00",
+  "updated_at": "2026-08-14T03:19:42+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -29,7 +29,7 @@
       "id": "adaos_drive",
       "name": "adaos_drive",
       "version": "0.1.0",
-      "updated_at": "2026-08-13T18:50:24+00:00",
+      "updated_at": "2026-08-14T03:19:42+00:00",
       "path": "skills/adaos_drive",
       "manifest": "skills/adaos_drive/skill.yaml",
       "source": {
@@ -43,7 +43,7 @@
       },
       "description": "Two-panel browser file manager for explicitly connected local folders.",
       "runtime_python": "3.11",
-      "tools_count": 21
+      "tools_count": 23
     },
     {
       "kind": "skill",
@@ -815,7 +815,7 @@
       "id": "service_doctor_skill",
       "name": "service_doctor_skill",
       "version": "0.0.1",
-      "updated_at": "2026-08-13T18:50:26+00:00",
+      "updated_at": "2026-08-14T03:19:44+00:00",
       "path": "skills/service_doctor_skill",
       "manifest": "skills/service_doctor_skill/skill.yaml",
       "source": {
