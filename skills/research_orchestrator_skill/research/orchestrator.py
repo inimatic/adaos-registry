@@ -30,6 +30,14 @@ from research.contracts import (
     prototype_candidate_schema,
     prototype_quality_issues,
 )
+from research.formulation import (
+    STAGES,
+    assemble_candidate,
+    schema_text_format,
+    stage_digest,
+    stage_quality_issues,
+    validate_stage,
+)
 from research.repository import OrchestratorRepository
 
 
@@ -189,6 +197,88 @@ def _llm_failure(result: Mapping[str, Any], *, operation: str) -> RuntimeError:
             detail = str(incomplete.get("reason") or "")
     suffix = f": {detail[:300]}" if detail else ""
     return RuntimeError(f"Root LLM {operation} ended with status={status}{suffix}")
+
+
+def _mapping_path(value: Mapping[str, Any], *paths: tuple[str, ...]) -> Any:
+    for path in paths:
+        current: Any = value
+        for key in path:
+            if not isinstance(current, Mapping) or key not in current:
+                current = None
+                break
+            current = current[key]
+        if current not in (None, "", {}, []):
+            return current
+    return None
+
+
+def _llm_telemetry(
+    submitted: Mapping[str, Any],
+    completed: Mapping[str, Any],
+    *,
+    requested_model: str | None,
+    profile_scope: str,
+    output_text: str,
+    structured_output: bool,
+    repair_attempts: int,
+) -> dict[str, Any]:
+    """Retain reproducibility metadata without persisting hidden prompt text."""
+
+    model = _mapping_path(
+        completed,
+        ("model",),
+        ("resolved_model",),
+        ("response", "model"),
+        ("result", "model"),
+    )
+    provider = _mapping_path(
+        completed,
+        ("provider",),
+        ("resolved_provider",),
+        ("response", "provider"),
+        ("result", "provider"),
+    )
+    usage = _mapping_path(completed, ("usage",), ("response", "usage"), ("result", "usage"))
+    finish_reason = _mapping_path(
+        completed,
+        ("finish_reason",),
+        ("incomplete_details", "reason"),
+        ("response", "finish_reason"),
+        ("result", "finish_reason"),
+    )
+    client = submitted.get("_client") if isinstance(submitted.get("_client"), Mapping) else {}
+    return {
+        "requested_model": requested_model or None,
+        "resolved_model": str(model or requested_model or "root-default"),
+        "resolved_provider": str(provider or "root"),
+        "profile_scope": profile_scope,
+        "usage": dict(usage) if isinstance(usage, Mapping) else {},
+        "finish_reason": str(finish_reason or "unknown"),
+        "output_characters": len(output_text),
+        "structured_output": bool(structured_output),
+        "repair_attempts": int(repair_attempts),
+        "transport": {
+            "fallback": bool(client.get("fallback")),
+            "payload_bytes": int(client.get("payload_bytes") or 0),
+            "submit_ms": client.get("attempt_ms"),
+            "total_submit_ms": client.get("total_ms"),
+        },
+    }
+
+
+def _structured_output_unsupported(error: BaseException) -> bool:
+    detail = str(error).casefold()
+    return any(
+        marker in detail
+        for marker in (
+            "json_schema",
+            "structured output",
+            "structured_output",
+            "text.format",
+            "unsupported format",
+            "unknown format",
+        )
+    )
 
 
 def _repair_prompt(
@@ -711,6 +801,7 @@ class ResearchOrchestrator:
         *,
         actor: str = "user:local",
         context_coverage: Mapping[str, Any] | None = None,
+        formulation_trace: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         token = _direction_id(direction_id)
         state = self.repository.get_direction(token)
@@ -732,6 +823,7 @@ class ResearchOrchestrator:
             revision=int(previous.get("revision") or 0) + 1 if previous else 1,
             parent_digest=str(previous["digest"]) if previous else None,
             actor=actor,
+            formulation_trace=formulation_trace,
         )
         admission_issues = prototype_admission_issues(prototype)
         readiness = value.get("readiness") if isinstance(value.get("readiness"), Mapping) else {}
@@ -749,6 +841,7 @@ class ResearchOrchestrator:
                 revision=int(previous.get("revision") or 0) + 1 if previous else 1,
                 parent_digest=str(previous["digest"]) if previous else None,
                 actor=actor,
+                formulation_trace=formulation_trace,
             )
         stored = self.repository.put_prototype(token, prototype)
         self.repository.activity(
@@ -766,7 +859,7 @@ class ResearchOrchestrator:
         )
         return {"ok": True, "prototype": stored, "direction": self.repository.get_direction(token), "next_steps": self._next_steps(self.repository.get_direction(token) or {}, bundle, stored)}
 
-    def _source_context(self, bundle: Mapping[str, Any]) -> dict[str, Any]:
+    def _source_context(self, bundle: Mapping[str, Any], *, query: str = "") -> dict[str, Any]:
         selected: list[dict[str, Any]] = []
         sources = [item for item in bundle.get("sources") or [] if isinstance(item, Mapping)]
         remaining = 80_000
@@ -788,6 +881,7 @@ class ResearchOrchestrator:
                     group_id,
                     artifact_id,
                     max_characters=min(per_source, remaining),
+                    query=query,
                 )
                 excerpt = str(extracted.get("content") or "")
                 item_coverage = extracted.get("coverage") if isinstance(extracted.get("coverage"), Mapping) else {}
@@ -899,7 +993,523 @@ class ResearchOrchestrator:
         except Exception:
             pass
 
+    def _run_formulation_stage(
+        self,
+        *,
+        direction_id: str,
+        run_id: str,
+        stage_index: int,
+        stage_name: str,
+        stage_input: Mapping[str, Any],
+        rules: list[str],
+        allowed_source_refs: set[str],
+        model: str | None,
+        dialog: Mapping[str, Any],
+        group_id: str,
+        request_id_prefix: str,
+        max_tokens: int,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        schema = STAGES[stage_name]()
+        input_digest = stage_digest(stage_input)
+        schema_digest = stage_digest(schema)
+        profile_scope = f"research.formulation.{stage_name}"
+        base_prompt = {
+            "schema": "adaos.research.formulation_stage_input.v1",
+            "stage": stage_name,
+            "input": dict(stage_input),
+            "rules": list(rules),
+        }
+        self.repository.activity(
+            direction_id,
+            "formulation",
+            "stage_started",
+            f"Formulation stage {stage_index}/3 ({stage_name}) started.",
+            {
+                "run_id": run_id,
+                "stage": stage_name,
+                "stage_index": stage_index,
+                "input_digest": input_digest,
+                "schema_digest": schema_digest,
+            },
+        )
+        self._emit(
+            f"Formulation {stage_index}/3: {stage_name}",
+            dialog,
+            group_id=group_id,
+            phase=stage_name,
+            status="working",
+            seq=stage_index * 100_000,
+        )
+        jobs: list[dict[str, Any]] = []
+        repair_attempt = 0
+        structured_output = True
+
+        def execute(prompt: Mapping[str, Any], *, suffix: str, structured: bool) -> tuple[dict[str, Any], dict[str, Any], str]:
+            payload = dict(prompt)
+            if not structured:
+                payload["output_schema"] = schema
+                payload["fallback_note"] = "Provider-native Structured Outputs are unavailable; follow output_schema exactly and return JSON only."
+            stage_request_id = f"{request_id_prefix}-{stage_name}{suffix}"
+            submitted = llm_client.submit_response_job(
+                [
+                    {
+                        "role": "system",
+                        "content": (
+                            f"Produce only the {stage_name} artifact. Do not solve later stages. "
+                            "Separate source facts, author interpretations, proposals and unresolved choices. "
+                            "Return exactly one JSON object with no Markdown or commentary."
+                        ),
+                    },
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ],
+                model=model,
+                max_tokens=max_tokens,
+                request_id=stage_request_id,
+                profile_scope=profile_scope,
+                text=schema_text_format(stage_name) if structured else {"format": {"type": "json_object"}},
+                prompt_cache_key=f"research:{direction_id}:{stage_name}:{input_digest.removeprefix('sha256:')[:24]}",
+                stream=True,
+                timeout=30,
+            )
+            job_id = str(submitted.get("job_id") or "")
+            if not job_id:
+                raise RuntimeError("Root LLM did not return a job_id")
+            jobs.append({"job_id": job_id, "request_id": stage_request_id, "structured_output": structured})
+            base_url = str((submitted.get("_client") or {}).get("base_url") or "") or None
+            durable_phase = ""
+
+            def progress(value: Mapping[str, Any]) -> None:
+                nonlocal durable_phase
+                seq = int(value.get("seq") or 0)
+                label = str(value.get("label") or value.get("phase") or f"{stage_name} working")
+                phase = str(value.get("phase") or value.get("status") or label).strip().lower()
+                if phase != durable_phase:
+                    durable_phase = phase
+                    self.repository.activity(
+                        direction_id,
+                        "formulation",
+                        "stage_progress",
+                        label,
+                        {"run_id": run_id, "stage": stage_name, "job_id": job_id, "progress": dict(value), "coalesced": True},
+                    )
+                self._emit(
+                    label,
+                    dialog,
+                    group_id=group_id,
+                    phase=stage_name,
+                    status="working",
+                    seq=stage_index * 100_000 + seq,
+                )
+
+            completed = llm_client.wait_response_job(
+                job_id,
+                base_url=base_url,
+                timeout_s=300,
+                poll_interval_s=1.5,
+                progress_callback=progress,
+            )
+            if str(completed.get("status") or "").lower() != "succeeded":
+                raise _llm_failure(completed, operation=stage_name)
+            return submitted, completed, str(completed.get("output_text") or "")
+
+        try:
+            try:
+                submitted, completed, output_text = execute(base_prompt, suffix="", structured=True)
+            except Exception as exc:
+                if not _structured_output_unsupported(exc):
+                    raise
+                structured_output = False
+                self.repository.activity(
+                    direction_id,
+                    "formulation",
+                    "structured_output_fallback",
+                    f"{stage_name} provider does not support the requested JSON Schema; using explicit-schema JSON mode.",
+                    {"run_id": run_id, "stage": stage_name, "error": _bounded_text(exc, 800)},
+                )
+                submitted, completed, output_text = execute(base_prompt, suffix="-json-fallback", structured=False)
+
+            candidate: dict[str, Any] = {}
+            validation_error: Exception | None = None
+            try:
+                candidate = _json_object(output_text)
+                candidate = validate_stage(stage_name, candidate)
+                quality = stage_quality_issues(stage_name, candidate, allowed_source_refs=allowed_source_refs)
+                if quality:
+                    raise ValueError("; ".join(quality))
+            except ValueError as exc:
+                validation_error = exc
+
+            if validation_error is not None:
+                repair_attempt = 1
+                self.repository.activity(
+                    direction_id,
+                    "formulation",
+                    "stage_repair",
+                    f"{stage_name} failed its local contract; repairing only this stage.",
+                    {"run_id": run_id, "stage": stage_name, "validation_error": _bounded_text(validation_error, 1600)},
+                )
+                repair_prompt = {
+                    "schema": "adaos.research.formulation_stage_repair.v1",
+                    "stage": stage_name,
+                    "validation_errors": str(validation_error),
+                    "rejected_stage": candidate,
+                    "rules": list(rules),
+                    "allowed_source_refs": sorted(allowed_source_refs),
+                    "instruction": "Correct only this stage. Preserve valid grounded content and remove every field not admitted by the schema.",
+                }
+                try:
+                    submitted, completed, output_text = execute(repair_prompt, suffix="-repair-1", structured=structured_output)
+                except Exception as exc:
+                    if not structured_output or not _structured_output_unsupported(exc):
+                        raise
+                    structured_output = False
+                    submitted, completed, output_text = execute(repair_prompt, suffix="-repair-1-json-fallback", structured=False)
+                candidate = validate_stage(stage_name, _json_object(output_text))
+                quality = stage_quality_issues(stage_name, candidate, allowed_source_refs=allowed_source_refs)
+                if quality:
+                    raise ValueError(f"{stage_name} semantic quality gate: " + "; ".join(quality))
+
+            telemetry = _llm_telemetry(
+                submitted,
+                completed,
+                requested_model=model,
+                profile_scope=profile_scope,
+                output_text=output_text,
+                structured_output=structured_output,
+                repair_attempts=repair_attempt,
+            )
+            telemetry.update(
+                {
+                    "schema_digest": schema_digest,
+                    "input_digest": input_digest,
+                    "jobs": jobs,
+                }
+            )
+            output_digest = stage_digest(candidate)
+            self.repository.put_formulation_stage(
+                run_id=run_id,
+                direction_id=direction_id,
+                stage_index=stage_index,
+                stage_name=stage_name,
+                status="succeeded",
+                input_digest=input_digest,
+                output_digest=output_digest,
+                payload=candidate,
+                telemetry=telemetry,
+            )
+            self.repository.activity(
+                direction_id,
+                "formulation",
+                "stage_completed",
+                f"Formulation stage {stage_index}/3 ({stage_name}) passed its typed and semantic gates.",
+                {"run_id": run_id, "stage": stage_name, "output_digest": output_digest, "telemetry": telemetry},
+            )
+            return candidate, telemetry
+        except Exception as exc:
+            self.repository.put_formulation_stage(
+                run_id=run_id,
+                direction_id=direction_id,
+                stage_index=stage_index,
+                stage_name=stage_name,
+                status="failed",
+                input_digest=input_digest,
+                output_digest=None,
+                payload={},
+                telemetry={"jobs": jobs, "error": _bounded_text(exc, 2000), "repair_attempts": repair_attempt},
+            )
+            raise
+
+    def _discuss_staged(
+        self,
+        direction_id: str,
+        text: str,
+        *,
+        model: str | None = None,
+        actor: str | None = None,
+        dialog_payload: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        state = self.repository.get_direction(token)
+        if not state:
+            raise ValueError("research direction is not initialized")
+        bundle = artifact_context.source_bundle(token)
+        if not bundle.get("sources"):
+            raise ValueError("attach at least one source before discussion")
+        current = self.repository.get_prototype(state.get("current_prototype_digest"))
+        caller_payload = {"direction_id": token, **dict(dialog_payload or {})}
+        dialog = self._dialog(caller_payload)
+        directive = _directive_trace(text, actor=actor, payload=caller_payload)
+        actor_id = str(directive["actor_id"])
+        generation = int(state["generation"]) + 1
+        group_id = f"research-formulation-{token}-{generation}"
+        run_id = f"formulation-{token}-{generation}-{uuid.uuid4().hex[:10]}"
+        self.repository.activity(
+            token,
+            "formulation",
+            "directive_received",
+            f"Research directive recorded from {actor_id} via {directive['origin']}.",
+            {"group_id": group_id, "run_id": run_id, "directive": directive, "pipeline": "staged_v1"},
+        )
+        if bool(directive.get("project_to_chat")):
+            self._emit_directive(directive, dialog, group_id=group_id)
+
+        query = "\n".join(
+            item
+            for item in (
+                str(text or "").strip(),
+                str((current or {}).get("research_question") or "").strip(),
+                "research question hypothesis comparator dataset implementation evaluation metric reproducibility uncertainty evidence",
+            )
+            if item
+        )
+        source_context = self._source_context(bundle, query=query)
+        allowed_refs = {
+            str(ref)
+            for item in source_context["coverage"].get("items") or []
+            for ref in item.get("provenance_refs") or []
+        }
+        self.repository.activity(
+            token,
+            "formulation",
+            "source_context_prepared",
+            "Source artifacts were deterministically compacted and selected for the formulation query.",
+            {"run_id": run_id, "coverage": source_context["coverage"]},
+        )
+        request_identity = str(dialog.get("request_id") or "").strip() or uuid.uuid4().hex
+        request_token = re.sub(r"[^A-Za-z0-9_.-]+", "-", request_identity).strip("-._")[:40] or uuid.uuid4().hex
+        request_prefix = f"adaos-research-{token}-{bundle['digest'].removeprefix('sha256:')[:12]}-{generation}-{request_token}"
+        total_repairs = 0
+        stage_telemetry: dict[str, Any] = {}
+        try:
+            current_problem = (
+                {
+                    key: current.get(key)
+                    for key in ("title", "background", "research_question", "hypotheses", "source_grounding", "constraints", "assumptions", "open_questions")
+                }
+                if current
+                else None
+            )
+            problem, telemetry = self._run_formulation_stage(
+                direction_id=token,
+                run_id=run_id,
+                stage_index=1,
+                stage_name="problem_frame",
+                stage_input={
+                    "directive": directive["text"],
+                    "direction_id": token,
+                    "current_problem_frame": current_problem,
+                    "source_bundle": {"digest": bundle["digest"], **source_context},
+                    "epistemic_policy": {
+                        "historical_notebook_outputs": "exploratory_untrusted_not_confirmatory",
+                        "source_silence": "unknown_not_false",
+                        "one_primary_question": True,
+                    },
+                },
+                rules=[
+                    "Produce one falsifiable question; do not design the execution protocol in this stage.",
+                    "Separate direct source observations, author interpretations, hypotheses and unresolved choices.",
+                    "Every hypothesis id needs stance=hypothesis grounding; include at least one independent observed claim.",
+                    "Use exact supplied provenance refs only. Never treat historical notebook outputs as confirmation.",
+                    "Assess whether the supplied material is sufficient for a question versus an automation-ready protocol.",
+                    "Write substantive fields in Russian unless a precise technical identifier is clearer in English.",
+                ],
+                allowed_source_refs=allowed_refs,
+                model=model,
+                dialog=dialog,
+                group_id=group_id,
+                request_id_prefix=request_prefix,
+                max_tokens=4_500,
+            )
+            stage_telemetry["problem_frame"] = telemetry
+            total_repairs += int(telemetry.get("repair_attempts") or 0)
+
+            current_protocol = (
+                {key: current.get(key) for key in ("experimental_plan", "evaluation_plan", "open_questions")}
+                if current
+                else None
+            )
+            protocol, telemetry = self._run_formulation_stage(
+                direction_id=token,
+                run_id=run_id,
+                stage_index=2,
+                stage_name="protocol_design",
+                stage_input={
+                    "directive": directive["text"],
+                    "problem_frame": problem,
+                    "current_protocol": current_protocol,
+                    "adaos_policy": {
+                        "workflow_smoke": {"device": "cpu", "epochs": 3, "seed_values": [17], "inference_allowed": False},
+                        "confirmation": "must be separately budgeted and is the only inferential stage",
+                        "pairing": "predeclare every paired unit; vary only the intervention",
+                        "negative_results": "retain_and_report",
+                        "ray": "deferred",
+                    },
+                },
+                rules=[
+                    "Design exactly separated workflow_smoke and confirmatory stages; smoke never supports a scientific claim.",
+                    "Use the supplied CPU smoke policy. Mark other non-source choices as proposed or policy_default, never source_derived.",
+                    "Cover all nine decision areas in decision_register and cite refs only for source-derived choices.",
+                    "Declare exact seed_values and make pairing allocation planned_units and sample_size identical to the confirmatory units.",
+                    "Declare exactly one primary outcome, an operational estimand, uncertainty unit/method, stopping, multiplicity and practical significance.",
+                    "If a safe, reviewable proposal cannot be made, mark the choice unresolved and state one concrete open question.",
+                ],
+                allowed_source_refs=allowed_refs,
+                model=model,
+                dialog=dialog,
+                group_id=group_id,
+                request_id_prefix=request_prefix,
+                max_tokens=5_500,
+            )
+            stage_telemetry["protocol_design"] = telemetry
+            total_repairs += int(telemetry.get("repair_attempts") or 0)
+
+            implementation, telemetry = self._run_formulation_stage(
+                direction_id=token,
+                run_id=run_id,
+                stage_index=3,
+                stage_name="implementation_contract",
+                stage_input={
+                    "directive": directive["text"],
+                    "problem_frame": problem,
+                    "protocol_design": protocol,
+                    "target": {
+                        "kind": "adaos_skill",
+                        "ref": f"skill:{token}",
+                        "execution": "current_or_member_node",
+                        "ray": "deferred",
+                    },
+                },
+                rules=[
+                    "Translate the accepted scientific semantics into independently testable obligations; do not change the protocol.",
+                    "Populate every category key. Required categories need at least one item; optional categories may be empty arrays.",
+                    "Do not generate ids or enum variants; the AdaOS compiler owns ids and category flattening.",
+                    "Verification must name an observable command, assertion, report or artifact rather than subjective review.",
+                    "Include durable observability and content-addressed evidence without inventing external services.",
+                ],
+                allowed_source_refs=allowed_refs,
+                model=model,
+                dialog=dialog,
+                group_id=group_id,
+                request_id_prefix=request_prefix,
+                max_tokens=4_500,
+            )
+            stage_telemetry["implementation_contract"] = telemetry
+            total_repairs += int(telemetry.get("repair_attempts") or 0)
+
+            candidate = assemble_candidate(problem, protocol, implementation)
+            stage_values = {
+                "problem_frame": problem,
+                "protocol_design": protocol,
+                "implementation_contract": implementation,
+            }
+            formulation_trace = {
+                "run_id": run_id,
+                "pipeline": "staged_v1",
+                "stages": [
+                    {
+                        "stage": stage_name,
+                        "stage_index": stage_index,
+                        "input_digest": str(stage_telemetry[stage_name]["input_digest"]),
+                        "output_digest": stage_digest(stage_values[stage_name]),
+                        "schema_digest": str(stage_telemetry[stage_name]["schema_digest"]),
+                        "resolved_model": str(stage_telemetry[stage_name]["resolved_model"]),
+                        "resolved_provider": str(stage_telemetry[stage_name]["resolved_provider"]),
+                        "structured_output": bool(stage_telemetry[stage_name]["structured_output"]),
+                        "repair_attempts": int(stage_telemetry[stage_name]["repair_attempts"]),
+                    }
+                    for stage_index, stage_name in enumerate(stage_values, start=1)
+                ],
+            }
+            preview = materialize_prototype(
+                candidate,
+                direction_id=token,
+                source_bundle_digest=str(bundle["digest"]),
+                context_coverage=source_context["coverage"],
+                revision=int(current.get("revision") or 0) + 1 if current else 1,
+                parent_digest=str(current["digest"]) if current else None,
+                actor=f"llm:{model or 'root-default'}",
+                formulation_trace=formulation_trace,
+            )
+            quality_issues = prototype_quality_issues(preview)
+            if quality_issues:
+                raise ValueError("staged assembly semantic quality gate: " + "; ".join(quality_issues))
+            recorded = self.record_prototype(
+                token,
+                candidate,
+                actor=f"llm:{model or 'root-default'}",
+                context_coverage=source_context["coverage"],
+                formulation_trace=formulation_trace,
+            )
+            message, completion = _completion_projection(recorded["prototype"])
+            self.repository.activity(
+                token,
+                "formulation",
+                "llm_completed",
+                message,
+                {
+                    "run_id": run_id,
+                    "pipeline": "staged_v1",
+                    "prototype_digest": recorded["prototype"]["digest"],
+                    "directive_digest": directive["text_digest"],
+                    "stage_telemetry": stage_telemetry,
+                    **completion,
+                },
+            )
+            self._emit(message, dialog, group_id=group_id, phase="completed", status="succeeded", seq=999_999)
+            return {
+                **recorded,
+                "message": message,
+                "formulation_run": {
+                    "run_id": run_id,
+                    "pipeline": "staged_v1",
+                    "stages": self.repository.formulation_stages(token, run_id=run_id),
+                    "repairs": total_repairs,
+                },
+            }
+        except Exception as exc:
+            failure_message, failure_detail = _failure_projection(exc, repairs=total_repairs)
+            self.repository.activity(
+                token,
+                "formulation",
+                "failed",
+                failure_message,
+                {
+                    "run_id": run_id,
+                    "pipeline": "staged_v1",
+                    "directive_digest": directive["text_digest"],
+                    **failure_detail,
+                },
+            )
+            self._emit(failure_message, dialog, group_id=group_id, phase="failed", status="failed", seq=999_999)
+            raise
+
     def discuss(
+        self,
+        direction_id: str,
+        text: str,
+        *,
+        model: str | None = None,
+        actor: str | None = None,
+        dialog_payload: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        mode = str(os.getenv("ADAOS_RESEARCH_FORMULATION_MODE") or "staged").strip().lower()
+        if mode == "single_shot":
+            return self._discuss_single_shot(
+                direction_id,
+                text,
+                model=model,
+                actor=actor,
+                dialog_payload=dialog_payload,
+            )
+        return self._discuss_staged(
+            direction_id,
+            text,
+            model=model,
+            actor=actor,
+            dialog_payload=dialog_payload,
+        )
+
+    def _discuss_single_shot(
         self,
         direction_id: str,
         text: str,

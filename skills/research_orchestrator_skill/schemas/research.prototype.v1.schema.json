@@ -50,6 +50,34 @@
       },
       "additionalProperties": true
     },
+    "formulation_trace": {
+      "type": "object",
+      "required": ["run_id", "pipeline", "stages"],
+      "properties": {
+        "run_id": {"type": "string", "minLength": 3},
+        "pipeline": {"const": "staged_v1"},
+        "stages": {
+          "type": "array", "minItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["stage", "stage_index", "input_digest", "output_digest", "schema_digest", "resolved_model", "resolved_provider", "structured_output", "repair_attempts"],
+            "properties": {
+              "stage": {"enum": ["problem_frame", "protocol_design", "implementation_contract"]},
+              "stage_index": {"type": "integer", "minimum": 1, "maximum": 3},
+              "input_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "output_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "schema_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "resolved_model": {"type": "string", "minLength": 1},
+              "resolved_provider": {"type": "string", "minLength": 1},
+              "structured_output": {"type": "boolean"},
+              "repair_attempts": {"type": "integer", "minimum": 0}
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "title": {"type": "string", "minLength": 3},
     "background": {"type": "string", "minLength": 20},
     "research_question": {"type": "string", "minLength": 10},

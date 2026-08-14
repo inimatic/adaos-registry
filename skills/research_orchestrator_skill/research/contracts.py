@@ -19,6 +19,7 @@ _PROTOTYPE_MANAGED_FIELDS = {
     "parent_digest",
     "source_bundle_digest",
     "context_coverage",
+    "formulation_trace",
     "admission_review",
     "created_at",
     "created_by",
@@ -239,6 +240,7 @@ def materialize_prototype(
     revision: int,
     parent_digest: str | None,
     actor: str,
+    formulation_trace: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     candidate = copy.deepcopy(dict(value))
     candidate.update(
@@ -254,6 +256,8 @@ def materialize_prototype(
             "created_by": str(actor or "user:local"),
         }
     )
+    if formulation_trace is not None:
+        candidate["formulation_trace"] = copy.deepcopy(dict(formulation_trace))
     candidate["admission_review"] = build_admission_review(candidate)
     candidate["digest"] = digest(candidate)
     return validate("research.prototype.v1.schema.json", candidate)

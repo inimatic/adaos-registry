@@ -9,13 +9,13 @@ def test_source_context_discloses_balanced_coverage_and_provenance(monkeypatch) 
         "review": "artifact://skill/tlp/part0/review#lines=1-20",
     }
 
-    def extract_text(_skill_id, _group_id, artifact_id, *, max_characters):
+    def extract_text(_skill_id, _group_id, artifact_id, *, max_characters, query=""):
         key = "notebook" if artifact_id == "notebook" else "review"
         return {
             "artifact_ref": refs[key].split("#", 1)[0],
             "content": f"--- fragment [{refs[key]}] ---\nsource",
             "coverage": {
-                "strategy": "notebook_source_cells_without_outputs" if key == "notebook" else "utf8_line_chunks",
+                "strategy": "notebook_semantic_digest_v1" if key == "notebook" else "utf8_line_chunks",
                 "selected_characters": 6,
                 "truncated": False,
             },

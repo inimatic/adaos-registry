@@ -23,6 +23,15 @@ MIGRATIONS = (
             "CREATE TABLE research_commands (idempotency_key TEXT PRIMARY KEY, command_name TEXT NOT NULL, result_json TEXT NOT NULL, created_at TEXT NOT NULL)",
         ),
     ),
+    RelationalMigration(
+        version=2,
+        name="durable staged formulation artifacts",
+        idempotent=True,
+        statements=(
+            "CREATE TABLE research_formulation_stages (run_id TEXT NOT NULL, direction_id TEXT NOT NULL, stage_index INTEGER NOT NULL, stage_name TEXT NOT NULL, status TEXT NOT NULL, input_digest TEXT NOT NULL, output_digest TEXT, payload_json TEXT NOT NULL, telemetry_json TEXT NOT NULL, created_at TEXT NOT NULL, PRIMARY KEY(run_id, stage_name))",
+            "CREATE INDEX research_formulation_direction ON research_formulation_stages(direction_id, created_at)",
+        ),
+    ),
 )
 
 
@@ -174,6 +183,73 @@ class OrchestratorRepository:
             {"direction_id": direction_id},
         )[: max(1, min(int(limit), 500))]
         return [{**dict(row), "detail": json.loads(str(row["detail_json"]))} for row in reversed(rows)]
+
+    def put_formulation_stage(
+        self,
+        *,
+        run_id: str,
+        direction_id: str,
+        stage_index: int,
+        stage_name: str,
+        status: str,
+        input_digest: str,
+        output_digest: str | None,
+        payload: Mapping[str, Any] | None,
+        telemetry: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
+        value = {
+            "run_id": str(run_id),
+            "direction_id": str(direction_id),
+            "stage_index": int(stage_index),
+            "stage_name": str(stage_name),
+            "status": str(status),
+            "input_digest": str(input_digest),
+            "output_digest": str(output_digest) if output_digest else None,
+            "payload": dict(payload or {}),
+            "telemetry": dict(telemetry or {}),
+            "created_at": now(),
+        }
+        parameters = {
+            **value,
+            "payload_json": canonical_json(value["payload"]),
+            "telemetry_json": canonical_json(value["telemetry"]),
+        }
+        existing = self._db.fetch_one(
+            "SELECT run_id FROM research_formulation_stages WHERE run_id=:run_id AND stage_name=:stage_name",
+            {"run_id": value["run_id"], "stage_name": value["stage_name"]},
+        )
+        if existing:
+            self._db.execute(
+                "UPDATE research_formulation_stages SET status=:status, input_digest=:input_digest, output_digest=:output_digest, payload_json=:payload_json, telemetry_json=:telemetry_json, created_at=:created_at WHERE run_id=:run_id AND stage_name=:stage_name",
+                parameters,
+            )
+        else:
+            self._db.execute(
+                "INSERT INTO research_formulation_stages(run_id, direction_id, stage_index, stage_name, status, input_digest, output_digest, payload_json, telemetry_json, created_at) VALUES (:run_id, :direction_id, :stage_index, :stage_name, :status, :input_digest, :output_digest, :payload_json, :telemetry_json, :created_at)",
+                parameters,
+            )
+        return value
+
+    def formulation_stages(self, direction_id: str, *, run_id: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
+        if run_id:
+            rows = self._db.fetch_all(
+                "SELECT * FROM research_formulation_stages WHERE direction_id=:direction_id AND run_id=:run_id ORDER BY stage_index",
+                {"direction_id": direction_id, "run_id": run_id},
+            )
+        else:
+            rows = self._db.fetch_all(
+                "SELECT * FROM research_formulation_stages WHERE direction_id=:direction_id ORDER BY created_at DESC, stage_index DESC",
+                {"direction_id": direction_id},
+            )[: max(1, min(int(limit), 500))]
+        return [
+            {
+                **{key: value for key, value in dict(row).items() if key not in {"payload_json", "telemetry_json"}},
+                "stage_index": int(row["stage_index"]),
+                "payload": json.loads(str(row["payload_json"])),
+                "telemetry": json.loads(str(row["telemetry_json"])),
+            }
+            for row in rows
+        ]
 
     def once(self, key: str, command: str, operation: Callable[[], Mapping[str, Any]]) -> dict[str, Any]:
         previous = self._db.fetch_one("SELECT command_name, result_json FROM research_commands WHERE idempotency_key=:key", {"key": key})

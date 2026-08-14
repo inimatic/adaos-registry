@@ -382,8 +382,34 @@ def open_builder_session(
 def get_activity(direction_id: str, limit: int = 200, **_: Any) -> dict[str, Any]:
     repository = OrchestratorRepository()
     events = repository.activities(direction_id, limit)
-    content = "\n".join(f"- `{item['seq']:03d}` **{item['stage']} / {item['status']}** — {item['message']}" for item in events)
-    return {"ok": True, "direction_id": direction_id, "events": events, "content": content or "Событий пока нет."}
+    stages = repository.formulation_stages(direction_id, limit=30)
+    stage_summaries = [
+        {
+            "run_id": item["run_id"],
+            "stage_index": item["stage_index"],
+            "stage_name": item["stage_name"],
+            "status": item["status"],
+            "input_digest": item["input_digest"],
+            "output_digest": item.get("output_digest"),
+            "resolved_model": item["telemetry"].get("resolved_model"),
+            "resolved_provider": item["telemetry"].get("resolved_provider"),
+            "structured_output": item["telemetry"].get("structured_output"),
+            "repair_attempts": item["telemetry"].get("repair_attempts", 0),
+            "created_at": item["created_at"],
+        }
+        for item in stages
+    ]
+    stage_lines = "\n".join(
+        f"- `{item['run_id']}` · **{item['stage_index']}/3 {item['stage_name']}** · `{item['status']}` · "
+        f"model `{item.get('resolved_model') or 'unknown'}` · structured `{item.get('structured_output')}` · repairs `{item.get('repair_attempts', 0)}`"
+        for item in reversed(stage_summaries)
+    )
+    event_lines = "\n".join(f"- `{item['seq']:03d}` **{item['stage']} / {item['status']}** — {item['message']}" for item in events)
+    content = (
+        f"## Formulation stages\n\n{stage_lines or 'No staged formulation runs yet.'}\n\n"
+        f"## Activity events\n\n{event_lines or 'No activity events yet.'}"
+    )
+    return {"ok": True, "direction_id": direction_id, "events": events, "formulation_stages": stage_summaries, "content": content}
 
 
 @tool(summary="Explain the next admitted steps for text or voice surfaces.", side_effects="none")
