@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.1.7
+version: 0.1.8
 description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
 supported_locales:
 - en
@@ -34,6 +34,7 @@ exports:
   - library
   - list_items
   - get_item
+  - playback_queue
   - playback_plan
   - set_favorite
   - status
@@ -127,7 +128,7 @@ tools:
   output_schema:
     type: object
 - name: scan_roots
-  description: Import playable files from configured folders into Media Server-backed resources.
+  description: Register playable files from configured folders without copying media bytes.
   entry: handlers.main:scan_roots
   side_effects: local_write
   timeout_seconds: 600
@@ -147,7 +148,7 @@ tools:
   output_schema:
     type: object
 - name: import_folder
-  description: Add a folder and import playable files through Media Server.
+  description: Add a folder and register its playable files in place.
   entry: handlers.main:import_folder
   side_effects: local_write
   timeout_seconds: 600
@@ -241,6 +242,35 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: playback_queue
+  description: Return the selected item first and at most ten playable queue entries.
+  entry: handlers.main:playback_queue
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - item_id
+    properties:
+      item_id:
+        type: string
+      query:
+        type: string
+      media_kind:
+        type: string
+        default: playable
+      source:
+        type: string
+      sort:
+        type: string
+        default: recent
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 10
+        default: 10
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: playback_plan
   description: Return a playback plan based on the item's core MediaResource descriptor.
   entry: handlers.main:playback_plan
@@ -327,22 +357,46 @@ data_routes:
     preserve_last_value: true
     invalidation_tags:
     - media_center.catalog
-- surface: widget:media-center-player
+- surface: widget:media-center-catalog
   route: tool
   tool: library
   owner: skill:media_center_skill
-  first_paint: bounded catalog rows with core playback descriptors
-  recovery: repeat library after scan invalidation
+  first_paint: one bounded thirty-row catalog page
+  recovery: repeat library after scan invalidation or filter changes
   guard_visibility: catalog metadata and safe content paths only
   budget:
-    max_payload_bytes: 1048576
-    max_items: 500
+    max_payload_bytes: 524288
+    max_items: 30
     snapshot_policy: manual
   read_policy:
     mode: explicit
     triggers:
     - mount
     - explicit_refresh
+    - state_dependency_changed
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - media_center.catalog
+- surface: widget:media-center-player
+  route: tool
+  tool: playback_queue
+  owner: skill:media_center_skill
+  first_paint: selected item plus a bounded ten-item playback queue
+  recovery: select a catalog item again or repeat playback_queue after invalidation
+  guard_visibility: catalog metadata and safe content paths only
+  budget:
+    max_payload_bytes: 1048576
+    max_items: 10
+    snapshot_policy: manual
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - state_dependency_changed
     - targeted_invalidation
     cache_ttl_ms: 0
     max_request_hz: 2
@@ -460,4 +514,4 @@ nlu_hints:
   - show media library
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-12T13:50:00+00:00'
+updated_at: '2026-08-14T12:00:00+00:00'

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import mimetypes
 import sys
 from pathlib import Path
@@ -79,23 +78,26 @@ def _discover_resources(source: str = "all", limit: int | None = 5000) -> tuple[
         return [], {"ok": False, "error": "media_discovery_failed", "detail": str(exc)}
 
 
-def _publish_media_file_descriptor(path: Path, *, root: Mapping[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+def _register_media_file_descriptor(path: Path, *, root: Mapping[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
     try:
-        from adaos.sdk.io.media import publish_media_file
+        from adaos.sdk.io.media import register_media_file
     except Exception as exc:
-        return None, {"error": "sdk_media_publication_unavailable", "detail": str(exc), "path": str(path)}
+        return None, {"error": "sdk_media_registration_unavailable", "detail": str(exc), "path": str(path)}
 
     try:
-        stat = path.stat()
         mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
-        identity = f"{root.get('id')}:{path.resolve(strict=False)}:{stat.st_mtime_ns}:{stat.st_size}"
-        content_ref = "media_center:" + hashlib.sha256(identity.encode("utf-8", errors="replace")).hexdigest()
-        descriptor = publish_media_file(
+        resolved_path = path.resolve(strict=True)
+        root_path = Path(str(root.get("path") or "")).expanduser().resolve(strict=True)
+        descriptor = register_media_file(
             path,
-            content_ref=content_ref,
+            root=root_path,
+            content_ref=f"{root.get('id')}:{resolved_path}",
             namespace="media-center",
-            variant="import",
             mime=mime_type,
+            metadata={
+                "media_center_root_id": str(root.get("id") or ""),
+                "media_center_root_path": str(root_path),
+            },
         )
         descriptor = dict(descriptor)
         descriptor.setdefault("source_path", str(path))
@@ -103,15 +105,9 @@ def _publish_media_file_descriptor(path: Path, *, root: Mapping[str, Any]) -> tu
         descriptor.setdefault("name", path.name)
         descriptor.setdefault("title", path.stem)
         descriptor.setdefault("mime_type", mime_type)
-        metadata = descriptor.get("metadata") if isinstance(descriptor.get("metadata"), Mapping) else {}
-        descriptor["metadata"] = {
-            **dict(metadata),
-            "media_center_root_id": str(root.get("id") or ""),
-            "media_center_root_path": str(root.get("path") or ""),
-        }
         return descriptor, None
     except Exception as exc:
-        return None, {"error": "media_file_publication_failed", "detail": str(exc), "path": str(path)}
+        return None, {"error": "media_file_registration_failed", "detail": str(exc), "path": str(path)}
 
 
 def _iter_root_media_files(root: Mapping[str, Any]) -> Iterator[Path]:
@@ -178,7 +174,7 @@ def remove_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
     return _repository().remove_root(root_id=root_id, path=path)
 
 
-@tool(summary="Import playable files from configured folders into Media Server-backed resources.", side_effects="local_write")
+@tool(summary="Register playable files from configured folders without copying media bytes.", side_effects="local_write")
 def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -> dict[str, Any]:
     repo = _repository()
     limit_value = _int_limit(limit, 1000, 5000)
@@ -211,7 +207,7 @@ def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -
             skipped += 1
             repo.mark_root_scanned(str(root.get("id") or ""), status="limit_reached")
             continue
-        root_published = 0
+        root_registered = 0
         root_errors = 0
         root_skipped = 0
         found = False
@@ -222,17 +218,17 @@ def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -
                 root_skipped += 1
                 break
             visited += 1
-            descriptor, error = _publish_media_file_descriptor(file_path, root=root)
+            descriptor, error = _register_media_file_descriptor(file_path, root=root)
             if descriptor:
                 descriptors.append(descriptor)
-                root_published += 1
+                root_registered += 1
             elif error:
                 errors.append(error)
                 root_errors += 1
         if not found:
             repo.mark_root_scanned(str(root.get("id") or ""), status="no_playable_files")
             continue
-        status = "ok" if root_published else ("error" if root_errors else "limit_reached" if root_skipped else "empty")
+        status = "ok" if root_registered else ("error" if root_errors else "limit_reached" if root_skipped else "empty")
         repo.mark_root_scanned(str(root.get("id") or ""), status=status)
 
     scan = repo.scan_resources(descriptors, source="media_server", mark_missing=False) if descriptors else {
@@ -248,14 +244,14 @@ def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -
         **scan,
         "roots": repo.list_roots()["items"],
         "visited_count": visited,
-        "published_count": len(descriptors),
+        "registered_count": len(descriptors),
         "skipped_count": skipped,
         "error_count": len(errors),
         "errors": errors[:20],
     }
 
 
-@tool(summary="Add a folder and import its playable files through Media Server.", side_effects="local_write")
+@tool(summary="Add a folder and register its playable files in place.", side_effects="local_write")
 def import_folder(path: str = "", label: str = "", include_images: bool = False, limit: int = 1000, **_: Any) -> dict[str, Any]:
     repo = _repository()
     added = repo.add_root(path, label=label, include_images=_bool(include_images, False))
@@ -297,7 +293,8 @@ def library(
     payload["runtime"] = {
         "catalog_owner": "media_center_skill",
         "resource_boundary": "adaos.sdk.io.media.list_media_resources",
-        "publication_boundary": "adaos.sdk.io.media.publish_media_file",
+        "publication_boundary": "adaos.sdk.io.media.register_media_file",
+        "storage_mode": "reference",
         "playback_contract": "adaos.media.resource.v1",
     }
     payload["capabilities"] = {
@@ -316,6 +313,56 @@ def list_items(**payload: Any) -> dict[str, Any]:
 @tool(summary="Read one media-center catalog item.", side_effects="none")
 def get_item(item_id: str = "", **_: Any) -> dict[str, Any]:
     return _repository().get_item(item_id)
+
+
+@tool(summary="Return the selected media item and a bounded playback queue.", side_effects="none")
+def playback_queue(
+    item_id: str = "",
+    query: str = "",
+    media_kind: str = "playable",
+    source: str = "",
+    sort: str = "recent",
+    limit: int = 10,
+    **_: Any,
+) -> dict[str, Any]:
+    repo = _repository()
+    selected_result = repo.get_item(item_id)
+    if not selected_result.get("ok"):
+        return {**selected_result, "items": [], "count": 0, "total_count": 0}
+    selected = dict(selected_result["item"])
+    queue_limit = _int_limit(limit, 10, 10)
+    listing = repo.list_items(
+        query=query,
+        media_kind=media_kind or "playable",
+        source=source,
+        limit=queue_limit,
+        offset=0,
+        sort=sort,
+    )
+    items = [selected]
+    items.extend(item for item in listing["items"] if item.get("id") != selected.get("id"))
+    items = items[:queue_limit]
+    return {
+        **listing,
+        "items": items,
+        "count": len(items),
+        "selected_item_id": selected.get("id"),
+        "pagination": {
+            "limit": queue_limit,
+            "offset": 0,
+            "next_offset": None,
+            "has_more": False,
+        },
+        "runtime": {
+            "catalog_owner": "media_center_skill",
+            "playback_contract": "adaos.media.resource.v1",
+            "storage_mode": "reference",
+        },
+        "capabilities": {
+            "playback": {"status": "delegated_to_core_media_resource"},
+            "playlist": {"status": "bounded", "max_items": 10},
+        },
+    }
 
 
 @tool(summary="Return a core-media playback plan for one catalog item.", side_effects="local_write")
@@ -345,7 +392,7 @@ def next_steps(**_: Any) -> dict[str, Any]:
         {
             "id": "folders",
             "label": "Import folders",
-            "reason": "Store folder roots in the skill, publish playable files into Media Server, and index the resulting core descriptors.",
+            "reason": "Store folder roots in the skill, register playable files in place, and index the resulting core descriptors.",
         },
         {
             "id": "play",

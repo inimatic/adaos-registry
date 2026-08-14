@@ -109,7 +109,7 @@ def test_incremental_root_scan_does_not_mark_existing_media_server_rows_missing(
     assert {item["resource_id"] for item in available} == {"old.mp4", "new.mp4"}
 
 
-def test_import_folder_publishes_playable_files_through_media_server(monkeypatch, tmp_path):
+def test_import_folder_registers_playable_files_without_copying(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     media_dir = tmp_path / "media"
     media_dir.mkdir()
@@ -118,18 +118,70 @@ def test_import_folder_publishes_playable_files_through_media_server(monkeypatch
     movie.write_bytes(b"video")
     image.write_bytes(b"image")
 
-    def publish(path: Path, *, root: dict):
-        return _resource(path.name), None
+    def register(path: Path, *, root: dict):
+        resource = _resource(path.name)
+        resource["source_path"] = str(path.resolve())
+        resource["metadata"] = {"storage_mode": "reference"}
+        return resource, None
 
-    monkeypatch.setattr(main, "_publish_media_file_descriptor", publish)
+    monkeypatch.setattr(main, "_register_media_file_descriptor", register)
 
     result = main.import_folder(path=str(media_dir), limit=20)
     listing = main.library(media_kind="playable", auto_scan=False, limit=20)
 
     assert result["ok"] is True
-    assert result["published_count"] == 1
+    assert result["registered_count"] == 1
     assert result["roots"][0]["path"] == str(media_dir.resolve())
     assert [item["resource_id"] for item in listing["items"]] == ["movie.mp4"]
+    assert listing["items"][0]["source_path"] == str(movie.resolve())
+    assert listing["items"][0]["resource"]["metadata"]["storage_mode"] == "reference"
+
+
+def test_reference_registration_keeps_original_media_bytes(monkeypatch, tmp_path):
+    media_dir = tmp_path / "library"
+    media_dir.mkdir()
+    movie = media_dir / "movie.mp4"
+    movie.write_bytes(b"original-video")
+    monkeypatch.setenv("ADAOS_MEDIA_REFERENCE_DB_PATH", str(tmp_path / "state" / "media_references.sqlite3"))
+
+    descriptor, error = main._register_media_file_descriptor(
+        movie,
+        root={"id": "root-1", "path": str(media_dir)},
+    )
+
+    assert error is None
+    assert descriptor is not None
+    assert descriptor["path"] == str(movie.resolve())
+    assert descriptor["source_path"] == str(movie.resolve())
+    assert descriptor["metadata"]["storage_mode"] == "reference"
+    assert descriptor["content_path"].startswith("/api/node/media/resources/content/ref_")
+    assert list(tmp_path.rglob("*.mp4")) == [movie]
+
+
+def test_playback_queue_puts_selection_first_and_clamps_to_ten(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repo = MediaCenterRepository()
+    repo.scan_resources([_resource(f"clip-{index:02d}.mp4") for index in range(15)])
+    selected = next(item for item in repo.list_items(limit=15)["items"] if item["resource_id"] == "clip-12.mp4")
+
+    payload = main.playback_queue(
+        item_id=selected["id"],
+        media_kind="playable",
+        sort="title",
+        limit=100,
+    )
+
+    assert payload["ok"] is True
+    assert payload["selected_item_id"] == selected["id"]
+    assert payload["items"][0]["id"] == selected["id"]
+    assert len(payload["items"]) == 10
+    assert payload["pagination"] == {
+        "limit": 10,
+        "offset": 0,
+        "next_offset": None,
+        "has_more": False,
+    }
+    assert payload["capabilities"]["playlist"]["max_items"] == 10
 
 
 def test_scan_roots_without_active_roots_returns_human_i18n_error(monkeypatch, tmp_path):

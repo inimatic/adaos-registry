@@ -4,14 +4,19 @@
 roots, favorites, filters, and playback plans derived from core media resource
 descriptors.
 
-The core media plane remains responsible for media publication and playback
-routes. Folder imports call `adaos.sdk.io.media.publish_media_file`, then index
-the returned `adaos.media.resource.v1` descriptors.
+The core media plane remains responsible for media registration and playback
+routes. Folder imports call `adaos.sdk.io.media.register_media_file`, then index
+the returned `adaos.media.resource.v1` descriptors. Registration stores only a
+root-bound reference in `.adaos`; media bytes stay at their original path.
 
 The default `library()` projection is `media_kind="playable"` so the main Media
 Center catalog stays focused on video/audio resources supported by the current
 Media Server. Image descriptors remain queryable only when a caller explicitly
 requests `media_kind="image"`.
+
+`playback_queue()` always returns the selected item first and clamps the entire
+queue to ten rows. This is the server-side budget used by the modal player and
+prevents the browser playlist control from loading a catalog page.
 
 ## User-Facing Errors
 

@@ -380,8 +380,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.1.7",
-      "updated_at": "2026-08-12T13:50:00+00:00",
+      "version": "0.1.8",
+      "updated_at": "2026-08-14T12:00:00+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -396,7 +396,7 @@
       "description": "Durable MVP media-center catalog built on AdaOS media resource descriptors.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 16
+      "tools_count": 17
     },
     {
       "kind": "skill",
@@ -1197,8 +1197,8 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.1.5",
-      "updated_at": "2026-08-12T13:50:00+00:00",
+      "version": "0.1.6",
+      "updated_at": "2026-08-14T12:00:00+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {
@@ -1211,7 +1211,7 @@
         "id": "media_center"
       },
       "title": "Media Center",
-      "description": "MVP media-center workspace for folder import, catalog browsing, server-backed pages, and playback over AdaOS media resource descriptors.",
+      "description": "Compact media-center catalog with in-place folder registration, server-backed pages, and modal playback over AdaOS media resource descriptors.",
       "trigger": "manual",
       "skills": {
         "required": [

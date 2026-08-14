@@ -1,8 +1,8 @@
 id: media_center
 name: media_center
-version: 0.1.5
+version: 0.1.6
 title: Media Center
-description: MVP media-center workspace for folder import, catalog browsing, server-backed pages, and playback over AdaOS media resource descriptors.
+description: Compact media-center catalog with in-place folder registration, server-backed pages, and modal playback over AdaOS media resource descriptors.
 type: desktop
 supported_locales:
 - en
@@ -25,7 +25,7 @@ guidance:
   schema: adaos.scenario.guidance.v1
   readme: README.md
   overview:
-    en: Browse and play local media through a durable catalog while keeping streaming and storage in the core media plane.
+    en: Browse and play local media through a durable catalog while keeping files at their original storage paths.
   presentation:
     channels:
     - web
@@ -43,7 +43,7 @@ guidance:
     help_intent: media_center.help
     next_steps_intent: media_center.next_steps
 llm_hints:
-  description: Media Center MVP scenario for local media folders, playable catalog filters, details, server-backed pages, and playback.
+  description: Media Center MVP scenario for in-place media folders, compact playable filters, server-backed pages, and modal playback.
   aliases:
   - Media Center
   - media center
@@ -79,4 +79,4 @@ nlu:
     entities: []
 steps: []
 prototype: scenario_default
-updated_at: '2026-08-12T13:50:00+00:00'
+updated_at: '2026-08-14T12:00:00+00:00'
