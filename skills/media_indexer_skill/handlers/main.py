@@ -583,7 +583,10 @@ async def _read_directory_from_webspace_form(webspace_id: str | None, payload: D
             for path in paths:
                 form = _get_nested_value(data, path)
                 if isinstance(form, dict):
-                    directory = _clean_directory_value(form.get("directory"))
+                    directory = await asyncio.to_thread(
+                        _clean_directory_value,
+                        form.get("directory"),
+                    )
                     if directory:
                         return directory
     except Exception:
@@ -596,6 +599,30 @@ def _resolve_query(payload: Dict[str, Any]) -> str:
     if raw.startswith("$"):
         raw = ""
     return raw or str(_current_form().get("query") or DEFAULT_QUERY).strip()
+
+
+def _action_selection(payload: Dict[str, Any], *, include_path: bool) -> tuple[str, str, bool]:
+    return (
+        _resolve_directory(payload, include_path=include_path),
+        _resolve_query(payload),
+        _payload_has_directory(payload, include_path=include_path),
+    )
+
+
+def _persist_action_selection(*, directory: str, query: str, k: int) -> Dict[str, Any]:
+    _state["selected_directory"] = directory
+    _state["selected_query"] = query
+    _save_settings(selected_directory=directory, selected_query=query, k=k)
+    return _current_form(directory=directory, query=query, k=k)
+
+
+def _resolve_playback_action(payload: Dict[str, Any]) -> tuple[str, Dict[str, Any] | None, str, bool]:
+    if _has_persisted_index():
+        _ensure_initialized(load_index=True)
+    selected_path = _path_from_action_payload(payload)
+    selected_payload, playback_path = _resolve_playback_payload(selected_path)
+    exists = pathlib.Path(playback_path).is_file() if playback_path else False
+    return selected_path, selected_payload, playback_path, exists
 
 
 def _status_payload(
@@ -663,6 +690,34 @@ def _overview_payload(status: Dict[str, Any], diagnostics: Dict[str, Any]) -> Di
     }
 
 
+def _snapshot_payload_with_form(
+    *,
+    status: Dict[str, Any],
+    form: Dict[str, Any],
+    results: List[Dict[str, Any]] | None = None,
+    diagnostics: Dict[str, Any] | None = None,
+    include_library: bool = True,
+    include_results: bool = True,
+    include_playback: bool = True,
+) -> Dict[str, Any]:
+    diagnostics_payload = diagnostics or _state.get("last_diagnostics") or _empty_diagnostics()
+    result_items = list(results if results is not None else (_state.get("last_results") or []))[:MAX_RESULTS] if include_results else []
+    playback = (
+        _state.get("playback") or _empty_playback_snapshot()
+    ) if include_playback else _empty_playback_snapshot()
+    payload = {
+        "status": status,
+        "overview": _overview_payload(status, diagnostics_payload),
+        "form": form,
+        "results": result_items,
+        "playback": playback,
+        "diagnostics": diagnostics_payload,
+        "library": list(_state.get("library_items") or [])[:SNAPSHOT_LIBRARY_LIMIT] if include_library else [],
+        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+    return payload
+
+
 def _snapshot_payload(
     *,
     status: Dict[str, Any],
@@ -673,24 +728,19 @@ def _snapshot_payload(
     include_results: bool = True,
     include_playback: bool = True,
 ) -> Dict[str, Any]:
-    diagnostics_payload = diagnostics or _state.get("last_diagnostics") or _empty_diagnostics()
-    result_items = list(results if results is not None else (_state.get("last_results") or []))[:MAX_RESULTS] if include_results else []
-    playback = (_state.get("playback") or _playback_snapshot()) if include_playback else _playback_snapshot()
-    payload = {
-        "status": status,
-        "overview": _overview_payload(status, diagnostics_payload),
-        "form": form or _current_form(),
-        "results": result_items,
-        "playback": playback,
-        "diagnostics": diagnostics_payload,
-        "library": list(_state.get("library_items") or [])[:SNAPSHOT_LIBRARY_LIMIT] if include_library else [],
-        "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    }
-    return payload
+    return _snapshot_payload_with_form(
+        status=status,
+        form=form or _current_form(),
+        results=results,
+        diagnostics=diagnostics,
+        include_library=include_library,
+        include_results=include_results,
+        include_playback=include_playback,
+    )
 
 
-def _progress_snapshot_payload(*, status: Dict[str, Any], form: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    return _snapshot_payload(
+def _progress_snapshot_payload(*, status: Dict[str, Any], form: Dict[str, Any]) -> Dict[str, Any]:
+    return _snapshot_payload_with_form(
         status=status,
         form=form,
         include_library=False,
@@ -715,7 +765,7 @@ def _project_snapshot(snapshot: Dict[str, Any], *, webspace_id: str | None = Non
 async def _project_snapshot_async(snapshot: Dict[str, Any], *, webspace_id: str | None = None) -> None:
     pushed = False
     try:
-        _load_skill_data_projections()
+        await asyncio.to_thread(_load_skill_data_projections)
         pushed = set_current_skill("media_indexer_skill")
         set_async = getattr(ctx_subnet, "set_async", None)
         if callable(set_async):
@@ -1067,18 +1117,23 @@ def _player_item_from_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _playback_snapshot(payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
+def _empty_playback_snapshot() -> Dict[str, Any]:
     updated_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    return {
+        "ok": True,
+        "items": [],
+        "count": 0,
+        "total_bytes": 0,
+        "runtime": {"recommended_path": "direct_local_http"},
+        "capabilities": {"notes": ["Select a media item from Media Indexer results to preview it."]},
+        "updated_at": updated_at,
+    }
+
+
+def _playback_snapshot(payload: Dict[str, Any] | None = None) -> Dict[str, Any]:
     if not payload:
-        return {
-            "ok": True,
-            "items": [],
-            "count": 0,
-            "total_bytes": 0,
-            "runtime": {"recommended_path": "direct_local_http"},
-            "capabilities": {"notes": ["Select a media item from Media Indexer results to preview it."]},
-            "updated_at": updated_at,
-        }
+        return _empty_playback_snapshot()
+    updated_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     item = _player_item_from_payload(payload)
     return {
         "ok": True,
@@ -2133,14 +2188,17 @@ async def on_media_indexer_action(evt: Any) -> None:
 
     action_id = str(payload.get("id") or payload.get("action") or "").strip().lower()
     directory_action = action_id in {"scan", "set_directory", "directory"}
-    directory = _resolve_directory(payload, include_path=directory_action)
-    query = _resolve_query(payload)
+    directory, query, payload_has_directory = await asyncio.to_thread(
+        _action_selection,
+        payload,
+        include_path=directory_action,
+    )
     try:
         k = max(1, min(MAX_RESULTS, int(payload.get("k") or 5)))
     except (TypeError, ValueError):
         k = 5
 
-    if action_id == "scan" and not _payload_has_directory(payload, include_path=True):
+    if action_id == "scan" and not payload_has_directory:
         form_directory = await _read_directory_from_webspace_form(webspace_id, payload)
         if form_directory:
             directory = form_directory
@@ -2149,17 +2207,19 @@ async def on_media_indexer_action(evt: Any) -> None:
         "media_indexer.action received id=%s webspace=%s has_directory=%s directory=%s",
         action_id or "-",
         webspace_id or "default",
-        _payload_has_directory(payload, include_path=directory_action),
+        payload_has_directory,
         directory or "",
     )
-    _state["selected_directory"] = directory
-    _state["selected_query"] = query
-    _save_settings(selected_directory=directory, selected_query=query, k=k)
-    form = _current_form(directory=directory, query=query, k=k)
+    form = await asyncio.to_thread(
+        _persist_action_selection,
+        directory=directory,
+        query=query,
+        k=k,
+    )
 
     if action_id in {"set_directory", "directory"}:
         await _project_snapshot_async(
-            _snapshot_payload(
+            _snapshot_payload_with_form(
                 status=_status_payload(value="ready", subtitle="Directory selected", description=f"Media source: {directory or 'not set'}"),
                 form=form,
                 include_library=False,
@@ -2172,7 +2232,7 @@ async def on_media_indexer_action(evt: Any) -> None:
 
     if action_id in {"set_query", "query"}:
         await _project_snapshot_async(
-            _snapshot_payload(
+            _snapshot_payload_with_form(
                 status=_status_payload(value="ready", subtitle="Query selected", description=f"Query: {query or 'not set'}"),
                 form=form,
                 include_library=False,
@@ -2184,11 +2244,10 @@ async def on_media_indexer_action(evt: Any) -> None:
         return
 
     if action_id in {"play", "preview"}:
-        if _has_persisted_index():
-            _ensure_initialized(load_index=True)
-        selected_path = _path_from_action_payload(payload)
-        selected_payload, playback_path = _resolve_playback_payload(selected_path)
-        exists = pathlib.Path(playback_path).is_file() if playback_path else False
+        selected_path, selected_payload, playback_path, exists = await asyncio.to_thread(
+            _resolve_playback_action,
+            payload,
+        )
         if not selected_payload or not exists:
             status = _status_payload(
                 value="error",
@@ -2196,16 +2255,22 @@ async def on_media_indexer_action(evt: Any) -> None:
                 description=f"File is not indexed or missing: {selected_path or 'no path'}",
                 error="file_not_found",
             )
-            await _project_snapshot_async(_snapshot_payload(status=status, form=form, include_library=False), webspace_id=webspace_id)
+            await _project_snapshot_async(
+                _snapshot_payload_with_form(status=status, form=form, include_library=False),
+                webspace_id=webspace_id,
+            )
             _publish_operation({"value": "error", "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
             return
-        _state["playback"] = _playback_snapshot(selected_payload)
+        _state["playback"] = await asyncio.to_thread(_playback_snapshot, selected_payload)
         status = _status_payload(
             value="ready",
             subtitle="Preview selected",
             description=str(selected_payload.get("real_file_name") or pathlib.Path(playback_path or selected_path).name),
         )
-        await _project_snapshot_async(_snapshot_payload(status=status, form=form, include_library=False), webspace_id=webspace_id)
+        await _project_snapshot_async(
+            _snapshot_payload_with_form(status=status, form=form, include_library=False),
+            webspace_id=webspace_id,
+        )
         _publish_operation({"value": "ready", "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
         return
 
@@ -2217,7 +2282,13 @@ async def on_media_indexer_action(evt: Any) -> None:
                 description="Wait for the current scan to finish.",
             )
             await _project_snapshot_async(
-                _snapshot_payload(status=status, form=form, include_library=False, include_results=False, include_playback=False),
+                _snapshot_payload_with_form(
+                    status=status,
+                    form=form,
+                    include_library=False,
+                    include_results=False,
+                    include_playback=False,
+                ),
                 webspace_id=webspace_id,
             )
             _publish_operation({"value": status["value"], "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
@@ -2225,7 +2296,13 @@ async def on_media_indexer_action(evt: Any) -> None:
 
         status = _status_payload(value="scanning", subtitle="Building media library", description=f"Scanning {directory or 'no directory'}")
         await _project_snapshot_async(
-            _snapshot_payload(status=status, form=form, include_library=False, include_results=False, include_playback=False),
+            _snapshot_payload_with_form(
+                status=status,
+                form=form,
+                include_library=False,
+                include_results=False,
+                include_playback=False,
+            ),
             webspace_id=webspace_id,
         )
         _publish_operation({"value": "scanning", "subtitle": "Building media library", "description": status["description"]}, webspace_id=webspace_id)
@@ -2273,7 +2350,10 @@ async def on_media_indexer_action(evt: Any) -> None:
                 description=str(update.get("description") or ""),
                 indexed_count=int(update["indexed_count"]) if update.get("indexed_count") is not None else None,
             )
-            await _project_snapshot_async(_progress_snapshot_payload(status=progress_status, form=_current_form(k=k)), webspace_id=webspace_id)
+            await _project_snapshot_async(
+                _progress_snapshot_payload(status=progress_status, form=form),
+                webspace_id=webspace_id,
+            )
             _publish_operation(update, webspace_id=webspace_id)
 
         try:
@@ -2326,9 +2406,9 @@ async def on_media_indexer_action(evt: Any) -> None:
             indexed_count=indexed_count,
         )
         await _project_snapshot_async(
-            _snapshot_payload(
+            _snapshot_payload_with_form(
                 status=final_status,
-                form=_current_form(k=k),
+                form=form,
                 diagnostics=diagnostics,
                 include_results=False,
                 include_playback=False,
@@ -2351,14 +2431,26 @@ async def on_media_indexer_action(evt: Any) -> None:
         if not query.strip():
             status = _status_payload(value="ready", subtitle="Enter a search query", description="Try: movie, music, Queen, Inception, sunset.")
             await _project_snapshot_async(
-                _snapshot_payload(status=status, form=form, include_library=False, include_results=False, include_playback=False),
+                _snapshot_payload_with_form(
+                    status=status,
+                    form=form,
+                    include_library=False,
+                    include_results=False,
+                    include_playback=False,
+                ),
                 webspace_id=webspace_id,
             )
             _publish_operation({"value": "ready", "subtitle": status["subtitle"], "description": status["description"]}, webspace_id=webspace_id)
             return
         status = _status_payload(value="searching", subtitle="Semantic search", description=f"Searching for: {query}")
         await _project_snapshot_async(
-            _snapshot_payload(status=status, form=form, include_library=False, include_results=False, include_playback=False),
+            _snapshot_payload_with_form(
+                status=status,
+                form=form,
+                include_library=False,
+                include_results=False,
+                include_playback=False,
+            ),
             webspace_id=webspace_id,
         )
         _publish_operation({"value": "searching", "subtitle": "Semantic search", "description": status["description"]}, webspace_id=webspace_id)
@@ -2372,9 +2464,9 @@ async def on_media_indexer_action(evt: Any) -> None:
             error=error,
         )
         await _project_snapshot_async(
-            _snapshot_payload(
+            _snapshot_payload_with_form(
                 status=final_status,
-                form=_current_form(k=k),
+                form=form,
                 results=results,
                 include_library=False,
                 include_playback=False,

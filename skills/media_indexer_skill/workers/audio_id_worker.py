@@ -17,6 +17,10 @@ def _cache_key(path: Path) -> str:
     return f"{path.resolve()}|{int(stat.st_size)}|{int(stat.st_mtime)}"
 
 
+def _path_available(path: Path) -> bool:
+    return path.exists() and path.is_file()
+
+
 def _load_cache(path: Path) -> Dict[str, Any]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -73,7 +77,7 @@ async def _run(request: Dict[str, Any]) -> Dict[str, Any]:
     cache_path = Path(str(request.get("cache_path") or "audio_id_cache.json"))
     per_file_timeout = max(5.0, float(request.get("per_file_timeout_sec") or 30))
     max_files = max(1, int(request.get("max_files") or 20))
-    cache = _load_cache(cache_path)
+    cache = await asyncio.to_thread(_load_cache, cache_path)
     shazam = Shazam()
     results: Dict[str, Any] = {}
     errors: Dict[str, str] = {}
@@ -82,10 +86,11 @@ async def _run(request: Dict[str, Any]) -> Dict[str, Any]:
         path = Path(str(raw or ""))
         key = str(path)
         try:
-            if not path.exists() or not path.is_file():
+            path_available = await asyncio.to_thread(_path_available, path)
+            if not path_available:
                 errors[key] = "missing_file"
                 continue
-            cache_key = _cache_key(path)
+            cache_key = await asyncio.to_thread(_cache_key, path)
             cached = cache.get(cache_key)
             if isinstance(cached, dict):
                 results[key] = {**cached, "cached": True}
@@ -98,12 +103,12 @@ async def _run(request: Dict[str, Any]) -> Dict[str, Any]:
             errors[key] = f"{type(exc).__name__}: {exc}"
             cache_key = ""
             try:
-                cache_key = _cache_key(path)
+                cache_key = await asyncio.to_thread(_cache_key, path)
             except Exception:
                 pass
             if cache_key:
                 cache[cache_key] = {}
-    _save_cache(cache_path, cache)
+    await asyncio.to_thread(_save_cache, cache_path, cache)
     return {"ok": True, "results": results, "errors": errors, "processed": len(results) + len(errors)}
 
 
