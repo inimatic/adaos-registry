@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-14T19:39:36+00:00",
+  "updated_at": "2026-08-14T19:40:29+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -157,7 +157,7 @@
       "kind": "skill",
       "id": "builder_skill",
       "name": "builder_skill",
-      "version": "0.3.38",
+      "version": "0.3.39",
       "updated_at": "2026-08-14T19:40:29+00:00",
       "path": "skills/builder_skill",
       "manifest": "skills/builder_skill/skill.yaml",

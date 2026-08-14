@@ -4,6 +4,7 @@ import asyncio
 import copy
 import hashlib
 import inspect
+import importlib.resources as resources
 import json
 import logging
 import os
@@ -4868,6 +4869,14 @@ def _repo_root() -> Path:
 
 
 def _load_webui_schema() -> dict[str, Any]:
+    try:
+        raw = json.loads(
+            resources.files("adaos.abi").joinpath("webui.v1.schema.json").read_text(encoding="utf-8-sig")
+        )
+        if isinstance(raw, dict):
+            return raw
+    except Exception:
+        pass
     path = _repo_root() / "src" / "adaos" / "abi" / "webui.v1.schema.json"
     try:
         raw = json.loads(path.read_text(encoding="utf-8-sig"))

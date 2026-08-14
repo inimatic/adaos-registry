@@ -1,5 +1,5 @@
 name: builder_skill
-version: 0.3.38
+version: 0.3.39
 description: Rapid prototyping Builder skill for creating and editing scenario UI
   drafts from voice or text dialog.
 entry: handlers/main.py
@@ -419,4 +419,3 @@ compatibility:
 prototype: builder_skill
 conversational:
   manifest: conversational/manifest.yaml
-

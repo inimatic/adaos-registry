@@ -2033,6 +2033,17 @@ def test_builder_llm_request_includes_runtime_context_and_project_prompt(tmp_pat
     assert len(request["user_prompt"].encode("utf-8")) < 50_000
 
 
+def test_webui_schema_loads_from_installed_abi_without_monorepo_layout(monkeypatch, tmp_path) -> None:
+    skill = _load_module()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(skill, "_repo_root", lambda: tmp_path)
+
+    schema = skill._load_webui_schema()
+
+    assert schema["$id"] == "adaos.webui.v1"
+    assert "formInputType" in schema["$defs"]
+
+
 def test_builder_form_component_contract_validates_choice_and_grid_fields() -> None:
     skill = _load_module()
 
