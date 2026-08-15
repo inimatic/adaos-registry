@@ -1,12 +1,25 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 from types import SimpleNamespace
+
+import yaml
 
 try:
     from skills.subnet_env.handlers import main
 except ModuleNotFoundError:
     from handlers import main
+
+
+def test_activation_policy_allows_desktop_tooling_across_scenarios():
+    manifest_path = Path(__file__).resolve().parents[1] / "skill.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    when = manifest["runtime"]["activation"]["when"]
+
+    assert when["client_presence"] is True
+    assert when["webspace_scope"] == "active"
+    assert "scenarios_active" not in when
 
 
 def test_snapshot_demand_refreshes_subnet_env_projection(monkeypatch):
