@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -20,6 +21,12 @@ def test_activation_policy_allows_desktop_tooling_across_scenarios():
     assert when["client_presence"] is True
     assert when["webspace_scope"] == "active"
     assert "scenarios_active" not in when
+
+    registry_path = Path(__file__).resolve().parents[3] / "registry.json"
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    entry = next(item for item in registry["skills"] if item["name"] == "subnet_env")
+    assert entry["version"] == str(manifest["version"])
+    assert entry["activation"] == manifest["runtime"]["activation"]
 
 
 def test_snapshot_demand_refreshes_subnet_env_projection(monkeypatch):
