@@ -22,7 +22,11 @@ def test_activation_policy_allows_desktop_tooling_across_scenarios():
     assert when["webspace_scope"] == "active"
     assert "scenarios_active" not in when
 
-    registry_path = Path(__file__).resolve().parents[3] / "registry.json"
+    registry_path = next(
+        candidate / "registry.json"
+        for candidate in Path(__file__).resolve().parents
+        if (candidate / "registry.json").is_file()
+    )
     registry = json.loads(registry_path.read_text(encoding="utf-8"))
     entry = next(item for item in registry["skills"] if item["name"] == "subnet_env")
     assert entry["version"] == str(manifest["version"])

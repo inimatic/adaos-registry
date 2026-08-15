@@ -1,5 +1,5 @@
 name: subnet_env
-version: 0.8.9
+version: 0.8.10
 description: Local subnet environment operator skill for safe SDK-first web_desktop
   workflows.
 runtime:
