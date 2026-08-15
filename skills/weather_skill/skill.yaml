@@ -1,5 +1,5 @@
 name: weather_skill
-version: 2.6.18
+version: 2.6.19
 description: Standalone SDK weather skill with Open-Meteo forecasts, browser location,
   declarative actions and subnet projections.
 runtime:
@@ -41,6 +41,8 @@ tools:
   description: Resolve current weather and forecast for a city or browser-provided
     coordinates.
   entry: handlers.main:get_weather
+  side_effects: read_only
+  side_effect_class: read_only
   input_schema:
     type: object
     properties:
@@ -77,6 +79,8 @@ tools:
 - name: get_snapshot
   description: Return the current weather widget snapshot for the selected webspace.
   entry: handlers.main:get_snapshot
+  side_effects: read_only
+  side_effect_class: read_only
   input_schema:
     type: object
     properties:

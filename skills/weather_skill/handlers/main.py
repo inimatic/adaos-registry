@@ -19,6 +19,7 @@ from typing import Any, Dict, Optional, Tuple
 
 import requests
 from adaos.sdk.core.decorators import subscribe, tool
+from adaos.sdk.control_plane import get_self_object
 from adaos.sdk.data.bus import emit
 from adaos.sdk.data.context import clear_current_skill, get_current_skill, set_current_skill
 from adaos.sdk.data import ctx_subnet
@@ -1082,7 +1083,13 @@ def _target_context(payload: Dict[str, Any]) -> Tuple[bool, str, Optional[str]]:
     meta = payload.get("_meta") if isinstance(payload.get("_meta"), dict) else {}
     raw_ws = payload.get("webspace_id") or payload.get("workspace_id") or meta.get("webspace_id") or meta.get("workspace_id")
     webspace_id = str(raw_ws).strip() if raw_ws else None
-    return True, target_node_id, webspace_id
+    try:
+        self_object = get_self_object()
+        local_node_id = str(self_object.get("id") or self_object.get("node_id") or "").strip()
+    except Exception:
+        local_node_id = ""
+    allowed = not target_node_id or bool(local_node_id and target_node_id == local_node_id)
+    return allowed, target_node_id, webspace_id
 
 
 async def _refresh_weather_live_snapshot(

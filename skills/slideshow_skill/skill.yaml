@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.63
+version: 0.1.64
 description: Slideshow pilot skill that shows photos in the widget and can optionally
   project cached thumbnails to assigned ReDevice endpoints.
 supported_locales:
@@ -57,6 +57,8 @@ tools:
   description: List source photos that can be shown in the widget or sent to a ReDevice
     slideshow endpoint.
   entry: handlers.main:list_slideshow_photos
+  side_effects: read_only
+  side_effect_class: read_only
   input_schema:
     type: object
     properties:
@@ -114,6 +116,8 @@ tools:
 - name: get_slideshow_index_status
   description: Publish and return the current background photo index status.
   entry: handlers.main:get_slideshow_index_status
+  side_effects: read_only
+  side_effect_class: read_only
   input_schema:
     type: object
     properties:
@@ -139,6 +143,8 @@ tools:
 - name: get_slideshow_folders
   description: Publish and return the current top-level slideshow folder snapshot.
   entry: handlers.main:get_slideshow_folders
+  side_effects: read_only
+  side_effect_class: read_only
   input_schema:
     type: object
     properties:

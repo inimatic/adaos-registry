@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import os
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
 
 import yaml
 
-from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import ctx_subnet
+from adaos.sdk.data.context import clear_current_skill, set_current_skill
 from adaos.sdk.data.control_plane import get_reliability_projection, get_self_object
 from adaos.services import node_config as _node_config
 from adaos.services.agent_context import get_ctx
+
+_log = logging.getLogger("skills.subnet_env")
+_DEMAND_REFRESH_LOCK = threading.RLock()
+_LAST_DEMAND_REFRESH: dict[str, float] = {}
+_DEMAND_REFRESH_MIN_INTERVAL_S = 1.0
 
 _BOOL_TRUE = {"1", "true", "yes", "on"}
 _BOOL_FALSE = {"0", "false", "no", "off"}
@@ -649,6 +658,91 @@ def _refresh(*, webspace_id: str | None = None) -> dict[str, Any]:
     snapshot = _build_snapshot()
     _project_snapshot(snapshot, webspace_id=webspace_id)
     return snapshot
+
+
+def _event_payload(evt: Any) -> dict[str, Any]:
+    payload = getattr(evt, "payload", evt)
+    return payload if isinstance(payload, dict) else {}
+
+
+def _event_webspace_id(payload: dict[str, Any]) -> str | None:
+    meta = payload.get("_meta") if isinstance(payload.get("_meta"), dict) else {}
+    raw = payload.get("webspace_id") or payload.get("workspace_id") or meta.get("webspace_id")
+    token = str(raw or "").strip()
+    return token or None
+
+
+def _request_targets_local_node(payload: dict[str, Any]) -> bool:
+    meta = payload.get("_meta") if isinstance(payload.get("_meta"), dict) else {}
+    target_node_id = str(
+        payload.get("target_node_id")
+        or payload.get("node_id")
+        or meta.get("target_node_id")
+        or ""
+    ).strip()
+    try:
+        self_object = get_self_object()
+        local_node_id = str(self_object.get("id") or self_object.get("node_id") or "").strip()
+    except Exception:
+        local_node_id = ""
+    return not target_node_id or bool(local_node_id and target_node_id == local_node_id)
+
+
+def _is_subnet_env_projection_request(payload: dict[str, Any]) -> bool:
+    slot = str(payload.get("slot") or payload.get("projection") or "").strip()
+    if slot == "subnet_env.snapshot" or slot.startswith("subnet_env."):
+        return True
+    path = str(payload.get("path") or payload.get("projection_path") or "").strip().replace("\\", "/")
+    if path == "data/subnet_env" or path.startswith("data/subnet_env/"):
+        return True
+    topic = str(payload.get("topic") or "").strip()
+    return ".subnet_env." in topic or topic.endswith(".subnet_env")
+
+
+def _refresh_on_projection_demand(*, webspace_id: str | None, reason: str) -> dict[str, Any]:
+    target = _projection_webspace_id(webspace_id)
+    with _DEMAND_REFRESH_LOCK:
+        now = time.monotonic()
+        previous = float(_LAST_DEMAND_REFRESH.get(target) or 0.0)
+        if previous > 0 and now - previous < _DEMAND_REFRESH_MIN_INTERVAL_S:
+            return {"ok": True, "skipped": True, "reason": "demand_coalesced", "webspace_id": target}
+        pushed = False
+        try:
+            pushed = set_current_skill("subnet_env")
+            snapshot = _refresh(webspace_id=target)
+            _LAST_DEMAND_REFRESH[target] = time.monotonic()
+            _log.info("subnet_env projection refreshed webspace=%s reason=%s", target, reason)
+            return {"ok": True, "webspace_id": target, "snapshot": snapshot}
+        finally:
+            if pushed:
+                clear_current_skill()
+
+
+@subscribe("webio.yjs.snapshot.requested")
+async def on_webio_yjs_snapshot_requested(evt: Any) -> None:
+    payload = _event_payload(evt)
+    if not _is_subnet_env_projection_request(payload) or not _request_targets_local_node(payload):
+        return
+    await asyncio.to_thread(
+        _refresh_on_projection_demand,
+        webspace_id=_event_webspace_id(payload),
+        reason="snapshot_requested",
+    )
+
+
+@subscribe("webio.yjs.subscription.changed")
+async def on_webio_yjs_subscription_changed(evt: Any) -> None:
+    payload = _event_payload(evt)
+    if not _is_subnet_env_projection_request(payload) or not _request_targets_local_node(payload):
+        return
+    action = str(payload.get("action") or "subscribed").strip().lower()
+    if action == "unsubscribed":
+        return
+    await asyncio.to_thread(
+        _refresh_on_projection_demand,
+        webspace_id=_event_webspace_id(payload),
+        reason="subscription_changed",
+    )
 
 
 @tool("get_snapshot")

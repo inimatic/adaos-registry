@@ -80,6 +80,7 @@ def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch
         return True, {"temp": 10, "description": "clear", "wind_ms": 1}
 
     monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "get_self_object", lambda: {"id": "member-local"})
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", None))
     monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
@@ -134,6 +135,7 @@ def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
         }
 
     monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "get_self_object", lambda: {"id": "member-local"})
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", "Moscow"))
     monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
@@ -157,6 +159,35 @@ def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
     assert projected[0][1]["current"]["request_id"] == "req-geo"
     assert projected[0][1]["current"]["pending"] is False
     assert projected[0][1]["current"]["location"]["latitude"] == 52.52
+
+
+def test_weather_targeted_request_is_only_processed_by_target_node(monkeypatch):
+    mod = _load_weather_module()
+    fetches: list[str] = []
+
+    async def _fetch_weather_async(*_args, **_kwargs):
+        fetches.append("called")
+        return True, {"temp": 10, "description": "clear", "wind_ms": 1}
+
+    monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "get_self_object", lambda: {"id": "hub-local"})
+    monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
+
+    import asyncio
+
+    asyncio.run(
+        mod.on_weather_city_changed(
+            {
+                "city": "Berlin",
+                "webspace_id": "desktop",
+                "target_node_id": "member-remote",
+                "_meta": {"target_node_id": "member-remote"},
+            }
+        )
+    )
+
+    assert fetches == []
+    assert mod._WEATHER_UPDATE_TASKS == {}
 
 
 def test_weather_legacy_openweathermap_endpoint_uses_open_meteo(monkeypatch):

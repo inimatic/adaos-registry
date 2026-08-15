@@ -3859,6 +3859,7 @@ def test_infrastate_effective_runtime_projection_prefers_validated_target_slot()
         },
     }
     build = {
+        "runtime_mode": "slot",
         "runtime_version": "old",
         "runtime_git_commit": "ddeb33f-old",
         "runtime_git_short_commit": "ddeb33f",

@@ -13,9 +13,18 @@ if _REPO_SRC.exists():
     sys.path.insert(0, str(_REPO_SRC))
 
 import pytest
+import yaml
 from PIL import Image
 
 
+def test_slideshow_snapshot_tools_declare_read_only_contract() -> None:
+    manifest_path = Path(__file__).resolve().parents[1] / "skill.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    tools = {tool["name"]: tool for tool in manifest["tools"]}
+
+    for name in ("list_slideshow_photos", "get_slideshow_index_status", "get_slideshow_folders"):
+        assert tools[name]["side_effects"] == "read_only"
+        assert tools[name]["side_effect_class"] == "read_only"
 def _load_slideshow_module():
     path = Path(__file__).resolve().parents[1] / "handlers" / "main.py"
     module_name = f"test_slideshow_skill_{uuid4().hex}"

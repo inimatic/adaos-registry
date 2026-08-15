@@ -1,5 +1,5 @@
 name: subnet_env
-version: 0.8.4
+version: 0.8.5
 description: Local subnet environment operator skill for safe SDK-first web_desktop
   workflows.
 runtime:
@@ -15,7 +15,10 @@ runtime:
       webspace_scope: active
 entry: handlers/main.py
 dependencies: []
-events: {}
+events:
+  subscribe:
+  - webio.yjs.snapshot.requested
+  - webio.yjs.subscription.changed
 data_projections:
 - scope: subnet
   slot: subnet_env.snapshot
