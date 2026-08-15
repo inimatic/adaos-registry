@@ -157,20 +157,6 @@ def _technical_metadata_enabled() -> bool:
     return _feature_enabled("MEDIA_INDEXER_ENABLE_TECHNICAL_METADATA", default=False)
 
 
-def _runtime_logs_dir() -> pathlib.Path:
-    override = os.getenv("MEDIA_INDEXER_LOG_DIR")
-    if override:
-        path = pathlib.Path(override)
-    elif os.getenv("ADAOS_SKILL_ENV_PATH"):
-        slot_root = _SKILL_ROOT.parents[2] if len(_SKILL_ROOT.parents) > 2 else _SKILL_ROOT
-        path = slot_root / "runtime" / "logs"
-    else:
-        base_dir = pathlib.Path(os.getenv("ADAOS_BASE_DIR") or pathlib.Path.home() / ".adaos")
-        path = base_dir / "state" / "media_indexer_skill" / "logs"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
 def _skill_version() -> str:
     env_version = str(os.getenv("ADAOS_SKILL_VERSION") or "").strip()
     if env_version:
@@ -181,23 +167,6 @@ def _skill_version() -> str:
     except Exception:
         return "0.0.0"
     return str(manifest.get("version") or "0.0.0")
-
-
-def _configure_logging() -> None:
-    log_path = _runtime_logs_dir() / "media_indexer.runtime.log"
-    root_logger = logging.getLogger()
-    for handler in root_logger.handlers:
-        if isinstance(handler, logging.FileHandler) and pathlib.Path(handler.baseFilename) == log_path:
-            return
-    handler = logging.FileHandler(log_path, encoding="utf-8")
-    handler.setLevel(logging.INFO)
-    handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
-    root_logger.addHandler(handler)
-    root_logger.setLevel(min(root_logger.level or logging.INFO, logging.INFO))
-
-
-_configure_logging()
-
 
 def _event_payload(evt: Any) -> Dict[str, Any]:
     payload = getattr(evt, "payload", None) if hasattr(evt, "payload") else evt
