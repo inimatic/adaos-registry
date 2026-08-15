@@ -1,5 +1,5 @@
 name: subnet_env
-version: 0.8.10
+version: 0.8.11
 description: Local subnet environment operator skill for safe SDK-first web_desktop
   workflows.
 runtime:
@@ -28,6 +28,7 @@ tools:
 - name: get_snapshot
   description: Return the current local subnet environment snapshot.
   entry: handlers.main:get_snapshot
+  side_effects: read
   input_schema:
     type: object
     properties:
@@ -38,6 +39,7 @@ tools:
 - name: refresh_snapshot
   description: Refresh and project the subnet environment snapshot.
   entry: handlers.main:refresh_snapshot
+  side_effects: runtime_write
   input_schema:
     type: object
     properties:
@@ -48,6 +50,7 @@ tools:
 - name: set_env_value
   description: Update one allowlisted environment key and refresh the projection.
   entry: handlers.main:set_env_value
+  side_effects: local_write
   input_schema:
     type: object
     properties:
@@ -68,6 +71,7 @@ tools:
 - name: apply_action
   description: Apply a predefined subnet_env UI action and refresh the projection.
   entry: handlers.main:apply_action
+  side_effects: local_write
   input_schema:
     type: object
     properties:

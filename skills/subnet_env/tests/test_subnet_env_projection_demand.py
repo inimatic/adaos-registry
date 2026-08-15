@@ -33,6 +33,31 @@ def test_activation_policy_allows_desktop_tooling_across_scenarios():
     assert entry["activation"] == manifest["runtime"]["activation"]
 
 
+def test_tool_side_effect_contract_separates_reads_from_projection_and_env_writes():
+    manifest_path = Path(__file__).resolve().parents[1] / "skill.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    effects = {tool["name"]: tool.get("side_effects") for tool in manifest["tools"]}
+
+    assert effects == {
+        "get_snapshot": "read",
+        "refresh_snapshot": "runtime_write",
+        "set_env_value": "local_write",
+        "apply_action": "local_write",
+    }
+
+
+def test_get_snapshot_does_not_write_projection(monkeypatch):
+    expected = {"summary": {"value": "dev"}}
+    monkeypatch.setattr(main, "_build_snapshot", lambda: expected)
+    monkeypatch.setattr(
+        main,
+        "_project_snapshot",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("unexpected projection write")),
+    )
+
+    assert main.get_snapshot(webspace_id="desktop") == expected
+
+
 def test_snapshot_demand_refreshes_subnet_env_projection(monkeypatch):
     calls: list[str | None] = []
     main._LAST_DEMAND_REFRESH.clear()

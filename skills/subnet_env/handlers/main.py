@@ -772,7 +772,7 @@ def get_snapshot(
     target_node_id: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
-    return _refresh(webspace_id=webspace_id)
+    return _build_snapshot()
 
 
 @tool("refresh_snapshot")
