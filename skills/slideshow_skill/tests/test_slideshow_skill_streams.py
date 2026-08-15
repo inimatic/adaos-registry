@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sqlite3
 import sys
 import time
 from pathlib import Path
@@ -11,6 +12,7 @@ _REPO_SRC = Path(__file__).resolve().parents[5] / "src"
 if _REPO_SRC.exists():
     sys.path.insert(0, str(_REPO_SRC))
 
+import pytest
 from PIL import Image
 
 
@@ -76,7 +78,7 @@ def test_folder_items_survive_process_cache_reset_without_sqlite_query(monkeypat
     monkeypatch.setenv("SLIDESHOW_DATA_DIR", str(tmp_path / "state"))
     monkeypatch.setattr(mod, "_ensure_index", lambda _root: {"ok": True})
 
-    with mod._connect_index() as conn:
+    with mod._index_connection() as conn:
         conn.execute(
             """
             INSERT INTO photos (
@@ -114,6 +116,17 @@ def test_folder_items_survive_process_cache_reset_without_sqlite_query(monkeypat
 
     second = mod._folder_items(state)
     assert second == first
+
+
+def test_index_connection_closes_sqlite_handle(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+    monkeypatch.setenv("SLIDESHOW_DATA_DIR", str(tmp_path / "state"))
+
+    with mod._index_connection() as conn:
+        conn.execute("SELECT 1").fetchone()
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        conn.execute("SELECT 1")
 
 
 def test_subscription_changed_does_not_build_snapshot(monkeypatch):

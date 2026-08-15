@@ -10,9 +10,10 @@ import socket
 import sqlite3
 import threading
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Iterator, Mapping
 
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import device_access
@@ -561,6 +562,16 @@ def _connect_index(*, read_only: bool = False) -> sqlite3.Connection:
     return conn
 
 
+@contextmanager
+def _index_connection(*, read_only: bool = False) -> Iterator[sqlite3.Connection]:
+    conn = _connect_index(read_only=read_only)
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
+
+
 def _top_folder(root: Path, path: Path) -> str:
     try:
         rel = path.resolve().relative_to(root.resolve())
@@ -579,7 +590,7 @@ def _rel_path(root: Path, path: Path) -> str:
 
 def _index_meta(root: Path) -> dict[str, Any]:
     try:
-        with _connect_index(read_only=True) as conn:
+        with _index_connection(read_only=True) as conn:
             row = conn.execute("SELECT indexed_at, photo_count FROM roots WHERE root_dir = ?", (str(root),)).fetchone()
     except Exception:
         return {}
@@ -815,7 +826,7 @@ def _scan_index(root: Path, *, job_id: str, webspace_id: str | None = None) -> d
     )
 
     try:
-        with _connect_index() as conn:
+        with _index_connection() as conn:
             for current, dirs, names in os.walk(str(root)):
                 dirs[:] = [name for name in dirs if name != ".adaos-thumbs"]
                 if _index_stop.is_set():
@@ -1103,7 +1114,7 @@ def _query_photo_records(
         sql += " LIMIT ?"
         params.append(max(1, int(limit)))
     try:
-        with _connect_index(read_only=True) as conn:
+        with _index_connection(read_only=True) as conn:
             return [dict(row) for row in conn.execute(sql, params).fetchall()]
     except Exception:
         _log.debug("failed to query slideshow index", exc_info=True)
@@ -1127,7 +1138,7 @@ def _favorite_files_for_state(state: Mapping[str, Any], limit: int | None = None
 
 def _favorite_refs(root: Path) -> list[str]:
     try:
-        with _connect_index(read_only=True) as conn:
+        with _index_connection(read_only=True) as conn:
             rows = conn.execute(
                 "SELECT content_ref FROM photos WHERE root_dir = ? AND favorite = 1 ORDER BY mtime DESC",
                 (str(root),),
@@ -1139,7 +1150,7 @@ def _favorite_refs(root: Path) -> list[str]:
 
 def _favorite_count(root: Path) -> int:
     try:
-        with _connect_index(read_only=True) as conn:
+        with _index_connection(read_only=True) as conn:
             row = conn.execute(
                 "SELECT COUNT(*) AS count FROM photos WHERE root_dir = ? AND favorite = 1",
                 (str(root),),
@@ -1151,7 +1162,7 @@ def _favorite_count(root: Path) -> int:
 
 def _set_favorite(root: Path, content_ref: str, favorite: bool) -> None:
     try:
-        with _connect_index() as conn:
+        with _index_connection() as conn:
             conn.execute(
                 "UPDATE photos SET favorite = ? WHERE root_dir = ? AND content_ref = ?",
                 (1 if favorite else 0, str(root), content_ref),
@@ -1163,7 +1174,7 @@ def _set_favorite(root: Path, content_ref: str, favorite: bool) -> None:
 
 def _set_hidden(root: Path, content_ref: str, hidden: bool) -> None:
     try:
-        with _connect_index() as conn:
+        with _index_connection() as conn:
             conn.execute(
                 "UPDATE photos SET hidden = ? WHERE root_dir = ? AND content_ref = ?",
                 (1 if hidden else 0, str(root), content_ref),
@@ -1175,7 +1186,7 @@ def _set_hidden(root: Path, content_ref: str, hidden: bool) -> None:
 
 def _is_favorite(root: Path, content_ref: str) -> bool:
     try:
-        with _connect_index(read_only=True) as conn:
+        with _index_connection(read_only=True) as conn:
             row = conn.execute(
                 "SELECT favorite FROM photos WHERE root_dir = ? AND content_ref = ?",
                 (str(root), content_ref),
@@ -1208,7 +1219,7 @@ def _folder_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
     items = [{"id": "", "title": "All photos", "subtitle": str(root), "selected": selected == "", "selectable": True}]
     total_folders = 0
     try:
-        with _connect_index(read_only=True) as conn:
+        with _index_connection(read_only=True) as conn:
             count_row = conn.execute(
                 """
                 SELECT COUNT(*) AS count FROM (
