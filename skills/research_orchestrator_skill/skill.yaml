@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.12.0
+version: 0.13.0
 description: Durable pre-Codex orchestration for reusable AdaOS research-direction
   skill projects.
 supported_locales:
@@ -686,12 +686,13 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-12T08:40:52+00:00'
+updated_at: '2026-08-15T23:20:13+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.763+4916.b621cb26
-    recorded_at: '2026-08-12T08:40:52+00:00'
+    min_version: 0.1.819+5094.e0556122
+    recorded_at: '2026-08-15T23:20:13+00:00'
     source: skill_push
-    min_commit: b621cb26fe030d9f9451139cab6ddce58a221897
-    min_short_commit: b621cb26
-    build_date: '2026-08-12T11:29:43+03:00'
+    min_commit: e055612229ba354a87263a99f3201ace46e7051e
+    min_short_commit: e0556122
+    build_date: '2026-08-16T02:19:18+03:00'
+
