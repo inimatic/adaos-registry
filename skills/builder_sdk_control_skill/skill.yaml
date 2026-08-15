@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.59
+version: 0.1.60
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -1092,8 +1092,6 @@ tools:
   timeout_seconds: 120
   input_schema:
     type: object
-    required:
-    - implementation_brief
     properties:
       implementation_brief:
         type: string

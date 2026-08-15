@@ -1,6 +1,6 @@
 id: research_workbench
 name: research_workbench
-version: 0.0.11
+version: 0.0.12
 title: Research Workbench
 description: Shared portfolio, intake, formulation, and pre-Codex handoff for AdaOS
   research directions.
@@ -70,4 +70,3 @@ nlu:
 steps: []
 prototype: scenario_default
 updated_at: '2026-08-12T12:46:50+00:00'
-

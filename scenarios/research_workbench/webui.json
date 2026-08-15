@@ -18,6 +18,7 @@
             "researchPrototypeDigest": null,
             "researchAdmissionDecision": "needs_discussion",
             "researchCanAccept": false,
+            "researchAutomationBriefDigest": null,
             "builderUrl": null,
             "selectedArtifactId": null,
             "selectedArtifactGroupId": null,
@@ -265,6 +266,7 @@
                   "researchPrototypeDigest": "current_prototype.digest",
                   "researchAdmissionDecision": "formulation.admission_decision",
                   "researchCanAccept": "formulation.can_accept",
+                  "researchAutomationBriefDigest": "automation_brief.digest",
                   "builderUrl": "builder_url",
                   "selectedDirectionTitle": "direction.title",
                   "researchConversationId": "conversation_id"
@@ -566,7 +568,15 @@
                   "on": "click:open-builder",
                   "type": "callSkill",
                   "target": "research_orchestrator_skill.open_builder_session",
-                  "background": true,
+                  "openResultUrl": true,
+                  "resultUrlPath": "url",
+                  "resultUrlTarget": "adaos-builder",
+                  "feedback": {
+                    "pending": {
+                      "label": "Binding Builder session…",
+                      "disable": true
+                    }
+                  },
                   "params": {
                     "direction_id": "$state.selectedDirectionId",
                     "builder_webspace_id": "desktop-dev"
@@ -576,25 +586,6 @@
                   ]
                 },
                 {
-                  "on": "click:open-builder",
-                  "type": "openUrl",
-                  "params": {
-                    "url": "$state.builderUrl",
-                    "target": "adaos-builder"
-                  }
-                },
-                {
-                  "on": "click:open-builder",
-                  "type": "callHost",
-                  "target": "builder.context.selected",
-                  "params": {
-                    "source_webspace_id": "desktop",
-                    "object_type": "skill",
-                    "object_id": "$state.selectedDirectionId",
-                    "title": "$state.selectedDirectionTitle"
-                  }
-                },
-                {
                   "on": "click:help-modal",
                   "type": "openModal",
                   "params": {
@@ -602,6 +593,26 @@
                   }
                 }
               ]
+            },
+            {
+              "id": "handoff-ready-receipt",
+              "type": "ui.actions",
+              "area": "workspace",
+              "title": "Development handoff",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'development' && $state.researchAutomationBriefDigest != null",
+              "inputs": {
+                "variant": "stack",
+                "buttons": [
+                  {
+                    "id": "handoff-ready",
+                    "label": "Exact prototype accepted · AutomationBrief and Development Session are ready",
+                    "icon": "checkmark-circle-outline",
+                    "disabled": true,
+                    "title": "Acceptance is durable and digest-bound. Open Builder to start Codex from this exact instruction."
+                  }
+                ]
+              },
+              "actions": []
             },
             {
               "id": "automation-brief",

@@ -397,6 +397,93 @@ def test_file_and_automation_tools_forward_stable_project_identity(monkeypatch) 
     assert started["status"] == "queued"
 
 
+def test_start_automation_uses_exact_bound_instruction_without_manual_paste(monkeypatch) -> None:
+    module = _module()
+    digest = "sha256:" + "8" * 64
+    brief = {
+        "schema": "adaos.research.automation_brief.v1",
+        "digest": digest,
+        "objective": "Build a reproducible CPU experiment base.",
+        "implementation_requirements": [
+            {
+                "id": "REQ-EXEC-1",
+                "requirement": "Implement an immutable typed RunSpec.",
+                "verification": "RunSpec conformance test",
+            }
+        ],
+        "acceptance_checks": [
+            {
+                "id": "AC-EXEC-1",
+                "check": "The smoke profile runs without scientific inference.",
+                "evidence": "Smoke report",
+            }
+        ],
+        "prohibited_actions": ["Do not start scientific execution."],
+    }
+    planned: list[dict] = []
+    launched: list[dict] = []
+    monkeypatch.setattr(
+        module,
+        "_bound_automation_instruction",
+        lambda *_args: {
+            "value": brief,
+            "instruction": {"path": "C:/state/instructions/automation_brief.json"},
+            "session": {"session_id": "dev-tlp"},
+        },
+    )
+    monkeypatch.setattr(
+        module,
+        "_project_topic",
+        lambda *_args, **_kwargs: {"conversation_id": "conv", "topic_id": "topic"},
+    )
+    monkeypatch.setattr(module.workflow, "get_state", lambda *_args: {})
+    monkeypatch.setattr(
+        module,
+        "plan_change_set",
+        lambda **kwargs: planned.append(kwargs)
+        or {"workflow": {"change_set": {"change_set_id": "change-tlp"}}},
+    )
+    monkeypatch.setattr(
+        module.automation,
+        "start",
+        lambda **kwargs: launched.append(kwargs) or {"ok": True, "status": "queued"},
+    )
+
+    result = module.start_automation(
+        object_type="skill",
+        object_id="tlp_research_03",
+        webspace_id="desktop-dev",
+    )
+
+    assert result["status"] == "queued"
+    assert len(planned[0]["request"]) < 4000
+    assert [item["issue_id"] for item in planned[0]["issues"]] == ["REQ-EXEC-1", "AC-EXEC-1"]
+    assert launched[0]["implementation_brief"] == module._instruction_text(brief)
+    assert launched[0]["brief_path"].endswith("automation_brief.json")
+    assert launched[0]["change_set_id"] == "change-tlp"
+
+
+def test_start_automation_rejects_free_form_replacement_of_bound_instruction(monkeypatch) -> None:
+    module = _module()
+    brief = {"digest": "sha256:" + "9" * 64, "objective": "Exact objective"}
+    monkeypatch.setattr(
+        module,
+        "_bound_automation_instruction",
+        lambda *_args: {
+            "value": brief,
+            "instruction": {"path": "C:/state/instructions/automation_brief.json"},
+            "session": {"session_id": "dev-tlp"},
+        },
+    )
+
+    with pytest.raises(ValueError, match="free-form replacement"):
+        module.start_automation(
+            "Do something else",
+            object_type="skill",
+            object_id="tlp_research_03",
+        )
+
+
 def test_plan_change_set_persists_workflow_and_durable_change_evidence(monkeypatch) -> None:
     module = _module()
     transitions: list[dict] = []

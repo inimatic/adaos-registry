@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ import yaml
 from adaos.sdk import conversation, navigation
 from adaos.sdk.builder import automation, development_sessions, issues as builder_issues, preview, review, semantic_ui, workflow
 from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.errors import SdkRuntimeNotInitialized
 from adaos.sdk.developer import compositions, projects, prompt_context
 from adaos.sdk.llm.llm_client import list_llm_models
 
@@ -80,6 +82,114 @@ def _identity(object_type: str | None, object_id: str | None) -> tuple[str, str]
     return kind, project_id
 
 
+def _bound_automation_instruction(
+    kind: str,
+    project_id: str,
+    source_webspace_id: str,
+) -> dict[str, Any] | None:
+    """Resolve the exact instruction admitted by this Builder host binding."""
+
+    try:
+        binding = development_sessions.binding_for(source_webspace_id)
+    except SdkRuntimeNotInitialized:
+        return None
+    if not binding:
+        return None
+    session = development_sessions.get(str(binding["session_id"]))
+    target_ref = f"{kind}:{project_id}"
+    target_refs = {
+        str(item.get("ref") or "")
+        for group in session["targets"].values()
+        for item in group
+        if isinstance(item, Mapping)
+    }
+    if target_ref not in target_refs:
+        return None
+    if not any(
+        str(item.get("kind") or "") == "automation_brief"
+        for item in session.get("instruction_inputs") or []
+        if isinstance(item, Mapping)
+    ):
+        return None
+    instruction = development_sessions.get_instruction(
+        str(session["session_id"]), "automation_brief"
+    )
+    value = instruction["value"]
+    expected_digest = str(session["handoff"]["automation_brief_digest"])
+    if str(value.get("digest") or "") != expected_digest:
+        raise ValueError("bound AutomationBrief digest does not match the Development Session")
+    return {**instruction, "session": session, "binding": binding}
+
+
+def _instruction_text(value: Mapping[str, Any]) -> str:
+    return json.dumps(dict(value), ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def _automation_change_request(brief: Mapping[str, Any] | None, fallback: str) -> str:
+    if not brief:
+        return " ".join(str(fallback or "").split())[:4000]
+    lines = [
+        "Implement the exact accepted AutomationBrief through Builder Automation.",
+        f"Brief digest: {str(brief.get('digest') or 'unavailable')}",
+        f"Objective: {' '.join(str(brief.get('objective') or '').split())}",
+        "The full digest-bound brief is an immutable Development Session instruction input.",
+    ]
+    prohibited = [" ".join(str(item).split()) for item in brief.get("prohibited_actions") or []]
+    if prohibited:
+        lines.append("Prohibited: " + " | ".join(prohibited))
+    return "\n".join(lines)[:4000]
+
+
+def _automation_change_issues(brief: Mapping[str, Any] | None, fallback: str) -> list[dict[str, Any]]:
+    if not brief:
+        return [
+            {
+                "issue_id": f"automation-{uuid4().hex[:12]}",
+                "title": " ".join(str(fallback).split())[:240],
+                "lane": "automation",
+                "acceptance_criteria": [
+                    f"The implementation and its tests satisfy: {' '.join(str(fallback).split())}"[:500]
+                ],
+            }
+        ]
+    issues: list[dict[str, Any]] = []
+    for index, item in enumerate(brief.get("implementation_requirements") or [], start=1):
+        if not isinstance(item, Mapping):
+            continue
+        requirement = " ".join(str(item.get("requirement") or "").split())
+        verification = " ".join(str(item.get("verification") or "").split())
+        if not requirement:
+            continue
+        criteria = [requirement]
+        if verification:
+            criteria.append(f"Verification evidence: {verification}")
+        issues.append(
+            {
+                "issue_id": str(item.get("id") or f"requirement-{index}"),
+                "title": requirement[:240],
+                "lane": "automation",
+                "acceptance_criteria": [criterion[:500] for criterion in criteria],
+            }
+        )
+    for index, item in enumerate(brief.get("acceptance_checks") or [], start=1):
+        if not isinstance(item, Mapping):
+            continue
+        check = " ".join(str(item.get("check") or "").split())
+        evidence = " ".join(str(item.get("evidence") or "").split())
+        if not check:
+            continue
+        criterion = check if not evidence else f"{check} Evidence: {evidence}"
+        issues.append(
+            {
+                "issue_id": str(item.get("id") or f"acceptance-{index}"),
+                "title": check[:240],
+                "lane": "automation",
+                "acceptance_criteria": [criterion[:500]],
+            }
+        )
+    return issues or _automation_change_issues(None, fallback)
+
+
 @tool("get_development_session", summary="Read the scoped Development Session bound to this Builder host.", side_effects="none")
 def get_development_session(
     webspace_id: str | None = None,
@@ -95,6 +205,15 @@ def get_development_session(
             "content": "No external Development Session is bound. Select a normal Builder project or open an accepted handoff from its owning Workbench.",
         }
     session = development_sessions.get(str(binding["session_id"]))
+    instruction = None
+    if any(
+        str(item.get("kind") or "") == "automation_brief"
+        for item in session.get("instruction_inputs") or []
+        if isinstance(item, Mapping)
+    ):
+        instruction = development_sessions.get_instruction(
+            str(session["session_id"]), "automation_brief"
+        )
     targets = [
         item
         for group in session["targets"].values()
@@ -116,6 +235,12 @@ def get_development_session(
         )
         return_url = navigation.build_url(destination, base_url=preview.public_app_base())
     return_link = f"\n\n[Return to Research Workbench]({return_url})" if return_url else ""
+    instruction_content = (
+        f"**Exact instruction:** `{instruction['instruction']['ref']}`  \n"
+        f"**Instruction digest:** `{instruction['value'].get('digest')}`\n\n"
+        if instruction
+        else "**Exact instruction:** not attached\n\n"
+    )
     content = (
         f"## Scoped Development Session `{session['session_id']}`\n\n"
         f"**Project:** `{session['project_ref']}`  \n"
@@ -123,6 +248,7 @@ def get_development_session(
         f"**Read-write targets:** {target_labels}  \n"
         f"**Read-only context:** {context_labels}  \n"
         f"**Artifact inputs:** {artifact_labels}\n\n"
+        f"{instruction_content}"
         "Changing UI focus does not enlarge write authority. Codex has not been started."
         f"{return_link}"
     )
@@ -133,6 +259,9 @@ def get_development_session(
         "binding": binding,
         "session": session,
         "targets": targets,
+        "instruction": instruction["instruction"] if instruction else None,
+        "implementation_brief": _instruction_text(instruction["value"]) if instruction else None,
+        "implementation_brief_digest": instruction["value"].get("digest") if instruction else None,
         "return_url": return_url,
         "content": content,
     }
@@ -867,6 +996,7 @@ def get_project(
         else {}
     )
     source = _preview_source_webspace_id(webspace_id, _meta)
+    development_instruction = _bound_automation_instruction(kind, project_id, source)
     topic = _project_topic(kind, project_id, webspace_id=source)
     prototype_projection = (
         workflow_projection.get("prototype")
@@ -946,7 +1076,29 @@ def get_project(
         "can_decide_candidate": bool(capabilities.get("can_decide_candidate")),
         "can_publish": bool(capabilities.get("can_publish")),
         "can_start_implementation": bool(
-            active_phase == "prototype" and change_gate == "automation" and change_id
+            active_phase == "prototype"
+            and (
+                (change_gate == "automation" and change_id)
+                or (
+                    development_instruction is not None
+                    and change_status in {"not_planned", "published", "rejected", "superseded"}
+                )
+            )
+        ),
+        "development_session_id": (
+            development_instruction["session"]["session_id"]
+            if development_instruction
+            else None
+        ),
+        "development_implementation_brief": (
+            _instruction_text(development_instruction["value"])
+            if development_instruction
+            else None
+        ),
+        "development_implementation_brief_digest": (
+            development_instruction["value"].get("digest")
+            if development_instruction
+            else None
         ),
         "change_set_id": change_set_projection.get("change_set_id"),
         "change_id": change_id or None,
@@ -2434,7 +2586,7 @@ def get_lifecycle(
 
 @tool("start_automation", summary="Start Builder Automation from an approved brief.", side_effects="local_write")
 def start_automation(
-    implementation_brief: str,
+    implementation_brief: str | None = None,
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
     webspace_id: str | None = None,
@@ -2442,9 +2594,32 @@ def start_automation(
     brief_path: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    _require_transport_integrity(implementation_brief)
     kind, project_id = _identity(object_type, object_id)
-    source = _webspace_id(webspace_id, _meta)
+    source = _preview_source_webspace_id(webspace_id, _meta)
+    admitted = _bound_automation_instruction(kind, project_id, source)
+    supplied_brief = str(implementation_brief or "").strip()
+    brief_value: Mapping[str, Any] | None = None
+    if admitted:
+        brief_value = admitted["value"]
+        exact_brief = _instruction_text(brief_value)
+        if supplied_brief:
+            try:
+                supplied_value = json.loads(supplied_brief)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    "this Builder host is bound to an exact AutomationBrief; free-form replacement is not allowed"
+                ) from exc
+            if not isinstance(supplied_value, Mapping) or dict(supplied_value) != dict(brief_value):
+                raise ValueError(
+                    "submitted AutomationBrief does not match the digest-bound Development Session instruction"
+                )
+        implementation_brief = exact_brief
+        brief_path = str(admitted["instruction"]["path"])
+    elif not supplied_brief:
+        raise ValueError("implementation_brief is required when no exact Development Session instruction is bound")
+    else:
+        implementation_brief = supplied_brief
+    _require_transport_integrity(implementation_brief)
     topic = _project_topic(kind, project_id, webspace_id=source)
     bound_conversation_id = str(conversation_id or topic.get("conversation_id") or "").strip() or None
     workflow_state = workflow.get_state(kind, project_id)
@@ -2459,17 +2634,8 @@ def start_automation(
         "superseded",
     }:
         planned = plan_change_set(
-            request=implementation_brief,
-            issues=[
-                {
-                    "issue_id": f"automation-{uuid4().hex[:12]}",
-                    "title": " ".join(str(implementation_brief).split())[:240],
-                    "lane": "automation",
-                    "acceptance_criteria": [
-                        f"The implementation and its tests satisfy: {' '.join(str(implementation_brief).split())}"[:500]
-                    ],
-                }
-            ],
+            request=_automation_change_request(brief_value, implementation_brief),
+            issues=_automation_change_issues(brief_value, implementation_brief),
             object_type=kind,
             object_id=project_id,
             webspace_id=source,

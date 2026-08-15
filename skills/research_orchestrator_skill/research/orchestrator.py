@@ -686,7 +686,7 @@ class ResearchOrchestrator:
                 zone=str(scope["zone"]),
                 subnet_id=str(scope["subnet_id"]),
                 webspace_id="desktop-dev",
-                space_kind="workspace",
+                space_kind="development",
                 expected_scenario_id="builder",
             )
             builder_url = _address_builder_url(
@@ -710,7 +710,13 @@ class ResearchOrchestrator:
             "formulation": {
                 "admission_decision": admission_review.get("decision") or "needs_discussion",
                 "admission_blockers": list(admission_review.get("blockers") or []),
-                "can_accept": bool(prototype) and not prototype_stale and admission_review.get("decision") == "admitted",
+                "can_accept": (
+                    bool(prototype)
+                    and not prototype_stale
+                    and admission_review.get("decision") == "admitted"
+                    and str(state.get("accepted_prototype_digest") or "")
+                    != str(prototype.get("digest") or "")
+                ),
                 "context_coverage": (prototype or {}).get("context_coverage") or {},
             },
             "accepted_prototype": accepted,
@@ -752,6 +758,16 @@ class ResearchOrchestrator:
         session = state.get("development_session")
         if not isinstance(session, Mapping):
             raise ValueError("accept the ResearchPrototype before opening a Builder Development Session")
+        brief = state.get("automation_brief")
+        if not isinstance(brief, Mapping):
+            raise ValueError("the accepted AutomationBrief is unavailable")
+        attached = development_sessions.attach_instruction(
+            str(session["session_id"]),
+            "automation_brief",
+            brief,
+            expected_digest=str(session["handoff"]["automation_brief_digest"]),
+        )
+        session = attached["session"]
         binding = development_sessions.bind(str(session["session_id"]), builder_webspace_id)
         selected = builder_preview.select_project(
             "skill",
@@ -766,7 +782,7 @@ class ResearchOrchestrator:
             zone=str(scope["zone"]),
             subnet_id=str(scope["subnet_id"]),
             webspace_id=builder_webspace_id,
-            space_kind="workspace",
+            space_kind="development",
             expected_scenario_id="builder",
         )
         builder_url = _address_builder_url(
@@ -780,6 +796,7 @@ class ResearchOrchestrator:
             "destination": destination,
             "binding": binding["binding"],
             "session": session,
+            "instruction": attached["instruction"],
             "builder_selection": selected,
             "codex_started": False,
         }
@@ -1993,7 +2010,13 @@ class ResearchOrchestrator:
                 },
                 actor=actor,
             )
-            session = session_result["session"]
+            attached = development_sessions.attach_instruction(
+                str(session_result["session"]["session_id"]),
+                "automation_brief",
+                stored,
+                expected_digest=str(stored["digest"]),
+            )
+            session = attached["session"]
             self.repository.activity(token, "acceptance", "handoff_ready", "Research formulation accepted; Automation Brief and scoped Development Session are ready. Codex was not started.", {"prototype_digest": prototype_digest, "automation_brief_digest": stored["digest"], "development_session_id": session["session_id"], "checkpoint": checkpoint})
             return {"ok": True, "direction": self.repository.get_direction(token), "prototype": prototype, "automation_brief": stored, "development_session": session, "builder_checkpoint": checkpoint, "codex_started": False}
 

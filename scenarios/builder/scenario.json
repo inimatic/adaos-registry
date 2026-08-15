@@ -388,7 +388,10 @@
                                     "canPublish": "can_publish",
                                     "workflowGeneration": "workflow_generation",
                                     "changeLabel": "change_label",
-                                    "canStartImplementation": "can_start_implementation"
+                                    "canStartImplementation": "can_start_implementation",
+                                    "developmentSessionId": "development_session_id",
+                                    "developmentImplementationBrief": "development_implementation_brief",
+                                    "developmentImplementationBriefDigest": "development_implementation_brief_digest"
                                 }
                             }
                         },
@@ -651,6 +654,8 @@
                                         "id": "implementation_brief",
                                         "type": "longText",
                                         "label": "Утверждённый implementation brief",
+                                        "defaultValue": "$state.developmentImplementationBrief",
+                                        "helpText": "A bound Development Session supplies this exact digest-verified instruction automatically. Builder rejects edits that do not match it.",
                                         "required": true,
                                         "label_i18n": {
                                             "key": "builder.text.approved.implementation.brief"
@@ -3106,6 +3111,8 @@
                                             "id": "implementation_brief",
                                             "type": "longText",
                                             "label": "Утверждённый implementation brief",
+                                            "defaultValue": "$state.developmentImplementationBrief",
+                                            "helpText": "A bound Development Session supplies this exact digest-verified instruction automatically. Builder rejects edits that do not match it.",
                                             "required": true,
                                             "label_i18n": {
                                                 "key": "builder.text.approved.implementation.brief"
