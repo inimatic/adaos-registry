@@ -3,7 +3,10 @@ from __future__ import annotations
 import asyncio
 from types import SimpleNamespace
 
-from skills.subnet_env.handlers import main
+try:
+    from skills.subnet_env.handlers import main
+except ModuleNotFoundError:
+    from handlers import main
 
 
 def test_snapshot_demand_refreshes_subnet_env_projection(monkeypatch):
