@@ -96,7 +96,7 @@ def test_projection_demand_for_another_node_is_ignored(monkeypatch):
     monkeypatch.setattr(
         main,
         "get_self_object",
-        lambda: {"id": "hub-local"},
+        lambda: {"id": "hub:hub-local"},
     )
 
     asyncio.run(
@@ -112,3 +112,29 @@ def test_projection_demand_for_another_node_is_ignored(monkeypatch):
     )
 
     assert calls == []
+
+
+def test_projection_demand_accepts_raw_target_for_canonical_self(monkeypatch):
+    calls: list[str | None] = []
+    main._LAST_DEMAND_REFRESH.clear()
+    monkeypatch.setattr(
+        main,
+        "_refresh",
+        lambda *, webspace_id=None: calls.append(webspace_id) or {"summary": {"value": "dev"}},
+    )
+    monkeypatch.setattr(main, "set_current_skill", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(main, "get_self_object", lambda: {"id": "hub:hub-local"})
+
+    asyncio.run(
+        main.on_webio_yjs_snapshot_requested(
+            SimpleNamespace(
+                payload={
+                    "webspace_id": "desktop",
+                    "slot": "subnet_env.snapshot",
+                    "target_node_id": "hub-local",
+                }
+            )
+        )
+    )
+
+    assert calls == ["desktop"]

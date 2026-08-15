@@ -1073,7 +1073,18 @@ def _project_weather_current(data: Dict[str, Any], *, webspace_id: Optional[str]
     loop.create_task(_project_weather_current_async(data, webspace_id=webspace_id, status=status))
 
 
-def _target_context(payload: Dict[str, Any]) -> Tuple[bool, str, Optional[str]]:
+_CANONICAL_NODE_KINDS = frozenset({"hub", "member", "node", "redevice"})
+
+
+def _node_identity_token(value: Any) -> str:
+    raw = str(value or "").strip()
+    kind, separator, token = raw.partition(":")
+    if separator and kind.lower() in _CANONICAL_NODE_KINDS and token:
+        return token
+    return raw
+
+
+def _target_context(payload: Dict[str, Any]) -> Tuple[bool, str, Optional[str], str]:
     target_node_id = str(
         payload.get("target_node_id")
         or (payload.get("_meta") or {}).get("target_node_id")
@@ -1085,11 +1096,13 @@ def _target_context(payload: Dict[str, Any]) -> Tuple[bool, str, Optional[str]]:
     webspace_id = str(raw_ws).strip() if raw_ws else None
     try:
         self_object = get_self_object()
-        local_node_id = str(self_object.get("id") or self_object.get("node_id") or "").strip()
+        local_node_id = str(self_object.get("node_id") or self_object.get("id") or "").strip()
     except Exception:
         local_node_id = ""
-    allowed = not target_node_id or bool(local_node_id and target_node_id == local_node_id)
-    return allowed, target_node_id, webspace_id
+    target_token = _node_identity_token(target_node_id)
+    local_token = _node_identity_token(local_node_id)
+    allowed = not target_token or bool(local_token and target_token == local_token)
+    return allowed, target_node_id, webspace_id, local_node_id
 
 
 async def _refresh_weather_live_snapshot(
@@ -1145,9 +1158,13 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
         payload = _event_payload(evt)
         if not payload:
             return
-        allowed, target_node_id, webspace_id = _target_context(payload)
+        allowed, target_node_id, webspace_id, local_node_id = _target_context(payload)
         if not allowed:
-            _log.info("weather request ignored: target_node_mismatch target_node_id=%s", target_node_id)
+            _log.info(
+                "weather request ignored: target_node_mismatch target_node_id=%s local_node_id=%s",
+                target_node_id,
+                local_node_id or "missing",
+            )
             return
 
         city = _extract_city_from_payload(payload)

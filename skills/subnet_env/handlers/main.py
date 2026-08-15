@@ -672,6 +672,17 @@ def _event_webspace_id(payload: dict[str, Any]) -> str | None:
     return token or None
 
 
+_CANONICAL_NODE_KINDS = frozenset({"hub", "member", "node", "redevice"})
+
+
+def _node_identity_token(value: Any) -> str:
+    raw = str(value or "").strip()
+    kind, separator, token = raw.partition(":")
+    if separator and kind.lower() in _CANONICAL_NODE_KINDS and token:
+        return token
+    return raw
+
+
 def _request_targets_local_node(payload: dict[str, Any]) -> bool:
     meta = payload.get("_meta") if isinstance(payload.get("_meta"), dict) else {}
     target_node_id = str(
@@ -682,10 +693,19 @@ def _request_targets_local_node(payload: dict[str, Any]) -> bool:
     ).strip()
     try:
         self_object = get_self_object()
-        local_node_id = str(self_object.get("id") or self_object.get("node_id") or "").strip()
+        local_node_id = str(self_object.get("node_id") or self_object.get("id") or "").strip()
     except Exception:
         local_node_id = ""
-    return not target_node_id or bool(local_node_id and target_node_id == local_node_id)
+    target_token = _node_identity_token(target_node_id)
+    local_token = _node_identity_token(local_node_id)
+    allowed = not target_token or bool(local_token and target_token == local_token)
+    if not allowed:
+        _log.info(
+            "subnet_env projection request ignored: target_node_mismatch target_node_id=%s local_node_id=%s",
+            target_node_id,
+            local_node_id or "missing",
+        )
+    return allowed
 
 
 def _is_subnet_env_projection_request(payload: dict[str, Any]) -> bool:
