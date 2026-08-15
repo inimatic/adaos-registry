@@ -32,6 +32,33 @@ def _candidate() -> dict:
         "evidence_policy": {"historical_results": "exploratory_source_only", "workflow_smoke": "workflow_evidence_only", "negative_results": "retain_and_report"},
         "experimental_plan": {
             "comparators": ["maxpool", "tlp"],
+            "system_specification": {
+                "subject": "Paired STL-10 pooling classifier",
+                "components": [
+                    {
+                        "id": "convnet",
+                        "role": "subject",
+                        "specification": "Source-derived fixed convolutional classifier used by both arms.",
+                        "settings": [
+                            {"key": "layer_sequence", "value": "conv32,pool1,conv64,pool2,conv128,pool3,fc256,fc10"},
+                            {"key": "optimizer", "value": "Adam(lr=0.001)"},
+                        ],
+                        "decision_status": "source_derived",
+                        "source_refs": [source_ref],
+                    },
+                    {
+                        "id": "pool2",
+                        "role": "intervention",
+                        "specification": "Only pool2 varies between MaxPool and centered channel-wise max-plus pooling.",
+                        "settings": [{"key": "window", "value": "2x2 stride 2"}],
+                        "decision_status": "source_derived",
+                        "source_refs": [source_ref],
+                    },
+                ],
+                "locked_invariants": ["All non-pool2 architecture and optimization settings are identical."],
+                "intervention_boundary": "Only the pool2 operator and its declared trainability may differ.",
+                "unresolved_choices": [],
+            },
             "stages": [
                 {"id": "smoke", "purpose": "validate the complete local workflow", "evidence_class": "workflow_smoke", "execution_profile": {"device": "cpu", "epochs": 3}, "budget": {"epochs": 3, "seeds": 1}, "inference_allowed": False, "stop_conditions": ["both paired arms finish or one fails"]},
                 {"id": "series", "purpose": "estimate the locked paired scientific contrasts", "evidence_class": "confirmatory", "execution_profile": {"device": "declared member"}, "budget": {"seeds": 10}, "inference_allowed": True, "stop_conditions": ["enumerated trials complete or budget exhausts"]},
@@ -159,6 +186,13 @@ def test_prototype_and_automation_brief_bind_exact_inputs() -> None:
     assert brief["project"]["manifest_digest"] == "sha256:" + "6" * 64
     assert brief["development_scope"]["targets"][0]["access"] == "read-write"
     assert brief["development_scope"]["context_members"][0]["access"] == "read-only"
+    assert any(item["ref"] == "skill:research_manager_skill" for item in brief["development_scope"]["context_members"])
+    runner = next(item for item in brief["contract_requirements"] if item["id"] == "research.runner.provider")
+    assert runner["consumer_ref"] == "skill:research_manager_skill"
+    assert runner["operations"] == ["prepare_attempt", "collect_attempt", "verify_artifact", "dataset_status"]
+    tracker = next(item for item in brief["contract_requirements"] if item["id"] == "research.tracker.indirect")
+    assert tracker["owner_ref"] == "skill:research_manager_skill"
+    assert tracker["operations"] == []
     assert any("direction-specific scenario" in item["check"] for item in brief["acceptance_checks"])
     assert any("three-epoch" in item.lower() for item in brief["prohibited_actions"])
 
@@ -206,6 +240,28 @@ def test_contract_accepts_compact_scientific_units_and_one_declared_pairing_inva
     )
 
     assert prototype["admission_review"]["decision"] == "admitted"
+
+
+def test_automation_admission_requires_exact_system_specification_for_new_prototypes() -> None:
+    candidate = _candidate()
+    candidate["experimental_plan"].pop("system_specification")
+
+    prototype = materialize_prototype(
+        candidate,
+        direction_id="tlp_direction_skill",
+        source_bundle_digest="sha256:" + "1" * 64,
+        context_coverage=_coverage(),
+        revision=1,
+        parent_digest=None,
+        actor="user:test",
+    )
+
+    assert prototype["schema_version"] == "1.3.0"
+    assert prototype["admission_review"]["decision"] == "needs_discussion"
+    assert any(
+        item["id"] == "design.system_specification" and item["passed"] is False
+        for item in prototype["admission_review"]["checks"]
+    )
 
 
 def test_deterministic_admission_review_cannot_be_self_asserted_or_cite_omitted_context() -> None:

@@ -114,6 +114,13 @@ def problem_frame_schema() -> dict[str, Any]:
 
 def protocol_design_schema() -> dict[str, Any]:
     properties = prototype_candidate_schema()["properties"]
+    system_specification = copy.deepcopy(
+        properties["experimental_plan"]["properties"]["system_specification"]
+    )
+    system_specification["properties"]["components"]["items"]["properties"]["source_refs"] = {
+        "type": "array",
+        "items": {"type": "string", "pattern": "^SRC-[0-9]{3}$"},
+    }
     execution_profile = _object(
         {
             "node": {"type": "string", "minLength": 2},
@@ -158,6 +165,7 @@ def protocol_design_schema() -> dict[str, Any]:
     experimental_plan = _object(
         {
             "comparators": properties["experimental_plan"]["properties"]["comparators"],
+            "system_specification": system_specification,
             "stages": {
                 "type": "array",
                 "minItems": 2,
@@ -180,7 +188,7 @@ def protocol_design_schema() -> dict[str, Any]:
             ),
             "reproducibility": properties["experimental_plan"]["properties"]["reproducibility"],
         },
-        ["comparators", "stages", "data_policy", "reproducibility"],
+        ["comparators", "system_specification", "stages", "data_policy", "reproducibility"],
     )
     experimental_plan["properties"]["reproducibility"]["properties"]["environment"]["additionalProperties"] = False
     decision = _object(
@@ -339,6 +347,24 @@ def stage_quality_issues(
             issues.append("a two-sided difference hypothesis cannot treat the opposite direction as falsification")
     elif stage == "protocol_design":
         plan = payload["experimental_plan"]
+        system_spec = plan["system_specification"]
+        component_ids = [str(item["id"]) for item in system_spec["components"]]
+        if len(component_ids) != len(set(component_ids)):
+            issues.append("system_specification component ids must be unique")
+        for component in system_spec["components"]:
+            refs = {str(ref) for ref in component.get("source_refs") or []}
+            status = str(component.get("decision_status") or "")
+            if status == "source_derived" and not refs:
+                issues.append(f"source-derived system component {component['id']} requires source_refs")
+            if status != "source_derived" and refs:
+                issues.append(f"non-source system component {component['id']} must leave source_refs empty")
+            if allowed_source_refs is not None and not refs.issubset(allowed_source_refs):
+                issues.append(f"system component {component['id']} cites an unavailable source id")
+            setting_keys = [str(item["key"]) for item in component["settings"]]
+            if len(setting_keys) != len(set(setting_keys)):
+                issues.append(f"system component {component['id']} setting keys must be unique")
+        if system_spec.get("unresolved_choices"):
+            issues.append("system_specification unresolved_choices must be empty before automation")
         stages = [item for item in plan["stages"] if isinstance(item, Mapping)]
         smoke = [item for item in stages if item.get("evidence_class") == "workflow_smoke"]
         confirmation = [item for item in stages if item.get("evidence_class") == "confirmatory"]
@@ -613,6 +639,8 @@ def assemble_candidate(
                 }
             )
     experimental_plan = copy.deepcopy(protocol["experimental_plan"])
+    for component in experimental_plan["system_specification"]["components"]:
+        component["source_refs"] = resolve_refs(component)
     evaluation_access = experimental_plan["data_policy"]["evaluation_access"]
     evaluation_access["selection_rule"] = _compile_selection_rule(
         str(evaluation_access["selection_source"])

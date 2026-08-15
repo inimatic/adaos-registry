@@ -120,6 +120,27 @@ def build_admission_review(value: Mapping[str, Any]) -> dict[str, Any]:
 
     comparators = [str(item).strip().lower() for item in plan.get("comparators") or [] if str(item).strip()]
     _check(checks, "design.comparators", "quality", len(set(comparators)) >= 2, "at least two distinct comparators are required")
+    system_spec = plan.get("system_specification") if isinstance(plan.get("system_specification"), Mapping) else {}
+    components = [item for item in system_spec.get("components") or [] if isinstance(item, Mapping)]
+    component_ids = [str(item.get("id") or "").strip() for item in components]
+    system_spec_required = str(value.get("schema_version") or "") == "1.3.0"
+    system_spec_complete = (
+        len(components) >= 2
+        and all(component_ids)
+        and len(component_ids) == len(set(component_ids))
+        and all(item.get("settings") for item in components)
+        and bool(list(system_spec.get("locked_invariants") or []))
+        and bool(str(system_spec.get("intervention_boundary") or "").strip())
+        and not list(system_spec.get("unresolved_choices") or [])
+        and not _has_placeholder(system_spec)
+    )
+    _check(
+        checks,
+        "design.system_specification",
+        "quality",
+        system_spec_complete if system_spec_required else (not system_spec or system_spec_complete),
+        "automation-ready protocols require exact components, settings, locked invariants, one intervention boundary, and no unresolved implementation choices",
+    )
     reproducibility = plan.get("reproducibility") if isinstance(plan.get("reproducibility"), Mapping) else {}
     streams = {
         str(item.get("id") or "").strip().lower()
@@ -181,6 +202,8 @@ def build_admission_review(value: Mapping[str, Any]) -> dict[str, Any]:
     }
     grounding = [item for item in value.get("source_grounding") or [] if isinstance(item, Mapping)]
     cited_refs = {str(ref) for item in grounding for ref in item.get("source_refs") or []}
+    source_components = [item for item in components if item.get("decision_status") == "source_derived"]
+    component_refs = {str(ref) for item in source_components for ref in item.get("source_refs") or []}
     hypothesis_ids = {str(item.get("id") or "") for item in value.get("hypotheses") or [] if isinstance(item, Mapping)}
     grounded_ids = {str(item.get("claim_id") or "") for item in grounding}
     hypothesis_grounding = {
@@ -195,6 +218,14 @@ def build_admission_review(value: Mapping[str, Any]) -> dict[str, Any]:
         and str(item.get("claim_id") or "") not in hypothesis_ids
     ]
     _check(checks, "sources.provenance", "quality", bool(cited_refs) and cited_refs.issubset(admitted_refs), "source_grounding may cite only context fragments actually supplied to the formulation model")
+    _check(
+        checks,
+        "sources.system_specification",
+        "quality",
+        (not source_components or all(item.get("source_refs") for item in source_components))
+        and component_refs.issubset(admitted_refs),
+        "source-derived system components must cite only context fragments supplied to the formulation model",
+    )
     _check(checks, "sources.hypotheses_grounded", "quality", bool(hypothesis_ids) and hypothesis_ids.issubset(grounded_ids), "every hypothesis id must have an explicit source-grounding record")
     _check(checks, "sources.hypothesis_stance", "quality", bool(hypothesis_ids) and hypothesis_ids.issubset(hypothesis_grounding), "every hypothesis must be grounded with stance=hypothesis, never promoted to an observed source fact")
     _check(checks, "sources.observations_separated", "quality", bool(observed_claims), "at least one independent observed source claim must be separated from hypothesis identifiers")
@@ -265,7 +296,7 @@ def materialize_prototype(
     candidate.update(
         {
             "schema": "adaos.research.prototype.v1",
-            "schema_version": "1.2.0",
+            "schema_version": "1.3.0",
             "direction": {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"},
             "revision": int(revision),
             "parent_digest": parent_digest,
@@ -295,7 +326,7 @@ def materialize_automation_brief(
     implementation_requirements = list(prototype.get("implementation_requirements") or [])
     brief = {
         "schema": "adaos.research.automation_brief.v1",
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "brief_id": f"automation-{prototype['digest'].removeprefix('sha256:')[:20]}",
         "direction": {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"},
         "project": {
@@ -350,17 +381,38 @@ def materialize_automation_brief(
             "context_members": [
                 {"ref": "scenario:research_workbench", "relation": "presentation", "access": "read-only", "context": "contract"},
                 {"ref": "skill:research_orchestrator_skill", "relation": "dependency", "access": "read-only", "context": "contract"},
+                {"ref": "skill:research_manager_skill", "relation": "contract-consumer", "access": "read-only", "context": "contract"},
             ],
             "artifact_inputs": [
                 {"ref": item["ref"], "access": "read-only", "manifest_digest": item["digest"], "root_path": item["root_path"]}
                 for item in artifact_groups
             ],
         },
+        "contract_requirements": [
+            {
+                "id": "research.runner.provider",
+                "contract": "adaos.research.runner.v1",
+                "capability": "research.runner",
+                "role": "provider",
+                "consumer_ref": "skill:research_manager_skill",
+                "operations": ["prepare_attempt", "collect_attempt", "verify_artifact", "dataset_status"],
+                "boundary": "The direction skill prepares an ExecutionSpec-compatible command and returns normalized observations and portable artifact refs; research_manager_skill owns attempt submission, tracker sessions, ingestion, and finalization.",
+            },
+            {
+                "id": "research.tracker.indirect",
+                "contract": "adaos.research.tracker.v1",
+                "role": "indirect-consumer",
+                "owner_ref": "skill:research_manager_skill",
+                "operations": [],
+                "boundary": "The direction skill must not open, query, or close tracker sessions. It emits runner collection data for ingestion by research_manager_skill.",
+            },
+        ],
         "implementation_requirements": implementation_requirements,
         "acceptance_checks": [
             {"id": "adaos.direction_boundary", "check": "Preserve the Project-owned direction-skill boundary; do not create a direction-specific scenario.", "evidence": "Project manifest and package inventory"},
             {"id": "adaos.data_ownership", "check": "Keep primary experimental data in this direction skill's scoped runtime data bucket.", "evidence": "Resolved capability bindings and runtime paths"},
-            {"id": "adaos.runner_contract", "check": "Implement the declared runner contract and deterministic CPU smoke profile.", "evidence": "Native runner conformance and smoke reports"},
+            {"id": "adaos.runner_contract", "check": "Provide adaos.research.runner.v1 through prepare_attempt, collect_attempt, verify_artifact, and dataset_status; let research_manager_skill orchestrate attempts and tracking.", "evidence": "Consumer-driven runner conformance, installation, and bounded smoke reports"},
+            {"id": "adaos.tracker_boundary", "check": "Return normalized observations and portable ContentRefs without creating a direction-owned Tracker implementation.", "evidence": "ResearchManager ingestion conformance and absence of direct tracker-session calls"},
             {"id": "adaos.content_identity", "check": "Bind experiment inputs, code, environment, metrics and evidence by digest.", "evidence": "ContentRef and tracker records"},
             {"id": "adaos.historical_evidence", "check": "Treat imported notebook outputs as untrusted exploratory source material.", "evidence": "Evidence classification in produced records"},
             {"id": "adaos.native_validation", "check": "Pass native AdaOS skill validation, package tests and research runner conformance checks.", "evidence": "CLI validation and test reports"},

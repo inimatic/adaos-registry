@@ -36,6 +36,33 @@ def _protocol(*, unresolved: bool = False) -> dict:
         "assistant_message": "Предложен двухстадийный протокол.",
         "experimental_plan": {
             "comparators": ["MaxPool", "TLP"],
+            "system_specification": {
+                "subject": "Paired STL-10 pooling classifier",
+                "components": [
+                    {
+                        "id": "convnet",
+                        "role": "subject",
+                        "specification": "Fixed source-derived convolutional classifier for both paired arms.",
+                        "settings": [
+                            {"key": "layer_sequence", "value": "conv32,pool1,conv64,pool2,conv128,pool3,fc256,fc10"},
+                            {"key": "optimizer", "value": "Adam(lr=0.001)"},
+                        ],
+                        "decision_status": "source_derived",
+                        "source_refs": [REF],
+                    },
+                    {
+                        "id": "pool2",
+                        "role": "intervention",
+                        "specification": "Only pool2 varies between MaxPool and centered channel-wise max-plus pooling.",
+                        "settings": [{"key": "window", "value": "2x2 stride 2"}],
+                        "decision_status": "source_derived",
+                        "source_refs": [REF],
+                    },
+                ],
+                "locked_invariants": ["Every non-pool2 parameter and data stream remains identical."],
+                "intervention_boundary": "Only the pool2 operator and its trainability may differ between arms.",
+                "unresolved_choices": [],
+            },
             "stages": [
                 {"id": "smoke", "purpose": "Проверить исполнимость и сбор evidence.", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current", "device": "cpu"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30}, "inference_allowed": False, "stop_conditions": ["Остановить при нечисловом loss."]},
                 {"id": "confirmatory", "purpose": "Оценить заранее объявленный парный контраст.", "evidence_class": "confirmatory", "execution_profile": {"node": "member", "device": "cpu"}, "budget": {"epochs": 30, "seed_values": seed_values, "max_wall_time_minutes": 360}, "inference_allowed": True, "stop_conditions": ["Завершить фиксированный бюджет."]},
@@ -175,6 +202,17 @@ def test_resolved_protocol_decision_cannot_retain_a_blocking_question() -> None:
 
     assert stage_quality_issues("protocol_design", protocol) == [
         "resolved decision budget must leave blocking_question empty"
+    ]
+
+
+def test_protocol_system_specification_cannot_hide_an_unresolved_implementation_choice() -> None:
+    protocol = _protocol()
+    protocol["experimental_plan"]["system_specification"]["unresolved_choices"] = [
+        "optimizer is not selected"
+    ]
+
+    assert stage_quality_issues("protocol_design", protocol) == [
+        "system_specification unresolved_choices must be empty before automation"
     ]
 
 
