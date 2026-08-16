@@ -999,6 +999,30 @@ def test_infrastate_schedule_snapshot_refresh_starts_thread_without_running_loop
     assert mod._background_refresh_reason == "test.no_loop"
 
 
+def test_infrastate_schedule_snapshot_refresh_does_not_touch_memory_on_event_loop(monkeypatch):
+    mod = _load_infrastate_module()
+
+    def _forbidden_ui_write(**_kwargs):
+        raise AssertionError("skill memory I/O ran while scheduling an event refresh")
+
+    monkeypatch.setattr(mod, "_write_ui_state", _forbidden_ui_write)
+    mod._background_refresh_task = None
+    mod._background_refresh_thread = None
+    mod._background_refresh_pending = False
+
+    async def _run() -> None:
+        mod._schedule_snapshot_refresh(webspace_id="desktop", reason="skills.activated")
+        task = mod._background_refresh_task
+        assert task is not None
+        assert mod._projection_diag["last_refresh_scheduled_reason"] == "skills.activated"
+        assert mod._projection_diag["last_refresh_scheduled_webspace_id"] == "desktop"
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(_run())
+
+
 def test_infrastate_background_refresh_memory_io_does_not_block_event_loop(monkeypatch):
     mod = _load_infrastate_module()
     io_thread_ids: list[int] = []

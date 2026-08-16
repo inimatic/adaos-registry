@@ -216,6 +216,11 @@ _projection_diag = {
     "max_refresh_payload_bytes": 0,
     "last_refresh_projected_slots": [],
     "last_refresh_error": "",
+    "refresh_schedule_total": 0,
+    "refresh_schedule_coalesced_total": 0,
+    "last_refresh_scheduled_at": None,
+    "last_refresh_scheduled_reason": "",
+    "last_refresh_scheduled_webspace_id": "",
 }
 _PROJECTION_EXECUTOR: ThreadPoolExecutor | None = None
 _STREAM_SNAPSHOT_EXECUTOR: ThreadPoolExecutor | None = None
@@ -2160,6 +2165,13 @@ def _projection_diag_snapshot() -> dict[str, Any]:
         "snapshot_request_total": int(_projection_diag.get("snapshot_request_total") or 0),
         "snapshot_request_forced_total": int(_projection_diag.get("snapshot_request_forced_total") or 0),
         "snapshot_request_coalesced_total": int(_projection_diag.get("snapshot_request_coalesced_total") or 0),
+        "refresh_schedule_total": int(_projection_diag.get("refresh_schedule_total") or 0),
+        "refresh_schedule_coalesced_total": int(_projection_diag.get("refresh_schedule_coalesced_total") or 0),
+        "last_refresh_scheduled_at": _projection_diag.get("last_refresh_scheduled_at"),
+        "last_refresh_scheduled_reason": str(_projection_diag.get("last_refresh_scheduled_reason") or ""),
+        "last_refresh_scheduled_webspace_id": str(
+            _projection_diag.get("last_refresh_scheduled_webspace_id") or ""
+        ),
         "tool_project_admitted_under_pressure_total": int(_projection_diag.get("tool_project_admitted_under_pressure_total") or 0),
         "tool_project_suppressed_total": int(_projection_diag.get("tool_project_suppressed_total") or 0),
         "tool_project_current_skip_total": int(_projection_diag.get("tool_project_current_skip_total") or 0),
@@ -5127,18 +5139,24 @@ def _set_background_refresh_pending(*, webspace_id: str | None, reason: str) -> 
     global _background_refresh_webspace_id
 
     token = str(webspace_id or "").strip() or None
+    coalesced = bool(
+        _background_refresh_pending
+        or (_background_refresh_task is not None and not _background_refresh_task.done())
+        or (_background_refresh_thread is not None and _background_refresh_thread.is_alive())
+    )
+    requested_at = time.time()
     _background_refresh_pending = True
     if token:
         _background_refresh_webspace_id = token
     _background_refresh_reason = str(reason or "runtime.event").strip() or "runtime.event"
-    _write_ui_state(
-        background_refresh_pending=True,
-        background_refresh_running=bool(_background_refresh_task and not _background_refresh_task.done()),
-        background_refresh_reason=_background_refresh_reason,
-        background_refresh_requested_at=time.time(),
-        background_refresh_webspace_id=_background_refresh_webspace_id or "",
-        background_refresh_error="",
-    )
+    _projection_diag["refresh_schedule_total"] = int(_projection_diag.get("refresh_schedule_total") or 0) + 1
+    if coalesced:
+        _projection_diag["refresh_schedule_coalesced_total"] = int(
+            _projection_diag.get("refresh_schedule_coalesced_total") or 0
+        ) + 1
+    _projection_diag["last_refresh_scheduled_at"] = requested_at
+    _projection_diag["last_refresh_scheduled_reason"] = _background_refresh_reason
+    _projection_diag["last_refresh_scheduled_webspace_id"] = _background_refresh_webspace_id or ""
 
 
 async def _background_refresh_worker() -> None:
@@ -5279,12 +5297,9 @@ def _schedule_snapshot_refresh(*, webspace_id: str | None = None, reason: str = 
     global _background_refresh_task
     global _background_refresh_webspace_id
 
-    pushed = _push_infrastate_skill_context()
-    try:
-        _set_background_refresh_pending(webspace_id=webspace_id, reason=reason)
-    finally:
-        if pushed:
-            clear_current_skill()
+    # Event subscribers share the core event loop. Scheduling must stay memory-only;
+    # skill-memory JSON I/O is performed by the background worker.
+    _set_background_refresh_pending(webspace_id=webspace_id, reason=reason)
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
