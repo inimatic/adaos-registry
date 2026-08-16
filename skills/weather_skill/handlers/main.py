@@ -47,6 +47,8 @@ _GEOCODE_CACHE_TTL = 24 * 60 * 60.0
 _CITY_CACHE_MAX_ITEMS = 128
 _GEOCODE_CACHE_MAX_ITEMS = 512
 _STALE_WEATHER_CACHE_TTL = 24 * 60 * 60.0
+_WEBSPACE_SNAPSHOT_MEMORY_PREFIX = "webspace_snapshot."
+_WEBSPACE_SNAPSHOT_TTL = _CITY_CACHE_TTL
 _WEATHER_UNAVAILABLE_TEXT = "\u041d\u0435 \u0443\u0434\u0430\u0435\u0442\u0441\u044f \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0434\u0430\u043d\u043d\u044b\u0435 \u043e \u043f\u043e\u0433\u043e\u0434\u0435."
 
 WEATHER_CURRENT_FIELDS = [
@@ -164,6 +166,49 @@ def _cache_put(
             oldest = min(cache, key=lambda item_key: cache[item_key][0])
             cache.pop(oldest, None)
         cache[key] = (now, dict(value))
+
+
+def _webspace_snapshot_memory_key(webspace_id: Optional[str]) -> str:
+    token = str(webspace_id or "default").strip() or "default"
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", token)[:120] or "default"
+    return f"{_WEBSPACE_SNAPSHOT_MEMORY_PREFIX}{safe}"
+
+
+def _load_webspace_snapshot(webspace_id: Optional[str]) -> Optional[Dict[str, Any]]:
+    try:
+        value = memory_get(_webspace_snapshot_memory_key(webspace_id))
+    except Exception:
+        _log.warning("failed to read persisted weather snapshot webspace=%s", webspace_id or "default", exc_info=True)
+        return None
+    if not isinstance(value, dict) or not isinstance(value.get("current"), dict):
+        return None
+    return dict(value)
+
+
+def _webspace_snapshot_fresh(snapshot: Dict[str, Any]) -> bool:
+    current = snapshot.get("current") if isinstance(snapshot.get("current"), dict) else {}
+    raw_updated_at = current.get("updated_at") or snapshot.get("updated_at")
+    try:
+        if isinstance(raw_updated_at, (int, float)):
+            updated_at = float(raw_updated_at)
+        else:
+            token = str(raw_updated_at or "").strip().replace("Z", "+00:00")
+            updated_at = datetime.fromisoformat(token).timestamp()
+    except (TypeError, ValueError):
+        return False
+    age_s = time.time() - updated_at
+    return -60.0 <= age_s < _WEBSPACE_SNAPSHOT_TTL
+
+
+def _store_webspace_snapshot(webspace_id: Optional[str], snapshot: Dict[str, Any]) -> None:
+    try:
+        memory_set(_webspace_snapshot_memory_key(webspace_id), snapshot)
+        current = snapshot.get("current") if isinstance(snapshot.get("current"), dict) else {}
+        city = _normalize_city_token(current.get("city"))
+        if city and city.lower() != "current location":
+            memory_set("last_city", city)
+    except Exception:
+        _log.warning("failed to persist weather snapshot webspace=%s", webspace_id or "default", exc_info=True)
 
 _RU_TRANSLIT = {
     ord("\u0430"): "a",
@@ -860,6 +905,13 @@ def get_weather(
     if not ok:
         return {"ok": False, **data}
 
+    selected_city = _normalize_city_token(data.get("city") or target_city)
+    if selected_city and selected_city.lower() != "current location":
+        try:
+            memory_set("last_city", selected_city)
+        except Exception:
+            _log.warning("failed to persist selected weather city city=%s", selected_city, exc_info=True)
+
     if not silent:
         try:
             publish_event(
@@ -894,6 +946,24 @@ def get_snapshot(
         payload["city"] = city
     target_city = _extract_city_from_payload(payload)
     location = _extract_location_from_payload(payload)
+    if not target_city and not location:
+        persisted = _load_webspace_snapshot(webspace_id)
+        if persisted is not None:
+            current = dict(persisted.get("current") or {})
+            if str(persisted.get("status") or "ok").strip().lower() != "error" and _webspace_snapshot_fresh(persisted):
+                return {
+                    "ok": True,
+                    "weather": persisted,
+                    "current": current,
+                    "webspace_id": webspace_id,
+                    "target_node_id": target_node_id or node_id or "",
+                    "snapshot_source": "skill_memory",
+                }
+            persisted_location = current.get("location") if isinstance(current.get("location"), dict) else None
+            if persisted_location and persisted_location.get("latitude") is not None and persisted_location.get("longitude") is not None:
+                location = dict(persisted_location)
+            else:
+                target_city = _normalize_city_token(current.get("city")) or None
     result = get_weather({"city": target_city, "location": location, "silent": True})
     ok = bool(isinstance(result, dict) and result.get("ok"))
     if ok:
@@ -910,6 +980,7 @@ def get_snapshot(
         _, default_city = _load_config()
         current = _weather_current_payload(target_city or default_city or "Moscow", None, ok=False, error=str(result.get("error") or "weather_api_unavailable"))
         snapshot = _weather_projection_payload(current, status="error")
+    _store_webspace_snapshot(webspace_id, snapshot)
     return {
         "ok": ok,
         "weather": snapshot,
@@ -1054,6 +1125,7 @@ async def _project_weather_snapshot_async(snapshot: Dict[str, Any], *, webspace_
     try:
         pushed = set_current_skill("weather_skill")
         await ctx_subnet.set_async("weather.snapshot", snapshot, webspace_id=webspace_id)
+        await asyncio.to_thread(_store_webspace_snapshot, webspace_id, snapshot)
     except Exception:
         _log.warning("failed to project weather.snapshot via ctx_subnet", exc_info=True)
     finally:

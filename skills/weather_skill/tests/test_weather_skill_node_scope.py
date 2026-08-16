@@ -162,6 +162,105 @@ def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
     assert projected[0][1]["current"]["location"]["latitude"] == 52.52
 
 
+def test_weather_snapshot_returns_last_projected_webspace_state_without_refetch(monkeypatch):
+    mod = _load_weather_module()
+    persisted = {
+        "status": "ok",
+        "current": {
+            "city": "Vienna",
+            "temp_c": 22.3,
+            "request_id": "req-vienna",
+            "pending": False,
+            "source": "api",
+            "updated_at": mod._now_iso(),
+        },
+        "hourly_chart": {"points": []},
+        "daily": [],
+    }
+
+    monkeypatch.setattr(
+        mod,
+        "memory_get",
+        lambda key, default=None: persisted if key == "webspace_snapshot.desktop" else default,
+    )
+    monkeypatch.setattr(
+        mod,
+        "get_weather",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not refetch")),
+    )
+
+    result = mod.get_snapshot(webspace_id="desktop")
+
+    assert result["ok"] is True
+    assert result["snapshot_source"] == "skill_memory"
+    assert result["current"]["city"] == "Vienna"
+    assert result["current"]["request_id"] == "req-vienna"
+
+
+def test_weather_snapshot_refreshes_stale_selected_city_instead_of_default(monkeypatch):
+    mod = _load_weather_module()
+    persisted = {
+        "status": "ok",
+        "current": {
+            "city": "Vienna",
+            "temp_c": 18.0,
+            "updated_at": "2020-01-01T00:00:00+00:00",
+            "source": "api",
+        },
+    }
+    requests: list[dict] = []
+
+    monkeypatch.setattr(
+        mod,
+        "memory_get",
+        lambda key, default=None: persisted if key == "webspace_snapshot.desktop" else default,
+    )
+    monkeypatch.setattr(mod, "memory_set", lambda *_args, **_kwargs: None)
+
+    def _get_weather(payload):
+        requests.append(dict(payload))
+        return {
+            "ok": True,
+            "current": {"city": "Vienna", "temp_c": 22.3, "updated_at": mod._now_iso(), "source": "api"},
+            "hourly_chart": {"points": []},
+            "daily": [],
+        }
+
+    monkeypatch.setattr(mod, "get_weather", _get_weather)
+
+    result = mod.get_snapshot(webspace_id="desktop")
+
+    assert requests[0]["city"] == "Vienna"
+    assert result["current"]["city"] == "Vienna"
+    assert result.get("snapshot_source") is None
+
+
+def test_weather_projection_persists_snapshot_after_yjs_write(monkeypatch):
+    mod = _load_weather_module()
+    projected: list[tuple[str, dict, str | None]] = []
+    memory: dict[str, object] = {}
+
+    class _CtxSubnet:
+        async def set_async(self, slot, payload, webspace_id=None):
+            projected.append((slot, payload, webspace_id))
+
+    snapshot = {
+        "status": "ok",
+        "current": {"city": "Vienna", "temp_c": 22.3, "request_id": "req-vienna", "pending": False},
+    }
+    monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
+    monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "memory_set", lambda key, value: memory.__setitem__(key, value))
+
+    import asyncio
+
+    asyncio.run(mod._project_weather_snapshot_async(snapshot, webspace_id="desktop"))
+
+    assert projected == [("weather.snapshot", snapshot, "desktop")]
+    assert memory["webspace_snapshot.desktop"] == snapshot
+    assert memory["last_city"] == "Vienna"
+
+
 def test_weather_targeted_request_is_only_processed_by_target_node(monkeypatch):
     mod = _load_weather_module()
     fetches: list[str] = []
