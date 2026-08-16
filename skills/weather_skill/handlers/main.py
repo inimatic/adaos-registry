@@ -17,7 +17,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-import requests
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.control_plane import get_self_object
 from adaos.sdk.data.bus import emit
@@ -37,6 +36,8 @@ REQUIRES_DATA_PROJECTIONS = [
 DEFAULT_API_ENDPOINT = "https://api.open-meteo.com/v1/forecast"
 DEFAULT_GEOCODING_ENDPOINT = "https://geocoding-api.open-meteo.com/v1/search"
 WEATHER_API_CHANNEL = "weather.open_meteo.forecast"
+WEATHER_GEOCODING_CHANNEL = "weather.open_meteo.geocoding"
+WEATHER_HTTP_TIMEOUT = (2, 4)
 _LEGACY_API_ENDPOINT_HOSTS = ("api.openweathermap.org",)
 _CITY_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _GEOCODE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
@@ -422,14 +423,21 @@ def _geocode_city(city: str) -> Optional[Dict[str, Any]]:
     cached = _cache_get(_GEOCODE_CACHE, cache_key, ttl_seconds=_GEOCODE_CACHE_TTL)
     if cached:
         return cached
-    try:
-        response = requests.get(
-            DEFAULT_GEOCODING_ENDPOINT,
-            params={"name": canonical, "count": 1, "language": "en", "format": "json"},
-            timeout=5,
+    result = external_api.get(
+        DEFAULT_GEOCODING_ENDPOINT,
+        params={"name": canonical, "count": 1, "language": "en", "format": "json"},
+        service=WEATHER_GEOCODING_CHANNEL,
+        timeout=WEATHER_HTTP_TIMEOUT,
+    )
+    if result.policy_changed:
+        _log.info(
+            "weather geocoding channel policy updated mode=%s attempts=%s",
+            result.mode,
+            result.attempts,
         )
-    except Exception:
+    if not result.ok or result.response is None:
         return None
+    response = result.response
     if response.status_code != 200:
         return None
     try:
@@ -587,7 +595,7 @@ def _fetch_weather_for_location(api_entry_point: str, location: Dict[str, Any]) 
         _normalize_api_entry_point(api_entry_point).rstrip("/"),
         params=params,
         service=WEATHER_API_CHANNEL,
-        timeout=(3, 10),
+        timeout=WEATHER_HTTP_TIMEOUT,
     )
     if result.policy_changed:
         _log.info(
@@ -676,6 +684,7 @@ def _fetch_weather_for_location(api_entry_point: str, location: Dict[str, Any]) 
         "updated_at": current["updated_at"],
         "source": "api",
         "route_mode": result.mode,
+        "attempts": list(result.attempts),
     }
     return True, data
 
@@ -1114,6 +1123,7 @@ async def _refresh_weather_live_snapshot(
     webspace_id: Optional[str],
     request_id: str,
 ) -> None:
+    started = time.monotonic()
     try:
         ok, live = await _fetch_weather_async(api_entry_point, city, location)
         if _WEATHER_UPDATE_TASKS.get(task_key) is not asyncio.current_task():
@@ -1135,14 +1145,18 @@ async def _refresh_weather_live_snapshot(
                 "daily": live.get("daily") if ok else None,
             },
         )
+        await _project_weather_snapshot_async(snapshot, webspace_id=webspace_id)
         _log.info(
-            "weather live update webspace=%s city=%s ok=%s temp_c=%s",
+            "weather live update projected webspace=%s city=%s ok=%s temp_c=%s request_id=%s "
+            "route_mode=%s duration_ms=%d",
             webspace_id or "default",
             current.get("city"),
             ok,
             current.get("temp_c"),
+            request_id or "missing",
+            live.get("route_mode") or "unavailable",
+            round((time.monotonic() - started) * 1000),
         )
-        await _project_weather_snapshot_async(snapshot, webspace_id=webspace_id)
     except asyncio.CancelledError:
         raise
     except Exception:

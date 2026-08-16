@@ -1026,7 +1026,7 @@
       "kind": "skill",
       "id": "weather_skill",
       "name": "weather_skill",
-      "version": "2.6.20",
+      "version": "2.6.21",
       "updated_at": "2026-08-15T19:10:16+00:00",
       "path": "skills/weather_skill",
       "manifest": "skills/weather_skill/skill.yaml",

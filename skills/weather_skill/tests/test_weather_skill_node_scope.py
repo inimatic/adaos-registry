@@ -63,6 +63,7 @@ def test_weather_webui_uses_targeted_projection_observers():
     assert action["on"] == "change"
     assert action["params"]["payload"]["city"] == "$event.value"
     assert action["feedback"]["observe"]["match"]["request_id"] == "$client.requestId"
+    assert action["feedback"]["observe"]["timeout_ms"] == 20000
 
 
 def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch):
@@ -214,7 +215,7 @@ def test_weather_legacy_openweathermap_endpoint_uses_open_meteo(monkeypatch):
     assert ok is True
     assert request["url"] == mod.DEFAULT_API_ENDPOINT
     assert request["service"] == mod.WEATHER_API_CHANNEL
-    assert request["timeout"] == (3, 10)
+    assert request["timeout"] == mod.WEATHER_HTTP_TIMEOUT
     assert request["params"]["latitude"] == 55.75
     assert request["params"]["longitude"] == 37.62
     assert "temperature_2m" in request["params"]["current"]
@@ -223,6 +224,42 @@ def test_weather_legacy_openweathermap_endpoint_uses_open_meteo(monkeypatch):
     assert request["params"]["wind_speed_unit"] == "ms"
     assert data["temp_c"] == 11.25
     assert data["wind_ms"] == 2.5
+
+
+def test_weather_geocoding_uses_resilient_external_api_route(monkeypatch):
+    mod = _load_weather_module()
+    request: dict[str, object] = {}
+
+    class _Response:
+        status_code = 200
+
+        def json(self):
+            return {
+                "results": [
+                    {
+                        "name": "Reykjavik",
+                        "country_code": "IS",
+                        "latitude": 64.1466,
+                        "longitude": -21.9426,
+                        "timezone": "Atlantic/Reykjavik",
+                    }
+                ]
+            }
+
+    def _get(url, *, params=None, service=None, timeout=None):
+        request.update(url=url, params=params, service=service, timeout=timeout)
+        return mod.external_api.ExternalApiResult(ok=True, response=_Response(), mode="global_proxy", url=url)
+
+    monkeypatch.setattr(mod.external_api, "get", _get)
+    mod._GEOCODE_CACHE.clear()
+
+    location = mod._geocode_city("Reykjavik")
+
+    assert request["url"] == mod.DEFAULT_GEOCODING_ENDPOINT
+    assert request["service"] == mod.WEATHER_GEOCODING_CHANNEL
+    assert request["timeout"] == mod.WEATHER_HTTP_TIMEOUT
+    assert location["city"] == "Reykjavik"
+    assert location["source"] == "geocoding"
 
 
 def test_weather_fetch_uses_last_success_as_status_error_fallback(monkeypatch):

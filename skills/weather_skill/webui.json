@@ -126,7 +126,7 @@
                       "kind": "y",
                       "path": "data/weather/current",
                       "scope": "node",
-                      "timeout_ms": 9000,
+                      "timeout_ms": 20000,
                       "match": {
                         "request_id": "$client.requestId",
                         "pending": false
@@ -148,7 +148,7 @@
                       "kind": "y",
                       "path": "data/weather/current",
                       "scope": "node",
-                      "timeout_ms": 9000,
+                      "timeout_ms": 20000,
                       "match": {
                         "request_id": "$client.requestId",
                         "pending": false
@@ -197,7 +197,7 @@
                       "kind": "y",
                       "path": "data/weather/current",
                       "scope": "node",
-                      "timeout_ms": 9000,
+                      "timeout_ms": 20000,
                       "match": {
                         "request_id": "$client.requestId",
                         "pending": false
@@ -219,7 +219,7 @@
                       "kind": "y",
                       "path": "data/weather/current",
                       "scope": "node",
-                      "timeout_ms": 9000,
+                      "timeout_ms": 20000,
                       "match": {
                         "request_id": "$client.requestId",
                         "pending": false
@@ -267,7 +267,7 @@
                       "kind": "y",
                       "path": "data/weather/current",
                       "scope": "node",
-                      "timeout_ms": 9000,
+                      "timeout_ms": 20000,
                       "match": {
                         "request_id": "$client.requestId",
                         "pending": false
@@ -289,7 +289,7 @@
                       "kind": "y",
                       "path": "data/weather/current",
                       "scope": "node",
-                      "timeout_ms": 9000,
+                      "timeout_ms": 20000,
                       "match": {
                         "request_id": "$client.requestId",
                         "pending": false
