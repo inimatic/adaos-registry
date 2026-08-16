@@ -354,8 +354,8 @@
       "kind": "skill",
       "id": "infrastate_skill",
       "name": "infrastate_skill",
-      "version": "0.75.67",
-      "updated_at": "2026-08-15T19:10:16+00:00",
+      "version": "0.75.68",
+      "updated_at": "2026-08-16T08:49:52+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
       "source": {
