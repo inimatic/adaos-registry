@@ -42,6 +42,8 @@ _LEGACY_API_ENDPOINT_HOSTS = ("api.openweathermap.org",)
 _CITY_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _GEOCODE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _CACHE_LOCK = threading.Lock()
+_SNAPSHOT_STATE_LOCK = threading.Lock()
+_WEBSPACE_REQUEST_GENERATIONS: Dict[str, int] = {}
 _CITY_CACHE_TTL = 300.0
 _GEOCODE_CACHE_TTL = 24 * 60 * 60.0
 _CITY_CACHE_MAX_ITEMS = 128
@@ -174,9 +176,49 @@ def _webspace_snapshot_memory_key(webspace_id: Optional[str]) -> str:
     return f"{_WEBSPACE_SNAPSHOT_MEMORY_PREFIX}{safe}"
 
 
+def _webspace_generation_key(webspace_id: Optional[str]) -> str:
+    return _webspace_snapshot_memory_key(webspace_id)
+
+
+def _snapshot_request_generation(snapshot: Any) -> int:
+    if not isinstance(snapshot, dict):
+        return 0
+    try:
+        return max(0, int(snapshot.get("request_generation") or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _current_webspace_request_generation(webspace_id: Optional[str]) -> int:
+    key = _webspace_generation_key(webspace_id)
+    with _SNAPSHOT_STATE_LOCK:
+        local_generation = _WEBSPACE_REQUEST_GENERATIONS.get(key, 0)
+        try:
+            persisted_generation = _snapshot_request_generation(memory_get(key))
+        except Exception:
+            persisted_generation = 0
+        generation = max(local_generation, persisted_generation)
+        _WEBSPACE_REQUEST_GENERATIONS[key] = generation
+        return generation
+
+
+def _advance_webspace_request_generation(webspace_id: Optional[str]) -> int:
+    key = _webspace_generation_key(webspace_id)
+    with _SNAPSHOT_STATE_LOCK:
+        local_generation = _WEBSPACE_REQUEST_GENERATIONS.get(key, 0)
+        try:
+            persisted_generation = _snapshot_request_generation(memory_get(key))
+        except Exception:
+            persisted_generation = 0
+        generation = max(time.time_ns(), local_generation + 1, persisted_generation + 1)
+        _WEBSPACE_REQUEST_GENERATIONS[key] = generation
+        return generation
+
+
 def _load_webspace_snapshot(webspace_id: Optional[str]) -> Optional[Dict[str, Any]]:
     try:
-        value = memory_get(_webspace_snapshot_memory_key(webspace_id))
+        with _SNAPSHOT_STATE_LOCK:
+            value = memory_get(_webspace_snapshot_memory_key(webspace_id))
     except Exception:
         _log.warning("failed to read persisted weather snapshot webspace=%s", webspace_id or "default", exc_info=True)
         return None
@@ -200,15 +242,31 @@ def _webspace_snapshot_fresh(snapshot: Dict[str, Any]) -> bool:
     return -60.0 <= age_s < _WEBSPACE_SNAPSHOT_TTL
 
 
-def _store_webspace_snapshot(webspace_id: Optional[str], snapshot: Dict[str, Any]) -> None:
+def _store_webspace_snapshot(
+    webspace_id: Optional[str],
+    snapshot: Dict[str, Any],
+    *,
+    expected_generation: Optional[int] = None,
+) -> bool:
     try:
-        memory_set(_webspace_snapshot_memory_key(webspace_id), snapshot)
-        current = snapshot.get("current") if isinstance(snapshot.get("current"), dict) else {}
-        city = _normalize_city_token(current.get("city"))
-        if city and city.lower() != "current location":
-            memory_set("last_city", city)
+        key = _webspace_generation_key(webspace_id)
+        with _SNAPSHOT_STATE_LOCK:
+            local_generation = _WEBSPACE_REQUEST_GENERATIONS.get(key, 0)
+            persisted_generation = _snapshot_request_generation(memory_get(key))
+            observed_generation = max(local_generation, persisted_generation)
+            if expected_generation is not None:
+                if observed_generation > expected_generation:
+                    return False
+                _WEBSPACE_REQUEST_GENERATIONS[key] = expected_generation
+            memory_set(key, snapshot)
+            current = snapshot.get("current") if isinstance(snapshot.get("current"), dict) else {}
+            city = _normalize_city_token(current.get("city"))
+            if city and city.lower() != "current location":
+                memory_set("last_city", city)
+        return True
     except Exception:
         _log.warning("failed to persist weather snapshot webspace=%s", webspace_id or "default", exc_info=True)
+        return False
 
 _RU_TRANSLIT = {
     ord("\u0430"): "a",
@@ -942,6 +1000,7 @@ def get_snapshot(
     **_: Any,
 ) -> Dict[str, Any]:
     payload = dict(_payload or {}) if isinstance(_payload, dict) else {}
+    request_generation = _current_webspace_request_generation(webspace_id)
     if city:
         payload["city"] = city
     target_city = _extract_city_from_payload(payload)
@@ -980,7 +1039,23 @@ def get_snapshot(
         _, default_city = _load_config()
         current = _weather_current_payload(target_city or default_city or "Moscow", None, ok=False, error=str(result.get("error") or "weather_api_unavailable"))
         snapshot = _weather_projection_payload(current, status="error")
-    _store_webspace_snapshot(webspace_id, snapshot)
+    stored = _store_webspace_snapshot(
+        webspace_id,
+        snapshot,
+        expected_generation=request_generation,
+    )
+    if not stored:
+        latest = _load_webspace_snapshot(webspace_id)
+        if latest is not None:
+            latest_status = str(latest.get("status") or "ok").strip().lower()
+            return {
+                "ok": latest_status != "error",
+                "weather": latest,
+                "current": dict(latest.get("current") or {}),
+                "webspace_id": webspace_id,
+                "target_node_id": target_node_id or node_id or "",
+                "snapshot_source": "superseded_by_newer_request",
+            }
     return {
         "ok": ok,
         "weather": snapshot,
@@ -997,7 +1072,10 @@ def dispose(**_: Any) -> Dict[str, Any]:
         geocode_count = len(_GEOCODE_CACHE)
         _CITY_CACHE.clear()
         _GEOCODE_CACHE.clear()
-    return {"ok": True, "released": city_count + geocode_count}
+    with _SNAPSHOT_STATE_LOCK:
+        generation_count = len(_WEBSPACE_REQUEST_GENERATIONS)
+        _WEBSPACE_REQUEST_GENERATIONS.clear()
+    return {"ok": True, "released": city_count + geocode_count + generation_count}
 
 
 @subscribe("nlp.intent.weather.get")
@@ -1120,14 +1198,28 @@ def _weather_projection_payload(
     return payload
 
 
-async def _project_weather_snapshot_async(snapshot: Dict[str, Any], *, webspace_id: Optional[str]) -> None:
+async def _project_weather_snapshot_async(
+    snapshot: Dict[str, Any],
+    *,
+    webspace_id: Optional[str],
+    expected_generation: Optional[int] = None,
+) -> bool:
     pushed = False
     try:
         pushed = set_current_skill("weather_skill")
+        stored = await asyncio.to_thread(
+            _store_webspace_snapshot,
+            webspace_id,
+            snapshot,
+            expected_generation=expected_generation,
+        )
+        if not stored:
+            return False
         await ctx_subnet.set_async("weather.snapshot", snapshot, webspace_id=webspace_id)
-        await asyncio.to_thread(_store_webspace_snapshot, webspace_id, snapshot)
+        return True
     except Exception:
         _log.warning("failed to project weather.snapshot via ctx_subnet", exc_info=True)
+        return False
     finally:
         if pushed:
             clear_current_skill()
@@ -1194,6 +1286,7 @@ async def _refresh_weather_live_snapshot(
     location: Optional[Dict[str, Any]],
     webspace_id: Optional[str],
     request_id: str,
+    request_generation: int,
 ) -> None:
     started = time.monotonic()
     try:
@@ -1217,15 +1310,22 @@ async def _refresh_weather_live_snapshot(
                 "daily": live.get("daily") if ok else None,
             },
         )
-        await _project_weather_snapshot_async(snapshot, webspace_id=webspace_id)
+        snapshot["request_generation"] = request_generation
+        projected = await _project_weather_snapshot_async(
+            snapshot,
+            webspace_id=webspace_id,
+            expected_generation=request_generation,
+        )
         _log.info(
-            "weather live update projected webspace=%s city=%s ok=%s temp_c=%s request_id=%s "
-            "route_mode=%s duration_ms=%d",
+            "weather live update projected webspace=%s city=%s ok=%s projected=%s temp_c=%s request_id=%s "
+            "request_generation=%d route_mode=%s duration_ms=%d",
             webspace_id or "default",
             current.get("city"),
             ok,
+            projected,
             current.get("temp_c"),
             request_id or "missing",
+            request_generation,
             live.get("route_mode") or "unavailable",
             round((time.monotonic() - started) * 1000),
         )
@@ -1274,6 +1374,28 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
         previous = _WEATHER_UPDATE_TASKS.get(task_key)
         if previous and not previous.done():
             previous.cancel()
+        request_generation = await asyncio.to_thread(_advance_webspace_request_generation, webspace_id)
+        pending_current: Dict[str, Any] = {
+            "city": city or str((location or {}).get("label") or "Current location"),
+            "label": city or str((location or {}).get("label") or "Current location"),
+            "temp_c": None,
+            "condition": "",
+            "description": "",
+            "wind_ms": None,
+            "updated_at": _now_iso(),
+            "request_id": request_id,
+            "pending": True,
+            "source": "pending",
+        }
+        if location:
+            pending_current["location"] = dict(location)
+        pending_snapshot = _weather_projection_payload(pending_current, status="pending")
+        pending_snapshot["request_generation"] = request_generation
+        await _project_weather_snapshot_async(
+            pending_snapshot,
+            webspace_id=webspace_id,
+            expected_generation=request_generation,
+        )
         refresh_task = asyncio.create_task(
             _refresh_weather_live_snapshot(
                 task_key=task_key,
@@ -1282,6 +1404,7 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
                 location=location,
                 webspace_id=webspace_id,
                 request_id=request_id,
+                request_generation=request_generation,
             )
         )
         _WEATHER_UPDATE_TASKS[task_key] = refresh_task
