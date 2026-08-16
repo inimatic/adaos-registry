@@ -61,9 +61,9 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["apply_semantic_ui_change"]["side_effects"] == "local_write"
     assert tools["register_review_constraint"]["side_effects"] == "local_write"
     assert tools["evaluate_review_constraints"]["side_effects"] == "local_write"
-    assert "side_effects" not in tools["get_interaction_frame"]
-    assert "side_effects" not in tools["get_process"]
-    assert "side_effects" not in tools["get_change_context"]
+    assert tools["get_interaction_frame"]["side_effects"] == "none"
+    assert tools["get_process"]["side_effects"] == "none"
+    assert tools["get_change_context"]["side_effects"] == "none"
     assert tools["plan_change_set"]["side_effects"] == "local_write"
     assert tools["add_change_issues"]["side_effects"] == "local_write"
     assert tools["update_change_issue"]["side_effects"] == "local_write"
@@ -80,9 +80,11 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["recover_validated_automation"]["side_effects"] == "local_write"
     assert tools["reconcile_automation_checkpoint"]["side_effects"] == "external_write"
     assert tools["apply_subscription_update"]["side_effects"] == "external_write"
-    assert "side_effects" not in tools["push_project"]
-    assert "side_effects" not in tools["publish_project"]
-    assert "side_effects" not in tools["delete_project"]
+    assert tools["push_project"]["side_effects"] == "local_write"
+    assert tools["publish_project"]["side_effects"] == "external_write"
+    assert tools["delete_project"]["side_effects"] == "external_write"
+    declared_effects = {"none", "local_write", "ui_navigation", "external_write"}
+    assert all(tool.get("side_effects") in declared_effects for tool in tools.values())
     push_schema = tools["push_project"]["input_schema"]
     assert "checkpoint_id" in push_schema["required"]
     assert push_schema["properties"]["checkpoint_id"]["minLength"] == 1

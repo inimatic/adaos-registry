@@ -2731,7 +2731,11 @@ def reconcile_automation_checkpoint(
     )
 
 
-@tool("get_subscription_update", summary="Inspect one stable subscription and its reviewed update plan.")
+@tool(
+    "get_subscription_update",
+    summary="Inspect one stable subscription and its reviewed update plan.",
+    side_effects="none",
+)
 def get_subscription_update(
     object_type: str = DEFAULT_PROJECT_KIND,
     object_id: str = DEFAULT_PROJECT_ID,
