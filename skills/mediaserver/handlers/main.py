@@ -503,6 +503,7 @@ def _library_page(
     "get_snapshot",
     summary="return mediaserver library snapshot and channel capability diagnostics",
     stability="experimental",
+    side_effects="runtime_write",
 )
 def get_snapshot(
     _payload: dict[str, Any] | None = None,
@@ -520,6 +521,7 @@ def get_snapshot(
     "list_library_page",
     summary="return a bounded page of mediaserver library rows",
     stability="experimental",
+    side_effects="none",
 )
 def list_library_page(
     _payload: dict[str, Any] | None = None,
@@ -548,6 +550,7 @@ def list_library_page(
     "refresh_snapshot",
     summary="publish mediaserver library snapshot and return lightweight ack",
     stability="experimental",
+    side_effects="runtime_write",
 )
 def refresh_snapshot(
     _payload: dict[str, Any] | None = None,
@@ -565,6 +568,7 @@ def refresh_snapshot(
     "get_diagnostics",
     summary="return compact operator diagnostics for mediaserver Yjs projection pressure",
     stability="experimental",
+    side_effects="none",
 )
 def get_diagnostics(
     _payload: dict[str, Any] | None = None,

@@ -87,6 +87,22 @@ def test_manifest_declares_diagnostics_tool() -> None:
     }
 
 
+def test_handler_side_effects_match_manifest_contract() -> None:
+    from adaos.sdk.core.decorators import tools_meta
+    from handlers import main
+
+    expected = {
+        "get_snapshot": "runtime_write",
+        "list_library_page": "none",
+        "refresh_snapshot": "runtime_write",
+        "get_diagnostics": "none",
+    }
+    assert {
+        name: tools_meta[f"{main.__name__}.{name}"]["side_effects"]
+        for name in expected
+    } == expected
+
+
 def test_webui_keeps_user_library_surface_in_media_center_scenario() -> None:
     webui = json.loads((SKILL_ROOT / "webui.json").read_text(encoding="utf-8"))
     Draft202012Validator(_load_webui_schema()).validate(webui)
