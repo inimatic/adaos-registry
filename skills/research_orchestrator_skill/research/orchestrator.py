@@ -670,11 +670,45 @@ class ResearchOrchestrator:
 
     def get(self, direction_id: str) -> dict[str, Any]:
         token = _direction_id(direction_id)
-        state = self.repository.get_direction(token)
-        if not state:
-            raise ValueError("research direction is not initialized")
-        bundle = artifact_context.source_bundle(token)
         project = self._require_direction_project(token)["project"]
+        state = self.repository.get_direction(token)
+        bundle = artifact_context.source_bundle(token)
+        if not state:
+            return {
+                "ok": True,
+                "initialized": False,
+                "direction": {
+                    "id": token,
+                    "direction_id": token,
+                    "title": str(project.get("title") or token),
+                    "status": "not_initialized",
+                    "generation": 0,
+                    "project_ref": project["ref"],
+                    "primary_skill_ref": f"skill:{token}",
+                },
+                "project": project,
+                "artifact_groups": artifact_context.groups(token),
+                "source_bundle": bundle,
+                "current_prototype": None,
+                "prototype_stale": False,
+                "formulation": {
+                    "admission_decision": "needs_discussion",
+                    "admission_blockers": ["The direction ledger is not initialized."],
+                    "can_accept": False,
+                    "context_coverage": {},
+                },
+                "accepted_prototype": None,
+                "automation_brief": None,
+                "development_session": None,
+                "builder_url": None,
+                "next_steps": [
+                    {
+                        "id": "initialize",
+                        "label": "Initialize direction",
+                        "reason": "The direction ledger is not initialized.",
+                    }
+                ],
+            }
         prototype = self.repository.get_prototype(state.get("current_prototype_digest"))
         accepted = self.repository.get_prototype(state.get("accepted_prototype_digest"))
         brief = self.repository.get_brief(state.get("automation_brief_digest"))
@@ -701,6 +735,7 @@ class ResearchOrchestrator:
         admission_review = prototype.get("admission_review") if isinstance((prototype or {}).get("admission_review"), Mapping) else {}
         return {
             "ok": True,
+            "initialized": True,
             "direction": {**state, "project_ref": project["ref"], "primary_skill_ref": f"skill:{token}"},
             "project": project,
             "artifact_groups": artifact_context.groups(token),

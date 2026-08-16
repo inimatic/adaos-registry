@@ -180,7 +180,13 @@ def list_artifacts(direction_id: str, **_: Any) -> dict[str, Any]:
                     "preview_kind": preview_kind,
                 }
             )
-    return {"ok": True, "direction_id": direction_id, "items": items, "count": len(items)}
+    return {
+        "ok": True,
+        "initialized": bool(state.get("initialized", True)),
+        "direction_id": direction_id,
+        "items": items,
+        "count": len(items),
+    }
 
 
 @tool(summary="Preview one manifested text, Markdown, or PDF artifact.", side_effects="none")
@@ -245,6 +251,7 @@ def get_consensus(direction_id: str, **_: Any) -> dict[str, Any]:
     if not prototype:
         return {
             "ok": True,
+            "initialized": bool(state.get("initialized", True)),
             "direction_id": direction_id,
             "status": "not_formulated",
             "accepted": False,
@@ -361,7 +368,20 @@ def accept_prototype(
 def get_automation_brief(direction_id: str, **_: Any) -> dict[str, Any]:
     state = _orchestrator().get(direction_id)
     brief = state.get("automation_brief")
-    return {"ok": brief is not None, "direction": state["direction"], "automation_brief": brief, "content": __import__("json").dumps(brief, ensure_ascii=False, indent=2) if brief else "Automation Brief ещё не сформирован.", "language": "json", "codex_started": False}
+    return {
+        "ok": True,
+        "available": brief is not None,
+        "initialized": bool(state.get("initialized", True)),
+        "direction": state["direction"],
+        "automation_brief": brief,
+        "content": (
+            __import__("json").dumps(brief, ensure_ascii=False, indent=2)
+            if brief
+            else "Automation Brief has not been created yet."
+        ),
+        "language": "json",
+        "codex_started": False,
+    }
 
 
 @tool(summary="Bind and open the exact pre-Codex Development Session in Builder.", side_effects="local_write")
