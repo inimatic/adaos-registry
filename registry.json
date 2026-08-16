@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-15T23:20:13+00:00",
+  "updated_at": "2026-08-14T19:40:13+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1026,8 +1026,8 @@
       "kind": "skill",
       "id": "weather_skill",
       "name": "weather_skill",
-      "version": "2.6.21",
-      "updated_at": "2026-08-15T19:10:16+00:00",
+      "version": "2.6.23",
+      "updated_at": "2026-08-14T19:40:13+00:00",
       "path": "skills/weather_skill",
       "manifest": "skills/weather_skill/skill.yaml",
       "source": {
