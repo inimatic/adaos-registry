@@ -1312,55 +1312,75 @@ class ResearchOrchestrator:
                 )
                 submitted, completed, output_text = execute(base_prompt, suffix="-json-fallback", structured=False)
 
-            validation_error: Exception | None = None
-            try:
-                candidate = _json_object(output_text)
-                candidate = validate_stage(stage_name, candidate)
-                quality = stage_quality_issues(
-                    stage_name,
-                    candidate,
-                    allowed_source_refs=allowed_source_refs,
-                    expected_effect_direction=expected_effect_direction,
-                )
-                if quality:
-                    raise ValueError("; ".join(quality))
-            except ValueError as exc:
-                validation_error = exc
-
-            if validation_error is not None:
-                repair_attempt = 1
+            max_repairs = max(
+                1,
+                min(int(os.getenv("ADAOS_RESEARCH_LLM_STAGE_REPAIRS") or "3"), 4),
+            )
+            while True:
+                validation_error: Exception | None = None
+                try:
+                    candidate = validate_stage(stage_name, _json_object(output_text))
+                    quality = stage_quality_issues(
+                        stage_name,
+                        candidate,
+                        allowed_source_refs=allowed_source_refs,
+                        expected_effect_direction=expected_effect_direction,
+                    )
+                    if quality:
+                        raise ValueError("; ".join(quality))
+                except ValueError as exc:
+                    validation_error = exc
+                if validation_error is None:
+                    break
+                if repair_attempt >= max_repairs:
+                    raise ValueError(
+                        f"{stage_name} local contract still fails after {repair_attempt} repairs: "
+                        f"{validation_error}"
+                    ) from validation_error
+                repair_attempt += 1
                 self.repository.activity(
                     direction_id,
                     "formulation",
                     "stage_repair",
-                    f"{stage_name} failed its local contract; repairing only this stage.",
-                    {"run_id": run_id, "stage": stage_name, "validation_error": _bounded_text(validation_error, 1600)},
+                    f"{stage_name} failed its local contract; repairing only this stage ({repair_attempt}/{max_repairs}).",
+                    {
+                        "run_id": run_id,
+                        "stage": stage_name,
+                        "repair_attempt": repair_attempt,
+                        "max_repairs": max_repairs,
+                        "validation_error": _bounded_text(validation_error, 1600),
+                    },
                 )
                 repair_prompt = {
                     "schema": "adaos.research.formulation_stage_repair.v1",
                     "stage": stage_name,
+                    "repair_attempt": repair_attempt,
+                    "max_repairs": max_repairs,
                     "validation_errors": str(validation_error),
                     "rejected_stage": candidate,
                     "rules": list(rules),
                     "allowed_source_refs": sorted(allowed_source_refs),
-                    "instruction": "Correct only this stage. Preserve valid grounded content and remove every field not admitted by the schema.",
+                    "instruction": (
+                        "Correct every listed violation in this stage and no later stage. "
+                        "Preserve valid grounded content, do not invent source facts, and remove every field not admitted by the schema. "
+                        "Before returning, check each validation_errors clause against the corrected object."
+                    ),
                 }
                 try:
-                    submitted, completed, output_text = execute(repair_prompt, suffix="-repair-1", structured=structured_output)
+                    submitted, completed, output_text = execute(
+                        repair_prompt,
+                        suffix=f"-repair-{repair_attempt}",
+                        structured=structured_output,
+                    )
                 except Exception as exc:
                     if not structured_output or not _structured_output_unsupported(exc):
                         raise
                     structured_output = False
-                    submitted, completed, output_text = execute(repair_prompt, suffix="-repair-1-json-fallback", structured=False)
-                candidate = validate_stage(stage_name, _json_object(output_text))
-                quality = stage_quality_issues(
-                    stage_name,
-                    candidate,
-                    allowed_source_refs=allowed_source_refs,
-                    expected_effect_direction=expected_effect_direction,
-                )
-                if quality:
-                    raise ValueError(f"{stage_name} semantic quality gate: " + "; ".join(quality))
+                    submitted, completed, output_text = execute(
+                        repair_prompt,
+                        suffix=f"-repair-{repair_attempt}-json-fallback",
+                        structured=False,
+                    )
 
             telemetry = _llm_telemetry(
                 submitted,
