@@ -1,0 +1,191 @@
+name: research_calibration_runner_skill
+version: 0.1.1
+description: Contamination-aware execution bridge from frozen research calibration
+  packets to native Builder Automation.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: get_attempt
+runtime:
+  python: '3.11'
+dependencies: []
+capabilities:
+- skills.invoke
+- builder.project_sources
+exports:
+  tools:
+  - prepare_attempt
+  - start_attempt
+  - get_attempt
+tools:
+- name: prepare_attempt
+  description: Create or reuse one disposable candidate Project and bind its exact
+    C0-C4 Development Session.
+  entry: handlers.main:prepare_attempt
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - task_id
+    - arm_id
+    - attempt_index
+    properties:
+      task_id:
+        type: string
+      arm_id:
+        enum:
+        - C0_raw
+        - C1_reviewed_prose
+        - C2_staged
+        - C3_typed_execution
+        - C4_over_specified
+      attempt_index:
+        type: integer
+        minimum: 1
+      budget_view:
+        enum:
+        - fixed_downstream
+        - fixed_total_system
+        default: fixed_downstream
+      candidate_id:
+        type:
+        - string
+        - 'null'
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - task_id
+    - packet_digest
+    - candidate_id
+    - session_id
+    - builder_webspace_id
+- name: start_attempt
+  description: Prepare one candidate and launch the normal Builder/Codex Automation
+    path without evaluator access.
+  entry: handlers.main:start_attempt
+  side_effects: external_io
+  timeout_seconds: 180
+  input_schema:
+    type: object
+    required:
+    - task_id
+    - arm_id
+    - attempt_index
+    properties:
+      task_id:
+        type: string
+      arm_id:
+        enum:
+        - C0_raw
+        - C1_reviewed_prose
+        - C2_staged
+        - C3_typed_execution
+        - C4_over_specified
+      attempt_index:
+        type: integer
+        minimum: 1
+      budget_view:
+        enum:
+        - fixed_downstream
+        - fixed_total_system
+        default: fixed_downstream
+      candidate_id:
+        type:
+        - string
+        - 'null'
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - task_id
+    - packet_digest
+    - candidate_id
+    - session_id
+    - builder_webspace_id
+    - automation
+- name: get_attempt
+  description: Read the canonical Builder Automation projection for a prepared candidate.
+  entry: handlers.main:get_attempt
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - candidate_id
+    - builder_webspace_id
+    properties:
+      candidate_id:
+        type: string
+      builder_webspace_id:
+        type: string
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - candidate_id
+    - automation
+data_routes:
+- surface: calibration execution state
+  route: tool/details
+  tool: get_attempt
+  path: builder.development_sessions+builder.automation
+  owner: skill:research_calibration_runner_skill
+  first_paint: no prepared attempt
+  recovery: reconstruct the same candidate and session from the frozen packet digest
+  guard_visibility: the runner sees public packets only; evaluator-hidden inputs are
+    never returned
+  budget:
+    max_payload_bytes: 2097152
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - builder.project.automation
+llm_hints:
+  description: Executes preregistered research-compiler calibration arms through native
+    Builder Automation.
+  aliases:
+  - research calibration runner
+  - calibration executor
+  primary_actions:
+  - id: research_calibration_runner_skill.prepare_attempt
+    intent: research_calibration_runner_skill.prepare_attempt
+    tool: prepare_attempt
+    side_effect_class: local_write
+    examples:
+    - Prepare one frozen calibration arm
+  - id: research_calibration_runner_skill.start_attempt
+    intent: research_calibration_runner_skill.start_attempt
+    tool: start_attempt
+    side_effect_class: external_io
+    examples:
+    - Start one Builder calibration attempt
+  examples: []
+  owner_hints:
+  - skill:research_calibration_runner_skill
+nlu_hints:
+  aliases:
+  - research calibration runner
+  examples: []
+  slot_schemas: {}
+  entities: []
+updated_at: '2026-08-17T23:12:00+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.854+5189.33cfc395
+    recorded_at: '2026-08-17T23:12:01+00:00'
+    source: skill_push
+    min_commit: 33cfc39501142abf787ed6a249fd105f7a68d633
+    min_short_commit: 33cfc395
+    build_date: '2026-08-18T02:11:52+03:00'
+
