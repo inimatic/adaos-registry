@@ -155,6 +155,20 @@ def test_stage_schemas_are_provider_strict_and_candidate_is_deterministically_as
     )
 
 
+def test_candidate_assembly_canonicalizes_repeated_source_refs() -> None:
+    problem = _problem()
+    problem["hypotheses"][0]["source_refs"] = [REF, REF]
+
+    candidate = assemble_candidate(
+        problem,
+        _protocol(),
+        _implementation(),
+        source_ref_map={REF: EXACT_REF},
+    )
+
+    assert candidate["source_grounding"][0]["source_refs"] == [EXACT_REF]
+
+
 def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceability() -> None:
     bundle = {
         "digest": "sha256:" + "9" * 64,

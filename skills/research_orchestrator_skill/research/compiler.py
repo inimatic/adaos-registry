@@ -80,7 +80,12 @@ def build_compilation(
         return [
             {
                 "claim": str(item["claim"]),
-                "source_refs": [reference_map.get(str(ref), str(ref)) for ref in item.get("source_refs") or []],
+                "source_refs": list(
+                    dict.fromkeys(
+                        reference_map.get(str(ref), str(ref))
+                        for ref in item.get("source_refs") or []
+                    )
+                ),
             }
             for item in values
         ]

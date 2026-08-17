@@ -605,7 +605,12 @@ def assemble_candidate(
     questions = list(dict.fromkeys(item for item in questions if item.strip()))
     reference_map = dict(source_ref_map or {})
     def resolve_refs(item: Mapping[str, Any]) -> list[str]:
-        return [reference_map.get(str(ref), str(ref)) for ref in item.get("source_refs") or []]
+        return list(
+            dict.fromkeys(
+                reference_map.get(str(ref), str(ref))
+                for ref in item.get("source_refs") or []
+            )
+        )
 
     hypotheses = []
     grounding = []
