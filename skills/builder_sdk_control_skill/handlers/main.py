@@ -82,12 +82,12 @@ def _identity(object_type: str | None, object_id: str | None) -> tuple[str, str]
     return kind, project_id
 
 
-def _bound_automation_instruction(
+def _bound_development_session(
     kind: str,
     project_id: str,
     source_webspace_id: str,
 ) -> dict[str, Any] | None:
-    """Resolve the exact instruction admitted by this Builder host binding."""
+    """Resolve the exact Development Session admitted by this Builder host."""
 
     try:
         binding = development_sessions.binding_for(source_webspace_id)
@@ -105,6 +105,20 @@ def _bound_automation_instruction(
     }
     if target_ref not in target_refs:
         return None
+    return {"session": session, "binding": binding}
+
+
+def _bound_automation_instruction(
+    kind: str,
+    project_id: str,
+    source_webspace_id: str,
+) -> dict[str, Any] | None:
+    """Resolve the exact AutomationBrief admitted by this Builder host binding."""
+
+    admitted = _bound_development_session(kind, project_id, source_webspace_id)
+    if not admitted:
+        return None
+    session = admitted["session"]
     if not any(
         str(item.get("kind") or "") == "automation_brief"
         for item in session.get("instruction_inputs") or []
@@ -118,7 +132,7 @@ def _bound_automation_instruction(
     expected_digest = str(session["handoff"]["automation_brief_digest"])
     if str(value.get("digest") or "") != expected_digest:
         raise ValueError("bound AutomationBrief digest does not match the Development Session")
-    return {**instruction, "session": session, "binding": binding}
+    return {**instruction, **admitted}
 
 
 def _instruction_text(value: Mapping[str, Any]) -> str:
@@ -2653,6 +2667,7 @@ def start_automation(
     kind, project_id = _identity(object_type, object_id)
     source = _preview_source_webspace_id(webspace_id, _meta)
     admitted = _bound_automation_instruction(kind, project_id, source)
+    admitted_session = admitted or _bound_development_session(kind, project_id, source)
     supplied_brief = str(implementation_brief or "").strip()
     brief_value: Mapping[str, Any] | None = None
     if admitted:
@@ -2715,6 +2730,11 @@ def start_automation(
         conversation_id=bound_conversation_id,
         brief_path=brief_path,
         change_set_id=str(change_set.get("change_set_id") or "").strip() or None,
+        development_session_id=(
+            str(admitted_session["session"]["session_id"])
+            if admitted_session
+            else None
+        ),
     )
 
 

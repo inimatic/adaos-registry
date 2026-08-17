@@ -465,6 +465,7 @@ def test_start_automation_uses_exact_bound_instruction_without_manual_paste(monk
     assert launched[0]["implementation_brief"] == module._instruction_text(brief)
     assert launched[0]["brief_path"].endswith("automation_brief.json")
     assert launched[0]["change_set_id"] == "change-tlp"
+    assert launched[0]["development_session_id"] == "dev-tlp"
 
 
 def test_start_automation_rejects_free_form_replacement_of_bound_instruction(monkeypatch) -> None:
