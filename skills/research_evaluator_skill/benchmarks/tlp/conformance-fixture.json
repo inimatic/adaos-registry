@@ -1,0 +1,35 @@
+{
+  "schema": "adaos.research.tlp_conformance_fixture.v1",
+  "purpose": "Consumer-side contract for a TLP research direction skill; it describes observable behavior, not an implementation.",
+  "required_surfaces": [
+    {
+      "id": "conditions",
+      "contract": "Versioned experiment conditions can be read, edited before lock, validated, and frozen by digest."
+    },
+    {
+      "id": "execution",
+      "contract": "A CPU workflow-smoke run and a separately gated confirmatory run expose lifecycle state without using smoke as scientific evidence."
+    },
+    {
+      "id": "tracking",
+      "contract": "Runs, parameters, metrics, artifacts, code, environment, dataset, and protocol identities are linked by stable content references."
+    },
+    {
+      "id": "evidence",
+      "contract": "Paired results and the primary estimand are independently reconstructable from immutable run records."
+    }
+  ],
+  "mandatory_checks": [
+    "adaos skill validate <candidate> --strict --probe-tools --json",
+    "adaos skill test <candidate>",
+    "research runner conformance for conditions, run lifecycle, tracker records, and evidence manifest",
+    "three-epoch CPU workflow smoke for seed 17 with zero final-test evidence claims",
+    "protocol digest in produced records equals the accepted ResearchPrototype digest"
+  ],
+  "forbidden_shortcuts": [
+    "No direction-specific scenario is required.",
+    "Do not read evaluator tools, hidden rubric material, or a legacy TLP implementation.",
+    "Do not replace the paired protocol, primary estimand, test seal, or evidence policy to simplify implementation.",
+    "Do not claim scientific confirmation from the workflow smoke."
+  ]
+}

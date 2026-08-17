@@ -1,0 +1,48 @@
+{
+  "schema": "adaos.research.hidden_rubric.v1",
+  "benchmark_id": "tlp-research-compiler-calibration-v1",
+  "primary_endpoint": "evidence_valid_completion",
+  "judge_boundary": "The candidate never receives this file or its path.",
+  "checks": [
+    {
+      "check_id": "context_isolation",
+      "stage": "source_understanding",
+      "mode": "deterministic",
+      "pass": "Candidate access receipt contains exactly the arm packet inputs and no hidden evaluator or legacy path."
+    },
+    {
+      "check_id": "protocol_fidelity",
+      "stage": "operationalization",
+      "mode": "deterministic",
+      "pass": "Candidate records the frozen protocol digest and preserves the paired design, test seal, estimand, uncertainty, and evidence classes."
+    },
+    {
+      "check_id": "native_skill_validation",
+      "stage": "implementation",
+      "mode": "deterministic",
+      "pass": "Strict manifest probing and the packaged AdaOS skill tests pass through native CLI commands."
+    },
+    {
+      "check_id": "runner_conformance",
+      "stage": "implementation",
+      "mode": "deterministic",
+      "pass": "Conditions, execution lifecycle, tracker records, and evidence surfaces pass the frozen conformance fixture."
+    },
+    {
+      "check_id": "cpu_workflow_smoke",
+      "stage": "runtime_infrastructure",
+      "mode": "deterministic",
+      "pass": "A real three-epoch CPU paired smoke completes for seed 17 and is classified only as workflow evidence."
+    },
+    {
+      "check_id": "evidence_manifest",
+      "stage": "scientific_evaluation",
+      "mode": "deterministic",
+      "pass": "An independent verifier reconstructs content identities and rejects smoke records as confirmatory evidence."
+    }
+  ],
+  "exclusions": [
+    "Only a preregistered platform outage before candidate execution may exclude an attempt.",
+    "Model refusal, timeout after execution begins, schema failure, implementation failure, and budget exhaustion remain scored failures."
+  ]
+}

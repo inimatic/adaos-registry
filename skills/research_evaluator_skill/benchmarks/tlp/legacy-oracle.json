@@ -1,0 +1,16 @@
+{
+  "schema": "adaos.research.legacy_oracle.v1",
+  "benchmark_id": "tlp-research-compiler-calibration-v1",
+  "visibility": "evaluator_only",
+  "warning": "Never expose this oracle, the tlp_research skill, or research_workbench implementation details to a candidate agent.",
+  "reference_capabilities": [
+    "Versioned and lockable experiment conditions",
+    "Real paired CPU execution with shared initialization and synchronized sampling",
+    "Tracker-provider abstraction with MLflow compatibility",
+    "Content-addressed run and evidence records",
+    "Separated workflow-smoke and confirmatory evidence classes",
+    "Reconciliation, cancellation, finalization, and failure visibility",
+    "Human-readable conditions, runs, results, evidence, and help projections"
+  ],
+  "evaluation_use": "Use only to identify missing capability classes after deterministic checks; do not require source-level similarity or copy its design."
+}
