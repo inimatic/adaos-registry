@@ -189,6 +189,19 @@ def list_artifacts(direction_id: str, **_: Any) -> dict[str, Any]:
                 if media_type.startswith("text/") or suffix in {".txt", ".json", ".yaml", ".yml", ".py", ".ipynb"}
                 else "unsupported"
             )
+            policy = item.get("context_policy") if isinstance(item.get("context_policy"), Mapping) else {}
+            allow = set(str(value) for value in policy.get("allow") or [])
+            visibility_profile = (
+                "shared"
+                if not policy or policy.get("default") == "allow"
+                else "evaluation_only"
+                if allow == {"research.evaluation"}
+                else "formulation_only"
+                if allow == {"research.formulation"}
+                else "implementation_input"
+                if allow == {"research.implementation", "research.evaluation"}
+                else "custom"
+            )
             items.append(
                 {
                     **dict(item),
@@ -199,6 +212,7 @@ def list_artifacts(direction_id: str, **_: Any) -> dict[str, Any]:
                     "group_id": group.get("group_id"),
                     "preview_kind": preview_kind,
                     "context_policy": item.get("context_policy"),
+                    "visibility_profile": visibility_profile,
                 }
             )
     return {
@@ -480,8 +494,116 @@ def get_formulation_run(direction_id: str, run_id: str | None = None, **_: Any) 
     }
 
 
+def _compilation_markdown(compilation: Mapping[str, Any], facet: str) -> str:
+    facets = compilation.get("facets") if isinstance(compilation.get("facets"), Mapping) else {}
+    selected = facets.get(facet) if isinstance(facets.get(facet), Mapping) else {}
+    payload = selected.get("payload") if isinstance(selected.get("payload"), Mapping) else {}
+    if facet == "source_analysis":
+        inventory = [
+            f"**{item.get('name', 'source')}** · `{item.get('role', 'source')}` · `{item.get('digest', '')}`  \n"
+            f"Extraction: `{item.get('extraction', {}).get('strategy', 'unknown')}` · "
+            f"selected `{item.get('extraction', {}).get('selected_characters', 0)}` chars · "
+            f"truncated `{item.get('extraction', {}).get('truncated', False)}`"
+            for item in payload.get("inventory") or []
+            if isinstance(item, Mapping)
+        ]
+        facts = [
+            f"{item.get('claim', '')}  \nSources: {', '.join(f'`{ref}`' for ref in item.get('source_refs') or [])}"
+            for item in payload.get("observed_facts") or []
+            if isinstance(item, Mapping)
+        ]
+        interpretations = [
+            f"{item.get('claim', '')}  \nSources: {', '.join(f'`{ref}`' for ref in item.get('source_refs') or [])}"
+            for item in payload.get("author_interpretations") or []
+            if isinstance(item, Mapping)
+        ]
+        return (
+            f"## Source Analysis\n\n**Digest:** `{selected.get('digest')}` · **sufficiency:** `{payload.get('sufficiency')}`\n\n"
+            f"### Inventory\n\n{_markdown_lines(inventory)}\n\n"
+            f"### Observed facts\n\n{_markdown_lines(facts)}\n\n"
+            f"### Author interpretations\n\n{_markdown_lines(interpretations)}\n\n"
+            f"### Coverage limitations\n\n{_markdown_lines(payload.get('coverage_limitations'))}\n\n"
+            f"### Unresolved source decisions\n\n{_markdown_lines(payload.get('unresolved_decisions'))}"
+        )
+    if facet == "research_problem":
+        hypotheses = [
+            f"**{item.get('id', 'H')}** — {item.get('statement', '')}  \nFalsification: {item.get('falsification', '')}"
+            for item in payload.get("hypotheses") or []
+            if isinstance(item, Mapping)
+        ]
+        return (
+            f"## Research Problem\n\n**Digest:** `{selected.get('digest')}`\n\n"
+            f"### Background\n\n{payload.get('background', '—')}\n\n"
+            f"### Primary question\n\n{payload.get('research_question', '—')}\n\n"
+            f"### Hypothesis\n\n{_markdown_lines(hypotheses)}\n\n"
+            f"### Constraints\n\n{_markdown_lines(payload.get('constraints'))}\n\n"
+            f"### Assumptions\n\n{_markdown_lines(payload.get('assumptions'))}\n\n"
+            f"### Open questions\n\n{_markdown_lines(payload.get('open_questions'))}"
+        )
+    if facet == "experimental_protocol":
+        plan = payload.get("experimental_plan") if isinstance(payload.get("experimental_plan"), Mapping) else {}
+        evaluation = payload.get("evaluation_plan") if isinstance(payload.get("evaluation_plan"), Mapping) else {}
+        stages = [
+            f"**{item.get('id', 'stage')}** `{item.get('evidence_class', 'unknown')}` — {item.get('purpose', '')}  \n"
+            f"Device `{item.get('execution_profile', {}).get('device')}` · budget `{item.get('budget')}` · inference `{item.get('inference_allowed')}`"
+            for item in plan.get("stages") or []
+            if isinstance(item, Mapping)
+        ]
+        decisions = [
+            f"**{area}** `{item.get('status')}` — {item.get('value_summary', '')}"
+            for area, item in (payload.get("decisions_by_area") or {}).items()
+            if isinstance(item, Mapping)
+        ]
+        return (
+            f"## Experimental Protocol\n\n**Digest:** `{selected.get('digest')}`\n\n"
+            f"**Comparators:** {', '.join(f'`{item}`' for item in plan.get('comparators') or [])}\n\n"
+            f"### Stages\n\n{_markdown_lines(stages)}\n\n"
+            f"### Protocol decisions\n\n{_markdown_lines(decisions)}\n\n"
+            f"### Primary estimand\n\n`{evaluation.get('primary_estimand', {})}`\n\n"
+            f"### Evaluation contract\n\nUncertainty `{evaluation.get('uncertainty', {})}`  \n"
+            f"Stopping `{evaluation.get('stopping_rule', {})}`  \nMultiplicity `{evaluation.get('multiplicity', {})}`"
+        )
+    if facet == "engineering_contract":
+        requirements = [
+            f"**{category}** — {item.get('requirement', '')}  \nVerify: {item.get('verification', '')}"
+            for category, values in (payload.get("requirements_by_category") or {}).items()
+            for item in values or []
+            if isinstance(item, Mapping)
+        ]
+        checks = [
+            f"**{category}** — {item.get('check', '')}  \nEvidence: {item.get('evidence', '')}"
+            for category, values in (payload.get("checks_by_category") or {}).items()
+            for item in values or []
+            if isinstance(item, Mapping)
+        ]
+        return (
+            f"## Engineering Contract\n\n**Digest:** `{selected.get('digest')}`\n\n"
+            f"### Requirements\n\n{_markdown_lines(requirements)}\n\n"
+            f"### Acceptance checks\n\n{_markdown_lines(checks)}"
+        )
+    traceability = compilation.get("traceability_coverage") if isinstance(compilation.get("traceability_coverage"), Mapping) else {}
+    findings = [
+        f"`{item.get('requirement_id')}` — {'covered' if item.get('covered') else 'missing'} · "
+        f"{' → '.join(item.get('path') or []) or 'no path'}"
+        for item in traceability.get("findings") or []
+        if isinstance(item, Mapping)
+    ]
+    return (
+        f"## Traceability\n\n**Graph:** `{compilation.get('traceability_graph', {}).get('digest')}` · "
+        f"**coverage:** `{traceability.get('covered', 0)}/{traceability.get('total', 0)}` · "
+        f"**readiness:** `{compilation.get('readiness', {}).get('decision', 'unknown')}`\n\n"
+        f"### Required paths\n\n{_markdown_lines(findings)}\n\n"
+        f"### Blockers\n\n{_markdown_lines(compilation.get('readiness', {}).get('blockers'))}"
+    )
+
+
 @tool(summary="Read the latest digest-bound research compilation facets and traceability.", side_effects="none")
-def get_compilation(direction_id: str, run_id: str | None = None, **_: Any) -> dict[str, Any]:
+def get_compilation(
+    direction_id: str,
+    run_id: str | None = None,
+    facet: str = "traceability",
+    **_: Any,
+) -> dict[str, Any]:
     state = _orchestrator().get(direction_id)
     prototype = state.get("accepted_prototype") or state.get("current_prototype") or {}
     trace = prototype.get("formulation_trace") if isinstance(prototype.get("formulation_trace"), Mapping) else {}
@@ -504,13 +626,10 @@ def get_compilation(direction_id: str, run_id: str | None = None, **_: Any) -> d
         for name, item in facets.items()
         if isinstance(item, Mapping)
     ]
-    content = (
-        "## Research Compilation\n\n"
-        + "\n".join(lines)
-        + f"\n\n**Traceability:** `{traceability.get('covered', 0)}/{traceability.get('total', 0)}` paths · "
-        f"**readiness:** `{compilation.get('readiness', {}).get('decision', 'unknown')}`\n\n"
-        f"**Compilation digest:** `{compilation.get('digest')}`"
-    )
+    selected_facet = str(facet or "traceability").strip()
+    if selected_facet not in {*facets, "traceability"}:
+        selected_facet = "traceability"
+    content = _compilation_markdown(compilation, selected_facet)
     return {
         "ok": True,
         "available": True,
@@ -519,6 +638,8 @@ def get_compilation(direction_id: str, run_id: str | None = None, **_: Any) -> d
         "compilation": compilation,
         "facets": facets,
         "traceability": traceability,
+        "selected_facet": selected_facet,
+        "facet_index": lines,
         "content": content,
     }
 

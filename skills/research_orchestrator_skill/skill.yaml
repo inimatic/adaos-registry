@@ -465,6 +465,15 @@ tools:
         type:
         - string
         - 'null'
+      facet:
+        type: string
+        enum:
+        - source_analysis
+        - research_problem
+        - experimental_protocol
+        - engineering_contract
+        - traceability
+        default: traceability
     additionalProperties: true
   output_schema:
     type: object
