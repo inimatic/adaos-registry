@@ -6,7 +6,6 @@ import os
 import signal
 import sys
 import threading
-import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -94,7 +93,10 @@ class _HealthHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
-        self.wfile.write(raw)
+        try:
+            self.wfile.write(raw)
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            return
 
     def log_message(self, _format: str, *_args: Any) -> None:
         return
@@ -123,9 +125,11 @@ def run() -> None:
     health_thread = threading.Thread(target=_serve_health, name="slideshow-health", daemon=True)
     health_thread.start()
     _log.info("slideshow service started")
-    main.activate_slideshow_runtime()
-    while not _stop.wait(main._POLL_INTERVAL_S):
-        main._poll_once()
+    webspace_id = main.default_webspace_id()
+    main._ensure_polling(webspace_id, force=True)
+    main._poll_once(webspace_id)
+    _stop.wait()
+    main.dispose(reason="service_stopped")
     _log.info("slideshow service stopped")
 
 

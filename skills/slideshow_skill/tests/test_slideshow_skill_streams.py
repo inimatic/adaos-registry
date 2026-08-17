@@ -138,6 +138,24 @@ def test_index_connection_closes_sqlite_handle(monkeypatch, tmp_path):
         conn.execute("SELECT 1")
 
 
+def test_read_only_index_connection_is_reused_until_dispose(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+    monkeypatch.setenv("SLIDESHOW_DATA_DIR", str(tmp_path / "state"))
+
+    with mod._index_connection() as conn:
+        conn.execute("SELECT 1").fetchone()
+
+    with mod._index_connection(read_only=True) as first:
+        first.execute("SELECT 1").fetchone()
+    with mod._index_connection(read_only=True) as second:
+        second.execute("SELECT 1").fetchone()
+
+    assert first is second
+    mod.dispose(reason="test")
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        first.execute("SELECT 1")
+
+
 def test_subscription_changed_does_not_build_snapshot(monkeypatch):
     mod = _load_slideshow_module()
 
@@ -1143,6 +1161,48 @@ def test_service_tick_defers_surface_sync_while_index_running(monkeypatch, tmp_p
     assert saved[-1]["last_service_tick_at"] == 100.0
 
 
+def test_poll_once_does_not_rebuild_session_after_endpoint_tick(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+    published: list[str] = []
+    state = {
+        "source_dir": str(tmp_path),
+        "selected_codes": ["A"],
+        "running": True,
+    }
+    monkeypatch.setattr(mod, "_load_state", lambda: dict(state))
+    monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "A"}])
+    monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: [tmp_path / "one.jpg"])
+    monkeypatch.setattr(mod, "_apply_root_events", lambda current, *_args, **_kwargs: current)
+    monkeypatch.setattr(mod, "_apply_service_tick", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(mod, "_endpoint_payload", lambda *_args, **_kwargs: {"ok": True})
+    monkeypatch.setattr(mod, "_publish", lambda receiver, *_args, **_kwargs: published.append(receiver))
+    monkeypatch.setattr(
+        mod,
+        "_session_payload",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("endpoint tick already publishes its session while sending the surface")
+        ),
+    )
+
+    mod._poll_once("ws-1")
+
+    assert published == ["slideshow_skill.endpoints"]
+
+
+def test_polling_thread_is_owned_only_by_service_process(monkeypatch):
+    mod = _load_slideshow_module()
+    monkeypatch.delenv("ADAOS_SERVICE_SKILL", raising=False)
+    monkeypatch.setattr(
+        mod.threading,
+        "Thread",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("core lifecycle must not create a slideshow polling thread")
+        ),
+    )
+
+    assert mod._ensure_polling("ws-core") is False
+
+
 def test_activate_runtime_rehydrates_running_slideshow(monkeypatch):
     mod = _load_slideshow_module()
 
@@ -1162,7 +1222,7 @@ def test_activate_runtime_rehydrates_running_slideshow(monkeypatch):
             "scope": "all",
         },
     )
-    monkeypatch.setattr(mod, "_ensure_polling", lambda webspace_id=None: started.append(webspace_id))
+    monkeypatch.setattr(mod, "_ensure_polling", lambda webspace_id=None: started.append(webspace_id) or True)
     monkeypatch.setattr(mod, "_poll_once", lambda webspace_id=None: polled.append(webspace_id))
 
     result = mod.activate_slideshow_runtime(webspace_id="ws-restore")

@@ -1,5 +1,5 @@
 name: slideshow_skill
-version: 0.1.64
+version: 0.1.66
 description: Slideshow pilot skill that shows photos in the widget and can optionally
   project cached thumbnails to assigned ReDevice endpoints.
 supported_locales:
@@ -566,6 +566,14 @@ data_routes:
     quarantine: false
 memory_budget:
   expected_rss_mb: 128
+  process:
+    sample_interval_seconds: 10
+    sustained_samples: 3
+    max_write_bytes_per_second: 262144
+    max_read_bytes_per_second: 8388608
+    max_file_descriptors: 32
+    max_windows_handles: 512
+    max_threads: 8
   caches:
   - name: slideshow.photos.sqlite
     owner: slideshow_skill
@@ -600,7 +608,7 @@ memory_budget:
     max_threads: 1
     cleanup_hook: dispose
 redui: redui.json
-updated_at: '2026-08-15T09:00:41+00:00'
+updated_at: '2026-08-17T23:30:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166

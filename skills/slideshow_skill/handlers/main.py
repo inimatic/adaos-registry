@@ -115,6 +115,9 @@ _device_cache_jobs: dict[str, float] = {}
 _media_lock = threading.Lock()
 _index_schema_lock = threading.Lock()
 _index_schema_ready_path = ""
+_index_read_lock = threading.RLock()
+_index_read_connection: sqlite3.Connection | None = None
+_index_read_connection_path = ""
 _folder_cache_lock = threading.Lock()
 _folder_cache: dict[tuple[str, str, int, int], list[dict[str, Any]]] = {}
 
@@ -552,18 +555,51 @@ def _ensure_index_schema() -> None:
 
 
 def _connect_index(*, read_only: bool = False) -> sqlite3.Connection:
+    global _index_read_connection, _index_read_connection_path
     _ensure_index_schema()
     path = _index_path()
     if read_only:
-        conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True, timeout=2)
+        path_key = str(path.resolve())
+        if _index_read_connection is not None and _index_read_connection_path == path_key:
+            return _index_read_connection
+        if _index_read_connection is not None:
+            try:
+                _index_read_connection.close()
+            except Exception:
+                pass
+        conn = sqlite3.connect(
+            f"file:{path.as_posix()}?mode=ro",
+            uri=True,
+            timeout=2,
+            check_same_thread=False,
+        )
+        _index_read_connection = conn
+        _index_read_connection_path = path_key
     else:
         conn = sqlite3.connect(str(path), timeout=30)
     conn.row_factory = sqlite3.Row
     return conn
 
 
+def _close_index_read_connection() -> None:
+    global _index_read_connection, _index_read_connection_path
+    with _index_read_lock:
+        conn = _index_read_connection
+        _index_read_connection = None
+        _index_read_connection_path = ""
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+
 @contextmanager
 def _index_connection(*, read_only: bool = False) -> Iterator[sqlite3.Connection]:
+    if read_only:
+        with _index_read_lock:
+            yield _connect_index(read_only=True)
+        return
     conn = _connect_index(read_only=read_only)
     try:
         with conn:
@@ -1047,6 +1083,7 @@ def _cancel_index_job(webspace_id: str | None = None) -> dict[str, Any]:
 def dispose(reason: str | None = None, **_: Any) -> dict[str, Any]:
     _poll_stop.set()
     _index_stop.set()
+    _close_index_read_connection()
     with _stream_lock:
         active_receiver_total = sum(len(items) for items in _active_receivers_by_webspace.values())
         _active_receivers_by_webspace.clear()
@@ -3091,7 +3128,7 @@ def _poll_once(webspace_id: str | None = None) -> None:
         state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=running)
         if running:
             ticked = _apply_service_tick(state, files, devices=devices, webspace_id=webspace_id)
-            if ticked:
+            if ticked and not selected_codes:
                 _publish(
                     _SESSION_RECEIVER,
                     _session_payload(
@@ -3146,16 +3183,20 @@ def _poll_loop() -> None:
         _poll_once(_poll_webspace_id or None)
 
 
-def _ensure_polling(webspace_id: str | None = None) -> None:
+def _ensure_polling(webspace_id: str | None = None, *, force: bool = False) -> bool:
     global _poll_thread, _poll_webspace_id
+    service_owner = _text(os.environ.get("ADAOS_SERVICE_SKILL")) == "slideshow_skill"
+    if not force and not service_owner:
+        return False
     if webspace_id:
         _poll_webspace_id = _text(webspace_id)
     with _poll_lock:
         if _poll_thread is not None and _poll_thread.is_alive():
-            return
+            return True
         _poll_stop.clear()
         _poll_thread = threading.Thread(target=_poll_loop, name="slideshow-root-poll", daemon=True)
         _poll_thread.start()
+    return True
 
 
 @tool
@@ -3163,12 +3204,16 @@ def activate_slideshow_runtime(webspace_id: str | None = None, **_payload: Any) 
     state = _load_state()
     selected = _unique_texts(state.get("selected_codes"))
     should_poll = bool(state.get("running") or selected)
+    polling_local = False
     if should_poll:
-        _ensure_polling(webspace_id or default_webspace_id())
-        _poll_once(webspace_id or default_webspace_id())
+        polling_local = _ensure_polling(webspace_id or default_webspace_id())
+        if polling_local:
+            _poll_once(webspace_id or default_webspace_id())
     return {
         "ok": True,
         "polling": should_poll,
+        "polling_local": polling_local,
+        "polling_owner": "service_process",
         "selected_codes": selected,
         "running": bool(state.get("running")),
     }
