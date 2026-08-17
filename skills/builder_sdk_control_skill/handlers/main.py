@@ -300,6 +300,62 @@ def request_development_scope(
     )
 
 
+@tool("record_development_feedback", summary="Return typed implementation feedback without mutating the accepted protocol.", side_effects="local_write")
+def record_development_feedback(
+    kind: str,
+    summary: str,
+    severity: str = "warning",
+    blocking: bool = True,
+    affected_refs: list[str] | None = None,
+    constraints: list[str] | None = None,
+    evidence: list[Mapping[str, Any]] | None = None,
+    proposed_action: str = "clarify_contract",
+    protocol_digest: str | None = None,
+    webspace_id: str | None = None,
+    actor: str = "codex",
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    source = _preview_source_webspace_id(webspace_id, _meta)
+    binding = development_sessions.binding_for(source)
+    if not binding:
+        raise ValueError("no Development Session is bound to this Builder host")
+    session = development_sessions.get(str(binding["session_id"]))
+    return development_sessions.record_feedback(
+        str(session["session_id"]),
+        kind,
+        summary,
+        severity=severity,
+        blocking=blocking,
+        affected_refs=affected_refs or (),
+        constraints=constraints or (),
+        evidence=evidence or (),
+        proposed_action=proposed_action,
+        protocol_digest=protocol_digest or str(session["handoff"]["research_prototype_digest"]),
+        actor=actor,
+    )
+
+
+@tool("list_development_feedback", summary="Read typed feedback returned for the bound Development Session.", side_effects="none")
+def list_development_feedback(
+    kind: str | None = None,
+    blocking: bool | None = None,
+    limit: int = 500,
+    webspace_id: str | None = None,
+    _meta: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    source = _preview_source_webspace_id(webspace_id, _meta)
+    binding = development_sessions.binding_for(source)
+    if not binding:
+        return {"ok": True, "bound": False, "items": []}
+    items = development_sessions.list_feedback(
+        str(binding["session_id"]),
+        kind=kind,
+        blocking=blocking,
+        limit=limit,
+    )
+    return {"ok": True, "bound": True, "session_id": binding["session_id"], "items": items}
+
+
 @tool("get_skill_preview", summary="Describe the skill selected by the paired Builder host.", side_effects="none")
 def get_skill_preview(
     webspace_id: str | None = None,
@@ -3643,6 +3699,7 @@ __all__ = [
     "get_project",
     "get_state",
     "list_changes",
+    "list_development_feedback",
     "list_project_file_tree",
     "list_project_files",
     "list_project_objects",
@@ -3653,6 +3710,7 @@ __all__ = [
     "publish_project",
     "push_project",
     "read_project_file",
+    "record_development_feedback",
     "save_prompt_context",
     "save_project_file",
     "select_preview",

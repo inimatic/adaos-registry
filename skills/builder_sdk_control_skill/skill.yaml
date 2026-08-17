@@ -1470,6 +1470,68 @@ tools:
     - ok
     - approved
     - request
+- name: record_development_feedback
+  description: Return typed clarification, feasibility, capability, protocol, or runtime feedback without mutating accepted science.
+  entry: handlers.main:record_development_feedback
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [kind, summary]
+    properties:
+      kind:
+        enum: [clarification_required, feasibility_constraint, capability_gap, protocol_conflict, runtime_blocker]
+      summary: {type: string, minLength: 10, maxLength: 4000}
+      severity:
+        enum: [info, warning, error]
+        default: warning
+      blocking: {type: boolean, default: true}
+      affected_refs:
+        type: array
+        maxItems: 50
+        uniqueItems: true
+        items: {type: string, pattern: '^(skill|scenario):'}
+      constraints:
+        type: array
+        maxItems: 100
+        uniqueItems: true
+        items: {type: string, minLength: 3}
+      evidence:
+        type: array
+        maxItems: 100
+        items:
+          type: object
+          required: [kind, ref, digest]
+          properties:
+            kind: {enum: [file, test, log, contract, environment]}
+            ref: {type: string, minLength: 1}
+            digest: {type: [string, 'null'], pattern: '^sha256:[0-9a-f]{64}$'}
+          additionalProperties: false
+      proposed_action:
+        enum: [clarify_contract, revise_engineering_contract, request_capability, request_scope, retry_infrastructure, abort_execution]
+        default: clarify_contract
+      protocol_digest: {type: string, pattern: '^sha256:[0-9a-f]{64}$'}
+      webspace_id: {type: string}
+      actor: {type: string}
+    additionalProperties: true
+  output_schema:
+    type: object
+    required: [ok, idempotent, feedback, state_path]
+- name: list_development_feedback
+  description: Read validated typed feedback for the Development Session bound to this Builder host.
+  entry: handlers.main:list_development_feedback
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      kind:
+        enum: [clarification_required, feasibility_constraint, capability_gap, protocol_conflict, runtime_blocker]
+      blocking: {type: boolean}
+      limit: {type: integer, minimum: 1, maximum: 5000}
+      webspace_id: {type: string}
+    additionalProperties: true
+  output_schema:
+    type: object
+    required: [ok, bound, items]
 - name: get_skill_preview
   description: Describe the skill selected by the paired Builder host for the generic
     preview scenario.

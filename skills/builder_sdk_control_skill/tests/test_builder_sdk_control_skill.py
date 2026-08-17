@@ -78,6 +78,8 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     }
     assert tools["return_to_prototype"]["side_effects"] == "local_write"
     assert tools["recover_validated_automation"]["side_effects"] == "local_write"
+    assert tools["record_development_feedback"]["side_effects"] == "local_write"
+    assert tools["list_development_feedback"]["side_effects"] == "none"
     assert tools["reconcile_automation_checkpoint"]["side_effects"] == "external_write"
     assert tools["apply_subscription_update"]["side_effects"] == "external_write"
     assert tools["push_project"]["side_effects"] == "local_write"
