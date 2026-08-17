@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.calibration_result.v1",
+  "type": "object",
+  "required": [
+    "schema", "schema_version", "result_id", "task_id", "task_digest",
+    "arm_id", "attempt_index", "paired_seed", "model", "environment_digest",
+    "protocol_digest", "budget_view", "budget_usage", "checks", "metrics", "failure",
+    "evaluated_at", "digest"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.calibration_result.v1"},
+    "schema_version": {"const": "1.0.0"},
+    "result_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string"},
+    "task_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "arm_id": {"enum": ["C0_raw", "C1_reviewed_prose", "C2_staged", "C3_typed_execution", "C4_over_specified"]},
+    "attempt_index": {"type": "integer", "minimum": 1},
+    "paired_seed": {"type": "integer"},
+    "model": {"type": "string", "minLength": 1},
+    "environment_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "protocol_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "budget_view": {"enum": ["fixed_downstream", "fixed_total_system"]},
+    "budget_usage": {
+      "type": "object",
+      "required": ["model_tokens", "wall_seconds", "attempts", "human_interventions"],
+      "properties": {
+        "model_tokens": {"type": "integer", "minimum": 0},
+        "wall_seconds": {"type": "number", "minimum": 0},
+        "attempts": {"type": "integer", "minimum": 1},
+        "human_interventions": {"type": "integer", "minimum": 0},
+        "formulation_tokens": {"type": "integer", "minimum": 0},
+        "expert_minutes": {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "checks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["check_id", "status", "evidence_refs", "detail"],
+        "properties": {
+          "check_id": {"type": "string"},
+          "status": {"enum": ["pass", "fail", "not_evaluated"]},
+          "evidence_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+          "detail": {"type": "string"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": ["evidence_valid_completion", "mandatory_passed", "mandatory_total", "protocol_drift", "budget_compliant"],
+      "properties": {
+        "evidence_valid_completion": {"type": "boolean"},
+        "mandatory_passed": {"type": "integer", "minimum": 0},
+        "mandatory_total": {"type": "integer", "minimum": 0},
+        "protocol_drift": {"type": "boolean"},
+        "budget_compliant": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "failure": {
+      "type": ["object", "null"],
+      "properties": {
+        "stage": {"enum": ["source_understanding", "formulation", "operationalization", "engineering_compilation", "implementation", "runtime_infrastructure", "scientific_evaluation"]},
+        "code": {"type": "string", "minLength": 1},
+        "detail": {"type": "string"}
+      },
+      "required": ["stage", "code", "detail"],
+      "additionalProperties": false
+    },
+    "evaluated_at": {"type": "string", "format": "date-time"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

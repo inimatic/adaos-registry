@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.calibration_task.v1",
+  "type": "object",
+  "required": [
+    "schema", "schema_version", "task_id", "title", "direction_skill_id",
+    "base_request", "artifact_groups", "inputs", "hidden_inputs", "arms",
+    "rubric", "budget_views", "repetitions", "frozen_at", "digest"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.calibration_task.v1"},
+    "schema_version": {"const": "1.0.0"},
+    "task_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,127}$"},
+    "title": {"type": "string", "minLength": 3},
+    "direction_skill_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,127}$"},
+    "base_request": {"type": "string", "minLength": 20},
+    "artifact_groups": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+    "expected_protocol_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "inputs": {"type": "array", "items": {"$ref": "#/$defs/input"}},
+    "hidden_inputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/hiddenInput"}},
+    "arms": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/arm"}},
+    "rubric": {
+      "type": "object",
+      "required": ["primary_endpoint", "checks", "failure_stages"],
+      "properties": {
+        "primary_endpoint": {"const": "evidence_valid_completion"},
+        "checks": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/check"}},
+        "failure_stages": {
+          "type": "array", "minItems": 1, "uniqueItems": true,
+          "items": {"enum": ["source_understanding", "formulation", "operationalization", "engineering_compilation", "implementation", "runtime_infrastructure", "scientific_evaluation"]}
+        }
+      },
+      "additionalProperties": false
+    },
+    "budget_views": {
+      "type": "object",
+      "required": ["fixed_downstream", "fixed_total_system"],
+      "properties": {
+        "fixed_downstream": {"$ref": "#/$defs/budget"},
+        "fixed_total_system": {"$ref": "#/$defs/budget"}
+      },
+      "additionalProperties": false
+    },
+    "repetitions": {
+      "type": "object",
+      "required": ["attempts_per_arm", "paired_seeds"],
+      "properties": {
+        "attempts_per_arm": {"type": "integer", "minimum": 1, "maximum": 100},
+        "paired_seeds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "integer"}}
+      },
+      "additionalProperties": false
+    },
+    "exclusion_rules": {"type": "array", "items": {"type": "string", "minLength": 5}},
+    "frozen_at": {"type": "string", "format": "date-time"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "input": {
+      "type": "object",
+      "required": ["input_id", "kind", "ref", "digest", "path", "visible_arms"],
+      "properties": {
+        "input_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,127}$"},
+        "kind": {"enum": ["research_compilation", "automation_brief", "conformance_fixture", "prescribed_scaffold", "reviewed_prose"]},
+        "ref": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "path": {"type": "string", "minLength": 1},
+        "visible_arms": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"$ref": "#/$defs/armId"}}
+      },
+      "additionalProperties": false
+    },
+    "hiddenInput": {
+      "type": "object",
+      "required": ["input_id", "kind", "ref", "digest", "path"],
+      "properties": {
+        "input_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,127}$"},
+        "kind": {"enum": ["expert_oracle", "legacy_implementation", "hidden_rubric", "judge_guidance"]},
+        "ref": {"type": "string", "minLength": 1},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "path": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "armId": {"enum": ["C0_raw", "C1_reviewed_prose", "C2_staged", "C3_typed_execution", "C4_over_specified"]},
+    "arm": {
+      "type": "object",
+      "required": ["arm_id", "artifact_audience", "instruction_input_ids", "description"],
+      "properties": {
+        "arm_id": {"$ref": "#/$defs/armId"},
+        "artifact_audience": {"type": "string", "pattern": "^research[.][A-Za-z0-9_.-]+$"},
+        "instruction_input_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "description": {"type": "string", "minLength": 10}
+      },
+      "additionalProperties": false
+    },
+    "check": {
+      "type": "object",
+      "required": ["check_id", "stage", "evaluation_mode", "mandatory", "description"],
+      "properties": {
+        "check_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{0,127}$"},
+        "stage": {"enum": ["source_understanding", "formulation", "operationalization", "engineering_compilation", "implementation", "runtime_infrastructure", "scientific_evaluation"]},
+        "evaluation_mode": {"enum": ["deterministic", "expert", "llm_judge"]},
+        "mandatory": {"type": "boolean"},
+        "description": {"type": "string", "minLength": 10}
+      },
+      "additionalProperties": false
+    },
+    "budget": {
+      "type": "object",
+      "required": ["max_model_tokens", "max_wall_seconds", "max_attempts", "max_human_interventions"],
+      "properties": {
+        "max_model_tokens": {"type": "integer", "minimum": 1},
+        "max_wall_seconds": {"type": "integer", "minimum": 1},
+        "max_attempts": {"type": "integer", "minimum": 1},
+        "max_human_interventions": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,131 @@
+name: research_evaluator_skill
+version: 0.1.0
+description: Independent, contamination-aware evaluator for AdaOS research-compilation calibrations.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: summarize_calibration
+runtime:
+  python: '3.11'
+dependencies: []
+capabilities:
+  requires:
+  - storage.relational
+  - builder.project_sources
+lifecycle:
+  after_activate:
+  - tool: ensure_schema
+exports:
+  tools:
+  - ensure_schema
+  - freeze_calibration
+  - get_task
+  - prepare_calibration_arm
+  - record_calibration_result
+  - summarize_calibration
+tools:
+- name: ensure_schema
+  description: Ensure the owner-scoped independent evaluation ledger and report its binding.
+  entry: handlers.main:ensure_schema
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+    required: [ok, binding, health]
+- name: freeze_calibration
+  description: Validate and freeze an immutable C0-C4 calibration task with visible and hidden inputs.
+  entry: handlers.main:freeze_calibration
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required: [task]
+    properties:
+      task: {type: object}
+    additionalProperties: false
+  output_schema:
+    type: object
+    required: [ok, task, task_id, task_digest, message]
+- name: get_task
+  description: Read the public projection of a frozen calibration task without hidden evaluator paths.
+  entry: handlers.main:get_task
+  side_effect_class: none
+  input_schema:
+    type: object
+    required: [task_id]
+    properties:
+      task_id: {type: string}
+    additionalProperties: false
+  output_schema:
+    type: object
+    required: [ok, task]
+- name: prepare_calibration_arm
+  description: Materialize a digest-bound, contamination-checked input packet for one paired attempt.
+  entry: handlers.main:prepare_calibration_arm
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required: [task_id, arm_id, attempt_index]
+    properties:
+      task_id: {type: string}
+      arm_id:
+        enum: [C0_raw, C1_reviewed_prose, C2_staged, C3_typed_execution, C4_over_specified]
+      attempt_index: {type: integer, minimum: 1}
+      budget_view:
+        enum: [fixed_downstream, fixed_total_system]
+        default: fixed_downstream
+    additionalProperties: false
+  output_schema:
+    type: object
+    required: [ok, packet]
+- name: record_calibration_result
+  description: Independently score and persist a candidate against every frozen mandatory check.
+  entry: handlers.main:record_calibration_result
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required: [task_id, candidate]
+    properties:
+      task_id: {type: string}
+      candidate: {type: object}
+    additionalProperties: false
+  output_schema:
+    type: object
+    required: [ok, result, evidence_valid_completion]
+- name: summarize_calibration
+  description: Report per-arm evidence-valid completion, uncertainty, cost, and failure attribution.
+  entry: handlers.main:summarize_calibration
+  side_effect_class: none
+  input_schema:
+    type: object
+    required: [task_id]
+    properties:
+      task_id: {type: string}
+      budget_view:
+        enum: [fixed_downstream, fixed_total_system]
+        default: fixed_downstream
+    additionalProperties: false
+  output_schema:
+    type: object
+    required: [ok, summary, content]
+data_routes:
+- surface: frozen calibration protocol
+  route: skill-local
+  path: research_evaluator.calibration_tasks
+  owner: skill:research_evaluator_skill
+  first_paint: empty task list
+  recovery: restore the owner-scoped relational binding from a verified backup
+  guard_visibility: hidden inputs are omitted from public tool projections and never enter arm packets
+  budget:
+    max_payload_bytes: 1048576
+- surface: arm packets and independent results
+  route: skill-local
+  path: research_evaluator.calibration_packets+calibration_results
+  owner: skill:research_evaluator_skill
+  first_paint: empty evaluation ledger
+  recovery: rematerialize packets from the frozen task; rerun evaluation only under preregistered exclusions
+  guard_visibility: packet construction fails when a hidden id, ref, or path leaks into candidate context
+  budget:
+    max_payload_bytes: 4194304
