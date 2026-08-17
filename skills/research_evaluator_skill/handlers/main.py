@@ -11,7 +11,7 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from evaluation.contracts import freeze_task  # noqa: E402
+from evaluation.contracts import ARM_IDS, freeze_task  # noqa: E402
 from evaluation.harness import evaluate_candidate, prepare_arm, summarize  # noqa: E402
 from evaluation.repository import EvaluationRepository  # noqa: E402
 
@@ -58,6 +58,41 @@ def prepare_calibration_arm(
     return {"ok": True, "packet": repository.put_packet(packet)}
 
 
+@tool(summary="Materialize every preregistered arm packet for one budget view.", side_effects="local_write")
+def prepare_calibration_suite(
+    task_id: str,
+    budget_view: str = "fixed_downstream",
+    **_: Any,
+) -> dict[str, Any]:
+    repository = EvaluationRepository()
+    task = repository.get_task(str(task_id))
+    stored = []
+    for attempt_index in range(1, int(task["repetitions"]["attempts_per_arm"]) + 1):
+        for arm_id in ARM_IDS:
+            packet = repository.put_packet(
+                prepare_arm(task, arm_id, attempt_index, budget_view=budget_view)
+            )
+            stored.append(
+                {
+                    "packet_id": packet["packet_id"],
+                    "digest": packet["digest"],
+                    "arm_id": packet["arm_id"],
+                    "attempt_index": packet["attempt_index"],
+                    "paired_seed": packet["paired_seed"],
+                    "instruction_kinds": [item["kind"] for item in packet["instruction_inputs"]],
+                    "context_digests": [item["context_digest"] for item in packet["artifact_inputs"]],
+                }
+            )
+    return {
+        "ok": True,
+        "task_id": task["task_id"],
+        "task_digest": task["digest"],
+        "budget_view": budget_view,
+        "count": len(stored),
+        "packets": stored,
+    }
+
+
 @tool(summary="Independently score one candidate against the frozen calibration rubric.", side_effects="local_write")
 def record_calibration_result(
     task_id: str,
@@ -102,6 +137,7 @@ __all__ = [
     "freeze_calibration",
     "get_task",
     "prepare_calibration_arm",
+    "prepare_calibration_suite",
     "record_calibration_result",
     "summarize_calibration",
 ]
