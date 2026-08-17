@@ -178,7 +178,7 @@ def _prepare(
         ),
         str(packet["digest"]),
     )
-    session_id = "devcal_" + str(packet["digest"]).removeprefix("sha256:")[:24]
+    session_id = "devcal2_" + str(packet["digest"]).removeprefix("sha256:")[:24]
     artifact_sources = [
         _artifact_source(str(item["ref"]), str(item.get("audience") or ""))
         for item in packet["artifact_inputs"]
@@ -189,6 +189,7 @@ def _prepare(
         research_prototype_digest=str(packet["task_digest"]),
         artifact_groups=[],
         artifact_sources=artifact_sources,
+        request=str(packet["base_request"]),
         prohibited_actions=list(packet["prohibited_actions"]),
         primary_targets=[f"skill:{candidate}"],
         focus_ref=f"skill:{candidate}",
@@ -263,16 +264,18 @@ def start_attempt(
 ) -> dict[str, Any]:
     prepared = _prepare(task_id, arm_id, attempt_index, budget_view, candidate_id)
     public = _public_preparation(prepared)
+    arguments = {
+        "object_type": "skill",
+        "object_id": public["candidate_id"],
+        "webspace_id": public["builder_webspace_id"],
+        "conversation_id": f"conv.research.calibration.{public['packet_id']}",
+    }
+    if "automation_brief" not in set(public["instruction_kinds"]):
+        arguments["implementation_brief"] = public["base_request"]
     result = invoke_skill(
         "builder_sdk_control_skill",
         "start_automation",
-        {
-            "implementation_brief": public["base_request"],
-            "object_type": "skill",
-            "object_id": public["candidate_id"],
-            "webspace_id": public["builder_webspace_id"],
-            "conversation_id": f"conv.research.calibration.{public['packet_id']}",
-        },
+        arguments,
         timeout=120,
     )
     return {**public, "automation": result}
