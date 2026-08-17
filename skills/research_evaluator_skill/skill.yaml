@@ -11,9 +11,8 @@ runtime:
   python: '3.11'
 dependencies: []
 capabilities:
-  requires:
-  - storage.relational
-  - builder.project_sources
+- storage.relational
+- builder.project_sources
 lifecycle:
   after_activate:
   - tool: ensure_schema
@@ -191,4 +190,3 @@ compatibility:
     min_commit: 1afa4113f3f20bd2750d99f992075370e0fbb27c
     min_short_commit: 1afa4113
     build_date: '2026-08-18T01:41:01+03:00'
-
