@@ -197,6 +197,51 @@ def test_prototype_and_automation_brief_bind_exact_inputs() -> None:
     assert any("three-epoch" in item.lower() for item in brief["prohibited_actions"])
 
 
+def test_compiled_automation_brief_exposes_only_implementation_context_view() -> None:
+    source_digest = "sha256:" + "1" * 64
+    prototype = materialize_prototype(
+        _candidate(),
+        direction_id="tlp_direction_skill",
+        source_bundle_digest=source_digest,
+        context_coverage=_coverage(),
+        revision=1,
+        parent_digest=None,
+        actor="user:test",
+    )
+    compilation = {
+        "digest": "sha256:" + "a" * 64,
+        "traceability_graph": {"digest": "sha256:" + "b" * 64},
+    }
+    view = {
+        "source_ref": "artifact://skill/tlp_direction_skill/part0",
+        "audience": "research.implementation",
+        "digest": "sha256:" + "c" * 64,
+        "root_path": "/state/context/views/compiled/files",
+        "manifest_path": "/state/context/views/compiled/context-view.json",
+    }
+
+    brief = materialize_automation_brief(
+        direction_id="tlp_direction_skill",
+        project={"id": "tlp_research", "ref": "project:tlp_research", "version": "0.1.0", "manifest_digest": "sha256:" + "6" * 64, "source_path": "/dev/projects/tlp_research"},
+        artifact_groups=[{"ref": "artifact://skill/tlp_direction_skill/part0", "group_id": "part0", "digest": "sha256:" + "7" * 64, "root_path": "/dev/skills/tlp_direction_skill/artifacts/part0", "manifest_path": "/dev/skills/tlp_direction_skill/artifacts/part0/manifest.yaml"}],
+        source_bundle={"digest": source_digest, "sources": [{"source_id": "raw", "name": "raw.ipynb", "digest": "sha256:" + "2" * 64, "media_type": "application/x-ipynb+json", "role": "notebook", "analysis": {}, "artifact_ref": "artifact://skill/tlp_direction_skill/part0/raw", "group_id": "part0"}]},
+        implementation_bundle={"digest": "sha256:" + "d" * 64, "sources": [{"source_id": "raw", "name": "raw.ipynb", "digest": "sha256:" + "2" * 64, "media_type": "application/x-ipynb+json", "role": "notebook", "analysis": {}, "artifact_ref": "artifact://skill/tlp_direction_skill/part0/raw", "group_id": "part0"}]},
+        prototype=prototype,
+        checkpoint={"package_digest": "sha256:" + "3" * 64, "source_revision": "abc", "source_tree": "sha256:" + "4" * 64, "sha256": "sha256:" + "5" * 64},
+        actor="user:test",
+        compilation=compilation,
+        context_views=[view],
+    )
+
+    assert brief["schema_version"] == "1.2.0"
+    assert brief["compilation_digest"] == compilation["digest"]
+    assert brief["traceability_digest"] == compilation["traceability_graph"]["digest"]
+    artifact_input = brief["development_scope"]["artifact_inputs"][0]
+    assert artifact_input["root_path"] == view["root_path"]
+    assert artifact_input["context_digest"] == view["digest"]
+    assert "/dev/skills/" not in artifact_input["root_path"]
+
+
 def test_llm_candidate_schema_matches_the_typed_contract_and_reports_all_violations() -> None:
     schema = prototype_candidate_schema()
     Draft202012Validator(schema).validate(_candidate())

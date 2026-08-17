@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.compilation_package.v1",
+  "type": "object",
+  "required": [
+    "schema", "schema_version", "direction_id", "run_id",
+    "source_bundle_digest", "context_receipt", "facets",
+    "traceability_graph", "traceability_coverage", "readiness", "digest"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.compilation_package.v1"},
+    "schema_version": {"const": "1.0.0"},
+    "direction_id": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "context_receipt": {
+      "type": "object",
+      "required": ["audience", "visible_source_ids", "excluded_count", "coverage"],
+      "properties": {
+        "audience": {"const": "research.formulation"},
+        "visible_source_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "excluded_count": {"type": "integer", "minimum": 0},
+        "coverage": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "facets": {
+      "type": "object",
+      "required": ["source_analysis", "research_problem", "experimental_protocol", "engineering_contract"],
+      "properties": {
+        "source_analysis": {"$ref": "#/$defs/facet"},
+        "research_problem": {"$ref": "#/$defs/facet"},
+        "experimental_protocol": {"$ref": "#/$defs/facet"},
+        "engineering_contract": {"$ref": "#/$defs/facet"}
+      },
+      "additionalProperties": false
+    },
+    "traceability_graph": {"type": "object"},
+    "traceability_coverage": {"type": "object"},
+    "readiness": {
+      "type": "object",
+      "required": ["decision", "blockers"],
+      "properties": {
+        "decision": {"enum": ["ready_for_acceptance", "needs_revision"]},
+        "blockers": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "$defs": {
+    "facet": {
+      "type": "object",
+      "required": ["schema", "stage", "source_stage", "payload", "digest"],
+      "properties": {
+        "schema": {"const": "adaos.research.compilation_facet.v1"},
+        "stage": {"enum": ["source_analysis", "research_problem", "experimental_protocol", "engineering_contract"]},
+        "source_stage": {"type": "string", "minLength": 1},
+        "payload": {"type": "object"},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -12,6 +12,9 @@ experimental data or scientific governance records.
    its primary `research_direction` skill through the Builder SDK.
 2. Add notebooks and prose in Workbench. `attach_source` copies them into the
    target skill's `artifacts/part0/` and updates its digest-bound manifest.
+   Choose an explicit stage visibility profile when a source is not shared.
+   `evaluation_only` is the correct profile for a hidden expert oracle such as
+   the historical TLP initial review.
 3. Use `chat` to discuss the sources. Every meaningful response is validated
    and stored as a ResearchPrototype revision; the transcript is not truth.
    Notebook code and Markdown are parsed before bounding; imports, definitions,
@@ -19,7 +22,9 @@ experimental data or scientific governance records.
    bounded historical-output summaries are represented separately. Historical
    outputs remain explicitly exploratory/untrusted. Every supplied fragment has
    an exact `artifact://...#cell/lines` reference.
-4. Inspect `get_direction` and resolve blocking questions.
+4. Inspect `get_compilation`: Source Analysis, Research Problem, Experimental
+   Protocol, and Engineering Contract have independent digests and a
+   source-to-acceptance traceability report. Resolve blocking questions.
 5. Call `accept_prototype` with the exact prototype digest, current generation,
    and an idempotency key. The command creates a private local Builder
    checkpoint, immutable AutomationBrief, and a least-write Builder Development
@@ -42,9 +47,13 @@ Callers outside chat should pass stable `actor` and `invocation_origin` values.
 
 ## Hard formulation boundary
 
-The default path is a three-stage pipeline: `problem_frame`,
-`protocol_design`, and `implementation_contract`. The Root LLM proposes only
-each bounded stage artifact. AdaOS materializes and
+The default path uses three bounded LLM stages: `problem_frame`,
+`protocol_design`, and `implementation_contract`. AdaOS then compiles four
+stable facets: `source_analysis`, `research_problem`,
+`experimental_protocol`, and `engineering_contract`. It also creates a
+digest-bound traceability graph and fails the compilation gate when required
+source-to-acceptance paths are absent. The Root LLM proposes only each bounded
+stage artifact. AdaOS materializes and
 digests `context_coverage` and `admission_review`; neither can be self-asserted
 by the model. Provider-native Structured Outputs constrain shape; AdaOS retains
 the richer local JSON Schema and semantic gates because provider schemas accept
@@ -87,6 +96,13 @@ provider-supported subset; it never invents domain content. A structurally or
 semantically invalid stage is rejected after the bounded repair budget and no
 revision is stored. A valid candidate with a genuinely unresolved decision
 remains a visible draft. Neither case can silently become an AutomationBrief.
+
+Artifact visibility is an enforced filesystem boundary. Each item has a
+generic core `context_policy`; this skill maps research profiles to the exact
+`research.formulation`, `research.implementation`, and
+`research.evaluation` audiences. Acceptance materializes immutable filtered
+views and binds their digests into Builder's Development Session. Hidden files
+are not present under Codex's read-only artifact roots.
 
 ## Ownership
 

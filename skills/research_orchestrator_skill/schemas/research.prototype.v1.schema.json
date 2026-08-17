@@ -55,7 +55,9 @@
       "required": ["run_id", "pipeline", "stages"],
       "properties": {
         "run_id": {"type": "string", "minLength": 3},
-        "pipeline": {"const": "staged_v1"},
+        "pipeline": {"enum": ["staged_v1", "research_compiler_v1"]},
+        "compilation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "traceability_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "stages": {
           "type": "array", "minItems": 3,
           "items": {

@@ -13,8 +13,8 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from research.orchestrator import ResearchOrchestrator
-from research.repository import OrchestratorRepository
+from research.orchestrator import ResearchOrchestrator  # noqa: E402
+from research.repository import OrchestratorRepository  # noqa: E402
 
 
 def _orchestrator() -> ResearchOrchestrator:
@@ -105,6 +105,7 @@ def attach_source(
     group_id: str = "part0",
     name: str | None = None,
     role: str = "source",
+    visibility_profile: str = "shared",
     actor: str = "user:local",
     cleanup_staging: bool = False,
     replace_existing: bool = False,
@@ -116,9 +117,28 @@ def attach_source(
         group_id=group_id,
         name=name,
         role=role,
+        visibility_profile=visibility_profile,
         actor=actor,
         cleanup_staging=cleanup_staging,
         replace_existing=replace_existing,
+    )
+
+
+@tool(summary="Set one source artifact's research-stage visibility profile.", side_effects="local_write")
+def set_source_visibility(
+    direction_id: str,
+    group_id: str,
+    artifact_id: str,
+    visibility_profile: str,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().set_source_visibility(
+        direction_id,
+        group_id,
+        artifact_id,
+        visibility_profile,
+        actor=actor,
     )
 
 
@@ -178,6 +198,7 @@ def list_artifacts(direction_id: str, **_: Any) -> dict[str, Any]:
                     "preview": item.get("digest"),
                     "group_id": group.get("group_id"),
                     "preview_kind": preview_kind,
+                    "context_policy": item.get("context_policy"),
                 }
             )
     return {
@@ -421,7 +442,7 @@ def get_activity(direction_id: str, limit: int = 200, **_: Any) -> dict[str, Any
         for item in stages
     ]
     stage_lines = "\n".join(
-        f"- `{item['run_id']}` · **{item['stage_index']}/3 {item['stage_name']}** · `{item['status']}` · "
+        f"- `{item['run_id']}` · **{item['stage_index']}/4 {item['stage_name']}** · `{item['status']}` · "
         f"model `{item.get('resolved_model') or 'unknown'}` · structured `{item.get('structured_output')}` · repairs `{item.get('repair_attempts', 0)}`"
         f" · tokens `{(item.get('aggregate_usage') or {}).get('total_tokens', 0)}`"
         for item in reversed(stage_summaries)
@@ -443,7 +464,7 @@ def get_formulation_run(direction_id: str, run_id: str | None = None, **_: Any) 
         selected_run = str(recent[0]["run_id"]) if recent else ""
     stages = repository.formulation_stages(direction_id, run_id=selected_run) if selected_run else []
     lines = [
-        f"- **{item['stage_index']}/3 {item['stage_name']}** · `{item['status']}` · "
+        f"- **{item['stage_index']}/4 {item['stage_name']}** · `{item['status']}` · "
         f"model `{item['telemetry'].get('resolved_model') or 'unknown'}` · "
         f"structured `{item['telemetry'].get('structured_output')}` · "
         f"repairs `{item['telemetry'].get('repair_attempts', 0)}` · "
@@ -456,6 +477,49 @@ def get_formulation_run(direction_id: str, run_id: str | None = None, **_: Any) 
         "run_id": selected_run or None,
         "stages": stages,
         "content": "## Formulation run\n\n" + ("\n".join(lines) if lines else "No formulation run was found."),
+    }
+
+
+@tool(summary="Read the latest digest-bound research compilation facets and traceability.", side_effects="none")
+def get_compilation(direction_id: str, run_id: str | None = None, **_: Any) -> dict[str, Any]:
+    state = _orchestrator().get(direction_id)
+    prototype = state.get("accepted_prototype") or state.get("current_prototype") or {}
+    trace = prototype.get("formulation_trace") if isinstance(prototype.get("formulation_trace"), Mapping) else {}
+    selected_run = str(run_id or trace.get("run_id") or "").strip()
+    stages = OrchestratorRepository().formulation_stages(direction_id, run_id=selected_run) if selected_run else []
+    stage = next((item for item in stages if item.get("stage_name") == "research_compilation"), None)
+    compilation = dict(stage.get("payload") or {}) if isinstance(stage, Mapping) else {}
+    if not compilation:
+        return {
+            "ok": True,
+            "available": False,
+            "direction_id": direction_id,
+            "run_id": selected_run or None,
+            "content": "Research Compilation has not been produced yet.",
+        }
+    facets = compilation.get("facets") if isinstance(compilation.get("facets"), Mapping) else {}
+    traceability = compilation.get("traceability_coverage") if isinstance(compilation.get("traceability_coverage"), Mapping) else {}
+    lines = [
+        f"- **{name.replace('_', ' ').title()}** — `{item.get('digest')}`"
+        for name, item in facets.items()
+        if isinstance(item, Mapping)
+    ]
+    content = (
+        "## Research Compilation\n\n"
+        + "\n".join(lines)
+        + f"\n\n**Traceability:** `{traceability.get('covered', 0)}/{traceability.get('total', 0)}` paths · "
+        f"**readiness:** `{compilation.get('readiness', {}).get('decision', 'unknown')}`\n\n"
+        f"**Compilation digest:** `{compilation.get('digest')}`"
+    )
+    return {
+        "ok": True,
+        "available": True,
+        "direction_id": direction_id,
+        "run_id": selected_run,
+        "compilation": compilation,
+        "facets": facets,
+        "traceability": traceability,
+        "content": content,
     }
 
 

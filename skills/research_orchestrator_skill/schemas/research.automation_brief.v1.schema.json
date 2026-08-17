@@ -10,7 +10,7 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.automation_brief.v1"},
-    "schema_version": {"const": "1.1.0"},
+    "schema_version": {"enum": ["1.1.0", "1.2.0"]},
     "brief_id": {"type": "string"},
     "direction": {"type": "object"},
     "project": {
@@ -27,6 +27,9 @@
     },
     "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "prototype_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "compilation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "traceability_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "context_audience": {"type": "string", "minLength": 1},
     "builder_checkpoint": {
       "type": "object",
       "required": ["package_digest", "source_revision", "source_tree", "sha256"],
@@ -79,5 +82,11 @@
     "created_by": {"type": "string"},
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.2.0"}}},
+      "then": {"required": ["compilation_digest", "traceability_digest", "context_audience"]}
+    }
+  ],
   "additionalProperties": false
 }

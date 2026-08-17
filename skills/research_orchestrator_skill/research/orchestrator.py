@@ -30,6 +30,7 @@ from research.contracts import (
     prototype_candidate_schema,
     prototype_quality_issues,
 )
+from research.compiler import build_compilation
 from research.formulation import (
     assemble_candidate,
     provider_schema,
@@ -44,6 +45,29 @@ from research.repository import OrchestratorRepository
 
 _DIRECTION_RE = re.compile(r"^[a-z0-9_.-]+$")
 _DIRECTIVE_TEXT_LIMIT = 6000
+_FORMULATION_AUDIENCE = "research.formulation"
+_IMPLEMENTATION_AUDIENCE = "research.implementation"
+_RESEARCH_CONTEXT_PROFILES = {
+    "shared": {"default": "allow", "allow": [], "deny": [], "reason": None},
+    "evaluation_only": {
+        "default": "deny",
+        "allow": ["research.evaluation"],
+        "deny": [],
+        "reason": "Evaluator-only material; hidden from formulation and implementation.",
+    },
+    "formulation_only": {
+        "default": "deny",
+        "allow": ["research.formulation"],
+        "deny": [],
+        "reason": "Formulation-only material; not an implementation input.",
+    },
+    "implementation_input": {
+        "default": "deny",
+        "allow": ["research.implementation", "research.evaluation"],
+        "deny": [],
+        "reason": "Implementation and evaluation input; excluded from formulation.",
+    },
+}
 
 
 def _direction_id(value: str) -> str:
@@ -58,6 +82,15 @@ def _bounded_text(value: Any, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: max(0, limit - 1)].rstrip() + "…"
+
+
+def _context_profile(value: str) -> dict[str, Any]:
+    profile = str(value or "shared").strip().lower()
+    if profile not in _RESEARCH_CONTEXT_PROFILES:
+        raise ValueError(
+            "visibility_profile must be shared, evaluation_only, formulation_only, or implementation_input"
+        )
+    return copy.deepcopy(_RESEARCH_CONTEXT_PROFILES[profile])
 
 
 def _directive_trace(
@@ -540,7 +573,7 @@ class ResearchOrchestrator:
         for project in compositions.list_projects(profile="adaos.research.direction.v1", limit=limit):
             direction_id = str(project["primary_ref"]).partition(":")[2]
             state = states.get(direction_id)
-            bundle = artifact_context.source_bundle(direction_id)
+            bundle = artifact_context.source_bundle(direction_id, audience=_FORMULATION_AUDIENCE)
             prototype = self.repository.get_prototype((state or {}).get("current_prototype_digest"))
             next_steps = (
                 self._next_steps(state or {}, bundle, prototype)
@@ -574,7 +607,7 @@ class ResearchOrchestrator:
     def initialize(self, direction_id: str, title: str, *, actor: str = "user:local") -> dict[str, Any]:
         token = _direction_id(direction_id)
         self._require_direction_project(token)
-        state = self.repository.initialize(token, str(title or token).strip())
+        self.repository.initialize(token, str(title or token).strip())
         self.repository.activity(token, "intake", "ready", "Research direction initialized.", {"actor": actor})
         return self.get(token)
 
@@ -586,6 +619,7 @@ class ResearchOrchestrator:
         group_id: str = "part0",
         name: str | None = None,
         role: str = "source",
+        visibility_profile: str = "shared",
         actor: str = "user:local",
         cleanup_staging: bool = False,
         replace_existing: bool = False,
@@ -629,13 +663,14 @@ class ResearchOrchestrator:
             name=name,
             role=role,
             origin={"kind": "orchestrator_intake", "actor": actor},
+            context_policy=_context_profile(visibility_profile),
             replace_existing=replace_existing,
         )
         staging_cleanup = {"requested": bool(cleanup_staging), "removed": False}
         if staging_source is not None:
             staging_source.unlink(missing_ok=True)
             staging_cleanup["removed"] = not staging_source.exists()
-        bundle = artifact_context.source_bundle(token)
+        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
         persisted = self.repository.get_direction(token) or {}
         state = (
             persisted
@@ -668,11 +703,57 @@ class ResearchOrchestrator:
             "staging_cleanup": staging_cleanup,
         }
 
+    def set_source_visibility(
+        self,
+        direction_id: str,
+        group_id: str,
+        artifact_id: str,
+        visibility_profile: str,
+        *,
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        state = self.repository.get_direction(token)
+        if not state:
+            raise ValueError("research direction is not initialized")
+        if state.get("accepted_prototype_digest"):
+            raise ValueError("accepted research inputs are immutable; start a new formulation cycle")
+        result = artifact_context.set_context_policy(
+            token,
+            group_id,
+            artifact_id,
+            _context_profile(visibility_profile),
+        )
+        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        if str(state.get("current_bundle_digest") or "") != str(bundle["digest"]):
+            state = self.repository.set_bundle(token, str(bundle["digest"]))
+        self.repository.activity(
+            token,
+            "intake",
+            "visibility_changed",
+            f"Artifact {artifact_id} visibility changed to {visibility_profile}.",
+            {
+                "group_id": group_id,
+                "artifact_id": artifact_id,
+                "visibility_profile": visibility_profile,
+                "artifact_group_digest": result["group"]["digest"],
+                "formulation_bundle_digest": bundle["digest"],
+                "actor": actor,
+            },
+        )
+        return {
+            "ok": True,
+            "artifact": result["artifact"],
+            "artifact_group": result["group"],
+            "source_bundle": bundle,
+            "direction": state,
+        }
+
     def get(self, direction_id: str) -> dict[str, Any]:
         token = _direction_id(direction_id)
         project = self._require_direction_project(token)["project"]
         state = self.repository.get_direction(token)
-        bundle = artifact_context.source_bundle(token)
+        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
         if not state:
             return {
                 "ok": True,
@@ -767,7 +848,7 @@ class ResearchOrchestrator:
         if not state:
             self.initialize(token, token, actor=actor)
             state = self.repository.get_direction(token)
-        bundle = artifact_context.source_bundle(token)
+        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("direction skill artifact groups are empty")
         changed = str((state or {}).get("current_bundle_digest") or "") != str(bundle["digest"])
@@ -870,7 +951,7 @@ class ResearchOrchestrator:
             raise ValueError("research direction is not initialized")
         if state.get("accepted_prototype_digest"):
             raise ValueError("accepted formulation is immutable; create a new Builder change before revising it")
-        bundle = artifact_context.source_bundle(token)
+        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("at least one source artifact is required")
         previous = self.repository.get_prototype(state.get("current_prototype_digest"))
@@ -1379,7 +1460,7 @@ class ResearchOrchestrator:
         state = self.repository.get_direction(token)
         if not state:
             raise ValueError("research direction is not initialized")
-        bundle = artifact_context.source_bundle(token)
+        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("attach at least one source before discussion")
         current = self.repository.get_prototype(state.get("current_prototype_digest"))
@@ -1591,9 +1672,55 @@ class ResearchOrchestrator:
                 "protocol_design": protocol,
                 "implementation_contract": implementation,
             }
+            compilation = build_compilation(
+                direction_id=token,
+                run_id=run_id,
+                source_bundle=bundle,
+                source_context=source_context,
+                problem_frame=problem,
+                protocol_design=protocol,
+                implementation_contract=implementation,
+                source_ref_map=source_ref_map,
+            )
+            self.repository.put_formulation_stage(
+                run_id=run_id,
+                direction_id=token,
+                stage_index=4,
+                stage_name="research_compilation",
+                status="completed",
+                input_digest=stage_digest(
+                    {name: stage_digest(value) for name, value in stage_values.items()}
+                ),
+                output_digest=str(compilation["digest"]),
+                payload=compilation,
+                telemetry={
+                    "producer": "deterministic_compiler",
+                    "traceability_digest": compilation["traceability_graph"]["digest"],
+                    "traceability_coverage": compilation["traceability_coverage"]["coverage"],
+                },
+            )
+            if compilation["readiness"]["decision"] != "ready_for_acceptance":
+                raise ValueError(
+                    "research compilation gate: "
+                    + "; ".join(compilation["readiness"]["blockers"])
+                )
+            self.repository.activity(
+                token,
+                "compilation",
+                "completed",
+                "Research compilation produced four facets and passed traceability coverage.",
+                {
+                    "run_id": run_id,
+                    "compilation_digest": compilation["digest"],
+                    "traceability_digest": compilation["traceability_graph"]["digest"],
+                    "traceability_coverage": compilation["traceability_coverage"]["coverage"],
+                },
+            )
             formulation_trace = {
                 "run_id": run_id,
-                "pipeline": "staged_v1",
+                "pipeline": "research_compiler_v1",
+                "compilation_digest": compilation["digest"],
+                "traceability_digest": compilation["traceability_graph"]["digest"],
                 "stages": [
                     {
                         "stage": stage_name,
@@ -1712,7 +1839,7 @@ class ResearchOrchestrator:
         state = self.repository.get_direction(token)
         if not state:
             raise ValueError("research direction is not initialized")
-        bundle = artifact_context.source_bundle(token)
+        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("attach at least one source before discussion")
         current = self.repository.get_prototype(state.get("current_prototype_digest"))
@@ -2003,12 +2130,40 @@ class ResearchOrchestrator:
             admission_issues = prototype_admission_issues(prototype)
             if admission_issues:
                 raise ValueError("ResearchPrototype does not pass automation admission: " + "; ".join(admission_issues))
-            bundle = artifact_context.source_bundle(token)
+            bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
             if bundle.get("digest") != prototype.get("source_bundle_digest"):
                 raise ValueError("artifact groups changed after this ResearchPrototype revision; discuss and review a new revision")
             readiness = prototype.get("readiness") if isinstance(prototype.get("readiness"), Mapping) else {}
             if readiness.get("decision") != "ready_for_automation" or list(readiness.get("blocking_questions") or []):
                 raise ValueError("ResearchPrototype still has blocking questions")
+            formulation_trace = (
+                prototype.get("formulation_trace")
+                if isinstance(prototype.get("formulation_trace"), Mapping)
+                else {}
+            )
+            run_id = str(formulation_trace.get("run_id") or "")
+            compilation_stage = next(
+                (
+                    item
+                    for item in self.repository.formulation_stages(token, run_id=run_id)
+                    if item.get("stage_name") == "research_compilation"
+                ),
+                None,
+            )
+            compilation = (
+                dict(compilation_stage.get("payload") or {})
+                if isinstance(compilation_stage, Mapping)
+                else {}
+            )
+            if (
+                not compilation
+                or compilation.get("digest") != formulation_trace.get("compilation_digest")
+                or compilation.get("source_bundle_digest") != bundle.get("digest")
+                or compilation.get("readiness", {}).get("decision") != "ready_for_acceptance"
+            ):
+                raise ValueError(
+                    "ResearchCompilation is missing, stale, or did not pass its traceability gate"
+                )
             self.repository.activity(token, "acceptance", "checkpointing", "Creating an exact private local Builder checkpoint for the direction skill; no source is published.", {"prototype_digest": prototype_digest, "actor": actor})
             checkpoint = dict(
                 self._checkpoint(
@@ -2022,6 +2177,13 @@ class ResearchOrchestrator:
                 raise ValueError("Builder checkpoint did not return an immutable source identity")
             project = self._require_direction_project(token)["project"]
             groups = [artifact_context.get_group(token, item["group_id"]) for item in artifact_context.groups(token)]
+            context_views = [
+                artifact_context.materialize_context(token, str(item["group_id"]), _IMPLEMENTATION_AUDIENCE)
+                for item in groups
+            ]
+            implementation_bundle = artifact_context.source_bundle(
+                token, audience=_IMPLEMENTATION_AUDIENCE
+            )
             brief = materialize_automation_brief(
                 direction_id=token,
                 project=project,
@@ -2030,6 +2192,9 @@ class ResearchOrchestrator:
                 prototype=prototype,
                 checkpoint=checkpoint,
                 actor=actor,
+                compilation=compilation,
+                context_views=context_views,
+                implementation_bundle=implementation_bundle,
             )
             stored = self.repository.accept(token, expected_generation=expected_generation, prototype=prototype, brief=brief)
             session_result = development_sessions.create(
@@ -2037,6 +2202,7 @@ class ResearchOrchestrator:
                 automation_brief_digest=str(stored["digest"]),
                 research_prototype_digest=str(prototype["digest"]),
                 artifact_groups=[str(item["group_id"]) for item in groups],
+                artifact_audience=_IMPLEMENTATION_AUDIENCE,
                 context_members=list(stored["development_scope"]["context_members"]),
                 prohibited_actions=list(stored["prohibited_actions"]),
                 base_release={
@@ -2048,15 +2214,21 @@ class ResearchOrchestrator:
                 },
                 actor=actor,
             )
-            attached = development_sessions.attach_instruction(
+            development_sessions.attach_instruction(
                 str(session_result["session"]["session_id"]),
                 "automation_brief",
                 stored,
                 expected_digest=str(stored["digest"]),
             )
-            session = attached["session"]
+            compiled_instruction = development_sessions.attach_instruction(
+                str(session_result["session"]["session_id"]),
+                "research_compilation",
+                compilation,
+                expected_digest=str(compilation["digest"]),
+            )
+            session = compiled_instruction["session"]
             self.repository.activity(token, "acceptance", "handoff_ready", "Research formulation accepted; Automation Brief and scoped Development Session are ready. Codex was not started.", {"prototype_digest": prototype_digest, "automation_brief_digest": stored["digest"], "development_session_id": session["session_id"], "checkpoint": checkpoint})
-            return {"ok": True, "direction": self.repository.get_direction(token), "prototype": prototype, "automation_brief": stored, "development_session": session, "builder_checkpoint": checkpoint, "codex_started": False}
+            return {"ok": True, "direction": self.repository.get_direction(token), "prototype": prototype, "research_compilation": compilation, "automation_brief": stored, "development_session": session, "builder_checkpoint": checkpoint, "codex_started": False}
 
         return self.repository.once(str(idempotency_key or "").strip(), "accept_prototype", operation)
 

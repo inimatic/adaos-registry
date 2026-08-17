@@ -33,6 +33,7 @@ exports:
   - create_direction
   - initialize_direction
   - attach_source
+  - set_source_visibility
   - sync_source_bundle
   - get_direction
   - list_artifacts
@@ -45,6 +46,7 @@ exports:
   - open_builder_session
   - get_activity
   - get_formulation_run
+  - get_compilation
   - next_steps
 tools:
 - name: ensure_schema
@@ -164,12 +166,50 @@ tools:
         - 'null'
       role:
         type: string
+      visibility_profile:
+        type: string
+        enum:
+        - shared
+        - evaluation_only
+        - formulation_only
+        - implementation_input
+        default: shared
       cleanup_staging:
         type: boolean
         default: false
       replace_existing:
         type: boolean
         default: false
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: set_source_visibility
+  description: Apply a research-stage visibility profile to one manifested artifact.
+  entry: handlers.main:set_source_visibility
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - group_id
+    - artifact_id
+    - visibility_profile
+    properties:
+      direction_id:
+        type: string
+      group_id:
+        type: string
+      artifact_id:
+        type: string
+      visibility_profile:
+        type: string
+        enum:
+        - shared
+        - evaluation_only
+        - formulation_only
+        - implementation_input
+      actor:
+        type: string
     additionalProperties: true
   output_schema:
     type: object
@@ -395,6 +435,24 @@ tools:
   description: Read exact persisted stage payloads and provider telemetry for one
     formulation run, defaulting to the latest run.
   entry: handlers.main:get_formulation_run
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      run_id:
+        type:
+        - string
+        - 'null'
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: get_compilation
+  description: Read the latest digest-bound research compilation facets and traceability.
+  entry: handlers.main:get_compilation
   side_effects: none
   input_schema:
     type: object
@@ -646,6 +704,27 @@ data_routes:
     preserve_last_value: true
     invalidation_tags:
     - research.automation_brief
+- surface: widget:research-compilation
+  route: tool/details
+  tool: get_compilation
+  owner: skill:research_orchestrator_skill
+  first_paint: research compilation not produced
+  recovery: continue formulation or refresh after a compilation invalidation
+  guard_visibility: digest-bound facets and traceability; extracted source payload bytes excluded
+  budget:
+    max_payload_bytes: 2097152
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    cache_ttl_ms: 0
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - research.formulation
+    - research.compilation
 - surface: research formulation ledger
   route: skill-local
   path: data/db/research_orchestrator.sqlite3

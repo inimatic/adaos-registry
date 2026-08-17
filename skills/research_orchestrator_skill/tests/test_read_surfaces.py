@@ -27,7 +27,7 @@ def _uninitialized_orchestrator(monkeypatch: pytest.MonkeyPatch) -> ResearchOrch
     monkeypatch.setattr(
         orchestrator_module.artifact_context,
         "source_bundle",
-        lambda _direction_id: {"digest": None, "sources": [], "generation": 0},
+        lambda _direction_id, **_kwargs: {"digest": None, "sources": [], "generation": 0},
     )
     monkeypatch.setattr(orchestrator_module.artifact_context, "groups", lambda _direction_id: [])
     return orchestrator

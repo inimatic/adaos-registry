@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from research.formulation import STAGES, assemble_candidate, provider_schema, stage_quality_issues, stage_schema, validate_stage
+from research.compiler import build_compilation
 
 
 REF = "SRC-001"
@@ -152,6 +153,66 @@ def test_stage_schemas_are_provider_strict_and_candidate_is_deterministically_as
     assert candidate["experimental_plan"]["data_policy"]["evaluation_access"]["selection_rule"].startswith(
         "Выбрать checkpoint с максимальной"
     )
+
+
+def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceability() -> None:
+    bundle = {
+        "digest": "sha256:" + "9" * 64,
+        "audience": "research.formulation",
+        "excluded": [{"artifact_id": "hidden-oracle", "reason": "evaluation_only"}],
+        "sources": [
+            {
+                "source_id": "notebook",
+                "name": "experiment.ipynb",
+                "digest": "sha256:" + "8" * 64,
+                "media_type": "application/x-ipynb+json",
+                "role": "research_source",
+                "artifact_ref": EXACT_REF.split("#", 1)[0],
+                "analysis": {"kind": "notebook"},
+            }
+        ],
+    }
+    context = {
+        "coverage": {
+            "sources_total": 1,
+            "sources_represented": 1,
+            "selected_characters": 100,
+            "truncated_sources": [],
+            "unreadable_sources": [],
+            "items": [
+                {
+                    "artifact_ref": EXACT_REF.split("#", 1)[0],
+                    "strategy": "notebook_semantic_digest_v1",
+                    "selected_characters": 100,
+                    "truncated": False,
+                    "provenance_refs": [EXACT_REF],
+                }
+            ],
+        }
+    }
+
+    package = build_compilation(
+        direction_id="tlp_direction",
+        run_id="formulation-1",
+        source_bundle=bundle,
+        source_context=context,
+        problem_frame=_problem(),
+        protocol_design=_protocol(),
+        implementation_contract=_implementation(),
+        source_ref_map={REF: EXACT_REF},
+    )
+
+    assert list(package["facets"]) == [
+        "source_analysis",
+        "research_problem",
+        "experimental_protocol",
+        "engineering_contract",
+    ]
+    assert package["context_receipt"]["excluded_count"] == 1
+    assert package["traceability_coverage"]["valid"] is True
+    assert package["traceability_coverage"]["coverage"] == 1.0
+    assert package["readiness"] == {"decision": "ready_for_acceptance", "blockers": []}
+    assert package["digest"].startswith("sha256:")
 
 
 def test_dynamic_stage_schema_limits_every_source_reference_to_supplied_short_ids() -> None:

@@ -322,11 +322,19 @@ def materialize_automation_brief(
     prototype: Mapping[str, Any],
     checkpoint: Mapping[str, Any],
     actor: str,
+    compilation: Mapping[str, Any] | None = None,
+    context_views: list[Mapping[str, Any]] | None = None,
+    implementation_bundle: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     implementation_requirements = list(prototype.get("implementation_requirements") or [])
+    views_by_group = {
+        str(item.get("source_ref") or "").rsplit("/", 1)[-1]: dict(item)
+        for item in context_views or []
+    }
+    visible_bundle = implementation_bundle or source_bundle
     brief = {
         "schema": "adaos.research.automation_brief.v1",
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0" if compilation else "1.1.0",
         "brief_id": f"automation-{prototype['digest'].removeprefix('sha256:')[:20]}",
         "direction": {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"},
         "project": {
@@ -357,15 +365,17 @@ def materialize_automation_brief(
                 "artifact_ref": item.get("artifact_ref"),
                 "group_id": item.get("group_id"),
             }
-            for item in source_bundle.get("sources") or []
+            for item in visible_bundle.get("sources") or []
         ],
         "artifact_groups": [
             {
                 "ref": item["ref"],
                 "group_id": item["group_id"],
                 "manifest_digest": item["digest"],
-                "root_path": item["root_path"],
-                "manifest_path": item["manifest_path"],
+                "root_path": (views_by_group.get(str(item["group_id"])) or item)["root_path"],
+                "manifest_path": (views_by_group.get(str(item["group_id"])) or item)["manifest_path"],
+                "context_digest": (views_by_group.get(str(item["group_id"])) or {}).get("digest"),
+                "audience": (views_by_group.get(str(item["group_id"])) or {}).get("audience"),
             }
             for item in artifact_groups
         ],
@@ -384,7 +394,20 @@ def materialize_automation_brief(
                 {"ref": "skill:research_manager_skill", "relation": "contract-consumer", "access": "read-only", "context": "contract"},
             ],
             "artifact_inputs": [
-                {"ref": item["ref"], "access": "read-only", "manifest_digest": item["digest"], "root_path": item["root_path"]}
+                {
+                    "ref": item["ref"],
+                    "access": "read-only",
+                    "manifest_digest": item["digest"],
+                    "root_path": (views_by_group.get(str(item["group_id"])) or item)["root_path"],
+                    **(
+                        {
+                            "context_digest": views_by_group[str(item["group_id"])]["digest"],
+                            "audience": views_by_group[str(item["group_id"])]["audience"],
+                        }
+                        if str(item["group_id"]) in views_by_group
+                        else {}
+                    ),
+                }
                 for item in artifact_groups
             ],
         },
@@ -428,6 +451,14 @@ def materialize_automation_brief(
         "created_at": now(),
         "created_by": str(actor or "user:local"),
     }
+    if compilation:
+        brief.update(
+            {
+                "compilation_digest": str(compilation["digest"]),
+                "traceability_digest": str(compilation["traceability_graph"]["digest"]),
+                "context_audience": "research.implementation",
+            }
+        )
     brief["digest"] = digest(brief)
     return validate("research.automation_brief.v1.schema.json", brief)
 
