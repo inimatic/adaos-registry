@@ -11,6 +11,7 @@
           "initialState": {
             "researchViewMode": "portfolio",
             "activeResearchTab": "overview",
+            "activeCompilationFacet": "source_analysis",
             "selectedDirectionId": null,
             "selectedDirectionTitle": null,
             "researchConversationId": null,
@@ -36,6 +37,19 @@
               }
             ],
             "variants": [
+              {
+                "id": "compilation",
+                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
+                "type": "single",
+                "pattern": "stack",
+                "areas": [
+                  {
+                    "id": "workspace",
+                    "role": "main",
+                    "label": "Research compilation"
+                  }
+                ]
+              },
               {
                 "id": "direction",
                 "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null",
@@ -147,6 +161,7 @@
                     "researchCanAccept": false,
                     "builderUrl": null,
                     "activeResearchTab": "overview"
+                    ,"activeCompilationFacet": "source_analysis"
                   }
                 },
                 {
@@ -197,6 +212,7 @@
                     "selectedDirectionId": "$event.direction_id",
                     "selectedDirectionTitle": "$event.title",
                     "activeResearchTab": "overview",
+                    "activeCompilationFacet": "source_analysis",
                     "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
                     "researchGeneration": 0,
                     "researchPrototypeDigest": null,
@@ -303,6 +319,12 @@
                     "title": "Discuss artifacts and decisions with the Researcher; accepted answers materialize typed ResearchPrototype revisions."
                   },
                   {
+                    "id": "compilation",
+                    "label": "Compilation",
+                    "icon": "git-network-outline",
+                    "title": "Inspect Source Analysis, Research Problem, Experimental Protocol, Engineering Contract, and traceability before acceptance."
+                  },
+                  {
                     "id": "development",
                     "label": "Development",
                     "icon": "construct-outline",
@@ -382,6 +404,7 @@
                     "path": "$event.path",
                     "name": "$event.file.name",
                     "role": "research_source",
+                    "visibility_profile": "shared",
                     "cleanup_staging": true,
                     "replace_existing": true
                   },
@@ -441,13 +464,73 @@
               ]
             },
             {
+              "id": "artifact-visibility",
+              "type": "ui.form",
+              "area": "workspace",
+              "title": "Stage visibility for $state.selectedArtifactTitle",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts' && $state.selectedArtifactId != null",
+              "inputs": {
+                "layout": "inline",
+                "submitLabel": "Apply visibility",
+                "resetOnSuccess": false,
+                "fields": [
+                  {
+                    "id": "visibility_profile",
+                    "name": "visibility_profile",
+                    "type": "select",
+                    "label": "Visible to",
+                    "required": true,
+                    "default": "shared",
+                    "options": [
+                      {
+                        "label": "All research stages",
+                        "value": "shared"
+                      },
+                      {
+                        "label": "Evaluation only (hidden oracle)",
+                        "value": "evaluation_only"
+                      },
+                      {
+                        "label": "Formulation only",
+                        "value": "formulation_only"
+                      },
+                      {
+                        "label": "Implementation and evaluation",
+                        "value": "implementation_input"
+                      }
+                    ],
+                    "help": "The core materializes separate digest-bound filesystem views. Hidden files are absent from the coding agent's artifact root."
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "submit",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.set_source_visibility",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "group_id": "$state.selectedArtifactGroupId",
+                    "artifact_id": "$state.selectedArtifactId",
+                    "visibility_profile": "$event.values.visibility_profile"
+                  },
+                  "invalidates": [
+                    "research.artifacts",
+                    "research.formulation",
+                    "research.compilation",
+                    "research.activity"
+                  ]
+                }
+              ]
+            },
+            {
               "id": "artifact-policy",
               "type": "static.markdown",
               "area": "workspace",
               "title": "Artifact boundary",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
               "inputs": {
-                "content": "Files are copied into the selected direction skill under `artifacts/part0/` and recorded in its manifest. They are readable by ordinary filesystem tools now and by a future typed artifact capability without moving ownership to the orchestrator."
+                "content": "Files are copied into the selected direction skill under `artifacts/part0/` and recorded in its manifest. Each item has an explicit stage-visibility policy. AdaOS gives formulation, implementation, and evaluation separate digest-bound filesystem views; filtering a prompt is not treated as an isolation boundary. Mark expert reviews and legacy answers **evaluation only** for a clean from-raw arm."
               }
             },
             {
@@ -515,6 +598,84 @@
               "actions": []
             },
             {
+              "id": "compilation-facets",
+              "type": "ui.actions",
+              "area": "workspace",
+              "title": "Research Compilation",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
+              "inputs": {
+                "variant": "segmented",
+                "size": "small",
+                "selectedStateKey": "activeCompilationFacet",
+                "buttons": [
+                  {
+                    "id": "source_analysis",
+                    "label": "Source Analysis",
+                    "icon": "documents-outline",
+                    "title": "What the visible source snapshot contains, how it was extracted, and what remains missing."
+                  },
+                  {
+                    "id": "research_problem",
+                    "label": "Problem",
+                    "icon": "help-circle-outline",
+                    "title": "Primary question, falsifiable hypothesis, constraints, assumptions, and unresolved choices."
+                  },
+                  {
+                    "id": "experimental_protocol",
+                    "label": "Protocol",
+                    "icon": "git-compare-outline",
+                    "title": "Operational experiment, evidence classes, allocation, outcomes, and decision policy."
+                  },
+                  {
+                    "id": "engineering_contract",
+                    "label": "Engineering",
+                    "icon": "construct-outline",
+                    "title": "Bounded implementation obligations and independently checkable acceptance evidence."
+                  },
+                  {
+                    "id": "traceability",
+                    "label": "Traceability",
+                    "icon": "git-network-outline",
+                    "title": "Digest-bound source-to-acceptance paths and compilation blockers."
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click",
+                  "type": "updateState",
+                  "params": {
+                    "activeCompilationFacet": "$event.id"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "research-compilation",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Compiled research contract",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_compilation",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId",
+                  "facet": "$state.activeCompilationFacet"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.formulation",
+                  "research.compilation"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 1
+              },
+              "inputs": {
+                "bindField": "content"
+              }
+            },
+            {
               "id": "development-actions",
               "type": "ui.actions",
               "area": "workspace",
@@ -560,6 +721,7 @@
                   "invalidates": [
                     "research.portfolio",
                     "research.formulation",
+                    "research.compilation",
                     "research.activity",
                     "research.automation_brief"
                   ]
