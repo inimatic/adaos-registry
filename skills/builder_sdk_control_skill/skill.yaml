@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.61
+version: 0.1.62
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -1471,67 +1471,130 @@ tools:
     - approved
     - request
 - name: record_development_feedback
-  description: Return typed clarification, feasibility, capability, protocol, or runtime feedback without mutating accepted science.
+  description: Return typed clarification, feasibility, capability, protocol, or runtime
+    feedback without mutating accepted science.
   entry: handlers.main:record_development_feedback
   side_effects: local_write
   input_schema:
     type: object
-    required: [kind, summary]
+    required:
+    - kind
+    - summary
     properties:
       kind:
-        enum: [clarification_required, feasibility_constraint, capability_gap, protocol_conflict, runtime_blocker]
-      summary: {type: string, minLength: 10, maxLength: 4000}
+        enum:
+        - clarification_required
+        - feasibility_constraint
+        - capability_gap
+        - protocol_conflict
+        - runtime_blocker
+      summary:
+        type: string
+        minLength: 10
+        maxLength: 4000
       severity:
-        enum: [info, warning, error]
+        enum:
+        - info
+        - warning
+        - error
         default: warning
-      blocking: {type: boolean, default: true}
+      blocking:
+        type: boolean
+        default: true
       affected_refs:
         type: array
         maxItems: 50
         uniqueItems: true
-        items: {type: string, pattern: '^(skill|scenario):'}
+        items:
+          type: string
+          pattern: '^(skill|scenario):'
       constraints:
         type: array
         maxItems: 100
         uniqueItems: true
-        items: {type: string, minLength: 3}
+        items:
+          type: string
+          minLength: 3
       evidence:
         type: array
         maxItems: 100
         items:
           type: object
-          required: [kind, ref, digest]
+          required:
+          - kind
+          - ref
+          - digest
           properties:
-            kind: {enum: [file, test, log, contract, environment]}
-            ref: {type: string, minLength: 1}
-            digest: {type: [string, 'null'], pattern: '^sha256:[0-9a-f]{64}$'}
+            kind:
+              enum:
+              - file
+              - test
+              - log
+              - contract
+              - environment
+            ref:
+              type: string
+              minLength: 1
+            digest:
+              type:
+              - string
+              - 'null'
+              pattern: ^sha256:[0-9a-f]{64}$
           additionalProperties: false
       proposed_action:
-        enum: [clarify_contract, revise_engineering_contract, request_capability, request_scope, retry_infrastructure, abort_execution]
+        enum:
+        - clarify_contract
+        - revise_engineering_contract
+        - request_capability
+        - request_scope
+        - retry_infrastructure
+        - abort_execution
         default: clarify_contract
-      protocol_digest: {type: string, pattern: '^sha256:[0-9a-f]{64}$'}
-      webspace_id: {type: string}
-      actor: {type: string}
+      protocol_digest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      webspace_id:
+        type: string
+      actor:
+        type: string
     additionalProperties: true
   output_schema:
     type: object
-    required: [ok, idempotent, feedback, state_path]
+    required:
+    - ok
+    - idempotent
+    - feedback
+    - state_path
 - name: list_development_feedback
-  description: Read validated typed feedback for the Development Session bound to this Builder host.
+  description: Read validated typed feedback for the Development Session bound to
+    this Builder host.
   entry: handlers.main:list_development_feedback
   side_effects: none
   input_schema:
     type: object
     properties:
       kind:
-        enum: [clarification_required, feasibility_constraint, capability_gap, protocol_conflict, runtime_blocker]
-      blocking: {type: boolean}
-      limit: {type: integer, minimum: 1, maximum: 5000}
-      webspace_id: {type: string}
+        enum:
+        - clarification_required
+        - feasibility_constraint
+        - capability_gap
+        - protocol_conflict
+        - runtime_blocker
+      blocking:
+        type: boolean
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 5000
+      webspace_id:
+        type: string
     additionalProperties: true
   output_schema:
     type: object
-    required: [ok, bound, items]
+    required:
+    - ok
+    - bound
+    - items
 - name: get_skill_preview
   description: Describe the skill selected by the paired Builder host for the generic
     preview scenario.
@@ -2043,4 +2106,13 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-08-11T10:44:31+00:00'
+updated_at: '2026-08-17T22:22:11+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.854+5183.ca2965f0
+    recorded_at: '2026-08-17T22:22:11+00:00'
+    source: skill_push
+    min_commit: ca2965f080dbe46eb9e25bfeeab63d73b8d2be8a
+    min_short_commit: ca2965f0
+    build_date: '2026-08-18T01:21:57+03:00'
+
