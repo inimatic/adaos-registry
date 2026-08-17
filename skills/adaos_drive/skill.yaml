@@ -415,6 +415,34 @@ tools:
         type: boolean
       links:
         type: array
+- name: list_public_downloads
+  entry: handlers.main:list_public_downloads
+  description: List recent download and preview journal events for readonly public Drive links.
+  side_effects: read_only
+  side_effect_class: read_only
+  input_schema:
+    type: object
+    properties:
+      public_token:
+        type: string
+      limit:
+        type: integer
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - events
+    properties:
+      ok:
+        type: boolean
+      downloads:
+        type: object
+      events:
+        type: array
+      summary:
+        type: object
 - name: revoke_public_link
   entry: handlers.main:revoke_public_link
   description: Revoke a readonly public Drive link on the hub and Root registry.

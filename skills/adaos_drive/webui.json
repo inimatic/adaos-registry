@@ -58,6 +58,10 @@
           "public_links": {
             "items": []
           },
+          "public_downloads": {
+            "items": [],
+            "summary": {}
+          },
           "messages": [],
           "updated_at": null
         },
@@ -1518,6 +1522,62 @@
                   ]
                 }
               ]
+            },
+            {
+              "id": "adaos-drive-public-downloads",
+              "type": "ui.table",
+              "area": "preview",
+              "title": "Public download log",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "adaos_drive.browser",
+                "path": "public_downloads"
+              },
+              "inputs": {
+                "columns": [
+                  {
+                    "key": "time",
+                    "label": "Time",
+                    "width": "176px"
+                  },
+                  {
+                    "key": "status",
+                    "label": "Status",
+                    "width": "96px"
+                  },
+                  {
+                    "key": "action",
+                    "label": "Mode",
+                    "width": "96px"
+                  },
+                  {
+                    "key": "file",
+                    "label": "File"
+                  },
+                  {
+                    "key": "bytes",
+                    "label": "Bytes",
+                    "width": "96px"
+                  },
+                  {
+                    "key": "device",
+                    "label": "Device",
+                    "width": "140px"
+                  },
+                  {
+                    "key": "error",
+                    "label": "Error",
+                    "width": "160px"
+                  }
+                ],
+                "pageSize": 50,
+                "pageSizeOptions": [
+                  25,
+                  50,
+                  100
+                ],
+                "emptyText": "No public download events"
+              }
             }
           ]
         }

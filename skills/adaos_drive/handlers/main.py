@@ -25,6 +25,7 @@ from adaos.services.drive_public_links import (
     build_root_public_list_url,
     issue_hub_token,
     issue_public_token,
+    list_hub_public_download_events,
     list_hub_public_links,
     register_hub_public_link,
     register_root_public_link,
@@ -811,6 +812,41 @@ def _public_link_items() -> list[dict[str, Any]]:
         return []
 
 
+def _public_download_items(public_token: str = "", *, limit: int = 75) -> dict[str, Any]:
+    try:
+        payload = list_hub_public_download_events(public_token, limit=limit, ctx=get_ctx())
+    except Exception:
+        return {"items": [], "summary": {}}
+    out: list[dict[str, Any]] = []
+    for event in list(payload.get("events") or []):
+        if not isinstance(event, Mapping):
+            continue
+        status = str(event.get("status") or "")
+        action = str(event.get("action") or "")
+        filename = str(event.get("path") or event.get("filename") or "")
+        bytes_sent = event.get("bytes_sent")
+        bytes_label = _human_size(int(bytes_sent)) if isinstance(bytes_sent, int) else ""
+        status_code = event.get("status_code")
+        code_label = str(status_code) if status_code not in (None, "") else ""
+        device = str(event.get("guest_device_id") or event.get("client_ip_hash") or "")
+        error = str(event.get("error") or "")
+        out.append(
+            {
+                "id": str(event.get("id") or ""),
+                "time": str(event.get("at") or ""),
+                "status": status,
+                "action": action,
+                "file": filename,
+                "bytes": bytes_label,
+                "code": code_label,
+                "device": device,
+                "error": error,
+                "summary": " | ".join(part for part in (action, status, code_label, error) if part),
+            }
+        )
+    return {"items": out, "summary": dict(payload.get("summary") or {})}
+
+
 def _snapshot(state: dict[str, Any], webspace_id: str) -> dict[str, Any]:
     ws = _webspace_id(webspace_id)
     sources = _source_options(state, ws)
@@ -840,6 +876,7 @@ def _snapshot(state: dict[str, Any], webspace_id: str) -> dict[str, Any]:
         "last_link": dict(state.get("last_link") or _empty_link()),
         "recent_links": {"items": _recent_link_items(state)},
         "public_links": {"items": _public_link_items()},
+        "public_downloads": _public_download_items(),
         "messages": list(state.get("messages") or [])[-10:],
         "sequence": revision,
         "updated_at": _now_iso(state.get("updated_at") or _now()),
@@ -1802,6 +1839,23 @@ def download_selected(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
 @tool("list_public_links")
 def list_public_links(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     return {"ok": True, "links": _public_link_items()}
+
+
+@tool("list_public_downloads")
+def list_public_downloads(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
+    data = _payload(evt, **kwargs)
+    token = str(data.get("public_token") or data.get("id") or "").strip()
+    try:
+        limit = max(1, min(500, int(data.get("limit") or 100)))
+    except Exception:
+        limit = 100
+    payload = list_hub_public_download_events(token, limit=limit, ctx=get_ctx())
+    return {
+        "ok": True,
+        "downloads": payload,
+        "events": list(payload.get("events") or []),
+        "summary": dict(payload.get("summary") or {}),
+    }
 
 
 @tool("revoke_public_link")
