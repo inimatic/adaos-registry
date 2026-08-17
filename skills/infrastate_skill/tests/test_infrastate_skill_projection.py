@@ -666,15 +666,21 @@ def test_infrastate_marketplace_uses_remote_installed_set(monkeypatch):
 
 def test_infrastate_direct_marketplace_tool_returns_items(monkeypatch):
     mod = _load_infrastate_module()
+    calls: list[dict[str, object]] = []
 
     monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(node_id="hub-1"))
+
+    def _marketplace_items(**kwargs):
+        calls.append(dict(kwargs))
+        return {
+            "skills": [{"id": "weather_skill"}],
+            "scenarios": [{"id": "web_desktop"}],
+        }
+
     monkeypatch.setattr(
         mod,
         "_marketplace_items",
-        lambda **kwargs: {
-            "skills": [{"id": "weather_skill"}],
-            "scenarios": [{"id": "web_desktop"}],
-        },
+        _marketplace_items,
     )
 
     result = mod.get_marketplace(kind="skills", webspace_id="desktop", target_node_id="hub-1")
@@ -683,6 +689,42 @@ def test_infrastate_direct_marketplace_tool_returns_items(monkeypatch):
     assert result["kind"] == "skills"
     assert result["count"] == 1
     assert result["items"] == [{"id": "weather_skill"}]
+    assert calls == [
+        {
+            "webspace_id": "desktop",
+            "selected_node_id": "hub-1",
+            "local_node_id": "hub-1",
+            "requested_kinds": {"skills"},
+        }
+    ]
+
+
+def test_infrastate_scenario_marketplace_does_not_build_skill_inventory(monkeypatch):
+    mod = _load_infrastate_module()
+
+    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
+    monkeypatch.setattr(mod, "_scenario_items", lambda: [])
+    monkeypatch.setattr(
+        mod,
+        "_skills_items",
+        lambda: (_ for _ in ()).throw(AssertionError("scenario-only request must not build skill inventory")),
+    )
+    monkeypatch.setattr(
+        mod,
+        "_marketplace_catalog_entries",
+        lambda kind: (
+            [{"kind": "scenario", "id": "media_center", "name": "media_center", "version": "0.4.0"}]
+            if kind == "scenarios"
+            else (_ for _ in ()).throw(AssertionError("scenario-only request must not load skill catalog"))
+        ),
+    )
+    monkeypatch.setattr(mod, "_operations_snapshot", lambda webspace_id=None: {"active_items": []})
+    monkeypatch.setattr(mod, "read_manifest", lambda name: {})
+
+    items = mod._marketplace_items(webspace_id="desktop", requested_kinds={"scenarios"})
+
+    assert items["skills"] == []
+    assert [item["id"] for item in items["scenarios"]] == ["media_center"]
 
 
 def test_infrastate_direct_inventory_tool_returns_items(monkeypatch):
@@ -1666,7 +1708,7 @@ def test_infrastate_scenario_items_reconcile_sql_registry_to_local_runtime(monke
     assert all_items[2]["workspace_source_missing"] is True
 
     default_items = mod._scenario_items()
-    assert reconcile_calls == [workspace, workspace]
+    assert reconcile_calls == [workspace]
     assert [(item["name"], item["version"]) for item in default_items] == [
         ("alpha", "1.2.3"),
         ("beta", "2.0.0"),
@@ -1675,6 +1717,25 @@ def test_infrastate_scenario_items_reconcile_sql_registry_to_local_runtime(monke
 
     drift_items = mod._filter_inventory_drift(default_items, drift_only=True)
     assert [item["name"] for item in drift_items] == []
+
+
+def test_infrastate_scenario_reconcile_skips_full_scan_when_names_match(monkeypatch, tmp_path: Path):
+    mod = _load_infrastate_module()
+    workspace = tmp_path / "workspace"
+    scenario_dir = workspace / "scenarios" / "alpha"
+    scenario_dir.mkdir(parents=True, exist_ok=True)
+    (scenario_dir / "scenario.yaml").write_text("id: alpha\nversion: '1.0.0'\n", encoding="utf-8")
+    row = SimpleNamespace(name="alpha", installed=True)
+
+    monkeypatch.setattr(
+        mod,
+        "reconcile_workspace_db_to_materialized",
+        lambda _ctx: (_ for _ in ()).throw(AssertionError("matching registry must avoid a full scan")),
+    )
+
+    reconciled = mod._reconcile_scenario_registry_if_due(SimpleNamespace(), workspace, [row])
+
+    assert reconciled is False
 
 
 def test_infrastate_scenario_items_surface_dependency_failures_for_active_scenarios(monkeypatch, tmp_path: Path):
@@ -2222,6 +2283,7 @@ def test_infrastate_adaos_update_uses_union_sparse_sync_and_installed_skill_name
 def test_infrastate_marketplace_filters_installed_and_marks_running_operations(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
     monkeypatch.setattr(
         mod,
         "_marketplace_catalog_entries",
@@ -2301,6 +2363,35 @@ def test_infrastate_marketplace_catalog_prefers_remote_registry_and_local_scan(m
     assert [item["name"] for item in items] == ["infrascope", "remote_scene"]
 
 
+def test_infrastate_marketplace_catalog_skips_scan_when_workspace_registry_exists(monkeypatch, tmp_path: Path):
+    mod = _load_infrastate_module()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(
+        mod,
+        "get_ctx",
+        lambda: SimpleNamespace(paths=SimpleNamespace(workspace_dir=lambda: workspace)),
+    )
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(role="member"))
+    monkeypatch.setattr(
+        mod,
+        "list_workspace_registry_entries",
+        lambda *args, **kwargs: [
+            {"kind": "scenario", "id": "media_center", "name": "media_center", "version": "0.4.0"}
+        ],
+    )
+    monkeypatch.setattr(
+        mod,
+        "rebuild_workspace_registry",
+        lambda _workspace_root: (_ for _ in ()).throw(AssertionError("existing registry must avoid a full scan")),
+    )
+
+    items = mod._marketplace_catalog_entries("scenarios")
+
+    assert [item["name"] for item in items] == ["media_center"]
+
+
 def test_infrastate_marketplace_catalog_uses_ttl_cache(monkeypatch, tmp_path: Path):
     mod = _load_infrastate_module()
     workspace = tmp_path / "workspace"
@@ -2338,7 +2429,33 @@ def test_infrastate_marketplace_catalog_uses_ttl_cache(monkeypatch, tmp_path: Pa
 
     assert [item["name"] for item in first] == ["local_skill", "remote_skill"]
     assert [item["name"] for item in second] == ["local_skill", "remote_skill"]
-    assert calls == {"git": 1, "scan": 1}
+    assert calls == {"git": 2, "scan": 1}
+
+
+def test_infrastate_registry_payload_cache_is_shared_across_artifact_kinds(monkeypatch, tmp_path: Path):
+    mod = _load_infrastate_module()
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    calls = {"remote": 0}
+
+    monkeypatch.setattr(mod, "load_config", lambda: SimpleNamespace(role="hub"))
+    monkeypatch.setattr(mod, "_MARKETPLACE_CACHE_TTL_S", 30.0)
+
+    def _remote_payload():
+        calls["remote"] += 1
+        return {
+            "skills": [{"id": "weather_skill"}],
+            "scenarios": [{"id": "media_center"}],
+        }
+
+    monkeypatch.setattr(mod, "_registry_payload_from_url", _remote_payload)
+
+    skills = mod._registry_json_catalog_entries("skills", workspace)
+    scenarios = mod._registry_json_catalog_entries("scenarios", workspace)
+
+    assert [item["id"] for item in skills] == ["weather_skill"]
+    assert [item["id"] for item in scenarios] == ["media_center"]
+    assert calls == {"remote": 1}
 
 
 def test_infrastate_realtime_items_include_semantic_state_plane_cards():
@@ -2735,6 +2852,32 @@ def test_infrastate_runtime_cache_invalidation_does_not_wait_for_busy_snapshot_l
     assert snapshot["summary"]["value"] == "new"
     assert mod._snapshot_cache[cache_key][1]["summary"]["value"] == "new"
     assert mod._snapshot_cache_projection_fingerprints[cache_key] == "fp-new"
+
+
+def test_infrastate_snapshot_cache_metadata_is_bounded(monkeypatch):
+    mod = _load_infrastate_module()
+    monkeypatch.setattr(mod, "_SNAPSHOT_CACHE_MAX_ITEMS", 2)
+    mod._snapshot_cache.clear()
+    mod._snapshot_cache_invalidated_at.clear()
+    mod._snapshot_cache_versions.clear()
+    mod._snapshot_cache_entry_versions.clear()
+    mod._snapshot_cache_projection_fingerprints.clear()
+
+    for index in range(5):
+        mod._mark_snapshot_cache_invalidated(f"desktop-{index}")
+
+    retained = set(mod._snapshot_cache_invalidated_at) | set(mod._snapshot_cache_versions)
+    assert len(retained) == 2
+    assert "desktop-4" in retained
+
+
+def test_infrastate_generic_cache_pruning_keeps_recent_entries():
+    mod = _load_infrastate_module()
+    cache = {"old": 1, "middle": 2, "recent": 3}
+
+    mod._prune_oldest_cache_entries(cache, max_items=2)
+
+    assert cache == {"middle": 2, "recent": 3}
 
 
 def test_infrastate_snapshot_cache_skips_store_when_invalidated_during_build(monkeypatch):
@@ -3851,6 +3994,7 @@ def test_infrastate_sys_ready_materializes_when_event_history_is_unavailable(mon
 def test_infrastate_marketplace_hides_skills_installed_via_scenario_dependencies(monkeypatch):
     mod = _load_infrastate_module()
 
+    monkeypatch.setattr(mod, "get_ctx", lambda: SimpleNamespace())
     monkeypatch.setattr(
         mod,
         "_marketplace_catalog_entries",

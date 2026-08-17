@@ -12,6 +12,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
+from weakref import WeakValueDictionary
 
 import requests
 import yaml
@@ -69,6 +70,15 @@ _BACKGROUND_REFRESH_DEBOUNCE_S = 0.35
 _BACKGROUND_REFRESH_TIMEOUT_S = max(2.0, float(os.getenv("ADAOS_INFRASTATE_BACKGROUND_REFRESH_TIMEOUT_S") or "60"))
 _REMOTE_VERSION_PROBE_ENABLED = str(os.getenv("ADAOS_INFRASTATE_REMOTE_VERSION_PROBE") or "1").strip().lower() in {"1", "true", "yes", "on"}
 _MARKETPLACE_CACHE_TTL_S = max(0.0, float(os.getenv("ADAOS_INFRASTATE_MARKETPLACE_CACHE_TTL_S") or "30"))
+_MARKETPLACE_CACHE_MAX_ITEMS = max(4, int(os.getenv("ADAOS_INFRASTATE_MARKETPLACE_CACHE_MAX_ITEMS") or "16"))
+_REGISTRY_PAYLOAD_CACHE_MAX_ITEMS = max(
+    2,
+    int(os.getenv("ADAOS_INFRASTATE_REGISTRY_PAYLOAD_CACHE_MAX_ITEMS") or "8"),
+)
+_SCENARIO_RECONCILE_TTL_S = max(
+    0.0,
+    float(os.getenv("ADAOS_INFRASTATE_SCENARIO_RECONCILE_TTL_S") or "30"),
+)
 _MARKETPLACE_REMOTE_FETCH_ENABLED = str(os.getenv("ADAOS_INFRASTATE_MARKETPLACE_REMOTE_FETCH") or "").strip().lower() in {"1", "true", "yes", "on"}
 _MARKETPLACE_REMOTE_FETCH_TIMEOUT_S = max(
     0.1,
@@ -86,6 +96,9 @@ _MARKETPLACE_REGISTRY_JSON_URL = (
     or "https://raw.githubusercontent.com/inimatic/adaos-registry/refs/heads/main/registry.json"
 )
 _SNAPSHOT_CACHE_TTL_S = max(0.0, float(os.getenv("ADAOS_INFRASTATE_SNAPSHOT_CACHE_TTL_S") or "10.0"))
+_SNAPSHOT_CACHE_MAX_ITEMS = max(8, int(os.getenv("ADAOS_INFRASTATE_SNAPSHOT_CACHE_MAX_ITEMS") or "128"))
+_UI_STATE_FALLBACK_MAX_ITEMS = 256
+_SUMMARY_RENDER_STATE_FALLBACK_MAX_ITEMS = 64
 _PRESSURE_SNAPSHOT_CACHE_TTL_S = max(
     _SNAPSHOT_CACHE_TTL_S,
     float(os.getenv("ADAOS_INFRASTATE_PRESSURE_SNAPSHOT_CACHE_TTL_S") or "30.0"),
@@ -166,12 +179,16 @@ _background_refresh_thread: threading.Thread | None = None
 _background_refresh_pending = False
 _background_refresh_webspace_id: str | None = None
 _background_refresh_reason = ""
+_background_refresh_requested_at = 0.0
 _marketplace_catalog_cache: dict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = {}
 _registry_catalog_cache: dict[tuple[str, str], tuple[float, list[dict[str, Any]]]] = {}
 _registry_catalog_meta_cache: dict[tuple[str, str], tuple[float, dict[str, str]]] = {}
+_registry_payload_cache: dict[str, tuple[float, dict[str, Any], dict[str, str]]] = {}
+_scenario_reconciled_at: dict[str, float] = {}
+_scenario_reconcile_guard = threading.Lock()
 _snapshot_cache: dict[str, tuple[float, dict[str, Any]]] = {}
 _snapshot_cache_guard = threading.Lock()
-_snapshot_cache_locks: dict[str, threading.Lock] = {}
+_snapshot_cache_locks: WeakValueDictionary[str, threading.Lock] = WeakValueDictionary()
 _snapshot_cache_invalidated_at: dict[str, float] = {}
 _snapshot_cache_versions: dict[str, int] = {}
 _snapshot_cache_entry_versions: dict[str, int] = {}
@@ -1570,6 +1587,35 @@ def _snapshot_cache_key(webspace_id: str | None = None, selected_node_id: str | 
     return key
 
 
+def _prune_oldest_cache_entries(cache: dict[Any, Any], *, max_items: int) -> None:
+    while len(cache) > max(1, int(max_items)):
+        cache.pop(next(iter(cache)), None)
+
+
+def _prune_snapshot_cache_locked(*, preserve_key: str | None = None) -> None:
+    keys = set(_snapshot_cache)
+    keys.update(_snapshot_cache_invalidated_at)
+    keys.update(_snapshot_cache_versions)
+    keys.update(_snapshot_cache_entry_versions)
+    keys.update(_snapshot_cache_projection_fingerprints)
+    overflow = len(keys) - _SNAPSHOT_CACHE_MAX_ITEMS
+    if overflow <= 0:
+        return
+
+    def _last_used(key: str) -> float:
+        cached = _snapshot_cache.get(key)
+        cached_at = float(cached[0]) if cached is not None else 0.0
+        return max(cached_at, float(_snapshot_cache_invalidated_at.get(key) or 0.0))
+
+    candidates = sorted((key for key in keys if key != preserve_key), key=lambda key: (_last_used(key), key))
+    for key in candidates[:overflow]:
+        _snapshot_cache.pop(key, None)
+        _snapshot_cache_invalidated_at.pop(key, None)
+        _snapshot_cache_versions.pop(key, None)
+        _snapshot_cache_entry_versions.pop(key, None)
+        _snapshot_cache_projection_fingerprints.pop(key, None)
+
+
 def _snapshot_cache_lock_for(cache_key: str) -> threading.Lock:
     with _snapshot_cache_guard:
         lock = _snapshot_cache_locks.get(cache_key)
@@ -1583,6 +1629,7 @@ def _mark_snapshot_cache_invalidated(cache_key: str) -> None:
     with _snapshot_cache_guard:
         _snapshot_cache_invalidated_at[cache_key] = time.monotonic()
         _snapshot_cache_versions[cache_key] = int(_snapshot_cache_versions.get(cache_key) or 0) + 1
+        _prune_snapshot_cache_locked(preserve_key=cache_key)
 
 
 def _snapshot_cache_version(cache_key: str) -> int:
@@ -1633,6 +1680,9 @@ def _invalidate_runtime_caches(*, webspace_id: str | None = None, marketplace: b
         _marketplace_catalog_cache.clear()
         _registry_catalog_cache.clear()
         _registry_catalog_meta_cache.clear()
+        _registry_payload_cache.clear()
+        with _scenario_reconcile_guard:
+            _scenario_reconciled_at.clear()
 
 
 def _invalidate_projection_state(*, webspace_id: str | None = None) -> None:
@@ -1679,9 +1729,12 @@ def _shutdown_executor_ref(
 
 
 def _cleanup_runtime_state(*, reason: str = "lifecycle", wait: bool = False) -> dict[str, Any]:
+    global _UI_STATE_FALLBACK
+    global _SUMMARY_RENDER_STATE_FALLBACK
     global _background_refresh_task
     global _background_refresh_pending
     global _background_refresh_reason
+    global _background_refresh_requested_at
     global _background_refresh_webspace_id
     task_cancelled = False
     task = _background_refresh_task
@@ -1691,6 +1744,7 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle", wait: bool = False) -> 
     _background_refresh_task = None
     _background_refresh_pending = False
     _background_refresh_reason = ""
+    _background_refresh_requested_at = 0.0
     _background_refresh_webspace_id = None
     with _snapshot_cache_guard:
         snapshot_cache_total = len(_snapshot_cache)
@@ -1709,6 +1763,11 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle", wait: bool = False) -> 
     _marketplace_catalog_cache.clear()
     _registry_catalog_cache.clear()
     _registry_catalog_meta_cache.clear()
+    _registry_payload_cache.clear()
+    with _scenario_reconcile_guard:
+        _scenario_reconciled_at.clear()
+    _UI_STATE_FALLBACK = {}
+    _SUMMARY_RENDER_STATE_FALLBACK = {}
     with _inventory_stream_patch_lock:
         _inventory_row_cache.clear()
         _inventory_request_by_operation.clear()
@@ -2444,14 +2503,14 @@ def _registry_git_available() -> bool:
         return False
 
 
-def _registry_json_catalog_entries(kind_plural: str, workspace_root: Path) -> list[dict[str, Any]]:
-    cache_key = (str(Path(workspace_root)), str(kind_plural or "").strip())
+def _registry_json_catalog_payload(workspace_root: Path) -> tuple[dict[str, Any], dict[str, str]]:
+    cache_key = str(Path(workspace_root))
     cache_now = time.monotonic()
-    cached = _registry_catalog_cache.get(cache_key)
+    cached = _registry_payload_cache.get(cache_key)
     if cached is not None and _MARKETPLACE_CACHE_TTL_S > 0:
-        cached_at, cached_items = cached
+        cached_at, cached_payload, cached_meta = cached
         if cache_now - cached_at <= _MARKETPLACE_CACHE_TTL_S:
-            return [dict(item) for item in cached_items]
+            return cached_payload, dict(cached_meta)
 
     catalog_source = "unavailable"
     catalog_commit = ""
@@ -2477,13 +2536,33 @@ def _registry_json_catalog_entries(kind_plural: str, workspace_root: Path) -> li
             catalog_source = f"git_ref_unavailable:{remote}/{branch}"
             catalog_state = "unavailable"
 
+    normalized_payload = payload if isinstance(payload, dict) else {}
+    meta = {"catalog_source": catalog_source, "catalog_commit": catalog_commit, "catalog_state": catalog_state}
+    _registry_payload_cache[cache_key] = (time.monotonic(), normalized_payload, dict(meta))
+    _prune_oldest_cache_entries(_registry_payload_cache, max_items=_REGISTRY_PAYLOAD_CACHE_MAX_ITEMS)
+    return normalized_payload, meta
+
+
+def _registry_json_catalog_entries(kind_plural: str, workspace_root: Path) -> list[dict[str, Any]]:
+    cache_key = (str(Path(workspace_root)), str(kind_plural or "").strip())
+    cache_now = time.monotonic()
+    cached = _registry_catalog_cache.get(cache_key)
+    if cached is not None and _MARKETPLACE_CACHE_TTL_S > 0:
+        cached_at, cached_items = cached
+        if cache_now - cached_at <= _MARKETPLACE_CACHE_TTL_S:
+            return [dict(item) for item in cached_items]
+
+    payload, meta = _registry_json_catalog_payload(workspace_root)
     raw_entries = payload.get(kind_plural) if isinstance(payload, dict) else []
     result = [dict(item) for item in list(raw_entries or []) if isinstance(item, dict)]
-    _registry_catalog_cache[cache_key] = (cache_now, [dict(item) for item in result])
+    completed_at = time.monotonic()
+    _registry_catalog_cache[cache_key] = (completed_at, [dict(item) for item in result])
     _registry_catalog_meta_cache[cache_key] = (
-        cache_now,
-        {"catalog_source": catalog_source, "catalog_commit": catalog_commit, "catalog_state": catalog_state},
+        completed_at,
+        dict(meta),
     )
+    _prune_oldest_cache_entries(_registry_catalog_cache, max_items=_MARKETPLACE_CACHE_MAX_ITEMS)
+    _prune_oldest_cache_entries(_registry_catalog_meta_cache, max_items=_MARKETPLACE_CACHE_MAX_ITEMS)
     return result
 
 
@@ -3066,26 +3145,29 @@ def _marketplace_catalog_entries(kind_plural: str) -> list[dict[str, Any]]:
                 continue
             merged[key] = dict(raw)
 
-    remote_payload = _registry_payload_from_url() if _allow_marketplace_remote_fetch() else None
-    if not isinstance(remote_payload, dict) and _allow_marketplace_git_ref_lookup():
-        remote_payload = _registry_payload_from_git_ref(workspace_root)
-    if isinstance(remote_payload, dict):
-        _merge(remote_payload.get(kind_plural))
+    # Reuse the version catalog cache. Inventory and Marketplace are commonly
+    # opened together and must not perform two identical remote registry reads.
+    _merge(_registry_json_catalog_entries(kind_plural, workspace_root))
 
     try:
-        _merge(list_workspace_registry_entries(workspace_root, kind=kind_plural))
+        local_entries = list_workspace_registry_entries(workspace_root, kind=kind_plural)
     except Exception:
-        pass
+        local_entries = []
+    _merge(local_entries)
 
-    try:
-        scanned_payload = rebuild_workspace_registry(workspace_root)
-    except Exception:
-        scanned_payload = None
-    if isinstance(scanned_payload, dict):
-        _merge(scanned_payload.get(kind_plural))
+    # Registry sync owns normal workspace reconciliation. A full scan here is
+    # only a recovery path because it can traverse every installed artifact.
+    if not local_entries:
+        try:
+            scanned_payload = rebuild_workspace_registry(workspace_root)
+        except Exception:
+            scanned_payload = None
+        if isinstance(scanned_payload, dict):
+            _merge(scanned_payload.get(kind_plural))
 
     result = [merged[key] for key in sorted(merged, key=str.lower)]
     _marketplace_catalog_cache[cache_key] = (cache_now, [dict(item) for item in result])
+    _prune_oldest_cache_entries(_marketplace_catalog_cache, max_items=_MARKETPLACE_CACHE_MAX_ITEMS)
     return result
 
 
@@ -3248,6 +3330,56 @@ def _skills_items(*, include_all: bool = True) -> list[dict[str, Any]]:
     return out
 
 
+def _materialized_scenario_names(workspace_root: Path) -> set[str]:
+    scenarios_root = workspace_root / "scenarios"
+    try:
+        return {
+            child.name
+            for child in scenarios_root.iterdir()
+            if child.is_dir()
+            and not child.name.startswith(".")
+            and ((child / "scenario.yaml").is_file() or (child / "scenario.yml").is_file())
+        }
+    except Exception:
+        return set()
+
+
+def _reconcile_scenario_registry_if_due(ctx: Any, workspace_root: Path, registry_rows: list[Any]) -> bool:
+    cache_key = str(workspace_root.resolve())
+    with _scenario_reconcile_guard:
+        now = time.monotonic()
+        reconciled_at = float(_scenario_reconciled_at.get(cache_key) or 0.0)
+        if _SCENARIO_RECONCILE_TTL_S > 0 and now - reconciled_at < _SCENARIO_RECONCILE_TTL_S:
+            return False
+
+        registered_names = set(installed_names(registry_rows))
+        materialized_names = _materialized_scenario_names(workspace_root)
+        if materialized_names == registered_names:
+            _scenario_reconciled_at[cache_key] = now
+            return False
+
+        started_at = time.perf_counter()
+        added = sorted(materialized_names - registered_names)
+        removed = sorted(registered_names - materialized_names)
+        try:
+            reconcile_workspace_db_to_materialized(ctx)
+        except Exception:
+            _log.warning("infrastate scenario registry reconcile failed workspace=%s", workspace_root, exc_info=True)
+        finally:
+            _scenario_reconciled_at[cache_key] = time.monotonic()
+
+        elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+        if elapsed_ms >= 1000.0:
+            _log.warning(
+                "infrastate scenario registry reconcile slow total_ms=%.1f workspace=%s added=%s removed=%s",
+                elapsed_ms,
+                workspace_root,
+                added,
+                removed,
+            )
+        return True
+
+
 def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | None = None) -> list[dict[str, Any]]:
     try:
         ctx = get_ctx()
@@ -3256,14 +3388,14 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
     workspace_root = Path(ctx.paths.workspace_dir())
 
     try:
-        reconcile_workspace_db_to_materialized(ctx)
-    except Exception:
-        pass
-
-    try:
         registry_rows = SqliteScenarioRegistry(ctx.sql).list() or []
     except Exception:
         registry_rows = []
+    if _reconcile_scenario_registry_if_due(ctx, workspace_root, registry_rows):
+        try:
+            registry_rows = SqliteScenarioRegistry(ctx.sql).list() or []
+        except Exception:
+            registry_rows = []
     installed_scenario_names, _fallback_used = effective_registry_names(
         ctx,
         installed_names(registry_rows),
@@ -3289,8 +3421,8 @@ def _scenario_items(*, include_all: bool = True, operations: dict[str, Any] | No
         row = registry_rows_by_name.get(name)
         capacity_entry = capacity_by_name.get(name) or {}
         workspace_source_version = (
-            _read_local_artifact_version(workspace_root, "scenarios", name)
-            or _clean_version_text((workspace_registry_by_name.get(name) or {}).get("version"))
+            _clean_version_text((workspace_registry_by_name.get(name) or {}).get("version"))
+            or _read_local_artifact_version(workspace_root, "scenarios", name)
             or ""
         )
         active_version = (
@@ -3702,11 +3834,21 @@ def _marketplace_items(
     webspace_id: str | None = None,
     selected_node_id: str | None = None,
     local_node_id: str | None = None,
+    requested_kinds: set[str] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
+    started_at = time.perf_counter()
     try:
         ctx = get_ctx()
     except Exception:
         return {"skills": [], "scenarios": []}
+
+    kinds = {
+        str(item or "").strip().lower()
+        for item in (requested_kinds or {"skills", "scenarios"})
+        if str(item or "").strip().lower() in {"skills", "scenarios"}
+    }
+    if not kinds:
+        kinds = {"skills", "scenarios"}
 
     operations = _operations_snapshot(webspace_id=webspace_id)
     active_by_target: dict[tuple[str, str], dict[str, Any]] = {}
@@ -3716,16 +3858,36 @@ def _marketplace_items(
         key = (str(item.get("target_kind") or ""), str(item.get("target_id") or ""))
         active_by_target[key] = item
 
-    installed_skills = {
-        str(item.get("name") or "").strip()
-        for item in _inventory_items_from(_skills_items)
-        if str(item.get("name") or "").strip()
-    }
-    installed_scenarios = {
-        str(item.get("name") or "").strip()
-        for item in _inventory_items_from(_scenario_items)
-        if str(item.get("name") or "").strip()
-    }
+    try:
+        workspace_root = Path(ctx.paths.workspace_dir())
+    except Exception:
+        workspace_root = Path.cwd()
+
+    def _installed_names(kind_plural: str) -> set[str]:
+        try:
+            registry = SqliteSkillRegistry(ctx.sql) if kind_plural == "skills" else SqliteScenarioRegistry(ctx.sql)
+            registry_rows = registry.list() or []
+            names, _fallback_used = effective_registry_names(
+                ctx,
+                installed_names(registry_rows),
+                workspace_root,
+                kind_plural,
+            )
+            result = {str(name or "").strip() for name in names if str(name or "").strip()}
+            if kind_plural == "scenarios":
+                result.update(_capacity_scenario_entry_map())
+            return result
+        except Exception:
+            builder = _skills_items if kind_plural == "skills" else _scenario_items
+            return {
+                str(item.get("name") or "").strip()
+                for item in _inventory_items_from(builder)
+                if str(item.get("name") or "").strip()
+            }
+
+    installed_skills = _installed_names("skills") if "skills" in kinds else set()
+    installed_scenarios = _installed_names("scenarios")
+    installed_elapsed_ms = (time.perf_counter() - started_at) * 1000.0
 
     selected_node_token = str(selected_node_id or "").strip()
     local_node_token = str(local_node_id or "").strip()
@@ -3740,11 +3902,12 @@ def _marketplace_items(
             )
             member = _selected_member_entry(reliability, selected_node_token)
             if member:
-                installed_skills = {
-                    str(item.get("name") or item.get("id") or "").strip()
-                    for item in _remote_capacity_inventory_items(member, "skills")
-                    if str(item.get("name") or item.get("id") or "").strip()
-                }
+                if "skills" in kinds:
+                    installed_skills = {
+                        str(item.get("name") or item.get("id") or "").strip()
+                        for item in _remote_capacity_inventory_items(member, "skills")
+                        if str(item.get("name") or item.get("id") or "").strip()
+                    }
                 installed_scenarios = {
                     str(item.get("name") or item.get("id") or "").strip()
                     for item in _remote_capacity_inventory_items(member, "scenarios")
@@ -3800,16 +3963,29 @@ def _marketplace_items(
                     deps.add(dep_name)
         return deps
     scenario_rows = _rows("scenarios", installed_scenarios)
-    hidden_skill_ids = _scenario_depends([str(item.get("id") or "") for item in scenario_rows])
-    skill_rows = [
-        item
-        for item in _rows("skills", installed_skills)
-        if str(item.get("id") or "").strip() not in hidden_skill_ids
-    ]
+    skill_rows: list[dict[str, Any]] = []
+    if "skills" in kinds:
+        hidden_skill_ids = _scenario_depends([str(item.get("id") or "") for item in scenario_rows])
+        skill_rows = [
+            item
+            for item in _rows("skills", installed_skills)
+            if str(item.get("id") or "").strip() not in hidden_skill_ids
+        ]
+
+    elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+    if elapsed_ms >= 1000.0:
+        _log.warning(
+            "infrastate marketplace build slow kinds=%s total_ms=%.1f installed_ms=%.1f skills=%d scenarios=%d",
+            ",".join(sorted(kinds)),
+            elapsed_ms,
+            installed_elapsed_ms,
+            len(skill_rows),
+            len(scenario_rows),
+        )
 
     return {
-        "skills": skill_rows,
-        "scenarios": scenario_rows,
+        "skills": skill_rows if "skills" in kinds else [],
+        "scenarios": scenario_rows if "scenarios" in kinds else [],
     }
 
 
@@ -4897,6 +5073,7 @@ def _write_ui_state(**updates: Any) -> dict[str, Any]:
     global _UI_STATE_FALLBACK
     payload = dict(_ui_state())
     payload.update(updates)
+    _prune_oldest_cache_entries(payload, max_items=_UI_STATE_FALLBACK_MAX_ITEMS)
     try:
         skill_memory_set(_UI_STATE_KEY, payload)
     except SdkRuntimeNotInitialized:
@@ -5049,11 +5226,13 @@ def _summary_render_state() -> dict[str, Any]:
 
 def _write_summary_render_state(payload: dict[str, Any]) -> dict[str, Any]:
     global _SUMMARY_RENDER_STATE_FALLBACK
+    bounded_payload = dict(payload or {})
+    _prune_oldest_cache_entries(bounded_payload, max_items=_SUMMARY_RENDER_STATE_FALLBACK_MAX_ITEMS)
     try:
-        skill_memory_set(_SUMMARY_RENDER_STATE_KEY, payload)
+        skill_memory_set(_SUMMARY_RENDER_STATE_KEY, bounded_payload)
     except SdkRuntimeNotInitialized:
-        _SUMMARY_RENDER_STATE_FALLBACK = dict(payload)
-    return payload
+        _SUMMARY_RENDER_STATE_FALLBACK = dict(bounded_payload)
+    return bounded_payload
 
 
 def _summary_render_context_key(selected_kind: str, selected_node_id: str, selected_yjs_webspace_id: str) -> str:
@@ -5136,6 +5315,7 @@ def _highlight_summary_changes(summary: dict[str, Any], *, context_key: str) -> 
 def _set_background_refresh_pending(*, webspace_id: str | None, reason: str) -> None:
     global _background_refresh_pending
     global _background_refresh_reason
+    global _background_refresh_requested_at
     global _background_refresh_webspace_id
 
     token = str(webspace_id or "").strip() or None
@@ -5149,6 +5329,7 @@ def _set_background_refresh_pending(*, webspace_id: str | None, reason: str) -> 
     if token:
         _background_refresh_webspace_id = token
     _background_refresh_reason = str(reason or "runtime.event").strip() or "runtime.event"
+    _background_refresh_requested_at = requested_at
     _projection_diag["refresh_schedule_total"] = int(_projection_diag.get("refresh_schedule_total") or 0) + 1
     if coalesced:
         _projection_diag["refresh_schedule_coalesced_total"] = int(
@@ -5162,6 +5343,7 @@ def _set_background_refresh_pending(*, webspace_id: str | None, reason: str) -> 
 async def _background_refresh_worker() -> None:
     global _background_refresh_pending
     global _background_refresh_reason
+    global _background_refresh_requested_at
     global _background_refresh_task
     global _background_refresh_webspace_id
 
@@ -5170,8 +5352,10 @@ async def _background_refresh_worker() -> None:
             await asyncio.sleep(_BACKGROUND_REFRESH_DEBOUNCE_S)
             webspace_id = _background_refresh_webspace_id
             reason = _background_refresh_reason or "runtime.event"
+            requested_at = _background_refresh_requested_at or time.time()
             _background_refresh_pending = False
             _background_refresh_reason = ""
+            _background_refresh_requested_at = 0.0
             _background_refresh_webspace_id = None
             started_at = time.time()
             await asyncio.to_thread(
@@ -5179,6 +5363,7 @@ async def _background_refresh_worker() -> None:
                 background_refresh_pending=False,
                 background_refresh_running=True,
                 background_refresh_reason=reason,
+                background_refresh_requested_at=requested_at,
                 background_refresh_started_at=started_at,
                 background_refresh_webspace_id=webspace_id or "",
                 background_refresh_error="",
@@ -8675,6 +8860,7 @@ def _snapshot_or_fallback_cached(
                 _snapshot_cache[cache_key] = (time.monotonic(), cached_snapshot)
                 _snapshot_cache_entry_versions[cache_key] = build_version
                 _snapshot_cache_projection_fingerprints[cache_key] = fingerprint
+                _prune_snapshot_cache_locked(preserve_key=cache_key)
             return snapshot
     build_version = _snapshot_cache_version(cache_key)
     if str(selected_node_id or "").strip():
@@ -8693,6 +8879,7 @@ def _snapshot_or_fallback_cached(
             _snapshot_cache[cache_key] = (time.monotonic(), cached_snapshot)
             _snapshot_cache_entry_versions[cache_key] = build_version
             _snapshot_cache_projection_fingerprints[cache_key] = fingerprint
+            _prune_snapshot_cache_locked(preserve_key=cache_key)
     return snapshot
 
 
@@ -8928,6 +9115,9 @@ def _build_stream_payload_for_receiver(
                 webspace_id=webspace_id,
                 selected_node_id=selected_node_id,
                 local_node_id=str(getattr(conf, "node_id", "") or "").strip() or None,
+                requested_kinds={
+                    "skills" if token == _marketplace_skills_receiver() else "scenarios"
+                },
             )
             key = "skills" if token == _marketplace_skills_receiver() else "scenarios"
             return list(marketplace.get(key) or [])
@@ -9361,12 +9551,23 @@ def get_marketplace(
         local_node_id = str(getattr(load_config(), "node_id", "") or "").strip()
     except Exception:
         local_node_id = ""
+    started_at = time.perf_counter()
     marketplace = _marketplace_items(
         webspace_id=webspace_id,
         selected_node_id=requested_node_id or local_node_id or None,
         local_node_id=local_node_id or None,
+        requested_kinds={key},
     )
     items = list(marketplace.get(key) or [])
+    elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+    if elapsed_ms >= 1000.0:
+        _log.warning(
+            "infrastate marketplace tool slow kind=%s total_ms=%.1f count=%d target_node_id=%s",
+            key,
+            elapsed_ms,
+            len(items),
+            requested_node_id or local_node_id or "local",
+        )
     return {
         "ok": True,
         "kind": key,
@@ -9387,6 +9588,7 @@ def get_inventory(
     allow_cache: bool = True,
     **_: Any,
 ) -> dict[str, Any]:
+    started_at = time.perf_counter()
     token = str(kind or "skills").strip().lower()
     key = "scenarios" if token.startswith("scenario") else "skills"
     requested_node_id = str(target_node_id or node_id or "").strip()
@@ -9397,6 +9599,7 @@ def get_inventory(
             requested_node_id = str(ui_state.get("selected_node_id") or getattr(conf, "node_id", "") or "").strip()
         except Exception:
             requested_node_id = ""
+    local_node_id = ""
     try:
         conf = load_config()
         local_node_id = str(getattr(conf, "node_id", "") or "").strip()
@@ -9422,6 +9625,15 @@ def get_inventory(
     except Exception:
         _log.debug("failed to build direct inventory payload", exc_info=True)
         items = []
+    elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+    if elapsed_ms >= 1000.0:
+        _log.warning(
+            "infrastate inventory tool slow kind=%s total_ms=%.1f count=%d target_node_id=%s",
+            key,
+            elapsed_ms,
+            len(items),
+            requested_node_id or local_node_id or "local",
+        )
     return {
         "ok": True,
         "kind": key,

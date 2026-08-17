@@ -1,5 +1,5 @@
 name: infrastate_skill
-version: 0.75.68
+version: 0.75.70
 description: Локальный обзор состояния ядра, graceful update, A/B слотов и последнего
   результата обновления.
 runtime:
@@ -533,6 +533,39 @@ memory_budget:
   - name: infrastate.inventory_request_by_operation
     storage: process_memory
     max_items: 256
+    cleanup_hook: infrastate_runtime_dispose
+  - name: UI_STATE_FALLBACK
+    storage: process_memory
+    max_items: 256
+    cleanup_hook: infrastate_runtime_dispose
+  - name: SUMMARY_RENDER_STATE_FALLBACK
+    storage: process_memory
+    max_items: 64
+    cleanup_hook: infrastate_runtime_dispose
+  - name: marketplace_catalog_cache
+    storage: process_memory
+    max_items: 16
+    ttl_seconds: 30
+    cleanup_hook: infrastate_runtime_dispose
+  - name: registry_catalog_cache
+    storage: process_memory
+    max_items: 16
+    ttl_seconds: 30
+    cleanup_hook: infrastate_runtime_dispose
+  - name: registry_catalog_meta_cache
+    storage: process_memory
+    max_items: 16
+    ttl_seconds: 30
+    cleanup_hook: infrastate_runtime_dispose
+  - name: registry_payload_cache
+    storage: process_memory
+    max_items: 8
+    ttl_seconds: 30
+    cleanup_hook: infrastate_runtime_dispose
+  - name: snapshot_cache
+    storage: process_memory
+    max_items: 128
+    ttl_seconds: 30
     cleanup_hook: infrastate_runtime_dispose
 lifecycle:
   drain: infrastate_runtime_drain

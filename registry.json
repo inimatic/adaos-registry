@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-14T19:40:13+00:00",
+  "updated_at": "2026-08-17T04:32:11+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -29,7 +29,7 @@
       "id": "adaos_drive",
       "name": "adaos_drive",
       "version": "0.1.0",
-      "updated_at": "2026-08-14T03:19:42+00:00",
+      "updated_at": "2026-08-17T04:32:11+00:00",
       "path": "skills/adaos_drive",
       "manifest": "skills/adaos_drive/skill.yaml",
       "source": {
@@ -265,7 +265,7 @@
       "kind": "skill",
       "id": "greet_on_boot_skill",
       "name": "greet_on_boot_skill",
-      "version": "0.2.2",
+      "version": "0.2.3",
       "updated_at": "2026-08-14T19:39:29+00:00",
       "path": "skills/greet_on_boot_skill",
       "manifest": "skills/greet_on_boot_skill/skill.yaml",
@@ -354,8 +354,8 @@
       "kind": "skill",
       "id": "infrastate_skill",
       "name": "infrastate_skill",
-      "version": "0.75.68",
-      "updated_at": "2026-08-16T08:49:52+00:00",
+      "version": "0.75.70",
+      "updated_at": "2026-08-14T19:39:43+00:00",
       "path": "skills/infrastate_skill",
       "manifest": "skills/infrastate_skill/skill.yaml",
       "source": {
@@ -758,7 +758,7 @@
       "kind": "skill",
       "id": "research_orchestrator_skill",
       "name": "research_orchestrator_skill",
-      "version": "0.13.0",
+      "version": "0.13.1",
       "updated_at": "2026-08-15T23:20:13+00:00",
       "path": "skills/research_orchestrator_skill",
       "manifest": "skills/research_orchestrator_skill/skill.yaml",
@@ -857,7 +857,7 @@
       "id": "slideshow_skill",
       "name": "slideshow_skill",
       "version": "0.1.64",
-      "updated_at": "2026-08-15T19:10:16+00:00",
+      "updated_at": "2026-08-15T09:00:41+00:00",
       "path": "skills/slideshow_skill",
       "manifest": "skills/slideshow_skill/skill.yaml",
       "source": {
@@ -899,7 +899,7 @@
       "id": "subnet_env",
       "name": "subnet_env",
       "version": "0.8.11",
-      "updated_at": "2026-08-15T19:10:16+00:00",
+      "updated_at": "2026-08-11T09:29:30+00:00",
       "path": "skills/subnet_env",
       "manifest": "skills/subnet_env/skill.yaml",
       "source": {
@@ -923,50 +923,6 @@
         "startup_allowed": false,
         "background_refresh": false
       },
-      "tools_count": 4
-    },
-    {
-      "kind": "skill",
-      "id": "test03_recipes_skill",
-      "name": "test03_recipes_skill",
-      "version": "0.2.5",
-      "updated_at": "2026-07-28T08:38:38+00:00",
-      "path": "skills/test03_recipes_skill",
-      "manifest": "skills/test03_recipes_skill/skill.yaml",
-      "source": {
-        "path": "skills/test03_recipes_skill",
-        "manifest": "skills/test03_recipes_skill/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "test03_recipes_skill",
-        "id": "test03_recipes_skill"
-      },
-      "description": "Durable node-local recipe catalog and favorite selections for the Test03 Recipes scenario.",
-      "entry": "handlers/main.py",
-      "runtime_python": "3.11",
-      "tools_count": 3
-    },
-    {
-      "kind": "skill",
-      "id": "test05_recipes_skill",
-      "name": "test05_recipes_skill",
-      "version": "0.1.1",
-      "updated_at": "2026-07-29T17:25:33+00:00",
-      "path": "skills/test05_recipes_skill",
-      "manifest": "skills/test05_recipes_skill/skill.yaml",
-      "source": {
-        "path": "skills/test05_recipes_skill",
-        "manifest": "skills/test05_recipes_skill/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "test05_recipes_skill",
-        "id": "test05_recipes_skill"
-      },
-      "description": "Локальная книга рецептов с поиском и избранным.",
-      "entry": "handlers/main.py",
-      "runtime_python": "3.11",
       "tools_count": 4
     },
     {
@@ -1064,28 +1020,6 @@
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
       "tools_count": 0
-    },
-    {
-      "kind": "skill",
-      "id": "workflow_lab_dashboard_skill",
-      "name": "workflow_lab_dashboard_skill",
-      "version": "0.1.1",
-      "updated_at": "2026-08-05T20:24:22+00:00",
-      "path": "skills/workflow_lab_dashboard_skill",
-      "manifest": "skills/workflow_lab_dashboard_skill/skill.yaml",
-      "source": {
-        "path": "skills/workflow_lab_dashboard_skill",
-        "manifest": "skills/workflow_lab_dashboard_skill/skill.yaml"
-      },
-      "install": {
-        "kind": "skill",
-        "name": "workflow_lab_dashboard_skill",
-        "id": "workflow_lab_dashboard_skill"
-      },
-      "description": "Deterministic local request-state tools for the bilingual Workflow Lab dashboard.",
-      "entry": "handlers/main.py",
-      "runtime_python": "3.11",
-      "tools_count": 2
     }
   ],
   "scenarios": [
@@ -1458,65 +1392,6 @@
     },
     {
       "kind": "scenario",
-      "id": "test03_recipes",
-      "name": "test03_recipes",
-      "version": "0.2.12",
-      "updated_at": "2026-07-28T08:38:41+00:00",
-      "path": "scenarios/test03_recipes",
-      "manifest": "scenarios/test03_recipes/scenario.yaml",
-      "source": {
-        "path": "scenarios/test03_recipes",
-        "manifest": "scenarios/test03_recipes/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "test03_recipes",
-        "id": "test03_recipes"
-      },
-      "title": "Кулинарные рецепты",
-      "title_i18n": {
-        "key": "scenario.test03_recipes.title",
-        "fallback": "Test03 Recipes"
-      },
-      "description": "Durable local recipe catalog with favorite selections.",
-      "skills": {
-        "required": [
-          "test03_recipes_skill"
-        ]
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "test05_recipes",
-      "name": "test05_recipes",
-      "version": "0.1.4",
-      "updated_at": "2026-07-29T17:25:37+00:00",
-      "path": "scenarios/test05_recipes",
-      "manifest": "scenarios/test05_recipes/scenario.yaml",
-      "source": {
-        "path": "scenarios/test05_recipes",
-        "manifest": "scenarios/test05_recipes/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "test05_recipes",
-        "id": "test05_recipes"
-      },
-      "title": "Домашняя книга рецептов",
-      "title_i18n": {
-        "fallback": "Домашняя книга рецептов",
-        "key": "scenario.test05_recipes.title"
-      },
-      "description": "Локальная книга рецептов с поиском, добавлением и избранным.",
-      "trigger": "manual",
-      "skills": {
-        "required": [
-          "test05_recipes_skill"
-        ]
-      }
-    },
-    {
-      "kind": "scenario",
       "id": "tlp_research",
       "name": "tlp_research",
       "version": "0.3.6",
@@ -1568,36 +1443,6 @@
           "greet_on_boot_skill",
           "pair_new_device_skill",
           "voice_chat_skill"
-        ]
-      }
-    },
-    {
-      "kind": "scenario",
-      "id": "workflow_lab_dashboard",
-      "name": "workflow_lab_dashboard",
-      "version": "0.1.2",
-      "updated_at": "2026-08-05T20:24:26+00:00",
-      "path": "scenarios/workflow_lab_dashboard",
-      "manifest": "scenarios/workflow_lab_dashboard/scenario.yaml",
-      "source": {
-        "path": "scenarios/workflow_lab_dashboard",
-        "manifest": "scenarios/workflow_lab_dashboard/scenario.yaml"
-      },
-      "install": {
-        "kind": "scenario",
-        "name": "workflow_lab_dashboard",
-        "id": "workflow_lab_dashboard"
-      },
-      "title": "Workflow Lab Dashboard • Панель заявок",
-      "title_i18n": {
-        "key": "scenario.workflow_lab_dashboard.title",
-        "fallback": "Workflow Lab Dashboard"
-      },
-      "description": "Compact bilingual request-state dashboard backed only by deterministic local fixtures.",
-      "trigger": "manual",
-      "skills": {
-        "required": [
-          "workflow_lab_dashboard_skill"
         ]
       }
     }
