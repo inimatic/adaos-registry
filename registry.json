@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-17T04:32:11+00:00",
+  "updated_at": "2026-08-17T20:11:20+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -28,8 +28,8 @@
       "kind": "skill",
       "id": "adaos_drive",
       "name": "adaos_drive",
-      "version": "0.1.0",
-      "updated_at": "2026-08-17T04:32:11+00:00",
+      "version": "0.1.1",
+      "updated_at": "2026-08-17T20:11:20+00:00",
       "path": "skills/adaos_drive",
       "manifest": "skills/adaos_drive/skill.yaml",
       "source": {
@@ -43,7 +43,7 @@
       },
       "description": "Two-panel browser file manager for explicitly connected local folders.",
       "runtime_python": "3.11",
-      "tools_count": 23
+      "tools_count": 24
     },
     {
       "kind": "skill",

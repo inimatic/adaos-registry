@@ -1,5 +1,5 @@
 name: adaos_drive
-version: 0.1.0
+version: 0.1.1
 description: Two-panel browser file manager for explicitly connected local folders.
 supported_locales:
 - en
@@ -316,7 +316,8 @@ tools:
         type: object
 - name: copy_to_other_panel
   entry: handlers.main:copy_to_other_panel
-  description: Copy the selected file or folder from one panel to the other panel folder.
+  description: Copy the selected file or folder from one panel to the other panel
+    folder.
   side_effects: local_write
   side_effect_class: local_write
   input_schema:
@@ -343,7 +344,8 @@ tools:
         type: object
 - name: create_guest_link
   entry: handlers.main:create_guest_link
-  description: Register a Root-mediated readonly public link for the selected file or folder.
+  description: Register a Root-mediated readonly public link for the selected file
+    or folder.
   side_effects: local_write
   side_effect_class: local_write
   input_schema:
@@ -371,7 +373,8 @@ tools:
         type: object
 - name: download_selected
   entry: handlers.main:download_selected
-  description: Create and open a direct download link for the selected file, or the public face for folders.
+  description: Create and open a direct download link for the selected file, or the
+    public face for folders.
   side_effects: local_write
   side_effect_class: local_write
   input_schema:
@@ -397,7 +400,8 @@ tools:
         type: object
 - name: list_public_links
   entry: handlers.main:list_public_links
-  description: List readonly public Drive links registered on this hub for owner risk review.
+  description: List readonly public Drive links registered on this hub for owner risk
+    review.
   side_effects: read_only
   side_effect_class: read_only
   input_schema:
@@ -417,7 +421,8 @@ tools:
         type: array
 - name: list_public_downloads
   entry: handlers.main:list_public_downloads
-  description: List recent download and preview journal events for readonly public Drive links.
+  description: List recent download and preview journal events for readonly public
+    Drive links.
   side_effects: read_only
   side_effect_class: read_only
   input_schema:
@@ -653,3 +658,13 @@ nlu:
     - show files
     slot_schemas: {}
     entities: []
+updated_at: '2026-08-17T20:11:20+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.852+5172.db034608
+    recorded_at: '2026-08-17T20:11:20+00:00'
+    source: skill_push
+    min_commit: db034608c180a7a428dcaed50a4c977e0d2a8ea8
+    min_short_commit: db034608
+    build_date: '2026-08-17T22:47:28+03:00'
+
