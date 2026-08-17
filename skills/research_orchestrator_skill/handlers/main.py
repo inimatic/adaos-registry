@@ -597,6 +597,16 @@ def _compilation_markdown(compilation: Mapping[str, Any], facet: str) -> str:
     )
 
 
+@tool(summary="Resume deterministic research compilation from durable successful LLM stages.", side_effects="local_write")
+def resume_compilation(
+    direction_id: str,
+    run_id: str,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().resume_compilation(direction_id, run_id, actor=actor)
+
+
 @tool(summary="Read the latest digest-bound research compilation facets and traceability.", side_effects="none")
 def get_compilation(
     direction_id: str,

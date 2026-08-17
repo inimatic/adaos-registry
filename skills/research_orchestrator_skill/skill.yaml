@@ -352,6 +352,21 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: resume_compilation
+  description: Resume deterministic compilation from three digest-verified durable LLM stage outputs without rerunning the model.
+  entry: handlers.main:resume_compilation
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [direction_id, run_id]
+    properties:
+      direction_id: {type: string}
+      run_id: {type: string}
+      actor: {type: string}
+    additionalProperties: true
+  output_schema:
+    type: object
+    required: [ok, resumed, prototype, compilation, formulation_run]
 - name: accept_prototype
   description: Accept an exact candidate digest and emit a digest-bound pre-Codex
     AutomationBrief.
@@ -784,4 +799,3 @@ compatibility:
     min_commit: e047d821636b576bc6be2ae047abd3607a8cf8e7
     min_short_commit: e047d821
     build_date: '2026-08-18T01:27:29+03:00'
-

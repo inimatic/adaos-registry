@@ -1820,6 +1820,175 @@ class ResearchOrchestrator:
             self._emit(failure_message, dialog, group_id=group_id, phase="failed", status="failed", seq=999_999)
             raise
 
+    def resume_compilation(
+        self,
+        direction_id: str,
+        run_id: str,
+        *,
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        """Resume the deterministic compiler from three durable successful stages."""
+
+        token = _direction_id(direction_id)
+        state = self.repository.get_direction(token)
+        if not state:
+            raise ValueError("research direction is not initialized")
+        rows = self.repository.formulation_stages(token, run_id=str(run_id))
+        by_name = {str(item["stage_name"]): dict(item) for item in rows}
+        required = ("problem_frame", "protocol_design", "implementation_contract")
+        missing = [name for name in required if by_name.get(name, {}).get("status") != "succeeded"]
+        if missing:
+            raise ValueError(f"cannot resume compilation; successful durable stages are missing: {missing}")
+        for name in required:
+            expected = str(by_name[name].get("output_digest") or "")
+            if expected != stage_digest(by_name[name]["payload"]):
+                raise ValueError(f"cannot resume compilation; {name} payload digest drifted")
+        events = self.repository.activities(token, limit=500)
+        context_event = next(
+            (
+                item
+                for item in reversed(events)
+                if item.get("status") == "source_context_prepared"
+                and str((item.get("detail") or {}).get("run_id") or "") == str(run_id)
+            ),
+            None,
+        )
+        if not context_event:
+            raise ValueError("cannot resume compilation; the durable source-context receipt is missing")
+        later_source_changes = [
+            item
+            for item in events
+            if int(item.get("seq") or 0) > int(context_event.get("seq") or 0)
+            and item.get("status") in {"source_added", "source_replaced", "source_removed", "visibility_changed"}
+        ]
+        if later_source_changes:
+            raise ValueError("cannot resume compilation after source context changed")
+        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        coverage = copy.deepcopy(dict((context_event.get("detail") or {}).get("coverage") or {}))
+        source_context = {"coverage": coverage}
+        exact_refs = sorted(
+            {
+                str(ref)
+                for item in coverage.get("items") or []
+                for ref in item.get("provenance_refs") or []
+            }
+        )
+        source_ref_map = {
+            f"SRC-{index:03d}": ref
+            for index, ref in enumerate(exact_refs, start=1)
+        }
+        problem = by_name["problem_frame"]["payload"]
+        protocol = by_name["protocol_design"]["payload"]
+        implementation = by_name["implementation_contract"]["payload"]
+        compilation = build_compilation(
+            direction_id=token,
+            run_id=str(run_id),
+            source_bundle=bundle,
+            source_context=source_context,
+            problem_frame=problem,
+            protocol_design=protocol,
+            implementation_contract=implementation,
+            source_ref_map=source_ref_map,
+        )
+        stage_values = {
+            "problem_frame": problem,
+            "protocol_design": protocol,
+            "implementation_contract": implementation,
+        }
+        self.repository.put_formulation_stage(
+            run_id=str(run_id),
+            direction_id=token,
+            stage_index=4,
+            stage_name="research_compilation",
+            status="completed",
+            input_digest=stage_digest(
+                {name: stage_digest(value) for name, value in stage_values.items()}
+            ),
+            output_digest=str(compilation["digest"]),
+            payload=compilation,
+            telemetry={
+                "producer": "deterministic_compiler",
+                "resumed": True,
+                "traceability_digest": compilation["traceability_graph"]["digest"],
+                "traceability_coverage": compilation["traceability_coverage"]["coverage"],
+            },
+        )
+        if compilation["readiness"]["decision"] != "ready_for_acceptance":
+            raise ValueError(
+                "research compilation gate: "
+                + "; ".join(compilation["readiness"]["blockers"])
+            )
+        formulation_trace = {
+            "run_id": str(run_id),
+            "pipeline": "research_compiler_v1",
+            "compilation_digest": compilation["digest"],
+            "traceability_digest": compilation["traceability_graph"]["digest"],
+            "stages": [
+                {
+                    "stage": name,
+                    "stage_index": index,
+                    "input_digest": str(by_name[name]["input_digest"]),
+                    "output_digest": str(by_name[name]["output_digest"]),
+                    "schema_digest": str((by_name[name].get("telemetry") or {})["schema_digest"]),
+                    "resolved_model": str((by_name[name].get("telemetry") or {})["resolved_model"]),
+                    "resolved_provider": str((by_name[name].get("telemetry") or {})["resolved_provider"]),
+                    "structured_output": bool((by_name[name].get("telemetry") or {})["structured_output"]),
+                    "repair_attempts": int((by_name[name].get("telemetry") or {}).get("repair_attempts") or 0),
+                }
+                for index, name in enumerate(required, start=1)
+            ],
+        }
+        candidate = assemble_candidate(
+            problem,
+            protocol,
+            implementation,
+            source_ref_map=source_ref_map,
+        )
+        current = self.repository.get_prototype(state.get("current_prototype_digest"))
+        preview = materialize_prototype(
+            candidate,
+            direction_id=token,
+            source_bundle_digest=str(bundle["digest"]),
+            context_coverage=coverage,
+            revision=int(current.get("revision") or 0) + 1 if current else 1,
+            parent_digest=str(current["digest"]) if current else None,
+            actor=str(actor or "compiler:resume"),
+            formulation_trace=formulation_trace,
+        )
+        quality_issues = prototype_quality_issues(preview)
+        if quality_issues:
+            raise ValueError("resumed assembly semantic quality gate: " + "; ".join(quality_issues))
+        recorded = self.record_prototype(
+            token,
+            candidate,
+            actor=str(actor or "compiler:resume"),
+            context_coverage=coverage,
+            formulation_trace=formulation_trace,
+        )
+        self.repository.activity(
+            token,
+            "compilation",
+            "resumed",
+            "Research compilation resumed from three digest-verified durable LLM stages.",
+            {
+                "run_id": str(run_id),
+                "compilation_digest": compilation["digest"],
+                "prototype_digest": recorded["prototype"]["digest"],
+                "actor": str(actor or "compiler:resume"),
+            },
+        )
+        return {
+            **recorded,
+            "ok": True,
+            "resumed": True,
+            "compilation": compilation,
+            "formulation_run": {
+                "run_id": str(run_id),
+                "pipeline": "research_compiler_v1",
+                "stages": self.repository.formulation_stages(token, run_id=str(run_id)),
+            },
+        }
+
     def discuss(
         self,
         direction_id: str,
