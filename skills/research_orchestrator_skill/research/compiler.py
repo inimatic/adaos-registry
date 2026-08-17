@@ -133,8 +133,8 @@ def build_compilation(
         node_id = f"hypothesis:{hypothesis_id}"
         hypothesis_nodes.append(node_id)
         nodes.append({"node_id": node_id, "kind": "hypothesis", "label": str(hypothesis["statement"])})
-        for short in hypothesis.get("source_refs") or []:
-            cited_short_refs.add(str(short))
+        for short in dict.fromkeys(str(item) for item in hypothesis.get("source_refs") or []):
+            cited_short_refs.add(short)
             edges.append(
                 {
                     "edge_id": f"grounding:{short}:{hypothesis_id}",

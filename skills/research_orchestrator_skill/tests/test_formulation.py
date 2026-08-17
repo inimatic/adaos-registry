@@ -215,6 +215,63 @@ def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceabili
     assert package["digest"].startswith("sha256:")
 
 
+def test_research_compiler_deduplicates_repeated_grounding_refs() -> None:
+    problem = _problem()
+    problem["hypotheses"][0]["source_refs"] = [REF, REF]
+    bundle = {
+        "digest": "sha256:" + "9" * 64,
+        "audience": "research.formulation",
+        "excluded": [],
+        "sources": [
+            {
+                "source_id": "notebook",
+                "name": "experiment.ipynb",
+                "digest": "sha256:" + "8" * 64,
+                "media_type": "application/x-ipynb+json",
+                "role": "research_source",
+                "artifact_ref": EXACT_REF.split("#", 1)[0],
+                "analysis": {"kind": "notebook"},
+            }
+        ],
+    }
+    context = {
+        "coverage": {
+            "sources_total": 1,
+            "sources_represented": 1,
+            "selected_characters": 100,
+            "truncated_sources": [],
+            "unreadable_sources": [],
+            "items": [
+                {
+                    "artifact_ref": EXACT_REF.split("#", 1)[0],
+                    "strategy": "notebook_semantic_digest_v1",
+                    "selected_characters": 100,
+                    "truncated": False,
+                    "provenance_refs": [EXACT_REF],
+                }
+            ],
+        }
+    }
+
+    package = build_compilation(
+        direction_id="tlp_direction",
+        run_id="formulation-duplicate-grounding",
+        source_bundle=bundle,
+        source_context=context,
+        problem_frame=problem,
+        protocol_design=_protocol(),
+        implementation_contract=_implementation(),
+        source_ref_map={REF: EXACT_REF},
+    )
+
+    grounding = [
+        edge
+        for edge in package["traceability_graph"]["edges"]
+        if edge["relation"] == "motivates"
+    ]
+    assert len(grounding) == 1
+
+
 def test_dynamic_stage_schema_limits_every_source_reference_to_supplied_short_ids() -> None:
     schema = stage_schema("problem_frame", allowed_source_refs={"SRC-001", "SRC-002"})
     _assert_strict_objects(schema)
