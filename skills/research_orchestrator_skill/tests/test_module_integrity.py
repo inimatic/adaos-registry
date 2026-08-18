@@ -13,7 +13,11 @@ def test_skill_manifest_and_entrypoint_are_valid() -> None:
     root = Path(__file__).resolve().parents[1]
     manifest = yaml.safe_load((root / "skill.yaml").read_text(encoding="utf-8"))
     assert manifest["name"] == "research_orchestrator_skill"
-    assert set(manifest["capabilities"]) == {"storage.relational", "builder.project_sources"}
+    assert set(manifest["capabilities"]) == {
+        "storage.relational",
+        "builder.project_sources",
+        "skills.invoke",
+    }
     assert "accept_prototype" in manifest["exports"]["tools"]
     assert "get_formulation_run" in manifest["exports"]["tools"]
     assert manifest["conversation"]["dialog_channel"]["default_tool"] == "research_orchestrator_skill.chat"

@@ -57,8 +57,8 @@ def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def canonical_json(value: Mapping[str, Any]) -> str:
-    return json.dumps(dict(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+def canonical_json(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def digest(value: Mapping[str, Any]) -> str:
