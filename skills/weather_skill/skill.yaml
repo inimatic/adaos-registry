@@ -1,5 +1,5 @@
 name: weather_skill
-version: 2.6.24
+version: 2.6.25
 description: Standalone SDK weather skill with Open-Meteo forecasts, browser location,
   declarative actions and subnet projections.
 runtime:

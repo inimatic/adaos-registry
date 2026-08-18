@@ -55,6 +55,8 @@ _REQUEST_DIAGNOSTICS: Dict[str, Any] = {
     "max_active_total": 0,
     "last_result": None,
 }
+_REQUEST_DIAGNOSTICS_HYDRATED = False
+_REQUEST_DIAGNOSTICS_MEMORY_KEY = "request_runtime_diagnostics"
 _CITY_CACHE_TTL = 300.0
 _GEOCODE_CACHE_TTL = 24 * 60 * 60.0
 _CITY_CACHE_MAX_ITEMS = 128
@@ -1187,6 +1189,48 @@ def _remove_weather_update_task(task_key: str, task: asyncio.Task[Any]) -> None:
             _WEATHER_UPDATE_TASKS.pop(task_key, None)
 
 
+async def _ensure_weather_request_diagnostics() -> None:
+    global _REQUEST_DIAGNOSTICS_HYDRATED
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        if _REQUEST_DIAGNOSTICS_HYDRATED:
+            return
+    try:
+        persisted = await asyncio.to_thread(memory_get, _REQUEST_DIAGNOSTICS_MEMORY_KEY)
+    except Exception:
+        persisted = None
+        _log.warning("failed to load weather request diagnostics", exc_info=True)
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        if _REQUEST_DIAGNOSTICS_HYDRATED:
+            return
+        if isinstance(persisted, dict):
+            for key in (
+                "accepted_total",
+                "completed_total",
+                "superseded_total",
+                "failed_total",
+                "projection_rejected_total",
+                "max_active_total",
+            ):
+                try:
+                    _REQUEST_DIAGNOSTICS[key] = max(0, int(persisted.get(key) or 0))
+                except (TypeError, ValueError):
+                    continue
+            last_result = persisted.get("last_result")
+            if isinstance(last_result, dict):
+                _REQUEST_DIAGNOSTICS["last_result"] = dict(last_result)
+        _REQUEST_DIAGNOSTICS["active_total"] = 0
+        _REQUEST_DIAGNOSTICS_HYDRATED = True
+
+
+def _weather_request_diagnostics_snapshot() -> Dict[str, Any]:
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        diagnostics = dict(_REQUEST_DIAGNOSTICS)
+        last_result = diagnostics.get("last_result")
+        diagnostics["last_result"] = dict(last_result) if isinstance(last_result, dict) else None
+    diagnostics["updated_at"] = _now_iso()
+    return diagnostics
+
+
 def _record_weather_request_started() -> None:
     with _REQUEST_DIAGNOSTICS_LOCK:
         _REQUEST_DIAGNOSTICS["accepted_total"] += 1
@@ -1205,7 +1249,7 @@ def _record_weather_request_finished(
     request_id: str,
     request_generation: int,
     duration_ms: int,
-) -> None:
+) -> Dict[str, Any]:
     counter = {
         "completed": "completed_total",
         "superseded": "superseded_total",
@@ -1223,12 +1267,24 @@ def _record_weather_request_finished(
             "duration_ms": duration_ms,
             "finished_at": _now_iso(),
         }
+    return _weather_request_diagnostics_snapshot()
+
+
+async def _persist_weather_request_diagnostics(diagnostics: Dict[str, Any]) -> None:
+    try:
+        await asyncio.to_thread(memory_set, _REQUEST_DIAGNOSTICS_MEMORY_KEY, diagnostics)
+    except Exception:
+        _log.warning("failed to persist weather request diagnostics", exc_info=True)
 
 
 @tool("get_runtime_status")
 def get_runtime_status(**_: Any) -> Dict[str, Any]:
+    try:
+        persisted = memory_get(_REQUEST_DIAGNOSTICS_MEMORY_KEY)
+    except Exception:
+        persisted = None
     with _REQUEST_DIAGNOSTICS_LOCK:
-        diagnostics = dict(_REQUEST_DIAGNOSTICS)
+        diagnostics = dict(persisted) if isinstance(persisted, dict) else dict(_REQUEST_DIAGNOSTICS)
         last_result = diagnostics.get("last_result")
         diagnostics["last_result"] = dict(last_result) if isinstance(last_result, dict) else None
         tracked_task_total = sum(1 for task in _WEATHER_UPDATE_TASKS.values() if not task.done())
@@ -1237,6 +1293,7 @@ def get_runtime_status(**_: Any) -> Dict[str, Any]:
             "ok": True,
             "schema": "adaos.weather.request_runtime.v1",
             "tracked_task_total": tracked_task_total,
+            "status_source": "skill_memory" if isinstance(persisted, dict) else "process_memory",
             "updated_at": _now_iso(),
         }
     )
@@ -1460,6 +1517,7 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
         current_task = asyncio.current_task()
         if current_task is None:
             raise RuntimeError("weather request handler has no runtime task")
+        await _ensure_weather_request_diagnostics()
         previous = _replace_weather_update_task(task_key, current_task)
         _record_weather_request_started()
         request_started = time.monotonic()
@@ -1484,7 +1542,7 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
             outcome = "superseded"
             raise
         finally:
-            _record_weather_request_finished(
+            diagnostics = _record_weather_request_finished(
                 outcome,
                 city=city or str((location or {}).get("label") or "Current location"),
                 webspace_id=webspace_id,
@@ -1492,7 +1550,10 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
                 request_generation=request_generation,
                 duration_ms=round((time.monotonic() - request_started) * 1000),
             )
-            _remove_weather_update_task(task_key, current_task)
+            try:
+                await _persist_weather_request_diagnostics(diagnostics)
+            finally:
+                _remove_weather_update_task(task_key, current_task)
     finally:
         if pushed:
             clear_current_skill()

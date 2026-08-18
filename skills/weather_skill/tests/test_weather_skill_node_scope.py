@@ -69,6 +69,7 @@ def test_weather_webui_uses_targeted_projection_observers():
 def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch):
     mod = _load_weather_module()
     projected: list[tuple[str, dict, str | None]] = []
+    memory: dict[str, object] = {}
 
     class _CtxSubnet:
         def set(self, *_args, **_kwargs):
@@ -85,6 +86,8 @@ def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", None))
     monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
+    monkeypatch.setattr(mod, "memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(mod, "memory_set", lambda key, value: memory.__setitem__(key, value))
 
     import asyncio
 
@@ -112,6 +115,7 @@ def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch
 def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
     mod = _load_weather_module()
     projected: list[tuple[str, dict, str | None]] = []
+    memory: dict[str, object] = {}
 
     class _CtxSubnet:
         async def set_async(self, slot, payload, webspace_id=None):
@@ -141,6 +145,8 @@ def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", "Moscow"))
     monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
+    monkeypatch.setattr(mod, "memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(mod, "memory_set", lambda key, value: memory.__setitem__(key, value))
 
     import asyncio
 
@@ -167,6 +173,7 @@ def test_weather_rapid_city_changes_project_only_latest_terminal_snapshot(monkey
     mod = _load_weather_module()
     projected: list[tuple[str, dict, str | None]] = []
     berlin_started = None
+    memory: dict[str, object] = {}
 
     class _CtxSubnet:
         async def set_async(self, slot, payload, webspace_id=None):
@@ -176,6 +183,8 @@ def test_weather_rapid_city_changes_project_only_latest_terminal_snapshot(monkey
     monkeypatch.setattr(mod, "get_self_object", lambda: {"id": "member:member-local"})
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", None))
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
+    monkeypatch.setattr(mod, "memory_get", lambda key, default=None: memory.get(key, default))
+    monkeypatch.setattr(mod, "memory_set", lambda key, value: memory.__setitem__(key, value))
 
     import asyncio
 
@@ -214,6 +223,7 @@ def test_weather_rapid_city_changes_project_only_latest_terminal_snapshot(monkey
     assert runtime["completed_total"] == 1
     assert runtime["superseded_total"] == 1
     assert runtime["active_total"] == 0
+    assert runtime["status_source"] == "skill_memory"
 
 
 def test_weather_snapshot_returns_last_projected_webspace_state_without_refetch(monkeypatch):
