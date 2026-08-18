@@ -57,7 +57,7 @@ def rehydrate() -> dict[str, Any]:
     return ensure_schema()
 
 
-@tool(summary="List local research Projects with durable formulation status.", side_effects="none")
+@tool(summary="List durable research directions from the authoritative research index.", side_effects="none")
 def list_directions(limit: int = 500, **_: Any) -> dict[str, Any]:
     return _orchestrator().list_directions(limit=limit)
 
@@ -98,7 +98,7 @@ def resolve_focus(
         }
 
 
-@tool(summary="Create one Project and its primary research-direction skill atomically.", side_effects="local_write")
+@tool(summary="Create one research direction and its artifact-custodian skill atomically.", side_effects="local_write")
 def create_direction(
     project_id: str,
     title: str,
@@ -118,9 +118,45 @@ def create_direction(
     )
 
 
-@tool(summary="Initialize one research direction skill project.", side_effects="local_write")
+@tool(summary="Adopt a legacy direction custodian into the research-domain index.", side_effects="local_write")
 def initialize_direction(direction_id: str, title: str, actor: str = "user:local", **_: Any) -> dict[str, Any]:
     return _orchestrator().initialize(direction_id, title, actor=actor)
+
+
+@tool(summary="Create a bounded ResearchTask inside one research direction.", side_effects="local_write")
+def create_task(
+    direction_id: str,
+    title: str,
+    task_id: str | None = None,
+    research_question: str = "",
+    parent_task_id: str | None = None,
+    branch_of_task_id: str | None = None,
+    dependency_refs: list[str] | None = None,
+    activate: bool = False,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().create_task(
+        direction_id,
+        title,
+        task_id=task_id,
+        research_question=research_question,
+        parent_task_id=parent_task_id,
+        branch_of_task_id=branch_of_task_id,
+        dependency_refs=dependency_refs,
+        activate=activate,
+        actor=actor,
+    )
+
+
+@tool(summary="Select the ResearchTask that receives subsequent formulation writes.", side_effects="local_write")
+def select_active_task(
+    direction_id: str,
+    task_id: str,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().select_active_task(direction_id, task_id, actor=actor)
 
 
 @tool(summary="Attach one immutable source artifact.", side_effects="local_write")
@@ -168,9 +204,18 @@ def set_source_visibility(
 
 
 @tool(summary="Read canonical pre-Codex research direction state.", side_effects="none")
-def get_direction(direction_id: str, **_: Any) -> dict[str, Any]:
+def get_direction(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
     try:
-        result = _orchestrator().get(direction_id)
+        result = _orchestrator().get(
+            direction_id,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+        )
         direction = result["direction"]
         bundle = result["source_bundle"]
         prototype = result.get("current_prototype") or {}
@@ -218,8 +263,17 @@ def adopt_calibration_lineage(
 
 
 @tool(summary="Read a joined source-to-result research lineage.", side_effects="none")
-def get_lineage(direction_id: str, **_: Any) -> dict[str, Any]:
-    return _orchestrator().lineage(direction_id)
+def get_lineage(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().lineage(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+    )
 
 
 @tool(summary="List manifested source artifacts for one direction.", side_effects="none")
@@ -278,7 +332,7 @@ def list_artifacts(direction_id: str, **_: Any) -> dict[str, Any]:
 @tool(summary="Preview one manifested text, Markdown, or PDF artifact.", side_effects="none")
 def preview_artifact(direction_id: str, group_id: str, artifact_id: str, **_: Any) -> dict[str, Any]:
     state = _orchestrator().get(direction_id)
-    skill_id = str(state["direction"]["primary_skill_ref"]).partition(":")[2]
+    skill_id = str(state["direction"]["artifact_owner_ref"]).partition(":")[2]
     resolved = artifact_context.resolve(skill_id, group_id, artifact_id)
     path = str(resolved.get("path") or artifact_id)
     media_type = str(resolved.get("media_type") or "application/octet-stream").lower()
@@ -329,8 +383,8 @@ def _markdown_lines(items: Any, *, empty: str = "—") -> str:
 
 
 @tool(summary="Read the evolving human-readable research consensus.", side_effects="none")
-def get_consensus(direction_id: str, **_: Any) -> dict[str, Any]:
-    state = _orchestrator().get(direction_id)
+def get_consensus(direction_id: str, task_id: str | None = None, **_: Any) -> dict[str, Any]:
+    state = _orchestrator().get(direction_id, task_id=task_id)
     prototype = state.get("accepted_prototype") or state.get("current_prototype") or {}
     brief = state.get("automation_brief") or {}
     direction = state["direction"]
@@ -412,6 +466,7 @@ def record_prototype(direction_id: str, prototype: Mapping[str, Any], actor: str
 def chat(
     direction_id: str,
     text: str,
+    task_id: str | None = None,
     model: str | None = None,
     actor: str | None = None,
     invocation_origin: str | None = None,
@@ -419,6 +474,8 @@ def chat(
     **payload: Any,
 ) -> dict[str, Any]:
     dialog_payload = dict(payload)
+    if task_id:
+        dialog_payload["task_id"] = task_id
     if invocation_origin:
         dialog_payload["invocation_origin"] = invocation_origin
     if _meta:
@@ -451,8 +508,17 @@ def accept_prototype(
 
 
 @tool(summary="Read the accepted digest-bound AutomationBrief.", side_effects="none")
-def get_automation_brief(direction_id: str, **_: Any) -> dict[str, Any]:
-    state = _orchestrator().get(direction_id)
+def get_automation_brief(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    state = _orchestrator().get(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+    )
     brief = state.get("automation_brief")
     return {
         "ok": True,
@@ -473,22 +539,47 @@ def get_automation_brief(direction_id: str, **_: Any) -> dict[str, Any]:
 @tool(summary="Bind and open the exact pre-Codex Development Session in Builder.", side_effects="local_write")
 def open_builder_session(
     direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
     builder_webspace_id: str = "desktop-dev",
     base_url: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
     return _orchestrator().open_builder_session(
         direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
         builder_webspace_id=builder_webspace_id,
         base_url=base_url,
     )
 
 
 @tool(summary="Read durable research formulation activity.", side_effects="none")
-def get_activity(direction_id: str, limit: int = 200, **_: Any) -> dict[str, Any]:
+def get_activity(
+    direction_id: str,
+    limit: int = 200,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
     repository = OrchestratorRepository()
     events = repository.activities(direction_id, limit)
     stages = repository.formulation_stages(direction_id, limit=30)
+    if task_id:
+        task_ref = f"research-task:{task_id}"
+        track_ref = (
+            f"implementation-track:{implementation_track_id}"
+            if implementation_track_id
+            else None
+        )
+        events = [
+            item
+            for item in events
+            if item.get("subject_ref") in {None, task_ref, track_ref}
+            or item.get("detail", {}).get("task_ref") == task_ref
+            or item.get("detail", {}).get("implementation_track_ref") == track_ref
+        ]
+        stages = [item for item in stages if item.get("task_id") == task_id]
     stage_summaries = [
         {
             "run_id": item["run_id"],
@@ -661,22 +752,34 @@ def resume_compilation(
 @tool(summary="Read the latest digest-bound research compilation facets and traceability.", side_effects="none")
 def get_compilation(
     direction_id: str,
+    task_id: str | None = None,
     run_id: str | None = None,
     facet: str = "traceability",
     **_: Any,
 ) -> dict[str, Any]:
-    state = _orchestrator().get(direction_id)
+    state = _orchestrator().get(direction_id, task_id=task_id)
     prototype = state.get("accepted_prototype") or state.get("current_prototype") or {}
     trace = prototype.get("formulation_trace") if isinstance(prototype.get("formulation_trace"), Mapping) else {}
     selected_run = str(run_id or trace.get("run_id") or "").strip()
     stages = OrchestratorRepository().formulation_stages(direction_id, run_id=selected_run) if selected_run else []
+    selected_task_id = str((state.get("selected_task") or state.get("active_task") or {}).get("task_id") or "")
+    if selected_task_id:
+        stages = [item for item in stages if item.get("task_id") == selected_task_id]
     stage = next((item for item in stages if item.get("stage_name") == "research_compilation"), None)
-    compilation = dict(stage.get("payload") or {}) if isinstance(stage, Mapping) else {}
+    accepted_record = state.get("accepted_compilation_record") or {}
+    compilation = (
+        dict(accepted_record.get("payload") or {})
+        if isinstance(accepted_record, Mapping) and accepted_record.get("payload")
+        else dict(stage.get("payload") or {})
+        if isinstance(stage, Mapping)
+        else {}
+    )
     if not compilation:
         return {
             "ok": True,
             "available": False,
             "direction_id": direction_id,
+            "task_id": selected_task_id or None,
             "run_id": selected_run or None,
             "content": "Research Compilation has not been produced yet.",
         }
@@ -695,6 +798,8 @@ def get_compilation(
         "ok": True,
         "available": True,
         "direction_id": direction_id,
+        "task_id": selected_task_id or None,
+        "compilation_record": accepted_record or None,
         "run_id": selected_run,
         "compilation": compilation,
         "facets": facets,

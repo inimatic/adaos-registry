@@ -4,7 +4,7 @@
   "type": "object",
   "required": [
     "schema", "direction_id", "ref", "title", "project_kind", "status",
-    "generation", "description", "tags", "artifact_owner_skill_id",
+    "revision", "generation", "description", "tags", "artifact_owner_skill_id",
     "artifact_owner_ref", "created_at", "updated_at"
   ],
   "properties": {
@@ -14,6 +14,7 @@
     "title": {"type": "string", "minLength": 1},
     "project_kind": {"const": "research_direction"},
     "status": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 1},
     "generation": {"type": "integer", "minimum": 0},
     "description": {"type": "string"},
     "tags": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},

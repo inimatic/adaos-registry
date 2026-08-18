@@ -18,6 +18,7 @@
             "selectedResearchSubjectRef": null,
             "selectedResearchTaskId": null,
             "selectedImplementationTrackId": null,
+            "activeResearchTaskId": null,
             "researchConversationId": null,
             "researchGeneration": 0,
             "researchPrototypeDigest": null,
@@ -91,7 +92,7 @@
                     "id": "new-research",
                     "label": "New research",
                     "icon": "add-circle-outline",
-                    "title": "Create a Project and its primary research-direction skill."
+                    "title": "Create a research direction and its isolated artifact-custodian skill."
                   }
                 ]
               },
@@ -126,14 +127,13 @@
                     "id": "current",
                     "label": "$state.selectedDirectionTitle",
                     "icon": "flask-outline",
-                    "disabled": true,
-                    "title": "Currently selected research direction."
+                    "title": "Open the searchable research-direction selector."
                   },
                   {
                     "id": "details",
                     "label": "Details",
                     "icon": "information-circle-outline",
-                    "title": "Show Project identity, formulation generation, artifact-set digest, and Development Session."
+                    "title": "Show direction identity, selected task, artifact custodian, source digest, and Development Session."
                   }
                 ]
               },
@@ -149,6 +149,7 @@
                     "selectedResearchSubjectRef": null,
                     "selectedResearchTaskId": null,
                     "selectedImplementationTrackId": null,
+                    "activeResearchTaskId": null,
                     "researchConversationId": null,
                     "researchGeneration": 0,
                     "researchPrototypeDigest": null,
@@ -157,6 +158,13 @@
                     "builderUrl": null,
                     "activeResearchTab": "overview"
                     ,"activeCompilationFacet": "source_analysis"
+                  }
+                },
+                {
+                  "on": "click:current",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "research_direction_selector"
                   }
                 },
                 {
@@ -194,7 +202,7 @@
                 "titleKey": "title",
                 "subtitleKey": "status",
                 "previewKey": "description",
-                "emptyText": "No research directions yet. Choose New research to create the first Project.",
+                "emptyText": "No research directions yet. Choose New research to create the first direction.",
                 "errorText": "Research directions are temporarily unavailable. Check the Hub connection or retry.",
                 "staleText": "Showing the last loaded research directions while the Hub reconnects."
               },
@@ -210,6 +218,7 @@
                     "selectedResearchSubjectRef": null,
                     "selectedResearchTaskId": null,
                     "selectedImplementationTrackId": null,
+                    "activeResearchTaskId": null,
                     "activeResearchTab": "overview",
                     "activeCompilationFacet": "source_analysis",
                     "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
@@ -286,7 +295,9 @@
                 "kind": "skill",
                 "name": "research_orchestrator_skill.get_direction",
                 "params": {
-                  "direction_id": "$state.selectedDirectionId"
+                  "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId",
+                  "implementation_track_id": "$state.selectedImplementationTrackId"
                 },
                 "cacheTtlMs": 0,
                 "invalidationTags": [
@@ -310,12 +321,12 @@
                     "label": "Artifact custodian"
                   },
                   {
-                    "key": "active_task.ref",
-                    "label": "Active task"
+                    "key": "selected_task.ref",
+                    "label": "Selected task"
                   },
                   {
-                    "key": "active_implementation_track.ref",
-                    "label": "Implementation track"
+                    "key": "selected_implementation_track.ref",
+                    "label": "Selected implementation track"
                   },
                   {
                     "key": "direction.status",
@@ -346,7 +357,8 @@
                   "researchAutomationBriefDigest": "automation_brief.digest",
                   "builderUrl": "builder_url",
                   "selectedDirectionTitle": "direction.title",
-                  "researchConversationId": "conversation_id"
+                  "researchConversationId": "conversation_id",
+                  "activeResearchTaskId": "active_task.task_id"
                 }
               }
             },
@@ -365,13 +377,13 @@
                     "id": "overview",
                     "label": "Overview",
                     "icon": "information-circle-outline",
-                    "title": "Project identity, current formulation, and admitted next steps."
+                    "title": "Direction identity, selected task, current formulation, and admitted next steps."
                   },
                   {
                     "id": "artifacts",
                     "label": "Artifacts",
                     "icon": "file-tray-stacked-outline",
-                    "title": "Source material physically owned by the direction skill."
+                    "title": "Source material physically held by the direction's artifact-custodian skill."
                   },
                   {
                     "id": "formulation",
@@ -425,7 +437,9 @@
                 "kind": "skill",
                 "name": "research_orchestrator_skill.get_direction",
                 "params": {
-                  "direction_id": "$state.selectedDirectionId"
+                  "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId",
+                  "implementation_track_id": "$state.selectedImplementationTrackId"
                 },
                 "cacheTtlMs": 0,
                 "invalidationTags": [
@@ -591,8 +605,45 @@
               "title": "Artifact boundary",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts'",
               "inputs": {
-                "content": "Files are copied into the selected direction skill under `artifacts/part0/` and recorded in its manifest. Each item has an explicit stage-visibility policy. AdaOS gives formulation, implementation, and evaluation separate digest-bound filesystem views; filtering a prompt is not treated as an isolation boundary. Mark expert reviews and legacy answers **evaluation only** for a clean from-raw arm."
+                "content": "Files are copied into the direction's artifact-custodian skill under `artifacts/part0/` and recorded in its manifest. Each item has an explicit stage-visibility policy. AdaOS gives formulation, implementation, and evaluation separate digest-bound filesystem views; filtering a prompt is not treated as an isolation boundary. Mark expert reviews and legacy answers **evaluation only** for a clean from-raw arm."
               }
+            },
+            {
+              "id": "task-formulation-context",
+              "type": "ui.actions",
+              "area": "workspace",
+              "title": "Task formulation authority",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation' && $state.selectedResearchTaskId != null && $state.selectedResearchTaskId !== $state.activeResearchTaskId",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "activate-task",
+                    "label": "Activate selected task",
+                    "icon": "radio-button-on-outline",
+                    "title": "Make this task the only writable formulation target. Selection alone is read-only and never changes scientific state."
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:activate-task",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.select_active_task",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId"
+                  },
+                  "invalidates": [
+                    "research.portfolio",
+                    "research.formulation",
+                    "research.activity",
+                    "research.compilation",
+                    "research.automation_brief"
+                  ]
+                }
+              ]
             },
             {
               "id": "research-consensus",
@@ -604,7 +655,8 @@
                 "kind": "skill",
                 "name": "research_orchestrator_skill.get_consensus",
                 "params": {
-                  "direction_id": "$state.selectedDirectionId"
+                  "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId"
                 },
                 "cacheTtlMs": 0,
                 "invalidationTags": [
@@ -653,6 +705,7 @@
                   "thread_id": "research:$state.selectedDirectionId",
                   "dialog_channel_id": "research_orchestrator",
                   "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId",
                   "route_id": "voice_chat"
                 }
               },
@@ -722,6 +775,7 @@
                 "name": "research_orchestrator_skill.get_compilation",
                 "params": {
                   "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId",
                   "facet": "$state.activeCompilationFacet"
                 },
                 "cacheTtlMs": 0,
@@ -751,7 +805,7 @@
                     "label": "Accept exact prototype",
                     "icon": "shield-checkmark-outline",
                     "enabledIf": "$state.researchCanAccept === true && $state.researchAdmissionDecision === 'admitted'",
-                    "title": "Enabled only after the deterministic AdaOS admission review passes. Checkpoint the exact Project-owned skill and artifact set, then create the AutomationBrief and scoped Development Session. Codex is not started."
+                    "title": "Enabled only for the active task after deterministic AdaOS admission passes. Checkpoint the exact Project implementation target and artifact set, then create the AutomationBrief and scoped Development Session. Codex is not started."
                   },
                   {
                     "id": "open-builder",
@@ -802,6 +856,8 @@
                   },
                   "params": {
                     "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "implementation_track_id": "$state.selectedImplementationTrackId",
                     "builder_webspace_id": "desktop-dev"
                   },
                   "invalidates": [
@@ -847,7 +903,9 @@
                 "kind": "skill",
                 "name": "research_orchestrator_skill.get_automation_brief",
                 "params": {
-                  "direction_id": "$state.selectedDirectionId"
+                  "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId",
+                  "implementation_track_id": "$state.selectedImplementationTrackId"
                 },
                 "cacheTtlMs": 0,
                 "invalidationTags": [
@@ -872,7 +930,9 @@
                 "kind": "skill",
                 "name": "research_orchestrator_skill.get_direction",
                 "params": {
-                  "direction_id": "$state.selectedDirectionId"
+                  "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId",
+                  "implementation_track_id": "$state.selectedImplementationTrackId"
                 },
                 "cacheTtlMs": 0,
                 "invalidationTags": [
@@ -919,6 +979,8 @@
                 "name": "research_orchestrator_skill.get_activity",
                 "params": {
                   "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId",
+                  "implementation_track_id": "$state.selectedImplementationTrackId",
                   "limit": 200
                 },
                 "cacheTtlMs": 0,
@@ -953,7 +1015,9 @@
                 "kind": "skill",
                 "name": "research_orchestrator_skill.get_lineage",
                 "params": {
-                  "direction_id": "$state.selectedDirectionId"
+                  "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId",
+                  "implementation_track_id": "$state.selectedImplementationTrackId"
                 },
                 "cacheTtlMs": 0,
                 "invalidationTags": [
@@ -993,6 +1057,84 @@
         }
       },
       "modals": {
+        "research_direction_selector": {
+          "title": "Choose research direction",
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
+          "schema": {
+            "id": "research_direction_selector",
+            "title": "Choose research direction",
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "direction-selector-list",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Research directions",
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "research_orchestrator_skill.list_directions",
+                  "params": {
+                    "limit": 500
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "research.portfolio",
+                    "research.formulation"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 2
+                },
+                "inputs": {
+                  "variant": "cards",
+                  "search": true,
+                  "titleKey": "title",
+                  "subtitleKey": "status",
+                  "previewKey": "description",
+                  "emptyText": "No research directions are available."
+                },
+                "actions": [
+                  {
+                    "on": "select",
+                    "type": "updateState",
+                    "params": {
+                      "researchViewMode": "direction",
+                      "selectedDirectionId": "$event.direction_id",
+                      "selectedDirectionTitle": "$event.title",
+                      "selectedResearchNodeId": null,
+                      "selectedResearchSubjectRef": null,
+                      "selectedResearchTaskId": null,
+                      "selectedImplementationTrackId": null,
+                      "activeResearchTaskId": null,
+                      "activeResearchTab": "overview",
+                      "activeCompilationFacet": "source_analysis",
+                      "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
+                      "researchGeneration": 0,
+                      "researchPrototypeDigest": null,
+                      "researchAdmissionDecision": "needs_discussion",
+                      "researchCanAccept": false,
+                      "builderUrl": null
+                    }
+                  },
+                  {
+                    "on": "select",
+                    "type": "closeModal"
+                  }
+                ]
+              }
+            ]
+          }
+        },
         "research_new_direction": {
           "title": "New research direction",
           "presentation": {
@@ -1031,10 +1173,10 @@
                     {
                       "id": "project_id",
                       "type": "shortText",
-                      "label": "Project ID",
+                      "label": "Direction ID",
                       "required": true,
                       "placeholder": "my_research",
-                      "help": "Stable lowercase ID: letters, digits, dot, underscore, or hyphen. The Project and its primary skill are created together."
+                      "help": "Stable lowercase ID: letters, digits, dot, underscore, or hyphen. The logical direction and its artifact-custodian skill are created together; an implementation Project is created only at accepted handoff."
                     },
                     {
                       "id": "title",
@@ -1112,7 +1254,9 @@
                   "kind": "skill",
                   "name": "research_orchestrator_skill.get_direction",
                   "params": {
-                    "direction_id": "$state.selectedDirectionId"
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "implementation_track_id": "$state.selectedImplementationTrackId"
                   },
                   "cacheTtlMs": 0,
                   "invalidationTags": [
@@ -1125,8 +1269,11 @@
                 },
                 "inputs": {
                   "fields": [
-                    {"key": "project.ref", "label": "Project"},
-                    {"key": "direction.primary_skill_ref", "label": "Primary skill"},
+                    {"key": "direction.ref", "label": "Direction"},
+                    {"key": "direction.artifact_owner_ref", "label": "Artifact custodian"},
+                    {"key": "selected_task.ref", "label": "Selected task"},
+                    {"key": "selected_implementation_track.ref", "label": "Implementation track"},
+                    {"key": "project.ref", "label": "Implementation Project"},
                     {"key": "direction.status", "label": "Stage"},
                     {"key": "direction.generation", "label": "Generation"},
                     {"key": "source_bundle.digest", "label": "Artifact set"},
@@ -1299,7 +1446,7 @@
                 "type": "static.markdown",
                 "area": "main",
                 "inputs": {
-                  "content": "# Research Workbench\n\nThis shared application manages many research directions; it does not create a scenario per direction.\n\n- A direction is an `adaos.project.v1` Project with one primary research skill.\n- Source artifacts belong to that skill and stay readable by normal filesystem tools.\n- LLM discussion proposes typed ResearchPrototype revisions.\n- Human acceptance binds the exact Project, skill checkpoint, artifacts, and prototype.\n- Builder receives one explicit read-write target and read-only context.\n- Codex, experiment execution, Ray, and article generation are outside this milestone."
+                  "content": "# Research Workbench\n\nThis shared application manages many research directions; it does not create a scenario per direction.\n\n- A ResearchDirection and its ResearchTasks are scientific lifecycle records owned by Workbench.\n- A dedicated skill is the physical custodian of source artifacts; custody does not make the skill the direction identity.\n- LLM discussion proposes task-bound ResearchPrototype revisions.\n- Human acceptance binds an exact task, ResearchCompilation, implementation track, Project, artifact view, and AutomationBrief.\n- Builder receives the full Project envelope, one explicit read-write target, and digest-bound read-only context.\n- Selecting a task is read-only; formulation writes require explicit task activation.\n- Ray and article generation remain deferred."
                 }
               },
               {

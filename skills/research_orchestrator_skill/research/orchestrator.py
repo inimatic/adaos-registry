@@ -26,6 +26,7 @@ from adaos.services.agent_context import get_ctx
 from adaos.services.skill.artifacts import skill_upload_dir
 
 from research.contracts import (
+    digest as contract_digest,
     materialize_automation_brief,
     materialize_prototype,
     prototype_admission_issues,
@@ -764,6 +765,92 @@ class ResearchOrchestrator:
         )
         return self.get(token)
 
+    def create_task(
+        self,
+        direction_id: str,
+        title: str,
+        *,
+        task_id: str | None = None,
+        research_question: str = "",
+        parent_task_id: str | None = None,
+        branch_of_task_id: str | None = None,
+        dependency_refs: list[str] | None = None,
+        activate: bool = False,
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        direction = self.repository.get_direction(token)
+        if not direction:
+            raise ValueError("research direction is not initialized")
+        candidate_id = _direction_id(
+            task_id
+            or f"{token}.task-{len(self.repository.list_tasks(token)) + 1:03d}"
+        )
+        task = self.repository.create_task(
+            token,
+            task_id=candidate_id,
+            title=str(title or candidate_id).strip(),
+            research_question=str(research_question or "").strip(),
+            parent_task_id=parent_task_id,
+            branch_of_task_id=branch_of_task_id,
+            dependency_refs=dependency_refs,
+        )
+        if activate:
+            direction = self.repository.set_active_task(token, candidate_id)
+        self.repository.activity(
+            token,
+            "agenda",
+            "task_created",
+            f"ResearchTask {task['ref']} was created{' and activated' if activate else ''}.",
+            {
+                "task_ref": task["ref"],
+                "parent_task_id": task.get("parent_task_id"),
+                "branch_of_task_id": task.get("branch_of_task_id"),
+                "dependency_refs": task.get("dependency_refs") or [],
+                "activated": bool(activate),
+            },
+            actor=actor,
+            subject_ref=str(task["ref"]),
+        )
+        return {
+            "ok": True,
+            "direction": direction,
+            "task": task,
+            "agenda": self.get(token, task_id=candidate_id).get("agenda"),
+        }
+
+    def select_active_task(
+        self,
+        direction_id: str,
+        task_id: str,
+        *,
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        selected_task_id = _direction_id(task_id)
+        previous = self.repository.get_direction(token)
+        if not previous:
+            raise ValueError("research direction is not initialized")
+        direction = self.repository.set_active_task(token, selected_task_id)
+        if previous.get("active_task_id") != selected_task_id:
+            self.repository.activity(
+                token,
+                "agenda",
+                "task_activated",
+                f"ResearchTask research-task:{selected_task_id} became the active formulation task.",
+                {
+                    "previous_task_ref": (
+                        f"research-task:{previous['active_task_id']}"
+                        if previous.get("active_task_id")
+                        else None
+                    ),
+                    "task_ref": f"research-task:{selected_task_id}",
+                },
+                actor=actor,
+                subject_ref=f"research-task:{selected_task_id}",
+            )
+        return self.get(token, task_id=selected_task_id)
+
     def attach_source(
         self,
         direction_id: str,
@@ -904,7 +991,13 @@ class ResearchOrchestrator:
             "direction": state,
         }
 
-    def get(self, direction_id: str) -> dict[str, Any]:
+    def get(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+    ) -> dict[str, Any]:
         token = _direction_id(direction_id)
         admitted = self._require_direction_project(token)
         project = admitted.get("project")
@@ -952,23 +1045,63 @@ class ResearchOrchestrator:
                     }
                 ],
             }
-        prototype = self.repository.get_prototype(state.get("current_prototype_digest"))
-        accepted = self.repository.get_prototype(state.get("accepted_prototype_digest"))
-        brief = self.repository.get_brief(state.get("automation_brief_digest"))
         tasks = self.repository.list_tasks(token)
         active_task = self.repository.get_task(state.get("active_task_id"))
+        selected_task = self.repository.get_task(task_id) if task_id else active_task
+        if selected_task and selected_task.get("direction_id") != token:
+            raise ValueError("selected ResearchTask belongs to another direction")
+        if task_id and not selected_task:
+            raise ValueError("selected ResearchTask does not exist")
         tracks = (
-            self.repository.list_tracks(str(active_task["task_id"]))
-            if active_task
+            self.repository.list_tracks(str(selected_task["task_id"]))
+            if selected_task
             else []
         )
-        active_track = next(
-            (item for item in reversed(tracks) if item.get("development_session_id")),
-            tracks[-1] if tracks else None,
+        selected_track = (
+            self.repository.get_track(implementation_track_id)
+            if implementation_track_id
+            else next(
+                (item for item in reversed(tracks) if item.get("development_session_id")),
+                tracks[-1] if tracks else None,
+            )
         )
-        if active_track and str(active_track.get("project_ref") or "").startswith("project:"):
+        if selected_track and (
+            selected_track.get("direction_id") != token
+            or selected_track.get("task_id") != (selected_task or {}).get("task_id")
+        ):
+            raise ValueError("selected ImplementationTrack belongs to another ResearchTask")
+        if implementation_track_id and not selected_track:
+            raise ValueError("selected ImplementationTrack does not exist")
+        compilation_record = self.repository.get_compilation_record(
+            (selected_task or {}).get("accepted_compilation_digest")
+        )
+        prototype = self.repository.get_prototype(
+            (selected_task or {}).get("current_prototype_digest")
+            or (
+                state.get("current_prototype_digest")
+                if (selected_task or {}).get("task_id") == state.get("active_task_id")
+                else None
+            )
+        )
+        accepted = self.repository.get_prototype(
+            (compilation_record or {}).get("prototype_digest")
+            or (
+                state.get("accepted_prototype_digest")
+                if (selected_task or {}).get("task_id") == state.get("active_task_id")
+                else None
+            )
+        )
+        brief = (
+            self.repository.get_brief_for_task(
+                str(selected_task["task_id"]),
+                implementation_track_id=(selected_track or {}).get("track_id"),
+            )
+            if selected_task
+            else None
+        )
+        if selected_track and str(selected_track.get("project_ref") or "").startswith("project:"):
             try:
-                project = compositions.get(str(active_track["project_ref"]).partition(":")[2])
+                project = compositions.get(str(selected_track["project_ref"]).partition(":")[2])
             except Exception:
                 pass
         sessions = (
@@ -980,7 +1113,7 @@ class ResearchOrchestrator:
             (
                 item
                 for item in sessions
-                if item.get("session_id") == (active_track or {}).get("development_session_id")
+                if item.get("session_id") == (selected_track or {}).get("development_session_id")
             ),
             sessions[-1] if sessions else None,
         )
@@ -1004,6 +1137,16 @@ class ResearchOrchestrator:
             and str(prototype.get("source_bundle_digest") or "") != str(bundle.get("digest") or "")
         )
         admission_review = prototype.get("admission_review") if isinstance((prototype or {}).get("admission_review"), Mapping) else {}
+        agenda_payload = {
+            "schema": "adaos.research.agenda.v1",
+            "direction_id": token,
+            "direction_ref": f"research-direction:{token}",
+            "revision": int(state.get("revision") or 1)
+            + sum(int(item.get("revision") or 1) for item in tasks),
+            "tasks": tasks,
+            "active_task_id": (active_task or {}).get("task_id"),
+        }
+        agenda_payload["digest"] = contract_digest(agenda_payload)
         return {
             "ok": True,
             "initialized": True,
@@ -1014,19 +1157,14 @@ class ResearchOrchestrator:
                 "artifact_owner_ref": f"skill:{owner_skill_id}",
             },
             "project": project,
-            "agenda": {
-                "schema": "adaos.research.agenda.v1",
-                "direction_id": token,
-                "direction_ref": f"research-direction:{token}",
-                "tasks": tasks,
-                "active_task_id": (active_task or {}).get("task_id"),
-            },
+            "agenda": agenda_payload,
             "active_task": active_task,
+            "selected_task": selected_task,
             "implementation_tracks": tracks,
-            "active_implementation_track": active_track,
-            "accepted_compilation": self.repository.get_compilation(
-                (active_task or {}).get("accepted_compilation_digest")
-            ),
+            "active_implementation_track": selected_track,
+            "selected_implementation_track": selected_track,
+            "accepted_compilation": (compilation_record or {}).get("payload"),
+            "accepted_compilation_record": compilation_record,
             "artifact_groups": artifact_context.groups(owner_skill_id),
             "source_bundle": bundle,
             "current_prototype": prototype,
@@ -1036,6 +1174,7 @@ class ResearchOrchestrator:
                 "admission_blockers": list(admission_review.get("blockers") or []),
                 "can_accept": (
                     bool(prototype)
+                    and (selected_task or {}).get("task_id") == state.get("active_task_id")
                     and not prototype_stale
                     and admission_review.get("decision") == "admitted"
                     and str(state.get("accepted_prototype_digest") or "")
@@ -1057,7 +1196,11 @@ class ResearchOrchestrator:
         view = self.get(token)
         direction = dict(view["direction"])
         tasks = list((view.get("agenda") or {}).get("tasks") or [])
-        tracks = list(view.get("implementation_tracks") or [])
+        tracks = [
+            track
+            for task in tasks
+            for track in self.repository.list_tracks(str(task["task_id"]))
+        ]
         nodes: list[dict[str, Any]] = []
 
         def add(
@@ -1245,11 +1388,23 @@ class ResearchOrchestrator:
             "nodes": nodes,
         }
 
-    def lineage(self, direction_id: str) -> dict[str, Any]:
+    def lineage(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+    ) -> dict[str, Any]:
         token = _direction_id(direction_id)
-        view = self.get(token)
-        task = view.get("active_task") or {}
+        view = self.get(
+            token,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+        )
+        task = view.get("selected_task") or view.get("active_task") or {}
         tracks = list(view.get("implementation_tracks") or [])
+        if implementation_track_id:
+            tracks = [item for item in tracks if item.get("track_id") == implementation_track_id]
         local_sources = list((view.get("source_bundle") or {}).get("sources") or [])
         calibration = dict((task.get("metadata") or {}).get("calibration") or {})
         admitted_sources = list(calibration.get("admitted_sources") or [])
@@ -1485,10 +1640,16 @@ class ResearchOrchestrator:
         self,
         direction_id: str,
         *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
         builder_webspace_id: str = "desktop-dev",
         base_url: str | None = None,
     ) -> dict[str, Any]:
-        state = self.get(direction_id)
+        state = self.get(
+            direction_id,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+        )
         session = state.get("development_session")
         if not isinstance(session, Mapping):
             raise ValueError("accept the ResearchPrototype before opening a Builder Development Session")
@@ -2108,6 +2269,12 @@ class ResearchOrchestrator:
         state = self.repository.get_direction(token)
         if not state:
             raise ValueError("research direction is not initialized")
+        requested_task_id = str((dialog_payload or {}).get("task_id") or "").strip()
+        active_task_id = str(state.get("active_task_id") or "")
+        if requested_task_id and requested_task_id != active_task_id:
+            raise ValueError(
+                "selected ResearchTask is read-only until it is explicitly activated for formulation"
+            )
         bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("attach at least one source before discussion")
@@ -2124,7 +2291,8 @@ class ResearchOrchestrator:
             "formulation",
             "directive_received",
             f"Research directive recorded from {actor_id} via {directive['origin']}.",
-            {"group_id": group_id, "run_id": run_id, "directive": directive, "pipeline": "staged_v1"},
+            {"group_id": group_id, "run_id": run_id, "directive": directive, "pipeline": "staged_v1", "task_ref": f"research-task:{active_task_id}"},
+            subject_ref=f"research-task:{active_task_id}",
         )
         if bool(directive.get("project_to_chat")):
             self._emit_directive(directive, dialog, group_id=group_id)
@@ -2662,6 +2830,12 @@ class ResearchOrchestrator:
         state = self.repository.get_direction(token)
         if not state:
             raise ValueError("research direction is not initialized")
+        requested_task_id = str((dialog_payload or {}).get("task_id") or "").strip()
+        active_task_id = str(state.get("active_task_id") or "")
+        if requested_task_id and requested_task_id != active_task_id:
+            raise ValueError(
+                "selected ResearchTask is read-only until it is explicitly activated for formulation"
+            )
         bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("attach at least one source before discussion")
@@ -2676,7 +2850,8 @@ class ResearchOrchestrator:
             "formulation",
             "directive_received",
             f"Research directive recorded from {actor} via {directive['origin']}.",
-            {"group_id": group_id, "directive": directive},
+            {"group_id": group_id, "directive": directive, "task_ref": f"research-task:{active_task_id}"},
+            subject_ref=f"research-task:{active_task_id}",
         )
         if bool(directive.get("project_to_chat")):
             self._emit_directive(directive, dialog, group_id=group_id)

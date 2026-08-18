@@ -1,7 +1,7 @@
 name: research_orchestrator_skill
 version: 0.23.0
-description: Durable pre-Codex orchestration for reusable AdaOS research-direction
-  skill projects.
+description: Durable pre-Codex orchestration for reusable AdaOS research directions,
+  bounded tasks, compilations, and implementation tracks.
 supported_locales:
 - en
 - ru
@@ -34,6 +34,8 @@ exports:
   - resolve_focus
   - create_direction
   - initialize_direction
+  - create_task
+  - select_active_task
   - attach_source
   - set_source_visibility
   - sync_source_bundle
@@ -98,7 +100,8 @@ tools:
   output_schema:
     type: object
 - name: list_directions
-  description: List local adaos.research.direction.v1 Projects and formulation status.
+  description: List the authoritative local adaos.research.direction.v1 index and
+    aggregate formulation status.
   entry: handlers.main:list_directions
   side_effects: none
   input_schema:
@@ -125,7 +128,8 @@ tools:
   output_schema:
     type: object
 - name: create_direction
-  description: Atomically create a research Project and its primary direction skill.
+  description: Atomically create a logical research direction and its physical artifact-custodian
+    skill.
   entry: handlers.main:create_direction
   side_effects: local_write
   input_schema:
@@ -154,7 +158,7 @@ tools:
   output_schema:
     type: object
 - name: initialize_direction
-  description: Bind a research-direction session to one Builder skill project.
+  description: Adopt one legacy artifact-custodian skill into the research-domain index.
   entry: handlers.main:initialize_direction
   side_effects: local_write
   input_schema:
@@ -166,6 +170,66 @@ tools:
       direction_id:
         type: string
       title:
+        type: string
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: create_task
+  description: Create a bounded task with optional parent, branch, and dependency
+    relations inside one research direction.
+  entry: handlers.main:create_task
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - title
+    properties:
+      direction_id:
+        type: string
+      title:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      research_question:
+        type: string
+      parent_task_id:
+        type:
+        - string
+        - 'null'
+      branch_of_task_id:
+        type:
+        - string
+        - 'null'
+      dependency_refs:
+        type: array
+        items:
+          type: string
+      activate:
+        type: boolean
+        default: false
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: select_active_task
+  description: Select the exact task that subsequent formulation writes may update.
+  entry: handlers.main:select_active_task
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - task_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
         type: string
       actor:
         type: string
@@ -254,6 +318,14 @@ tools:
     properties:
       direction_id:
         type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
     additionalProperties: true
   output_schema:
     type: object
@@ -309,6 +381,14 @@ tools:
     properties:
       direction_id:
         type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
     additionalProperties: true
   output_schema:
     type: object
@@ -375,6 +455,10 @@ tools:
     properties:
       direction_id:
         type: string
+      task_id:
+        type:
+        - string
+        - 'null'
     additionalProperties: true
   output_schema:
     type: object
@@ -415,6 +499,10 @@ tools:
         type: string
       text:
         type: string
+      task_id:
+        type:
+        - string
+        - 'null'
       model:
         type:
         - string
@@ -500,6 +588,14 @@ tools:
     properties:
       direction_id:
         type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
     additionalProperties: true
   output_schema:
     type: object
@@ -514,6 +610,14 @@ tools:
     properties:
       direction_id:
         type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
       builder_webspace_id:
         type: string
         default: desktop-dev
@@ -535,6 +639,14 @@ tools:
     properties:
       direction_id:
         type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
       limit:
         type: integer
         minimum: 1
@@ -572,6 +684,10 @@ tools:
     properties:
       direction_id:
         type: string
+      task_id:
+        type:
+        - string
+        - 'null'
       run_id:
         type:
         - string
@@ -681,9 +797,9 @@ data_routes:
   route: tool/details
   tool: list_directions
   owner: skill:research_orchestrator_skill
-  first_paint: empty local research Project portfolio
+  first_paint: empty local research direction portfolio
   recovery: repeat list_directions after targeted invalidation
-  guard_visibility: Project catalog metadata and formulation status only
+  guard_visibility: research direction index metadata and formulation status only
   budget:
     max_payload_bytes: 1048576
   read_policy:
@@ -895,4 +1011,3 @@ compatibility:
     min_commit: 0f8757f463afa85c63706267e922aef41f22d2db
     min_short_commit: 0f8757f4
     build_date: '2026-08-18T17:08:54+03:00'
-

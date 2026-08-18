@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.compilation.v1",
+  "type": "object",
+  "required": [
+    "schema", "compilation_id", "ref", "direction_id", "direction_ref",
+    "task_id", "task_ref", "revision", "digest", "prototype_digest",
+    "source_bundle_digest", "payload", "accepted_at", "accepted_by"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.compilation.v1"},
+    "compilation_id": {"type": "string", "minLength": 1},
+    "ref": {"type": "string", "pattern": "^research-compilation:.+"},
+    "direction_id": {"type": "string", "minLength": 1},
+    "direction_ref": {"type": "string", "pattern": "^research-direction:.+"},
+    "task_id": {"type": "string", "minLength": 1},
+    "task_ref": {"type": "string", "pattern": "^research-task:.+"},
+    "revision": {"type": "integer", "minimum": 1},
+    "parent_digest": {"type": ["string", "null"]},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "prototype_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "payload": {"type": "object"},
+    "accepted_at": {"type": "string", "minLength": 1},
+    "accepted_by": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

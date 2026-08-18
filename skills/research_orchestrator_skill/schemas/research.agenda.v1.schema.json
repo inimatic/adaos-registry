@@ -2,11 +2,13 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "adaos.research.agenda.v1",
   "type": "object",
-  "required": ["schema", "direction_id", "direction_ref", "tasks", "active_task_id"],
+  "required": ["schema", "direction_id", "direction_ref", "revision", "digest", "tasks", "active_task_id"],
   "properties": {
     "schema": {"const": "adaos.research.agenda.v1"},
     "direction_id": {"type": "string", "minLength": 1},
     "direction_ref": {"type": "string", "pattern": "^research-direction:.+"},
+    "revision": {"type": "integer", "minimum": 1},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "tasks": {"type": "array", "items": {"$ref": "research.task.v1.schema.json"}},
     "active_task_id": {"type": ["string", "null"]}
   },

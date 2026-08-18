@@ -1,15 +1,19 @@
 # Research Orchestrator Skill
 
 The orchestrator is the reusable pre-Codex control component of AdaOS
-Research Fabric. A research direction is one Builder skill project. The
+Research Fabric. A ResearchDirection is a scientific lifecycle aggregate in
+the Workbench index, not a Project, skill, Builder session, or UI node. A
+separate skill is its physical artifact custodian. Implementation Projects are
+created only for accepted ResearchTask/ImplementationTrack handoffs. The
 orchestrator does not generate a scenario for every direction and does not own
-experimental data or scientific governance records.
+experimental data or post-handoff scientific governance records.
 
 ## First milestone
 
 1. Open the shared `research_workbench` application and create a direction.
-   `create_direction` atomically creates an `adaos.project.v1` declaration and
-   its primary `research_direction` skill through the Builder SDK.
+   `create_direction` atomically creates the domain record and a project-only
+   artifact-custodian skill through the Builder SDK. It does not create an
+   implementation Project yet.
 2. Add notebooks and prose in Workbench. `attach_source` copies them into the
    target skill's `artifacts/part0/` and updates its digest-bound manifest.
    Choose an explicit stage visibility profile when a source is not shared.
@@ -26,9 +30,11 @@ experimental data or scientific governance records.
    Protocol, and Engineering Contract have independent digests and a
    source-to-acceptance traceability report. Resolve blocking questions.
 5. Call `accept_prototype` with the exact prototype digest, current generation,
-   and an idempotency key. The command creates a private local Builder
-   checkpoint, immutable AutomationBrief, and a least-write Builder Development
-   Session. It uploads neither the direction source nor its intake artifacts.
+   and an idempotency key. The command creates an ImplementationTrack, its
+   implementation Project, a private local Builder checkpoint, immutable
+   task-bound ResearchCompilation and AutomationBrief, and a least-write
+   Project-scoped Builder Development Session. It uploads neither the direction
+   source nor its intake artifacts.
 6. Inspect the brief and use `open_builder_session`. Codex is deliberately not
    started by acceptance.
 
@@ -106,12 +112,18 @@ are not present under Codex's read-only artifact roots.
 
 ## Ownership
 
-- The Project declaration owns distribution composition; Builder owns component
+- This skill owns the local ResearchDirection index, ResearchAgenda/Task,
+  formulation sessions, accepted ResearchCompilation, ImplementationTrack,
+  prototype revisions, acceptance, aliases, and AutomationBriefs in its private
+  relational binding.
+- The artifact-custodian skill owns intake bytes and manifests. Logical
+  ownership is explicit in the direction/task projection; other skills receive
+  path-free, audience-filtered SDK projections rather than its raw DB binding.
+- A Project owns implementation/distribution composition; Builder owns component
   source and package checkpoints. Private pre-Codex checkpoints stay in local
   CTX state; ordinary Forge publication starts only after implementation and
   review.
-- This skill owns formulation sessions, prototype revisions, acceptance, and
-  Automation Briefs in its private relational binding.
-- The direction skill owns intake artifacts, experimental code, and primary data.
+- Selecting a task is a read operation. `select_active_task` is the explicit
+  authority transition required before formulation may write that task.
 - `research_manager_skill` remains the deterministic governance truth after
   Automation.

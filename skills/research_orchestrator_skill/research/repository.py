@@ -97,6 +97,11 @@ class OrchestratorRepository:
             "schema": "adaos.research.direction.v1",
             "direction_id": str(row["direction_id"]),
             "ref": f"research-direction:{row['direction_id']}",
+            # ``generation`` remains the optimistic-concurrency token stored by
+            # the v1 ledger.  ``revision`` is its one-based domain projection;
+            # both therefore advance atomically without a second lifecycle
+            # counter that could drift.
+            "revision": int(row["generation"]) + 1,
             "title": str(row["title"]),
             "project_kind": str(row["project_kind"]),
             "status": str(row["status"]),
@@ -199,11 +204,31 @@ class OrchestratorRepository:
         dependency_refs: list[str] | None = None,
         metadata: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
+        direction = self.get_direction(direction_id)
+        if not direction:
+            raise ValueError("research direction does not exist")
         existing = self.get_task(task_id)
         if existing:
             if existing["direction_id"] != direction_id:
                 raise ValueError("research task id belongs to another direction")
             return existing
+        for relation in [parent_task_id, branch_of_task_id, *(dependency_refs or [])]:
+            if not relation:
+                continue
+            relation_id = str(relation).removeprefix("research-task:")
+            if relation_id == task_id:
+                raise ValueError("research task cannot depend on itself")
+            related = self.get_task(relation_id)
+            if not related or related["direction_id"] != direction_id:
+                raise ValueError(
+                    f"research task relation must resolve inside research-direction:{direction_id}: {relation}"
+                )
+        normalized_dependencies = list(
+            dict.fromkeys(
+                f"research-task:{str(value).removeprefix('research-task:')}"
+                for value in dependency_refs or []
+            )
+        )
         timestamp = now()
         self._db.execute(
             "INSERT INTO research_tasks(task_id, direction_id, revision, title, research_question, status, parent_task_id, branch_of_task_id, dependency_refs_json, metadata_json, source_bundle_digest, current_prototype_digest, accepted_compilation_digest, created_at, updated_at) VALUES (:task_id, :direction_id, 1, :title, :research_question, 'draft', :parent_task_id, :branch_of_task_id, :dependency_refs_json, :metadata_json, NULL, NULL, NULL, :created_at, :updated_at)",
@@ -212,9 +237,9 @@ class OrchestratorRepository:
                 "direction_id": direction_id,
                 "title": title,
                 "research_question": research_question,
-                "parent_task_id": parent_task_id,
-                "branch_of_task_id": branch_of_task_id,
-                "dependency_refs_json": canonical_json(list(dependency_refs or [])),
+                "parent_task_id": str(parent_task_id).removeprefix("research-task:") if parent_task_id else None,
+                "branch_of_task_id": str(branch_of_task_id).removeprefix("research-task:") if branch_of_task_id else None,
+                "dependency_refs_json": canonical_json(normalized_dependencies),
                 "metadata_json": canonical_json(dict(metadata or {})),
                 "created_at": timestamp,
                 "updated_at": timestamp,
@@ -238,6 +263,35 @@ class OrchestratorRepository:
             {"direction_id": direction_id},
         )
         return [value for row in rows if (value := self._task(row)) is not None]
+
+    def set_active_task(self, direction_id: str, task_id: str) -> dict[str, Any]:
+        task = self.get_task(task_id)
+        if not task or task["direction_id"] != direction_id:
+            raise ValueError("active ResearchTask must belong to the research direction")
+        direction = self.get_direction(direction_id)
+        if not direction:
+            raise ValueError("research direction does not exist")
+        if direction.get("active_task_id") == task_id:
+            return direction
+        compilation = self.latest_compilation_for_task(task_id)
+        brief_row = self._db.fetch_one(
+            "SELECT digest FROM research_automation_briefs WHERE task_id=:task_id ORDER BY created_at DESC",
+            {"task_id": task_id},
+        )
+        self._db.execute(
+            "UPDATE research_directions SET active_task_id=:task_id, current_bundle_digest=:bundle_digest, current_prototype_digest=:prototype_digest, accepted_prototype_digest=:accepted_prototype_digest, automation_brief_digest=:brief_digest, status=:status, generation=generation+1, updated_at=:updated_at WHERE direction_id=:direction_id",
+            {
+                "direction_id": direction_id,
+                "task_id": task_id,
+                "bundle_digest": task.get("source_bundle_digest"),
+                "prototype_digest": task.get("current_prototype_digest"),
+                "accepted_prototype_digest": (compilation or {}).get("prototype_digest"),
+                "brief_digest": (brief_row or {}).get("digest"),
+                "status": "handoff_ready" if brief_row else str(task.get("status") or "draft"),
+                "updated_at": now(),
+            },
+        )
+        return dict(self.get_direction(direction_id) or {})
 
     def bind_task_formulation(
         self,
@@ -295,11 +349,11 @@ class OrchestratorRepository:
         value = dict(compilation)
         compilation_digest = str(value["digest"])
         previous = self._db.fetch_one(
-            "SELECT payload_json FROM research_compilations WHERE digest=:digest",
+            "SELECT * FROM research_compilations WHERE digest=:digest",
             {"digest": compilation_digest},
         )
         if previous:
-            return json.loads(str(previous["payload_json"]))
+            return dict(self._compilation(previous) or {})
         revision_row = self._db.fetch_one(
             "SELECT COALESCE(MAX(revision), 0) AS revision FROM research_compilations WHERE task_id=:task_id",
             {"task_id": task_id},
@@ -336,7 +390,30 @@ class OrchestratorRepository:
                     "direction_id": direction_id,
                 },
             )
-        return value
+        return dict(self.get_compilation_record(compilation_digest) or {})
+
+    @staticmethod
+    def _compilation(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
+        if not row:
+            return None
+        payload = json.loads(str(row["payload_json"]))
+        return {
+            "schema": "adaos.research.compilation.v1",
+            "compilation_id": str(row["compilation_id"]),
+            "ref": f"research-compilation:{row['compilation_id']}",
+            "direction_id": str(row["direction_id"]),
+            "direction_ref": f"research-direction:{row['direction_id']}",
+            "task_id": str(row["task_id"]),
+            "task_ref": f"research-task:{row['task_id']}",
+            "revision": int(row["revision"]),
+            "parent_digest": row.get("parent_digest"),
+            "digest": str(row["digest"]),
+            "prototype_digest": str(row["prototype_digest"]),
+            "source_bundle_digest": str(row["source_bundle_digest"]),
+            "payload": payload,
+            "accepted_at": str(row["accepted_at"]),
+            "accepted_by": str(row["accepted_by"]),
+        }
 
     def get_compilation(self, digest: str | None) -> dict[str, Any] | None:
         if not digest:
@@ -346,6 +423,24 @@ class OrchestratorRepository:
             {"digest": digest},
         )
         return json.loads(str(row["payload_json"])) if row else None
+
+    def get_compilation_record(self, digest: str | None) -> dict[str, Any] | None:
+        if not digest:
+            return None
+        return self._compilation(
+            self._db.fetch_one(
+                "SELECT * FROM research_compilations WHERE digest=:digest",
+                {"digest": digest},
+            )
+        )
+
+    def latest_compilation_for_task(self, task_id: str) -> dict[str, Any] | None:
+        return self._compilation(
+            self._db.fetch_one(
+                "SELECT * FROM research_compilations WHERE task_id=:task_id ORDER BY revision DESC",
+                {"task_id": task_id},
+            )
+        )
 
     @staticmethod
     def _track(row: Mapping[str, Any] | None) -> dict[str, Any] | None:
@@ -543,6 +638,8 @@ class OrchestratorRepository:
         task = self.get_task(task_id or (self.get_direction(direction_id) or {}).get("active_task_id"))
         if not task or task["direction_id"] != direction_id:
             raise ValueError("prototype requires a task owned by the research direction")
+        if task["task_id"] != (self.get_direction(direction_id) or {}).get("active_task_id"):
+            raise ValueError("prototype may only update the active ResearchTask")
         with self._db.transaction() as tx:
             existing = tx.fetch_one("SELECT payload_json FROM research_prototypes WHERE digest=:digest", {"digest": value["digest"]})
             if existing:
@@ -588,13 +685,27 @@ class OrchestratorRepository:
         implementation_track_id: str | None = None,
     ) -> dict[str, Any]:
         with self._db.transaction() as tx:
-            row = tx.fetch_one("SELECT generation, accepted_prototype_digest FROM research_directions WHERE direction_id=:direction_id", {"direction_id": direction_id})
+            row = tx.fetch_one("SELECT generation FROM research_directions WHERE direction_id=:direction_id", {"direction_id": direction_id})
             if not row:
                 raise ValueError("research direction is not initialized")
-            if row.get("accepted_prototype_digest"):
-                if str(row["accepted_prototype_digest"]) != str(prototype["digest"]):
-                    raise ValueError("another ResearchPrototype is already accepted")
-                existing = tx.fetch_one("SELECT payload_json FROM research_automation_briefs WHERE direction_id=:direction_id", {"direction_id": direction_id})
+            selected_task_id = str(task_id or "").strip()
+            if not selected_task_id:
+                raise ValueError("acceptance requires an exact ResearchTask")
+            task = tx.fetch_one(
+                "SELECT direction_id, current_prototype_digest FROM research_tasks WHERE task_id=:task_id",
+                {"task_id": selected_task_id},
+            )
+            if not task or str(task["direction_id"]) != direction_id:
+                raise ValueError("ResearchTask does not belong to this direction")
+            if str(task.get("current_prototype_digest") or "") != str(prototype["digest"]):
+                raise ValueError("only the current ResearchPrototype for the selected task can be accepted")
+            existing = tx.fetch_one(
+                "SELECT prototype_digest, payload_json FROM research_automation_briefs WHERE task_id=:task_id ORDER BY created_at DESC",
+                {"task_id": selected_task_id},
+            )
+            if existing:
+                if str(existing["prototype_digest"]) != str(prototype["digest"]):
+                    raise ValueError("another ResearchPrototype is already accepted for this ResearchTask")
                 return json.loads(str(existing["payload_json"])) if existing else dict(brief)
             if int(row["generation"]) != int(expected_generation):
                 raise ValueError(f"stale generation: expected {expected_generation}, current {row['generation']}")
@@ -617,6 +728,24 @@ class OrchestratorRepository:
         if not digest:
             return None
         row = self._db.fetch_one("SELECT payload_json FROM research_automation_briefs WHERE digest=:digest", {"digest": digest})
+        return json.loads(str(row["payload_json"])) if row else None
+
+    def get_brief_for_task(
+        self,
+        task_id: str,
+        *,
+        implementation_track_id: str | None = None,
+    ) -> dict[str, Any] | None:
+        statement = (
+            "SELECT payload_json FROM research_automation_briefs "
+            "WHERE task_id=:task_id"
+        )
+        parameters: dict[str, Any] = {"task_id": task_id}
+        if implementation_track_id:
+            statement += " AND implementation_track_id=:track_id"
+            parameters["track_id"] = implementation_track_id
+        statement += " ORDER BY created_at DESC"
+        row = self._db.fetch_one(statement, parameters)
         return json.loads(str(row["payload_json"])) if row else None
 
     def activity(

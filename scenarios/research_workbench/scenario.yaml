@@ -1,9 +1,9 @@
 id: research_workbench
 name: research_workbench
-version: 0.0.14
+version: 0.0.15
 title: Research Workbench
-description: Shared portfolio, intake, formulation, and pre-Codex handoff for AdaOS
-  research directions.
+description: Shared portfolio and full-page Direction to Task to ImplementationTrack
+  workbench with governed formulation, Builder handoff, and joined evidence lineage.
 type: desktop
 supported_locales:
 - en
@@ -25,8 +25,8 @@ guidance:
   schema: adaos.scenario.guidance.v1
   readme: README.md
   overview:
-    en: Create research Projects, attach source artifacts, formulate an exact research
-      task, and hand it to a scoped Builder session.
+    en: Create research directions, attach source artifacts, formulate an exact task,
+      and hand one implementation track to a scoped Project Builder session.
     ru: Создание исследовательских проектов, добавление исходных артефактов, формализация
       задачи и передача в ограниченную сессию Builder.
   presentation:
@@ -70,4 +70,3 @@ nlu:
 steps: []
 prototype: scenario_default
 updated_at: '2026-08-17T22:04:28+00:00'
-
