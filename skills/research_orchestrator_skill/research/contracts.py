@@ -291,13 +291,24 @@ def materialize_prototype(
     parent_digest: str | None,
     actor: str,
     formulation_trace: Mapping[str, Any] | None = None,
+    task: Mapping[str, Any] | None = None,
+    artifact_owner_skill_id: str | None = None,
 ) -> dict[str, Any]:
     candidate = copy.deepcopy(dict(value))
     candidate.update(
         {
             "schema": "adaos.research.prototype.v1",
-            "schema_version": "1.3.0",
-            "direction": {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"},
+            "schema_version": "1.4.0" if task else "1.3.0",
+            "direction": (
+                {
+                    "kind": "research_direction",
+                    "id": direction_id,
+                    "ref": f"research-direction:{direction_id}",
+                    "artifact_owner_ref": f"skill:{artifact_owner_skill_id or direction_id}",
+                }
+                if task
+                else {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"}
+            ),
             "revision": int(revision),
             "parent_digest": parent_digest,
             "source_bundle_digest": source_bundle_digest,
@@ -308,6 +319,12 @@ def materialize_prototype(
     )
     if formulation_trace is not None:
         candidate["formulation_trace"] = copy.deepcopy(dict(formulation_trace))
+    if task is not None:
+        candidate["task"] = {
+            "id": str(task["task_id"]),
+            "ref": f"research-task:{task['task_id']}",
+            "revision": int(task["revision"]),
+        }
     candidate["admission_review"] = build_admission_review(candidate)
     candidate["digest"] = digest(candidate)
     return validate("research.prototype.v1.schema.json", candidate)
@@ -325,6 +342,10 @@ def materialize_automation_brief(
     compilation: Mapping[str, Any] | None = None,
     context_views: list[Mapping[str, Any]] | None = None,
     implementation_bundle: Mapping[str, Any] | None = None,
+    task: Mapping[str, Any] | None = None,
+    implementation_track: Mapping[str, Any] | None = None,
+    primary_target_ref: str | None = None,
+    artifact_owner_skill_id: str | None = None,
 ) -> dict[str, Any]:
     implementation_requirements = list(prototype.get("implementation_requirements") or [])
     views_by_group = {
@@ -334,9 +355,40 @@ def materialize_automation_brief(
     visible_bundle = implementation_bundle or source_bundle
     brief = {
         "schema": "adaos.research.automation_brief.v1",
-        "schema_version": "1.3.0" if compilation else "1.1.0",
+        "schema_version": "1.5.0" if task and implementation_track else "1.3.0" if compilation else "1.1.0",
         "brief_id": f"automation-{prototype['digest'].removeprefix('sha256:')[:20]}",
-        "direction": {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"},
+        "direction": (
+            {
+                "kind": "research_direction",
+                "id": direction_id,
+                "ref": f"research-direction:{direction_id}",
+                "artifact_owner_ref": f"skill:{artifact_owner_skill_id or direction_id}",
+            }
+            if task
+            else {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"}
+        ),
+        **(
+            {
+                "research_task": {
+                    "id": str(task["task_id"]),
+                    "ref": f"research-task:{task['task_id']}",
+                    "revision": int(task["revision"]),
+                }
+            }
+            if task
+            else {}
+        ),
+        **(
+            {
+                "implementation_track": {
+                    "id": str(implementation_track["track_id"]),
+                    "ref": f"implementation-track:{implementation_track['track_id']}",
+                    "revision": int(implementation_track["revision"]),
+                }
+            }
+            if implementation_track
+            else {}
+        ),
         "project": {
             "id": project["id"],
             "ref": project["ref"],
@@ -392,11 +444,11 @@ def materialize_automation_brief(
         "development_scope": {
             "targets": [
                 {
-                    "ref": f"skill:{direction_id}",
+                    "ref": str(primary_target_ref or f"skill:{direction_id}"),
                     "access": "read-write",
                     "context": "full",
                     **(
-                        {"source_locator": f"project://{project['id']}/skill/{direction_id}"}
+                        {"source_locator": f"project://{project['id']}/{str(primary_target_ref or f'skill:{direction_id}').replace(':', '/')}"}
                         if compilation
                         else {
                             "source_path": str(

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.direction.v1",
+  "type": "object",
+  "required": [
+    "schema", "direction_id", "ref", "title", "project_kind", "status",
+    "generation", "description", "tags", "artifact_owner_skill_id",
+    "artifact_owner_ref", "created_at", "updated_at"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.direction.v1"},
+    "direction_id": {"type": "string", "minLength": 1},
+    "ref": {"type": "string", "pattern": "^research-direction:.+"},
+    "title": {"type": "string", "minLength": 1},
+    "project_kind": {"const": "research_direction"},
+    "status": {"type": "string", "minLength": 1},
+    "generation": {"type": "integer", "minimum": 0},
+    "description": {"type": "string"},
+    "tags": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "artifact_owner_skill_id": {"type": "string", "minLength": 1},
+    "artifact_owner_ref": {"type": "string", "pattern": "^skill:.+"},
+    "legacy_project_ref": {"type": ["string", "null"]},
+    "active_task_id": {"type": ["string", "null"]},
+    "current_bundle_digest": {"type": ["string", "null"]},
+    "current_prototype_digest": {"type": ["string", "null"]},
+    "accepted_prototype_digest": {"type": ["string", "null"]},
+    "automation_brief_digest": {"type": ["string", "null"]},
+    "created_at": {"type": "string", "minLength": 1},
+    "updated_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

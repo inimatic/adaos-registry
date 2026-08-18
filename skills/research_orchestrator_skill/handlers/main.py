@@ -196,6 +196,32 @@ def get_direction(direction_id: str, **_: Any) -> dict[str, Any]:
         return {"ok": False, "initialized": False, "direction_id": direction_id, "message": str(exc), "next_steps": [{"id": "initialize", "label": "Инициализировать направление", "reason": "ОИ ещё не связал этот skill project с formulation ledger."}]}
 
 
+@tool(summary="Read a typed Direction to Task to Implementation navigation outline.", side_effects="none")
+def get_outline(direction_id: str, **_: Any) -> dict[str, Any]:
+    return _orchestrator().outline(direction_id)
+
+
+@tool(summary="Adopt an immutable evaluator-owned calibration lineage.", side_effects="local_write")
+def adopt_calibration_lineage(
+    direction_id: str,
+    evaluator_task_id: str,
+    budget_view: str = "fixed_downstream",
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().adopt_calibration_lineage(
+        direction_id,
+        evaluator_task_id,
+        budget_view=budget_view,
+        actor=actor,
+    )
+
+
+@tool(summary="Read a joined source-to-result research lineage.", side_effects="none")
+def get_lineage(direction_id: str, **_: Any) -> dict[str, Any]:
+    return _orchestrator().lineage(direction_id)
+
+
 @tool(summary="List manifested source artifacts for one direction.", side_effects="none")
 def list_artifacts(direction_id: str, **_: Any) -> dict[str, Any]:
     state = _orchestrator().get(direction_id)

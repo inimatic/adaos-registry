@@ -30,6 +30,7 @@ def _node_token(value: str) -> str:
 def build_compilation(
     *,
     direction_id: str,
+    task: Mapping[str, Any] | None = None,
     run_id: str,
     source_bundle: Mapping[str, Any],
     source_context: Mapping[str, Any],
@@ -236,6 +237,17 @@ def build_compilation(
             "blockers": blockers,
         },
     }
+    if task is not None:
+        task_id = str(task.get("task_id") or "").strip()
+        if not task_id:
+            raise ValueError("research compilation task requires task_id")
+        if str(task.get("direction_id") or direction_id) != str(direction_id):
+            raise ValueError("research compilation task belongs to another direction")
+        package["task"] = {
+            "task_id": task_id,
+            "ref": str(task.get("ref") or f"research-task:{task_id}"),
+            "revision": int(task.get("revision") or 1),
+        }
     package["digest"] = digest(package)
     return validate("research.compilation_package.v1.schema.json", package)
 
@@ -286,6 +298,8 @@ def project_execution_compilation(value: Mapping[str, Any]) -> dict[str, Any]:
         },
         "readiness": copy.deepcopy(source["readiness"]),
     }
+    if source.get("task"):
+        projected["task"] = copy.deepcopy(dict(source["task"]))
     projected["digest"] = digest(projected)
     return validate("research.compilation_projection.v1.schema.json", projected)
 

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.task.v1",
+  "type": "object",
+  "required": [
+    "schema", "task_id", "ref", "direction_id", "direction_ref", "revision",
+    "title", "research_question", "status", "dependency_refs", "metadata", "created_at", "updated_at"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.task.v1"},
+    "task_id": {"type": "string", "minLength": 1},
+    "ref": {"type": "string", "pattern": "^research-task:.+"},
+    "direction_id": {"type": "string", "minLength": 1},
+    "direction_ref": {"type": "string", "pattern": "^research-direction:.+"},
+    "revision": {"type": "integer", "minimum": 1},
+    "title": {"type": "string", "minLength": 1},
+    "research_question": {"type": "string"},
+    "status": {"type": "string", "minLength": 1},
+    "parent_task_id": {"type": ["string", "null"]},
+    "branch_of_task_id": {"type": ["string", "null"]},
+    "dependency_refs": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "metadata": {"type": "object"},
+    "source_bundle_digest": {"type": ["string", "null"]},
+    "current_prototype_digest": {"type": ["string", "null"]},
+    "accepted_compilation_digest": {"type": ["string", "null"]},
+    "created_at": {"type": "string", "minLength": 1},
+    "updated_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}

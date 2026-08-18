@@ -16,6 +16,7 @@ data_migration:
 capabilities:
 - storage.relational
 - builder.project_sources
+- skills.invoke
 dependencies: []
 events:
   subscribe: []
@@ -37,6 +38,9 @@ exports:
   - set_source_visibility
   - sync_source_bundle
   - get_direction
+  - get_outline
+  - adopt_calibration_lineage
+  - get_lineage
   - list_artifacts
   - preview_artifact
   - get_consensus
@@ -242,6 +246,61 @@ tools:
 - name: get_direction
   description: Return the canonical pre-Codex state and current SourceBundle.
   entry: handlers.main:get_direction
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: get_outline
+  description: Project a research direction, its tasks, compilations, and implementation
+    tracks as a generic navigation outline.
+  entry: handlers.main:get_outline
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: adopt_calibration_lineage
+  description: Import path-free immutable calibration identities through the evaluator
+    public tool and attach them to one canonical task and implementation tracks.
+  entry: handlers.main:adopt_calibration_lineage
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - evaluator_task_id
+    properties:
+      direction_id:
+        type: string
+      evaluator_task_id:
+        type: string
+      budget_view:
+        enum:
+        - fixed_downstream
+        - fixed_total_system
+        default: fixed_downstream
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: get_lineage
+  description: Read one joined source, task, compilation, implementation packet,
+    candidate, result, cost, and failure projection.
+  entry: handlers.main:get_lineage
   side_effects: none
   input_schema:
     type: object
@@ -836,4 +895,3 @@ compatibility:
     min_commit: 0df997efb3b3c450ab24195663d55f68ea1daeae
     min_short_commit: 0df997ef
     build_date: '2026-08-18T03:54:58+03:00'
-

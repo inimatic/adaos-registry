@@ -11,6 +11,16 @@
     "schema": {"const": "adaos.research.compilation_projection.v1"},
     "schema_version": {"const": "1.0.0"},
     "direction_id": {"type": "string", "minLength": 1},
+    "task": {
+      "type": "object",
+      "required": ["task_id", "ref", "revision"],
+      "properties": {
+        "task_id": {"type": "string", "minLength": 1},
+        "ref": {"type": "string", "pattern": "^research-task:.+"},
+        "revision": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
     "compilation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "source_analysis": {

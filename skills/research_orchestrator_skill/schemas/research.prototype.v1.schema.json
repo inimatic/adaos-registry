@@ -12,11 +12,26 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.prototype.v1"},
-    "schema_version": {"enum": ["1.2.0", "1.3.0"]},
+    "schema_version": {"enum": ["1.2.0", "1.3.0", "1.4.0"]},
     "direction": {
       "type": "object",
       "required": ["kind", "id", "ref"],
-      "properties": {"kind": {"const": "skill"}, "id": {"type": "string"}, "ref": {"type": "string"}},
+      "properties": {
+        "kind": {"enum": ["skill", "research_direction"]},
+        "id": {"type": "string"},
+        "ref": {"type": "string"},
+        "artifact_owner_ref": {"type": "string", "pattern": "^skill:"}
+      },
+      "additionalProperties": false
+    },
+    "task": {
+      "type": "object",
+      "required": ["id", "ref", "revision"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "ref": {"type": "string", "pattern": "^research-task:"},
+        "revision": {"type": "integer", "minimum": 1}
+      },
       "additionalProperties": false
     },
     "revision": {"type": "integer", "minimum": 1},

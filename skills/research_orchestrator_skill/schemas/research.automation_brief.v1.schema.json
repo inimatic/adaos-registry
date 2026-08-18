@@ -9,9 +9,29 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.automation_brief.v1"},
-    "schema_version": {"enum": ["1.1.0", "1.2.0", "1.3.0", "1.4.0"]},
+    "schema_version": {"enum": ["1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0"]},
     "brief_id": {"type": "string"},
     "direction": {"type": "object"},
+    "research_task": {
+      "type": "object",
+      "required": ["id", "ref", "revision"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "ref": {"type": "string", "pattern": "^research-task:"},
+        "revision": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "implementation_track": {
+      "type": "object",
+      "required": ["id", "ref", "revision"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "ref": {"type": "string", "pattern": "^implementation-track:"},
+        "revision": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
     "project": {
       "type": "object",
       "required": ["id", "ref", "version", "manifest_digest"],

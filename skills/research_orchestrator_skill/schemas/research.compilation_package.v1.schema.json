@@ -11,6 +11,7 @@
     "schema": {"const": "adaos.research.compilation_package.v1"},
     "schema_version": {"const": "1.0.0"},
     "direction_id": {"type": "string", "minLength": 1},
+    "task": {"$ref": "#/$defs/taskRef"},
     "run_id": {"type": "string", "minLength": 1},
     "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "context_receipt": {
@@ -49,6 +50,16 @@
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   },
   "$defs": {
+    "taskRef": {
+      "type": "object",
+      "required": ["task_id", "ref", "revision"],
+      "properties": {
+        "task_id": {"type": "string", "minLength": 1},
+        "ref": {"type": "string", "pattern": "^research-task:.+"},
+        "revision": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
     "facet": {
       "type": "object",
       "required": ["schema", "stage", "source_stage", "payload", "digest"],

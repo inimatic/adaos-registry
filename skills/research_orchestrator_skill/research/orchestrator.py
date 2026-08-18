@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
@@ -20,6 +21,7 @@ from adaos.sdk.builder import development_sessions
 from adaos.sdk.builder import preview as builder_preview
 from adaos.sdk.developer import artifact_context, compositions, projects
 from adaos.sdk.llm import llm_client
+from adaos.sdk.skills import invoke as invoke_skill
 from adaos.services.agent_context import get_ctx
 from adaos.services.skill.artifacts import skill_upload_dir
 
@@ -527,16 +529,115 @@ class ResearchOrchestrator:
         self.repository = repository or OrchestratorRepository()
         self._checkpoint = checkpoint or builder_artifacts.local_checkpoint
 
+    def _artifact_owner_id(self, direction_id: str) -> str:
+        state = self.repository.get_direction(direction_id)
+        return str((state or {}).get("artifact_owner_skill_id") or direction_id)
+
     def _require_direction_project(self, direction_id: str) -> dict[str, Any]:
-        description = projects.describe("skill", direction_id)
-        manifest = yaml.safe_load(projects.read_file("skill", direction_id, "skill.yaml")["content"]) or {}
+        state = self.repository.get_direction(direction_id)
+        owner_skill_id = str((state or {}).get("artifact_owner_skill_id") or direction_id)
+        description = projects.describe("skill", owner_skill_id)
+        manifest = yaml.safe_load(projects.read_file("skill", owner_skill_id, "skill.yaml")["content"]) or {}
         research = manifest.get("research_direction") if isinstance(manifest, Mapping) else None
         if not isinstance(research, Mapping) or research.get("schema") != "adaos.research.direction.v1":
-            raise ValueError(f"skill:{direction_id} is not a research_direction project")
-        project = compositions.project_for_component(f"skill:{direction_id}")
-        if not project or "adaos.research.direction.v1" not in set(project.get("profiles") or []):
-            raise ValueError(f"skill:{direction_id} is not owned by an adaos.research.direction.v1 Project")
-        return {**description, "project": project}
+            raise ValueError(f"skill:{owner_skill_id} is not an admitted research artifact custodian")
+        project = None
+        project_ref = str((state or {}).get("legacy_project_ref") or "")
+        if project_ref.startswith("project:"):
+            try:
+                project = compositions.get(project_ref.partition(":")[2])
+            except Exception:
+                project = None
+        if project is None and state is None:
+            candidate = compositions.project_for_component(f"skill:{owner_skill_id}")
+            if candidate and "adaos.research.direction.v1" in set(candidate.get("profiles") or []):
+                project = candidate
+        return {**description, "artifact_owner_skill_id": owner_skill_id, "project": project}
+
+    def _ensure_implementation_project(
+        self,
+        direction: Mapping[str, Any],
+        task: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        owner_skill_id = str(direction.get("artifact_owner_skill_id") or direction["direction_id"])
+        legacy_ref = str(direction.get("legacy_project_ref") or "")
+        if legacy_ref.startswith("project:"):
+            legacy = compositions.get(legacy_ref.partition(":")[2])
+            if f"skill:{owner_skill_id}" in {
+                str(item.get("ref") or "") for item in legacy["components"]["owned"]
+            }:
+                return legacy
+        project_id = _direction_id(f"{direction['direction_id']}_implementation")
+        try:
+            project = compositions.get(project_id)
+        except Exception:
+            project = compositions.create(
+                {
+                    "schema": "adaos.project.v1",
+                    "kind": "project",
+                    "id": project_id,
+                    "version": "0.1.0",
+                    "profiles": ["adaos.research.implementation.v1"],
+                    "components": {
+                        "owned": [
+                            {
+                                "ref": f"skill:{owner_skill_id}",
+                                "role": "primary",
+                                "exposure": "project_only",
+                                "lifecycle": "bound",
+                                "relations": ["realizes"],
+                            }
+                        ],
+                        "dependencies": [
+                            {
+                                "ref": "project:adaos_research_platform",
+                                "version": "^0.2",
+                                "lifecycle": "shared",
+                                "relations": ["presents", "uses"],
+                            }
+                        ],
+                    },
+                    "entrypoints": [
+                        {
+                            "id": "research",
+                            "presentation": "scenario:research_workbench",
+                            "default": True,
+                            "bindings": {
+                                "direction_ref": f"research-direction:{direction['direction_id']}",
+                                "task_ref": f"research-task:{task['task_id']}",
+                            },
+                        }
+                    ],
+                    "catalog": {
+                        "title": f"{direction['title']} — implementation",
+                        "description": (
+                            "Project-scoped implementation for "
+                            f"research-task:{task['task_id']}."
+                        ),
+                        "categories": ["research", "development"],
+                        "tags": list(direction.get("tags") or []),
+                    },
+                    "compatibility": {
+                        "required_entrypoints": ["research"],
+                        "required_contracts": [
+                            "adaos.research.compilation_package.v1",
+                            "adaos.research.automation_brief.v1",
+                        ],
+                        "validation_profiles": [
+                            "project.conformance",
+                            "research.consumer-contracts",
+                        ],
+                    },
+                    "lifecycle": {
+                        "uninstall": {
+                            "components": "remove_if_unreferenced",
+                            "runtime_data": "retain",
+                            "source_artifacts": "retain",
+                        }
+                    },
+                }
+            )
+        return project
 
     def create_direction(
         self,
@@ -548,32 +649,62 @@ class ResearchOrchestrator:
         tags: list[str] | None = None,
         actor: str = "user:local",
     ) -> dict[str, Any]:
-        created = compositions.create_research_direction(
-            project_id,
-            title=title,
-            description=description,
-            skill_id=skill_id,
-            tags=list(tags or []),
-            actor=actor,
-        )
-        direction_id = str(created["project"]["components"]["owned"][0]["ref"]).partition(":")[2]
-        initialized = self.initialize(direction_id, title, actor=actor)
+        direction_id = _direction_id(project_id)
+        owner_skill_id = _direction_id(skill_id or direction_id)
+        if self.repository.get_direction(direction_id):
+            raise ValueError(f"research-direction:{direction_id} already exists")
+        owner_root = projects.resolve_root("skill", owner_skill_id, required=False)
+        if owner_root.exists():
+            raise ValueError(f"artifact custodian skill:{owner_skill_id} already exists")
+        created_owner = False
+        try:
+            projects.create("skill", owner_skill_id, template="research_direction")
+            created_owner = True
+            projects.update_metadata(
+                "skill",
+                owner_skill_id,
+                title=f"{str(title or direction_id).strip()} — research assets",
+                description=(
+                    "Project-only artifact custody and implementation source for "
+                    f"research-direction:{direction_id}. {str(description or '').strip()}"
+                ).strip(),
+            )
+            self.repository.initialize(
+                direction_id,
+                str(title or direction_id).strip(),
+                description=str(description or "").strip(),
+                tags=list(tags or []),
+                artifact_owner_skill_id=owner_skill_id,
+            )
+        except Exception:
+            if created_owner and owner_root.is_dir():
+                shutil.rmtree(owner_root)
+            raise
         self.repository.activity(
             direction_id,
             "intake",
-            "project_created",
-            f"Project {created['project']['ref']} and primary skill:{direction_id} were created atomically.",
-            {"project_manifest_digest": created["project"]["manifest_digest"], "actor": actor},
+            "direction_created",
+            f"Research direction and artifact custodian skill:{owner_skill_id} were created.",
+            {
+                "direction_ref": f"research-direction:{direction_id}",
+                "artifact_owner_ref": f"skill:{owner_skill_id}",
+            },
+            actor=actor,
+            subject_ref=f"research-direction:{direction_id}",
         )
-        return initialized
+        return self.get(direction_id)
 
     def list_directions(self, *, limit: int = 500) -> dict[str, Any]:
         items: list[dict[str, Any]] = []
-        states = {item["direction_id"]: item for item in self.repository.list_directions(limit=5000)}
-        for project in compositions.list_projects(profile="adaos.research.direction.v1", limit=limit):
-            direction_id = str(project["primary_ref"]).partition(":")[2]
-            state = states.get(direction_id)
-            bundle = artifact_context.source_bundle(direction_id, audience=_FORMULATION_AUDIENCE)
+        for state in self.repository.list_directions(limit=limit):
+            direction_id = str(state["direction_id"])
+            owner_skill_id = str(state.get("artifact_owner_skill_id") or direction_id)
+            try:
+                bundle = artifact_context.source_bundle(owner_skill_id, audience=_FORMULATION_AUDIENCE)
+                custody_error = None
+            except Exception as exc:
+                bundle = {"digest": None, "sources": [], "generation": 0}
+                custody_error = _bounded_text(exc, 500)
             prototype = self.repository.get_prototype((state or {}).get("current_prototype_digest"))
             next_steps = (
                 self._next_steps(state or {}, bundle, prototype)
@@ -584,7 +715,11 @@ class ResearchOrchestrator:
             latest = activity[-1] if activity else None
             items.append(
                 {
-                    **project,
+                    "id": direction_id,
+                    "ref": f"research-direction:{direction_id}",
+                    "title": state["title"],
+                    "description": state.get("description") or "",
+                    "tags": list(state.get("tags") or []),
                     "direction_id": direction_id,
                     "status": str((state or {}).get("status") or "not_initialized"),
                     "stage": str((latest or {}).get("stage") or (state or {}).get("status") or "not_initialized"),
@@ -600,15 +735,33 @@ class ResearchOrchestrator:
                     "automation_status": "not_started",
                     "current_prototype_digest": (state or {}).get("current_prototype_digest"),
                     "automation_brief_digest": (state or {}).get("automation_brief_digest"),
+                    "artifact_owner_ref": f"skill:{owner_skill_id}",
+                    "aggregate_health": "degraded" if custody_error else "ready",
+                    "projection_error": custody_error,
+                    "task_count": len(self.repository.list_tasks(direction_id)),
                 }
             )
         return {"ok": True, "items": items, "count": len(items)}
 
     def initialize(self, direction_id: str, title: str, *, actor: str = "user:local") -> dict[str, Any]:
         token = _direction_id(direction_id)
-        self._require_direction_project(token)
-        self.repository.initialize(token, str(title or token).strip())
-        self.repository.activity(token, "intake", "ready", "Research direction initialized.", {"actor": actor})
+        admitted = self._require_direction_project(token)
+        legacy_project = admitted.get("project")
+        self.repository.initialize(
+            token,
+            str(title or token).strip(),
+            artifact_owner_skill_id=str(admitted["artifact_owner_skill_id"]),
+            legacy_project_ref=(legacy_project or {}).get("ref"),
+        )
+        self.repository.activity(
+            token,
+            "intake",
+            "ready",
+            "Research direction initialized.",
+            {"legacy_project_ref": (legacy_project or {}).get("ref")},
+            actor=actor,
+            subject_ref=f"research-direction:{token}",
+        )
         return self.get(token)
 
     def attach_source(
@@ -656,8 +809,9 @@ class ResearchOrchestrator:
                 )
             if not any(staging_source == root or root in staging_source.parents for root in allowed_roots):
                 raise ValueError("cleanup_staging is only admitted for the orchestrator intake upload directory")
+        owner_skill_id = self._artifact_owner_id(token)
         result = artifact_context.add_path(
-            token,
+            owner_skill_id,
             group_id,
             path,
             name=name,
@@ -670,7 +824,7 @@ class ResearchOrchestrator:
         if staging_source is not None:
             staging_source.unlink(missing_ok=True)
             staging_cleanup["removed"] = not staging_source.exists()
-        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        bundle = artifact_context.source_bundle(owner_skill_id, audience=_FORMULATION_AUDIENCE)
         persisted = self.repository.get_direction(token) or {}
         state = (
             persisted
@@ -718,13 +872,14 @@ class ResearchOrchestrator:
             raise ValueError("research direction is not initialized")
         if state.get("accepted_prototype_digest"):
             raise ValueError("accepted research inputs are immutable; start a new formulation cycle")
+        owner_skill_id = self._artifact_owner_id(token)
         result = artifact_context.set_context_policy(
-            token,
+            owner_skill_id,
             group_id,
             artifact_id,
             _context_profile(visibility_profile),
         )
-        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        bundle = artifact_context.source_bundle(owner_skill_id, audience=_FORMULATION_AUDIENCE)
         if str(state.get("current_bundle_digest") or "") != str(bundle["digest"]):
             state = self.repository.set_bundle(token, str(bundle["digest"]))
         self.repository.activity(
@@ -751,9 +906,11 @@ class ResearchOrchestrator:
 
     def get(self, direction_id: str) -> dict[str, Any]:
         token = _direction_id(direction_id)
-        project = self._require_direction_project(token)["project"]
+        admitted = self._require_direction_project(token)
+        project = admitted.get("project")
+        owner_skill_id = str(admitted.get("artifact_owner_skill_id") or token)
         state = self.repository.get_direction(token)
-        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        bundle = artifact_context.source_bundle(owner_skill_id, audience=_FORMULATION_AUDIENCE)
         if not state:
             return {
                 "ok": True,
@@ -761,14 +918,19 @@ class ResearchOrchestrator:
                 "direction": {
                     "id": token,
                     "direction_id": token,
-                    "title": str(project.get("title") or token),
+                    "title": str((project or {}).get("title") or token),
                     "status": "not_initialized",
                     "generation": 0,
-                    "project_ref": project["ref"],
-                    "primary_skill_ref": f"skill:{token}",
+                    "project_ref": (project or {}).get("ref"),
+                    "artifact_owner_ref": f"skill:{owner_skill_id}",
                 },
                 "project": project,
-                "artifact_groups": artifact_context.groups(token),
+                "agenda": None,
+                "active_task": None,
+                "implementation_tracks": [],
+                "active_implementation_track": None,
+                "accepted_compilation": None,
+                "artifact_groups": artifact_context.groups(owner_skill_id),
                 "source_bundle": bundle,
                 "current_prototype": None,
                 "prototype_stale": False,
@@ -793,7 +955,35 @@ class ResearchOrchestrator:
         prototype = self.repository.get_prototype(state.get("current_prototype_digest"))
         accepted = self.repository.get_prototype(state.get("accepted_prototype_digest"))
         brief = self.repository.get_brief(state.get("automation_brief_digest"))
-        sessions = development_sessions.list_sessions(project_id=str(project["id"]), limit=20) if brief else []
+        tasks = self.repository.list_tasks(token)
+        active_task = self.repository.get_task(state.get("active_task_id"))
+        tracks = (
+            self.repository.list_tracks(str(active_task["task_id"]))
+            if active_task
+            else []
+        )
+        active_track = next(
+            (item for item in reversed(tracks) if item.get("development_session_id")),
+            tracks[-1] if tracks else None,
+        )
+        if active_track and str(active_track.get("project_ref") or "").startswith("project:"):
+            try:
+                project = compositions.get(str(active_track["project_ref"]).partition(":")[2])
+            except Exception:
+                pass
+        sessions = (
+            development_sessions.list_sessions(project_id=str(project["id"]), limit=20)
+            if brief and project
+            else []
+        )
+        development_session = next(
+            (
+                item
+                for item in sessions
+                if item.get("session_id") == (active_track or {}).get("development_session_id")
+            ),
+            sessions[-1] if sessions else None,
+        )
         builder_url = None
         if sessions:
             scope = navigation.runtime_scope()
@@ -817,9 +1007,27 @@ class ResearchOrchestrator:
         return {
             "ok": True,
             "initialized": True,
-            "direction": {**state, "project_ref": project["ref"], "primary_skill_ref": f"skill:{token}"},
+            "direction": {
+                **state,
+                "ref": f"research-direction:{token}",
+                "project_ref": (project or {}).get("ref"),
+                "artifact_owner_ref": f"skill:{owner_skill_id}",
+            },
             "project": project,
-            "artifact_groups": artifact_context.groups(token),
+            "agenda": {
+                "schema": "adaos.research.agenda.v1",
+                "direction_id": token,
+                "direction_ref": f"research-direction:{token}",
+                "tasks": tasks,
+                "active_task_id": (active_task or {}).get("task_id"),
+            },
+            "active_task": active_task,
+            "implementation_tracks": tracks,
+            "active_implementation_track": active_track,
+            "accepted_compilation": self.repository.get_compilation(
+                (active_task or {}).get("accepted_compilation_digest")
+            ),
+            "artifact_groups": artifact_context.groups(owner_skill_id),
             "source_bundle": bundle,
             "current_prototype": prototype,
             "prototype_stale": prototype_stale,
@@ -837,9 +1045,417 @@ class ResearchOrchestrator:
             },
             "accepted_prototype": accepted,
             "automation_brief": brief,
-            "development_session": sessions[-1] if sessions else None,
+            "development_session": development_session,
             "builder_url": builder_url,
             "next_steps": self._next_steps(state, bundle, prototype),
+        }
+
+    def outline(self, direction_id: str) -> dict[str, Any]:
+        """Project one direction aggregate as a generic typed navigation outline."""
+
+        token = _direction_id(direction_id)
+        view = self.get(token)
+        direction = dict(view["direction"])
+        tasks = list((view.get("agenda") or {}).get("tasks") or [])
+        tracks = list(view.get("implementation_tracks") or [])
+        nodes: list[dict[str, Any]] = []
+
+        def add(
+            node_id: str,
+            title: str,
+            *,
+            parent_id: str | None = None,
+            kind: str,
+            tab: str,
+            status: str | None = None,
+            subtitle: str | None = None,
+            icon: str | None = None,
+            task_id: str | None = None,
+            track_id: str | None = None,
+        ) -> None:
+            nodes.append(
+                {
+                    "node_id": node_id,
+                    "parent_id": parent_id,
+                    "title": title,
+                    "subtitle": subtitle,
+                    "kind": kind,
+                    "icon": icon,
+                    "badge": status,
+                    "target": {
+                        "tab": tab,
+                        "subject_ref": (
+                            f"implementation-track:{track_id}"
+                            if track_id
+                            else f"research-task:{task_id}"
+                            if task_id
+                            else f"research-direction:{token}"
+                        ),
+                        "task_id": task_id,
+                        "implementation_track_id": track_id,
+                    },
+                }
+            )
+
+        root_id = f"direction:{token}"
+        add(
+            root_id,
+            str(direction.get("title") or token),
+            kind="research_direction",
+            tab="overview",
+            status=str(direction.get("status") or "intake"),
+            subtitle=str(direction.get("description") or ""),
+            icon="flask-outline",
+        )
+        add(
+            f"{root_id}:sources",
+            "Sources",
+            parent_id=root_id,
+            kind="artifact_collection",
+            tab="artifacts",
+            status=str(len(view.get("source_bundle", {}).get("sources") or [])),
+            icon="file-tray-stacked-outline",
+        )
+        agenda_id = f"{root_id}:agenda"
+        add(
+            agenda_id,
+            "Research agenda",
+            parent_id=root_id,
+            kind="research_agenda",
+            tab="overview",
+            status=str(len(tasks)),
+            icon="list-outline",
+        )
+        for task in tasks:
+            task_id = str(task["task_id"])
+            task_node_id = f"task:{task_id}"
+            add(
+                task_node_id,
+                str(task.get("title") or task_id),
+                parent_id=agenda_id,
+                kind="research_task",
+                tab="formulation",
+                status=str(task.get("status") or "draft"),
+                subtitle=str(task.get("research_question") or ""),
+                icon="beaker-outline",
+                task_id=task_id,
+            )
+            add(
+                f"{task_node_id}:compilation",
+                "Accepted compilation",
+                parent_id=task_node_id,
+                kind="research_compilation",
+                tab="compilation",
+                status="ready" if task.get("accepted_compilation_digest") else "pending",
+                icon="git-network-outline",
+                task_id=task_id,
+            )
+            tracks_id = f"{task_node_id}:implementations"
+            task_tracks = [item for item in tracks if item.get("task_id") == task_id]
+            add(
+                tracks_id,
+                "Implementation tracks",
+                parent_id=task_node_id,
+                kind="implementation_collection",
+                tab="development",
+                status=str(len(task_tracks)),
+                icon="construct-outline",
+                task_id=task_id,
+            )
+            for track in task_tracks:
+                track_id = str(track["track_id"])
+                track_metadata = dict(track.get("metadata") or {})
+                add(
+                    f"track:{track_id}",
+                    str(track.get("title") or track_id),
+                    parent_id=tracks_id,
+                    kind="implementation_track",
+                    tab="development",
+                    status=str(track.get("status") or "planned"),
+                    subtitle=str(track.get("primary_target_ref") or ""),
+                    icon="code-slash-outline",
+                    task_id=task_id,
+                    track_id=track_id,
+                )
+                if track_metadata.get("packet_ref"):
+                    add(
+                        f"track:{track_id}:packet",
+                        "Input packet",
+                        parent_id=f"track:{track_id}",
+                        kind="calibration_packet",
+                        tab="development",
+                        status="frozen",
+                        subtitle=str(track_metadata.get("packet_digest") or ""),
+                        icon="document-lock-outline",
+                        task_id=task_id,
+                        track_id=track_id,
+                    )
+                if track_metadata.get("result_ref"):
+                    add(
+                        f"track:{track_id}:result",
+                        "Evaluation result",
+                        parent_id=f"track:{track_id}",
+                        kind="evaluation_result",
+                        tab="evidence",
+                        status=(
+                            "passed"
+                            if (track_metadata.get("metrics") or {}).get("evidence_valid_completion")
+                            else "failed"
+                        ),
+                        subtitle=str(track_metadata.get("result_digest") or ""),
+                        icon="shield-checkmark-outline",
+                        task_id=task_id,
+                        track_id=track_id,
+                    )
+            for suffix, title, kind, tab, icon in (
+                ("studies", "Studies", "study_collection", "studies", "analytics-outline"),
+                ("evidence", "Evidence", "evidence_collection", "evidence", "shield-checkmark-outline"),
+                ("releases", "Releases", "release_collection", "releases", "cube-outline"),
+            ):
+                add(
+                    f"{task_node_id}:{suffix}",
+                    title,
+                    parent_id=task_node_id,
+                    kind=kind,
+                    tab=tab,
+                    status="planned",
+                    icon=icon,
+                    task_id=task_id,
+                )
+        add(
+            f"{root_id}:activity",
+            "Activity journal",
+            parent_id=root_id,
+            kind="activity_journal",
+            tab="activity",
+            status=str(len(self.repository.activities(token, limit=500))),
+            icon="pulse-outline",
+        )
+        add(
+            f"{root_id}:help",
+            "Help",
+            parent_id=root_id,
+            kind="help",
+            tab="help",
+            icon="help-circle-outline",
+        )
+        return {
+            "ok": True,
+            "direction_ref": f"research-direction:{token}",
+            "nodes": nodes,
+        }
+
+    def lineage(self, direction_id: str) -> dict[str, Any]:
+        token = _direction_id(direction_id)
+        view = self.get(token)
+        task = view.get("active_task") or {}
+        tracks = list(view.get("implementation_tracks") or [])
+        local_sources = list((view.get("source_bundle") or {}).get("sources") or [])
+        calibration = dict((task.get("metadata") or {}).get("calibration") or {})
+        admitted_sources = list(calibration.get("admitted_sources") or [])
+        lines = [
+            f"# {view['direction'].get('title')}",
+            "",
+            f"**Direction:** `{view['direction'].get('ref')}`  ",
+            f"**Task:** `{task.get('ref') or 'not selected'}` · revision `{task.get('revision') or '—'}`  ",
+            f"**Accepted compilation:** `{task.get('accepted_compilation_digest') or 'not available'}`",
+            "",
+            "## Source custody",
+            "",
+        ]
+        lines.extend(
+            f"- **owned** `{item.get('name')}` · `{item.get('digest')}`"
+            for item in local_sources
+        )
+        lines.extend(
+            f"- **admitted read-only** `{item.get('ref')}` · context `{item.get('context_digest')}`"
+            for item in admitted_sources
+        )
+        if not local_sources and not admitted_sources:
+            lines.append("- No source manifests are connected.")
+        lines.extend(["", "## Implementation and evaluation lineage", ""])
+        for track in tracks:
+            metadata = dict(track.get("metadata") or {})
+            metrics = dict(metadata.get("metrics") or {})
+            failure = metadata.get("failure") if isinstance(metadata.get("failure"), Mapping) else {}
+            usage = dict(metadata.get("budget_usage") or {})
+            lines.extend(
+                [
+                    f"### {track.get('condition_id') or track.get('title')}",
+                    "",
+                    f"- Track: `{track.get('ref')}` · `{track.get('status')}`",
+                    f"- Packet: `{metadata.get('packet_ref') or 'not available'}` · `{metadata.get('packet_digest') or '—'}`",
+                    f"- Candidate: `{metadata.get('candidate_ref') or track.get('primary_target_ref') or 'not available'}`",
+                    f"- Result: `{metadata.get('result_ref') or 'not available'}` · `{metadata.get('result_digest') or '—'}`",
+                    f"- Evidence-valid: `{metrics.get('evidence_valid_completion') if metrics else 'not evaluated'}` · protocol drift: `{metrics.get('protocol_drift') if metrics else '—'}`",
+                    f"- Failure: `{failure.get('stage') or '—'}` · {failure.get('detail') or '—'}",
+                    f"- Budget: tokens `{usage.get('model_tokens', '—')}`, wall `{usage.get('wall_seconds', '—')}` s, attempts `{usage.get('attempts', '—')}`",
+                    "",
+                ]
+            )
+        if not tracks:
+            lines.append("No implementation tracks are connected.")
+        return {
+            "ok": True,
+            "direction_ref": view["direction"].get("ref"),
+            "task_ref": task.get("ref"),
+            "local_sources": local_sources,
+            "admitted_sources": admitted_sources,
+            "tracks": tracks,
+            "summary": calibration.get("summary") or {},
+            "content": "\n".join(lines),
+        }
+
+    def adopt_calibration_lineage(
+        self,
+        direction_id: str,
+        evaluator_task_id: str,
+        *,
+        budget_view: str = "fixed_downstream",
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        """Adopt evaluator-owned immutable records without crossing its storage boundary."""
+
+        token = _direction_id(direction_id)
+        direction = self.repository.get_direction(token)
+        if not direction:
+            raise ValueError("research direction is not initialized")
+        task = self.repository.get_task(direction.get("active_task_id"))
+        if not task:
+            raise ValueError("research direction has no active task")
+        response = invoke_skill(
+            "research_evaluator_skill",
+            "get_calibration_lineage",
+            {
+                "task_id": str(evaluator_task_id),
+                "budget_view": str(budget_view),
+            },
+            timeout=120,
+        )
+        if not isinstance(response, Mapping) or not response.get("ok"):
+            raise RuntimeError("research evaluator did not return an immutable lineage")
+        external_task = response.get("task")
+        if not isinstance(external_task, Mapping):
+            raise RuntimeError("research evaluator returned no calibration task")
+        packets = [dict(item) for item in response.get("packets") or [] if isinstance(item, Mapping)]
+        results = [dict(item) for item in response.get("results") or [] if isinstance(item, Mapping)]
+        by_attempt = {
+            (
+                str(item.get("arm_id") or ""),
+                int(item.get("attempt_index") or 0),
+                str(item.get("budget_view") or ""),
+            ): item
+            for item in results
+        }
+        canonical_task_ref = str(task["ref"])
+        alias = self.repository.put_alias(
+            f"calibration-task:{evaluator_task_id}",
+            canonical_task_ref,
+            {
+                "kind": "evaluation_projection",
+                "task_digest": external_task.get("digest"),
+                "budget_view": budget_view,
+                "source_owner": "skill:research_evaluator_skill",
+            },
+        )
+        admitted_sources: dict[str, dict[str, Any]] = {}
+        tracks = []
+        for packet in packets:
+            arm_id = str(packet.get("arm_id") or "")
+            attempt_index = int(packet.get("attempt_index") or 0)
+            result = by_attempt.get((arm_id, attempt_index, str(packet.get("budget_view") or "")))
+            candidate_id = str(packet.get("candidate_id") or "")
+            suffix = re.sub(r"[^a-z0-9]+", "-", arm_id.lower()).strip("-")
+            track_id = _direction_id(f"{task['task_id']}.{suffix}.a{attempt_index}")
+            metadata = {
+                "schema": "adaos.research.calibration_track_metadata.v1",
+                "external_task_ref": f"calibration-task:{evaluator_task_id}",
+                "external_task_digest": external_task.get("digest"),
+                "packet_ref": f"calibration-packet:{packet.get('packet_id')}",
+                "packet_digest": packet.get("digest"),
+                "budget_view": packet.get("budget_view"),
+                "paired_seed": packet.get("paired_seed"),
+                "candidate_ref": f"skill:{candidate_id}" if candidate_id else None,
+                "result_ref": f"calibration-result:{result.get('result_id')}" if result else None,
+                "result_digest": result.get("digest") if result else None,
+                "metrics": copy.deepcopy((result or {}).get("metrics") or {}),
+                "failure": copy.deepcopy((result or {}).get("failure")),
+                "budget_usage": copy.deepcopy((result or {}).get("budget_usage") or {}),
+            }
+            existed = self.repository.get_track(track_id) is not None
+            track = self.repository.create_track(
+                token,
+                str(task["task_id"]),
+                track_id=track_id,
+                title=f"{arm_id} · attempt {attempt_index}",
+                project_ref=f"project:{candidate_id}" if candidate_id else None,
+                primary_target_ref=f"skill:{candidate_id}" if candidate_id else None,
+                condition_id=arm_id,
+                metadata=metadata,
+            )
+            if result:
+                passed = bool((result.get("metrics") or {}).get("evidence_valid_completion"))
+                track = self.repository.record_track_evaluation(
+                    track_id,
+                    status="evaluated_passed" if passed else "evaluated_failed",
+                    metadata=metadata,
+                )
+            if candidate_id:
+                self.repository.put_alias(
+                    f"project:{candidate_id}",
+                    str(track["ref"]),
+                    {
+                        "kind": "legacy_calibration_candidate",
+                        "packet_digest": packet.get("digest"),
+                        "result_digest": (result or {}).get("digest"),
+                    },
+                )
+            for source in packet.get("artifact_inputs") or []:
+                source_ref = str(source.get("ref") or "")
+                if source_ref:
+                    admitted_sources[source_ref] = {
+                        **copy.deepcopy(dict(source)),
+                        "ownership": "admitted_read_only",
+                        "source_owner": source_ref.rsplit("/", 1)[0],
+                    }
+            if not existed:
+                self.repository.activity(
+                    token,
+                    "evaluation",
+                    str(track["status"]),
+                    f"Imported immutable calibration lineage for {arm_id} attempt {attempt_index}.",
+                    {
+                        "task_ref": canonical_task_ref,
+                        "track_ref": track["ref"],
+                        "packet_digest": packet.get("digest"),
+                        "result_digest": (result or {}).get("digest"),
+                    },
+                    actor=actor,
+                    origin="skill:research_evaluator_skill",
+                    subject_ref=str(track["ref"]),
+                )
+            tracks.append(track)
+        task = self.repository.merge_task_metadata(
+            str(task["task_id"]),
+            {
+                "calibration": {
+                    "external_task_ref": f"calibration-task:{evaluator_task_id}",
+                    "task_digest": external_task.get("digest"),
+                    "budget_view": budget_view,
+                    "summary": copy.deepcopy(response.get("summary") or {}),
+                    "admitted_sources": list(admitted_sources.values()),
+                    "track_refs": [item["ref"] for item in tracks],
+                }
+            },
+        )
+        return {
+            "ok": True,
+            "direction_ref": f"research-direction:{token}",
+            "task": task,
+            "tracks": tracks,
+            "alias": alias,
+            "summary": copy.deepcopy(response.get("summary") or {}),
+            "source_owner": "skill:research_evaluator_skill",
         }
 
     def sync_source_bundle(self, direction_id: str, *, actor: str = "user:local") -> dict[str, Any]:
@@ -848,7 +1464,9 @@ class ResearchOrchestrator:
         if not state:
             self.initialize(token, token, actor=actor)
             state = self.repository.get_direction(token)
-        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        bundle = artifact_context.source_bundle(
+            self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE
+        )
         if not bundle.get("sources"):
             raise ValueError("direction skill artifact groups are empty")
         changed = str((state or {}).get("current_bundle_digest") or "") != str(bundle["digest"])
@@ -885,9 +1503,12 @@ class ResearchOrchestrator:
         )
         session = attached["session"]
         binding = development_sessions.bind(str(session["session_id"]), builder_webspace_id)
+        track = state.get("active_implementation_track")
+        target_ref = str((track or {}).get("primary_target_ref") or session["focus"]["ref"])
+        target_kind, _, target_id = target_ref.partition(":")
         selected = builder_preview.select_project(
-            "skill",
-            str(state["direction"]["primary_skill_ref"]).partition(":")[2],
+            target_kind,
+            target_id,
             source_webspace_id=builder_webspace_id,
             ensure_ready=True,
             wait_for_rebuild=True,
@@ -951,10 +1572,13 @@ class ResearchOrchestrator:
             raise ValueError("research direction is not initialized")
         if state.get("accepted_prototype_digest"):
             raise ValueError("accepted formulation is immutable; create a new Builder change before revising it")
-        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("at least one source artifact is required")
         previous = self.repository.get_prototype(state.get("current_prototype_digest"))
+        task = self.repository.get_task(state.get("active_task_id"))
+        if not task:
+            raise ValueError("research direction has no active ResearchTask")
         source_context = self._source_context(bundle) if context_coverage is None else None
         coverage = dict(context_coverage or (source_context or {}).get("coverage") or {})
         prototype = materialize_prototype(
@@ -966,6 +1590,8 @@ class ResearchOrchestrator:
             parent_digest=str(previous["digest"]) if previous else None,
             actor=actor,
             formulation_trace=formulation_trace,
+            task=task,
+            artifact_owner_skill_id=self._artifact_owner_id(token),
         )
         admission_issues = prototype_admission_issues(prototype)
         readiness = value.get("readiness") if isinstance(value.get("readiness"), Mapping) else {}
@@ -984,8 +1610,10 @@ class ResearchOrchestrator:
                 parent_digest=str(previous["digest"]) if previous else None,
                 actor=actor,
                 formulation_trace=formulation_trace,
+                task=task,
+                artifact_owner_skill_id=self._artifact_owner_id(token),
             )
-        stored = self.repository.put_prototype(token, prototype)
+        stored = self.repository.put_prototype(token, prototype, task_id=str(task["task_id"]))
         self.repository.activity(
             token,
             "formulation",
@@ -1480,7 +2108,7 @@ class ResearchOrchestrator:
         state = self.repository.get_direction(token)
         if not state:
             raise ValueError("research direction is not initialized")
-        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("attach at least one source before discussion")
         current = self.repository.get_prototype(state.get("current_prototype_digest"))
@@ -1694,6 +2322,9 @@ class ResearchOrchestrator:
             }
             compilation = build_compilation(
                 direction_id=token,
+                task=self.repository.get_task(
+                    str((self.repository.get_direction(token) or {}).get("active_task_id") or "")
+                ),
                 run_id=run_id,
                 source_bundle=bundle,
                 source_context=source_context,
@@ -1863,7 +2494,7 @@ class ResearchOrchestrator:
         ]
         if later_source_changes:
             raise ValueError("cannot resume compilation after source context changed")
-        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         coverage = copy.deepcopy(dict((context_event.get("detail") or {}).get("coverage") or {}))
         source_context = {"coverage": coverage}
         exact_refs = sorted(
@@ -1882,6 +2513,9 @@ class ResearchOrchestrator:
         implementation = by_name["implementation_contract"]["payload"]
         compilation = build_compilation(
             direction_id=token,
+            task=self.repository.get_task(
+                str((self.repository.get_direction(token) or {}).get("active_task_id") or "")
+            ),
             run_id=str(run_id),
             source_bundle=bundle,
             source_context=source_context,
@@ -2028,7 +2662,7 @@ class ResearchOrchestrator:
         state = self.repository.get_direction(token)
         if not state:
             raise ValueError("research direction is not initialized")
-        bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+        bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("attach at least one source before discussion")
         current = self.repository.get_prototype(state.get("current_prototype_digest"))
@@ -2319,7 +2953,8 @@ class ResearchOrchestrator:
             admission_issues = prototype_admission_issues(prototype)
             if admission_issues:
                 raise ValueError("ResearchPrototype does not pass automation admission: " + "; ".join(admission_issues))
-            bundle = artifact_context.source_bundle(token, audience=_FORMULATION_AUDIENCE)
+            owner_skill_id = self._artifact_owner_id(token)
+            bundle = artifact_context.source_bundle(owner_skill_id, audience=_FORMULATION_AUDIENCE)
             if bundle.get("digest") != prototype.get("source_bundle_digest"):
                 raise ValueError("artifact groups changed after this ResearchPrototype revision; discuss and review a new revision")
             readiness = prototype.get("readiness") if isinstance(prototype.get("readiness"), Mapping) else {}
@@ -2353,25 +2988,48 @@ class ResearchOrchestrator:
                 raise ValueError(
                     "ResearchCompilation is missing, stale, or did not pass its traceability gate"
                 )
+            task = self.repository.get_task(state.get("active_task_id"))
+            if not task:
+                raise ValueError("research direction has no active ResearchTask")
+            prototype_task_id = str((prototype.get("task") or {}).get("id") or task["task_id"])
+            if prototype_task_id != str(task["task_id"]):
+                raise ValueError("ResearchPrototype belongs to another ResearchTask")
+            project = self._ensure_implementation_project(state, task)
+            primary_target_ref = f"skill:{owner_skill_id}"
+            track_id = f"{task['task_id']}.track-001"
+            track = self.repository.create_track(
+                token,
+                str(task["task_id"]),
+                track_id=track_id,
+                title="Primary implementation",
+                project_ref=str(project["ref"]),
+                primary_target_ref=primary_target_ref,
+            )
             self.repository.activity(token, "acceptance", "checkpointing", "Creating an exact private local Builder checkpoint for the direction skill; no source is published.", {"prototype_digest": prototype_digest, "actor": actor})
             checkpoint = dict(
                 self._checkpoint(
                     kind="skill",
-                    artifact_id=token,
+                    artifact_id=owner_skill_id,
                     message=f"research formulation accepted {prototype_digest}",
                     metadata={"research_prototype_digest": prototype_digest, "source_bundle_digest": bundle["digest"], "actor": actor},
                 )
             )
             if not any(checkpoint.get(key) for key in ("package_digest", "source_revision", "source_tree", "sha256", "commit")):
                 raise ValueError("Builder checkpoint did not return an immutable source identity")
-            project = self._require_direction_project(token)["project"]
-            groups = [artifact_context.get_group(token, item["group_id"]) for item in artifact_context.groups(token)]
+            groups = [
+                artifact_context.get_group(owner_skill_id, item["group_id"])
+                for item in artifact_context.groups(owner_skill_id)
+            ]
             context_views = [
-                artifact_context.materialize_context(token, str(item["group_id"]), _IMPLEMENTATION_AUDIENCE)
+                artifact_context.materialize_context(
+                    owner_skill_id,
+                    str(item["group_id"]),
+                    _IMPLEMENTATION_AUDIENCE,
+                )
                 for item in groups
             ]
             implementation_bundle = artifact_context.source_bundle(
-                token, audience=_IMPLEMENTATION_AUDIENCE
+                owner_skill_id, audience=_IMPLEMENTATION_AUDIENCE
             )
             brief = materialize_automation_brief(
                 direction_id=token,
@@ -2384,14 +3042,75 @@ class ResearchOrchestrator:
                 compilation=compilation,
                 context_views=context_views,
                 implementation_bundle=implementation_bundle,
+                task=task,
+                implementation_track=track,
+                primary_target_ref=primary_target_ref,
+                artifact_owner_skill_id=owner_skill_id,
             )
-            stored = self.repository.accept(token, expected_generation=expected_generation, prototype=prototype, brief=brief)
+            stored = self.repository.accept(
+                token,
+                expected_generation=expected_generation,
+                prototype=prototype,
+                brief=brief,
+                task_id=str(task["task_id"]),
+                implementation_track_id=track_id,
+            )
+            self.repository.put_compilation(
+                token,
+                str(task["task_id"]),
+                compilation,
+                prototype_digest=str(prototype["digest"]),
+                actor=actor,
+            )
             session_result = development_sessions.create(
                 str(project["id"]),
                 automation_brief_digest=str(stored["digest"]),
                 research_prototype_digest=str(prototype["digest"]),
-                artifact_groups=[str(item["group_id"]) for item in groups],
-                artifact_audience=_IMPLEMENTATION_AUDIENCE,
+                artifact_sources=[
+                    {
+                        "skill_id": owner_skill_id,
+                        "group_id": str(item["group_id"]),
+                        "audience": _IMPLEMENTATION_AUDIENCE,
+                    }
+                    for item in groups
+                ],
+                subject_refs=[
+                    {
+                        "kind": "research_direction",
+                        "ref": f"research-direction:{token}",
+                        "revision": int(state["generation"]),
+                    },
+                    {
+                        "kind": "research_task",
+                        "ref": f"research-task:{task['task_id']}",
+                        "revision": int(task["revision"]),
+                        "digest": str(prototype["digest"]),
+                    },
+                    {
+                        "kind": "implementation_track",
+                        "ref": f"implementation-track:{track_id}",
+                        "revision": int(track["revision"]),
+                    },
+                ],
+                contract_inputs=[
+                    {
+                        "kind": "research_compilation",
+                        "ref": f"research-compilation:{compilation.get('compilation_id') or compilation['digest']}",
+                        "digest": str(compilation["digest"]),
+                        "media_type": "application/json",
+                    },
+                    {
+                        "kind": "automation_brief",
+                        "ref": f"automation-brief:{stored['brief_id']}",
+                        "digest": str(stored["digest"]),
+                        "media_type": "application/json",
+                    },
+                ],
+                acceptance_profiles=[
+                    "project.conformance",
+                    "research.consumer-contracts",
+                    "research.traceability",
+                ],
                 context_members=list(stored["development_scope"]["context_members"]),
                 prohibited_actions=list(stored["prohibited_actions"]),
                 base_release={
@@ -2416,8 +3135,43 @@ class ResearchOrchestrator:
                 expected_digest=str(compilation["digest"]),
             )
             session = compiled_instruction["session"]
-            self.repository.activity(token, "acceptance", "handoff_ready", "Research formulation accepted; Automation Brief and scoped Development Session are ready. Codex was not started.", {"prototype_digest": prototype_digest, "automation_brief_digest": stored["digest"], "development_session_id": session["session_id"], "checkpoint": checkpoint})
-            return {"ok": True, "direction": self.repository.get_direction(token), "prototype": prototype, "research_compilation": compilation, "automation_brief": stored, "development_session": session, "builder_checkpoint": checkpoint, "codex_started": False}
+            track = self.repository.bind_track_development(
+                track_id,
+                project_ref=str(project["ref"]),
+                primary_target_ref=primary_target_ref,
+                development_session_id=str(session["session_id"]),
+            )
+            self.repository.activity(
+                token,
+                "acceptance",
+                "handoff_ready",
+                "ResearchTask formulation accepted; its Project-scoped Development Session is ready. Codex was not started.",
+                {
+                    "task_ref": f"research-task:{task['task_id']}",
+                    "implementation_track_ref": f"implementation-track:{track_id}",
+                    "project_ref": project["ref"],
+                    "prototype_digest": prototype_digest,
+                    "compilation_digest": compilation["digest"],
+                    "automation_brief_digest": stored["digest"],
+                    "development_session_id": session["session_id"],
+                    "checkpoint": checkpoint,
+                },
+                actor=actor,
+                subject_ref=f"implementation-track:{track_id}",
+            )
+            return {
+                "ok": True,
+                "direction": self.repository.get_direction(token),
+                "research_task": self.repository.get_task(str(task["task_id"])),
+                "implementation_track": track,
+                "project": project,
+                "prototype": prototype,
+                "research_compilation": compilation,
+                "automation_brief": stored,
+                "development_session": session,
+                "builder_checkpoint": checkpoint,
+                "codex_started": False,
+            }
 
         return self.repository.once(str(idempotency_key or "").strip(), "accept_prototype", operation)
 

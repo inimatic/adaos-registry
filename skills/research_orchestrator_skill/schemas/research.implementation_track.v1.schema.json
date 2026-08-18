@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.implementation_track.v1",
+  "type": "object",
+  "required": [
+    "schema", "track_id", "ref", "direction_id", "task_id", "revision",
+    "title", "status", "metadata", "created_at", "updated_at"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.implementation_track.v1"},
+    "track_id": {"type": "string", "minLength": 1},
+    "ref": {"type": "string", "pattern": "^implementation-track:.+"},
+    "direction_id": {"type": "string", "minLength": 1},
+    "task_id": {"type": "string", "minLength": 1},
+    "revision": {"type": "integer", "minimum": 1},
+    "title": {"type": "string", "minLength": 1},
+    "status": {"type": "string", "minLength": 1},
+    "condition_id": {"type": ["string", "null"]},
+    "parent_track_id": {"type": ["string", "null"]},
+    "project_ref": {"type": ["string", "null"]},
+    "primary_target_ref": {"type": ["string", "null"]},
+    "development_session_id": {"type": ["string", "null"]},
+    "candidate_release_digest": {"type": ["string", "null"]},
+    "metadata": {"type": "object"},
+    "created_at": {"type": "string", "minLength": 1},
+    "updated_at": {"type": "string", "minLength": 1}
+  },
+  "additionalProperties": false
+}
