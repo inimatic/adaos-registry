@@ -14,6 +14,10 @@
             "activeCompilationFacet": "source_analysis",
             "selectedDirectionId": null,
             "selectedDirectionTitle": null,
+            "selectedResearchNodeId": null,
+            "selectedResearchSubjectRef": null,
+            "selectedResearchTaskId": null,
+            "selectedImplementationTrackId": null,
             "researchConversationId": null,
             "researchGeneration": 0,
             "researchPrototypeDigest": null,
@@ -38,34 +42,21 @@
             ],
             "variants": [
               {
-                "id": "compilation",
-                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
-                "type": "single",
-                "pattern": "stack",
-                "areas": [
-                  {
-                    "id": "workspace",
-                    "role": "main",
-                    "label": "Research compilation"
-                  }
-                ]
-              },
-              {
                 "id": "direction",
                 "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null",
                 "type": "split",
-                "pattern": "focus-detail",
-                "auxWidth": 520,
+                "pattern": "outline-detail",
+                "sidebarWidth": 340,
                 "areas": [
+                  {
+                    "id": "navigation",
+                    "role": "sidebar",
+                    "label": "Research structure"
+                  },
                   {
                     "id": "workspace",
                     "role": "main",
-                    "label": "Selected direction"
-                  },
-                  {
-                    "id": "context",
-                    "role": "aux",
-                    "label": "Research formulation"
+                    "label": "Selected research object"
                   }
                 ]
               },
@@ -154,6 +145,10 @@
                     "researchViewMode": "portfolio",
                     "selectedDirectionId": null,
                     "selectedDirectionTitle": null,
+                    "selectedResearchNodeId": null,
+                    "selectedResearchSubjectRef": null,
+                    "selectedResearchTaskId": null,
+                    "selectedImplementationTrackId": null,
                     "researchConversationId": null,
                     "researchGeneration": 0,
                     "researchPrototypeDigest": null,
@@ -211,6 +206,10 @@
                     "researchViewMode": "direction",
                     "selectedDirectionId": "$event.direction_id",
                     "selectedDirectionTitle": "$event.title",
+                    "selectedResearchNodeId": null,
+                    "selectedResearchSubjectRef": null,
+                    "selectedResearchTaskId": null,
+                    "selectedImplementationTrackId": null,
                     "activeResearchTab": "overview",
                     "activeCompilationFacet": "source_analysis",
                     "researchConversationId": "conv.skill.research_orchestrator_skill.$event.direction_id.desktop",
@@ -219,6 +218,60 @@
                     "researchAdmissionDecision": "needs_discussion",
                     "researchCanAccept": false,
                     "builderUrl": null
+                  }
+                }
+              ]
+            },
+            {
+              "id": "research-outline",
+              "type": "navigation.outline",
+              "area": "navigation",
+              "title": "Research structure",
+              "visibleIf": "$state.selectedDirectionId != null",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_outline",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.artifacts",
+                  "research.formulation",
+                  "research.compilation",
+                  "research.activity",
+                  "research.automation_brief"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 2
+              },
+              "inputs": {
+                "stateKey": "selectedResearchNodeId",
+                "nodesKey": "nodes",
+                "idKey": "node_id",
+                "parentIdKey": "parent_id",
+                "titleKey": "title",
+                "subtitleKey": "subtitle",
+                "kindKey": "kind",
+                "iconKey": "icon",
+                "badgeKey": "badge",
+                "targetKey": "target",
+                "hideRoot": true,
+                "expandedByDefault": true,
+                "wrapTitles": true,
+                "maxNodes": 1000,
+                "emptyText": "The direction structure is temporarily unavailable."
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "selectedResearchNodeId": "$event.id",
+                    "selectedResearchSubjectRef": "$event.target.subject_ref",
+                    "selectedResearchTaskId": "$event.target.task_id",
+                    "selectedImplementationTrackId": "$event.target.implementation_track_id",
+                    "activeResearchTab": "$event.target.tab"
                   }
                 }
               ]
@@ -249,12 +302,20 @@
                 "compact": true,
                 "fields": [
                   {
-                    "key": "project.ref",
-                    "label": "Project"
+                    "key": "direction.ref",
+                    "label": "Direction"
                   },
                   {
-                    "key": "direction.primary_skill_ref",
-                    "label": "Primary skill"
+                    "key": "direction.artifact_owner_ref",
+                    "label": "Artifact custodian"
+                  },
+                  {
+                    "key": "active_task.ref",
+                    "label": "Active task"
+                  },
+                  {
+                    "key": "active_implementation_track.ref",
+                    "label": "Implementation track"
                   },
                   {
                     "key": "direction.status",
@@ -470,7 +531,7 @@
               "title": "Stage visibility for $state.selectedArtifactTitle",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'artifacts' && $state.selectedArtifactId != null",
               "inputs": {
-                "layout": "inline",
+                "layout": "responsiveGrid",
                 "submitLabel": "Apply visibility",
                 "resetOnSuccess": false,
                 "fields": [
@@ -536,7 +597,7 @@
             {
               "id": "research-consensus",
               "type": "static.markdown",
-              "area": "context",
+              "area": "workspace",
               "title": "Current draft and AdaOS review",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'formulation'",
               "dataSource": {
@@ -873,13 +934,59 @@
               }
             },
             {
+              "id": "studies-placeholder",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Studies",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'studies'",
+              "inputs": {
+                "content": "## No studies yet\n\nStudies are created only after an implementation track has produced an executable, contract-compatible candidate. The scientific task remains the parent of every study."
+              }
+            },
+            {
+              "id": "evidence-placeholder",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Evidence",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'evidence'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_lineage",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.artifacts",
+                  "research.compilation",
+                  "research.activity",
+                  "research.evidence"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 1
+              },
+              "inputs": {
+                "bindField": "content"
+              }
+            },
+            {
+              "id": "releases-placeholder",
+              "type": "static.markdown",
+              "area": "workspace",
+              "title": "Releases",
+              "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'releases'",
+              "inputs": {
+                "content": "## No research releases yet\n\nA portable release will freeze the direction snapshot and exact Project composition without making Project the owner of the scientific lifecycle."
+              }
+            },
+            {
               "id": "help",
               "type": "static.markdown",
               "area": "workspace",
               "title": "Using Research Workbench",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'help'",
               "inputs": {
-                "content": "# Research Workbench\n\n1. Add exact source artifacts.\n2. Open **Discussion** and reach a human-readable consensus with the Researcher.\n3. Inspect the typed ResearchPrototype and unresolved decisions.\n4. Accept an exact digest only when the formulation is ready.\n5. Open the named Builder window for scoped implementation.\n\nThe Workbench owns orchestration state. Each research-direction skill owns its source artifacts and remains the only write target during development."
+                "content": "# Research Workbench\n\n1. Add exact source artifacts.\n2. Select the active task and reach a human-readable consensus with the Researcher.\n3. Inspect the typed formulation, accepted compilation, and unresolved decisions.\n4. Accept an exact digest only when the formulation is ready.\n5. Open the named Builder window for the selected implementation track.\n\nThe Workbench owns direction, task, compilation, and implementation-track metadata. A dedicated skill is the physical custodian of source artifacts. Project is created for the implementation/distribution boundary and does not own the scientific lifecycle."
               }
             }
           ]
