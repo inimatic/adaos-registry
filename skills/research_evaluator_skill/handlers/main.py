@@ -451,6 +451,72 @@ def summarize_calibration(
     return {"ok": True, "summary": summary, "content": content}
 
 
+@tool(summary="Read a path-free immutable calibration lineage for another skill.", side_effects="none")
+def get_calibration_lineage(
+    task_id: str,
+    budget_view: str = "fixed_downstream",
+    **_: Any,
+) -> dict[str, Any]:
+    repository = EvaluationRepository()
+    task = repository.get_task(str(task_id))
+    public_task = {key: value for key, value in task.items() if key != "hidden_inputs"}
+    packets = repository.packets(str(task_id), budget_view=budget_view)
+    results = repository.results(str(task_id), budget_view=budget_view)
+    projected_packets = []
+    for packet in packets:
+        fingerprint = str(packet["digest"]).removeprefix("sha256:")[:12]
+        arm = str(packet["arm_id"]).split("_", 1)[0].lower()
+        view = "fts" if packet["budget_view"] == "fixed_total_system" else "fd"
+        projected_packets.append(
+            {
+                "packet_id": packet["packet_id"],
+                "digest": packet["digest"],
+                "task_digest": packet["task_digest"],
+                "arm_id": packet["arm_id"],
+                "attempt_index": packet["attempt_index"],
+                "paired_seed": packet["paired_seed"],
+                "budget_view": packet["budget_view"],
+                "candidate_id": f"tlp_cal_{arm}_a{int(packet['attempt_index'])}_{view}_{fingerprint}",
+                "artifact_inputs": [
+                    {
+                        "ref": item["ref"],
+                        "audience": item["audience"],
+                        "context_digest": item["context_digest"],
+                        "source_manifest_digest": item["source_manifest_digest"],
+                        "items": [
+                            {
+                                key: artifact[key]
+                                for key in ("artifact_id", "digest", "path", "size_bytes")
+                                if key in artifact
+                            }
+                            for artifact in item.get("items") or []
+                        ],
+                    }
+                    for item in packet.get("artifact_inputs") or []
+                ],
+                "instruction_inputs": [
+                    {
+                        key: item[key]
+                        for key in ("input_id", "kind", "digest")
+                        if key in item
+                    }
+                    for item in packet.get("instruction_inputs") or []
+                ],
+                "budget": copy.deepcopy(packet.get("budget") or {}),
+                "created_at": packet["created_at"],
+            }
+        )
+    return {
+        "ok": True,
+        "task": public_task,
+        "budget_view": budget_view,
+        "packets": projected_packets,
+        "results": results,
+        "summary": summarize(task, results),
+        "runtime_identity": sdk_runtime_identity(),
+    }
+
+
 @tool(summary="Export a content-addressed, machine-recomputable calibration package.", side_effects="local_write")
 def export_calibration_package(
     task_id: str,
@@ -501,6 +567,7 @@ __all__ = [
     "ensure_schema",
     "freeze_calibration",
     "get_task",
+    "get_calibration_lineage",
     "prepare_calibration_arm",
     "prepare_calibration_suite",
     "record_calibration_result",

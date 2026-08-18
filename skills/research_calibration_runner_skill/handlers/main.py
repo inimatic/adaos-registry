@@ -152,16 +152,89 @@ def _ensure_project(candidate_id: str, packet: Mapping[str, Any]) -> dict[str, A
     try:
         project = compositions.get(candidate_id)
         created = False
+        profiles = set(project.get("profiles") or [])
+        primary = next(
+            item
+            for item in project["components"]["owned"]
+            if item.get("role") == "primary"
+        )
+        if (
+            "adaos.research.direction.v1" in profiles
+            or primary.get("exposure") != "project_only"
+        ):
+            replacement = {
+                key: value
+                for key, value in project.items()
+                if key not in {"ref", "manifest_digest", "source_path"}
+            }
+            replacement["profiles"] = sorted(
+                (profiles - {"adaos.research.direction.v1"})
+                | {
+                    "adaos.research.implementation.v1",
+                    "adaos.research.calibration_candidate.v1",
+                }
+            )
+            primary.update(
+                {
+                    "exposure": "project_only",
+                    "lifecycle": "bound",
+                    "relations": ["realizes"],
+                }
+            )
+            replacement["components"]["owned"] = [
+                primary if item.get("role") == "primary" else item
+                for item in replacement["components"]["owned"]
+            ]
+            replacement["compatibility"] = {
+                "required_contracts": ["adaos.research.calibration_packet.v1"],
+                "validation_profiles": [
+                    "project.conformance",
+                    "research.calibration_candidate",
+                ],
+            }
+            project = compositions.replace(
+                candidate_id,
+                replacement,
+                expected_manifest_digest=str(project["manifest_digest"]),
+            )
     except compositions.ProjectCompositionNotFound:
-        result = compositions.create_research_direction(
+        result = compositions.create_with_primary_component(
             candidate_id,
+            kind="skill",
+            component_id=candidate_id,
+            template="research_direction",
             title=f"[Calibration] {packet['arm_id']} attempt {packet['attempt_index']}",
             description=(
                 "Disposable research-compiler calibration candidate. Its admitted context is "
                 f"frozen by packet {packet['digest']}."
             ),
-            skill_id=candidate_id,
+            profiles=(
+                "adaos.research.implementation.v1",
+                "adaos.research.calibration_candidate.v1",
+            ),
+            dependencies=(
+                {
+                    "ref": "project:adaos_research_platform",
+                    "version": "^0.2",
+                    "lifecycle": "shared",
+                    "relations": ["uses"],
+                },
+            ),
             tags=["research-calibration", str(packet["arm_id"]).lower()],
+            categories=("research", "development", "calibration"),
+            member={
+                "role": "primary",
+                "exposure": "project_only",
+                "lifecycle": "bound",
+                "relations": ["realizes"],
+            },
+            compatibility={
+                "required_contracts": ["adaos.research.calibration_packet.v1"],
+                "validation_profiles": [
+                    "project.conformance",
+                    "research.calibration_candidate",
+                ],
+            },
             actor="skill:research_calibration_runner_skill",
         )
         project = result["project"]
