@@ -25,6 +25,10 @@ from adaos.services.skill.validation import validate_webui_file_contract
 def load_module(monkeypatch, memory=None, skills_root: Path | None = None, base_dir: Path | None = None):
     sys.modules.pop("handlers.main", None)
     sys.modules.pop("handlers", None)
+    skill_path = str(SKILL_ROOT)
+    while skill_path in sys.path:
+        sys.path.remove(skill_path)
+    sys.path.insert(0, skill_path)
     mod = importlib.import_module("handlers.main")
     mod = importlib.reload(mod)
     streams = []

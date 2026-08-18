@@ -14,6 +14,12 @@ if str(SKILL_ROOT) not in sys.path:
 
 
 def load_module(monkeypatch, memory=None):
+    sys.modules.pop("handlers.main", None)
+    sys.modules.pop("handlers", None)
+    skill_path = str(SKILL_ROOT)
+    while skill_path in sys.path:
+        sys.path.remove(skill_path)
+    sys.path.insert(0, skill_path)
     mod = importlib.import_module("handlers.main")
     mod = importlib.reload(mod)
     projected = []
