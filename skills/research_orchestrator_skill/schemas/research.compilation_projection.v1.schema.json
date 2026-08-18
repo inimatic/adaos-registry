@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.research.compilation_projection.v1",
+  "type": "object",
+  "required": [
+    "schema", "schema_version", "direction_id", "compilation_digest",
+    "source_bundle_digest", "source_analysis", "research_problem",
+    "experimental_protocol", "traceability", "readiness", "digest"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.compilation_projection.v1"},
+    "schema_version": {"const": "1.0.0"},
+    "direction_id": {"type": "string", "minLength": 1},
+    "compilation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "source_analysis": {
+      "type": "object",
+      "required": ["sufficiency", "observed_facts", "author_interpretations", "coverage_limitations", "unresolved_decisions"],
+      "additionalProperties": false,
+      "properties": {
+        "sufficiency": {"type": "string"},
+        "observed_facts": {"type": "array", "items": {"type": "object"}},
+        "author_interpretations": {"type": "array", "items": {"type": "object"}},
+        "coverage_limitations": {"type": "array", "items": {"type": "string"}},
+        "unresolved_decisions": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "research_problem": {"type": "object"},
+    "experimental_protocol": {"type": "object"},
+    "traceability": {
+      "type": "object",
+      "required": ["protocol_digest", "nodes", "edges"],
+      "properties": {
+        "protocol_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "nodes": {"type": "array", "items": {"type": "object"}},
+        "edges": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": false
+    },
+    "readiness": {"type": "object"},
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

@@ -15,6 +15,8 @@ if str(_SKILL_ROOT) not in sys.path:
 
 from research.orchestrator import ResearchOrchestrator  # noqa: E402
 from research.repository import OrchestratorRepository  # noqa: E402
+from research.compiler import project_execution_compilation  # noqa: E402
+from research.contracts import project_execution_automation_brief  # noqa: E402
 
 
 def _orchestrator() -> ResearchOrchestrator:
@@ -25,6 +27,27 @@ def _orchestrator() -> ResearchOrchestrator:
 def ensure_schema() -> dict[str, Any]:
     repository = OrchestratorRepository()
     return {"ok": True, "binding": repository._db.binding.to_dict(), "health": dict(repository._db.health())}
+
+
+@tool(summary="Project audit contracts into compact digest-bound development inputs.", side_effects="none")
+def project_execution_contracts(
+    compilation: Mapping[str, Any],
+    automation_brief: Mapping[str, Any],
+    **_: Any,
+) -> dict[str, Any]:
+    scientific = project_execution_compilation(compilation)
+    engineering = project_execution_automation_brief(
+        automation_brief,
+        compilation_projection_digest=str(scientific["digest"]),
+        protocol_digest=str(scientific["traceability"]["protocol_digest"]),
+    )
+    return {
+        "ok": True,
+        "research_compilation": scientific,
+        "automation_brief": engineering,
+        "audit_compilation_digest": compilation["digest"],
+        "audit_automation_brief_digest": automation_brief["digest"],
+    }
 
 
 @tool(summary="Rehydrate the durable research-orchestrator ledger.", side_effects="local_write")

@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.18.0
+version: 0.19.0
 description: Durable pre-Codex orchestration for reusable AdaOS research-direction
   skill projects.
 supported_locales:
@@ -27,6 +27,7 @@ lifecycle:
 exports:
   tools:
   - ensure_schema
+  - project_execution_contracts
   - rehydrate
   - list_directions
   - resolve_focus
@@ -49,6 +50,30 @@ exports:
   - get_compilation
   - next_steps
 tools:
+- name: project_execution_contracts
+  description: Project full audit contracts into compact digest-bound scientific and
+    engineering inputs for an isolated developer.
+  entry: handlers.main:project_execution_contracts
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - compilation
+    - automation_brief
+    properties:
+      compilation:
+        type: object
+      automation_brief:
+        type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - research_compilation
+    - automation_brief
+    - audit_compilation_digest
+    - audit_automation_brief_digest
 - name: ensure_schema
   description: Apply checksum-pinned orchestrator migrations.
   entry: handlers.main:ensure_schema
@@ -801,13 +826,13 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-17T22:39:09+00:00'
+updated_at: '2026-08-18T00:06:09+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.854+5185.d8ab9946
-    recorded_at: '2026-08-17T22:39:09+00:00'
+    min_version: 0.1.854+5200.7fa32431
+    recorded_at: '2026-08-18T00:06:09+00:00'
     source: skill_push
-    min_commit: d8ab9946bc125084785beacf87dc0e7edac6fa14
-    min_short_commit: d8ab9946
-    build_date: '2026-08-18T01:39:05+03:00'
+    min_commit: 7fa32431ab22950adf838be4eb0796d7b5c3fd39
+    min_short_commit: 7fa32431
+    build_date: '2026-08-18T02:57:05+03:00'
 

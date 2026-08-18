@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 
 from research.formulation import STAGES, assemble_candidate, provider_schema, stage_quality_issues, stage_schema, validate_stage
-from research.compiler import build_compilation
+from research.compiler import build_compilation, project_execution_compilation
 
 
 REF = "SRC-001"
@@ -227,6 +227,11 @@ def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceabili
     assert package["traceability_coverage"]["coverage"] == 1.0
     assert package["readiness"] == {"decision": "ready_for_acceptance", "blockers": []}
     assert package["digest"].startswith("sha256:")
+    projection = project_execution_compilation(package)
+    assert projection["compilation_digest"] == package["digest"]
+    assert projection["traceability"]["protocol_digest"] == package["facets"]["experimental_protocol"]["digest"]
+    assert "inventory" not in projection["source_analysis"]
+    assert all(node["kind"] != "acceptance_check" for node in projection["traceability"]["nodes"])
 
 
 def test_research_compiler_deduplicates_repeated_grounding_refs() -> None:

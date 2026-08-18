@@ -1,11 +1,21 @@
 from __future__ import annotations
 
+import json
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from jsonschema import Draft202012Validator
 
-from research.contracts import materialize_automation_brief, materialize_prototype, prototype_admission_issues, prototype_candidate_schema, validate
+from research.contracts import (
+    digest,
+    materialize_automation_brief,
+    materialize_prototype,
+    project_execution_automation_brief,
+    project_portable_automation_brief,
+    prototype_admission_issues,
+    prototype_candidate_schema,
+    validate,
+)
 from research.orchestrator import (
     _address_builder_url,
     _completion_projection,
@@ -233,13 +243,63 @@ def test_compiled_automation_brief_exposes_only_implementation_context_view() ->
         context_views=[view],
     )
 
-    assert brief["schema_version"] == "1.2.0"
+    assert brief["schema_version"] == "1.3.0"
     assert brief["compilation_digest"] == compilation["digest"]
     assert brief["traceability_digest"] == compilation["traceability_graph"]["digest"]
     artifact_input = brief["development_scope"]["artifact_inputs"][0]
-    assert artifact_input["root_path"] == view["root_path"]
+    assert artifact_input["delivery"] == "development_session"
+    assert "root_path" not in artifact_input
     assert artifact_input["context_digest"] == view["digest"]
-    assert "/dev/skills/" not in artifact_input["root_path"]
+    assert brief["context_delivery"] == "development_session"
+    assert brief["project"]["source_locator"] == "project://tlp_research"
+    assert "source_path" not in brief["project"]
+
+
+def test_legacy_compiled_automation_brief_has_host_neutral_projection() -> None:
+    source = {
+        "schema": "adaos.research.automation_brief.v1",
+        "schema_version": "1.2.0",
+        "brief_id": "legacy",
+        "direction": {"kind": "skill", "id": "tlp_direction_skill", "ref": "skill:tlp_direction_skill"},
+        "project": {"id": "tlp_research", "ref": "project:tlp_research", "version": "0.1.0", "manifest_digest": "sha256:" + "1" * 64, "source_path": "C:/host/dev/project"},
+        "source_bundle_digest": "sha256:" + "2" * 64,
+        "prototype_digest": "sha256:" + "3" * 64,
+        "compilation_digest": "sha256:" + "4" * 64,
+        "traceability_digest": "sha256:" + "5" * 64,
+        "context_audience": "research.implementation",
+        "builder_checkpoint": {"package_digest": None, "source_revision": None, "source_tree": None, "sha256": None},
+        "objective": "test",
+        "research_prototype": {},
+        "source_inventory": [{}],
+        "artifact_groups": [{"ref": "artifact://skill/tlp_direction_skill/part0", "group_id": "part0", "manifest_digest": "sha256:" + "6" * 64, "root_path": "C:/host/view/files", "manifest_path": "C:/host/view/manifest.json"}],
+        "development_scope": {"targets": [{"ref": "skill:tlp_direction_skill", "access": "read-write", "context": "full", "source_path": "C:/host/skill"}], "context_members": [], "artifact_inputs": [{"ref": "artifact://skill/tlp_direction_skill/part0", "access": "read-only", "manifest_digest": "sha256:" + "6" * 64, "root_path": "C:/host/view/files"}]},
+        "contract_requirements": [{"id": "runner", "contract": "adaos.research.runner.v1", "role": "provider", "operations": [], "boundary": "observable"}],
+        "implementation_requirements": [{}],
+        "acceptance_checks": [{}],
+        "prohibited_actions": ["no hidden access"],
+        "handoff_state": "ready_for_codex",
+        "created_at": "2026-08-18T00:00:00Z",
+        "created_by": "user:test",
+    }
+    source["digest"] = digest(source)
+
+    projected = project_portable_automation_brief(source)
+
+    assert projected["predecessor_digest"] == source["digest"]
+    assert "C:/host" not in json.dumps(projected)
+    assert projected["development_scope"]["artifact_inputs"][0]["delivery"] == "development_session"
+
+    execution = project_execution_automation_brief(
+        source,
+        compilation_projection_digest="sha256:" + "7" * 64,
+        protocol_digest="sha256:" + "8" * 64,
+    )
+    assert execution["schema_version"] == "1.4.0"
+    assert execution["predecessor_digest"] == projected["digest"]
+    assert execution["scientific_contract_ref"]["execution_projection_digest"] == "sha256:" + "7" * 64
+    assert "research_prototype" not in execution
+    assert "source_inventory" not in execution
+    assert "builder_checkpoint" not in execution
 
 
 def test_llm_candidate_schema_matches_the_typed_contract_and_reports_all_violations() -> None:

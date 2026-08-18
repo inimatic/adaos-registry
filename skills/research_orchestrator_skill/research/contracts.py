@@ -334,7 +334,7 @@ def materialize_automation_brief(
     visible_bundle = implementation_bundle or source_bundle
     brief = {
         "schema": "adaos.research.automation_brief.v1",
-        "schema_version": "1.2.0" if compilation else "1.1.0",
+        "schema_version": "1.3.0" if compilation else "1.1.0",
         "brief_id": f"automation-{prototype['digest'].removeprefix('sha256:')[:20]}",
         "direction": {"kind": "skill", "id": direction_id, "ref": f"skill:{direction_id}"},
         "project": {
@@ -342,7 +342,11 @@ def materialize_automation_brief(
             "ref": project["ref"],
             "version": project["version"],
             "manifest_digest": project["manifest_digest"],
-            "source_path": project["source_path"],
+            **(
+                {"source_locator": f"project://{project['id']}"}
+                if compilation
+                else {"source_path": project["source_path"]}
+            ),
         },
         "source_bundle_digest": str(source_bundle["digest"]),
         "prototype_digest": str(prototype["digest"]),
@@ -372,10 +376,16 @@ def materialize_automation_brief(
                 "ref": item["ref"],
                 "group_id": item["group_id"],
                 "manifest_digest": item["digest"],
-                "root_path": (views_by_group.get(str(item["group_id"])) or item)["root_path"],
-                "manifest_path": (views_by_group.get(str(item["group_id"])) or item)["manifest_path"],
                 "context_digest": (views_by_group.get(str(item["group_id"])) or {}).get("digest"),
                 "audience": (views_by_group.get(str(item["group_id"])) or {}).get("audience"),
+                **(
+                    {"delivery": "development_session"}
+                    if compilation
+                    else {
+                        "root_path": (views_by_group.get(str(item["group_id"])) or item)["root_path"],
+                        "manifest_path": (views_by_group.get(str(item["group_id"])) or item)["manifest_path"],
+                    }
+                ),
             }
             for item in artifact_groups
         ],
@@ -385,7 +395,17 @@ def materialize_automation_brief(
                     "ref": f"skill:{direction_id}",
                     "access": "read-write",
                     "context": "full",
-                    "source_path": str(Path(project["source_path"]).parent.parent / "skills" / direction_id),
+                    **(
+                        {"source_locator": f"project://{project['id']}/skill/{direction_id}"}
+                        if compilation
+                        else {
+                            "source_path": str(
+                                Path(project["source_path"]).parent.parent
+                                / "skills"
+                                / direction_id
+                            )
+                        }
+                    ),
                 }
             ],
             "context_members": [
@@ -398,7 +418,15 @@ def materialize_automation_brief(
                     "ref": item["ref"],
                     "access": "read-only",
                     "manifest_digest": item["digest"],
-                    "root_path": (views_by_group.get(str(item["group_id"])) or item)["root_path"],
+                    **(
+                        {"delivery": "development_session"}
+                        if compilation
+                        else {
+                            "root_path": (views_by_group.get(str(item["group_id"])) or item)[
+                                "root_path"
+                            ]
+                        }
+                    ),
                     **(
                         {
                             "context_digest": views_by_group[str(item["group_id"])]["digest"],
@@ -457,10 +485,75 @@ def materialize_automation_brief(
                 "compilation_digest": str(compilation["digest"]),
                 "traceability_digest": str(compilation["traceability_graph"]["digest"]),
                 "context_audience": "research.implementation",
+                "context_delivery": "development_session",
             }
         )
     brief["digest"] = digest(brief)
     return validate("research.automation_brief.v1.schema.json", brief)
 
 
-__all__ = ["build_admission_review", "canonical_json", "digest", "load_schema", "materialize_automation_brief", "materialize_prototype", "now", "prototype_admission_issues", "prototype_candidate_schema", "prototype_quality_issues", "validate"]
+def project_portable_automation_brief(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Project a legacy accepted brief into the host-neutral v1.3 delivery contract."""
+
+    source = validate("research.automation_brief.v1.schema.json", value)
+    if source["schema_version"] == "1.3.0":
+        return copy.deepcopy(source)
+    if not source.get("compilation_digest"):
+        raise ValueError("only compiled AutomationBrief values can be projected to v1.3.0")
+    projected = copy.deepcopy(source)
+    predecessor_digest = str(projected.pop("digest"))
+    projected["schema_version"] = "1.3.0"
+    project = dict(projected["project"])
+    project.pop("source_path", None)
+    project["source_locator"] = f"project://{project['id']}"
+    projected["project"] = project
+    for group in projected["artifact_groups"]:
+        group.pop("root_path", None)
+        group.pop("manifest_path", None)
+        group["delivery"] = "development_session"
+    for target in projected["development_scope"]["targets"]:
+        target.pop("source_path", None)
+        target["source_locator"] = (
+            f"project://{project['id']}/skill/{str(target['ref']).partition(':')[2]}"
+        )
+    for artifact in projected["development_scope"]["artifact_inputs"]:
+        artifact.pop("root_path", None)
+        artifact["delivery"] = "development_session"
+    projected["context_delivery"] = "development_session"
+    projected["predecessor_digest"] = predecessor_digest
+    projected["digest"] = digest(projected)
+    return validate("research.automation_brief.v1.schema.json", projected)
+
+
+def project_execution_automation_brief(
+    value: Mapping[str, Any],
+    *,
+    compilation_projection_digest: str,
+    protocol_digest: str,
+) -> dict[str, Any]:
+    """Remove audit-only duplication while preserving the executable obligations."""
+
+    portable = project_portable_automation_brief(value)
+    projected = copy.deepcopy(portable)
+    predecessor_digest = str(projected.pop("digest"))
+    projected["schema_version"] = "1.4.0"
+    projected["predecessor_digest"] = predecessor_digest
+    execution_digest = str(compilation_projection_digest or "").strip()
+    accepted_protocol_digest = str(protocol_digest or "").strip()
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", execution_digest):
+        raise ValueError("compilation_projection_digest must be an exact sha256 digest")
+    if not re.fullmatch(r"sha256:[0-9a-f]{64}", accepted_protocol_digest):
+        raise ValueError("protocol_digest must be an exact sha256 digest")
+    projected["scientific_contract_ref"] = {
+        "audit_compilation_digest": str(projected["compilation_digest"]),
+        "execution_projection_digest": execution_digest,
+        "protocol_digest": accepted_protocol_digest,
+    }
+    projected.pop("research_prototype", None)
+    projected.pop("source_inventory", None)
+    projected.pop("builder_checkpoint", None)
+    projected["digest"] = digest(projected)
+    return validate("research.automation_brief.v1.schema.json", projected)
+
+
+__all__ = ["build_admission_review", "canonical_json", "digest", "load_schema", "materialize_automation_brief", "materialize_prototype", "now", "project_execution_automation_brief", "project_portable_automation_brief", "prototype_admission_issues", "prototype_candidate_schema", "prototype_quality_issues", "validate"]

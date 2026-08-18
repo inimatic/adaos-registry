@@ -4,24 +4,24 @@
   "type": "object",
   "required": [
     "schema", "schema_version", "brief_id", "direction", "project", "source_bundle_digest",
-    "prototype_digest", "builder_checkpoint", "objective", "research_prototype",
-    "source_inventory", "artifact_groups", "development_scope", "contract_requirements", "implementation_requirements", "acceptance_checks",
+    "prototype_digest", "objective", "artifact_groups", "development_scope", "contract_requirements", "implementation_requirements", "acceptance_checks",
     "prohibited_actions", "handoff_state", "created_at", "created_by", "digest"
   ],
   "properties": {
     "schema": {"const": "adaos.research.automation_brief.v1"},
-    "schema_version": {"enum": ["1.1.0", "1.2.0"]},
+    "schema_version": {"enum": ["1.1.0", "1.2.0", "1.3.0", "1.4.0"]},
     "brief_id": {"type": "string"},
     "direction": {"type": "object"},
     "project": {
       "type": "object",
-      "required": ["id", "ref", "version", "manifest_digest", "source_path"],
+      "required": ["id", "ref", "version", "manifest_digest"],
       "properties": {
         "id": {"type": "string"},
         "ref": {"type": "string", "pattern": "^project:"},
         "version": {"type": "string"},
         "manifest_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-        "source_path": {"type": "string"}
+        "source_path": {"type": "string"},
+        "source_locator": {"type": "string", "pattern": "^project://"}
       },
       "additionalProperties": false
     },
@@ -30,6 +30,18 @@
     "compilation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "traceability_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
     "context_audience": {"type": "string", "minLength": 1},
+    "context_delivery": {"enum": ["development_session"]},
+    "predecessor_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "scientific_contract_ref": {
+      "type": "object",
+      "required": ["audit_compilation_digest", "execution_projection_digest", "protocol_digest"],
+      "properties": {
+        "audit_compilation_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "execution_projection_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "protocol_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
     "builder_checkpoint": {
       "type": "object",
       "required": ["package_digest", "source_revision", "source_tree", "sha256"],
@@ -84,8 +96,20 @@
   },
   "allOf": [
     {
+      "if": {"properties": {"schema_version": {"enum": ["1.1.0", "1.2.0", "1.3.0"]}}},
+      "then": {"required": ["builder_checkpoint", "research_prototype", "source_inventory"]}
+    },
+    {
       "if": {"properties": {"schema_version": {"const": "1.2.0"}}},
       "then": {"required": ["compilation_digest", "traceability_digest", "context_audience"]}
+    },
+    {
+      "if": {"properties": {"schema_version": {"const": "1.3.0"}}},
+      "then": {"required": ["compilation_digest", "traceability_digest", "context_audience", "context_delivery"]}
+    },
+    {
+      "if": {"properties": {"schema_version": {"const": "1.4.0"}}},
+      "then": {"required": ["compilation_digest", "traceability_digest", "context_audience", "context_delivery", "predecessor_digest", "scientific_contract_ref"]}
     }
   ],
   "additionalProperties": false

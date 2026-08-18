@@ -240,4 +240,54 @@ def build_compilation(
     return validate("research.compilation_package.v1.schema.json", package)
 
 
-__all__ = ["build_compilation"]
+def project_execution_compilation(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Project the full audit package into the minimal scientific Codex input."""
+
+    source = validate("research.compilation_package.v1.schema.json", value)
+    source_analysis = dict(source["facets"]["source_analysis"]["payload"])
+    problem = copy.deepcopy(dict(source["facets"]["research_problem"]["payload"]))
+    problem.pop("assistant_message", None)
+    protocol_facet = dict(source["facets"]["experimental_protocol"])
+    graph = dict(source["traceability_graph"])
+    allowed_kinds = {"source_fragment", "hypothesis", "experimental_protocol"}
+    nodes = [
+        copy.deepcopy(dict(item))
+        for item in graph.get("nodes") or []
+        if str(item.get("kind") or "") in allowed_kinds
+    ]
+    admitted = {str(item.get("node_id") or "") for item in nodes}
+    edges = [
+        copy.deepcopy(dict(item))
+        for item in graph.get("edges") or []
+        if str(item.get("source") or "") in admitted and str(item.get("target") or "") in admitted
+    ]
+    projected = {
+        "schema": "adaos.research.compilation_projection.v1",
+        "schema_version": "1.0.0",
+        "direction_id": source["direction_id"],
+        "compilation_digest": source["digest"],
+        "source_bundle_digest": source["source_bundle_digest"],
+        "source_analysis": {
+            key: copy.deepcopy(source_analysis.get(key))
+            for key in (
+                "sufficiency",
+                "observed_facts",
+                "author_interpretations",
+                "coverage_limitations",
+                "unresolved_decisions",
+            )
+        },
+        "research_problem": problem,
+        "experimental_protocol": copy.deepcopy(protocol_facet["payload"]),
+        "traceability": {
+            "protocol_digest": protocol_facet["digest"],
+            "nodes": nodes,
+            "edges": edges,
+        },
+        "readiness": copy.deepcopy(source["readiness"]),
+    }
+    projected["digest"] = digest(projected)
+    return validate("research.compilation_projection.v1.schema.json", projected)
+
+
+__all__ = ["build_compilation", "project_execution_compilation"]
