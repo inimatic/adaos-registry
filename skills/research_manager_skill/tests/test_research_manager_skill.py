@@ -4,6 +4,7 @@ import json
 import sys
 import uuid
 from pathlib import Path
+from types import SimpleNamespace
 
 import jsonschema
 import pytest
@@ -12,11 +13,37 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
+import research.manager as manager_module
 from research.contracts import ResearchRecord, identity
 from research.manager import ResearchManager
 from research.tracker import MlflowTracker, TrackerConflict
 from research.workflow import TRANSITIONS
 from migrations.data_migration import migrate as migrate_runtime_data
+
+
+def test_fixture_timeout_cancels_attempt_and_reports_terminal_diagnostics(monkeypatch) -> None:
+    pending = SimpleNamespace(attempt_id="attempt-timeout", status="running", terminal=False)
+    cancelled = SimpleNamespace(
+        attempt_id="attempt-timeout",
+        status="cancelled",
+        terminal=True,
+        to_dict=lambda: {
+            "attempt_id": "attempt-timeout",
+            "status": "cancelled",
+            "failure": {"reason": "operator_cancelled"},
+            "last_heartbeat_at": "2026-08-18T00:00:00+00:00",
+        },
+    )
+    cancelled_ids: list[str] = []
+    monkeypatch.setattr(
+        manager_module,
+        "cancel_execution",
+        lambda attempt_id: cancelled_ids.append(attempt_id) or cancelled,
+    )
+
+    with pytest.raises(TimeoutError, match='"status": "cancelled"'):
+        ResearchManager._await_terminal_attempt(pending, timeout_s=0)
+    assert cancelled_ids == ["attempt-timeout"]
 
 
 def _splits() -> dict[str, dict[str, str]]:

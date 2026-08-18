@@ -373,6 +373,36 @@ class ResearchManager:
             raise RuntimeError("skill runtime data path is unavailable")
         return Path(env_path).resolve().parent.parent
 
+    @staticmethod
+    def _await_terminal_attempt(attempt: Any, *, timeout_s: float) -> Any:
+        deadline = time.monotonic() + max(0.0, float(timeout_s))
+        while not attempt.terminal and time.monotonic() < deadline:
+            time.sleep(0.05)
+            attempt = reconcile(attempt.attempt_id)
+        if attempt.terminal:
+            return attempt
+
+        cancellation_error = ""
+        try:
+            attempt = cancel_execution(attempt.attempt_id)
+        except Exception as exc:
+            cancellation_error = f"{type(exc).__name__}: {exc}"
+        details = attempt.to_dict() if hasattr(attempt, "to_dict") else {
+            "attempt_id": str(getattr(attempt, "attempt_id", "")),
+            "status": str(getattr(attempt, "status", "")),
+        }
+        details = {
+            "attempt_id": str(details.get("attempt_id") or ""),
+            "status": str(details.get("status") or "unknown"),
+            "failure": details.get("failure"),
+            "last_heartbeat_at": details.get("last_heartbeat_at"),
+            "cancellation_error": cancellation_error or None,
+        }
+        raise TimeoutError(
+            "fixture attempt did not reach a terminal state: "
+            + json.dumps(details, ensure_ascii=True, sort_keys=True)
+        )
+
     def run_fixture(
         self,
         *,
@@ -460,12 +490,10 @@ class ResearchManager:
             metadata={"operator_digest": trial.payload["operator_digest"], "trusted_fixture": True},
         )
         attempt = submit(execution, idempotency_key=idempotency_key)
-        deadline = time.monotonic() + 15
-        while not attempt.terminal and time.monotonic() < deadline:
-            time.sleep(0.05)
-            attempt = reconcile(attempt.attempt_id)
-        if not attempt.terminal:
-            raise TimeoutError("fixture attempt did not reach a terminal state")
+        attempt = self._await_terminal_attempt(
+            attempt,
+            timeout_s=max(30.0, float(execution.resources.wall_time_s) + 20.0),
+        )
         attempt_record = self.repository.put(
             ResearchRecord("execution_attempt", attempt.attempt_id, study_id, attempt.attempt_number, attempt.to_dict())
         )
