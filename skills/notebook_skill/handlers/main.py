@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import threading
 import time
 from copy import deepcopy
 from typing import Any, Mapping
@@ -16,31 +15,22 @@ from adaos.services.agent_context import get_ctx
 from adaos.services.node_config import load_config
 from adaos.services.webspace_id import coerce_webspace_id
 
-try:
-    from adaos.sdk.data import ctx_subnet
-except Exception:
-    class _MissingCtxSubnet:
-        def set(self, *_args: Any, **_kwargs: Any) -> None:
-            raise RuntimeError("ctx_subnet_unavailable")
-
-    ctx_subnet = _MissingCtxSubnet()
-
 _RECEIVER_NOTES = "notebook_skill.notes"
+_RECEIVER_EDITOR = "notebook_skill.editor"
+_RECEIVER_LATEST = "notebook_skill.latest"
+_STREAM_RECEIVERS = (_RECEIVER_NOTES, _RECEIVER_EDITOR, _RECEIVER_LATEST)
 _SKILL_NAME = "notebook_skill"
 _MAX_NOTES = 64
-_MAX_CONTENT_CHARS = 32000
+_MAX_CONTENT_BYTES = 32000
+_MAX_ATTACHMENTS_PER_NOTE = 8
 _NOTE_PREFIX = "note-"
 _DEFAULT_WEBSPACE_ID = "desktop"
 _SHARED_WEBSPACE_IDS = ("desktop", "desktop-dev", "default")
 _STATE_MEMORY_PREFIX = "notebook_state.v1"
 _LOG = logging.getLogger(_SKILL_NAME)
-_PROJECTION_TIMEOUT_S = 8.0
-_PROJECTION_DEBOUNCE_S = 0.2
 _LIST_PREVIEW_CHARS = 420
+_LIST_TITLE_CHARS = 160
 _WIDGET_PREVIEW_CHARS = 1200
-_PROJECTION_LOCK = threading.Lock()
-_PROJECTION_PENDING: dict[str, dict[str, Any]] = {}
-_PROJECTION_WORKER: threading.Thread | None = None
 
 
 def _now() -> float:
@@ -72,7 +62,6 @@ _STATE: dict[str, Any] = {
 }
 _LOADED_WEBSPACES: set[str] = set()
 _FALLBACK_MEMORY: dict[str, Any] = {}
-_RELOAD_REPUBLISH_DELAYS: tuple[float, ...] = (1.0, 3.0, 8.0, 15.0)
 
 
 def _memory_key(webspace_id: str) -> str:
@@ -314,9 +303,7 @@ def _clean_content(value: Any) -> str:
     text = str(value or "")
     if text.startswith(("$event.", "$state.", "$client.")):
         text = ""
-    if len(text) > _MAX_CONTENT_CHARS:
-        return text[:_MAX_CONTENT_CHARS]
-    return text
+    return _truncate_utf8(text, _MAX_CONTENT_BYTES)
 
 
 def _has_resolved_content(payload: Mapping[str, Any]) -> bool:
@@ -340,9 +327,20 @@ def _preview(content: str, *, limit: int = 120) -> str:
 
 def _bounded_text(value: Any, *, limit: int) -> str:
     text = str(value or "")
-    if len(text) <= limit:
+    encoded = text.encode("utf-8")
+    if len(encoded) <= limit:
         return text
-    return text[: max(0, limit - 1)].rstrip() + "..."
+    suffix = "..."
+    prefix = _truncate_utf8(text, max(0, limit - len(suffix.encode("utf-8")))).rstrip()
+    return prefix + suffix
+
+
+def _truncate_utf8(value: Any, max_bytes: int) -> str:
+    text = str(value or "")
+    encoded = text.encode("utf-8")
+    if len(encoded) <= max_bytes:
+        return text
+    return encoded[: max(0, int(max_bytes))].decode("utf-8", errors="ignore")
 
 
 def _content_lines(content: Any) -> list[str]:
@@ -355,7 +353,7 @@ def _note_heading(note: Mapping[str, Any], *, fallback: str = "New note") -> str
     if not lines:
         return fallback
     heading = str(lines[0] or "").strip()
-    return heading or fallback
+    return _bounded_text(heading, limit=_LIST_TITLE_CHARS) or fallback
 
 
 def _note_card_preview(note: Mapping[str, Any], *, limit: int = 420) -> str:
@@ -550,12 +548,7 @@ def _snapshot() -> dict[str, Any]:
 def _notes_stream_payload(snapshot: Mapping[str, Any] | None = None) -> dict[str, Any]:
     snap = snapshot if isinstance(snapshot, Mapping) else _snapshot()
     notes = snap.get("notes") if isinstance(snap.get("notes"), Mapping) else {}
-    display = snap.get("display") if isinstance(snap.get("display"), Mapping) else {}
-    editor = snap.get("editor") if isinstance(snap.get("editor"), Mapping) else {}
-    latest = snap.get("latest") if isinstance(snap.get("latest"), Mapping) else {}
-    widget = snap.get("widget") if isinstance(snap.get("widget"), Mapping) else {}
     items = [_stream_list_item(item) for item in list(notes.get("items") or []) if isinstance(item, Mapping)]
-    widget_items = widget.get("items") if isinstance(widget.get("items"), list) else []
     return {
         "ok": True,
         "_stream_rev": _stream_revision(snap),
@@ -563,11 +556,34 @@ def _notes_stream_payload(snapshot: Mapping[str, Any] | None = None) -> dict[str
         "selected_note_id": str(snap.get("selected_note_id") or ""),
         "display_note_id": str(snap.get("display_note_id") or ""),
         "editing_note_id": str(snap.get("editing_note_id") or ""),
-        "display": _stream_note_summary(display),
-        "editor": _stream_editor(editor),
-        "latest": _stream_note_summary(latest),
-        "widget": {"items": [_stream_widget_item(item) for item in widget_items if isinstance(item, Mapping)]},
         "items": items,
+        "updated_at": snap.get("updated_at"),
+    }
+
+
+def _editor_stream_payload(snapshot: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    snap = snapshot if isinstance(snapshot, Mapping) else _snapshot()
+    editor = snap.get("editor") if isinstance(snap.get("editor"), Mapping) else {}
+    return {
+        "ok": True,
+        "_stream_rev": _stream_revision(snap),
+        "_stream_require_revision": True,
+        "selected_note_id": str(snap.get("selected_note_id") or ""),
+        "editing_note_id": str(snap.get("editing_note_id") or ""),
+        "editor": _stream_editor(editor),
+        "updated_at": snap.get("updated_at"),
+    }
+
+
+def _latest_stream_payload(snapshot: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    snap = snapshot if isinstance(snapshot, Mapping) else _snapshot()
+    widget = snap.get("widget") if isinstance(snap.get("widget"), Mapping) else {}
+    widget_items = widget.get("items") if isinstance(widget.get("items"), list) else []
+    return {
+        "ok": True,
+        "_stream_rev": _stream_revision(snap),
+        "_stream_require_revision": True,
+        "widget": {"items": [_stream_widget_item(item) for item in widget_items if isinstance(item, Mapping)]},
         "updated_at": snap.get("updated_at"),
     }
 
@@ -594,22 +610,6 @@ def _stream_list_item(item: Mapping[str, Any]) -> dict[str, Any]:
     )
 
 
-def _stream_note_summary(item: Mapping[str, Any]) -> dict[str, Any]:
-    preview = _bounded_text(item.get("preview") or item.get("text") or item.get("description") or item.get("content"), limit=_WIDGET_PREVIEW_CHARS)
-    return _without_empty(
-        {
-            "id": str(item.get("id") or ""),
-            "title": str(item.get("title") or ""),
-            "text": preview,
-            "preview": preview,
-            "attachment_count": item.get("attachment_count"),
-            "updated_at": item.get("updated_at"),
-            "updated_label": item.get("updated_label"),
-            "version": item.get("version"),
-        }
-    )
-
-
 def _stream_widget_item(item: Mapping[str, Any]) -> dict[str, Any]:
     text = _bounded_text(item.get("text") or item.get("preview") or item.get("description") or item.get("content"), limit=_WIDGET_PREVIEW_CHARS)
     return _without_empty(
@@ -630,7 +630,11 @@ def _stream_editor(editor: Mapping[str, Any]) -> dict[str, Any]:
         {
             "id": str(editor.get("id") or ""),
             "content": str(editor.get("content") or ""),
-            "attachments": [_project_attachment(item) for item in attachments if isinstance(item, Mapping)],
+            "attachments": [
+                _project_attachment(item)
+                for item in attachments[:_MAX_ATTACHMENTS_PER_NOTE]
+                if isinstance(item, Mapping)
+            ],
             "updated_at": editor.get("updated_at"),
             "updated_label": editor.get("updated_label"),
             "version": editor.get("version"),
@@ -665,84 +669,54 @@ def _stream_revision(snapshot: Mapping[str, Any]) -> int:
     return int(best_updated * 1000) * 1000 + min(version_total, 999)
 
 
-def _project_notebook_snapshot_now(snapshot: Mapping[str, Any], webspace_id: str) -> None:
-    snap = deepcopy(dict(snapshot))
-    ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
-    try:
-        ctx_subnet.set("notebook.snapshot", snap, webspace_id=ws)
-    except Exception:
-        _LOG.warning("failed to project notebook snapshot via ctx_subnet webspace=%s", ws, exc_info=True)
+def _stream_payload(receiver: str, snapshot: Mapping[str, Any]) -> dict[str, Any]:
+    if receiver == _RECEIVER_EDITOR:
+        return _editor_stream_payload(snapshot)
+    if receiver == _RECEIVER_LATEST:
+        return _latest_stream_payload(snapshot)
+    return _notes_stream_payload(snapshot)
 
 
-def _projection_worker() -> None:
-    global _PROJECTION_WORKER
-    while True:
-        time.sleep(_PROJECTION_DEBOUNCE_S)
-        with _PROJECTION_LOCK:
-            pending = dict(_PROJECTION_PENDING)
-            _PROJECTION_PENDING.clear()
-            if not pending:
-                _PROJECTION_WORKER = None
-                return
-
-        for ws, snap in pending.items():
-            started = time.monotonic()
-            try:
-                _project_notebook_snapshot_now(snap, ws)
-            except Exception:
-                _LOG.warning("failed to project notebook snapshot in background webspace=%s", ws, exc_info=True)
-                continue
-            elapsed = time.monotonic() - started
-            if elapsed > _PROJECTION_TIMEOUT_S:
-                _LOG.warning("slow notebook snapshot projection webspace=%s duration=%.3fs", ws, elapsed)
-
-
-def _project_notebook_snapshot(snapshot: Mapping[str, Any], webspace_id: str) -> None:
-    global _PROJECTION_WORKER
-    snap = deepcopy(dict(snapshot))
-    ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
-    with _PROJECTION_LOCK:
-        _PROJECTION_PENDING[ws] = snap
-        if _PROJECTION_WORKER is not None and _PROJECTION_WORKER.is_alive():
-            return
-        _PROJECTION_WORKER = threading.Thread(
-            target=_projection_worker,
-            name=f"{_SKILL_NAME}-projection",
-            daemon=True,
-        )
-        _PROJECTION_WORKER.start()
-
-
-def _publish(snapshot: Mapping[str, Any] | None = None, *, webspace_id: str | None = None) -> dict[str, Any]:
+def _publish(
+    snapshot: Mapping[str, Any] | None = None,
+    *,
+    webspace_id: str | None = None,
+    receivers: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
     snap = dict(snapshot or _snapshot())
     ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
-    try:
-        _project_notebook_snapshot(snap, ws)
-    except Exception:
-        _LOG.warning("failed to schedule notebook snapshot projection webspace=%s", ws, exc_info=True)
-    try:
-        stream_publish(_RECEIVER_NOTES, _notes_stream_payload(snap), _meta={"webspace_id": ws})
-    except Exception:
-        _LOG.warning("failed to publish notebook notes stream webspace=%s", ws, exc_info=True)
+    selected = tuple(dict.fromkeys(receivers or _STREAM_RECEIVERS))
+    for receiver in selected:
+        if receiver not in _STREAM_RECEIVERS:
+            continue
+        try:
+            stream_publish(receiver, _stream_payload(receiver, snap), _meta={"webspace_id": ws})
+        except Exception:
+            _LOG.warning(
+                "failed to publish notebook stream receiver=%s webspace=%s",
+                receiver,
+                ws,
+                exc_info=True,
+            )
     return snap
 
 
-def _schedule_delayed_republish(webspace_id: str) -> None:
-    delays = tuple(float(item) for item in _RELOAD_REPUBLISH_DELAYS if float(item) > 0)
-    if not delays:
-        return
-    ws = coerce_webspace_id(webspace_id, fallback=_DEFAULT_WEBSPACE_ID)
+def _note_ack(note: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(note.get("id") or ""),
+        "version": int(note.get("version") or 0),
+        "updated_at": note.get("updated_at"),
+    }
 
-    def _runner() -> None:
-        for delay in delays:
-            time.sleep(delay)
-            try:
-                _prepare_state(ws, force=True)
-                _publish(webspace_id=ws)
-            except Exception:
-                _LOG.warning("failed delayed notebook republish webspace=%s delay=%s", ws, delay, exc_info=True)
 
-    threading.Thread(target=_runner, name=f"{_SKILL_NAME}-reload-republish", daemon=True).start()
+def _published_ack(snapshot: Mapping[str, Any], *, receivers: tuple[str, ...] | None = None) -> dict[str, Any]:
+    return {
+        "status": "published",
+        "receivers": list(receivers or _STREAM_RECEIVERS),
+        "selected_note_id": str(snapshot.get("selected_note_id") or ""),
+        "editing_note_id": str(snapshot.get("editing_note_id") or ""),
+        "updated_at": snapshot.get("updated_at"),
+    }
 
 
 
@@ -763,8 +737,17 @@ def get_notebook_snapshot(payload: Mapping[str, Any] | None = None, **kwargs: An
     body.update({k: v for k, v in kwargs.items() if v is not None})
     ws = _webspace_id(body)
     _prepare_state(ws)
+    return {"ok": True, "snapshot": _snapshot()}
+
+
+@tool("refresh_notebook")
+def refresh_notebook(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[str, Any]:
+    body = dict(payload or {})
+    body.update({k: v for k, v in kwargs.items() if v is not None})
+    ws = _webspace_id(body)
+    _prepare_state(ws, force=True)
     snap = _publish(webspace_id=ws)
-    return {"ok": True, "snapshot": snap}
+    return {"ok": True, **_published_ack(snap)}
 
 
 @tool("create_note")
@@ -793,7 +776,7 @@ def create_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict
     _STATE["editing_note_id"] = note_id
     _persist_state(ws)
     snap = _publish(webspace_id=ws)
-    return {"ok": True, "note": deepcopy(note), "snapshot": snap}
+    return {"ok": True, "note": _note_ack(note), **_published_ack(snap)}
 
 
 @tool("select_note")
@@ -812,7 +795,7 @@ def select_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict
         _STATE["editing_note_id"] = ""
     _persist_state(ws)
     snap = _publish(webspace_id=ws)
-    return {"ok": True, "note": deepcopy(_STATE["notes"][note_id]), "snapshot": snap}
+    return {"ok": True, "note": _note_ack(_STATE["notes"][note_id]), **_published_ack(snap)}
 
 
 @tool("save_note")
@@ -826,10 +809,10 @@ def save_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[s
     if not isinstance(note, dict):
         return {"ok": False, "error": "note_not_found", "note_id": note_id}
     if not _has_resolved_content(body):
-        return {"ok": False, "error": "content_required", "note_id": note_id, "note": deepcopy(note)}
+        return {"ok": False, "error": "content_required", "note_id": note_id, "note": _note_ack(note)}
     content = _clean_content(body.get("content"))
     if not content and str(note.get("content") or "") and not _allows_empty_content(body):
-        return {"ok": False, "error": "stale_empty_content", "note_id": note_id, "note": deepcopy(note)}
+        return {"ok": False, "error": "stale_empty_content", "note_id": note_id, "note": _note_ack(note)}
     note["content"] = content
     note["updated_at"] = _now()
     note["version"] = int(note.get("version") or 0) + 1
@@ -838,7 +821,7 @@ def save_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict[s
     _promote_note(note_id)
     _persist_state(ws)
     snap = _publish(webspace_id=ws)
-    return {"ok": True, "note": deepcopy(note), "snapshot": snap}
+    return {"ok": True, "note": _note_ack(note), **_published_ack(snap)}
 
 
 def _default_attachment_purpose(kind: str) -> str:
@@ -847,7 +830,7 @@ def _default_attachment_purpose(kind: str) -> str:
 
 def _clean_upload_relative_path(value: Any) -> str:
     raw = str(value or "").strip().replace("\\", "/").lstrip("/")
-    if not raw or ":" in raw:
+    if not raw or ":" in raw or len(raw.encode("utf-8")) > 512:
         return ""
     parts = raw.split("/")
     if any(part in {"", ".", ".."} for part in parts):
@@ -989,8 +972,8 @@ def _compact_artifact_ref(
     size_bytes: Any,
 ) -> dict[str, Any]:
     out: dict[str, Any] = {}
-    artifact_id = str(artifact.get("artifact_id") or artifact.get("id") or "").strip()
-    sha256 = str(artifact.get("sha256") or "").strip()
+    artifact_id = _bounded_text(artifact.get("artifact_id") or artifact.get("id"), limit=256).strip()
+    sha256 = _bounded_text(artifact.get("sha256"), limit=64).strip()
     if not artifact_id and sha256:
         artifact_id = f"skill_file:{_SKILL_NAME}:{purpose}:{sha256[:16]}"
     if artifact_id:
@@ -1015,24 +998,24 @@ def _project_attachment(value: Mapping[str, Any]) -> dict[str, Any]:
     raw = dict(value or {})
     artifact = raw.get("artifact_ref") if isinstance(raw.get("artifact_ref"), Mapping) else {}
     kind = "photo" if str(raw.get("kind") or "").strip() == "photo" else "file"
-    name = str(raw.get("name") or artifact.get("name") or artifact.get("filename") or "attachment").strip()
-    mime = str(raw.get("mime") or artifact.get("mime") or "").strip() or None
+    name = _bounded_text(raw.get("name") or artifact.get("name") or artifact.get("filename") or "attachment", limit=256).strip()
+    mime = _bounded_text(raw.get("mime") or artifact.get("mime"), limit=128).strip() or None
     size_bytes = raw.get("size_bytes") or artifact.get("size_bytes")
-    purpose = str(artifact.get("purpose") or _default_attachment_purpose(kind)).strip()
+    purpose = _bounded_text(artifact.get("purpose") or _default_attachment_purpose(kind), limit=64).strip()
     relative_path = _clean_upload_relative_path(raw.get("relative_path") or artifact.get("relative_path"))
     if not relative_path:
         relative_path = _fallback_upload_relative_path(purpose=purpose, name=name)
     url = _skill_file_url(relative_path) or _browser_safe_url(raw.get("url"))
     download_url = _skill_file_url(relative_path, download=True) or _browser_safe_url(raw.get("download_url"))
-    attachment_id = str(raw.get("id") or artifact.get("artifact_id") or artifact.get("id") or "").strip()
+    attachment_id = _bounded_text(raw.get("id") or artifact.get("artifact_id") or artifact.get("id"), limit=256).strip()
     out: dict[str, Any] = {
         "id": attachment_id or None,
         "kind": kind,
         "name": name,
         "mime": mime,
         "size_bytes": size_bytes,
-        "summary": str(raw.get("summary") or "").strip() or _attachment_summary(mime, size_bytes),
-        "icon": str(raw.get("icon") or "").strip() or _attachment_icon(kind, mime),
+        "summary": _bounded_text(raw.get("summary"), limit=256).strip() or _attachment_summary(mime, size_bytes),
+        "icon": _bounded_text(raw.get("icon"), limit=64).strip() or _attachment_icon(kind, mime),
         "relative_path": relative_path or None,
         "url": url or None,
         "download_url": download_url or None,
@@ -1110,6 +1093,14 @@ def _attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) -
             note = fallback_note
     if not isinstance(note, dict):
         return {"ok": False, "error": "note_not_found", "note_id": note_id}
+    attachments = note.get("attachments") if isinstance(note.get("attachments"), list) else []
+    if len(attachments) >= _MAX_ATTACHMENTS_PER_NOTE:
+        return {
+            "ok": False,
+            "error": "attachment_limit_reached",
+            "note_id": note_id,
+            "limit": _MAX_ATTACHMENTS_PER_NOTE,
+        }
     raw_note_id = str(body.get("note_id") or "").strip()
     if raw_note_id and raw_note_id != note_id and not requested_note_id:
         _LOG.warning("attach_note_file unresolved note_id token: raw=%s fallback=%s webspace=%s", raw_note_id, note_id, ws)
@@ -1138,7 +1129,8 @@ def _attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) -
         "download_url": download_url or None,
         "path": url or None,
     }
-    note.setdefault("attachments", []).append(attachment)
+    note["attachments"] = attachments
+    attachments.append(attachment)
     note["updated_at"] = _now()
     note["version"] = int(note.get("version") or 0) + 1
     _STATE["display_note_id"] = note_id
@@ -1146,7 +1138,12 @@ def _attach_note_file(payload: Mapping[str, Any] | None = None, **kwargs: Any) -
     _promote_note(note_id)
     _persist_state(ws)
     snap = _publish(webspace_id=ws)
-    return {"ok": True, "attachment": deepcopy(attachment), "note": deepcopy(note), "snapshot": snap}
+    return {
+        "ok": True,
+        "attachment": deepcopy(attachment),
+        "note": _note_ack(note),
+        **_published_ack(snap),
+    }
 
 
 @tool("attach_note_upload")
@@ -1176,7 +1173,7 @@ def delete_note(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> dict
     _STATE["editing_note_id"] = fallback
     _persist_state(ws)
     snap = _publish(webspace_id=ws)
-    return {"ok": True, "deleted_note_id": note_id, "snapshot": snap}
+    return {"ok": True, "deleted_note_id": note_id, **_published_ack(snap)}
 
 
 def _send_telegram_text(
@@ -1298,7 +1295,7 @@ def reset_notebook(payload: Mapping[str, Any] | None = None, **kwargs: Any) -> d
     _LOADED_WEBSPACES.add(ws)
     _persist_state(ws)
     snap = _publish(webspace_id=ws)
-    return {"ok": True, "snapshot": snap}
+    return {"ok": True, **_published_ack(snap)}
 
 
 @tool("notebook_persist_state")
@@ -1319,38 +1316,15 @@ def notebook_rehydrate(payload: Mapping[str, Any] | None = None, **kwargs: Any) 
     _load_state(ws, force=True)
     _ensure_default_note()
     snap = _publish(webspace_id=ws)
-    return {"ok": True, "webspace_id": ws, "snapshot": snap}
+    return {"ok": True, "webspace_id": ws, **_published_ack(snap)}
 
 
-@subscribe("webio.stream.snapshot.requested")
+@subscribe("webio.stream.snapshot.requested", receivers=_STREAM_RECEIVERS)
 def on_webio_stream_snapshot_requested(evt: Any) -> None:
     body = _payload(evt)
-    if str(body.get("receiver") or "").strip() != _RECEIVER_NOTES:
+    receiver = str(body.get("receiver") or "").strip()
+    if receiver not in _STREAM_RECEIVERS:
         return
     ws = _webspace_id(body)
     _prepare_state(ws, force=True)
-    _publish(webspace_id=ws)
-
-
-@subscribe("webio.stream.subscription.changed")
-def on_webio_stream_subscription_changed(evt: Any) -> None:
-    body = _payload(evt)
-    if str(body.get("receiver") or "").strip() != _RECEIVER_NOTES:
-        return
-    if str(body.get("action") or "").strip().lower() == "unsubscribed":
-        return
-    ws = _webspace_id(body)
-    _prepare_state(ws, force=True)
-    _publish(webspace_id=ws)
-
-
-@subscribe("node.yjs.control.completed")
-def on_yjs_control_completed(evt: Any) -> None:
-    body = _payload(evt)
-    action = str(body.get("action") or "").strip().lower()
-    if action not in {"reload", "reset", "restore"}:
-        return
-    ws = _webspace_id(body)
-    _prepare_state(ws, force=True)
-    _publish(webspace_id=ws)
-    _schedule_delayed_republish(ws)
+    _publish(webspace_id=ws, receivers=(receiver,))

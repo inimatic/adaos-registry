@@ -19,11 +19,6 @@ def load_module(monkeypatch, memory=None):
     projected = []
     streams = []
     memory = {} if memory is None else memory
-    monkeypatch.setattr(
-        mod,
-        "_project_notebook_snapshot",
-        lambda value, webspace_id=None: projected.append(("notebook.snapshot", value, webspace_id)),
-    )
     monkeypatch.setattr(mod, "stream_publish", lambda receiver, data=None, _meta=None: streams.append((receiver, data, _meta)))
     monkeypatch.setattr(mod, "skill_memory_get", lambda key, default=None: memory.get(key, default))
     monkeypatch.setattr(mod, "skill_memory_set", lambda key, value: memory.__setitem__(key, value))
@@ -35,8 +30,8 @@ def skill_file_url(relative_path: str, *, download: bool = False) -> str:
     return f"http://127.0.0.1:8777/api/skills/notebook_skill/files/content/{relative_path}?{query}"
 
 
-def test_create_save_and_select_note_updates_projection_and_stream(monkeypatch):
-    mod, projected, streams = load_module(monkeypatch)
+def test_create_save_and_select_note_updates_receiver_specific_streams(monkeypatch):
+    mod, _projected, streams = load_module(monkeypatch)
 
     created = mod.create_note({"content": "first", "webspace_id": "desktop"})
     assert created["ok"] is True
@@ -44,15 +39,15 @@ def test_create_save_and_select_note_updates_projection_and_stream(monkeypatch):
 
     saved = mod.save_note({"note_id": note_id, "content": "second", "webspace_id": "desktop"})
     assert saved["ok"] is True
-    assert saved["note"]["content"] == "second"
+    assert saved["note"]["id"] == note_id
 
     selected = mod.select_note({"note_id": "note-1", "edit": True, "webspace_id": "desktop"})
     assert selected["ok"] is True
-    assert projected[-1][0] == "notebook.snapshot"
-    assert projected[-1][1]["editor"]["id"] == "note-1"
-    assert projected[-1][1]["editing_note_id"] == "note-1"
-    assert streams[-1][0] == "notebook_skill.notes"
-    assert streams[-1][2]["webspace_id"] == "desktop"
+    by_receiver = {receiver: (payload, meta) for receiver, payload, meta in streams[-3:]}
+    assert by_receiver["notebook_skill.notes"][0]["editing_note_id"] == "note-1"
+    assert by_receiver["notebook_skill.editor"][0]["editor"]["id"] == "note-1"
+    assert by_receiver["notebook_skill.latest"][0]["widget"]["items"][0]["id"] == note_id
+    assert all(meta["webspace_id"] == "desktop" for _payload, meta in by_receiver.values())
 
 
 def test_delete_selected_note_falls_back_to_remaining_note(monkeypatch):
@@ -67,22 +62,31 @@ def test_delete_selected_note_falls_back_to_remaining_note(monkeypatch):
     assert snapshot["editor"]["content"] == ""
 
 
-def test_snapshot_request_republishes_note_list(monkeypatch):
+def test_snapshot_request_republishes_only_requested_read_model(monkeypatch):
     mod, _projected, streams = load_module(monkeypatch)
     mod.save_note({"note_id": "note-1", "content": "Stream title\nStream body", "source": "editor_change"})
+    streams.clear()
 
     mod.on_webio_stream_snapshot_requested({"receiver": "notebook_skill.notes", "webspace_id": "desktop"})
 
-    assert streams
-    receiver, payload, meta = streams[-1]
+    assert len(streams) == 1
+    receiver, payload, meta = streams[0]
     assert receiver == "notebook_skill.notes"
     assert payload["_stream_require_revision"] is True
     assert isinstance(payload["_stream_rev"], int)
     assert payload["items"][0]["id"] == "note-1"
-    assert payload["editor"]["content"] == "Stream title\nStream body"
-    assert payload["widget"]["items"][0]["title"] == "Stream title"
-    assert payload["widget"]["items"][0]["text"] == "Stream body"
+    assert "editor" not in payload
+    assert "widget" not in payload
     assert meta["webspace_id"] == "desktop"
+
+    mod.on_webio_stream_snapshot_requested({"receiver": "notebook_skill.editor", "webspace_id": "desktop"})
+    assert streams[-1][0] == "notebook_skill.editor"
+    assert streams[-1][1]["editor"]["content"] == "Stream title\nStream body"
+
+    mod.on_webio_stream_snapshot_requested({"receiver": "notebook_skill.latest", "webspace_id": "desktop"})
+    assert streams[-1][0] == "notebook_skill.latest"
+    assert streams[-1][1]["widget"]["items"][0]["title"] == "Stream title"
+    assert streams[-1][1]["widget"]["items"][0]["text"] == "Stream body"
 
 
 def test_snapshot_request_reloads_durable_state_before_publish(monkeypatch):
@@ -97,22 +101,25 @@ def test_snapshot_request_reloads_durable_state_before_publish(monkeypatch):
     mod._STATE["notes"]["note-1"]["content"] = "Old title\nOld body"
     mod._LOADED_WEBSPACES.add("desktop")
 
-    mod.on_webio_stream_snapshot_requested({"receiver": "notebook_skill.notes", "webspace_id": "desktop"})
+    mod.on_webio_stream_snapshot_requested({"receiver": "notebook_skill.editor", "webspace_id": "desktop"})
 
     assert streams[-1][1]["editor"]["content"] == "Fresh title\nFresh body"
-    assert streams[-1][1]["widget"]["items"][0]["title"] == "Fresh title"
-    assert streams[-1][1]["widget"]["items"][0]["text"] == "Fresh body"
 
 
 def test_actions_default_to_desktop_webspace(monkeypatch):
-    mod, projected, streams = load_module(monkeypatch)
+    mod, _projected, streams = load_module(monkeypatch)
 
     result = mod.save_note({"note_id": "note-1", "content": "Desktop note"})
 
     assert result["ok"] is True
-    assert projected[-1][2] == "desktop"
-    assert streams[-1][2]["webspace_id"] == "desktop"
-    assert projected[-1][1]["widget"]["items"][0]["title"] == "Desktop note"
+    assert {receiver for receiver, _payload, _meta in streams[-3:]} == {
+        "notebook_skill.notes",
+        "notebook_skill.editor",
+        "notebook_skill.latest",
+    }
+    assert all(meta["webspace_id"] == "desktop" for _receiver, _payload, meta in streams[-3:])
+    latest = next(payload for receiver, payload, _meta in streams[-3:] if receiver == "notebook_skill.latest")
+    assert latest["widget"]["items"][0]["title"] == "Desktop note"
 
 
 def test_save_note_ignores_unresolved_content_placeholders(monkeypatch):
@@ -141,7 +148,7 @@ def test_save_note_rejects_stale_empty_state_but_allows_editor_clear(monkeypatch
     cleared = mod.save_note({"note_id": "note-1", "content": "", "source": "editor_change"})
 
     assert cleared["ok"] is True
-    assert cleared["note"]["content"] == ""
+    assert mod.get_notebook_snapshot()["snapshot"]["editor"]["content"] == ""
 
 
 def test_notebook_state_rehydrates_from_skill_memory(monkeypatch):
@@ -150,15 +157,18 @@ def test_notebook_state_rehydrates_from_skill_memory(monkeypatch):
 
     mod.save_note({"note_id": "note-1", "content": "Persisted title\nPersisted body", "webspace_id": "desktop"})
 
-    mod, projected, streams = load_module(monkeypatch, memory=memory)
+    mod, _projected, streams = load_module(monkeypatch, memory=memory)
     snapshot = mod.get_notebook_snapshot({"webspace_id": "desktop"})["snapshot"]
 
     assert snapshot["editor"]["content"] == "Persisted title\nPersisted body"
     assert snapshot["notes"]["items"][0]["title"] == "Persisted title"
     assert snapshot["notes"]["items"][0]["preview"] == "Persisted body"
     assert snapshot["widget"]["items"][0]["text"] == "Persisted body"
-    assert projected[-1][1]["editor"]["content"] == "Persisted title\nPersisted body"
-    assert streams[-1][1]["items"][0]["preview"] == "Persisted body"
+    mod.refresh_notebook({"webspace_id": "desktop"})
+    notes = next(payload for receiver, payload, _meta in streams[-3:] if receiver == "notebook_skill.notes")
+    editor = next(payload for receiver, payload, _meta in streams[-3:] if receiver == "notebook_skill.editor")
+    assert notes["items"][0]["preview"] == "Persisted body"
+    assert editor["editor"]["content"] == "Persisted title\nPersisted body"
 
 
 def test_notebook_state_persists_to_projected_webspaces(monkeypatch):
@@ -186,13 +196,12 @@ def test_notebook_state_rehydrates_from_freshest_webspace_alias(monkeypatch):
     memory[mod._memory_key("default")] = old_state
     memory[mod._memory_key("desktop")] = fresh_state
 
-    mod, projected, streams = load_module(monkeypatch, memory=memory)
+    mod, _projected, streams = load_module(monkeypatch, memory=memory)
     snapshot = mod.get_notebook_snapshot({"webspace_id": "desktop-dev"})["snapshot"]
 
     assert snapshot["editor"]["content"] == "Fresh alias\nFresh body"
     assert snapshot["widget"]["items"][0]["title"] == "Fresh alias"
-    assert projected[-1][2] == "desktop-dev"
-    assert streams[-1][2]["webspace_id"] == "desktop-dev"
+    assert all(meta["webspace_id"] == "desktop-dev" for _receiver, _payload, meta in streams[-3:])
     for ws in ["desktop-dev", "desktop", "default"]:
         assert memory[mod._memory_key(ws)]["notes"]["note-1"]["content"] == "Fresh alias\nFresh body"
 
@@ -210,24 +219,28 @@ def test_lifecycle_persist_rehydrates_before_writing_memory(monkeypatch):
         assert memory[mod._memory_key(ws)]["notes"]["note-1"]["content"] == "Durable title\nDurable body"
 
 
-def test_yjs_reload_completion_reprojects_notebook_snapshot(monkeypatch):
+def test_refresh_reloads_durable_state_and_publishes_all_read_models(monkeypatch):
     memory = {}
-    mod, projected, _streams = load_module(monkeypatch, memory=memory)
-    monkeypatch.setattr(mod, "_RELOAD_REPUBLISH_DELAYS", ())
+    mod, _projected, streams = load_module(monkeypatch, memory=memory)
     mod.save_note({"note_id": "note-1", "content": "Reloaded title\nReloaded body", "webspace_id": "desktop"})
-    projected.clear()
+    streams.clear()
 
-    mod.on_yjs_control_completed({"action": "reload", "webspace_id": "desktop-dev", "ok": True, "accepted": True})
+    result = mod.refresh_notebook({"webspace_id": "desktop-dev"})
 
-    assert projected[-1][2] == "desktop-dev"
-    assert projected[-1][1]["widget"]["items"][0]["title"] == "Reloaded title"
-    assert projected[-1][1]["widget"]["items"][0]["text"] == "Reloaded body"
+    assert result["status"] == "published"
+    assert len(streams) == 3
+    latest = next(payload for receiver, payload, _meta in streams if receiver == "notebook_skill.latest")
+    assert latest["widget"]["items"][0]["title"] == "Reloaded title"
+    assert latest["widget"]["items"][0]["text"] == "Reloaded body"
 
 
-def test_notebook_manifest_subscribes_to_yjs_reload_events():
+def test_notebook_manifest_uses_receiver_snapshot_recovery_only():
     text = (SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8")
 
-    assert "node.yjs.control.completed" in text
+    assert "webio.stream.snapshot.requested" in text
+    assert "webio.stream.subscription.changed" not in text
+    assert "node.yjs.control.completed" not in text
+    assert "data_projections:" not in text
 
 
 def test_notebook_back_action_does_not_save_empty_state():
@@ -286,7 +299,7 @@ def test_notebook_ui_reads_editor_and_widget_from_stream():
     assert modal_interface["ownership"]["persistence"]["ack"] == "tool:notebook_skill.save_note"
     assert desktop_widget["dataSource"] == {
         "kind": "stream",
-        "receiver": "notebook_skill.notes",
+        "receiver": "notebook_skill.latest",
         "path": "widget",
     }
     assert desktop_widget["inputs"]["detailsPresentation"] == "body"
@@ -303,12 +316,12 @@ def test_notebook_ui_reads_editor_and_widget_from_stream():
     }
     assert editor["dataSource"] == {
         "kind": "stream",
-        "receiver": "notebook_skill.notes",
+        "receiver": "notebook_skill.editor",
         "path": "editor",
     }
     assert attachments["dataSource"] == {
         "kind": "stream",
-        "receiver": "notebook_skill.notes",
+        "receiver": "notebook_skill.editor",
         "path": "editor",
     }
     assert attachments["inputs"]["collectionKey"] == "attachments"
@@ -353,7 +366,7 @@ def test_send_note_to_telegram_uses_root_outbox_contract(monkeypatch):
 
 
 def test_attach_note_file_updates_editor_and_widget(monkeypatch):
-    mod, projected, _streams = load_module(monkeypatch)
+    mod, _projected, streams = load_module(monkeypatch)
     created = mod.create_note({"content": "with file", "webspace_id": "desktop"})
     note_id = created["note"]["id"]
 
@@ -369,11 +382,12 @@ def test_attach_note_file_updates_editor_and_widget(monkeypatch):
     assert result["attachment"]["kind"] == "photo"
     assert result["attachment"]["url"] == skill_file_url("uploads/photos/photo.jpg")
     assert result["attachment"]["download_url"] == skill_file_url("uploads/photos/photo.jpg", download=True)
-    assert projected[-1][1]["editor"]["attachments"][0]["name"] == "photo.jpg"
+    editor = next(payload for receiver, payload, _meta in streams[-3:] if receiver == "notebook_skill.editor")
+    assert editor["editor"]["attachments"][0]["name"] == "photo.jpg"
 
 
 def test_attach_note_upload_accepts_sanitized_upload_payload(monkeypatch):
-    mod, projected, _streams = load_module(monkeypatch)
+    mod, _projected, streams = load_module(monkeypatch)
     created = mod.create_note({"content": "with upload", "webspace_id": "desktop"})
     note_id = created["note"]["id"]
 
@@ -406,12 +420,13 @@ def test_attach_note_upload_accepts_sanitized_upload_payload(monkeypatch):
     assert result["attachment"]["url"] == skill_file_url("uploads/photos/photo.gif")
     assert result["attachment"]["download_url"] == skill_file_url("uploads/photos/photo.gif", download=True)
     assert result["attachment"]["summary"] == "image/gif | 123 B"
-    assert projected[-1][1]["editor"]["attachments"][0]["mime"] == "image/gif"
-    assert projected[-1][1]["editor"]["attachments"][0]["url"] == skill_file_url("uploads/photos/photo.gif")
+    editor = next(payload for receiver, payload, _meta in streams[-3:] if receiver == "notebook_skill.editor")
+    assert editor["editor"]["attachments"][0]["mime"] == "image/gif"
+    assert editor["editor"]["attachments"][0]["url"] == skill_file_url("uploads/photos/photo.gif")
 
 
 def test_attach_note_upload_uses_current_note_when_state_note_id_is_unresolved(monkeypatch):
-    mod, projected, _streams = load_module(monkeypatch)
+    mod, _projected, streams = load_module(monkeypatch)
     created = mod.create_note({"content": "current note", "webspace_id": "desktop"})
     note_id = created["note"]["id"]
 
@@ -440,14 +455,15 @@ def test_attach_note_upload_uses_current_note_when_state_note_id_is_unresolved(m
     assert result["note"]["id"] == note_id
     assert result["attachment"]["url"] == skill_file_url("uploads/photos/fallback.jpg")
     assert mod._STATE["notes"][note_id]["attachments"][0]["name"] == "fallback.jpg"
-    assert projected[-1][1]["editor"]["attachments"][0]["name"] == "fallback.jpg"
+    editor = next(payload for receiver, payload, _meta in streams[-3:] if receiver == "notebook_skill.editor")
+    assert editor["editor"]["attachments"][0]["name"] == "fallback.jpg"
 
 
 def test_note_cards_use_first_line_title_and_remaining_preview(monkeypatch):
     mod, _projected, _streams = load_module(monkeypatch)
 
-    created = mod.create_note({"content": "Heading\nBody line one\nBody line two"})
-    item = created["snapshot"]["notes"]["items"][0]
+    mod.create_note({"content": "Heading\nBody line one\nBody line two"})
+    item = mod._snapshot()["notes"]["items"][0]
 
     assert item["title"] == "Heading"
     assert item["content"] == "Body line one\nBody line two"
@@ -489,34 +505,85 @@ def test_stream_payload_uses_compact_cards_and_safe_attachment_links(monkeypatch
     mod._STATE["display_note_id"] = selected_id
     mod._STATE["editing_note_id"] = selected_id
 
-    payload = mod._notes_stream_payload(mod._snapshot())
-    encoded = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), default=str)
+    snapshot = mod._snapshot()
+    notes_payload = mod._notes_stream_payload(snapshot)
+    editor_payload = mod._editor_stream_payload(snapshot)
+    latest_payload = mod._latest_stream_payload(snapshot)
+    notes_encoded = json.dumps(notes_payload, ensure_ascii=False, separators=(",", ":"), default=str)
+    editor_encoded = json.dumps(editor_payload, ensure_ascii=False, separators=(",", ":"), default=str)
+    latest_encoded = json.dumps(latest_payload, ensure_ascii=False, separators=(",", ":"), default=str)
 
-    assert len(encoded.encode("utf-8")) * 3 < 65536
-    assert "content" not in payload["items"][0]
-    assert "text" not in payload["items"][0]
-    assert payload["items"][0]["preview"].endswith("...")
-    assert payload["editor"]["content"].startswith("Title 7\n")
-    assert payload["editor"]["attachments"][0]["url"] == skill_file_url("uploads/photos/local.gif")
-    assert "local_path" not in encoded
-    assert "stored_path" not in encoded
-    assert "file:///" not in encoded
-    assert r"D:\\git" not in encoded
+    assert len(notes_encoded.encode("utf-8")) < 65536
+    assert len(editor_encoded.encode("utf-8")) < 65536
+    assert len(latest_encoded.encode("utf-8")) < 4096
+    assert "content" not in notes_payload["items"][0]
+    assert "text" not in notes_payload["items"][0]
+    assert notes_payload["items"][0]["preview"].endswith("...")
+    assert editor_payload["editor"]["content"].startswith("Title 7\n")
+    assert editor_payload["editor"]["attachments"][0]["url"] == skill_file_url("uploads/photos/local.gif")
+    assert "local_path" not in editor_encoded
+    assert "stored_path" not in editor_encoded
+    assert "file:///" not in editor_encoded
+    assert r"D:\\git" not in editor_encoded
 
 
-def test_snapshot_projection_uses_ctx_subnet_without_custom_yjs_writer(monkeypatch):
+def test_stream_payloads_bound_worst_case_unicode_notes(monkeypatch):
     mod, _projected, _streams = load_module(monkeypatch)
-    calls = []
+    now = mod._now()
+    content = mod._clean_content(("Заголовок" * 100) + "\n" + ("данные" * 10000))
+    assert len(content.encode("utf-8")) <= mod._MAX_CONTENT_BYTES
+    notes = {
+        f"note-{index}": {
+            "id": f"note-{index}",
+            "content": content,
+            "attachments": [],
+            "created_at": now,
+            "updated_at": now + index,
+            "version": 1,
+        }
+        for index in range(mod._MAX_NOTES)
+    }
+    mod._STATE.update({
+        "notes": notes,
+        "order": list(notes),
+        "display_note_id": "note-0",
+        "editing_note_id": "note-0",
+    })
 
-    monkeypatch.setattr(
-        mod.ctx_subnet,
-        "set",
-        lambda slot, value, webspace_id=None: calls.append((slot, value, webspace_id)),
-    )
+    snapshot = mod._snapshot()
+    notes_bytes = len(json.dumps(mod._notes_stream_payload(snapshot), ensure_ascii=False).encode("utf-8"))
+    editor_bytes = len(json.dumps(mod._editor_stream_payload(snapshot), ensure_ascii=False).encode("utf-8"))
+    latest_bytes = len(json.dumps(mod._latest_stream_payload(snapshot), ensure_ascii=False).encode("utf-8"))
 
-    mod._project_notebook_snapshot_now({"ok": True, "notes": {"items": []}}, "desktop")
+    assert notes_bytes < 65536
+    assert editor_bytes < 65536
+    assert latest_bytes < 4096
 
-    assert calls == [("notebook.snapshot", {"ok": True, "notes": {"items": []}}, "desktop")]
+
+def test_attachment_count_is_bounded(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+    note = mod._STATE["notes"]["note-1"]
+    note["attachments"] = [{"id": f"att-{index}", "name": "file.txt"} for index in range(mod._MAX_ATTACHMENTS_PER_NOTE)]
+
+    result = mod.attach_note_file({"note_id": "note-1", "file": {"name": "overflow.txt"}})
+
+    assert result == {
+        "ok": False,
+        "error": "attachment_limit_reached",
+        "note_id": "note-1",
+        "limit": mod._MAX_ATTACHMENTS_PER_NOTE,
+    }
+
+
+def test_save_ack_does_not_duplicate_note_or_stream_snapshot(monkeypatch):
+    mod, _projected, _streams = load_module(monkeypatch)
+
+    result = mod.save_note({"note_id": "note-1", "content": "x" * mod._MAX_CONTENT_BYTES})
+    encoded = json.dumps(result, ensure_ascii=False, separators=(",", ":"), default=str)
+
+    assert len(encoded.encode("utf-8")) < 2048
+    assert "snapshot" not in result
+    assert "content" not in result["note"]
 
 
 def test_widget_snapshot_uses_latest_changed_note(monkeypatch):
@@ -525,7 +592,8 @@ def test_widget_snapshot_uses_latest_changed_note(monkeypatch):
     first = mod.create_note({"content": "First note"})
     second = mod.create_note({"content": "Second note"})
     mod.save_note({"note_id": first["note"]["id"], "content": "First note\nupdated"})
-    snapshot = mod.select_note({"note_id": second["note"]["id"], "edit": True})["snapshot"]
+    mod.select_note({"note_id": second["note"]["id"], "edit": True})
+    snapshot = mod._snapshot()
 
     assert snapshot["editor"]["id"] == second["note"]["id"]
     assert snapshot["widget"]["items"][0]["id"] == first["note"]["id"]

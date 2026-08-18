@@ -17,10 +17,11 @@
           "updated_at": null
         },
         "budget": {
-          "maxPayloadBytes": 32768,
+          "maxPayloadBytes": 65536,
           "maxPublishHz": 2,
           "maxSnapshotHz": 1,
-          "maxItems": 64
+          "maxItems": 64,
+          "maxFanout": 3
         },
         "guardVisibility": {
           "degradedState": "Keep the last notebook list snapshot.",
@@ -33,6 +34,87 @@
           "surface": "modal:notebook_modal",
           "owner": "skill:notebook_skill",
           "firstPaint": "default note cards",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "notebook_skill.action"
+          ]
+        }
+      },
+      "notebook_skill.editor": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": true,
+          "status": "loading",
+          "message": "Loading note",
+          "selected_note_id": "",
+          "editing_note_id": "",
+          "editor": {
+            "id": "",
+            "content": "",
+            "attachments": [],
+            "editing": false
+          },
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 2,
+          "maxSnapshotHz": 1,
+          "maxItems": 8,
+          "maxFanout": 3
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last editor snapshot.",
+          "log": "skill:notebook_skill.runtime",
+          "quarantine": false,
+          "metric": "webio_stream_guard.notebook_skill.editor"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:notebook_modal",
+          "owner": "skill:notebook_skill",
+          "firstPaint": "selected note editor",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "notebook_skill.action"
+          ]
+        }
+      },
+      "notebook_skill.latest": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": true,
+          "status": "loading",
+          "message": "Loading latest note",
+          "widget": {
+            "items": []
+          },
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 4096,
+          "maxPublishHz": 2,
+          "maxSnapshotHz": 1,
+          "maxItems": 1,
+          "maxFanout": 3
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last notebook widget snapshot.",
+          "log": "skill:notebook_skill.runtime",
+          "quarantine": false,
+          "metric": "webio_stream_guard.notebook_skill.latest"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "desktop.widget:notebook_skill_last_note",
+          "owner": "skill:notebook_skill",
+          "firstPaint": "latest note card",
           "recovery": "snapshot requested on stream subscribe",
           "updateSource": [
             "webio.stream.snapshot.requested",
@@ -54,7 +136,7 @@
         "params": {},
         "data": {
           "note": {
-            "source": "notebook_skill.notes",
+            "source": "notebook_skill.latest",
             "path": "widget.items.0"
           }
         },
@@ -91,7 +173,7 @@
         },
         "data": {
           "note": {
-            "source": "notebook_skill.notes",
+            "source": "notebook_skill.editor",
             "path": "editor"
           }
         },
@@ -168,7 +250,7 @@
       "icon": "document-text-outline",
       "dataSource": {
         "kind": "stream",
-        "receiver": "notebook_skill.notes",
+        "receiver": "notebook_skill.latest",
         "path": "widget"
       },
       "inputs": {
@@ -483,7 +565,7 @@
               "visibleIf": "$state.notebookViewMode === 'edit'",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "notebook_skill.notes",
+                "receiver": "notebook_skill.editor",
                 "path": "editor"
               },
               "inputs": {
@@ -526,7 +608,7 @@
               "visibleIf": "$state.notebookViewMode === 'edit'",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "notebook_skill.notes",
+                "receiver": "notebook_skill.editor",
                 "path": "editor"
               },
               "inputs": {
@@ -720,7 +802,7 @@
                 {
                   "on": "click:refresh",
                   "type": "callSkill",
-                  "target": "notebook_skill.get_notebook_snapshot"
+                  "target": "notebook_skill.refresh_notebook"
                 },
                 {
                   "on": "click:telegram",
@@ -755,46 +837,6 @@
         "title_i18n": {
           "key": "notebook.title"
         }
-      }
-    }
-  },
-  "ydoc_defaults": {
-    "data/desktop/notebook": {
-      "selected_note_id": "note-1",
-      "display_note_id": "note-1",
-      "editing_note_id": "",
-      "display": {
-        "id": "note-1",
-        "content": "",
-        "attachments": [],
-        "updated_at": null,
-        "version": 0
-      },
-      "editor": {
-        "id": "note-1",
-        "content": "",
-        "attachments": [],
-        "updated_at": null,
-        "version": 0,
-        "editing": false
-      },
-      "widget": {
-        "items": [
-          {
-            "id": "note-1",
-            "title": "New note",
-            "subtitle": "",
-            "content": "",
-            "text": "",
-            "preview": "",
-            "description": "",
-            "attachments": [],
-            "updated_at": null,
-            "title_i18n": {
-              "key": "notebook.new_note"
-            }
-          }
-        ]
       }
     }
   },

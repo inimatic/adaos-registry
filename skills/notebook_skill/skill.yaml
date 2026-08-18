@@ -1,5 +1,5 @@
 name: notebook_skill
-version: 0.1.38
+version: 0.1.39
 description: Shared plain-text notebook with one active editable note, a live note
   list stream, and Telegram export.
 supported_locales:
@@ -11,27 +11,20 @@ webui_owner: shared
 events:
   subscribe:
   - webio.stream.snapshot.requested
-  - webio.stream.subscription.changed
-  - node.yjs.control.completed
-data_projections:
-- scope: subnet
-  slot: notebook.snapshot
-  targets:
-  - backend: yjs
-    webspace_id: desktop
-    path: data/desktop/notebook
 data_routes:
 - surface: modal:notebook_modal
   route: stream
-  receiver: notebook_skill.notes
+  receiver: notebook_skill.editor
   path: editor
   first_paint: selected note from stream snapshot
   recovery: skill republishes durable state on stream subscribe
   update_source:
   - notebook_skill.action
   budget:
-    max_payload_bytes: 32768
+    max_payload_bytes: 65536
     max_publish_hz: 2
+    max_items: 8
+    max_fanout: 3
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: editor keeps the last stream snapshot
@@ -46,9 +39,10 @@ data_routes:
   - notebook_skill.action
   - webio.stream.snapshot.requested
   budget:
-    max_payload_bytes: 32768
+    max_payload_bytes: 65536
     max_publish_hz: 2
     max_items: 64
+    max_fanout: 3
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: note list keeps the last stream snapshot
@@ -56,7 +50,7 @@ data_routes:
     quarantine: false
 - surface: desktop.widget:notebook_skill_last_note
   route: stream
-  receiver: notebook_skill.notes
+  receiver: notebook_skill.latest
   path: widget
   first_paint: last note from stream snapshot
   recovery: skill republishes durable state on stream subscribe
@@ -64,9 +58,10 @@ data_routes:
   - notebook_skill.action
   - webio.stream.snapshot.requested
   budget:
-    max_payload_bytes: 32768
+    max_payload_bytes: 4096
     max_publish_hz: 2
     max_items: 1
+    max_fanout: 3
     snapshot_policy: on_subscribe
   guard_visibility:
     degraded_state: last note widget keeps the last stream snapshot
@@ -75,7 +70,7 @@ data_routes:
 memory_budget:
   expected_rss_mb: 64
   caches:
-  - name: notebook.notes
+  - name: notebook.state
     storage: skill_memory
     max_items: 64
     cleanup_hook: reset_notebook
@@ -85,8 +80,9 @@ lifecycle:
 tools:
 - name: get_notebook_snapshot
   entry: handlers.main:get_notebook_snapshot
-  description: Return the current in-memory notebook snapshot and publish it to Yjs
-    and stream outputs.
+  description: Return the current in-memory notebook snapshot without publishing it.
+  side_effects: read_only
+  side_effect_class: read_only
   input_schema:
     type: object
     properties:
@@ -102,6 +98,26 @@ tools:
         type: boolean
       snapshot:
         type: object
+- name: refresh_notebook
+  entry: handlers.main:refresh_notebook
+  description: Reload durable notebook state and publish receiver-specific snapshots.
+  side_effects: runtime_write
+  side_effect_class: runtime_write
+  input_schema:
+    type: object
+    properties:
+      webspace_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - status
+    properties:
+      ok:
+        type: boolean
+      status:
+        type: string
 - name: create_note
   entry: handlers.main:create_note
   description: Create a plain-text note and select it for editing.
@@ -147,7 +163,7 @@ tools:
         type: object
 - name: save_note
   entry: handlers.main:save_note
-  description: Save the active note content and publish updated Yjs/stream state.
+  description: Save the active note content and publish bounded stream state.
   side_effect_class: local_write
   input_schema:
     type: object
@@ -314,7 +330,7 @@ tools:
     properties:
       ok:
         type: boolean
-updated_at: '2026-08-11T09:26:50+00:00'
+updated_at: '2026-08-18T09:59:52+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.741+4835.a49f9166
@@ -336,4 +352,3 @@ nlu:
         tool: create_note
         target: notebook_skill.create_note
         params: {}
-
