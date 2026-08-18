@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-18T14:15:34+00:00",
+  "updated_at": "2026-08-18T14:16:06+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -754,8 +754,8 @@
       "kind": "skill",
       "id": "research_evaluator_skill",
       "name": "research_evaluator_skill",
-      "version": "0.1.13",
-      "updated_at": "2026-08-18T03:49:30+00:00",
+      "version": "0.1.15",
+      "updated_at": "2026-08-18T14:16:06+00:00",
       "path": "skills/research_evaluator_skill",
       "manifest": "skills/research_evaluator_skill/skill.yaml",
       "source": {
@@ -770,7 +770,7 @@
       "description": "Independent, contamination-aware evaluator for AdaOS research-compilation calibrations.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 10
+      "tools_count": 11
     },
     {
       "kind": "skill",

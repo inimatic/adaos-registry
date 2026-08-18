@@ -1,5 +1,5 @@
 name: research_evaluator_skill
-version: 0.1.13
+version: 0.1.15
 description: Independent, contamination-aware evaluator for AdaOS research-compilation
   calibrations.
 supported_locales:
@@ -162,8 +162,8 @@ tools:
     - task
     - runtime_identity
 - name: get_calibration_lineage
-  description: Return a path-free immutable task, packet, candidate, result, and
-    summary lineage for an authorized research-domain importer.
+  description: Return a path-free immutable task, packet, candidate, result, and summary
+    lineage for an authorized research-domain importer.
   entry: handlers.main:get_calibration_lineage
   side_effect_class: none
   input_schema:
@@ -390,12 +390,13 @@ data_routes:
     into candidate context
   budget:
     max_payload_bytes: 4194304
-updated_at: '2026-08-18T03:49:30+00:00'
+updated_at: '2026-08-18T14:16:06+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.859+5215.b06c8633
-    recorded_at: '2026-08-18T03:49:30+00:00'
+    min_version: 0.1.862+5251.0f8757f4
+    recorded_at: '2026-08-18T14:16:07+00:00'
     source: skill_push
-    min_commit: d462cceb37f676b7c246d71f460de27609e4f2ef
-    min_short_commit: d462cceb
-    build_date: '2026-08-18T01:32:47+00:00'
+    min_commit: 0f8757f463afa85c63706267e922aef41f22d2db
+    min_short_commit: 0f8757f4
+    build_date: '2026-08-18T17:08:54+03:00'
+
