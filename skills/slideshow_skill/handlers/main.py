@@ -29,7 +29,8 @@ from adaos.sdk.io.media import (
 from adaos.sdk.redevice import (
     choose_endpoint as sdk_choose_endpoint,
     compact_endpoint,
-    list_endpoints as sdk_list_endpoints,
+    fetch_endpoint_snapshot as sdk_fetch_endpoint_snapshot,
+    list_cached_endpoints as sdk_list_cached_endpoints,
     select_transport,
     with_local_content_route,
 )
@@ -94,6 +95,11 @@ _SURFACE_REASSERT_INTERVAL_S = 20.0
 _REDEVICE_COMMAND_TTL_S = _env_int("SLIDESHOW_REDEVICE_COMMAND_TTL_S", 120, 15, 600)
 _REDEVICE_LIST_TIMEOUT_S = _env_float("SLIDESHOW_REDEVICE_LIST_TIMEOUT_S", 5.0, 1.0, 20.0)
 _REDEVICE_COMMAND_HTTP_TIMEOUT_S = _env_float("SLIDESHOW_REDEVICE_COMMAND_HTTP_TIMEOUT_S", 4.0, 1.0, 12.0)
+_REDEVICE_REFRESH_INTERVAL_S = _env_float("SLIDESHOW_REDEVICE_REFRESH_INTERVAL_S", 60.0, 15.0, 3600.0)
+_REDEVICE_REFRESH_BACKOFF_MAX_S = _env_float("SLIDESHOW_REDEVICE_REFRESH_BACKOFF_MAX_S", 300.0, 30.0, 3600.0)
+_REDEVICE_REFRESH_JITTER_RATIO = _env_float("SLIDESHOW_REDEVICE_REFRESH_JITTER_RATIO", 0.2, 0.0, 0.5)
+_REDEVICE_COMMAND_BACKOFF_INITIAL_S = _env_float("SLIDESHOW_REDEVICE_COMMAND_BACKOFF_INITIAL_S", 10.0, 2.0, 60.0)
+_REDEVICE_COMMAND_BACKOFF_MAX_S = _env_float("SLIDESHOW_REDEVICE_COMMAND_BACKOFF_MAX_S", 60.0, 10.0, 600.0)
 _REDEVICE_CACHE_MIN_FREE_FRACTION = 0.20
 _VOLATILE_STREAM_KEYS = {"updated_at"}
 _log = logging.getLogger("skills.slideshow_skill")
@@ -120,6 +126,35 @@ _index_read_connection: sqlite3.Connection | None = None
 _index_read_connection_path = ""
 _folder_cache_lock = threading.Lock()
 _folder_cache: dict[tuple[str, str, int, int], list[dict[str, Any]]] = {}
+_device_read_lock = threading.Lock()
+_device_read_stats: dict[str, Any] = {
+    "cached_reads": 0,
+    "remote_reads": 0,
+    "cached_items": 0,
+    "remote_items": 0,
+    "last_cached_at": "",
+    "last_remote_at": "",
+    "last_cached_duration_ms": 0.0,
+    "last_remote_duration_ms": 0.0,
+    "max_remote_duration_ms": 0.0,
+    "remote_failures": 0,
+    "remote_failure_streak": 0,
+    "last_remote_error": "",
+    "next_remote_refresh_at": "",
+    "command_attempts": 0,
+    "command_failures": 0,
+    "command_backoff_suppressed": 0,
+    "last_command_error": "",
+    "last_command_duration_ms": 0.0,
+    "next_command_retry_at": "",
+    "local_projection_bootstrap_reads": 0,
+    "projection_source": "uninitialized",
+}
+_device_projection: list[dict[str, Any]] = []
+_device_projection_initialized = False
+_device_refresh_lock = threading.Lock()
+_device_refresh_next_monotonic = 0.0
+_device_command_guards: dict[str, dict[str, Any]] = {}
 
 
 def _now() -> str:
@@ -1725,11 +1760,15 @@ def _hide_current_photo(state: dict[str, Any], files: list[Path]) -> dict[str, A
     return _hide_ref(state, _content_ref(current))
 
 
-def _selected_endpoint_label(selected_codes: list[str]) -> str:
+def _selected_endpoint_label(
+    selected_codes: list[str],
+    *,
+    endpoint_devices: list[Mapping[str, Any]] | None = None,
+) -> str:
     if not selected_codes:
         return "Widget only"
     try:
-        devices = _load_devices()
+        devices = endpoint_devices if endpoint_devices is not None else _load_devices()
         items = [compact_endpoint(item, selected_codes=set(selected_codes)) for item in devices]
         by_code = {_text(item.get("code")): _text(item.get("title")) for item in items}
         labels = [by_code.get(code) or code for code in selected_codes]
@@ -1748,6 +1787,7 @@ def _session_payload(
     defer_media: bool | None = None,
     defer_reason: str = "index_running",
     resolve_endpoint_label: bool = True,
+    endpoint_devices: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     selected = _selected_photos(files, state)
     current, next_photo = _current_and_next_photos(files, state)
@@ -1804,7 +1844,7 @@ def _session_payload(
                 _media_lock.release()
     selected_codes = _unique_texts(state.get("selected_codes"))
     if resolve_endpoint_label:
-        header = _selected_endpoint_label(selected_codes)
+        header = _selected_endpoint_label(selected_codes, endpoint_devices=endpoint_devices)
     else:
         header = _text(state.get("selected_label")) or ", ".join(selected_codes) or "Widget only"
     favorite_count = _favorite_count(root)
@@ -1870,8 +1910,128 @@ def _publish(receiver: str, payload: Mapping[str, Any], webspace_id: str | None 
         _log.debug("failed to publish slideshow stream receiver=%s", token, exc_info=True)
 
 
+def _record_device_read(
+    source: str,
+    started_at: float,
+    count: int,
+    *,
+    ok: bool = True,
+    error: str = "",
+) -> None:
+    duration_ms = max(0.0, (time.perf_counter() - started_at) * 1000.0)
+    with _device_read_lock:
+        _device_read_stats[f"{source}_reads"] = int(_device_read_stats.get(f"{source}_reads") or 0) + 1
+        _device_read_stats[f"{source}_items"] = max(0, int(count))
+        _device_read_stats[f"last_{source}_at"] = _now()
+        _device_read_stats[f"last_{source}_duration_ms"] = round(duration_ms, 3)
+        if source == "remote":
+            _device_read_stats["max_remote_duration_ms"] = round(
+                max(duration_ms, float(_device_read_stats.get("max_remote_duration_ms") or 0.0)),
+                3,
+            )
+            if not ok:
+                _device_read_stats["remote_failures"] = int(_device_read_stats.get("remote_failures") or 0) + 1
+                _device_read_stats["last_remote_error"] = _text(error) or "remote_refresh_failed"
+            else:
+                _device_read_stats["last_remote_error"] = ""
+
+
+def device_read_diagnostics() -> dict[str, Any]:
+    with _device_read_lock:
+        snapshot = dict(_device_read_stats)
+    return {
+        "source": "process_local",
+        "pid": os.getpid(),
+        **snapshot,
+    }
+
+
 def _load_devices() -> list[dict[str, Any]]:
-    return sdk_list_endpoints(sync_registry=True, timeout=_REDEVICE_LIST_TIMEOUT_S)
+    global _device_projection_initialized
+    started_at = time.perf_counter()
+    snapshot = sdk_fetch_endpoint_snapshot(sync_registry=True, timeout=_REDEVICE_LIST_TIMEOUT_S)
+    devices = [dict(item) for item in snapshot.get("endpoints") or [] if isinstance(item, Mapping)]
+    remote = _mapping(snapshot.get("remote"))
+    remote_ok = bool(remote.get("ok"))
+    _record_device_read(
+        "remote",
+        started_at,
+        len(devices),
+        ok=remote_ok,
+        error=_text(remote.get("error")),
+    )
+    with _device_read_lock:
+        if remote_ok or not _device_projection_initialized:
+            _device_projection[:] = devices
+            _device_projection_initialized = True
+            _device_read_stats["projection_source"] = "remote_merged" if remote_ok else "local_fallback"
+    return devices
+
+
+def _load_cached_devices() -> list[dict[str, Any]]:
+    global _device_projection_initialized
+    started_at = time.perf_counter()
+    with _device_read_lock:
+        initialized = _device_projection_initialized
+    if not initialized:
+        local_devices = [dict(item) for item in sdk_list_cached_endpoints()]
+        with _device_read_lock:
+            if not _device_projection_initialized:
+                _device_projection[:] = local_devices
+                _device_projection_initialized = True
+                _device_read_stats["local_projection_bootstrap_reads"] = int(
+                    _device_read_stats.get("local_projection_bootstrap_reads") or 0
+                ) + 1
+                _device_read_stats["projection_source"] = "local_bootstrap"
+    with _device_read_lock:
+        devices = [dict(item) for item in _device_projection]
+    _record_device_read("cached", started_at, len(devices))
+    return devices
+
+
+def _schedule_next_device_refresh(*, ok: bool, error: str = "") -> None:
+    global _device_refresh_next_monotonic
+    now = time.monotonic()
+    with _device_read_lock:
+        if ok:
+            streak = 0
+            delay_s = _REDEVICE_REFRESH_INTERVAL_S
+            _device_read_stats["last_remote_error"] = ""
+        else:
+            streak = int(_device_read_stats.get("remote_failure_streak") or 0) + 1
+            delay_s = min(
+                _REDEVICE_REFRESH_BACKOFF_MAX_S,
+                max(5.0, 5.0 * (2 ** min(8, streak - 1))),
+            )
+            _device_read_stats["last_remote_error"] = _text(error) or "remote_refresh_failed"
+        jitter = random.uniform(-_REDEVICE_REFRESH_JITTER_RATIO, _REDEVICE_REFRESH_JITTER_RATIO)
+        delay_s = max(1.0, delay_s * (1.0 + jitter))
+        _device_refresh_next_monotonic = now + delay_s
+        _device_read_stats["remote_failure_streak"] = streak
+        _device_read_stats["next_remote_refresh_at"] = datetime.fromtimestamp(
+            time.time() + delay_s,
+            tz=timezone.utc,
+        ).isoformat()
+
+
+def _refresh_device_projection_if_due(*, force: bool = False) -> bool:
+    now = time.monotonic()
+    with _device_read_lock:
+        due = force or now >= _device_refresh_next_monotonic
+    if not due or not _device_refresh_lock.acquire(blocking=False):
+        return False
+    try:
+        with _device_read_lock:
+            if not force and time.monotonic() < _device_refresh_next_monotonic:
+                return False
+        devices = _load_devices()
+        with _device_read_lock:
+            ok = not bool(_device_read_stats.get("last_remote_error"))
+            error = _text(_device_read_stats.get("last_remote_error"))
+        _schedule_next_device_refresh(ok=ok, error=error)
+        return bool(devices) or ok
+    finally:
+        _device_refresh_lock.release()
 
 
 def _select_device(devices: list[Mapping[str, Any]], code: str | None = None) -> Mapping[str, Any] | None:
@@ -2008,14 +2168,76 @@ def _send_endpoint_command(
     endpoint: Mapping[str, Any] | None = None,
     constraints: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return device_access.send_endpoint_command(
+    target = _text(pair_code)
+    now = time.monotonic()
+    with _device_read_lock:
+        guard = dict(_device_command_guards.get(target) or {})
+        not_before = float(guard.get("not_before") or 0.0)
+        if now < not_before:
+            retry_after_s = max(0.0, not_before - now)
+            _device_read_stats["command_backoff_suppressed"] = int(
+                _device_read_stats.get("command_backoff_suppressed") or 0
+            ) + 1
+            _device_read_stats["next_command_retry_at"] = datetime.fromtimestamp(
+                time.time() + retry_after_s,
+                tz=timezone.utc,
+            ).isoformat()
+            return {
+                "ok": False,
+                "error": "command_backoff",
+                "code": target,
+                "retry_after_s": round(retry_after_s, 3),
+                "failure_streak": int(guard.get("failure_streak") or 0),
+            }
+    started_at = time.perf_counter()
+    result = device_access.send_endpoint_command(
         device_ref=_endpoint_device_ref(endpoint, pair_code) or None,
         code=pair_code,
         command=command,
         requested_by=_owner(),
         constraints=constraints,
         timeout=_REDEVICE_COMMAND_HTTP_TIMEOUT_S,
+        refresh_endpoint=False,
+        endpoint_snapshot=endpoint,
     )
+    duration_ms = max(0.0, (time.perf_counter() - started_at) * 1000.0)
+    with _device_read_lock:
+        _device_read_stats["command_attempts"] = int(_device_read_stats.get("command_attempts") or 0) + 1
+        _device_read_stats["last_command_duration_ms"] = round(duration_ms, 3)
+        if bool(result.get("ok")):
+            _device_command_guards.pop(target, None)
+            _device_read_stats["last_command_error"] = ""
+            _device_read_stats["next_command_retry_at"] = ""
+        else:
+            failure_streak = int(guard.get("failure_streak") or 0) + 1
+            delay_s = min(
+                _REDEVICE_COMMAND_BACKOFF_MAX_S,
+                _REDEVICE_COMMAND_BACKOFF_INITIAL_S * (2 ** min(8, failure_streak - 1)),
+            )
+            delay_s = max(
+                1.0,
+                delay_s
+                * (1.0 + random.uniform(-_REDEVICE_REFRESH_JITTER_RATIO, _REDEVICE_REFRESH_JITTER_RATIO)),
+            )
+            not_before = time.monotonic() + delay_s
+            _device_command_guards[target] = {
+                "failure_streak": failure_streak,
+                "not_before": not_before,
+                "updated_at": time.monotonic(),
+            }
+            if len(_device_command_guards) > 32:
+                oldest = min(
+                    _device_command_guards,
+                    key=lambda key: float(_device_command_guards[key].get("updated_at") or 0.0),
+                )
+                _device_command_guards.pop(oldest, None)
+            _device_read_stats["command_failures"] = int(_device_read_stats.get("command_failures") or 0) + 1
+            _device_read_stats["last_command_error"] = _text(result.get("error")) or "command_failed"
+            _device_read_stats["next_command_retry_at"] = datetime.fromtimestamp(
+                time.time() + delay_s,
+                tz=timezone.utc,
+            ).isoformat()
+    return result
 
 
 def _endpoint_payload(devices: list[dict[str, Any]], state: Mapping[str, Any]) -> dict[str, Any]:
@@ -2645,8 +2867,9 @@ def _send_to_selected(
     *,
     code: str | None = None,
     webspace_id: str | None = None,
+    endpoint_devices: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    devices = _load_devices()
+    devices = endpoint_devices if endpoint_devices is not None else _load_devices()
     configured_codes = _unique_texts(state.get("selected_codes"))
     target_codes = _unique_texts([code]) if code else configured_codes
     if not target_codes:
@@ -2809,6 +3032,7 @@ def _send_to_selected(
             webspace_id=webspace_id,
             schedule_prewarm=True,
             defer_media=_index_busy_for_state(state),
+            endpoint_devices=devices,
         ),
         webspace_id,
     )
@@ -2880,6 +3104,7 @@ def _sync_running_surface(
     code: str | None = None,
     webspace_id: str | None = None,
     reason: str = "state_changed",
+    endpoint_devices: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     if not state.get("running"):
         return {}
@@ -2891,9 +3116,20 @@ def _sync_running_surface(
         state["last_surface_sync_reason"] = _text(reason) or "state_changed"
         state["last_surface_sync_at"] = time.time()
         _save_state(state)
-        return _stop_selected(state, code=code, webspace_id=webspace_id)
+        return _stop_selected(
+            state,
+            code=code,
+            webspace_id=webspace_id,
+            endpoint_devices=endpoint_devices,
+        )
     state["last_surface_sync_reason"] = _text(reason) or "state_changed"
-    return _send_to_selected(state, selected_files, code=code, webspace_id=webspace_id)
+    return _send_to_selected(
+        state,
+        selected_files,
+        code=code,
+        webspace_id=webspace_id,
+        endpoint_devices=endpoint_devices,
+    )
 
 
 def _active_app_conflicts(
@@ -2926,8 +3162,9 @@ def _stop_selected(
     *,
     code: str | None = None,
     webspace_id: str | None = None,
+    endpoint_devices: list[Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
-    devices = _load_devices()
+    devices = endpoint_devices if endpoint_devices is not None else _load_devices()
     selected_codes = _unique_texts([code] if code else state.get("selected_codes"))
     if not selected_codes:
         device = _select_device(devices)
@@ -3005,6 +3242,7 @@ def _stop_selected(
             webspace_id=webspace_id,
             schedule_prewarm=True,
             defer_media=_index_busy_for_state(state),
+            endpoint_devices=devices,
         ),
         webspace_id,
     )
@@ -3061,11 +3299,22 @@ def _apply_root_events(
         if _index_busy_for_state(state):
             return state
         if broadcast and state.get("sync"):
-            _send_to_selected(state, _files_for_state(state, _MAX_CONTROL_SCAN), webspace_id=webspace_id)
+            _send_to_selected(
+                state,
+                _files_for_state(state, _MAX_CONTROL_SCAN),
+                webspace_id=webspace_id,
+                endpoint_devices=list(devices),
+            )
         elif broadcast and refresh_codes:
             fresh_files = _files_for_state(state, _MAX_CONTROL_SCAN)
             for target_code in sorted(refresh_codes):
-                _send_to_selected(state, fresh_files, code=target_code, webspace_id=webspace_id)
+                _send_to_selected(
+                    state,
+                    fresh_files,
+                    code=target_code,
+                    webspace_id=webspace_id,
+                    endpoint_devices=list(devices),
+                )
     return state
 
 
@@ -3101,18 +3350,36 @@ def _apply_service_tick(
     if last_tick <= 0:
         state["last_service_tick_at"] = now
         _save_state(state)
-        _sync_running_surface(state, files, webspace_id=webspace_id, reason="runtime_started")
+        _sync_running_surface(
+            state,
+            files,
+            webspace_id=webspace_id,
+            reason="runtime_started",
+            endpoint_devices=list(devices or []),
+        )
         return True
     if now - last_tick < interval_s:
         last_sync = float(state.get("last_surface_sync_at") or 0)
         if now - last_sync >= _SURFACE_REASSERT_INTERVAL_S:
-            _sync_running_surface(state, files, webspace_id=webspace_id, reason="periodic_reassert")
+            _sync_running_surface(
+                state,
+                files,
+                webspace_id=webspace_id,
+                reason="periodic_reassert",
+                endpoint_devices=list(devices or []),
+            )
             return True
         return False
     _advance(state, files, 1)
     state["last_service_tick_at"] = now
     _save_state(state)
-    _sync_running_surface(state, files, webspace_id=webspace_id, reason="service_tick")
+    _sync_running_surface(
+        state,
+        files,
+        webspace_id=webspace_id,
+        reason="service_tick",
+        endpoint_devices=list(devices or []),
+    )
     return True
 
 
@@ -3123,7 +3390,7 @@ def _poll_once(webspace_id: str | None = None) -> None:
         running = bool(state.get("running"))
         if not running and not selected_codes:
             return
-        devices = _load_devices() if selected_codes else []
+        devices = _load_cached_devices() if selected_codes else []
         files = _files_for_state(state, _MAX_CONTROL_SCAN) if running else []
         state = _apply_root_events(state, devices, files, webspace_id=webspace_id, broadcast=running)
         if running:
@@ -3179,8 +3446,11 @@ def _schedule_pending_device_cache_after_index(root: Path, scan_started: float, 
 
 
 def _poll_loop() -> None:
-    while not _poll_stop.wait(_POLL_INTERVAL_S):
+    while not _poll_stop.is_set():
+        _refresh_device_projection_if_due()
         _poll_once(_poll_webspace_id or None)
+        if _poll_stop.wait(_POLL_INTERVAL_S):
+            break
 
 
 def _ensure_polling(webspace_id: str | None = None, *, force: bool = False) -> bool:

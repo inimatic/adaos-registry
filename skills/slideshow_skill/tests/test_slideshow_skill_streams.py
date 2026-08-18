@@ -339,7 +339,16 @@ def test_stopped_poll_does_not_publish_session_or_query_files(monkeypatch):
             "running": False,
         },
     )
-    monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "ABC123", "state": "approved", "last_seen_at": 1}])
+    monkeypatch.setattr(
+        mod,
+        "_load_cached_devices",
+        lambda: [{"code": "ABC123", "state": "approved", "last_seen_at": 1}],
+    )
+    monkeypatch.setattr(
+        mod,
+        "_load_devices",
+        lambda: (_ for _ in ()).throw(AssertionError("background poll must not request Root")),
+    )
     monkeypatch.setattr(
         mod,
         "_files_for_state",
@@ -360,6 +369,120 @@ def test_stopped_poll_does_not_publish_session_or_query_files(monkeypatch):
     mod._poll_once("ws-1")
 
     assert published == ["slideshow_skill.endpoints"]
+
+
+def test_device_read_diagnostics_attribute_cached_and_remote_sources(monkeypatch):
+    mod = _load_slideshow_module()
+    monkeypatch.setattr(mod, "sdk_list_cached_endpoints", lambda: [{"code": "CACHED"}])
+    monkeypatch.setattr(
+        mod,
+        "sdk_fetch_endpoint_snapshot",
+        lambda **_kwargs: {
+            "endpoints": [{"code": "REMOTE"}, {"code": "REMOTE2"}],
+            "remote": {"ok": True, "item_count": 2},
+        },
+    )
+
+    assert [item["code"] for item in mod._load_cached_devices()] == ["CACHED"]
+    assert [item["code"] for item in mod._load_devices()] == ["REMOTE", "REMOTE2"]
+
+    diagnostics = mod.device_read_diagnostics()
+    assert diagnostics["source"] == "process_local"
+    assert diagnostics["cached_reads"] == 1
+    assert diagnostics["remote_reads"] == 1
+    assert diagnostics["cached_items"] == 1
+    assert diagnostics["remote_items"] == 2
+    assert diagnostics["last_cached_at"]
+    assert diagnostics["last_remote_at"]
+
+
+def test_cached_device_ticks_bootstrap_disk_projection_once(monkeypatch):
+    mod = _load_slideshow_module()
+    calls: list[str] = []
+    monkeypatch.setattr(
+        mod,
+        "sdk_list_cached_endpoints",
+        lambda: calls.append("local") or [{"code": "CACHED", "endpoint_id": "endpoint-1"}],
+    )
+
+    assert [item["code"] for item in mod._load_cached_devices()] == ["CACHED"]
+    assert [item["code"] for item in mod._load_cached_devices()] == ["CACHED"]
+
+    assert calls == ["local"]
+    diagnostics = mod.device_read_diagnostics()
+    assert diagnostics["local_projection_bootstrap_reads"] == 1
+    assert diagnostics["projection_source"] == "local_bootstrap"
+
+
+def test_background_endpoint_refresh_backs_off_and_populates_projection(monkeypatch):
+    mod = _load_slideshow_module()
+    calls: list[str] = []
+    monkeypatch.setattr(mod, "sdk_list_cached_endpoints", lambda: [])
+    monkeypatch.setattr(mod.random, "uniform", lambda *_args: 0.0)
+
+    def fetch(**_kwargs):
+        calls.append("fetch")
+        return {
+            "endpoints": [{"code": "REMOTE", "endpoint_id": "endpoint-1"}],
+            "remote": {"ok": True, "item_count": 1},
+        }
+
+    monkeypatch.setattr(mod, "sdk_fetch_endpoint_snapshot", fetch)
+
+    assert mod._refresh_device_projection_if_due(force=True) is True
+    assert mod._refresh_device_projection_if_due() is False
+    assert calls == ["fetch"]
+    assert [item["code"] for item in mod._load_cached_devices()] == ["REMOTE"]
+    diagnostics = mod.device_read_diagnostics()
+    assert diagnostics["remote_failure_streak"] == 0
+    assert diagnostics["next_remote_refresh_at"]
+
+
+def test_background_endpoint_refresh_records_failure_backoff(monkeypatch):
+    mod = _load_slideshow_module()
+    monkeypatch.setattr(mod.random, "uniform", lambda *_args: 0.0)
+    monkeypatch.setattr(
+        mod,
+        "sdk_fetch_endpoint_snapshot",
+        lambda **_kwargs: {
+            "endpoints": [],
+            "remote": {"ok": False, "error": "request_failed", "item_count": 0},
+        },
+    )
+
+    assert mod._refresh_device_projection_if_due(force=True) is False
+    assert mod._refresh_device_projection_if_due() is False
+    diagnostics = mod.device_read_diagnostics()
+    assert diagnostics["remote_failures"] == 1
+    assert diagnostics["remote_failure_streak"] == 1
+    assert diagnostics["last_remote_error"] == "request_failed"
+    assert diagnostics["next_remote_refresh_at"]
+
+
+def test_endpoint_command_failures_open_per_target_backoff(monkeypatch):
+    mod = _load_slideshow_module()
+    calls: list[dict[str, object]] = []
+    monkeypatch.setattr(mod.random, "uniform", lambda *_args: 0.0)
+    monkeypatch.setattr(
+        mod.device_access,
+        "send_endpoint_command",
+        lambda **kwargs: calls.append(dict(kwargs)) or {"ok": False, "error": "request_failed"},
+    )
+
+    first = mod._send_endpoint_command("A", {"type": "display.test"})
+    second = mod._send_endpoint_command("A", {"type": "display.test"})
+
+    assert first["error"] == "request_failed"
+    assert second["error"] == "command_backoff"
+    assert second["failure_streak"] == 1
+    assert second["retry_after_s"] >= 9.9
+    assert len(calls) == 1
+    assert calls[0]["refresh_endpoint"] is False
+    diagnostics = mod.device_read_diagnostics()
+    assert diagnostics["command_attempts"] == 1
+    assert diagnostics["command_failures"] == 1
+    assert diagnostics["command_backoff_suppressed"] == 1
+    assert diagnostics["next_command_retry_at"]
 
 
 def test_start_index_job_reports_running_status_with_previous_count(monkeypatch, tmp_path):
@@ -1170,7 +1293,7 @@ def test_poll_once_does_not_rebuild_session_after_endpoint_tick(monkeypatch, tmp
         "running": True,
     }
     monkeypatch.setattr(mod, "_load_state", lambda: dict(state))
-    monkeypatch.setattr(mod, "_load_devices", lambda: [{"code": "A"}])
+    monkeypatch.setattr(mod, "_load_cached_devices", lambda: [{"code": "A"}])
     monkeypatch.setattr(mod, "_files_for_state", lambda *_args, **_kwargs: [tmp_path / "one.jpg"])
     monkeypatch.setattr(mod, "_apply_root_events", lambda current, *_args, **_kwargs: current)
     monkeypatch.setattr(mod, "_apply_service_tick", lambda *_args, **_kwargs: True)
@@ -1187,6 +1310,58 @@ def test_poll_once_does_not_rebuild_session_after_endpoint_tick(monkeypatch, tmp
     mod._poll_once("ws-1")
 
     assert published == ["slideshow_skill.endpoints"]
+
+
+def test_service_tick_reuses_cached_devices_for_surface_send(monkeypatch, tmp_path):
+    mod = _load_slideshow_module()
+    devices = [{"code": "A", "state": "approved"}]
+    observed: list[list[dict[str, object]]] = []
+    state = {
+        "source_dir": str(tmp_path),
+        "selected_codes": ["A"],
+        "running": True,
+        "interval_ms": 7000,
+        "last_service_tick_at": 0,
+    }
+    monkeypatch.setattr(mod, "_selected_photos", lambda *_args, **_kwargs: [tmp_path / "one.jpg"])
+    monkeypatch.setattr(mod, "_save_state", lambda current: current)
+    monkeypatch.setattr(
+        mod,
+        "_sync_running_surface",
+        lambda *_args, **kwargs: observed.append(list(kwargs.get("endpoint_devices") or [])) or {"ok": True},
+    )
+
+    assert mod._apply_service_tick(state, [tmp_path / "one.jpg"], devices=devices) is True
+    assert observed == [devices]
+
+
+def test_surface_send_does_not_refresh_root_when_devices_are_supplied(monkeypatch):
+    mod = _load_slideshow_module()
+    devices = [{"code": "A", "state": "approved"}]
+    session_devices: list[list[dict[str, object]]] = []
+    monkeypatch.setattr(
+        mod,
+        "_load_devices",
+        lambda: (_ for _ in ()).throw(AssertionError("routine surface send must reuse cached devices")),
+    )
+    monkeypatch.setattr(mod, "_endpoint_accepts_commands", lambda _endpoint: False)
+    monkeypatch.setattr(mod, "_remember_command_payload", lambda payload: payload)
+    monkeypatch.setattr(mod, "_command_items", lambda _payload: [])
+    monkeypatch.setattr(mod, "_publish", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        mod,
+        "_session_payload",
+        lambda *_args, **kwargs: session_devices.append(list(kwargs.get("endpoint_devices") or [])) or {"ok": True},
+    )
+
+    result = mod._send_to_selected(
+        {"selected_codes": ["A"], "source_dir": ""},
+        [],
+        endpoint_devices=devices,
+    )
+
+    assert result["degraded"] is True
+    assert session_devices == [devices]
 
 
 def test_polling_thread_is_owned_only_by_service_process(monkeypatch):
@@ -1229,6 +1404,8 @@ def test_activate_runtime_rehydrates_running_slideshow(monkeypatch):
 
     assert result["ok"] is True
     assert result["polling"] is True
+    assert result["polling_local"] is True
+    assert result["polling_owner"] == "service_process"
     assert started == ["ws-restore"]
     assert polled == ["ws-restore"]
 

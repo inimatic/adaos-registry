@@ -86,6 +86,7 @@ class _HealthHandler(BaseHTTPRequestHandler):
             "current_index": state.get("current_index") or 0,
             "last_surface_sync_reason": state.get("last_surface_sync_reason") or "",
             "memory_path": os.environ.get("ADAOS_SKILL_ENV_PATH") or "",
+            "device_reads": main.device_read_diagnostics(),
             "updated_at": main._now(),
         }
         raw = json.dumps(body, ensure_ascii=False).encode("utf-8")
