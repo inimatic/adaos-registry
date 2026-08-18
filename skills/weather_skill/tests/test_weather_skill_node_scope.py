@@ -37,6 +37,25 @@ def _load_weather_module():
     return module
 
 
+def _patch_memory(monkeypatch, mod, memory: dict[str, object]) -> None:
+    def _get(key, default=None):
+        return memory.get(key, default)
+
+    def _set(key, value):
+        memory[key] = value
+
+    async def _async_get(key, default=None):
+        return _get(key, default)
+
+    async def _async_set(key, value):
+        _set(key, value)
+
+    monkeypatch.setattr(mod, "memory_get", _get)
+    monkeypatch.setattr(mod, "memory_set", _set)
+    monkeypatch.setattr(mod, "memory_async_get", _async_get)
+    monkeypatch.setattr(mod, "memory_async_set", _async_set)
+
+
 def test_weather_webui_uses_targeted_projection_observers():
     webui_path = Path(__file__).resolve().parents[1] / "webui.json"
     contract = json.loads(webui_path.read_text(encoding="utf-8"))
@@ -81,13 +100,11 @@ def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch
     async def _fetch_weather_async(*_args, **_kwargs):
         return True, {"temp": 10, "description": "clear", "wind_ms": 1}
 
-    monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(mod, "get_self_object", lambda: {"id": "member:member-local"})
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", None))
     monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
-    monkeypatch.setattr(mod, "memory_get", lambda key, default=None: memory.get(key, default))
-    monkeypatch.setattr(mod, "memory_set", lambda key, value: memory.__setitem__(key, value))
+    _patch_memory(monkeypatch, mod, memory)
 
     import asyncio
 
@@ -140,13 +157,11 @@ def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
             "daily": [{"day": "2026-05-17"}],
         }
 
-    monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(mod, "get_self_object", lambda: {"id": "member:member-local"})
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", "Moscow"))
     monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
-    monkeypatch.setattr(mod, "memory_get", lambda key, default=None: memory.get(key, default))
-    monkeypatch.setattr(mod, "memory_set", lambda key, value: memory.__setitem__(key, value))
+    _patch_memory(monkeypatch, mod, memory)
 
     import asyncio
 
@@ -179,12 +194,10 @@ def test_weather_rapid_city_changes_project_only_latest_terminal_snapshot(monkey
         async def set_async(self, slot, payload, webspace_id=None):
             projected.append((slot, payload, webspace_id))
 
-    monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(mod, "get_self_object", lambda: {"id": "member:member-local"})
     monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", None))
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
-    monkeypatch.setattr(mod, "memory_get", lambda key, default=None: memory.get(key, default))
-    monkeypatch.setattr(mod, "memory_set", lambda key, value: memory.__setitem__(key, value))
+    _patch_memory(monkeypatch, mod, memory)
 
     import asyncio
 
@@ -224,6 +237,57 @@ def test_weather_rapid_city_changes_project_only_latest_terminal_snapshot(monkey
     assert runtime["superseded_total"] == 1
     assert runtime["active_total"] == 0
     assert runtime["status_source"] == "skill_memory"
+
+
+def test_weather_runtime_status_does_not_report_stale_active_state_as_current(monkeypatch):
+    mod = _load_weather_module()
+    stale_state = {
+        "accepted_total": 2,
+        "completed_total": 0,
+        "superseded_total": 1,
+        "failed_total": 0,
+        "projection_rejected_total": 0,
+        "active_total": 1,
+        "max_active_total": 2,
+        "state_updated_at": "2020-01-01T00:00:00+00:00",
+    }
+    monkeypatch.setattr(
+        mod,
+        "memory_get",
+        lambda key, default=None: stale_state if key == mod._REQUEST_DIAGNOSTICS_MEMORY_KEY else default,
+    )
+
+    runtime = mod.get_runtime_status()
+
+    assert runtime["status_source"] == "skill_memory"
+    assert runtime["active_state_stale"] is True
+    assert runtime["reported_active_total"] == 1
+    assert runtime["active_total"] is None
+    assert runtime["state_updated_at"] == "2020-01-01T00:00:00+00:00"
+    assert runtime["observed_at"] != runtime["state_updated_at"]
+
+
+def test_weather_runtime_status_exposes_diagnostic_persistence_failure(monkeypatch):
+    mod = _load_weather_module()
+
+    async def _fail_set(*_args, **_kwargs):
+        raise OSError("disk unavailable")
+
+    monkeypatch.setattr(mod, "memory_async_set", _fail_set)
+    monkeypatch.setattr(mod, "memory_get", lambda _key, default=None: default)
+
+    import asyncio
+
+    asyncio.run(
+        mod._persist_weather_request_diagnostics(
+            {"active_total": 0, "state_updated_at": mod._now_iso()}
+        )
+    )
+    runtime = mod.get_runtime_status()
+
+    assert runtime["status_source"] == "process_memory"
+    assert runtime["diagnostic_persist_failed_total"] == 1
+    assert runtime["last_persist_error"]["type"] == "OSError"
 
 
 def test_weather_snapshot_returns_last_projected_webspace_state_without_refetch(monkeypatch):
@@ -351,16 +415,20 @@ def test_weather_projection_persists_snapshot_before_yjs_write(monkeypatch):
         "current": {"city": "Vienna", "temp_c": 22.3, "request_id": "req-vienna", "pending": False},
     }
     monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
-    monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(mod, "memory_set", lambda key, value: memory.__setitem__(key, value))
 
     import asyncio
 
-    asyncio.run(mod._project_weather_snapshot_async(snapshot, webspace_id="desktop"))
+    async def _run():
+        assert await mod._project_weather_snapshot_async(snapshot, webspace_id="desktop") is True
+        await mod.memory_async_set("projection_context_probe", {"ready": True})
+
+    asyncio.run(_run())
 
     assert projected == [("weather.snapshot", snapshot, "desktop")]
     assert memory["webspace_snapshot.desktop"] == snapshot
     assert memory["last_city"] == "Vienna"
+    assert mod.memory_get("projection_context_probe") == {"ready": True}
 
 
 def test_weather_targeted_request_is_only_processed_by_target_node(monkeypatch):
@@ -371,7 +439,6 @@ def test_weather_targeted_request_is_only_processed_by_target_node(monkeypatch):
         fetches.append("called")
         return True, {"temp": 10, "description": "clear", "wind_ms": 1}
 
-    monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(mod, "get_self_object", lambda: {"id": "hub:hub-local"})
     monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
 
@@ -544,6 +611,8 @@ def test_weather_async_fetch_preserves_skill_i18n_in_worker_thread(monkeypatch):
         json.dumps({"runtime.weather.errors.status": "Weather API returned status {status}"}, ensure_ascii=False),
         encoding="utf-8",
     )
+    previous = ctx.skill_ctx.get()
+    assert ctx.skill_ctx.set("weather_skill", skill_dir) is True
 
     class _Response:
         status_code = 503
@@ -564,7 +633,13 @@ def test_weather_async_fetch_preserves_skill_i18n_in_worker_thread(monkeypatch):
 
     import asyncio
 
-    ok, data = asyncio.run(mod._fetch_weather_async("https://example.test", "Berlin"))
+    try:
+        ok, data = asyncio.run(mod._fetch_weather_async("https://example.test", "Berlin"))
+    finally:
+        if previous is None:
+            ctx.skill_ctx.clear()
+        else:
+            ctx.skill_ctx.set(previous.name, previous.path)
 
     assert ok is False
     assert data["error"] == "Weather API returned status 503"

@@ -20,10 +20,15 @@ from typing import Any, Dict, Optional, Tuple
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.control_plane import get_self_object
 from adaos.sdk.data.bus import emit
-from adaos.sdk.data.context import clear_current_skill, get_current_skill, set_current_skill
+from adaos.sdk.data.context import get_current_skill, use_current_skill
 from adaos.sdk.data import ctx_subnet
 from adaos.sdk.data.i18n import _
-from adaos.sdk.data.skill_memory import get as memory_get, set as memory_set
+from adaos.sdk.data.skill_memory import (
+    async_get as memory_async_get,
+    async_set as memory_async_set,
+    get as memory_get,
+    set as memory_set,
+)
 from adaos.sdk.data.events import publish as publish_event
 from adaos.sdk.net import external_api
 
@@ -51,12 +56,16 @@ _REQUEST_DIAGNOSTICS: Dict[str, Any] = {
     "superseded_total": 0,
     "failed_total": 0,
     "projection_rejected_total": 0,
+    "diagnostic_persist_failed_total": 0,
     "active_total": 0,
     "max_active_total": 0,
     "last_result": None,
+    "last_persist_error": None,
+    "state_updated_at": None,
 }
 _REQUEST_DIAGNOSTICS_HYDRATED = False
 _REQUEST_DIAGNOSTICS_MEMORY_KEY = "request_runtime_diagnostics"
+_REQUEST_DIAGNOSTICS_ACTIVE_STALE_AFTER_S = 30.0
 _CITY_CACHE_TTL = 300.0
 _GEOCODE_CACHE_TTL = 24 * 60 * 60.0
 _CITY_CACHE_MAX_ITEMS = 128
@@ -910,16 +919,12 @@ async def _fetch_weather_async(
     city: Optional[str] = None,
     location: Optional[Dict[str, Any]] = None,
 ) -> Tuple[bool, Dict[str, Any]]:
-    loop = asyncio.get_running_loop()
-
-    def _run() -> Tuple[bool, Dict[str, Any]]:
-        set_current_skill("weather_skill")
-        try:
-            return _fetch_weather_by_request(api_entry_point, city=city, location=location)
-        finally:
-            clear_current_skill()
-
-    return await loop.run_in_executor(None, _run)
+    return await asyncio.to_thread(
+        _fetch_weather_by_request,
+        api_entry_point,
+        city=city,
+        location=location,
+    )
 
 
 def _route_wants_chat(meta: Dict[str, Any]) -> bool:
@@ -935,17 +940,17 @@ async def _emit_weather_failure(text: str, meta: Dict[str, Any], extra: Dict[str
 
 
 def handle(topic: str, payload: dict) -> None:
-    set_current_skill("weather_skill")
-    api_entry_point, default_city = _load_config()
-    city = _resolve_city((payload or {}).get("city")) or default_city
-    if not city:
-        _output(_("prep.weather.api_error", city=""))
-        return
-    ok, data = _fetch_weather(api_entry_point, city)
-    if not ok:
-        _output(_("prep.weather.api_error", city=city))
-        return
-    _output(_("prep.weather.success", city=data["city"], temp=data["temp"], description=data["description"]))
+    with use_current_skill("weather_skill"):
+        api_entry_point, default_city = _load_config()
+        city = _resolve_city((payload or {}).get("city")) or default_city
+        if not city:
+            _output(_("prep.weather.api_error", city=""))
+            return
+        ok, data = _fetch_weather(api_entry_point, city)
+        if not ok:
+            _output(_("prep.weather.api_error", city=city))
+            return
+        _output(_("prep.weather.success", city=data["city"], temp=data["temp"], description=data["description"]))
 
 
 def handle_intent(intent: str, entities: dict) -> None:
@@ -1195,7 +1200,7 @@ async def _ensure_weather_request_diagnostics() -> None:
         if _REQUEST_DIAGNOSTICS_HYDRATED:
             return
     try:
-        persisted = await asyncio.to_thread(memory_get, _REQUEST_DIAGNOSTICS_MEMORY_KEY)
+        persisted = await memory_async_get(_REQUEST_DIAGNOSTICS_MEMORY_KEY)
     except Exception:
         persisted = None
         _log.warning("failed to load weather request diagnostics", exc_info=True)
@@ -1209,6 +1214,7 @@ async def _ensure_weather_request_diagnostics() -> None:
                 "superseded_total",
                 "failed_total",
                 "projection_rejected_total",
+                "diagnostic_persist_failed_total",
                 "max_active_total",
             ):
                 try:
@@ -1218,6 +1224,10 @@ async def _ensure_weather_request_diagnostics() -> None:
             last_result = persisted.get("last_result")
             if isinstance(last_result, dict):
                 _REQUEST_DIAGNOSTICS["last_result"] = dict(last_result)
+            last_persist_error = persisted.get("last_persist_error")
+            if isinstance(last_persist_error, dict):
+                _REQUEST_DIAGNOSTICS["last_persist_error"] = dict(last_persist_error)
+            _REQUEST_DIAGNOSTICS["state_updated_at"] = persisted.get("state_updated_at")
         _REQUEST_DIAGNOSTICS["active_total"] = 0
         _REQUEST_DIAGNOSTICS_HYDRATED = True
 
@@ -1227,14 +1237,21 @@ def _weather_request_diagnostics_snapshot() -> Dict[str, Any]:
         diagnostics = dict(_REQUEST_DIAGNOSTICS)
         last_result = diagnostics.get("last_result")
         diagnostics["last_result"] = dict(last_result) if isinstance(last_result, dict) else None
-    diagnostics["updated_at"] = _now_iso()
     return diagnostics
+
+
+def _diagnostics_timestamp(value: Any) -> float:
+    try:
+        return datetime.fromisoformat(str(value or "").replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return 0.0
 
 
 def _record_weather_request_started() -> None:
     with _REQUEST_DIAGNOSTICS_LOCK:
         _REQUEST_DIAGNOSTICS["accepted_total"] += 1
         _REQUEST_DIAGNOSTICS["active_total"] += 1
+        _REQUEST_DIAGNOSTICS["state_updated_at"] = _now_iso()
         _REQUEST_DIAGNOSTICS["max_active_total"] = max(
             _REQUEST_DIAGNOSTICS["max_active_total"],
             _REQUEST_DIAGNOSTICS["active_total"],
@@ -1267,13 +1284,21 @@ def _record_weather_request_finished(
             "duration_ms": duration_ms,
             "finished_at": _now_iso(),
         }
+        _REQUEST_DIAGNOSTICS["state_updated_at"] = _now_iso()
     return _weather_request_diagnostics_snapshot()
 
 
 async def _persist_weather_request_diagnostics(diagnostics: Dict[str, Any]) -> None:
     try:
-        await asyncio.to_thread(memory_set, _REQUEST_DIAGNOSTICS_MEMORY_KEY, diagnostics)
-    except Exception:
+        await memory_async_set(_REQUEST_DIAGNOSTICS_MEMORY_KEY, diagnostics)
+    except Exception as exc:
+        with _REQUEST_DIAGNOSTICS_LOCK:
+            _REQUEST_DIAGNOSTICS["diagnostic_persist_failed_total"] += 1
+            _REQUEST_DIAGNOSTICS["last_persist_error"] = {
+                "type": type(exc).__name__,
+                "at": _now_iso(),
+            }
+            _REQUEST_DIAGNOSTICS["state_updated_at"] = _now_iso()
         _log.warning("failed to persist weather request diagnostics", exc_info=True)
 
 
@@ -1284,17 +1309,30 @@ def get_runtime_status(**_: Any) -> Dict[str, Any]:
     except Exception:
         persisted = None
     with _REQUEST_DIAGNOSTICS_LOCK:
-        diagnostics = dict(persisted) if isinstance(persisted, dict) else dict(_REQUEST_DIAGNOSTICS)
+        process_diagnostics = dict(_REQUEST_DIAGNOSTICS)
+        use_persisted = isinstance(persisted, dict) and _diagnostics_timestamp(
+            persisted.get("state_updated_at")
+        ) >= _diagnostics_timestamp(process_diagnostics.get("state_updated_at"))
+        diagnostics = dict(persisted) if use_persisted else process_diagnostics
         last_result = diagnostics.get("last_result")
         diagnostics["last_result"] = dict(last_result) if isinstance(last_result, dict) else None
         tracked_task_total = sum(1 for task in _WEATHER_UPDATE_TASKS.values() if not task.done())
+    observed_at = _now_iso()
+    state_age_s = max(0.0, time.time() - _diagnostics_timestamp(diagnostics.get("state_updated_at")))
+    reported_active_total = max(0, int(diagnostics.get("active_total") or 0))
+    active_state_stale = reported_active_total > 0 and state_age_s > _REQUEST_DIAGNOSTICS_ACTIVE_STALE_AFTER_S
+    if active_state_stale:
+        diagnostics["reported_active_total"] = reported_active_total
+        diagnostics["active_total"] = None
     diagnostics.update(
         {
             "ok": True,
-            "schema": "adaos.weather.request_runtime.v1",
+            "schema": "adaos.weather.request_runtime.v2",
             "tracked_task_total": tracked_task_total,
-            "status_source": "skill_memory" if isinstance(persisted, dict) else "process_memory",
-            "updated_at": _now_iso(),
+            "status_source": "skill_memory" if use_persisted else "process_memory",
+            "active_state_stale": active_state_stale,
+            "state_age_ms": round(state_age_s * 1000),
+            "observed_at": observed_at,
         }
     )
     return diagnostics
@@ -1367,25 +1405,21 @@ async def _project_weather_snapshot_async(
     webspace_id: Optional[str],
     expected_generation: Optional[int] = None,
 ) -> bool:
-    pushed = False
-    try:
-        pushed = set_current_skill("weather_skill")
-        stored = await asyncio.to_thread(
-            _store_webspace_snapshot,
-            webspace_id,
-            snapshot,
-            expected_generation=expected_generation,
-        )
-        if not stored:
+    with use_current_skill("weather_skill"):
+        try:
+            stored = await asyncio.to_thread(
+                _store_webspace_snapshot,
+                webspace_id,
+                snapshot,
+                expected_generation=expected_generation,
+            )
+            if not stored:
+                return False
+            await ctx_subnet.set_async("weather.snapshot", snapshot, webspace_id=webspace_id)
+            return True
+        except Exception:
+            _log.warning("failed to project weather.snapshot via ctx_subnet", exc_info=True)
             return False
-        await ctx_subnet.set_async("weather.snapshot", snapshot, webspace_id=webspace_id)
-        return True
-    except Exception:
-        _log.warning("failed to project weather.snapshot via ctx_subnet", exc_info=True)
-        return False
-    finally:
-        if pushed:
-            clear_current_skill()
 
 
 _CANONICAL_NODE_KINDS = frozenset({"hub", "member", "node", "redevice"})
@@ -1480,8 +1514,7 @@ async def _refresh_weather_live_snapshot(
 
 
 async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
-    pushed = set_current_skill("weather_skill")
-    try:
+    with use_current_skill("weather_skill"):
         payload = _event_payload(evt)
         if not payload:
             return
@@ -1554,9 +1587,6 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
                 await _persist_weather_request_diagnostics(diagnostics)
             finally:
                 _remove_weather_update_task(task_key, current_task)
-    finally:
-        if pushed:
-            clear_current_skill()
 
 
 @subscribe("weather.location.requested")
