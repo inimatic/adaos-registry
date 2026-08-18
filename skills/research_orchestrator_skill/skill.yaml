@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.24.0
+version: 0.25.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -953,7 +953,8 @@ data_routes:
   owner: skill:research_orchestrator_skill
   first_paint: selected task source-to-result lineage or an explicit empty projection
   recovery: preserve the last lineage and retry after targeted invalidation
-  guard_visibility: owned and admitted path-free refs, digests, costs, failures, and results
+  guard_visibility: owned and admitted path-free refs, digests, costs, failures, and
+    results
   budget:
     max_payload_bytes: 1048576
     max_items: 1000
@@ -1054,12 +1055,13 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-18T14:50:00+00:00'
+updated_at: '2026-08-18T14:54:13+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.863+5254.102db58e
-    recorded_at: '2026-08-18T14:50:00+00:00'
+    min_version: 0.1.863+5255.a81c7a26
+    recorded_at: '2026-08-18T14:54:13+00:00'
     source: skill_push
-    min_commit: 102db58eeff1e395e53ab0415e648e26fdd682a3
-    min_short_commit: 102db58e
-    build_date: '2026-08-18T17:35:22+03:00'
+    min_commit: a81c7a26c1e3516880555b7662f893509fbc4883
+    min_short_commit: a81c7a26
+    build_date: '2026-08-18T17:54:03+03:00'
+
