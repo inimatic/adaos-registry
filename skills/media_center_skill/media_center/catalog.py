@@ -283,6 +283,7 @@ class MediaCenterRepository:
         limit: int = DEFAULT_LIST_LIMIT,
         offset: int = 0,
         include_missing: bool = False,
+        favorites_only: bool = False,
         sort: str = "recent",
     ) -> dict[str, Any]:
         limit = max(1, min(MAX_LIST_LIMIT, int(limit or DEFAULT_LIST_LIMIT)))
@@ -291,6 +292,8 @@ class MediaCenterRepository:
         params: list[Any] = []
         if not include_missing:
             filters.append("missing = 0")
+        if favorites_only:
+            filters.append("favorite = 1")
         query_token = _text(query)
         if query_token:
             like = f"%{query_token.lower()}%"
@@ -454,6 +457,71 @@ class MediaCenterRepository:
             connection.commit()
         return {"ok": True, "schema": SCHEMA_VERSION, "roots": self.list_roots()["items"], "summary": self.summary()}
 
+    def root_delete_plan(self, *, root_id: str = "", path: str = "") -> dict[str, Any]:
+        id_token = _text(root_id)
+        path_token = _text(path)
+        with self.connect() as connection:
+            if id_token:
+                root = connection.execute("SELECT * FROM library_roots WHERE id = ?", (id_token,)).fetchone()
+            elif path_token:
+                try:
+                    resolved_path = str(Path(path_token).expanduser().resolve(strict=False))
+                except Exception:
+                    resolved_path = path_token
+                root = connection.execute("SELECT * FROM library_roots WHERE path = ?", (resolved_path,)).fetchone()
+            else:
+                root = None
+            if root is None:
+                error = "root_id_required" if not id_token and not path_token else "root_not_found"
+                return {"ok": False, "error": error, "root_id": id_token, "roots": self.list_roots()["items"]}
+            item_rows = connection.execute(
+                "SELECT id, resource_id, metadata_json FROM catalog_items"
+            ).fetchall()
+
+        public_root = _public_root(root)
+        item_ids: list[str] = []
+        resource_ids: list[str] = []
+        for item in item_rows:
+            metadata = _json_loads(item["metadata_json"])
+            if not _metadata_matches_root(metadata, public_root):
+                continue
+            item_ids.append(str(item["id"]))
+            resource_id = _text(item["resource_id"])
+            if resource_id.startswith("ref_") and resource_id not in resource_ids:
+                resource_ids.append(resource_id)
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "root": public_root,
+            "item_ids": item_ids,
+            "resource_ids": resource_ids,
+            "item_count": len(item_ids),
+            "resource_link_count": len(resource_ids),
+        }
+
+    def delete_root(self, *, root_id: str = "", path: str = "") -> dict[str, Any]:
+        plan = self.root_delete_plan(root_id=root_id, path=path)
+        if not plan.get("ok"):
+            return plan
+        root = dict(plan["root"])
+        item_ids = [str(item_id) for item_id in plan.get("item_ids") or []]
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if item_ids:
+                placeholders = ",".join("?" for _ in item_ids)
+                connection.execute(f"DELETE FROM catalog_items WHERE id IN ({placeholders})", tuple(item_ids))
+            deleted_root = connection.execute("DELETE FROM library_roots WHERE id = ?", (root["id"],)).rowcount
+            connection.commit()
+        if not deleted_root:
+            return {**plan, "ok": False, "error": "root_delete_conflict"}
+        return {
+            **plan,
+            "deleted": True,
+            "deleted_item_count": len(item_ids),
+            "roots": self.list_roots()["items"],
+            "summary": self.summary(),
+        }
+
     def list_roots(self, *, include_disabled: bool = False) -> dict[str, Any]:
         where = "" if include_disabled else "WHERE enabled = 1"
         with self.connect() as connection:
@@ -615,6 +683,20 @@ def _public_item(row: sqlite3.Row) -> dict[str, Any]:
     }
     item["preview"] = item["subtitle"]
     return item
+
+
+def _metadata_matches_root(metadata: Any, root: Mapping[str, Any]) -> bool:
+    if not isinstance(metadata, Mapping):
+        return False
+    root_id = _text(root.get("id"))
+    metadata_root_id = _text(metadata.get("media_center_root_id"))
+    if root_id and metadata_root_id == root_id:
+        return True
+    root_path = _text(root.get("path"))
+    metadata_root_path = _text(metadata.get("media_center_root_path"))
+    if not root_path or not metadata_root_path:
+        return False
+    return os.path.normcase(os.path.normpath(metadata_root_path)) == os.path.normcase(os.path.normpath(root_path))
 
 
 def _item_id(source: str, resource_id: str) -> str:

@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.1.9
+version: 0.1.10
 description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
 supported_locales:
 - en
@@ -29,6 +29,7 @@ exports:
   - list_roots
   - add_root
   - remove_root
+  - delete_root
   - scan_roots
   - import_folder
   - library
@@ -127,6 +128,20 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: delete_root
+  description: Delete a configured folder, its catalog rows, and exact core media resource links without deleting source files.
+  entry: handlers.main:delete_root
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      root_id:
+        type: string
+      path:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: scan_roots
   description: Register playable files from configured folders without copying media bytes.
   entry: handlers.main:scan_roots
@@ -204,6 +219,9 @@ tools:
       include_missing:
         type: boolean
         default: false
+      favorites_only:
+        type: boolean
+        default: false
       sort:
         type: string
         enum:
@@ -260,6 +278,9 @@ tools:
         default: playable
       source:
         type: string
+      favorites_only:
+        type: boolean
+        default: false
       sort:
         type: string
         default: recent

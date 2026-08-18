@@ -3,6 +3,7 @@ from __future__ import annotations
 import mimetypes
 import re
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 
@@ -23,8 +24,54 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".
 LEGACY_MANAGED_COPY_RE = re.compile(r"^media-center-[0-9a-f]{24}-import\.[^.]+$", re.IGNORECASE)
 
 
+class MediaRootOperationBusy(RuntimeError):
+    pass
+
+
 def _repository() -> MediaCenterRepository:
     return MediaCenterRepository()
+
+
+@contextmanager
+def _root_mutation_lease(repo: MediaCenterRepository) -> Iterator[None]:
+    lock_path = repo.db_path.with_suffix(".root-mutation.lock")
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    handle = lock_path.open("a+b")
+    acquired = False
+    try:
+        handle.seek(0, 2)
+        if handle.tell() == 0:
+            handle.write(b"0")
+            handle.flush()
+        handle.seek(0)
+        try:
+            if sys.platform == "win32":
+                import msvcrt
+
+                msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+            else:
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            acquired = True
+        except (OSError, BlockingIOError) as exc:
+            raise MediaRootOperationBusy("media_root_operation_busy") from exc
+        yield
+    finally:
+        if acquired:
+            handle.seek(0)
+            try:
+                if sys.platform == "win32":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+        handle.close()
 
 
 def _bool(value: Any, default: bool = False) -> bool:
@@ -176,17 +223,78 @@ def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
 
 @tool(summary="Add a local library folder to the media-center import set.", side_effects="local_write")
 def add_root(path: str = "", label: str = "", include_images: bool = False, **_: Any) -> dict[str, Any]:
-    return _repository().add_root(path, label=label, include_images=_bool(include_images, False))
+    repo = _repository()
+    try:
+        with _root_mutation_lease(repo):
+            return repo.add_root(path, label=label, include_images=_bool(include_images, False))
+    except MediaRootOperationBusy:
+        return _skill_error(
+            "media_root_operation_busy",
+            message="Another media folder import or deletion is still running.",
+            retryable=True,
+        )
 
 
 @tool(summary="Disable a configured media-center library folder.", side_effects="local_write")
 def remove_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
-    return _repository().remove_root(root_id=root_id, path=path)
+    repo = _repository()
+    try:
+        with _root_mutation_lease(repo):
+            return repo.remove_root(root_id=root_id, path=path)
+    except MediaRootOperationBusy:
+        return _skill_error(
+            "media_root_operation_busy",
+            message="Another media folder import or deletion is still running.",
+            retryable=True,
+        )
+
+
+@tool(summary="Delete a media folder, its catalog rows, and core resource links.", side_effects="local_write")
+def delete_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
+    repo = _repository()
+    try:
+        with _root_mutation_lease(repo):
+            plan = repo.root_delete_plan(root_id=root_id, path=path)
+            if not plan.get("ok"):
+                return plan
+            resource_ids = [str(item) for item in plan.get("resource_ids") or []]
+            try:
+                from adaos.sdk.io.media import unregister_media_references
+
+                resource_cleanup = unregister_media_references(resource_ids)
+            except Exception as exc:
+                return _skill_error(
+                    "media_reference_cleanup_failed",
+                    message="The folder was retained because its media resource links could not be removed.",
+                    detail=str(exc),
+                    root=plan.get("root"),
+                    resource_ids=resource_ids,
+                )
+            deleted = repo.delete_root(root_id=str(plan["root"]["id"]))
+            return {**deleted, "resource_cleanup": resource_cleanup}
+    except MediaRootOperationBusy:
+        return _skill_error(
+            "media_root_operation_busy",
+            message="Another media folder import or deletion is still running.",
+            retryable=True,
+        )
 
 
 @tool(summary="Register playable files from configured folders without copying media bytes.", side_effects="local_write")
 def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -> dict[str, Any]:
     repo = _repository()
+    try:
+        with _root_mutation_lease(repo):
+            return _scan_roots(repo, root_id=root_id, path=path, limit=limit)
+    except MediaRootOperationBusy:
+        return _skill_error(
+            "media_root_operation_busy",
+            message="Another media folder import or deletion is still running.",
+            retryable=True,
+        )
+
+
+def _scan_roots(repo: MediaCenterRepository, *, root_id: str = "", path: str = "", limit: int = 1000) -> dict[str, Any]:
     limit_value = _int_limit(limit, 1000, 5000)
     roots = repo.list_roots()["items"]
     root_token = str(root_id or "").strip()
@@ -264,12 +372,20 @@ def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -
 @tool(summary="Add a folder and register its playable files in place.", side_effects="local_write")
 def import_folder(path: str = "", label: str = "", include_images: bool = False, limit: int = 1000, **_: Any) -> dict[str, Any]:
     repo = _repository()
-    added = repo.add_root(path, label=label, include_images=_bool(include_images, False))
-    if not added.get("ok"):
-        return added
-    root = added.get("root") if isinstance(added.get("root"), Mapping) else {}
-    scan = scan_roots(root_id=str(root.get("id") or ""), limit=limit)
-    return {**scan, "root": root, "add": added}
+    try:
+        with _root_mutation_lease(repo):
+            added = repo.add_root(path, label=label, include_images=_bool(include_images, False))
+            if not added.get("ok"):
+                return added
+            root = added.get("root") if isinstance(added.get("root"), Mapping) else {}
+            scan = _scan_roots(repo, root_id=str(root.get("id") or ""), limit=limit)
+            return {**scan, "root": root, "add": added}
+    except MediaRootOperationBusy:
+        return _skill_error(
+            "media_root_operation_busy",
+            message="Another media folder import or deletion is still running.",
+            retryable=True,
+        )
 
 
 @tool(summary="Return the media-center library projection for widgets and playback.", side_effects="none")
@@ -280,6 +396,7 @@ def library(
     limit: int = 100,
     offset: int = 0,
     include_missing: bool = False,
+    favorites_only: bool = False,
     sort: str = "recent",
     auto_scan: bool = True,
     **_: Any,
@@ -296,6 +413,7 @@ def library(
         limit=limit,
         offset=offset,
         include_missing=_bool(include_missing, False),
+        favorites_only=_bool(favorites_only, False),
         sort=sort,
     )
     if scan is not None:
@@ -331,6 +449,7 @@ def playback_queue(
     query: str = "",
     media_kind: str = "playable",
     source: str = "",
+    favorites_only: bool = False,
     sort: str = "recent",
     limit: int = 10,
     **_: Any,
@@ -345,6 +464,7 @@ def playback_queue(
         query=query,
         media_kind=media_kind or "playable",
         source=source,
+        favorites_only=_bool(favorites_only, False),
         limit=queue_limit,
         offset=0,
         sort=sort,

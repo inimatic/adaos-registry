@@ -60,7 +60,9 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     widgets = {widget["id"]: widget for widget in page["widgets"]}
 
     assert page["layout"]["type"] == "single"
+    assert page["interaction"]["initialFocus"] == "widget:media-search"
     assert page["initialState"]["mediaPageSize"] == 30
+    assert page["initialState"]["mediaFavoritesOnly"] is False
     assert set(widgets) == {
         "media-center-settings-action",
         "media-kind-tabs",
@@ -75,17 +77,15 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert kind_ids == ["playable", "video", "audio"]
     assert widgets["media-search"]["inputs"]["commitMode"] == "manual"
     assert widgets["media-search"]["inputs"]["saveLabel"] == "Search"
+    browse_ids = [button["id"] for button in widgets["media-search-actions"]["inputs"]["buttons"]]
+    assert browse_ids == ["all", "recent", "favorites", "clear-search"]
 
     catalog = widgets["media-catalog-table"]
     assert catalog["dataSource"]["params"]["limit"] == "$state.mediaPageSize"
     assert catalog["dataSource"]["params"]["offset"] == "$state.mediaOffset"
-    assert catalog["dataSource"]["params"]["media_kind"] == {
-        "kind": "expression",
-        "op": "if",
-        "condition": "$state.mediaKind",
-        "then": "$state.mediaKind",
-        "else": "playable",
-    }
+    assert catalog["dataSource"]["params"]["media_kind"] == "$state.mediaKind"
+    assert catalog["dataSource"]["params"]["favorites_only"] == "$state.mediaFavoritesOnly"
+    assert catalog["actions"][0]["params"]["selectedMediaFavorite"] == "$event.favorite"
     assert [action["type"] for action in catalog["actions"] if action["on"] == "select"] == [
         "updateState",
         "openModal",
@@ -102,10 +102,16 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     assert player["type"] == "media.videoBrowser"
     assert player["dataSource"]["name"] == "media_center_skill.playback_queue"
     assert player["dataSource"]["params"]["item_id"] == "$state.selectedMediaItemId"
+    assert player["dataSource"]["params"]["media_kind"] == "$state.mediaKind"
+    assert player["dataSource"]["params"]["favorites_only"] == "$state.mediaFavoritesOnly"
     assert player["dataSource"]["params"]["limit"] == 10
     assert player["inputs"]["playlistLimit"] == 10
     assert player["inputs"]["autoSelectFirst"] is True
     assert player["inputs"]["showDiagnostics"] is False
+    assert {
+        "media-center-player-mark-favorite",
+        "media-center-player-remove-favorite",
+    } <= set(player_widgets)
 
     settings_ids = {
         widget["id"]
@@ -118,8 +124,27 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-roots-actions",
         "media-roots-table",
         "media-source-tabs",
-        "media-sort-tabs",
     } <= settings_ids
+    assert "media-sort-tabs" not in settings_ids
+    roots = next(
+        widget
+        for widget in modals["media_center_settings"]["schema"]["widgets"]
+        if widget["id"] == "media-roots-table"
+    )
+    delete_column = next(column for column in roots["inputs"]["columns"] if column.get("kind") == "buttons")
+    assert delete_column["buttons"][0]["id"] == "delete"
+    assert roots["actions"][1]["params"]["modalId"] == "media_center_delete_root"
+
+    delete_actions = modals["media_center_delete_root"]["schema"]["widgets"][1]["actions"]
+    assert delete_actions[0]["target"] == "media_center_skill.delete_root"
+
+
+def test_media_center_skill_data_source_params_use_supported_scalar_state_refs() -> None:
+    webui = json.loads((SCENARIO_ROOT / "webui.json").read_text(encoding="utf-8"))
+
+    for data_source in _skill_data_sources(webui):
+        for value in (data_source.get("params") or {}).values():
+            assert not (isinstance(value, dict) and value.get("kind") == "expression")
 
 
 def test_media_center_skill_data_sources_match_data_route_read_policies() -> None:

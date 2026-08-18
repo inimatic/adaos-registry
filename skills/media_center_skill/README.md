@@ -21,6 +21,11 @@ requests `media_kind="image"`.
 queue to ten rows. This is the server-side budget used by the modal player and
 prevents the browser playlist control from loading a catalog page.
 
+`favorites_only=true` is an actual catalog predicate, not a favorite-first sort.
+Folder removal is serialized with folder import across processes, unregisters
+the exact core media reference ids, and then removes the matching catalog/root
+rows. It never deletes the original media files.
+
 ## User-Facing Errors
 
 Tools return stable machine codes in `error`/`code` and may include

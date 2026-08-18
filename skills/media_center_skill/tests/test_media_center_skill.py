@@ -3,6 +3,8 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+import pytest
+
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(SKILL_ROOT) not in sys.path:
@@ -85,6 +87,27 @@ def test_playable_filter_excludes_images_by_default(monkeypatch, tmp_path):
 
     assert [item["media_kind"] for item in playable] == ["video", "audio"]
     assert {item["resource_id"] for item in playable} == {"clip.mp4", "song.mp3"}
+
+
+def test_kind_and_favorites_filters_are_exact(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repo = MediaCenterRepository()
+    repo.scan_resources([_resource("clip.mp4"), _resource("song.mp3"), _resource("poster.jpg")])
+    clip = next(item for item in repo.list_items(limit=20)["items"] if item["resource_id"] == "clip.mp4")
+    repo.set_favorite(clip["id"], favorite=True)
+
+    videos = main.library(media_kind="video", auto_scan=False, limit=20)["items"]
+    audio = main.library(media_kind="audio", auto_scan=False, limit=20)["items"]
+    favorites = main.library(
+        media_kind="playable",
+        favorites_only=True,
+        auto_scan=False,
+        limit=20,
+    )["items"]
+
+    assert [item["resource_id"] for item in videos] == ["clip.mp4"]
+    assert [item["resource_id"] for item in audio] == ["song.mp3"]
+    assert [item["resource_id"] for item in favorites] == ["clip.mp4"]
 
 
 def test_library_defaults_to_playable_media(monkeypatch, tmp_path):
@@ -186,6 +209,50 @@ def test_reference_registration_keeps_original_media_bytes(monkeypatch, tmp_path
     assert descriptor["metadata"]["storage_mode"] == "reference"
     assert descriptor["content_path"].startswith("/api/node/media/resources/content/ref_")
     assert list(tmp_path.rglob("*.mp4")) == [movie]
+
+
+def test_delete_root_removes_catalog_and_core_links_but_preserves_media(monkeypatch, tmp_path):
+    from adaos.services import media_core
+
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    reference_db = tmp_path / "state" / "media_references.sqlite3"
+    monkeypatch.setenv("ADAOS_MEDIA_REFERENCE_DB_PATH", str(reference_db))
+    media_dir = tmp_path / "library"
+    media_dir.mkdir()
+    movie = media_dir / "movie.mp4"
+    movie.write_bytes(b"original-video")
+    imported = main.import_folder(path=str(media_dir), limit=20)
+    listing = main.library(auto_scan=False, limit=20)
+    resource_id = listing["items"][0]["resource_id"]
+    root_id = imported["root"]["id"]
+
+    deleted = main.delete_root(root_id=root_id)
+
+    assert deleted["ok"] is True
+    assert deleted["deleted"] is True
+    assert deleted["deleted_item_count"] == 1
+    assert deleted["resource_cleanup"]["deleted_count"] == 1
+    assert main.list_roots()["items"] == []
+    assert main.library(auto_scan=False, include_missing=True, limit=20)["items"] == []
+    assert movie.read_bytes() == b"original-video"
+    with pytest.raises(FileNotFoundError, match="media_reference_not_found"):
+        media_core.resolve_media_reference(resource_id, db_path=reference_db)
+
+
+def test_delete_root_rejects_concurrent_folder_mutation(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    media_dir = tmp_path / "library"
+    media_dir.mkdir()
+    repo = MediaCenterRepository()
+    root = repo.add_root(str(media_dir))["root"]
+
+    with main._root_mutation_lease(repo):
+        result = main.delete_root(root_id=root["id"])
+
+    assert result["ok"] is False
+    assert result["error"] == "media_root_operation_busy"
+    assert result["retryable"] is True
+    assert main.list_roots()["items"][0]["id"] == root["id"]
 
 
 def test_playback_queue_puts_selection_first_and_clamps_to_ten(monkeypatch, tmp_path):

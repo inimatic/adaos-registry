@@ -1,6 +1,6 @@
 id: media_center
 name: media_center
-version: 0.1.6
+version: 0.1.7
 title: Media Center
 description: Compact media-center catalog with in-place folder registration, server-backed pages, and modal playback over AdaOS media resource descriptors.
 type: desktop
