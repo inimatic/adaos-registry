@@ -1350,10 +1350,11 @@ class ResearchOrchestrator:
                         task_id=task_id,
                         track_id=track_id,
                     )
-            for suffix, title, kind, tab, icon in (
-                ("studies", "Studies", "study_collection", "studies", "analytics-outline"),
-                ("evidence", "Evidence", "evidence_collection", "evidence", "shield-checkmark-outline"),
-                ("releases", "Releases", "release_collection", "releases", "cube-outline"),
+            matched_studies = list((task.get("metadata") or {}).get("matched_studies") or [])
+            for suffix, title, kind, tab, icon, status in (
+                ("studies", "Studies", "study_collection", "studies", "analytics-outline", str(len(matched_studies))),
+                ("evidence", "Evidence", "evidence_collection", "evidence", "shield-checkmark-outline", "planned"),
+                ("releases", "Releases", "release_collection", "releases", "cube-outline", "planned"),
             ):
                 add(
                     f"{task_node_id}:{suffix}",
@@ -1361,8 +1362,21 @@ class ResearchOrchestrator:
                     parent_id=task_node_id,
                     kind=kind,
                     tab=tab,
-                    status="planned",
+                    status=status,
                     icon=icon,
+                    task_id=task_id,
+                )
+            for study in matched_studies:
+                study_ref = str(study.get("ref") or "")
+                add(
+                    f"study:{study.get('study_id') or contract_digest(study)[-16:]}",
+                    str(study.get("study_id") or study_ref or "Study"),
+                    parent_id=f"{task_node_id}:studies",
+                    kind="research_study",
+                    tab="evidence",
+                    status=str(study.get("status") or "unknown"),
+                    subtitle=str(study.get("primary_endpoint") or study.get("owner_ref") or ""),
+                    icon="analytics-outline",
                     task_id=task_id,
                 )
         add(
@@ -1407,6 +1421,7 @@ class ResearchOrchestrator:
             tracks = [item for item in tracks if item.get("track_id") == implementation_track_id]
         local_sources = list((view.get("source_bundle") or {}).get("sources") or [])
         calibration = dict((task.get("metadata") or {}).get("calibration") or {})
+        matched_studies = list((task.get("metadata") or {}).get("matched_studies") or [])
         admitted_sources = list(calibration.get("admitted_sources") or [])
         lines = [
             f"# {view['direction'].get('title')}",
@@ -1428,6 +1443,13 @@ class ResearchOrchestrator:
         )
         if not local_sources and not admitted_sources:
             lines.append("- No source manifests are connected.")
+        lines.extend(["", "## Matched studies", ""])
+        lines.extend(
+            f"- `{item.get('ref')}` · `{item.get('status')}` · endpoint `{item.get('primary_endpoint') or 'not declared'}` · owner `{item.get('owner_ref')}`"
+            for item in matched_studies
+        )
+        if not matched_studies:
+            lines.append("- No Study refs are connected.")
         lines.extend(["", "## Implementation and evaluation lineage", ""])
         for track in tracks:
             metadata = dict(track.get("metadata") or {})
@@ -1456,6 +1478,8 @@ class ResearchOrchestrator:
             "task_ref": task.get("ref"),
             "local_sources": local_sources,
             "admitted_sources": admitted_sources,
+            "matched_studies": matched_studies,
+            "accepted_compilation": view.get("accepted_compilation_record"),
             "tracks": tracks,
             "summary": calibration.get("summary") or {},
             "content": "\n".join(lines),
@@ -1492,6 +1516,55 @@ class ResearchOrchestrator:
         external_task = response.get("task")
         if not isinstance(external_task, Mapping):
             raise RuntimeError("research evaluator returned no calibration task")
+        compilation_record = self.repository.latest_compilation_for_task(str(task["task_id"]))
+        if not compilation_record:
+            prototype = self.repository.get_prototype(
+                task.get("current_prototype_digest")
+                or direction.get("accepted_prototype_digest")
+            )
+            trace = (
+                prototype.get("formulation_trace")
+                if isinstance((prototype or {}).get("formulation_trace"), Mapping)
+                else {}
+            )
+            run_id = str(trace.get("run_id") or "")
+            stage = next(
+                (
+                    item
+                    for item in self.repository.formulation_stages(token, run_id=run_id)
+                    if item.get("stage_name") == "research_compilation"
+                    and item.get("task_id") == task["task_id"]
+                ),
+                None,
+            )
+            compilation = dict(stage.get("payload") or {}) if isinstance(stage, Mapping) else {}
+            if (
+                prototype
+                and compilation
+                and compilation.get("digest") == trace.get("compilation_digest")
+                and compilation.get("source_bundle_digest") == prototype.get("source_bundle_digest")
+            ):
+                compilation_record = self.repository.put_compilation(
+                    token,
+                    str(task["task_id"]),
+                    compilation,
+                    prototype_digest=str(prototype["digest"]),
+                    actor=actor,
+                )
+                self.repository.activity(
+                    token,
+                    "compilation",
+                    "legacy_compilation_adopted",
+                    "The digest-verified accepted ResearchCompilation was re-homed under the canonical ResearchTask.",
+                    {
+                        "task_ref": task["ref"],
+                        "compilation_ref": compilation_record["ref"],
+                        "compilation_digest": compilation_record["digest"],
+                    },
+                    actor=actor,
+                    subject_ref=str(compilation_record["ref"]),
+                )
+                task = self.repository.get_task(str(task["task_id"])) or task
         packets = [dict(item) for item in response.get("packets") or [] if isinstance(item, Mapping)]
         results = [dict(item) for item in response.get("results") or [] if isinstance(item, Mapping)]
         by_attempt = {
@@ -1593,6 +1666,19 @@ class ResearchOrchestrator:
         task = self.repository.merge_task_metadata(
             str(task["task_id"]),
             {
+                "matched_studies": [
+                    {
+                        "schema": "adaos.research.study_ref.v1",
+                        "study_id": f"{evaluator_task_id}:{budget_view}",
+                        "ref": f"study:{evaluator_task_id}:{budget_view}",
+                        "owner_ref": "skill:research_evaluator_skill",
+                        "external_task_ref": f"calibration-task:{evaluator_task_id}",
+                        "external_task_digest": external_task.get("digest"),
+                        "status": "complete" if (response.get("summary") or {}).get("complete") else "incomplete",
+                        "primary_endpoint": (response.get("summary") or {}).get("primary_endpoint"),
+                        "summary_digest": (response.get("summary") or {}).get("digest"),
+                    }
+                ],
                 "calibration": {
                     "external_task_ref": f"calibration-task:{evaluator_task_id}",
                     "task_digest": external_task.get("digest"),
@@ -1608,6 +1694,8 @@ class ResearchOrchestrator:
             "direction_ref": f"research-direction:{token}",
             "task": task,
             "tracks": tracks,
+            "compilation": compilation_record,
+            "matched_studies": list(task.get("metadata", {}).get("matched_studies") or []),
             "alias": alias,
             "summary": copy.deepcopy(response.get("summary") or {}),
             "source_owner": "skill:research_evaluator_skill",
