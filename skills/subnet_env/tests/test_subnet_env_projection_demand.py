@@ -7,6 +7,8 @@ from types import SimpleNamespace
 
 import yaml
 
+from adaos.services.skill.activation import load_skill_stream_receiver_patterns
+
 try:
     from skills.subnet_env.handlers import main
 except ModuleNotFoundError:
@@ -31,6 +33,37 @@ def test_activation_policy_allows_desktop_tooling_across_scenarios():
     entry = next(item for item in registry["skills"] if item["name"] == "subnet_env")
     assert entry["version"] == str(manifest["version"])
     assert entry["activation"] == manifest["runtime"]["activation"]
+
+    route = manifest["data_routes"][0]
+    assert route["route"] == "yjs"
+    assert route["projection_slot"] == "subnet_env.snapshot"
+    assert route["budget"]["snapshot_policy"] == "on_subscribe"
+
+
+def test_every_webui_yjs_path_is_a_runtime_receiver_pattern():
+    skill_root = Path(__file__).resolve().parents[1]
+    webui = json.loads((skill_root / "webui.json").read_text(encoding="utf-8"))
+
+    def _yjs_slots(value):
+        slots = set()
+        if isinstance(value, dict):
+            if str(value.get("kind") or "").lower() == "y":
+                path = str(value.get("path") or "").strip("/")
+                parts = [part for part in path.split("/") if part]
+                if len(parts) >= 2 and parts[0] == "data":
+                    slots.add(".".join(parts[1:]))
+            for nested in value.values():
+                slots.update(_yjs_slots(nested))
+        elif isinstance(value, list):
+            for nested in value:
+                slots.update(_yjs_slots(nested))
+        return slots
+
+    expected = _yjs_slots(webui)
+    declared = set(load_skill_stream_receiver_patterns(skill_root.parent, "subnet_env"))
+
+    assert expected
+    assert expected <= declared
 
 
 def test_tool_side_effect_contract_separates_reads_from_projection_and_env_writes():

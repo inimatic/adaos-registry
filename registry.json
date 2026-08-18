@@ -942,8 +942,8 @@
       "kind": "skill",
       "id": "subnet_env",
       "name": "subnet_env",
-      "version": "0.8.11",
-      "updated_at": "2026-08-11T09:29:30+00:00",
+      "version": "0.8.12",
+      "updated_at": "2026-08-18T09:00:00+00:00",
       "path": "skills/subnet_env",
       "manifest": "skills/subnet_env/skill.yaml",
       "source": {
