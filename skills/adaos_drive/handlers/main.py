@@ -10,6 +10,7 @@ import shutil
 import time
 import uuid
 from copy import deepcopy
+from itertools import islice
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlencode, urlsplit
@@ -38,12 +39,29 @@ from adaos.services.webspace_id import coerce_webspace_id
 from adaos.services.zone_hosts import DEFAULT_PUBLIC_APP_BASE_URL, canonical_zone_id, zone_public_base_url
 
 _SKILL_NAME = "adaos_drive"
-_RECEIVER = "adaos_drive.browser"
+_LEFT_RECEIVER = "adaos_drive.left"
+_RIGHT_RECEIVER = "adaos_drive.right"
+_PREVIEW_RECEIVER = "adaos_drive.preview"
+_SHARING_RECEIVER = "adaos_drive.sharing"
+_PANEL_RECEIVERS = {
+    "left": _LEFT_RECEIVER,
+    "right": _RIGHT_RECEIVER,
+}
+_RECEIVERS = (
+    _LEFT_RECEIVER,
+    _RIGHT_RECEIVER,
+    _PREVIEW_RECEIVER,
+    _SHARING_RECEIVER,
+)
 _DEFAULT_WEBSPACE_ID = "desktop"
 _STATE_MEMORY_PREFIX = "adaos_drive.state.v1"
-_MAX_ITEMS_PER_FOLDER = 500
-_MAX_TREE_CHILDREN = 250
-_MAX_PREVIEW_BYTES = 512 * 1024
+_MAX_SOURCES = 16
+_MAX_ITEMS_PER_FOLDER = 64
+_MAX_TREE_CHILDREN = 32
+_MAX_TREE_BRANCHES = 4
+_MAX_PREVIEW_BYTES = 32 * 1024
+_MAX_PUBLIC_LINKS = 8
+_MAX_PUBLIC_DOWNLOADS = 16
 _UPLOAD_PURPOSE = "uploads"
 _DEFAULT_PUBLIC_DOWNLOAD_BASE_URL = DEFAULT_PUBLIC_APP_BASE_URL
 _LOG = logging.getLogger(_SKILL_NAME)
@@ -195,7 +213,8 @@ def _source_payload(label: str, root: Path) -> dict[str, Any]:
 
 def _normalize_sources(value: Any) -> list[dict[str, Any]]:
     sources = [dict(item) for item in value or [] if isinstance(item, Mapping)]
-    return [item for item in sources if str(item.get("id") or "").strip() and str(item.get("path") or "").strip()]
+    valid = [item for item in sources if str(item.get("id") or "").strip() and str(item.get("path") or "").strip()]
+    return valid[:_MAX_SOURCES]
 
 
 def _merge_sources(*source_lists: Any) -> list[dict[str, Any]]:
@@ -209,7 +228,7 @@ def _merge_sources(*source_lists: Any) -> list[dict[str, Any]]:
             if source_id not in merged:
                 order.append(source_id)
             merged[source_id] = item
-    return [merged[source_id] for source_id in order if source_id in merged]
+    return [merged[source_id] for source_id in order if source_id in merged][:_MAX_SOURCES]
 
 
 def _ensure_panel_sources(state: dict[str, Any]) -> None:
@@ -596,7 +615,7 @@ def _list_dir(source: Mapping[str, Any], rel_path: Any, *, limit: int = _MAX_ITE
         items.append(_item_for(source, target.parent, is_parent=True))
     children: list[Path] = []
     try:
-        children = list(target.iterdir())
+        children = list(islice(target.iterdir(), max(0, int(limit)) + 1))
     except PermissionError:
         return items
     children.sort(key=lambda p: (not p.is_dir(), p.name.lower()))
@@ -609,7 +628,7 @@ def _list_dir(source: Mapping[str, Any], rel_path: Any, *, limit: int = _MAX_ITE
         items.append(
             {
                 "id": "__truncated__",
-                "name": f"{len(children) - limit} more items hidden",
+                "name": "More items hidden",
                 "extension": "",
                 "path": current_rel,
                 "kind": "status",
@@ -620,7 +639,7 @@ def _list_dir(source: Mapping[str, Any], rel_path: Any, *, limit: int = _MAX_ITE
                 "modified_at": None,
                 "modified_label": "",
                 "icon": "ellipsis-horizontal-outline",
-                "summary": f"Folder contains more than {limit} entries.",
+                "summary": f"Folder view is limited to {limit} entries.",
                 "can_expand": False,
                 "can_preview": False,
                 "can_download": False,
@@ -635,7 +654,10 @@ def _tree_children(source: Mapping[str, Any], rel_path: Any) -> list[dict[str, A
         return []
     out: list[dict[str, Any]] = []
     try:
-        children = sorted(target.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+        children = sorted(
+            islice(target.iterdir(), _MAX_TREE_CHILDREN + 1),
+            key=lambda p: (not p.is_dir(), p.name.lower()),
+        )
     except PermissionError:
         return out
     for child in children[:_MAX_TREE_CHILDREN]:
@@ -679,21 +701,21 @@ def _tree_view_node(source: Mapping[str, Any], tree: Mapping[str, Any], rel_path
             else:
                 children.append(
                     {
-                        "id": str(child.get("id") or child_rel),
-                        "name": str(child.get("name") or child_rel or "File"),
-                        "title": str(child.get("name") or child_rel or "File"),
-                        "path": child_rel,
+                        "id": _bounded_text(child.get("id") or child_rel, 1024),
+                        "name": _bounded_text(child.get("name") or child_rel or "File", 512),
+                        "title": _bounded_text(child.get("name") or child_rel or "File", 512),
+                        "path": _bounded_text(child_rel, 1024),
                         "kind": "file",
                         "icon": str(child.get("icon") or "document-outline"),
-                        "subtitle": str(child.get("summary") or ""),
+                        "subtitle": _bounded_text(child.get("summary"), 512),
                         "children": [],
                     }
                 )
     return {
-        "id": rel_path or "__root__",
-        "name": title,
-        "title": title,
-        "path": rel_path,
+        "id": _bounded_text(rel_path or "__root__", 1024),
+        "name": _bounded_text(title, 512),
+        "title": _bounded_text(title, 512),
+        "path": _bounded_text(rel_path, 1024),
         "kind": "folder",
         "is_dir": True,
         "icon": icon,
@@ -717,13 +739,32 @@ def _selected_item(state: Mapping[str, Any], panel: str) -> dict[str, Any] | Non
     return None
 
 
+def _bounded_item(value: Mapping[str, Any]) -> dict[str, Any]:
+    item = dict(value)
+    for key, max_bytes in {
+        "id": 1024,
+        "name": 512,
+        "extension": 64,
+        "path": 1024,
+        "kind": 64,
+        "size": 64,
+        "modified_label": 128,
+        "icon": 128,
+        "summary": 512,
+        "mime": 128,
+    }.items():
+        if key in item:
+            item[key] = _bounded_text(item.get(key), max_bytes)
+    return item
+
+
 def _panel_snapshot(state: Mapping[str, Any], panel: str) -> dict[str, Any]:
     source = _source_for_panel(state, panel)
     panel_state = dict((state.get("panels") or {}).get(panel) or {})
     rel = ""
     try:
         rel = _clean_rel(panel_state.get("path") or "")
-        items = _list_dir(source, rel)
+        items = [_bounded_item(item) for item in _list_dir(source, rel)]
         error = ""
     except Exception as exc:
         rel = ""
@@ -735,7 +776,6 @@ def _panel_snapshot(state: Mapping[str, Any], panel: str) -> dict[str, Any]:
     tree = dict(panel_state.get("tree") or {})
     return {
         "id": panel,
-        "active": str(state.get("active_panel") or "left") == panel,
         "source_id": str(source.get("id") or ""),
         "source": {
             "id": str(source.get("id") or ""),
@@ -745,14 +785,13 @@ def _panel_snapshot(state: Mapping[str, Any], panel: str) -> dict[str, Any]:
             "description": str(source.get("description") or source.get("path") or ""),
             "connected": bool(source.get("connected", True)),
         },
-        "path": rel,
-        "path_label": path_label,
-        "selected_path": str(panel_state.get("selected_path") or ""),
-        "selected_item": selected,
+        "path": _bounded_text(rel, 1024),
+        "path_label": _bounded_text(path_label, 2304),
+        "selected_path": _bounded_text(panel_state.get("selected_path"), 1024),
+        "selected_item": _bounded_item(selected) if selected else None,
         "items": items,
-        "tree": tree,
         "tree_view": {"root": _tree_view_node(source, tree, "")},
-        "error": error,
+        "error": _bounded_text(error, 512),
     }
 
 
@@ -767,10 +806,10 @@ def _source_options(state: Mapping[str, Any], webspace_id: str) -> list[dict[str
                 "id": str(item.get("id") or ""),
                 "value": str(item.get("id") or ""),
                 "webspace_id": ws,
-                "label": str(item.get("label") or "Local folder"),
-                "description": str(item.get("description") or item.get("path") or ""),
+                "label": _bounded_text(item.get("label") or "Local folder", 256),
+                "description": _bounded_text(item.get("description") or item.get("path"), 2048),
                 "kind": str(item.get("kind") or "local"),
-                "path": str(item.get("path") or ""),
+                "path": _bounded_text(item.get("path"), 2048),
                 "connected": bool(item.get("connected", True)),
             }
         )
@@ -784,10 +823,53 @@ def _recent_link_items(state: Mapping[str, Any]) -> list[dict[str, Any]]:
     return [dict(link)]
 
 
-def _public_link_items() -> list[dict[str, Any]]:
+def _bounded_text(value: Any, max_bytes: int) -> str:
+    raw = str(value or "").encode("utf-8")
+    if len(raw) <= max_bytes:
+        return raw.decode("utf-8")
+    return raw[:max_bytes].decode("utf-8", errors="ignore")
+
+
+def _public_link_summary(value: Mapping[str, Any]) -> dict[str, Any]:
+    public_token = _bounded_text(value.get("public_token") or value.get("id"), 256)
+    name = _bounded_text(value.get("name") or value.get("filename") or value.get("label") or "Public link", 256)
+    view_url = _bounded_text(value.get("view_url") or value.get("url"), 512)
+    return {
+        "id": _bounded_text(value.get("id") or public_token, 256),
+        "public_token": public_token,
+        "name": name,
+        "label": _bounded_text(value.get("label") or name, 256),
+        "resource_kind": _bounded_text(value.get("resource_kind") or value.get("kind") or "file", 64),
+        "status": _bounded_text(value.get("status") or value.get("registration_status") or "", 64),
+        "view_url": view_url,
+        "url": _bounded_text(value.get("url") or view_url, 512),
+        "download_url": _bounded_text(value.get("download_url") or view_url, 512),
+        "open_url": _bounded_text(value.get("open_url"), 512),
+        "root_download_url": _bounded_text(value.get("root_download_url"), 512),
+        "list_url": _bounded_text(value.get("list_url"), 512),
+        "expires_at": _bounded_text(value.get("expires_at"), 128),
+        "registration_status": _bounded_text(value.get("registration_status"), 64),
+        "registration_error": _bounded_text(value.get("registration_error"), 256),
+        "readonly": bool(value.get("readonly", True)),
+        "capabilities": [_bounded_text(item, 64) for item in list(value.get("capabilities") or [])[:8]],
+        "summary": _bounded_text(value.get("summary") or value.get("download_summary"), 256),
+    }
+
+
+def _public_link_items(*, limit: int | None = None, include_download_stats: bool = True) -> list[dict[str, Any]]:
     try:
         out: list[dict[str, Any]] = []
-        for item in list_hub_public_links(ctx=get_ctx()):
+        try:
+            links = list_hub_public_links(
+                ctx=get_ctx(),
+                limit=limit,
+                include_download_stats=include_download_stats,
+            )
+        except TypeError:
+            links = list_hub_public_links(ctx=get_ctx())
+            if limit is not None:
+                links = links[:limit]
+        for item in links:
             if not isinstance(item, Mapping):
                 continue
             enriched = dict(item)
@@ -812,7 +894,14 @@ def _public_link_items() -> list[dict[str, Any]]:
         return []
 
 
-def _public_download_items(public_token: str = "", *, limit: int = 75) -> dict[str, Any]:
+def _public_link_summaries() -> list[dict[str, Any]]:
+    return [
+        _public_link_summary(item)
+        for item in _public_link_items(limit=_MAX_PUBLIC_LINKS, include_download_stats=False)[:_MAX_PUBLIC_LINKS]
+    ]
+
+
+def _public_download_items(public_token: str = "", *, limit: int = _MAX_PUBLIC_DOWNLOADS) -> dict[str, Any]:
     try:
         payload = list_hub_public_download_events(public_token, limit=limit, ctx=get_ctx())
     except Exception:
@@ -833,63 +922,130 @@ def _public_download_items(public_token: str = "", *, limit: int = 75) -> dict[s
         out.append(
             {
                 "id": str(event.get("id") or ""),
-                "time": str(event.get("at") or ""),
-                "status": status,
-                "action": action,
-                "file": filename,
+                "time": _bounded_text(event.get("at"), 128),
+                "status": _bounded_text(status, 64),
+                "action": _bounded_text(action, 64),
+                "file": _bounded_text(filename, 256),
                 "bytes": bytes_label,
                 "code": code_label,
-                "device": device,
-                "error": error,
-                "summary": " | ".join(part for part in (action, status, code_label, error) if part),
+                "device": _bounded_text(device, 128),
+                "error": _bounded_text(error, 256),
+                "summary": _bounded_text(" | ".join(part for part in (action, status, code_label, error) if part), 384),
             }
         )
     return {"items": out, "summary": dict(payload.get("summary") or {})}
 
 
+def _stream_meta(state: Mapping[str, Any], webspace_id: str, receiver: str) -> dict[str, Any]:
+    revision = _state_revision(state)
+    return {
+        "ok": True,
+        "status": "ready",
+        "receiver": receiver,
+        "webspace_id": _webspace_id(webspace_id),
+        "_stream_rev": revision,
+        "_stream_require_revision": True,
+        "updated_at": _now_iso(state.get("updated_at") or _now()),
+    }
+
+
+def _panel_stream_snapshot(state: dict[str, Any], webspace_id: str, panel: str) -> dict[str, Any]:
+    receiver = _PANEL_RECEIVERS[panel]
+    payload = _panel_snapshot(state, panel)
+    sources = _source_options(state, webspace_id)
+    return {
+        **_stream_meta(state, webspace_id, receiver),
+        **payload,
+        "selector": {"options": sources, "current": payload["source_id"]},
+    }
+
+
+def _preview_stream_snapshot(state: Mapping[str, Any], webspace_id: str) -> dict[str, Any]:
+    return {
+        **_stream_meta(state, webspace_id, _PREVIEW_RECEIVER),
+        **dict(state.get("preview") or _empty_preview()),
+    }
+
+
+def _sharing_stream_snapshot(state: Mapping[str, Any], webspace_id: str) -> dict[str, Any]:
+    return {
+        **_stream_meta(state, webspace_id, _SHARING_RECEIVER),
+        "recent_links": {"items": [_public_link_summary(item) for item in _recent_link_items(state)]},
+        "public_links": {"items": _public_link_summaries()},
+        "public_downloads": _public_download_items(),
+    }
+
+
+def _receiver_snapshot(state: dict[str, Any], webspace_id: str, receiver: str) -> dict[str, Any]:
+    if receiver == _LEFT_RECEIVER:
+        return _panel_stream_snapshot(state, webspace_id, "left")
+    if receiver == _RIGHT_RECEIVER:
+        return _panel_stream_snapshot(state, webspace_id, "right")
+    if receiver == _PREVIEW_RECEIVER:
+        return _preview_stream_snapshot(state, webspace_id)
+    if receiver == _SHARING_RECEIVER:
+        return _sharing_stream_snapshot(state, webspace_id)
+    raise ValueError(f"unknown AdaOS Drive receiver: {receiver}")
+
+
 def _snapshot(state: dict[str, Any], webspace_id: str) -> dict[str, Any]:
     ws = _webspace_id(webspace_id)
     sources = _source_options(state, ws)
-    left_source = _panel_snapshot(state, "left")
-    right_source = _panel_snapshot(state, "right")
+    left = _panel_snapshot(state, "left")
+    right = _panel_snapshot(state, "right")
+    sharing = _sharing_stream_snapshot(state, ws)
     revision = _state_revision(state)
     return {
         "ok": True,
         "schema": "adaos_drive.snapshot.v1",
         "status": "ready",
-        "receiver": _RECEIVER,
         "webspace_id": ws,
         "_stream_rev": revision,
         "_stream_require_revision": True,
         "sources": sources,
         "source_options": sources,
         "selectors": {
-            "left_source": {"options": sources, "current": left_source["source_id"]},
-            "right_source": {"options": sources, "current": right_source["source_id"]},
+            "left_source": {"options": sources, "current": left["source_id"]},
+            "right_source": {"options": sources, "current": right["source_id"]},
         },
         "active_panel": str(state.get("active_panel") or "left"),
-        "panels": {
-            "left": left_source,
-            "right": right_source,
-        },
+        "panels": {"left": left, "right": right},
         "preview": dict(state.get("preview") or _empty_preview()),
-        "last_link": dict(state.get("last_link") or _empty_link()),
-        "recent_links": {"items": _recent_link_items(state)},
-        "public_links": {"items": _public_link_items()},
-        "public_downloads": _public_download_items(),
+        "last_link": _public_link_summary(state.get("last_link") or _empty_link()),
+        "recent_links": sharing["recent_links"],
+        "public_links": sharing["public_links"],
+        "public_downloads": sharing["public_downloads"],
         "messages": list(state.get("messages") or [])[-10:],
         "sequence": revision,
         "updated_at": _now_iso(state.get("updated_at") or _now()),
     }
 
 
-def _publish(state: dict[str, Any], webspace_id: str) -> dict[str, Any]:
-    payload = _snapshot(state, webspace_id)
-    try:
-        stream_publish(_RECEIVER, payload, _meta={"webspace_id": _webspace_id(webspace_id)})
-    except Exception:
-        _LOG.exception("failed to publish adaos_drive snapshot")
-    return payload
+def _ack(state: Mapping[str, Any], webspace_id: str, receivers: tuple[str, ...] | list[str], **values: Any) -> dict[str, Any]:
+    published = list(dict.fromkeys(receivers))
+    result = {
+        "ok": True,
+        "status": "ready",
+        "webspace_id": _webspace_id(webspace_id),
+        "revision": _state_revision(state),
+        "receivers": published,
+        **values,
+    }
+    if len(published) == 1:
+        result["receiver"] = published[0]
+    return result
+
+
+def _publish_receivers(state: dict[str, Any], webspace_id: str, receivers: tuple[str, ...] | list[str]) -> dict[str, Any]:
+    published = tuple(dict.fromkeys(receiver for receiver in receivers if receiver in _RECEIVERS))
+    ws = _webspace_id(webspace_id)
+    for receiver in published:
+        payload = _receiver_snapshot(state, ws, receiver)
+        try:
+            stream_publish(receiver, payload, _meta={"webspace_id": ws})
+        except Exception:
+            _LOG.exception("failed to publish AdaOS Drive receiver %s", receiver)
+    return _ack(state, ws, published)
 
 
 def _message(state: dict[str, Any], text: str, *, level: str = "info") -> None:
@@ -898,11 +1054,16 @@ def _message(state: dict[str, Any], text: str, *, level: str = "info") -> None:
     state["messages"] = state["messages"][-10:]
 
 
-def _save_and_publish(state: dict[str, Any], webspace_id: str, message: str | None = None) -> dict[str, Any]:
+def _save_and_publish(
+    state: dict[str, Any],
+    webspace_id: str,
+    receivers: tuple[str, ...] | list[str],
+    message: str | None = None,
+) -> dict[str, Any]:
     if message:
         _message(state, message)
     _persist_state(webspace_id, state)
-    return _publish(state, webspace_id)
+    return _publish_receivers(state, webspace_id, receivers)
 
 
 def _panel_state(state: dict[str, Any], panel: str) -> dict[str, Any]:
@@ -1462,7 +1623,8 @@ def _artifact_path(value: Mapping[str, Any]) -> Path:
 
 
 def _preview_text(path: Path) -> tuple[str, str]:
-    data = path.read_bytes()
+    with path.open("rb") as handle:
+        data = handle.read(_MAX_PREVIEW_BYTES + 1)
     truncated = len(data) > _MAX_PREVIEW_BYTES
     raw = data[:_MAX_PREVIEW_BYTES]
     text = raw.decode("utf-8-sig", errors="replace")
@@ -1474,7 +1636,10 @@ def _preview_text(path: Path) -> tuple[str, str]:
         except Exception:
             pass
     if truncated:
-        text += "\n\n[Preview truncated]"
+        marker = "\n\n[Preview truncated]"
+        text = _bounded_text(text, _MAX_PREVIEW_BYTES - len(marker.encode("utf-8"))) + marker
+    else:
+        text = _bounded_text(text, _MAX_PREVIEW_BYTES)
     return text, language
 
 
@@ -1546,7 +1711,7 @@ def get_snapshot(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     data = _payload(evt, **kwargs)
     ws = _webspace_id(data.get("webspace_id"))
     state = _load_state(ws)
-    return {"ok": True, "snapshot": _publish(state, ws)}
+    return {"ok": True, "snapshot": _snapshot(state, ws)}
 
 
 @tool("add_source")
@@ -1567,8 +1732,8 @@ def add_source(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel_state["path"] = ""
     panel_state["selected_path"] = ""
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws, f"Added source {source['label']}.")
-    return {"ok": True, "source": source, "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_LEFT_RECEIVER, _RIGHT_RECEIVER), f"Added source {source['label']}.")
+    return {**ack, "source": source}
 
 
 @tool("select_source")
@@ -1595,8 +1760,8 @@ def select_source(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel_state["selected_path"] = ""
     panel_state["selected_id"] = ""
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws)
-    return {"ok": True, "panel": panel, "source_id": source_id, "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_LEFT_RECEIVER, _RIGHT_RECEIVER))
+    return {**ack, "panel": panel, "source_id": source_id}
 
 
 @tool("set_active_panel")
@@ -1606,8 +1771,8 @@ def set_active_panel(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     state = _load_state(ws)
     panel = _panel_name(data.get("panel"), state)
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws)
-    return {"ok": True, "active_panel": panel, "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_LEFT_RECEIVER, _RIGHT_RECEIVER))
+    return {**ack, "active_panel": panel}
 
 
 @tool("select_item")
@@ -1628,8 +1793,8 @@ def select_item(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel_state["selected_path"] = rel
     panel_state["selected_id"] = rel
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws)
-    return {"ok": True, "panel": panel, "selected_path": rel, "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_PANEL_RECEIVERS[panel],))
+    return {**ack, "panel": panel, "selected_path": rel}
 
 
 @tool("activate_item")
@@ -1672,8 +1837,8 @@ def open_folder(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel_state["selected_path"] = ""
     panel_state["selected_id"] = ""
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws)
-    return {"ok": True, "panel": panel, "path": rel, "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_PANEL_RECEIVERS[panel],))
+    return {**ack, "panel": panel, "path": rel}
 
 
 @tool("navigate_up")
@@ -1688,8 +1853,8 @@ def navigate_up(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel_state["selected_path"] = ""
     panel_state["selected_id"] = ""
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws)
-    return {"ok": True, "panel": panel, "path": panel_state["path"], "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_PANEL_RECEIVERS[panel],))
+    return {**ack, "panel": panel, "path": panel_state["path"]}
 
 
 @tool("expand_tree")
@@ -1703,11 +1868,15 @@ def expand_tree(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     children = _tree_children(source, rel)
     panel_state = _panel_state(state, panel)
     tree = dict(panel_state.get("tree") or {})
+    tree.pop(rel or "__root__", None)
     tree[rel or "__root__"] = children
+    branch_keys = [key for key in tree if key != "__root__"]
+    while len(branch_keys) > _MAX_TREE_BRANCHES - 1:
+        tree.pop(branch_keys.pop(0), None)
     panel_state["tree"] = tree
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws)
-    return {"ok": True, "panel": panel, "path": rel, "children": children, "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_PANEL_RECEIVERS[panel],))
+    return {**ack, "panel": panel, "path": rel, "children_count": len(children)}
 
 
 @tool("open_selected")
@@ -1753,8 +1922,8 @@ def rename_selected(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel_state["selected_path"] = _rel_from_path(source, target)
     panel_state["selected_id"] = panel_state["selected_path"]
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws, f"Renamed to {target.name}.")
-    return {"ok": True, "panel": panel, "path": panel_state["selected_path"], "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_PANEL_RECEIVERS[panel],), f"Renamed to {target.name}.")
+    return {**ack, "panel": panel, "path": panel_state["selected_path"]}
 
 
 @tool("copy_to_other_panel")
@@ -1777,8 +1946,13 @@ def copy_to_other_panel(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
         raise NotADirectoryError("target panel is not a folder")
     _copy_any(src, dst_dir / src.name)
     state["active_panel"] = from_panel
-    snapshot = _save_and_publish(state, ws, f"Copied {src.name} to {to_panel} panel.")
-    return {"ok": True, "from_panel": from_panel, "to_panel": to_panel, "snapshot": snapshot}
+    ack = _save_and_publish(
+        state,
+        ws,
+        (_PANEL_RECEIVERS[from_panel], _PANEL_RECEIVERS[to_panel]),
+        f"Copied {src.name} to {to_panel} panel.",
+    )
+    return {**ack, "from_panel": from_panel, "to_panel": to_panel}
 
 
 @tool("create_guest_link")
@@ -1825,8 +1999,8 @@ def create_guest_link(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
         if link.get("registration_status") == "registered"
         else f"Created local link token for {path.name}; Root registration is pending."
     )
-    snapshot = _save_and_publish(state, ws, message)
-    return {"ok": True, "link": state["last_link"], "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_SHARING_RECEIVER,), message)
+    return {**ack, "link": _public_link_summary(state["last_link"])}
 
 
 @tool("download_selected")
@@ -1838,7 +2012,12 @@ def download_selected(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
 
 @tool("list_public_links")
 def list_public_links(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
-    return {"ok": True, "links": _public_link_items()}
+    data = _payload(evt, **kwargs)
+    try:
+        limit = max(1, min(500, int(data.get("limit") or 100)))
+    except Exception:
+        limit = 100
+    return {"ok": True, "links": _public_link_items(limit=limit)}
 
 
 @tool("list_public_downloads")
@@ -1861,6 +2040,7 @@ def list_public_downloads(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
 @tool("revoke_public_link")
 def revoke_public_link(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     data = _payload(evt, **kwargs)
+    ws = _webspace_id(data.get("webspace_id"))
     token = str(data.get("public_token") or data.get("id") or "").strip()
     if not token:
         raise ValueError("public_token is required")
@@ -1896,8 +2076,10 @@ def revoke_public_link(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
         except Exception as exc:
             root_result = _root_registration_failure("root_revoke_request_failed", str(exc))
             break
+    state = _load_state(ws)
+    ack = _publish_receivers(state, ws, (_SHARING_RECEIVER,))
     return {
-        "ok": True,
+        **ack,
         "link": revoked,
         "root_revoke": root_result,
     }
@@ -1915,10 +2097,10 @@ def preview_in_other_panel(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     source = _source_for_panel(state, panel)
     path = _resolve_entry(source, selected)
     target_panel = _panel_name(data.get("preview_panel") or _other_panel(panel), state)
-    preview = _set_preview_from_path(state, source, path, panel=target_panel)
+    _set_preview_from_path(state, source, path, panel=target_panel)
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws, f"Previewed {path.name}.")
-    return {"ok": True, "preview": preview, "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_PREVIEW_RECEIVER,), f"Previewed {path.name}.")
+    return {**ack, "panel": target_panel, "path": _rel_from_path(source, path)}
 
 
 @tool("upload_to_panel")
@@ -1945,8 +2127,8 @@ def upload_to_panel(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel_state["selected_path"] = _rel_from_path(source, target)
     panel_state["selected_id"] = panel_state["selected_path"]
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws, f"Uploaded {target.name}.")
-    return {"ok": True, "panel": panel, "path": panel_state["selected_path"], "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_PANEL_RECEIVERS[panel],), f"Uploaded {target.name}.")
+    return {**ack, "panel": panel, "path": panel_state["selected_path"]}
 
 
 @tool("make_folder")
@@ -1964,8 +2146,8 @@ def make_folder(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     panel_state["selected_path"] = _rel_from_path(source, target)
     panel_state["selected_id"] = panel_state["selected_path"]
     state["active_panel"] = panel
-    snapshot = _save_and_publish(state, ws, f"Created folder {target.name}.")
-    return {"ok": True, "panel": panel, "path": panel_state["selected_path"], "snapshot": snapshot}
+    ack = _save_and_publish(state, ws, (_PANEL_RECEIVERS[panel],), f"Created folder {target.name}.")
+    return {**ack, "panel": panel, "path": panel_state["selected_path"]}
 
 
 @tool("refresh")
@@ -1975,9 +2157,12 @@ def refresh(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     state = _load_state(ws)
     panel = data.get("panel")
     if panel:
-        state["active_panel"] = _panel_name(panel, state)
-    snapshot = _save_and_publish(state, ws)
-    return {"ok": True, "snapshot": snapshot}
+        selected_panel = _panel_name(panel, state)
+        state["active_panel"] = selected_panel
+        receivers = (_PANEL_RECEIVERS[selected_panel],)
+    else:
+        receivers = _RECEIVERS
+    return _save_and_publish(state, ws, receivers)
 
 
 @tool("persist_state")
@@ -2001,7 +2186,7 @@ def rehydrate(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     else:
         state = loaded
         _STATE_BY_WEBSPACE[ws] = state
-    return {"ok": True, "snapshot": _publish(state, ws)}
+    return _publish_receivers(state, ws, _RECEIVERS)
 
 
 @tool("reset_drive")
@@ -2018,30 +2203,15 @@ def reset_drive(evt: Any = None, **kwargs: Any) -> dict[str, Any]:
     else:
         state = _default_state()
     _STATE_BY_WEBSPACE[ws] = state
-    snapshot = _save_and_publish(state, ws)
-    return {"ok": True, "snapshot": snapshot}
+    return _save_and_publish(state, ws, _RECEIVERS)
 
 
-@subscribe("webio.stream.snapshot.requested")
+@subscribe("webio.stream.snapshot.requested", receivers=_RECEIVERS)
 def on_stream_snapshot_requested(evt: Any = None) -> dict[str, Any] | None:
     data = _payload(evt)
     receiver = str(data.get("receiver") or data.get("id") or "").strip()
-    if receiver and receiver != _RECEIVER:
+    if receiver not in _RECEIVERS:
         return None
     ws = _webspace_id(data.get("webspace_id") or data.get("room") or data.get("webspace"))
     state = _load_state(ws)
-    return {"ok": True, "snapshot": _publish(state, ws)}
-
-
-@subscribe("webio.stream.subscription.changed")
-def on_stream_subscription_changed(evt: Any = None) -> dict[str, Any] | None:
-    data = _payload(evt)
-    receiver = str(data.get("receiver") or data.get("id") or "").strip()
-    subscribed = data.get("subscribed")
-    if receiver and receiver != _RECEIVER:
-        return None
-    if subscribed is False:
-        return None
-    ws = _webspace_id(data.get("webspace_id") or data.get("room") or data.get("webspace"))
-    state = _load_state(ws)
-    return {"ok": True, "snapshot": _publish(state, ws)}
+    return _publish_receivers(state, ws, (receiver,))

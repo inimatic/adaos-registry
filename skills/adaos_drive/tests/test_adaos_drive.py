@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 import sys
 from copy import deepcopy
 from pathlib import Path
@@ -11,6 +12,7 @@ import pytest
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = Path(__file__).resolve().parents[5]
+SCENARIO_ROOT = SKILL_ROOT.parents[1] / "scenarios" / "adaos_drive"
 SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
@@ -62,6 +64,10 @@ def load_module(monkeypatch, memory=None, skills_root: Path | None = None, base_
     return mod, streams
 
 
+def latest_stream(streams, receiver: str):
+    return next(payload for current, payload, _meta in reversed(streams) if current == receiver)
+
+
 def test_snapshot_lists_files_and_lazy_tree(monkeypatch, tmp_path):
     root = tmp_path / "left"
     nested = root / "docs"
@@ -72,7 +78,7 @@ def test_snapshot_lists_files_and_lazy_tree(monkeypatch, tmp_path):
 
     reset = mod.reset_drive({"root": str(root), "webspace_id": "test"})
     assert reset["ok"] is True
-    left = reset["snapshot"]["panels"]["left"]
+    left = latest_stream(streams, "adaos_drive.left")
     items = {item["name"]: item for item in left["items"]}
     assert items["alpha.txt"]["extension"] == "txt"
     assert items["alpha.txt"]["size"] == "5 B"
@@ -81,9 +87,9 @@ def test_snapshot_lists_files_and_lazy_tree(monkeypatch, tmp_path):
 
     expanded = mod.expand_tree({"panel": "left", "path": "", "webspace_id": "test"})
     assert expanded["ok"] is True
-    assert {item["name"] for item in expanded["children"]} >= {"alpha.txt", "docs"}
-    assert expanded["snapshot"]["panels"]["left"]["tree_view"]["root"]["children"]
-    assert streams[-1][0] == "adaos_drive.browser"
+    assert expanded["children_count"] == 2
+    assert latest_stream(streams, "adaos_drive.left")["tree_view"]["root"]["children"]
+    assert streams[-1][0] == "adaos_drive.left"
     assert streams[-1][2]["webspace_id"] == "test"
 
 
@@ -105,17 +111,17 @@ def test_activate_item_opens_folders_and_parent_rows(monkeypatch, tmp_path):
     nested = root / "scenarios"
     nested.mkdir(parents=True)
     (nested / "scenario.yaml").write_text("name: demo\n", encoding="utf-8")
-    mod, _streams = load_module(monkeypatch)
+    mod, streams = load_module(monkeypatch)
     mod.reset_drive({"root": str(root), "webspace_id": "test"})
 
     opened = mod.activate_item({"panel": "left", "path": "scenarios", "webspace_id": "test"})
-    assert opened["snapshot"]["panels"]["left"]["path"] == "scenarios"
+    assert latest_stream(streams, "adaos_drive.left")["path"] == "scenarios"
 
     selected = mod.activate_item({"panel": "left", "path": "scenarios/scenario.yaml", "webspace_id": "test"})
-    assert selected["snapshot"]["panels"]["left"]["selected_path"] == "scenarios/scenario.yaml"
+    assert latest_stream(streams, "adaos_drive.left")["selected_path"] == "scenarios/scenario.yaml"
 
     parent = mod.activate_item({"panel": "left", "path": "__parent__", "webspace_id": "test"})
-    assert parent["snapshot"]["panels"]["left"]["path"] == ""
+    assert latest_stream(streams, "adaos_drive.left")["path"] == ""
 
 
 def test_sources_are_shared_across_drive_webspaces(monkeypatch, tmp_path):
@@ -123,7 +129,7 @@ def test_sources_are_shared_across_drive_webspaces(monkeypatch, tmp_path):
     extra = tmp_path / "extra"
     left.mkdir()
     extra.mkdir()
-    mod, _streams = load_module(monkeypatch)
+    mod, streams = load_module(monkeypatch)
 
     mod.reset_drive({"root": str(left), "webspace_id": "desktop"})
     added = mod.add_source({"label": "Extra", "path": str(extra), "panel": "right", "webspace_id": "desktop"})
@@ -134,7 +140,7 @@ def test_sources_are_shared_across_drive_webspaces(monkeypatch, tmp_path):
     assert {item["webspace_id"] for item in home["source_options"]} == {"Homepoint"}
 
     selected = mod.select_source({"panel": "right", "source_id": source_id, "webspace_id": "Homepoint"})
-    assert selected["snapshot"]["selectors"]["right_source"]["current"] == source_id
+    assert latest_stream(streams, "adaos_drive.right")["selector"]["current"] == source_id
 
 
 def test_select_source_recovers_from_option_payload(monkeypatch, tmp_path):
@@ -142,7 +148,7 @@ def test_select_source_recovers_from_option_payload(monkeypatch, tmp_path):
     external = tmp_path / "external"
     root.mkdir()
     external.mkdir()
-    mod, _streams = load_module(monkeypatch)
+    mod, streams = load_module(monkeypatch)
 
     mod.reset_drive({"root": str(root), "webspace_id": "Homepoint"})
     source_id = mod._source_payload("External", external)["id"]
@@ -157,8 +163,9 @@ def test_select_source_recovers_from_option_payload(monkeypatch, tmp_path):
     )
 
     assert selected["source_id"] == source_id
-    assert selected["snapshot"]["selectors"]["right_source"]["current"] == source_id
-    assert source_id in {item["id"] for item in selected["snapshot"]["sources"]}
+    right_snapshot = latest_stream(streams, "adaos_drive.right")
+    assert right_snapshot["selector"]["current"] == source_id
+    assert source_id in {item["id"] for item in right_snapshot["selector"]["options"]}
 
 
 def test_copy_rename_upload_preview_and_link(monkeypatch, tmp_path):
@@ -177,7 +184,7 @@ def test_copy_rename_upload_preview_and_link(monkeypatch, tmp_path):
     (left / "alpha.txt").write_text("hello from left", encoding="utf-8")
     upload = tmp_path / "upload.txt"
     upload.write_text("uploaded", encoding="utf-8")
-    mod, _streams = load_module(monkeypatch, skills_root=skills_root)
+    mod, streams = load_module(monkeypatch, skills_root=skills_root)
     mod.reset_drive({"root": str(left), "webspace_id": "test"})
     mod.add_source({"label": "Right", "path": str(right), "panel": "right", "webspace_id": "test"})
 
@@ -203,8 +210,10 @@ def test_copy_rename_upload_preview_and_link(monkeypatch, tmp_path):
 
     mod.select_item({"panel": "left", "path": "alpha.txt", "webspace_id": "test"})
     preview = mod.preview_in_other_panel({"panel": "left", "webspace_id": "test"})
-    assert preview["preview"]["mode"] == "text"
-    assert "hello from left" in preview["preview"]["content"]
+    assert preview["receiver"] == "adaos_drive.preview"
+    preview_snapshot = latest_stream(streams, "adaos_drive.preview")
+    assert preview_snapshot["mode"] == "text"
+    assert "hello from left" in preview_snapshot["content"]
 
     registrations = []
     monkeypatch.setattr(mod, "_register_root_drive_link", lambda payload: registrations.append(dict(payload)) or {"ok": True, "link": {"public_token": payload["public_token"]}})
@@ -335,7 +344,7 @@ def test_guest_link_returns_pending_status_when_root_registration_fails(monkeypa
     assert link["ok"] is True
     assert link["link"]["registration_status"] == "pending_root_registration"
     assert link["link"]["registration_error"] == "unauthorized"
-    assert link["snapshot"]["last_link"]["registration_status"] == "pending_root_registration"
+    assert link["receiver"] == "adaos_drive.sharing"
 
 
 def test_rehydrate_keeps_newer_in_memory_folder_state(monkeypatch, tmp_path):
@@ -343,20 +352,101 @@ def test_rehydrate_keeps_newer_in_memory_folder_state(monkeypatch, tmp_path):
     root = tmp_path / "root"
     (root / "scenarios").mkdir(parents=True)
     (root / "scenarios" / "scenario.yaml").write_text("name: demo\n", encoding="utf-8")
-    mod, _streams = load_module(monkeypatch, memory=memory)
+    mod, streams = load_module(monkeypatch, memory=memory)
 
     mod.reset_drive({"root": str(root), "webspace_id": "test"})
     stale_state = deepcopy(mod._load_state("test"))
     opened = mod.open_folder({"panel": "left", "path": "scenarios", "webspace_id": "test"})
-    assert opened["snapshot"]["panels"]["left"]["path"] == "scenarios"
+    opened_snapshot = latest_stream(streams, "adaos_drive.left")
+    assert opened_snapshot["path"] == "scenarios"
     stale_state["sequence"] = 0
     memory[mod._state_key("test")] = stale_state
 
     rehydrated = mod.rehydrate({"webspace_id": "test"})
 
-    assert rehydrated["snapshot"]["panels"]["left"]["path"] == "scenarios"
-    assert rehydrated["snapshot"]["_stream_require_revision"] is True
-    assert rehydrated["snapshot"]["_stream_rev"] >= opened["snapshot"]["_stream_rev"]
+    rehydrated_snapshot = latest_stream(streams, "adaos_drive.left")
+    assert rehydrated_snapshot["path"] == "scenarios"
+    assert rehydrated_snapshot["_stream_require_revision"] is True
+    assert rehydrated_snapshot["_stream_rev"] >= opened_snapshot["_stream_rev"]
+
+
+def test_snapshot_requests_publish_only_the_requested_receiver(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    mod, streams = load_module(monkeypatch)
+    mod.reset_drive({"root": str(root), "webspace_id": "test"})
+    streams.clear()
+
+    result = mod.on_stream_snapshot_requested({"receiver": "adaos_drive.preview", "webspace_id": "test"})
+
+    assert result["receivers"] == ["adaos_drive.preview"]
+    assert [receiver for receiver, _payload, _meta in streams] == ["adaos_drive.preview"]
+    streams.clear()
+    assert mod.on_stream_snapshot_requested({"receiver": "foreign.receiver", "webspace_id": "test"}) is None
+    assert streams == []
+
+
+def test_preview_and_directory_reads_are_bounded(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    for index in range(80):
+        (root / f"item-{index:03}.txt").write_text("value", encoding="utf-8")
+    large = root / "large.txt"
+    large.write_bytes(b"x" * (64 * 1024))
+    mod, streams = load_module(monkeypatch)
+
+    mod.reset_drive({"root": str(root), "webspace_id": "test"})
+    panel = latest_stream(streams, "adaos_drive.left")
+    assert len(panel["items"]) == mod._MAX_ITEMS_PER_FOLDER + 1
+    assert panel["items"][-1]["id"] == "__truncated__"
+
+    mod.preview_in_other_panel({"panel": "left", "path": "large.txt", "webspace_id": "test"})
+    preview = latest_stream(streams, "adaos_drive.preview")
+    assert len(preview["content"].encode("utf-8")) <= mod._MAX_PREVIEW_BYTES
+    assert preview["content"].endswith("[Preview truncated]")
+
+
+def test_sharing_projection_drops_unbounded_link_details(monkeypatch, tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    mod, _streams = load_module(monkeypatch)
+    state = mod._default_state()
+    huge = "x" * 10000
+    monkeypatch.setattr(
+        mod,
+        "_public_link_items",
+        lambda **_kwargs: [
+            {
+                "id": f"link-{index}",
+                "public_token": f"token-{index}",
+                "name": huge,
+                "view_url": huge,
+                "download_url": huge,
+                "grant": {"unbounded": huge},
+                "download_stats": {"unbounded": huge},
+            }
+            for index in range(100)
+        ],
+    )
+    monkeypatch.setattr(mod, "_public_download_items", lambda *args, **kwargs: {"items": [], "summary": {}})
+
+    payload = mod._sharing_stream_snapshot(state, "test")
+    encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+    assert len(payload["public_links"]["items"]) == mod._MAX_PUBLIC_LINKS
+    assert len(encoded) <= 65536
+    assert all("grant" not in item and "download_stats" not in item for item in payload["public_links"]["items"])
+
+
+def test_skill_and_scenario_webui_use_the_same_drive_receivers():
+    if not (SCENARIO_ROOT / "webui.json").is_file():
+        pytest.skip("scenario manifest is not included in the isolated skill candidate")
+    skill_webui = json.loads((SKILL_ROOT / "webui.json").read_text(encoding="utf-8"))
+    scenario_webui = json.loads((SCENARIO_ROOT / "webui.json").read_text(encoding="utf-8"))
+
+    assert skill_webui["webio"]["receivers"] == scenario_webui["webio"]["receivers"]
+    assert "adaos_drive.browser" not in json.dumps(skill_webui)
+    assert "adaos_drive.browser" not in json.dumps(scenario_webui)
 
 
 def test_webui_contract_is_valid():

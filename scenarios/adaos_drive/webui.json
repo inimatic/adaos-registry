@@ -3,82 +3,176 @@
   "generated_by": "adaos_drive",
   "webio": {
     "receivers": {
-      "adaos_drive.browser": {
+      "adaos_drive.left": {
         "mode": "replace",
         "transport": "hub",
         "snapshotPolicy": "on_subscribe",
         "initialState": {
           "ok": true,
           "status": "loading",
-          "message": "Loading AdaOS Drive",
-          "sources": [],
-          "source_options": [],
-          "selectors": {
-            "left_source": {
-              "options": [],
-              "current": ""
-            },
-            "right_source": {
-              "options": [],
-              "current": ""
+          "message": "Loading left panel",
+          "id": "left",
+          "selector": {
+            "options": [],
+            "current": ""
+          },
+          "items": [],
+          "tree_view": {
+            "root": {
+              "id": "__root__",
+              "title": "Left",
+              "children": []
             }
           },
-          "active_panel": "left",
-          "panels": {
-            "left": {
-              "id": "left",
-              "items": [],
-              "tree_view": {
-                "root": {
-                  "id": "__root__",
-                  "title": "Left",
-                  "children": []
-                }
-              }
-            },
-            "right": {
-              "id": "right",
-              "items": [],
-              "tree_view": {
-                "root": {
-                  "id": "__root__",
-                  "title": "Right",
-                  "children": []
-                }
-              }
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 196608,
+          "maxPublishHz": 2,
+          "maxSnapshotHz": 1,
+          "maxItems": 64,
+          "maxFanout": 3
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last left panel snapshot.",
+          "log": "skill:adaos_drive.runtime",
+          "quarantine": false,
+          "metric": "webio_stream_guard.adaos_drive.left"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:adaos_drive_modal",
+          "owner": "skill:adaos_drive",
+          "firstPaint": "left file panel snapshot",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "adaos_drive.action"
+          ]
+        }
+      },
+      "adaos_drive.right": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": true,
+          "status": "loading",
+          "message": "Loading right panel",
+          "id": "right",
+          "selector": {
+            "options": [],
+            "current": ""
+          },
+          "items": [],
+          "tree_view": {
+            "root": {
+              "id": "__root__",
+              "title": "Right",
+              "children": []
             }
           },
-          "preview": {
-            "mode": "empty",
-            "content": "",
-            "language": "text"
-          },
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 196608,
+          "maxPublishHz": 2,
+          "maxSnapshotHz": 1,
+          "maxItems": 64,
+          "maxFanout": 3
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last right panel snapshot.",
+          "log": "skill:adaos_drive.runtime",
+          "quarantine": false,
+          "metric": "webio_stream_guard.adaos_drive.right"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:adaos_drive_modal",
+          "owner": "skill:adaos_drive",
+          "firstPaint": "right file panel snapshot",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "adaos_drive.action"
+          ]
+        }
+      },
+      "adaos_drive.preview": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": true,
+          "status": "loading",
+          "mode": "empty",
+          "content": "",
+          "language": "text",
+          "updated_at": null
+        },
+        "budget": {
+          "maxPayloadBytes": 49152,
+          "maxPublishHz": 2,
+          "maxSnapshotHz": 1,
+          "maxItems": 1,
+          "maxFanout": 3
+        },
+        "guardVisibility": {
+          "degradedState": "Keep the last bounded preview.",
+          "log": "skill:adaos_drive.runtime",
+          "quarantine": false,
+          "metric": "webio_stream_guard.adaos_drive.preview"
+        },
+        "route": {
+          "kind": "stream",
+          "surface": "modal:adaos_drive_modal",
+          "owner": "skill:adaos_drive",
+          "firstPaint": "empty preview",
+          "recovery": "snapshot requested on stream subscribe",
+          "updateSource": [
+            "webio.stream.snapshot.requested",
+            "adaos_drive.action"
+          ]
+        }
+      },
+      "adaos_drive.sharing": {
+        "mode": "replace",
+        "transport": "hub",
+        "snapshotPolicy": "on_subscribe",
+        "initialState": {
+          "ok": true,
+          "status": "loading",
           "recent_links": {
             "items": []
           },
           "public_links": {
             "items": []
           },
-          "messages": [],
+          "public_downloads": {
+            "items": [],
+            "summary": {}
+          },
           "updated_at": null
         },
         "budget": {
-          "maxPayloadBytes": 262144,
-          "maxPublishHz": 2,
+          "maxPayloadBytes": 65536,
+          "maxPublishHz": 1,
           "maxSnapshotHz": 1,
-          "maxItems": 500
+          "maxItems": 16,
+          "maxFanout": 3
         },
         "guardVisibility": {
-          "degradedState": "Keep the last file browser snapshot.",
+          "degradedState": "Keep the last bounded sharing summary.",
           "log": "skill:adaos_drive.runtime",
           "quarantine": false,
-          "metric": "webio_stream_guard.adaos_drive.browser"
+          "metric": "webio_stream_guard.adaos_drive.sharing"
         },
         "route": {
           "kind": "stream",
           "surface": "modal:adaos_drive_modal",
           "owner": "skill:adaos_drive",
-          "firstPaint": "two panel browser snapshot",
+          "firstPaint": "bounded public sharing summary",
           "recovery": "snapshot requested on stream subscribe",
           "updateSource": [
             "webio.stream.snapshot.requested",
@@ -438,8 +532,8 @@
               "title": "Left source",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "adaos_drive.browser",
-                "path": "selectors.left_source"
+                "receiver": "adaos_drive.left",
+                "path": "selector"
               },
               "inputs": {
                 "label": "Source",
@@ -603,8 +697,8 @@
               "title": "Left tree",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "adaos_drive.browser",
-                "path": "panels.left.tree_view"
+                "receiver": "adaos_drive.left",
+                "path": "tree_view"
               },
               "inputs": {
                 "titleKey": "name",
@@ -684,8 +778,8 @@
               "title": "Left files",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "adaos_drive.browser",
-                "path": "panels.left"
+                "receiver": "adaos_drive.left",
+                "path": ""
               },
               "inputs": {
                 "columns": [
@@ -847,8 +941,8 @@
               "title": "Right source",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "adaos_drive.browser",
-                "path": "selectors.right_source"
+                "receiver": "adaos_drive.right",
+                "path": "selector"
               },
               "inputs": {
                 "label": "Source",
@@ -1012,8 +1106,8 @@
               "title": "Right tree",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "adaos_drive.browser",
-                "path": "panels.right.tree_view"
+                "receiver": "adaos_drive.right",
+                "path": "tree_view"
               },
               "inputs": {
                 "titleKey": "name",
@@ -1093,8 +1187,8 @@
               "title": "Right files",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "adaos_drive.browser",
-                "path": "panels.right"
+                "receiver": "adaos_drive.right",
+                "path": ""
               },
               "inputs": {
                 "columns": [
@@ -1256,8 +1350,8 @@
               "title": "Preview",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "adaos_drive.browser",
-                "path": "preview"
+                "receiver": "adaos_drive.preview",
+                "path": ""
               },
               "inputs": {
                 "bindField": "content",
@@ -1272,7 +1366,7 @@
               "title": "Recent link",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "adaos_drive.browser",
+                "receiver": "adaos_drive.sharing",
                 "path": "recent_links"
               },
               "inputs": {
@@ -1340,7 +1434,7 @@
               "title": "Public shares",
               "dataSource": {
                 "kind": "stream",
-                "receiver": "adaos_drive.browser",
+                "receiver": "adaos_drive.sharing",
                 "path": "public_links"
               },
               "inputs": {
@@ -1448,7 +1542,7 @@
                 "domainState": {
                   "owner": "skill:adaos_drive",
                   "store": "skill_memory",
-                  "projection": "webio:adaos_drive.browser"
+                  "projection": "webio:adaos_drive.left"
                 },
                 "routeState": {
                   "owner": "browser",
@@ -1824,8 +1918,8 @@
                 "title": "Left source",
                 "dataSource": {
                   "kind": "stream",
-                  "receiver": "adaos_drive.browser",
-                  "path": "selectors.left_source"
+                  "receiver": "adaos_drive.left",
+                  "path": "selector"
                 },
                 "inputs": {
                   "label": "Source",
@@ -1989,8 +2083,8 @@
                 "title": "Left tree",
                 "dataSource": {
                   "kind": "stream",
-                  "receiver": "adaos_drive.browser",
-                  "path": "panels.left.tree_view"
+                  "receiver": "adaos_drive.left",
+                  "path": "tree_view"
                 },
                 "inputs": {
                   "titleKey": "name",
@@ -2070,8 +2164,8 @@
                 "title": "Left files",
                 "dataSource": {
                   "kind": "stream",
-                  "receiver": "adaos_drive.browser",
-                  "path": "panels.left"
+                  "receiver": "adaos_drive.left",
+                  "path": ""
                 },
                 "inputs": {
                   "columns": [
@@ -2233,8 +2327,8 @@
                 "title": "Right source",
                 "dataSource": {
                   "kind": "stream",
-                  "receiver": "adaos_drive.browser",
-                  "path": "selectors.right_source"
+                  "receiver": "adaos_drive.right",
+                  "path": "selector"
                 },
                 "inputs": {
                   "label": "Source",
@@ -2398,8 +2492,8 @@
                 "title": "Right tree",
                 "dataSource": {
                   "kind": "stream",
-                  "receiver": "adaos_drive.browser",
-                  "path": "panels.right.tree_view"
+                  "receiver": "adaos_drive.right",
+                  "path": "tree_view"
                 },
                 "inputs": {
                   "titleKey": "name",
@@ -2479,8 +2573,8 @@
                 "title": "Right files",
                 "dataSource": {
                   "kind": "stream",
-                  "receiver": "adaos_drive.browser",
-                  "path": "panels.right"
+                  "receiver": "adaos_drive.right",
+                  "path": ""
                 },
                 "inputs": {
                   "columns": [
@@ -2642,8 +2736,8 @@
                 "title": "Preview",
                 "dataSource": {
                   "kind": "stream",
-                  "receiver": "adaos_drive.browser",
-                  "path": "preview"
+                  "receiver": "adaos_drive.preview",
+                  "path": ""
                 },
                 "inputs": {
                   "bindField": "content",
@@ -2658,7 +2752,7 @@
                 "title": "Recent link",
                 "dataSource": {
                   "kind": "stream",
-                  "receiver": "adaos_drive.browser",
+                  "receiver": "adaos_drive.sharing",
                   "path": "recent_links"
                 },
                 "inputs": {
@@ -2726,7 +2820,7 @@
                 "title": "Public shares",
                 "dataSource": {
                   "kind": "stream",
-                  "receiver": "adaos_drive.browser",
+                  "receiver": "adaos_drive.sharing",
                   "path": "public_links"
                 },
                 "inputs": {

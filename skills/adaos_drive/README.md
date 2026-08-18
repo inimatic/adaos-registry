@@ -25,6 +25,17 @@ sources.
   language/theme controls, route status, and a public owner display name.
 - New folder creation and refresh commands.
 
+## Runtime data contract
+
+The browser consumes four bounded replace-state streams: `adaos_drive.left`,
+`adaos_drive.right`, `adaos_drive.preview`, and `adaos_drive.sharing`. File
+actions publish only the affected read model and return a compact acknowledgement;
+`get_snapshot` is the explicit read-only compatibility view and does not publish.
+Directory enumeration, retained tree branches, preview reads, source lists,
+public-link summaries, and download-event summaries are bounded before they are
+materialized. Full public-link diagnostics remain available through the explicit
+`list_public_links` tool.
+
 ## Safety model
 
 All filesystem operations are constrained to the selected source root. Relative

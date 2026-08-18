@@ -28,8 +28,8 @@
       "kind": "skill",
       "id": "adaos_drive",
       "name": "adaos_drive",
-      "version": "0.1.1",
-      "updated_at": "2026-08-17T20:11:20+00:00",
+      "version": "0.1.2",
+      "updated_at": "2026-08-18T00:00:00+00:00",
       "path": "skills/adaos_drive",
       "manifest": "skills/adaos_drive/skill.yaml",
       "source": {
@@ -1071,8 +1071,8 @@
       "kind": "scenario",
       "id": "adaos_drive",
       "name": "adaos_drive",
-      "version": "0.1.0",
-      "updated_at": "2026-08-12T00:00:00+00:00",
+      "version": "0.1.1",
+      "updated_at": "2026-08-18T00:00:00+00:00",
       "path": "scenarios/adaos_drive",
       "manifest": "scenarios/adaos_drive/scenario.yaml",
       "source": {
