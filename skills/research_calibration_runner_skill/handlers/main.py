@@ -190,6 +190,8 @@ def _prepare(
         artifact_groups=[],
         artifact_sources=artifact_sources,
         request=str(packet["base_request"]),
+        execution_budget={"budget_view": packet["budget_view"], **dict(packet["budget"])},
+        agent_profile=dict(packet["agent_profile"]) if packet.get("agent_profile") else None,
         prohibited_actions=list(packet["prohibited_actions"]),
         primary_targets=[f"skill:{candidate}"],
         focus_ref=f"skill:{candidate}",
@@ -201,6 +203,11 @@ def _prepare(
     actual_contexts = [str(item.get("context_digest") or "") for item in session["artifact_inputs"]]
     if actual_contexts != expected_contexts:
         raise ValueError("Development Session artifact views differ from the frozen packet")
+    expected_budget = {"budget_view": packet["budget_view"], **dict(packet["budget"])}
+    if dict(session["handoff"].get("execution_budget") or {}) != expected_budget:
+        raise ValueError("Development Session execution budget differs from the frozen packet")
+    if packet.get("agent_profile") and dict(session["handoff"].get("agent_profile") or {}) != dict(packet["agent_profile"]):
+        raise ValueError("Development Session agent profile differs from the frozen packet")
     attached = [_attach_instruction(session_id, item) for item in packet["instruction_inputs"]]
     builder_webspace_id = "builder-cal-" + str(packet["digest"]).removeprefix("sha256:")[:16]
     binding = development_sessions.bind(session_id, builder_webspace_id)

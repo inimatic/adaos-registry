@@ -83,3 +83,15 @@ def test_artifact_ref_is_converted_without_trusting_packet_path() -> None:
     }
     with pytest.raises(ValueError, match="unsupported"):
         module._artifact_source("D:/private/evaluator", "research.calibration.c0_raw")
+
+
+def test_packet_budget_is_complete_and_bounded() -> None:
+    module = _module()
+    budget = module._validate_packet(_packet(module))["budget"]
+
+    assert budget == {
+        "max_model_tokens": 80000,
+        "max_wall_seconds": 7200,
+        "max_attempts": 1,
+        "max_human_interventions": 0,
+    }
