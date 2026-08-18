@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-18T00:58:36+00:00",
+  "updated_at": "2026-08-18T00:58:55+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -732,8 +732,8 @@
       "kind": "skill",
       "id": "research_calibration_runner_skill",
       "name": "research_calibration_runner_skill",
-      "version": "0.1.3",
-      "updated_at": "2026-08-18T00:06:31+00:00",
+      "version": "0.1.5",
+      "updated_at": "2026-08-18T00:58:55+00:00",
       "path": "skills/research_calibration_runner_skill",
       "manifest": "skills/research_calibration_runner_skill/skill.yaml",
       "source": {
@@ -748,7 +748,7 @@
       "description": "Contamination-aware execution bridge from frozen research calibration packets to native Builder Automation.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 3
+      "tools_count": 4
     },
     {
       "kind": "skill",
