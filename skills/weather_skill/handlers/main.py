@@ -43,7 +43,18 @@ _CITY_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _GEOCODE_CACHE: Dict[str, Tuple[float, Dict[str, Any]]] = {}
 _CACHE_LOCK = threading.Lock()
 _SNAPSHOT_STATE_LOCK = threading.Lock()
+_REQUEST_DIAGNOSTICS_LOCK = threading.Lock()
 _WEBSPACE_REQUEST_GENERATIONS: Dict[str, int] = {}
+_REQUEST_DIAGNOSTICS: Dict[str, Any] = {
+    "accepted_total": 0,
+    "completed_total": 0,
+    "superseded_total": 0,
+    "failed_total": 0,
+    "projection_rejected_total": 0,
+    "active_total": 0,
+    "max_active_total": 0,
+    "last_result": None,
+}
 _CITY_CACHE_TTL = 300.0
 _GEOCODE_CACHE_TTL = 24 * 60 * 60.0
 _CITY_CACHE_MAX_ITEMS = 128
@@ -1075,7 +1086,27 @@ def dispose(**_: Any) -> Dict[str, Any]:
     with _SNAPSHOT_STATE_LOCK:
         generation_count = len(_WEBSPACE_REQUEST_GENERATIONS)
         _WEBSPACE_REQUEST_GENERATIONS.clear()
-    return {"ok": True, "released": city_count + geocode_count + generation_count}
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        tasks = list(_WEATHER_UPDATE_TASKS.values())
+        _WEATHER_UPDATE_TASKS.clear()
+    cancelled_tasks = 0
+    for task in tasks:
+        if task.done():
+            continue
+        try:
+            loop = task.get_loop()
+            if loop.is_running():
+                loop.call_soon_threadsafe(task.cancel)
+            else:
+                task.cancel()
+            cancelled_tasks += 1
+        except Exception:
+            _log.warning("failed to cancel weather update task during dispose", exc_info=True)
+    return {
+        "ok": True,
+        "released": city_count + geocode_count + generation_count + len(tasks),
+        "cancelled_tasks": cancelled_tasks,
+    }
 
 
 @subscribe("nlp.intent.weather.get")
@@ -1134,7 +1165,82 @@ def resolve_location(
     return None
 
 
-_WEATHER_UPDATE_TASKS: Dict[str, asyncio.Task[None]] = {}
+_WEATHER_UPDATE_TASKS: Dict[str, asyncio.Task[Any]] = {}
+
+
+def _replace_weather_update_task(task_key: str, task: asyncio.Task[Any]) -> Optional[asyncio.Task[Any]]:
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        previous = _WEATHER_UPDATE_TASKS.get(task_key)
+        _WEATHER_UPDATE_TASKS[task_key] = task
+        return previous
+
+
+def _weather_update_task_is_current(task_key: str, task: Optional[asyncio.Task[Any]] = None) -> bool:
+    selected = task or asyncio.current_task()
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        return selected is not None and _WEATHER_UPDATE_TASKS.get(task_key) is selected
+
+
+def _remove_weather_update_task(task_key: str, task: asyncio.Task[Any]) -> None:
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        if _WEATHER_UPDATE_TASKS.get(task_key) is task:
+            _WEATHER_UPDATE_TASKS.pop(task_key, None)
+
+
+def _record_weather_request_started() -> None:
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        _REQUEST_DIAGNOSTICS["accepted_total"] += 1
+        _REQUEST_DIAGNOSTICS["active_total"] += 1
+        _REQUEST_DIAGNOSTICS["max_active_total"] = max(
+            _REQUEST_DIAGNOSTICS["max_active_total"],
+            _REQUEST_DIAGNOSTICS["active_total"],
+        )
+
+
+def _record_weather_request_finished(
+    outcome: str,
+    *,
+    city: str,
+    webspace_id: Optional[str],
+    request_id: str,
+    request_generation: int,
+    duration_ms: int,
+) -> None:
+    counter = {
+        "completed": "completed_total",
+        "superseded": "superseded_total",
+        "projection_rejected": "projection_rejected_total",
+    }.get(outcome, "failed_total")
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        _REQUEST_DIAGNOSTICS["active_total"] = max(0, _REQUEST_DIAGNOSTICS["active_total"] - 1)
+        _REQUEST_DIAGNOSTICS[counter] += 1
+        _REQUEST_DIAGNOSTICS["last_result"] = {
+            "outcome": outcome,
+            "city": city,
+            "webspace_id": webspace_id or "default",
+            "request_id": request_id or None,
+            "request_generation": request_generation,
+            "duration_ms": duration_ms,
+            "finished_at": _now_iso(),
+        }
+
+
+@tool("get_runtime_status")
+def get_runtime_status(**_: Any) -> Dict[str, Any]:
+    with _REQUEST_DIAGNOSTICS_LOCK:
+        diagnostics = dict(_REQUEST_DIAGNOSTICS)
+        last_result = diagnostics.get("last_result")
+        diagnostics["last_result"] = dict(last_result) if isinstance(last_result, dict) else None
+        tracked_task_total = sum(1 for task in _WEATHER_UPDATE_TASKS.values() if not task.done())
+    diagnostics.update(
+        {
+            "ok": True,
+            "schema": "adaos.weather.request_runtime.v1",
+            "tracked_task_total": tracked_task_total,
+            "updated_at": _now_iso(),
+        }
+    )
+    return diagnostics
 
 
 def _weather_current_payload(
@@ -1225,27 +1331,6 @@ async def _project_weather_snapshot_async(
             clear_current_skill()
 
 
-async def _project_weather_current_async(data: Dict[str, Any], *, webspace_id: Optional[str], status: str = "") -> None:
-    await _project_weather_snapshot_async(_weather_projection_payload(data, status=status), webspace_id=webspace_id)
-
-
-def _project_weather_current(data: Dict[str, Any], *, webspace_id: Optional[str], status: str = "") -> None:
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
-        pushed = False
-        try:
-            pushed = set_current_skill("weather_skill")
-            ctx_subnet.set("weather.snapshot", _weather_projection_payload(data, status=status), webspace_id=webspace_id)
-        except Exception:
-            _log.warning("failed to project weather.snapshot via ctx_subnet", exc_info=True)
-        finally:
-            if pushed:
-                clear_current_skill()
-        return
-    loop.create_task(_project_weather_current_async(data, webspace_id=webspace_id, status=status))
-
-
 _CANONICAL_NODE_KINDS = frozenset({"hub", "member", "node", "redevice"})
 
 
@@ -1287,12 +1372,12 @@ async def _refresh_weather_live_snapshot(
     webspace_id: Optional[str],
     request_id: str,
     request_generation: int,
-) -> None:
+) -> str:
     started = time.monotonic()
     try:
         ok, live = await _fetch_weather_async(api_entry_point, city, location)
-        if _WEATHER_UPDATE_TASKS.get(task_key) is not asyncio.current_task():
-            return
+        if not _weather_update_task_is_current(task_key):
+            return "superseded"
         error_text = "" if ok else str(live.get("error") or live.get("error_code") or "weather_api_unavailable")
         current = _weather_current_payload(
             city or str((location or {}).get("label") or "Current location"),
@@ -1329,13 +1414,12 @@ async def _refresh_weather_live_snapshot(
             live.get("route_mode") or "unavailable",
             round((time.monotonic() - started) * 1000),
         )
+        return "completed" if projected else "projection_rejected"
     except asyncio.CancelledError:
         raise
     except Exception:
         _log.warning("weather live refresh failed city=%s webspace=%s", city, webspace_id or "default", exc_info=True)
-    finally:
-        if _WEATHER_UPDATE_TASKS.get(task_key) is asyncio.current_task():
-            _WEATHER_UPDATE_TASKS.pop(task_key, None)
+        return "failed"
 
 
 async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
@@ -1370,34 +1454,24 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
             city or str((location or {}).get("label") or "Current location"),
         )
 
-        task_key = f"{str(webspace_id or 'default').strip() or 'default'}::{target_node_id or 'local'}"
-        previous = _WEATHER_UPDATE_TASKS.get(task_key)
-        if previous and not previous.done():
-            previous.cancel()
+        task_node_id = _node_identity_token(target_node_id or local_node_id) or "local"
+        task_key = f"{str(webspace_id or 'default').strip() or 'default'}::{task_node_id}"
         request_generation = await asyncio.to_thread(_advance_webspace_request_generation, webspace_id)
-        pending_current: Dict[str, Any] = {
-            "city": city or str((location or {}).get("label") or "Current location"),
-            "label": city or str((location or {}).get("label") or "Current location"),
-            "temp_c": None,
-            "condition": "",
-            "description": "",
-            "wind_ms": None,
-            "updated_at": _now_iso(),
-            "request_id": request_id,
-            "pending": True,
-            "source": "pending",
-        }
-        if location:
-            pending_current["location"] = dict(location)
-        pending_snapshot = _weather_projection_payload(pending_current, status="pending")
-        pending_snapshot["request_generation"] = request_generation
-        await _project_weather_snapshot_async(
-            pending_snapshot,
-            webspace_id=webspace_id,
-            expected_generation=request_generation,
-        )
-        refresh_task = asyncio.create_task(
-            _refresh_weather_live_snapshot(
+        current_task = asyncio.current_task()
+        if current_task is None:
+            raise RuntimeError("weather request handler has no runtime task")
+        previous = _replace_weather_update_task(task_key, current_task)
+        _record_weather_request_started()
+        request_started = time.monotonic()
+        outcome = "failed"
+        try:
+            if previous and previous is not current_task and not previous.done():
+                previous.cancel()
+                await asyncio.gather(previous, return_exceptions=True)
+            if not _weather_update_task_is_current(task_key, current_task):
+                outcome = "superseded"
+                return
+            outcome = await _refresh_weather_live_snapshot(
                 task_key=task_key,
                 api_entry_point=api_entry_point,
                 city=city,
@@ -1406,17 +1480,19 @@ async def _handle_weather_request(evt: Any, *, event_name: str) -> None:
                 request_id=request_id,
                 request_generation=request_generation,
             )
-        )
-        _WEATHER_UPDATE_TASKS[task_key] = refresh_task
-        try:
-            # Event handlers may run in a bounded per-dispatch event loop. A
-            # detached task is cancelled when that loop closes and leaves the
-            # Yjs projection permanently in its pending state, so keep the
-            # handler alive until the offloaded network request is projected.
-            await refresh_task
         except asyncio.CancelledError:
-            if _WEATHER_UPDATE_TASKS.get(task_key) is refresh_task:
-                raise
+            outcome = "superseded"
+            raise
+        finally:
+            _record_weather_request_finished(
+                outcome,
+                city=city or str((location or {}).get("label") or "Current location"),
+                webspace_id=webspace_id,
+                request_id=request_id,
+                request_generation=request_generation,
+                duration_ms=round((time.monotonic() - request_started) * 1000),
+            )
+            _remove_weather_update_task(task_key, current_task)
     finally:
         if pushed:
             clear_current_skill()

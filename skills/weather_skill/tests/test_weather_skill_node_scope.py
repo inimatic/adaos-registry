@@ -101,16 +101,12 @@ def test_weather_city_changed_projects_without_blocking_sync_ctx_set(monkeypatch
 
     asyncio.run(_run())
 
-    assert [entry[0] for entry in projected] == ["weather.snapshot", "weather.snapshot"]
-    assert [entry[1].get("status") for entry in projected] == ["pending", "ok"]
+    assert [entry[0] for entry in projected] == ["weather.snapshot"]
+    assert [entry[1].get("status") for entry in projected] == ["ok"]
     assert {entry[2] for entry in projected} == {"desktop"}
     assert projected[0][1]["current"]["city"] == "Berlin"
-    assert projected[0][1]["current"]["source"] == "pending"
-    assert projected[0][1]["current"]["pending"] is True
-    assert projected[1][1]["current"]["city"] == "Berlin"
-    assert projected[1][1]["current"]["source"] == "api"
-    assert projected[1][1]["current"]["pending"] is False
-    assert projected[0][1]["request_generation"] == projected[1][1]["request_generation"]
+    assert projected[0][1]["current"]["source"] == "api"
+    assert projected[0][1]["current"]["pending"] is False
 
 
 def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
@@ -161,12 +157,63 @@ def test_weather_location_requested_projects_browser_coordinates(monkeypatch):
 
     asyncio.run(_run())
 
-    assert [entry[1].get("status") for entry in projected] == ["pending", "ok"]
+    assert [entry[1].get("status") for entry in projected] == ["ok"]
     assert projected[0][1]["current"]["request_id"] == "req-geo"
-    assert projected[0][1]["current"]["pending"] is True
-    assert projected[1][1]["current"]["request_id"] == "req-geo"
-    assert projected[1][1]["current"]["pending"] is False
-    assert projected[1][1]["current"]["location"]["latitude"] == 52.52
+    assert projected[0][1]["current"]["pending"] is False
+    assert projected[0][1]["current"]["location"]["latitude"] == 52.52
+
+
+def test_weather_rapid_city_changes_project_only_latest_terminal_snapshot(monkeypatch):
+    mod = _load_weather_module()
+    projected: list[tuple[str, dict, str | None]] = []
+    berlin_started = None
+
+    class _CtxSubnet:
+        async def set_async(self, slot, payload, webspace_id=None):
+            projected.append((slot, payload, webspace_id))
+
+    monkeypatch.setattr(mod, "set_current_skill", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(mod, "get_self_object", lambda: {"id": "member:member-local"})
+    monkeypatch.setattr(mod, "_load_config", lambda: ("https://example.test", None))
+    monkeypatch.setattr(mod, "ctx_subnet", _CtxSubnet())
+
+    import asyncio
+
+    async def _run():
+        nonlocal berlin_started
+        berlin_started = asyncio.Event()
+
+        async def _fetch_weather_async(_api, city=None, _location=None):
+            if city == "Berlin":
+                berlin_started.set()
+                await asyncio.sleep(10)
+            return True, {"city": city, "temp": 12, "description": "clear", "wind_ms": 1}
+
+        monkeypatch.setattr(mod, "_fetch_weather_async", _fetch_weather_async)
+        first = asyncio.create_task(
+            mod.on_weather_city_changed(
+                {"city": "Berlin", "request_id": "req-berlin", "webspace_id": "desktop"}
+            )
+        )
+        await asyncio.wait_for(berlin_started.wait(), timeout=1)
+        second = asyncio.create_task(
+            mod.on_weather_city_changed(
+                {"city": "Moscow", "request_id": "req-moscow", "webspace_id": "desktop"}
+            )
+        )
+        await asyncio.gather(first, second, return_exceptions=True)
+        assert mod._WEATHER_UPDATE_TASKS == {}
+
+    asyncio.run(_run())
+
+    assert len(projected) == 1
+    assert projected[0][1]["status"] == "ok"
+    assert projected[0][1]["current"]["city"] == "Moscow"
+    assert projected[0][1]["current"]["request_id"] == "req-moscow"
+    runtime = mod.get_runtime_status()
+    assert runtime["completed_total"] == 1
+    assert runtime["superseded_total"] == 1
+    assert runtime["active_total"] == 0
 
 
 def test_weather_snapshot_returns_last_projected_webspace_state_without_refetch(monkeypatch):
