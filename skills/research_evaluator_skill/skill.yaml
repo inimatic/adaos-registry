@@ -1,5 +1,5 @@
 name: research_evaluator_skill
-version: 0.1.6
+version: 0.1.7
 description: Independent, contamination-aware evaluator for AdaOS research-compilation
   calibrations.
 supported_locales:
@@ -33,7 +33,7 @@ exports:
 tools:
 - name: derive_compact_calibration
   description: Derive compact digest-linked developer inputs from a frozen audit task
-    and freeze an environment-controlled v1.1 calibration.
+    and freeze an environment-controlled v1.2 calibration.
   entry: handlers.main:derive_compact_calibration
   side_effect_class: local_write
   input_schema:
@@ -45,6 +45,10 @@ tools:
     - python_version
     - platform
     - model
+    - skill_workspace_commit
+    - orchestrator_version
+    - evaluator_version
+    - runner_version
     properties:
       baseline_task_id:
         type: string
@@ -59,6 +63,18 @@ tools:
         type: string
       model:
         type: string
+      skill_workspace_commit:
+        type: string
+        pattern: ^[0-9a-f]{40}$
+      orchestrator_version:
+        type: string
+      evaluator_version:
+        type: string
+      runner_version:
+        type: string
+      standard_prompt_version:
+        type: string
+        default: adaos-skill-realization/0.1.0
       reasoning_effort:
         enum:
         - low
@@ -325,4 +341,3 @@ compatibility:
     min_commit: 8aaac9eb58c0c3913e777f99c45f6562a91ab1a0
     min_short_commit: 8aaac9eb
     build_date: '2026-08-18T03:14:19+03:00'
-

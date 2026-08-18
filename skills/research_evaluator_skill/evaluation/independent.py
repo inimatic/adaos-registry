@@ -21,7 +21,7 @@ def _check(check_id: str, passed: bool, refs: Sequence[str], detail: str) -> dic
     return {
         "check_id": check_id,
         "status": "pass" if passed else "fail",
-        "evidence_refs": list(refs) if passed else list(refs),
+        "evidence_refs": list(dict.fromkeys(str(ref).strip() for ref in refs if str(ref).strip())),
         "detail": str(detail),
     }
 
@@ -196,7 +196,7 @@ def build_independent_candidate(
         "budget_usage": {
             "model_tokens": int(observed.get("model_tokens") or 0),
             "wall_seconds": float(observed.get("wall_seconds") or 0),
-            "attempts": 1,
+            "attempts": max(1, int(observed.get("attempts") or 0)),
             "human_interventions": 0,
             "formulation_tokens": 0,
             "expert_minutes": 0,

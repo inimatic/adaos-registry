@@ -45,7 +45,7 @@ def task_value(tmp_path: Path) -> dict:
         for arm_id in ARM_IDS
     }
     return {
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "task_id": "tlp-calibration-v1",
         "title": "TLP clean research compilation calibration",
         "direction_skill_id": "tlp_research_03",
@@ -65,6 +65,13 @@ def task_value(tmp_path: Path) -> dict:
             "executor_provider": "adaos.local_skill_factory",
             "hostile_isolation": False,
             "network_enforcement": False,
+            "skill_workspace_commit": "b" * 40,
+            "component_versions": {
+                "research_orchestrator_skill": "0.19.0",
+                "research_evaluator_skill": "0.1.7",
+                "research_calibration_runner_skill": "0.1.3",
+            },
+            "standard_prompt_version": "adaos-skill-realization/0.1.0",
         },
         "measurement_policy": {
             "model_token_charge": "input_plus_output_including_cached",
@@ -238,7 +245,7 @@ def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(
         packet=packet,
         candidate_id="candidate",
         session=session,
-        automation={"budget_usage": {"observed": {"model_tokens": 100, "wall_seconds": 10}}},
+        automation={"budget_usage": {"observed": {"model_tokens": 100, "wall_seconds": 10, "attempts": 2}}},
         validation={"ok": True, "digest": "sha256:" + "3" * 64, "source_digest": "sha256:" + "4" * 64},
         prepare={"ok": True, "execution_spec": spec},
         trial={"ok": False, "digest": "sha256:" + "5" * 64, "documents": {}, "outputs": []},
@@ -253,3 +260,8 @@ def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(
     assert statuses["native_skill_validation"] == "pass"
     assert statuses["cpu_workflow_smoke"] == "fail"
     assert statuses["evidence_manifest"] == "fail"
+    assert candidate["budget_usage"]["attempts"] == 2
+    assert all(ref for check in candidate["checks"] for ref in check["evidence_refs"])
+    evaluated = evaluate_candidate(task, candidate)
+    assert evaluated["metrics"]["evidence_valid_completion"] is False
+    assert evaluated["failure"]["stage"] == "implementation"

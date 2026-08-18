@@ -43,7 +43,7 @@ def freeze_calibration(task: Mapping[str, Any], **_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="Derive and freeze a compact v1.1 calibration from an immutable audit task.", side_effects="local_write")
+@tool(summary="Derive and freeze a compact v1.2 calibration from an immutable audit task.", side_effects="local_write")
 def derive_compact_calibration(
     baseline_task_id: str,
     task_id: str,
@@ -51,7 +51,12 @@ def derive_compact_calibration(
     python_version: str,
     platform: str,
     model: str,
+    skill_workspace_commit: str,
+    orchestrator_version: str,
+    evaluator_version: str,
+    runner_version: str,
     reasoning_effort: str = "high",
+    standard_prompt_version: str = "adaos-skill-realization/0.1.0",
     attempts_per_arm: int = 1,
     max_model_tokens: int = 5_000_000,
     max_wall_seconds: int = 10_800,
@@ -95,7 +100,7 @@ def derive_compact_calibration(
         raise ValueError("attempts_per_arm exceeds the baseline paired workload seeds")
     task.update(
         {
-            "schema_version": "1.1.0",
+            "schema_version": "1.2.0",
             "task_id": str(task_id),
             "title": str(baseline["title"]) + " (compact execution contracts)",
             "agent_profile": {
@@ -111,6 +116,13 @@ def derive_compact_calibration(
                 "executor_provider": "adaos.local_skill_factory",
                 "hostile_isolation": False,
                 "network_enforcement": False,
+                "skill_workspace_commit": str(skill_workspace_commit),
+                "component_versions": {
+                    "research_orchestrator_skill": str(orchestrator_version),
+                    "research_evaluator_skill": str(evaluator_version),
+                    "research_calibration_runner_skill": str(runner_version),
+                },
+                "standard_prompt_version": str(standard_prompt_version),
             },
             "measurement_policy": {
                 "model_token_charge": "input_plus_output_including_cached",
