@@ -66,6 +66,9 @@ def prepare_arm(
         "base_request": task["base_request"],
         "budget_view": budget_view,
         "budget": copy.deepcopy(task["budget_views"][budget_view]),
+        **({"agent_profile": copy.deepcopy(task["agent_profile"])} if task.get("agent_profile") else {}),
+        **({"environment_spec": copy.deepcopy(task["environment_spec"])} if task.get("environment_spec") else {}),
+        **({"measurement_policy": copy.deepcopy(task["measurement_policy"])} if task.get("measurement_policy") else {}),
         "artifact_inputs": [
             {
                 "ref": view["source_ref"],

@@ -1,5 +1,5 @@
 name: research_evaluator_skill
-version: 0.1.4
+version: 0.1.5
 description: Independent, contamination-aware evaluator for AdaOS research-compilation
   calibrations.
 supported_locales:
@@ -12,7 +12,9 @@ runtime:
 dependencies: []
 capabilities:
 - storage.relational
+- skills.invoke
 - builder.project_sources
+- builder.project_validation
 lifecycle:
   after_activate:
   - tool: ensure_schema
@@ -20,12 +22,72 @@ exports:
   tools:
   - ensure_schema
   - freeze_calibration
+  - derive_compact_calibration
   - get_task
   - prepare_calibration_arm
   - prepare_calibration_suite
   - record_calibration_result
+  - evaluate_builder_attempt
   - summarize_calibration
 tools:
+- name: derive_compact_calibration
+  description: Derive compact digest-linked developer inputs from a frozen audit task
+    and freeze an environment-controlled v1.1 calibration.
+  entry: handlers.main:derive_compact_calibration
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - baseline_task_id
+    - task_id
+    - core_commit
+    - python_version
+    - platform
+    - model
+    properties:
+      baseline_task_id:
+        type: string
+      task_id:
+        type: string
+      core_commit:
+        type: string
+        pattern: ^[0-9a-f]{40}$
+      python_version:
+        type: string
+      platform:
+        type: string
+      model:
+        type: string
+      reasoning_effort:
+        enum:
+        - low
+        - medium
+        - high
+        - xhigh
+        default: high
+      attempts_per_arm:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 1
+      max_model_tokens:
+        type: integer
+        minimum: 1
+        default: 5000000
+      max_wall_seconds:
+        type: integer
+        minimum: 60
+        maximum: 86400
+        default: 10800
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - task_id
+    - task_digest
+    - task
+    - projection_receipt
 - name: ensure_schema
   description: Ensure the owner-scoped independent evaluation ledger and report its
     binding.
@@ -163,6 +225,50 @@ tools:
     - ok
     - result
     - evidence_valid_completion
+- name: evaluate_builder_attempt
+  description: Run the hidden deterministic judge over one terminal isolated Builder
+    candidate.
+  entry: handlers.main:evaluate_builder_attempt
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - task_id
+    - arm_id
+    - attempt_index
+    - candidate_id
+    - development_session_id
+    - builder_webspace_id
+    properties:
+      task_id:
+        type: string
+      arm_id:
+        enum:
+        - C0_raw
+        - C1_reviewed_prose
+        - C2_staged
+        - C3_typed_execution
+        - C4_over_specified
+      attempt_index:
+        type: integer
+        minimum: 1
+      candidate_id:
+        type: string
+      development_session_id:
+        type: string
+      builder_webspace_id:
+        type: string
+      budget_view:
+        enum:
+        - fixed_downstream
+        - fixed_total_system
+        default: fixed_downstream
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - ready
 - name: summarize_calibration
   description: Report per-arm evidence-valid completion, uncertainty, cost, and failure
     attribution.
@@ -209,13 +315,13 @@ data_routes:
     into candidate context
   budget:
     max_payload_bytes: 4194304
-updated_at: '2026-08-17T22:52:26+00:00'
+updated_at: '2026-08-18T00:06:20+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.854+5187.d1235525
-    recorded_at: '2026-08-17T22:52:26+00:00'
+    min_version: 0.1.854+5200.7fa32431
+    recorded_at: '2026-08-18T00:06:20+00:00'
     source: skill_push
-    min_commit: d123552556e7a3f5a68852b59bf2bc26c347ae9c
-    min_short_commit: d1235525
-    build_date: '2026-08-18T01:49:31+03:00'
+    min_commit: 7fa32431ab22950adf838be4eb0796d7b5c3fd39
+    min_short_commit: 7fa32431
+    build_date: '2026-08-18T02:57:05+03:00'
 

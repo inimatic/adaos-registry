@@ -74,10 +74,11 @@ def _verify_input(item: Mapping[str, Any]) -> None:
 
 def freeze_task(value: Mapping[str, Any]) -> dict[str, Any]:
     task = copy.deepcopy(dict(value))
+    schema_version = str(task.get("schema_version") or "1.0.0")
     task.update(
         {
             "schema": "adaos.research.calibration_task.v1",
-            "schema_version": "1.0.0",
+            "schema_version": schema_version,
             "frozen_at": now(),
         }
     )
@@ -116,6 +117,8 @@ def freeze_task(value: Mapping[str, Any]) -> dict[str, Any]:
     seeds = list(validated["repetitions"]["paired_seeds"])
     if validated["repetitions"]["attempts_per_arm"] != len(seeds):
         raise ValueError("attempts_per_arm must equal paired_seeds length")
+    if schema_version == "1.1.0" and validated["repetitions"]["model_random_seed_control"] != "unsupported_not_claimed":
+        raise ValueError("calibration must not claim unsupported model random-seed control")
     check_ids = [str(item["check_id"]) for item in validated["rubric"]["checks"]]
     if len(check_ids) != len(set(check_ids)):
         raise ValueError("rubric check ids must be unique")

@@ -8,6 +8,7 @@ import pytest
 
 from evaluation.contracts import ARM_IDS, freeze_task
 from evaluation.harness import evaluate_candidate, prepare_arm, summarize
+from evaluation.independent import build_independent_candidate
 
 
 def _sha(value: bytes) -> str:
@@ -44,12 +45,33 @@ def task_value(tmp_path: Path) -> dict:
         for arm_id in ARM_IDS
     }
     return {
+        "schema_version": "1.1.0",
         "task_id": "tlp-calibration-v1",
         "title": "TLP clean research compilation calibration",
         "direction_skill_id": "tlp_research_03",
         "base_request": "Build a clean executable TLP experiment from the supplied source material without using hidden answers.",
         "artifact_groups": ["part0"],
         "expected_protocol_digest": "sha256:" + "a" * 64,
+        "agent_profile": {
+            "provider": "openai-codex-cli",
+            "model": "gpt-5.4",
+            "reasoning_effort": "high",
+            "tool_profile": "adaos-local-bounded-v1",
+        },
+        "environment_spec": {
+            "core_commit": "a" * 40,
+            "python_version": "3.12.10",
+            "platform": "windows-amd64",
+            "executor_provider": "adaos.local_skill_factory",
+            "hostile_isolation": False,
+            "network_enforcement": False,
+        },
+        "measurement_policy": {
+            "model_token_charge": "input_plus_output_including_cached",
+            "wall_clock": "builder_automation_elapsed_seconds",
+            "attempt_count": "initial_plus_automatic_repairs",
+            "human_intervention_count": "post_start_operator_directives",
+        },
         "inputs": inputs,
         "hidden_inputs": [
             {"input_id": "expert-oracle", "kind": "expert_oracle", "ref": "hidden://oracle", "digest": _sha(oracle.read_bytes()), "path": str(oracle)},
@@ -72,7 +94,7 @@ def task_value(tmp_path: Path) -> dict:
             "fixed_downstream": {"max_model_tokens": 10000, "max_wall_seconds": 3600, "max_attempts": 1, "max_human_interventions": 0},
             "fixed_total_system": {"max_model_tokens": 14000, "max_wall_seconds": 5400, "max_attempts": 1, "max_human_interventions": 0},
         },
-        "repetitions": {"attempts_per_arm": 2, "paired_seeds": [17, 23]},
+        "repetitions": {"attempts_per_arm": 2, "paired_seeds": [17, 23], "model_random_seed_control": "unsupported_not_claimed"},
         "exclusion_rules": ["Exclude only a preregistered platform outage before agent execution."],
     }
 
@@ -115,6 +137,7 @@ def test_prepare_arm_never_projects_hidden_evaluator_material(task_value, monkey
     assert "expert-oracle" not in serialized
     assert "hidden://legacy" not in serialized
     assert packet["paired_seed"] == 17
+    assert packet["agent_profile"]["model"] == "gpt-5.4"
 
 
 def _candidate(*, arm_id: str, attempt_index: int, seed: int, failed: str | None = None, tokens: int = 9000) -> dict:
@@ -148,3 +171,85 @@ def test_evaluator_computes_primary_endpoint_budget_and_first_failure(task_value
     assert summary["complete"] is False
     assert summary["arms"][0]["rate"] == 1.0
     assert summary["digest"].startswith("sha256:")
+
+
+def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(task_value) -> None:
+    task = freeze_task(task_value)
+    task["rubric"]["checks"] = [
+        {"check_id": check_id, "stage": "implementation", "evaluation_mode": "deterministic", "mandatory": True, "description": check_id}
+        for check_id in (
+            "context_isolation",
+            "protocol_fidelity",
+            "native_skill_validation",
+            "runner_conformance",
+            "cpu_workflow_smoke",
+            "evidence_manifest",
+        )
+    ]
+    packet = {
+        "packet_id": "packet-tlp-C3-1-fixed_downstream",
+        "task_id": task["task_id"],
+        "task_digest": task["digest"],
+        "arm_id": "C3_typed_execution",
+        "attempt_index": 1,
+        "paired_seed": 17,
+        "budget_view": "fixed_downstream",
+        "budget": task["budget_views"]["fixed_downstream"],
+        "artifact_inputs": [
+            {
+                "ref": "artifact://skill/tlp_direction/part0",
+                "source_manifest_digest": "sha256:" + "1" * 64,
+                "context_digest": "sha256:" + "2" * 64,
+                "audience": "research.calibration.c3_typed_execution",
+            }
+        ],
+        "instruction_inputs": [],
+        "prohibited_actions": ["no hidden access"],
+    }
+    session = {
+        "session_id": "dev-test",
+        "artifact_inputs": [
+            {
+                "ref": "artifact://skill/tlp_direction/part0",
+                "manifest_digest": "sha256:" + "1" * 64,
+                "context_digest": "sha256:" + "2" * 64,
+                "audience": "research.calibration.c3_typed_execution",
+            }
+        ],
+        "instruction_inputs": [],
+        "targets": {"primary": [{"ref": "skill:candidate"}], "secondary": []},
+        "handoff": {"prohibited_actions": ["no hidden access"]},
+    }
+    spec = {
+        "metadata": {
+            "protocol_digest": task["expected_protocol_digest"],
+            "stage": "workflow_smoke",
+            "evidence_class": "workflow_smoke",
+            "epochs": 3,
+            "seeds": ["seed-17"],
+            "inference_allowed": False,
+        },
+        "resources": {"gpu_count": 0},
+        "network": {"mode": "offline"},
+    }
+
+    candidate = build_independent_candidate(
+        task=task,
+        packet=packet,
+        candidate_id="candidate",
+        session=session,
+        automation={"budget_usage": {"observed": {"model_tokens": 100, "wall_seconds": 10}}},
+        validation={"ok": True, "digest": "sha256:" + "3" * 64, "source_digest": "sha256:" + "4" * 64},
+        prepare={"ok": True, "execution_spec": spec},
+        trial={"ok": False, "digest": "sha256:" + "5" * 64, "documents": {}, "outputs": []},
+        dataset={"ok": True},
+        verified_artifacts=[],
+        collected=None,
+    )
+
+    statuses = {item["check_id"]: item["status"] for item in candidate["checks"]}
+    assert statuses["context_isolation"] == "pass"
+    assert statuses["protocol_fidelity"] == "pass"
+    assert statuses["native_skill_validation"] == "pass"
+    assert statuses["cpu_workflow_smoke"] == "fail"
+    assert statuses["evidence_manifest"] == "fail"

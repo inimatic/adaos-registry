@@ -9,13 +9,16 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.calibration_task.v1"},
-    "schema_version": {"const": "1.0.0"},
+    "schema_version": {"enum": ["1.0.0", "1.1.0"]},
     "task_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,127}$"},
     "title": {"type": "string", "minLength": 3},
     "direction_skill_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,127}$"},
     "base_request": {"type": "string", "minLength": 20},
     "artifact_groups": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
     "expected_protocol_digest": {"type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$"},
+    "agent_profile": {"$ref": "#/$defs/agentProfile"},
+    "environment_spec": {"$ref": "#/$defs/environmentSpec"},
+    "measurement_policy": {"$ref": "#/$defs/measurementPolicy"},
     "inputs": {"type": "array", "items": {"$ref": "#/$defs/input"}},
     "hidden_inputs": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/hiddenInput"}},
     "arms": {"type": "array", "minItems": 5, "maxItems": 5, "items": {"$ref": "#/$defs/arm"}},
@@ -46,7 +49,8 @@
       "required": ["attempts_per_arm", "paired_seeds"],
       "properties": {
         "attempts_per_arm": {"type": "integer", "minimum": 1, "maximum": 100},
-        "paired_seeds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "integer"}}
+        "paired_seeds": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "integer"}, "description": "Paired scientific-workload seeds; not model sampling seeds."},
+        "model_random_seed_control": {"const": "unsupported_not_claimed"}
       },
       "additionalProperties": false
     },
@@ -54,7 +58,51 @@
     "frozen_at": {"type": "string", "format": "date-time"},
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.1.0"}}},
+      "then": {
+        "required": ["agent_profile", "environment_spec", "measurement_policy"],
+        "properties": {"repetitions": {"required": ["model_random_seed_control"]}}
+      }
+    }
+  ],
   "$defs": {
+    "agentProfile": {
+      "type": "object",
+      "required": ["provider", "model", "reasoning_effort", "tool_profile"],
+      "properties": {
+        "provider": {"const": "openai-codex-cli"},
+        "model": {"type": "string", "minLength": 1},
+        "reasoning_effort": {"enum": ["low", "medium", "high", "xhigh"]},
+        "tool_profile": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "environmentSpec": {
+      "type": "object",
+      "required": ["core_commit", "python_version", "platform", "executor_provider", "hostile_isolation", "network_enforcement"],
+      "properties": {
+        "core_commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        "python_version": {"type": "string", "minLength": 3},
+        "platform": {"type": "string", "minLength": 1},
+        "executor_provider": {"const": "adaos.local_skill_factory"},
+        "hostile_isolation": {"const": false},
+        "network_enforcement": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "measurementPolicy": {
+      "type": "object",
+      "required": ["model_token_charge", "wall_clock", "attempt_count", "human_intervention_count"],
+      "properties": {
+        "model_token_charge": {"const": "input_plus_output_including_cached"},
+        "wall_clock": {"const": "builder_automation_elapsed_seconds"},
+        "attempt_count": {"const": "initial_plus_automatic_repairs"},
+        "human_intervention_count": {"const": "post_start_operator_directives"}
+      },
+      "additionalProperties": false
+    },
     "input": {
       "type": "object",
       "required": ["input_id", "kind", "ref", "digest", "path", "visible_arms"],

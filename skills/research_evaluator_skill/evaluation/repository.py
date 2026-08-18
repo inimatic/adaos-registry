@@ -85,6 +85,26 @@ class EvaluationRepository:
         )
         return dict(packet)
 
+    def get_packet(
+        self,
+        task_id: str,
+        arm_id: str,
+        attempt_index: int,
+        budget_view: str,
+    ) -> dict[str, Any]:
+        row = self._db.fetch_one(
+            "SELECT payload_json FROM calibration_packets WHERE task_id=:task_id AND arm_id=:arm_id AND attempt_index=:attempt_index AND budget_view=:budget_view",
+            {
+                "task_id": task_id,
+                "arm_id": arm_id,
+                "attempt_index": int(attempt_index),
+                "budget_view": budget_view,
+            },
+        )
+        if not row:
+            raise ValueError("calibration packet was not prepared")
+        return json.loads(str(row["payload_json"]))
+
     def put_result(self, result: Mapping[str, Any]) -> dict[str, Any]:
         existing = self._db.fetch_one(
             "SELECT payload_json FROM calibration_results WHERE task_id=:task_id AND arm_id=:arm_id AND attempt_index=:attempt_index AND budget_view=:budget_view",
