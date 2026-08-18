@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import copy
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -10,6 +9,7 @@ from typing import Any, Mapping
 from adaos.sdk.core.decorators import tool
 from adaos.sdk.builder import automation, development_sessions
 from adaos.sdk.developer import validation as developer_validation
+from adaos.sdk.data.blob import store as blob_store
 from adaos.sdk.skills import invoke as invoke_skill
 
 
@@ -72,23 +72,20 @@ def derive_compact_calibration(
     )
     if not isinstance(response, Mapping) or not response.get("ok"):
         raise RuntimeError("research orchestrator did not return compact execution contracts")
-    data_root = Path(str(os.environ.get("ADAOS_SKILL_DATA_DIR") or "")).resolve()
-    if not str(os.environ.get("ADAOS_SKILL_DATA_DIR") or "").strip():
-        raise RuntimeError("ADAOS_SKILL_DATA_DIR is required for durable calibration inputs")
-    input_root = data_root / "files" / "calibrations" / str(task_id)
-    input_root.mkdir(parents=True, exist_ok=True)
+    input_store = blob_store("calibration_inputs")
     projected_inputs = {
         "research_compilation": dict(response["research_compilation"]),
         "automation_brief": dict(response["automation_brief"]),
     }
     replacements = {}
     for kind, value in projected_inputs.items():
-        path = input_root / f"{kind}.json"
-        encoded = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
-        if path.is_file() and path.read_text(encoding="utf-8") != encoded:
-            raise ValueError(f"frozen compact input drifted: {kind}")
-        path.write_text(encoded, encoding="utf-8")
-        replacements[kind] = {"path": str(path), "digest": str(value["digest"])}
+        blob = input_store.put_json(f"{task_id}-{kind}.json", value)
+        path = input_store.materialize_path(blob)
+        replacements[kind] = {
+            "path": str(path),
+            "digest": str(value["digest"]),
+            "blob_ref": str(blob["ref"]),
+        }
     task = copy.deepcopy(baseline)
     for field in ("schema", "frozen_at", "digest"):
         task.pop(field, None)
@@ -145,7 +142,7 @@ def derive_compact_calibration(
     for item in task["inputs"]:
         replacement = replacements.get(str(item["kind"]))
         if replacement:
-            item.update(replacement)
+            item.update({key: replacement[key] for key in ("path", "digest")})
             item["ref"] = f"calibration-input://{task_id}/{item['kind']}/{replacement['digest']}"
     stored = repository.put_task(freeze_task(task))
     return {
@@ -158,6 +155,7 @@ def derive_compact_calibration(
             "audit_automation_brief_digest": response["audit_automation_brief_digest"],
             "execution_compilation_digest": projected_inputs["research_compilation"]["digest"],
             "execution_automation_brief_digest": projected_inputs["automation_brief"]["digest"],
+            "blob_refs": {kind: item["blob_ref"] for kind, item in replacements.items()},
         },
     }
 
