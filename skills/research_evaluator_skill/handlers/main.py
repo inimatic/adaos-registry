@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.environment import runtime_identity as sdk_runtime_identity
 from adaos.sdk.builder import automation, development_sessions
 from adaos.sdk.developer import validation as developer_validation
 from adaos.sdk.data.blob import store as blob_store
@@ -64,6 +65,18 @@ def derive_compact_calibration(
 ) -> dict[str, Any]:
     repository = EvaluationRepository()
     baseline = repository.get_task(str(baseline_task_id))
+    local_identity = sdk_runtime_identity()
+    runner_response = invoke_skill(
+        "research_calibration_runner_skill",
+        "environment_identity",
+        {},
+        timeout=120,
+    )
+    if not isinstance(runner_response, Mapping) or not runner_response.get("ok"):
+        raise RuntimeError("calibration runner runtime identity is unavailable")
+    runner_identity = runner_response.get("runtime_identity")
+    if not isinstance(runner_identity, Mapping):
+        raise RuntimeError("calibration runner returned no runtime identity")
     visible = {str(item["kind"]): dict(item) for item in baseline["inputs"]}
     compilation_path = Path(visible["research_compilation"]["path"]).resolve()
     brief_path = Path(visible["automation_brief"]["path"]).resolve()
@@ -77,6 +90,49 @@ def derive_compact_calibration(
     )
     if not isinstance(response, Mapping) or not response.get("ok"):
         raise RuntimeError("research orchestrator did not return compact execution contracts")
+    orchestrator_identity = response.get("runtime_identity")
+    if not isinstance(orchestrator_identity, Mapping):
+        raise RuntimeError("research orchestrator returned no runtime identity")
+    expected_components = {
+        "research_orchestrator_skill": str(orchestrator_version),
+        "research_evaluator_skill": str(evaluator_version),
+        "research_calibration_runner_skill": str(runner_version),
+    }
+    actual_components = {
+        "research_orchestrator_skill": str(
+            dict(orchestrator_identity.get("current_skill") or {}).get("version") or ""
+        ),
+        "research_evaluator_skill": str(
+            dict(local_identity.get("current_skill") or {}).get("version") or ""
+        ),
+        "research_calibration_runner_skill": str(
+            dict(runner_identity.get("current_skill") or {}).get("version") or ""
+        ),
+    }
+    actual_environment = {
+        "core_commit": str(dict(local_identity.get("core") or {}).get("git_commit") or ""),
+        "python_version": str(local_identity.get("python_version") or ""),
+        "platform": str(local_identity.get("platform") or ""),
+    }
+    expected_environment = {
+        "core_commit": str(core_commit),
+        "python_version": str(python_version),
+        "platform": str(platform),
+    }
+    mismatches = [
+        key for key, value in expected_environment.items() if actual_environment.get(key) != value
+    ]
+    mismatches.extend(
+        key for key, value in expected_components.items() if actual_components.get(key) != value
+    )
+    for identity in (orchestrator_identity, runner_identity):
+        if str(dict(identity.get("core") or {}).get("git_commit") or "") != str(core_commit):
+            mismatches.append("component_core_commit")
+    if mismatches:
+        raise RuntimeError(
+            "cannot freeze a mismatched calibration environment: "
+            + ", ".join(sorted(set(mismatches)))
+        )
     input_store = blob_store("calibration_inputs")
     projected_inputs = {
         "research_compilation": dict(response["research_compilation"]),
@@ -117,11 +173,7 @@ def derive_compact_calibration(
                 "hostile_isolation": False,
                 "network_enforcement": False,
                 "skill_workspace_commit": str(skill_workspace_commit),
-                "component_versions": {
-                    "research_orchestrator_skill": str(orchestrator_version),
-                    "research_evaluator_skill": str(evaluator_version),
-                    "research_calibration_runner_skill": str(runner_version),
-                },
+                "component_versions": expected_components,
                 "standard_prompt_version": str(standard_prompt_version),
             },
             "measurement_policy": {
@@ -177,7 +229,7 @@ def get_task(task_id: str, **_: Any) -> dict[str, Any]:
     task = EvaluationRepository().get_task(str(task_id))
     public = {key: value for key, value in task.items() if key != "hidden_inputs"}
     public["hidden_input_count"] = len(task.get("hidden_inputs") or [])
-    return {"ok": True, "task": public}
+    return {"ok": True, "task": public, "runtime_identity": sdk_runtime_identity()}
 
 
 @tool(summary="Materialize one contamination-checked arm packet for a paired attempt.", side_effects="local_write")

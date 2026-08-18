@@ -74,6 +74,7 @@ tools:
     - automation_brief
     - audit_compilation_digest
     - audit_automation_brief_digest
+    - runtime_identity
 - name: ensure_schema
   description: Apply checksum-pinned orchestrator migrations.
   entry: handlers.main:ensure_schema
@@ -835,4 +836,3 @@ compatibility:
     min_commit: 7fa32431ab22950adf838be4eb0796d7b5c3fd39
     min_short_commit: 7fa32431
     build_date: '2026-08-18T02:57:05+03:00'
-

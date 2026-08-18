@@ -95,3 +95,51 @@ def test_packet_budget_is_complete_and_bounded() -> None:
         "max_attempts": 1,
         "max_human_interventions": 0,
     }
+
+
+def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
+    module = _module()
+    identity = {
+        "schema": "adaos.runtime.identity.v1",
+        "core": {"git_commit": "a" * 40},
+        "python_version": "3.11.9",
+        "platform": "windows-test",
+        "current_skill": {
+            "name": "research_calibration_runner_skill",
+            "version": "0.1.4",
+        },
+    }
+    evaluator_identity = {
+        **identity,
+        "current_skill": {"name": "research_evaluator_skill", "version": "0.1.9"},
+    }
+    task = {
+        "digest": "sha256:" + "1" * 64,
+        "environment_spec": {
+            "core_commit": "a" * 40,
+            "python_version": "3.11.9",
+            "platform": "windows-test",
+            "component_versions": {
+                "research_orchestrator_skill": "0.19.1",
+                "research_evaluator_skill": "0.1.9",
+                "research_calibration_runner_skill": "0.1.4",
+            },
+        },
+    }
+    monkeypatch.setattr(module, "sdk_runtime_identity", lambda: identity)
+    monkeypatch.setattr(
+        module,
+        "invoke_skill",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "task": task,
+            "runtime_identity": evaluator_identity,
+        },
+    )
+
+    receipt = module._environment_preflight("tlp-calibration-v1")
+
+    assert receipt["task_digest"] == task["digest"]
+    task["environment_spec"]["core_commit"] = "b" * 40
+    with pytest.raises(RuntimeError, match="core_commit"):
+        module._environment_preflight("tlp-calibration-v1")

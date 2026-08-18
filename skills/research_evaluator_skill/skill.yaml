@@ -158,6 +158,7 @@ tools:
     required:
     - ok
     - task
+    - runtime_identity
 - name: prepare_calibration_arm
   description: Materialize a digest-bound, contamination-checked input packet for
     one paired attempt.
@@ -341,4 +342,3 @@ compatibility:
     min_commit: 0faf147165b5e2c0af02ecb5a8fb6ff7b4d8f4cc
     min_short_commit: 0faf1471
     build_date: '2026-08-18T03:46:00+03:00'
-

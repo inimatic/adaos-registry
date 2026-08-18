@@ -9,6 +9,7 @@ from typing import Any
 
 from adaos.sdk.builder import development_sessions
 from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.environment import runtime_identity as sdk_runtime_identity
 from adaos.sdk.developer import compositions
 from adaos.sdk.skills import invoke as invoke_skill
 
@@ -73,6 +74,55 @@ def _packet(
     if not isinstance(packet, Mapping):
         raise RuntimeError("independent evaluator returned no packet object")
     return _validate_packet(packet)
+
+
+def _environment_preflight(task_id: str) -> dict[str, Any]:
+    response = invoke_skill(
+        "research_evaluator_skill",
+        "get_task",
+        {"task_id": str(task_id)},
+        timeout=120,
+    )
+    if not isinstance(response, Mapping) or not response.get("ok"):
+        raise RuntimeError("independent evaluator did not return the frozen task")
+    task = response.get("task")
+    evaluator_identity = response.get("runtime_identity")
+    if not isinstance(task, Mapping) or not isinstance(evaluator_identity, Mapping):
+        raise RuntimeError("frozen task environment identity is unavailable")
+    expected = task.get("environment_spec")
+    if not isinstance(expected, Mapping):
+        raise RuntimeError("calibration task does not freeze its environment")
+    local = sdk_runtime_identity()
+    components = expected.get("component_versions")
+    if not isinstance(components, Mapping):
+        raise RuntimeError("calibration task does not freeze component versions")
+    actual = {
+        "core_commit": str(dict(local.get("core") or {}).get("git_commit") or ""),
+        "python_version": str(local.get("python_version") or ""),
+        "platform": str(local.get("platform") or ""),
+        "runner_version": str(dict(local.get("current_skill") or {}).get("version") or ""),
+        "evaluator_version": str(
+            dict(evaluator_identity.get("current_skill") or {}).get("version") or ""
+        ),
+        "evaluator_core_commit": str(
+            dict(evaluator_identity.get("core") or {}).get("git_commit") or ""
+        ),
+    }
+    required = {
+        "core_commit": str(expected.get("core_commit") or ""),
+        "python_version": str(expected.get("python_version") or ""),
+        "platform": str(expected.get("platform") or ""),
+        "runner_version": str(components.get("research_calibration_runner_skill") or ""),
+        "evaluator_version": str(components.get("research_evaluator_skill") or ""),
+        "evaluator_core_commit": str(expected.get("core_commit") or ""),
+    }
+    mismatches = [key for key, value in required.items() if actual.get(key) != value]
+    if mismatches:
+        raise RuntimeError(
+            "calibration environment mismatch: "
+            + ", ".join(f"{key} expected={required[key]!r} actual={actual[key]!r}" for key in mismatches)
+        )
+    return {"task_digest": str(task["digest"]), "expected": required, "actual": actual}
 
 
 def _candidate_id(packet: Mapping[str, Any], explicit: str | None = None) -> str:
@@ -167,7 +217,10 @@ def _prepare(
     budget_view: str,
     candidate_id: str | None,
 ) -> dict[str, Any]:
+    environment = _environment_preflight(task_id)
     packet = _packet(task_id, arm_id, attempt_index, budget_view)
+    if str(packet["task_digest"]) != str(environment["task_digest"]):
+        raise ValueError("calibration packet task digest differs from environment preflight")
     candidate = _candidate_id(packet, candidate_id)
     project = _ensure_project(candidate, packet)
     automation_digest = next(
@@ -218,6 +271,7 @@ def _prepare(
         "session": binding["session"],
         "binding": binding["binding"],
         "attached": [item["instruction"] for item in attached],
+        "environment": environment,
     }
 
 
@@ -245,7 +299,13 @@ def _public_preparation(prepared: Mapping[str, Any]) -> dict[str, Any]:
         "instruction_kinds": [item["kind"] for item in session.get("instruction_inputs") or []],
         "base_request": packet["base_request"],
         "budget": packet["budget"],
+        "environment": prepared["environment"],
     }
+
+
+@tool(summary="Return the runner runtime identity used by calibration preflight.", side_effects="none")
+def environment_identity(**_: Any) -> dict[str, Any]:
+    return {"ok": True, "runtime_identity": sdk_runtime_identity()}
 
 
 @tool(summary="Prepare one isolated Builder candidate from a frozen calibration packet.", side_effects="local_write")
@@ -305,4 +365,4 @@ def get_attempt(candidate_id: str, builder_webspace_id: str, **_: Any) -> dict[s
     return {"ok": True, "candidate_id": candidate_id, "automation": result}
 
 
-__all__ = ["get_attempt", "prepare_attempt", "start_attempt"]
+__all__ = ["environment_identity", "get_attempt", "prepare_attempt", "start_attempt"]

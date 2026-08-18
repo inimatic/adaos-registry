@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.environment import runtime_identity
 from adaos.sdk.builder import preview as builder_preview
 from adaos.sdk.developer import artifact_context, compositions
 
@@ -47,6 +48,7 @@ def project_execution_contracts(
         "automation_brief": engineering,
         "audit_compilation_digest": compilation["digest"],
         "audit_automation_brief_digest": automation_brief["digest"],
+        "runtime_identity": runtime_identity(),
     }
 
 
