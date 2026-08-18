@@ -113,11 +113,22 @@ def derive_compact_calibration(
         "core_commit": str(dict(local_identity.get("core") or {}).get("git_commit") or ""),
         "python_version": str(local_identity.get("python_version") or ""),
         "platform": str(local_identity.get("platform") or ""),
+        "core_source_tree_clean": dict(
+            dict(local_identity.get("core") or {}).get("source_tree") or {}
+        ).get("clean"),
+        "core_source_tree_digest": str(
+            dict(dict(local_identity.get("core") or {}).get("source_tree") or {}).get(
+                "tracked_diff_digest"
+            )
+            or ""
+        ),
     }
     expected_environment = {
         "core_commit": str(core_commit),
         "python_version": str(python_version),
         "platform": str(platform),
+        "core_source_tree_clean": True,
+        "core_source_tree_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
     }
     mismatches = [
         key for key, value in expected_environment.items() if actual_environment.get(key) != value
@@ -175,6 +186,8 @@ def derive_compact_calibration(
                 "skill_workspace_commit": str(skill_workspace_commit),
                 "component_versions": expected_components,
                 "standard_prompt_version": str(standard_prompt_version),
+                "core_source_tree_clean": True,
+                "core_source_tree_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             },
             "measurement_policy": {
                 "model_token_charge": "input_plus_output_including_cached",

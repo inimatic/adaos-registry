@@ -101,7 +101,13 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
     module = _module()
     identity = {
         "schema": "adaos.runtime.identity.v1",
-        "core": {"git_commit": "a" * 40},
+        "core": {
+            "git_commit": "a" * 40,
+            "source_tree": {
+                "clean": True,
+                "tracked_diff_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            },
+        },
         "python_version": "3.11.9",
         "platform": "windows-test",
         "current_skill": {
@@ -119,6 +125,8 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
             "core_commit": "a" * 40,
             "python_version": "3.11.9",
             "platform": "windows-test",
+            "core_source_tree_clean": True,
+            "core_source_tree_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
             "component_versions": {
                 "research_orchestrator_skill": "0.19.1",
                 "research_evaluator_skill": "0.1.9",

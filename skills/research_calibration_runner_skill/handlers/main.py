@@ -98,6 +98,15 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
         raise RuntimeError("calibration task does not freeze component versions")
     actual = {
         "core_commit": str(dict(local.get("core") or {}).get("git_commit") or ""),
+        "core_source_tree_clean": dict(
+            dict(local.get("core") or {}).get("source_tree") or {}
+        ).get("clean"),
+        "core_source_tree_digest": str(
+            dict(dict(local.get("core") or {}).get("source_tree") or {}).get(
+                "tracked_diff_digest"
+            )
+            or ""
+        ),
         "python_version": str(local.get("python_version") or ""),
         "platform": str(local.get("platform") or ""),
         "runner_version": str(dict(local.get("current_skill") or {}).get("version") or ""),
@@ -110,6 +119,8 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
     }
     required = {
         "core_commit": str(expected.get("core_commit") or ""),
+        "core_source_tree_clean": expected.get("core_source_tree_clean"),
+        "core_source_tree_digest": str(expected.get("core_source_tree_digest") or ""),
         "python_version": str(expected.get("python_version") or ""),
         "platform": str(expected.get("platform") or ""),
         "runner_version": str(components.get("research_calibration_runner_skill") or ""),

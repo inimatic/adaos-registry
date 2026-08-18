@@ -73,7 +73,7 @@
         "properties": {
           "repetitions": {"required": ["model_random_seed_control"]},
           "environment_spec": {
-            "required": ["skill_workspace_commit", "component_versions", "standard_prompt_version"]
+            "required": ["skill_workspace_commit", "component_versions", "standard_prompt_version", "core_source_tree_clean", "core_source_tree_digest"]
           }
         }
       }
@@ -113,6 +113,8 @@
           "additionalProperties": false
         }
         ,"standard_prompt_version": {"type": "string", "minLength": 1}
+        ,"core_source_tree_clean": {"const": true}
+        ,"core_source_tree_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
       },
       "additionalProperties": false
     },

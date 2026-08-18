@@ -72,6 +72,8 @@ def task_value(tmp_path: Path) -> dict:
                 "research_calibration_runner_skill": "0.1.3",
             },
             "standard_prompt_version": "adaos-skill-realization/0.1.0",
+            "core_source_tree_clean": True,
+            "core_source_tree_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
         },
         "measurement_policy": {
             "model_token_charge": "input_plus_output_including_cached",
