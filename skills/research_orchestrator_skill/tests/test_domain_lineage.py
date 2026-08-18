@@ -100,8 +100,34 @@ def test_task_relations_active_projection_and_compilation_record_are_exact() -> 
     )
     _validate("research.compilation.v1.schema.json", record)
     assert record["task_ref"] == follow_up["ref"]
+    assert record["compilation_id"] == "agenda-task-002-r1"
+    assert record["ref"] == "research-compilation:agenda-task-002-r1"
     assert record["payload"] == payload
     assert repository.latest_compilation_for_task(follow_up["task_id"]) == record
+
+
+def test_legacy_prefixed_compilation_id_is_normalized_in_projection() -> None:
+    repository = OrchestratorRepository()
+    direction = repository.initialize("legacy", "Legacy")
+    task = repository.get_task(direction["active_task_id"])
+    assert task is not None
+    payload = {
+        "schema": "adaos.research.compilation_package.v1",
+        "compilation_id": "research-compilation:legacy-r1",
+        "source_bundle_digest": "sha256:" + "1" * 64,
+    }
+    payload["digest"] = digest(payload)
+
+    record = repository.put_compilation(
+        "legacy",
+        task["task_id"],
+        payload,
+        prototype_digest="sha256:" + "2" * 64,
+        actor="user:test",
+    )
+
+    assert record["compilation_id"] == "legacy-r1"
+    assert record["ref"] == "research-compilation:legacy-r1"
 
 
 def test_task_relations_cannot_cross_direction_boundary() -> None:

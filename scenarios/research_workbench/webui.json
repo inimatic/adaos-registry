@@ -1001,8 +1001,23 @@
               "area": "workspace",
               "title": "Studies",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'studies'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_studies",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.activity",
+                  "research.evidence"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 1
+              },
               "inputs": {
-                "content": "## No studies yet\n\nStudies are created only after an implementation track has produced an executable, contract-compatible candidate. The scientific task remains the parent of every study."
+                "bindField": "content"
               }
             },
             {

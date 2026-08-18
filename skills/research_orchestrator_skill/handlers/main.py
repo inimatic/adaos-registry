@@ -276,6 +276,33 @@ def get_lineage(
     )
 
 
+@tool(summary="Read Study references connected to one ResearchTask.", side_effects="none")
+def get_studies(
+    direction_id: str,
+    task_id: str | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    state = _orchestrator().get(direction_id, task_id=task_id)
+    task = state.get("selected_task") or state.get("active_task") or {}
+    studies = list((task.get("metadata") or {}).get("matched_studies") or [])
+    lines = [
+        (
+            f"- `{item.get('ref')}` · **{item.get('status') or 'unknown'}**  \n"
+            f"Owner: `{item.get('owner_ref')}` · endpoint: `{item.get('primary_endpoint') or 'not declared'}`  \n"
+            f"Task digest: `{item.get('external_task_digest')}` · summary: `{item.get('summary_digest')}`"
+        )
+        for item in studies
+    ]
+    return {
+        "ok": True,
+        "direction_ref": state["direction"].get("ref"),
+        "task_ref": task.get("ref"),
+        "items": studies,
+        "count": len(studies),
+        "content": "## Studies\n\n" + ("\n\n".join(lines) if lines else "No Study refs are connected to this task."),
+    }
+
+
 @tool(summary="List manifested source artifacts for one direction.", side_effects="none")
 def list_artifacts(direction_id: str, **_: Any) -> dict[str, Any]:
     state = _orchestrator().get(direction_id)

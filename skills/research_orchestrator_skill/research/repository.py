@@ -369,7 +369,9 @@ class OrchestratorRepository:
                 "INSERT INTO research_compilations(digest, compilation_id, direction_id, task_id, revision, parent_digest, prototype_digest, source_bundle_digest, payload_json, accepted_at, accepted_by) VALUES (:digest, :compilation_id, :direction_id, :task_id, :revision, :parent_digest, :prototype_digest, :source_bundle_digest, :payload_json, :accepted_at, :accepted_by)",
                 {
                     "digest": compilation_digest,
-                    "compilation_id": str(value.get("compilation_id") or f"research-compilation:{task_id}:{revision}"),
+                    "compilation_id": str(
+                        value.get("compilation_id") or f"{task_id}.r{revision}"
+                    ).removeprefix("research-compilation:"),
                     "direction_id": direction_id,
                     "task_id": task_id,
                     "revision": revision,
@@ -397,10 +399,11 @@ class OrchestratorRepository:
         if not row:
             return None
         payload = json.loads(str(row["payload_json"]))
+        compilation_id = str(row["compilation_id"]).removeprefix("research-compilation:")
         return {
             "schema": "adaos.research.compilation.v1",
-            "compilation_id": str(row["compilation_id"]),
-            "ref": f"research-compilation:{row['compilation_id']}",
+            "compilation_id": compilation_id,
+            "ref": f"research-compilation:{compilation_id}",
             "direction_id": str(row["direction_id"]),
             "direction_ref": f"research-direction:{row['direction_id']}",
             "task_id": str(row["task_id"]),
