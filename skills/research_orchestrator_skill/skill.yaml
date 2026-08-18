@@ -815,6 +815,32 @@ data_routes:
     invalidation_tags:
     - research.portfolio
     - research.formulation
+- surface: widget:research-outline
+  route: tool/details
+  tool: get_outline
+  owner: skill:research_orchestrator_skill
+  first_paint: bounded direction/task/implementation outline
+  recovery: preserve the last outline and retry after targeted invalidation
+  guard_visibility: typed ids, labels, badges, and targets; source bytes excluded
+  budget:
+    max_payload_bytes: 1048576
+    max_items: 1000
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags:
+    - research.artifacts
+    - research.formulation
+    - research.compilation
+    - research.activity
+    - research.automation_brief
 - surface: widget:artifact-list
   route: tool/details
   tool: list_artifacts
@@ -921,6 +947,31 @@ data_routes:
     invalidation_tags:
     - research.activity
     - research.formulation
+- surface: widget:research-lineage
+  route: tool/details
+  tool: get_lineage
+  owner: skill:research_orchestrator_skill
+  first_paint: selected task source-to-result lineage or an explicit empty projection
+  recovery: preserve the last lineage and retry after targeted invalidation
+  guard_visibility: owned and admitted path-free refs, digests, costs, failures, and results
+  budget:
+    max_payload_bytes: 1048576
+    max_items: 1000
+  read_policy:
+    mode: explicit
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
+    - state_dependency_changed
+    cache_ttl_ms: 0
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags:
+    - research.artifacts
+    - research.compilation
+    - research.activity
+    - research.evidence
 - surface: widget:research-automation-brief
   route: tool/details
   tool: get_automation_brief
@@ -1012,4 +1063,3 @@ compatibility:
     min_commit: 102db58eeff1e395e53ab0415e648e26fdd682a3
     min_short_commit: 102db58e
     build_date: '2026-08-18T17:35:22+03:00'
-
