@@ -1,5 +1,5 @@
 name: research_evaluator_skill
-version: 0.1.11
+version: 0.1.13
 description: Independent, contamination-aware evaluator for AdaOS research-compilation
   calibrations.
 supported_locales:
@@ -30,6 +30,7 @@ exports:
   - record_calibration_result
   - evaluate_builder_attempt
   - summarize_calibration
+  - export_calibration_package
 tools:
 - name: derive_compact_calibration
   description: Derive compact digest-linked developer inputs from a frozen audit task
@@ -311,6 +312,34 @@ tools:
     - ok
     - summary
     - content
+- name: export_calibration_package
+  description: Export the frozen task, packets, immutable results, and recomputed
+    summary as one content-addressed package.
+  entry: handlers.main:export_calibration_package
+  side_effect_class: local_write
+  input_schema:
+    type: object
+    required:
+    - task_id
+    properties:
+      task_id:
+        type: string
+      budget_view:
+        enum:
+        - fixed_downstream
+        - fixed_total_system
+        default: fixed_downstream
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    - task_id
+    - package_digest
+    - summary_digest
+    - packet_count
+    - result_count
+    - content_ref
 data_routes:
 - surface: frozen calibration protocol
   route: skill-local
@@ -333,13 +362,13 @@ data_routes:
     into candidate context
   budget:
     max_payload_bytes: 4194304
-updated_at: '2026-08-18T01:04:13+00:00'
+updated_at: '2026-08-18T03:49:30+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.856+5210.cdd62307
-    recorded_at: '2026-08-18T01:04:13+00:00'
+    min_version: 0.1.859+5215.b06c8633
+    recorded_at: '2026-08-18T03:49:30+00:00'
     source: skill_push
-    min_commit: cdd6230799efcafcd490a0aca463143e3a67b85e
-    min_short_commit: cdd62307
-    build_date: '2026-08-18T04:03:46+03:00'
+    min_commit: d462cceb37f676b7c246d71f460de27609e4f2ef
+    min_short_commit: d462cceb
+    build_date: '2026-08-18T01:32:47+00:00'
 

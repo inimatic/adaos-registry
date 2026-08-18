@@ -31,6 +31,10 @@ unresolved failure was reported.
    through `record_calibration_result`.
 5. `summarize_calibration` reports completion rate, Wilson intervals, resource
    usage, and first-failure stages for one budget view.
+6. `export_calibration_package` binds the frozen task, exact arm packets,
+   immutable results, and recomputed summary into one content-addressed JSON
+   object. Its digest is the portable audit identity; the database is not the
+   only place from which the reported score can be reconstructed.
 
 The evaluator owns its database. Research-direction skills own primary source
 artifacts. Candidate packets contain materialized audience views and selected

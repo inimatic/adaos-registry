@@ -105,6 +105,15 @@ class EvaluationRepository:
             raise ValueError("calibration packet was not prepared")
         return json.loads(str(row["payload_json"]))
 
+    def packets(self, task_id: str, *, budget_view: str | None = None) -> list[dict[str, Any]]:
+        sql = "SELECT payload_json FROM calibration_packets WHERE task_id=:task_id"
+        params: dict[str, Any] = {"task_id": task_id}
+        if budget_view:
+            sql += " AND budget_view=:budget_view"
+            params["budget_view"] = budget_view
+        rows = self._db.fetch_all(sql + " ORDER BY budget_view, arm_id, attempt_index", params)
+        return [json.loads(str(row["payload_json"])) for row in rows]
+
     def put_result(self, result: Mapping[str, Any]) -> dict[str, Any]:
         existing = self._db.fetch_one(
             "SELECT payload_json FROM calibration_results WHERE task_id=:task_id AND arm_id=:arm_id AND attempt_index=:attempt_index AND budget_view=:budget_view",

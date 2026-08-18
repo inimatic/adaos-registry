@@ -8,6 +8,7 @@ from typing import Any, Mapping
 
 from adaos.sdk.core.decorators import tool
 from adaos.sdk.core.environment import runtime_identity as sdk_runtime_identity
+from adaos.domain.runtime_bindings import ContentRef
 from adaos.sdk.builder import automation, development_sessions
 from adaos.sdk.developer import validation as developer_validation
 from adaos.sdk.data.blob import store as blob_store
@@ -19,7 +20,12 @@ if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
 from evaluation.contracts import ARM_IDS, freeze_task  # noqa: E402
-from evaluation.harness import evaluate_candidate, prepare_arm, summarize  # noqa: E402
+from evaluation.harness import (  # noqa: E402
+    build_recomputable_package,
+    evaluate_candidate,
+    prepare_arm,
+    summarize,
+)
 from evaluation.independent import build_independent_candidate  # noqa: E402
 from evaluation.repository import EvaluationRepository  # noqa: E402
 
@@ -393,7 +399,11 @@ def evaluate_builder_attempt(
         except Exception as exc:
             errors.append(f"{type(exc).__name__}: {exc}")
     else:
-        errors.append(f"Builder Automation ended with status {projection.get('status')}")
+        terminal_error = str(projection.get("error") or "").strip()
+        errors.append(
+            f"Builder Automation ended with status {projection.get('status')}"
+            + (f": {terminal_error}" if terminal_error else "")
+        )
     candidate = build_independent_candidate(
         task=task,
         packet=packet,
@@ -441,6 +451,52 @@ def summarize_calibration(
     return {"ok": True, "summary": summary, "content": content}
 
 
+@tool(summary="Export a content-addressed, machine-recomputable calibration package.", side_effects="local_write")
+def export_calibration_package(
+    task_id: str,
+    budget_view: str = "fixed_downstream",
+    **_: Any,
+) -> dict[str, Any]:
+    repository = EvaluationRepository()
+    task = repository.get_task(str(task_id))
+    packets = repository.packets(str(task_id), budget_view=budget_view)
+    results = repository.results(str(task_id), budget_view=budget_view)
+    package = build_recomputable_package(
+        task,
+        packets,
+        results,
+        budget_view=budget_view,
+    )
+    blob = blob_store("calibration_packages").put_json(
+        f"{task_id}-{budget_view}.json",
+        package,
+    )
+    content_ref = ContentRef(
+        uri=str(blob["ref"]),
+        digest=str(blob["digest"]),
+        size_bytes=int(blob["size_bytes"]),
+        media_type=str(blob["media_type"]),
+        owner_ref=str(blob["owner_ref"]),
+        kind="calibration_package",
+        metadata={
+            "task_id": str(task_id),
+            "budget_view": str(budget_view),
+            "package_digest": package["digest"],
+        },
+    ).to_dict()
+    return {
+        "ok": True,
+        "task_id": str(task_id),
+        "budget_view": str(budget_view),
+        "package_digest": package["digest"],
+        "summary_digest": package["summary"]["digest"],
+        "packet_count": len(package["packets"]),
+        "result_count": len(package["results"]),
+        "content_ref": content_ref,
+        "exporter_runtime_identity": sdk_runtime_identity(),
+    }
+
+
 __all__ = [
     "ensure_schema",
     "freeze_calibration",
@@ -449,5 +505,6 @@ __all__ = [
     "prepare_calibration_suite",
     "record_calibration_result",
     "evaluate_builder_attempt",
+    "export_calibration_package",
     "summarize_calibration",
 ]

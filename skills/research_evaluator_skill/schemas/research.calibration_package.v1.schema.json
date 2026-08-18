@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos://schemas/research.calibration_package.v1.schema.json",
+  "title": "AdaOS Research Calibration Package v1",
+  "type": "object",
+  "required": [
+    "schema",
+    "schema_version",
+    "task",
+    "budget_view",
+    "packets",
+    "results",
+    "summary",
+    "recompute",
+    "digest"
+  ],
+  "properties": {
+    "schema": {"const": "adaos.research.calibration_package.v1"},
+    "schema_version": {"const": "1.0.0"},
+    "task": {
+      "type": "object",
+      "required": ["task_id", "digest"],
+      "additionalProperties": true
+    },
+    "budget_view": {
+      "enum": ["fixed_downstream", "fixed_total_system"]
+    },
+    "packets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["packet_id", "arm_id", "attempt_index", "budget_view", "digest"],
+        "additionalProperties": true
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["result_id", "arm_id", "attempt_index", "budget_view", "digest"],
+        "additionalProperties": true
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["schema", "task_id", "budget_view", "arms", "digest"],
+      "additionalProperties": true
+    },
+    "recompute": {
+      "type": "object",
+      "required": ["algorithm", "algorithm_contract", "canonicalization"],
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {"type": "string", "minLength": 1},
+        "algorithm_contract": {"const": "adaos.research.calibration_summary.v1"},
+        "canonicalization": {"const": "utf8-json-sort-keys-compact"}
+      }
+    },
+    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "additionalProperties": false
+}

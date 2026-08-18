@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from evaluation.contracts import ARM_IDS, freeze_task
-from evaluation.harness import evaluate_candidate, prepare_arm, summarize
+from evaluation.harness import build_recomputable_package, evaluate_candidate, prepare_arm, summarize
 from evaluation.independent import build_independent_candidate
 
 
@@ -181,6 +181,24 @@ def test_evaluator_computes_primary_endpoint_budget_and_first_failure(task_value
     assert summary["arms"][0]["rate"] == 1.0
     assert summary["digest"].startswith("sha256:")
 
+    package = build_recomputable_package(
+        task,
+        [
+            {
+                "packet_id": "packet-1",
+                "budget_view": "fixed_downstream",
+                "arm_id": "C0_raw",
+                "attempt_index": 1,
+                "digest": "sha256:" + "9" * 64,
+            }
+        ],
+        [passed, failed, over_budget],
+        budget_view="fixed_downstream",
+    )
+    assert package["summary"] == summary
+    assert package["results"][0]["digest"] == passed["digest"]
+    assert package["digest"].startswith("sha256:")
+
 
 def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(task_value) -> None:
     task = freeze_task(task_value)
@@ -267,3 +285,76 @@ def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(
     evaluated = evaluate_candidate(task, candidate)
     assert evaluated["metrics"]["evidence_valid_completion"] is False
     assert evaluated["failure"]["stage"] == "implementation"
+
+
+def test_independent_judge_preserves_terminal_builder_failure_stage(task_value, monkeypatch) -> None:
+    task = freeze_task(task_value)
+    monkeypatch.setattr(
+        "evaluation.harness.artifact_context.materialize_context",
+        lambda skill, group, audience: {
+            "source_ref": f"artifact://skill/{skill}/{group}",
+            "audience": audience,
+            "digest": "sha256:" + "b" * 64,
+            "source_manifest_digest": "sha256:" + "c" * 64,
+            "root_path": "/isolated/view/files",
+            "items": [],
+        },
+    )
+    task["rubric"]["checks"] = [
+        {
+            "check_id": check_id,
+            "stage": "implementation",
+            "evaluation_mode": "deterministic",
+            "mandatory": True,
+            "description": check_id,
+        }
+        for check_id in (
+            "context_isolation",
+            "protocol_fidelity",
+            "native_skill_validation",
+            "runner_conformance",
+            "cpu_workflow_smoke",
+            "evidence_manifest",
+        )
+    ]
+    packet = prepare_arm(task, "C0_raw", 1)
+    session = {
+        "session_id": "dev-failed",
+        "artifact_inputs": [
+            {
+                "ref": item["ref"],
+                "manifest_digest": item["source_manifest_digest"],
+                "context_digest": item["context_digest"],
+                "audience": item["audience"],
+            }
+            for item in packet["artifact_inputs"]
+        ],
+        "instruction_inputs": [],
+        "targets": {"primary": [{"ref": "skill:candidate"}], "secondary": []},
+        "handoff": {"prohibited_actions": packet["prohibited_actions"]},
+    }
+    candidate = build_independent_candidate(
+        task=task,
+        packet=packet,
+        candidate_id="candidate",
+        session=session,
+        automation={
+            "status": "failed",
+            "failure_stage": "runtime_infrastructure",
+            "error": "worker host unavailable",
+        },
+        validation=None,
+        prepare=None,
+        trial=None,
+        dataset=None,
+        verified_artifacts=[],
+        collected=None,
+    )
+
+    evaluated = evaluate_candidate(task, candidate)
+
+    assert evaluated["failure"] == {
+        "stage": "runtime_infrastructure",
+        "code": "builder_automation.failed",
+        "detail": "worker host unavailable",
+    }

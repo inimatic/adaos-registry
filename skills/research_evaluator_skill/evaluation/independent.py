@@ -185,7 +185,29 @@ def build_independent_candidate(
             if check["check_id"] in {"runner_conformance", "cpu_workflow_smoke", "evidence_manifest"} and check["status"] != "pass":
                 check["detail"] = f"{check['detail']}: {detail}"
     observed = dict(dict(automation.get("budget_usage") or {}).get("observed") or {})
-    return {
+    terminal_status = str(automation.get("status") or "").strip()
+    terminal_failure = None
+    if terminal_status and terminal_status != "completed":
+        reported_stage = str(automation.get("failure_stage") or "").strip()
+        stage = (
+            reported_stage
+            if reported_stage in {
+                "source_understanding",
+                "formulation",
+                "operationalization",
+                "engineering_compilation",
+                "implementation",
+                "runtime_infrastructure",
+                "scientific_evaluation",
+            }
+            else "engineering_compilation"
+        )
+        terminal_failure = {
+            "stage": stage,
+            "code": f"builder_automation.{terminal_status}",
+            "detail": str(automation.get("error") or "Builder Automation did not deliver a candidate."),
+        }
+    candidate = {
         "arm_id": packet["arm_id"],
         "attempt_index": packet["attempt_index"],
         "paired_seed": packet["paired_seed"],
@@ -203,6 +225,9 @@ def build_independent_candidate(
         },
         "checks": checks,
     }
+    if terminal_failure is not None:
+        candidate["failure"] = terminal_failure
+    return candidate
 
 
 __all__ = ["build_independent_candidate"]

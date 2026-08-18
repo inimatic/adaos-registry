@@ -7,7 +7,7 @@ from typing import Any
 
 from adaos.sdk.developer import artifact_context
 
-from evaluation.contracts import ARM_IDS, canonical, digest, freeze_task, now, validate_result
+from evaluation.contracts import ARM_IDS, canonical, digest, freeze_task, now, validate, validate_result
 
 
 _FAILURE_STAGE_ORDER = (
@@ -253,4 +253,42 @@ def summarize(task: Mapping[str, Any], results: list[Mapping[str, Any]]) -> dict
     return {**identity, "digest": digest(identity)}
 
 
-__all__ = ["evaluate_candidate", "prepare_arm", "summarize"]
+def build_recomputable_package(
+    task: Mapping[str, Any],
+    packets: list[Mapping[str, Any]],
+    results: list[Mapping[str, Any]],
+    *,
+    budget_view: str,
+) -> dict[str, Any]:
+    """Bind every immutable scoring input to its independently recomputed summary."""
+
+    selected_packets = [
+        dict(item)
+        for item in packets
+        if str(item.get("budget_view") or "") == str(budget_view)
+    ]
+    selected_results = [
+        dict(item)
+        for item in results
+        if str(item.get("budget_view") or "") == str(budget_view)
+    ]
+    summary = summarize(task, selected_results)
+    identity = {
+        "schema": "adaos.research.calibration_package.v1",
+        "schema_version": "1.0.0",
+        "task": dict(task),
+        "budget_view": str(budget_view),
+        "packets": selected_packets,
+        "results": selected_results,
+        "summary": summary,
+        "recompute": {
+            "algorithm": "evaluation.harness:summarize",
+            "algorithm_contract": "adaos.research.calibration_summary.v1",
+            "canonicalization": "utf8-json-sort-keys-compact",
+        },
+    }
+    package = {**identity, "digest": digest(identity)}
+    return validate("research.calibration_package.v1.schema.json", package)
+
+
+__all__ = ["build_recomputable_package", "evaluate_candidate", "prepare_arm", "summarize"]
