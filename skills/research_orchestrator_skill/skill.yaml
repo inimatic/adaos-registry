@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.23.0
+version: 0.24.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -158,7 +158,8 @@ tools:
   output_schema:
     type: object
 - name: initialize_direction
-  description: Adopt one legacy artifact-custodian skill into the research-domain index.
+  description: Adopt one legacy artifact-custodian skill into the research-domain
+    index.
   entry: handlers.main:initialize_direction
   side_effects: local_write
   input_schema:
@@ -1002,12 +1003,13 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-18T14:19:51+00:00'
+updated_at: '2026-08-18T14:50:00+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.862+5251.0f8757f4
-    recorded_at: '2026-08-18T14:19:52+00:00'
+    min_version: 0.1.863+5254.102db58e
+    recorded_at: '2026-08-18T14:50:00+00:00'
     source: skill_push
-    min_commit: 0f8757f463afa85c63706267e922aef41f22d2db
-    min_short_commit: 0f8757f4
-    build_date: '2026-08-18T17:08:54+03:00'
+    min_commit: 102db58eeff1e395e53ab0415e648e26fdd682a3
+    min_short_commit: 102db58e
+    build_date: '2026-08-18T17:35:22+03:00'
+
