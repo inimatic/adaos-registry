@@ -31,6 +31,19 @@ CORRECTION_SCHEMA = "adaos.media_center.catalog_correction.v1"
 PLAYBACK_PLAN_SCHEMA = "adaos.media_center.playback_plan.v1"
 PROFILE_SCHEMA = "adaos.media_center.profile.v1"
 MAX_PAGE_SIZE = 30
+HOME_SHELF_ORDER = (
+    "continue",
+    "favorites",
+    "recent",
+    "recommended",
+    "movies",
+    "series",
+    "music",
+    "albums",
+    "audiobooks",
+    "playlists",
+    "folders",
+)
 
 
 def _default_profile_policy(kind: str = "personal") -> dict[str, Any]:
@@ -41,6 +54,10 @@ def _default_profile_policy(kind: str = "personal") -> dict[str, Any]:
         "allow_explicit": _text(kind).lower() != "kids",
         "show_history_on_shared_surface": not shared,
         "recommendations_enabled": True,
+        "home_row_order": list(HOME_SHELF_ORDER),
+        "default_view": "rail" if shared else "grid",
+        "density": "comfortable" if shared else "compact",
+        "default_target_id": "",
     }
 
 _SEASON_EPISODE = re.compile(r"(?i)(?:^|[ ._\-])s(?P<season>\d{1,3})e(?P<episode>\d{1,4})(?:[ ._\-]|$)")
@@ -285,6 +302,24 @@ class MediaCatalogCoordinator:
                     connection.execute(
                         f"ALTER TABLE media_background_jobs ADD COLUMN {name} {definition}"
                     )
+            variant_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(media_variants)"
+                ).fetchall()
+            }
+            for name, definition in {
+                "descriptor_json": "TEXT NOT NULL DEFAULT '{}'",
+                "resource_id": "TEXT NOT NULL DEFAULT ''",
+                "source_revision": "INTEGER NOT NULL DEFAULT 0",
+                "exact_source_id": "TEXT NOT NULL DEFAULT ''",
+                "exact_source_revision": "INTEGER NOT NULL DEFAULT 0",
+                "derived": "INTEGER NOT NULL DEFAULT 0",
+            }.items():
+                if name not in variant_columns:
+                    connection.execute(
+                        f"ALTER TABLE media_variants ADD COLUMN {name} {definition}"
+                    )
             personal_columns = {
                 str(row["name"])
                 for row in connection.execute(
@@ -481,7 +516,13 @@ class MediaCatalogCoordinator:
                     "UPDATE catalog_items SET missing=1, source_revision=?, catalog_revision=?, last_seen_at=? WHERE id=?",
                     (source_revision, revision, now_iso(), str(previous["id"])),
                 )
-                connection.execute("UPDATE media_variants SET available=0, revision=revision+1 WHERE source_id=? AND node_id=?", (source_id, node_id))
+                connection.execute(
+                    """
+                    UPDATE media_variants SET available=0,revision=revision+1
+                    WHERE node_id=? AND (source_id=? OR exact_source_id=?)
+                    """,
+                    (node_id, source_id, source_id),
+                )
             return "removed"
 
         descriptor = dict(source.get("descriptor") or {})
@@ -564,13 +605,100 @@ class MediaCatalogCoordinator:
         self._replace_search(connection, item_id, search_text)
         connection.execute(
             """
-            INSERT INTO media_variants(id, work_id, source_id, node_id, media_kind, mime_type, quality_json, available, revision)
-            VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1)
+            INSERT INTO media_variants(
+                id,work_id,source_id,node_id,media_kind,mime_type,quality_json,
+                available,revision,descriptor_json,resource_id,source_revision,
+                exact_source_id,exact_source_revision,derived
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, 0)
             ON CONFLICT(id) DO UPDATE SET work_id=excluded.work_id, media_kind=excluded.media_kind,
-                mime_type=excluded.mime_type, quality_json=excluded.quality_json, available=1, revision=media_variants.revision+1
+                mime_type=excluded.mime_type,quality_json=excluded.quality_json,
+                available=1,descriptor_json=excluded.descriptor_json,
+                resource_id=excluded.resource_id,source_revision=excluded.source_revision,
+                exact_source_id=excluded.exact_source_id,
+                exact_source_revision=excluded.exact_source_revision,derived=0,
+                revision=media_variants.revision+1
             """,
-            (variant_id, work_id, source_id, node_id, kind, mime_type, _json_dumps(self._quality(descriptor, metadata))),
+            (
+                variant_id,
+                work_id,
+                source_id,
+                node_id,
+                kind,
+                mime_type,
+                _json_dumps(self._quality(descriptor, metadata)),
+                _json_dumps(descriptor),
+                _text(
+                    source.get("resource_id")
+                    or descriptor.get("resource_id")
+                    or descriptor.get("id")
+                ),
+                source_revision,
+                source_id,
+                source_revision,
+            ),
         )
+        connection.execute(
+            "DELETE FROM media_variants WHERE node_id=? AND exact_source_id=? AND derived=1",
+            (node_id, source_id),
+        )
+        for derived in metadata.get("derived_renditions") or []:
+            if not isinstance(derived, Mapping):
+                continue
+            if (
+                _text(derived.get("exact_source_id")) != source_id
+                or _text(derived.get("exact_source_fingerprint"))
+                != _text(source.get("fingerprint"))
+            ):
+                continue
+            derived_descriptor = dict(derived.get("descriptor") or {})
+            derived_id = _text(derived.get("id"))
+            if not derived_id or not derived_descriptor:
+                continue
+            derived_mime = _text(
+                derived.get("mime_type")
+                or derived_descriptor.get("mime_type")
+                or derived_descriptor.get("mime")
+            )
+            derived_quality = dict(derived.get("quality") or {})
+            derived_variant_id = _stable_id(
+                "variant", work_id, node_id, derived_id, size=24
+            )
+            connection.execute(
+                """
+                INSERT INTO media_variants(
+                    id,work_id,source_id,node_id,media_kind,mime_type,
+                    quality_json,available,revision,descriptor_json,resource_id,
+                    source_revision,exact_source_id,exact_source_revision,derived
+                ) VALUES (?,?,?,?,?,?,?,1,1,?,?,?,?,?,1)
+                ON CONFLICT(id) DO UPDATE SET
+                    work_id=excluded.work_id,mime_type=excluded.mime_type,
+                    quality_json=excluded.quality_json,available=1,
+                    descriptor_json=excluded.descriptor_json,
+                    resource_id=excluded.resource_id,
+                    source_revision=excluded.source_revision,
+                    exact_source_id=excluded.exact_source_id,
+                    exact_source_revision=excluded.exact_source_revision,
+                    derived=1,revision=media_variants.revision+1
+                """,
+                (
+                    derived_variant_id,
+                    work_id,
+                    derived_id,
+                    node_id,
+                    kind,
+                    derived_mime,
+                    _json_dumps(derived_quality),
+                    _json_dumps(derived_descriptor),
+                    _text(
+                        derived_descriptor.get("resource_id")
+                        or derived_descriptor.get("id")
+                    ),
+                    source_revision,
+                    source_id,
+                    int(derived.get("exact_source_revision") or 0),
+                ),
+            )
         for membership_collection_id in collection_ids:
             connection.execute(
                 """
@@ -766,6 +894,126 @@ class MediaCatalogCoordinator:
             ).fetchone()
         return dict(row) if row else None
 
+    def source_binding(
+        self, *, agent_id: str = "", source_id: str = "", item_id: str = ""
+    ) -> dict[str, Any] | None:
+        filters: list[str] = []
+        params: list[Any] = []
+        if _text(item_id):
+            filters.append("c.id=?")
+            params.append(_text(item_id))
+        if _text(agent_id):
+            filters.append("c.agent_id=?")
+            params.append(_text(agent_id))
+        if _text(source_id):
+            filters.append("c.source_id=?")
+            params.append(_text(source_id))
+        if not filters:
+            return None
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                f"""
+                SELECT c.id,c.agent_id,c.node_id,c.source_id,c.source_revision,
+                    a.instance_id,a.availability,a.freshness
+                FROM catalog_items c
+                LEFT JOIN agent_catalog_state a ON a.agent_id=c.agent_id
+                WHERE {' AND '.join(filters)} LIMIT 1
+                """,
+                tuple(params),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def resolve_agent_hits(
+        self,
+        hits: Iterable[Mapping[str, Any]],
+        *,
+        agent_id: str,
+        profile_id: str = "default",
+        limit: int = 30,
+    ) -> list[dict[str, Any]]:
+        profile = self.get_profile(profile_id)["profile"]
+        policy = dict(profile.get("policy") or {})
+        allowed = {
+            _text(item).lower()
+            for item in policy.get("allowed_media_kinds") or []
+            if _text(item)
+        }
+        maximum = max(
+            0, min(21, int(policy.get("maximum_maturity_rating") or 0))
+        )
+        result: list[dict[str, Any]] = []
+        for hit in hits:
+            if len(result) >= max(1, min(100, int(limit or 30))):
+                break
+            source_id = _text(hit.get("id") or hit.get("source_id"))
+            if not source_id:
+                continue
+            with self.repository.connect() as connection:
+                row = connection.execute(
+                    """
+                    SELECT c.*,
+                        COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                        COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                        COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                        COALESCE(ps.completed,0) AS profile_completed,
+                        COALESCE(ps.rating,0) AS profile_rating,
+                        COALESCE(ps.hidden,0) AS profile_hidden,
+                        COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                        COALESCE(ps.revision,0) AS profile_revision
+                    FROM catalog_items c
+                    LEFT JOIN personal_media_state ps
+                        ON ps.item_id=c.id AND ps.profile_id=?
+                    WHERE c.agent_id=? AND c.source_id=? AND c.missing=0
+                    LIMIT 1
+                    """,
+                    (_text(profile_id) or "default", _text(agent_id), source_id),
+                ).fetchone()
+            if row is not None:
+                if bool(row["profile_hidden"]) or self._policy_denial(row, policy):
+                    continue
+                item = self._public_coordinator_item(
+                    row, _text(profile_id) or "default"
+                )
+                item["deep_match"] = dict(hit.get("match") or {})
+                item["materialized"] = True
+                result.append(item)
+                continue
+            metadata = dict(hit.get("metadata") or {})
+            kind = _text(hit.get("media_kind")).lower()
+            if kind not in allowed:
+                continue
+            try:
+                maturity = max(0, int(metadata.get("maturity_rating") or 0))
+            except (TypeError, ValueError):
+                maturity = 0
+            explicit = metadata.get("explicit", False)
+            if isinstance(explicit, str):
+                explicit = explicit.strip().lower() in {"1", "true", "yes", "on"}
+            if maturity > maximum or (
+                bool(explicit) and not bool(policy.get("allow_explicit", False))
+            ):
+                continue
+            result.append(
+                {
+                    "schema": CATALOG_ITEM_SCHEMA,
+                    "id": f"agent:{_text(agent_id)}:{source_id}",
+                    "agent_id": _text(agent_id),
+                    "node_id": _text(hit.get("node_id")),
+                    "source_id": source_id,
+                    "source_revision": int(hit.get("revision") or 0),
+                    "title": _title_from_name(_text(hit.get("name"))),
+                    "name": _text(hit.get("name")),
+                    "media_kind": kind,
+                    "mime_type": _text(hit.get("mime_type")),
+                    "folder_path": _text(hit.get("folder_path")),
+                    "available": bool(hit.get("present", True)),
+                    "materialized": False,
+                    "playable": False,
+                    "deep_match": dict(hit.get("match") or {}),
+                }
+            )
+        return result
+
     def reconcile_agent_instances(
         self, active_instance_ids: Iterable[str]
     ) -> dict[str, Any]:
@@ -894,6 +1142,10 @@ class MediaCatalogCoordinator:
             "allow_explicit",
             "show_history_on_shared_surface",
             "recommendations_enabled",
+            "home_row_order",
+            "default_view",
+            "density",
+            "default_target_id",
         }
         with self.repository.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -936,6 +1188,36 @@ class MediaCatalogCoordinator:
             policy["recommendations_enabled"] = bool(
                 policy.get("recommendations_enabled", True)
             )
+            requested_order = [
+                _text(item)
+                for item in policy.get("home_row_order") or []
+                if _text(item) in HOME_SHELF_ORDER
+            ]
+            policy["home_row_order"] = list(
+                dict.fromkeys(
+                    requested_order
+                    + [
+                        item
+                        for item in HOME_SHELF_ORDER
+                        if item not in requested_order
+                    ]
+                )
+            )
+            default_view = _text(policy.get("default_view")).lower()
+            policy["default_view"] = (
+                default_view
+                if default_view in {"list", "grid", "rail"}
+                else "grid"
+            )
+            density = _text(policy.get("density")).lower()
+            policy["density"] = (
+                density
+                if density in {"compact", "comfortable", "ten_foot"}
+                else "compact"
+            )
+            policy["default_target_id"] = _text(
+                policy.get("default_target_id")
+            )[:200]
             connection.execute(
                 """
                 UPDATE media_profiles SET policy_json=?,revision=revision+1,
@@ -1725,12 +2007,23 @@ class MediaCatalogCoordinator:
                 }
             rows = connection.execute(
                 """
-                SELECT c.*, v.quality_json AS variant_quality_json,
-                    v.available AS variant_available
-                FROM catalog_items c
-                JOIN media_variants v ON v.id=c.variant_id
-                WHERE c.work_id=?
-                ORDER BY c.id
+                SELECT v.id AS selected_variant_id,
+                    v.source_id AS selected_source_id,
+                    v.node_id AS selected_node_id,
+                    v.media_kind AS selected_media_kind,
+                    v.mime_type AS selected_mime_type,
+                    v.quality_json AS variant_quality_json,
+                    v.available AS variant_available,
+                    v.descriptor_json AS variant_descriptor_json,
+                    v.resource_id AS variant_resource_id,
+                    v.source_revision AS variant_source_revision,
+                    v.exact_source_id,v.exact_source_revision,v.derived,
+                    c.id AS catalog_item_id,c.missing,c.content_path,
+                    c.routed_content_path,c.descriptor_json AS catalog_descriptor_json
+                FROM media_variants v
+                LEFT JOIN catalog_items c ON c.variant_id=v.id
+                WHERE v.work_id=?
+                ORDER BY v.derived,v.id
                 """,
                 (str(selected_item["work_id"]),),
             ).fetchall()
@@ -1748,10 +2041,16 @@ class MediaCatalogCoordinator:
         for row in rows:
             quality = _json_loads(row["variant_quality_json"]) or {}
             reasons: list[str] = []
-            available = bool(row["variant_available"]) and not bool(row["missing"])
+            available = bool(row["variant_available"]) and not bool(
+                row["missing"] if row["missing"] is not None else False
+            )
             score = 1000.0 if available else -10000.0
             if override:
-                score += 100000.0 if str(row["variant_id"]) == override else -100000.0
+                score += (
+                    100000.0
+                    if str(row["selected_variant_id"]) == override
+                    else -100000.0
+                )
                 reasons.append("user_variant_override")
             codec = _text(quality.get("codec")).lower()
             if codec_support and codec:
@@ -1787,11 +2086,13 @@ class MediaCatalogCoordinator:
             if language_preference and language == language_preference:
                 score += 50.0
                 reasons.append("language_preference")
-            if endpoint_node_id and str(row["node_id"]) == _text(endpoint_node_id):
+            if endpoint_node_id and str(row["selected_node_id"]) == _text(endpoint_node_id):
                 score += 25.0
                 reasons.append("source_colocated_with_endpoint")
             ranked.append((score, row, quality, reasons))
-        ranked.sort(key=lambda item: (-item[0], str(item[1]["variant_id"])))
+        ranked.sort(
+            key=lambda item: (-item[0], str(item[1]["selected_variant_id"]))
+        )
         if not ranked or ranked[0][0] < -9000:
             return {
                 "ok": False,
@@ -1799,7 +2100,9 @@ class MediaCatalogCoordinator:
                 "item_id": token,
             }
         score, selected, quality, reasons = ranked[0]
-        descriptor = _json_loads(selected["descriptor_json"]) or {}
+        descriptor = _json_loads(selected["variant_descriptor_json"]) or {}
+        if not descriptor:
+            descriptor = _json_loads(selected["catalog_descriptor_json"]) or {}
         direct_candidates = [
             _text(item)
             for item in (
@@ -1822,17 +2125,17 @@ class MediaCatalogCoordinator:
                 if direct_candidates
                 else "root_routed_http_relay"
             ),
-            "source_node_id": str(selected["node_id"]),
+            "source_node_id": str(selected["selected_node_id"]),
             "endpoint_id": _text(endpoint_id),
             "endpoint_node_id": _text(endpoint_node_id),
             "direct_candidates": direct_candidates,
             "routed_path": routed_path,
             "node_path": node_path,
-            "resource_id": str(selected["resource_id"]),
+            "resource_id": str(selected["variant_resource_id"]),
             "fallback": {
                 "mode": "root_routed_http_relay",
                 "path": routed_path or node_path,
-                "target_node_id": str(selected["node_id"]),
+                "target_node_id": str(selected["selected_node_id"]),
                 "reason": (
                     "direct_candidate_failed"
                     if direct_candidates
@@ -1843,13 +2146,13 @@ class MediaCatalogCoordinator:
         return {
             "ok": True,
             "schema": PLAYBACK_PLAN_SCHEMA,
-            "item_id": str(selected["id"]),
-            "work_id": str(selected["work_id"]),
-            "variant_id": str(selected["variant_id"]),
-            "source_id": str(selected["source_id"]),
-            "media_kind": str(selected["media_kind"]),
-            "mime_type": str(selected["mime_type"]),
-            "title": str(selected["title"]),
+            "item_id": token,
+            "work_id": str(selected_item["work_id"]),
+            "variant_id": str(selected["selected_variant_id"]),
+            "source_id": str(selected["selected_source_id"]),
+            "media_kind": str(selected["selected_media_kind"]),
+            "mime_type": str(selected["selected_mime_type"]),
+            "title": str(selected_item["title"]),
             "profile_id": profile,
             "quality": quality,
             "descriptor": descriptor,
@@ -1862,6 +2165,11 @@ class MediaCatalogCoordinator:
                 "requested_variant_id": override,
                 "preferred_quality": quality_preference,
                 "preferred_language": language_preference,
+                "derived": bool(selected["derived"]),
+                "exact_source_id": str(selected["exact_source_id"]),
+                "exact_source_revision": int(
+                    selected["exact_source_revision"] or 0
+                ),
             },
         }
 
@@ -2124,6 +2432,18 @@ class MediaCatalogCoordinator:
                 }
                 for item in recommendation_page["items"]
             )
+        order = {
+            shelf_id: index
+            for index, shelf_id in enumerate(
+                profile["policy"].get("home_row_order") or HOME_SHELF_ORDER
+            )
+        }
+        shelves.sort(
+            key=lambda shelf: (order.get(_text(shelf.get("id")), 999), shelf["id"])
+        )
+        flattened.sort(
+            key=lambda item: order.get(_text(item.get("shelf_id")), 999)
+        )
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
@@ -2700,11 +3020,85 @@ class MediaCatalogCoordinator:
             works = int(connection.execute("SELECT COUNT(*) FROM media_works").fetchone()[0])
             variants = int(connection.execute("SELECT COUNT(*) FROM media_variants").fetchone()[0])
             collections = int(connection.execute("SELECT COUNT(*) FROM media_collections").fetchone()[0])
+            search_rows = int(connection.execute("SELECT COUNT(*) FROM catalog_search").fetchone()[0])
+            jobs = {
+                str(row["status"]): int(row["count"])
+                for row in connection.execute(
+                    """
+                    SELECT status,COUNT(*) AS count FROM media_background_jobs
+                    GROUP BY status
+                    """
+                ).fetchall()
+            }
+            agents = [
+                {
+                    "agent_id": str(row["agent_id"]),
+                    "node_id": str(row["node_id"]),
+                    "availability": str(row["availability"]),
+                    "freshness": str(row["freshness"]),
+                    "last_error": str(row["last_error"])[:200],
+                    "updated_at": str(row["updated_at"]),
+                }
+                for row in connection.execute(
+                    """
+                    SELECT agent_id,node_id,availability,freshness,last_error,updated_at
+                    FROM agent_catalog_state ORDER BY agent_id LIMIT 100
+                    """
+                ).fetchall()
+            ]
         summary = self.repository.summary()
+        recommendations: list[dict[str, Any]] = []
+        if not agents:
+            recommendations.append(
+                {
+                    "id": "deploy_library_agent",
+                    "severity": "warning",
+                    "reason": "no_library_agents_observed",
+                    "review_required": True,
+                    "proposed_action": {
+                        "tool": "media_center_skill.configure_deployment",
+                        "mode": "dry_run",
+                    },
+                }
+            )
+        for agent in agents:
+            if agent["availability"] != "available" or agent["freshness"] != "fresh":
+                recommendations.append(
+                    {
+                        "id": f"reconcile_agent:{agent['agent_id']}",
+                        "severity": "warning",
+                        "reason": "agent_unavailable_or_stale",
+                        "agent_id": agent["agent_id"],
+                        "node_id": agent["node_id"],
+                        "review_required": True,
+                        "proposed_action": {
+                            "tool": "media_center_skill.sync_agent",
+                            "arguments": {"max_pages": 4, "limit": 500},
+                        },
+                    }
+                )
+        if jobs.get("failed", 0):
+            recommendations.append(
+                {
+                    "id": "review_failed_metadata_jobs",
+                    "severity": "warning",
+                    "reason": "background_jobs_failed",
+                    "count": jobs["failed"],
+                    "review_required": True,
+                    "proposed_action": {
+                        "tool": "media_center_skill.operations",
+                        "arguments": {"limit": 30},
+                    },
+                }
+            )
         return {
             "ok": True, "schema": COORDINATOR_SCHEMA, "catalog_revision": self.catalog_revision(),
             "counts": {"sources": summary["total_count"], "works": works, "variants": variants, "collections": collections},
             "participation": self.participation(),
             "budgets": {"catalog_page": MAX_PAGE_SIZE, "player_queue": 10, "agent_delta_page": 1000},
             "storage": {"media_bytes": "external", "catalog": "skill_local_relational"},
+            "search": {"indexed_rows": search_rows, "ranking_version": "deterministic-fts-v1"},
+            "background_jobs": jobs,
+            "agents": agents,
+            "repair_recommendations": recommendations[:30],
         }

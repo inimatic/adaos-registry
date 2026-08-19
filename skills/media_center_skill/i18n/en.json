@@ -7,6 +7,7 @@
   "runtime.media_center.error.deployment_remove_failed": "Could not remove the Media Center agent.",
   "runtime.media_center.error.topology_define_failed": "Could not define Media Center service topology.",
   "runtime.media_center.error.route_explain_failed": "Could not explain the Media Center route.",
+  "runtime.media_center.error.rendition_agent_unavailable": "The source agent could not prepare a compatible media version.",
   "runtime.media_center.voice.invalid": "I could not determine the playback command.",
   "runtime.media_center.voice.control_unavailable": "Playback control is temporarily unavailable.",
   "runtime.media_center.voice.status": "The media library status is ready.",

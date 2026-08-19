@@ -6,6 +6,11 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
+Release `0.5.0` adds federated technical search, exact-source derived
+renditions, profile-owned presentation defaults, and sanitized operations
+diagnostics. Derived renditions are disposable managed outputs; they do not
+change ownership of the original source.
+
 The same release supports colocated one-node operation and selected-node
 deployment. Entry-point bindings select presentation semantics (`desktop`,
 `tv`, `mobile_control`, or `embedded`); they do not infer component placement
@@ -14,3 +19,4 @@ from viewport width.
 Uninstall removes unreferenced Project-owned code while retaining runtime
 evidence and source artifacts. External media roots are never Project-owned,
 never copied into `.adaos`, and never deleted by Project lifecycle operations.
+Derived rendition retention remains a separate reviewed choice.

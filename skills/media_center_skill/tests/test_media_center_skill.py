@@ -956,6 +956,233 @@ def test_playback_plan_selects_endpoint_compatible_variant_and_route(
     _validate_schema("playback-route.v1.schema.json", plan["route"])
 
 
+def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    original = _agent_delta(1, "Movies/Example.mkv", kind="video")
+    original["source"]["mime_type"] = "video/x-matroska"
+    original["source"]["metadata"]["technical"] = {
+        "height": 1080,
+        "codec": "hevc",
+        "container": "mkv",
+    }
+    catalog.apply_agent_page(_agent_page(original), instance_id="instance-a")
+
+    updated = _agent_delta(1, "Movies/Example.mkv", kind="video", revision=2)
+    updated["source"]["mime_type"] = "video/x-matroska"
+    updated["source"]["fingerprint"] = original["source"]["fingerprint"]
+    updated["source"]["metadata"]["technical"] = {
+        "height": 1080,
+        "codec": "hevc",
+        "container": "mkv",
+    }
+    updated["source"]["metadata"]["derived_renditions"] = [
+        {
+            "id": "rendition-source-1-browser",
+            "profile": "browser-mp4-v1",
+            "exact_source_id": "source-1",
+            "exact_source_revision": 1,
+            "exact_source_fingerprint": original["source"]["fingerprint"],
+            "mime_type": "video/mp4",
+            "descriptor": {
+                "resource_id": "derived-ref",
+                "mime_type": "video/mp4",
+                "direct_urls": ["http://node-a.local/media/derived-ref"],
+                "content_path": "/api/node/media/files/content/derived-ref",
+                "routed_content_path": "/media/files/content/derived-ref",
+                "metadata": {"storage_mode": "derived_copy"},
+            },
+            "quality": {
+                "height": 720,
+                "codec": "h264",
+                "container": "mp4",
+                "derived": True,
+            },
+            "size_bytes": 500,
+            "created_at": "2026-08-20T00:00:00+00:00",
+        }
+    ]
+    catalog.apply_agent_page(_agent_page(updated), instance_id="instance-a")
+
+    listing = catalog.list_items(media_kind="video")
+    plan = catalog.playback_plan(
+        listing["items"][0]["id"],
+        endpoint_capabilities={"codecs": ["h264"], "max_video_height": 720},
+    )
+    with catalog.repository.connect() as connection:
+        variants = connection.execute(
+            "SELECT source_id,derived FROM media_variants ORDER BY derived"
+        ).fetchall()
+
+    assert listing["total_count"] == 1
+    assert [(row["source_id"], row["derived"]) for row in variants] == [
+        ("source-1", 0),
+        ("rendition-source-1-browser", 1),
+    ]
+    assert plan["source_id"] == "rendition-source-1-browser"
+    assert plan["descriptor"]["metadata"]["storage_mode"] == "derived_copy"
+    assert plan["decision"]["derived"] is True
+    assert plan["decision"]["exact_source_id"] == "source-1"
+    assert plan["decision"]["exact_source_revision"] == 1
+    _validate_schema("playback-plan.v1.schema.json", plan)
+
+
+def test_federated_deep_search_is_bounded_policy_filtered_and_observable(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = main._coordinator()
+    source = _agent_delta(1, "Архив/Книга/01.mkv", kind="video")
+    source["source"]["metadata"]["technical"] = {
+        "codec": "hevc",
+        "container": "matroska",
+    }
+    catalog.apply_agent_page(_agent_page(source), instance_id="instance-a")
+
+    class Topology:
+        def agent_instances(self, *, limit):
+            assert limit == 2
+            return [{"instance_id": "instance-a", "node_id": "node-a"}]
+
+        def invoke_agent(self, instance_id, operation, arguments, *, timeout_seconds):
+            assert (instance_id, operation) == ("instance-a", "search_sources")
+            assert arguments["query"] == "hevc"
+            return {
+                "ok": True,
+                "items": [source["source"] | {"match": {"stage": "agent_technical_fts", "rank": -1.0}}],
+                "has_more": False,
+                "agent": {"id": "agent-node-a", "node_id": "node-a"},
+            }
+
+    monkeypatch.setattr(main, "_topology", lambda: Topology())
+    result = main.deep_search(query="hevc", limit=5, max_agents=2)
+
+    assert result["ok"] is True
+    assert result["count"] == 1
+    assert result["items"][0]["source_id"] == "source-1"
+    assert result["items"][0]["materialized"] is True
+    assert result["items"][0]["deep_match"]["stage"] == "agent_technical_fts"
+    assert result["stages"][-1]["status"] == "completed"
+    assert result["partial"] is False
+
+
+def test_coordinator_queues_rendition_on_exact_source_agent(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = main._coordinator()
+    source = _agent_delta(1, "Movies/Legacy.mkv", kind="video")
+    source["source"]["metadata"]["technical"] = {
+        "codec": "hevc",
+        "container": "mkv",
+    }
+    catalog.apply_agent_page(_agent_page(source), instance_id="instance-a")
+    item = catalog.list_items(media_kind="video")["items"][0]
+    captured = {}
+
+    class Topology:
+        def invoke_agent(self, instance_id, operation, arguments, *, timeout_seconds):
+            captured.update(
+                instance_id=instance_id,
+                operation=operation,
+                arguments=arguments,
+                timeout_seconds=timeout_seconds,
+            )
+            return {
+                "ok": True,
+                "asynchronous": True,
+                "job": {"id": "rendition-job-a", "status": "queued"},
+            }
+
+    monkeypatch.setattr(main, "_topology", lambda: Topology())
+    result = main.ensure_rendition(
+        item_id=item["id"],
+        endpoint_capabilities={"codecs": ["h264"], "containers": ["mp4"]},
+    )
+
+    assert result["status"] == "queued"
+    assert result["source_binding"] == {
+        "agent_id": "agent-node-a",
+        "node_id": "node-a",
+        "instance_id": "instance-a",
+    }
+    assert captured["operation"] == "plan_rendition"
+    assert captured["arguments"]["source_id"] == "source-1"
+
+
+def test_profile_customizes_home_order_view_density_and_target(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    current = catalog.get_profile("default")["profile"]
+    updated = catalog.set_profile_policy(
+        "default",
+        expected_revision=current["revision"],
+        values={
+            "home_row_order": ["folders", "movies"],
+            "default_view": "list",
+            "density": "comfortable",
+            "default_target_id": "living-room-tv",
+        },
+    )["profile"]
+    home = catalog.home(profile_id="default", limit=1)
+
+    assert updated["policy"]["home_row_order"][:2] == ["folders", "movies"]
+    assert updated["policy"]["default_view"] == "list"
+    assert updated["policy"]["density"] == "comfortable"
+    assert updated["policy"]["default_target_id"] == "living-room-tv"
+    assert home["shelves"][0]["id"] == "folders"
+    _validate_schema("profile.v1.schema.json", updated)
+
+
+def test_diagnostic_export_is_bounded_redacted_and_proposes_reviewed_repair(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+
+    class Topology:
+        def deployment_status(self, deployment_id, *, limit):
+            return {
+                "deployment_id": deployment_id,
+                "token": "private",
+                "root_path": "/mnt/private",
+            }
+
+        def distributed_status(self, *, limit):
+            return {"status": "ready", "direct_urls": ["http://private"]}
+
+    monkeypatch.setattr(main, "_topology", lambda: Topology())
+    monkeypatch.setattr(
+        main,
+        "_invoke_agent",
+        lambda *_args, **_kwargs: ({"ok": True, "source_path": "/mnt/media"}, ""),
+    )
+    monkeypatch.setattr(
+        main,
+        "_invoke_skill",
+        lambda *_args, **_kwargs: ({"ok": True, "password": "hidden"}, ""),
+    )
+
+    result = main.diagnostic_export(
+        browser_diagnostics={"frame_ms": 12, "credential": "hidden"}
+    )
+
+    assert result["ok"] is True
+    assert result["components"]["deployment"]["token"] == "[redacted]"
+    assert result["components"]["deployment"]["root_path"] == "[redacted]"
+    assert result["components"]["library_agent"]["source_path"] == "[redacted]"
+    assert result["components"]["browser"]["credential"] == "[redacted]"
+    assert result["privacy"]["automatic_repair"] is False
+    assert result["repair_recommendations"][0]["review_required"] is True
+
+
 def test_queue_builder_preserves_large_playlist_order_and_bounds_sources(
     monkeypatch, tmp_path
 ):

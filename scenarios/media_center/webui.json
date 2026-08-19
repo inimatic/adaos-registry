@@ -548,6 +548,14 @@
                 "inputs": {"presentation": "body"}
               },
               {
+                "id": "media-diagnostic-export",
+                "type": "item.details",
+                "area": "main",
+                "title": "System diagnostics",
+                "dataSource": {"kind": "skill", "name": "media_center_skill.diagnostic_export", "params": {"deployment_id": "media-center-home"}, "cacheTtlMs": 1000, "invalidationTags": ["media_center.diagnostics"], "preserveLastValue": true, "maxRequestHz": 1},
+                "inputs": {"presentation": "body"}
+              },
+              {
                 "id": "media-deployment-release",
                 "type": "input.text",
                 "area": "main",

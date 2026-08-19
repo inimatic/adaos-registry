@@ -10,7 +10,7 @@
     "kind": {"enum": ["personal", "household", "kids", "shared"]},
     "policy": {
       "type": "object",
-      "required": ["allowed_media_kinds", "maximum_maturity_rating", "allow_explicit", "show_history_on_shared_surface", "recommendations_enabled"],
+      "required": ["allowed_media_kinds", "maximum_maturity_rating", "allow_explicit", "show_history_on_shared_surface", "recommendations_enabled", "home_row_order", "default_view", "density", "default_target_id"],
       "properties": {
         "allowed_media_kinds": {
           "type": "array",
@@ -21,7 +21,17 @@
         "maximum_maturity_rating": {"type": "integer", "minimum": 0, "maximum": 21},
         "allow_explicit": {"type": "boolean"},
         "show_history_on_shared_surface": {"type": "boolean"},
-        "recommendations_enabled": {"type": "boolean"}
+        "recommendations_enabled": {"type": "boolean"},
+        "home_row_order": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 11,
+          "uniqueItems": true,
+          "items": {"enum": ["continue", "favorites", "recent", "recommended", "movies", "series", "music", "albums", "audiobooks", "playlists", "folders"]}
+        },
+        "default_view": {"enum": ["list", "grid", "rail"]},
+        "density": {"enum": ["compact", "comfortable", "ten_foot"]},
+        "default_target_id": {"type": "string", "maxLength": 200}
       },
       "additionalProperties": false
     },

@@ -16,7 +16,11 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
+from media_center.catalog import (  # noqa: E402
+    MediaCenterRepository,
+    SCHEMA_VERSION,
+    now_iso,
+)
 from media_center.coordinator import COORDINATOR_SCHEMA, MediaCatalogCoordinator  # noqa: E402
 from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
@@ -185,6 +189,44 @@ def _bool(value: Any, default: bool = False) -> bool:
     if isinstance(value, bool):
         return value
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _sanitize_diagnostic(value: Any, *, depth: int = 0) -> Any:
+    if depth >= 6:
+        return "[bounded]"
+    if isinstance(value, Mapping):
+        result: dict[str, Any] = {}
+        for key, item in list(value.items())[:100]:
+            token = str(key)
+            lowered = token.lower()
+            if any(
+                sensitive in lowered
+                for sensitive in (
+                    "password",
+                    "secret",
+                    "token",
+                    "credential",
+                    "source_path",
+                    "root_path",
+                    "content_path",
+                    "routed_path",
+                    "direct_url",
+                )
+            ):
+                result[token] = "[redacted]"
+            else:
+                result[token] = _sanitize_diagnostic(item, depth=depth + 1)
+        return result
+    if isinstance(value, (list, tuple)):
+        return [
+            _sanitize_diagnostic(item, depth=depth + 1)
+            for item in list(value)[:100]
+        ]
+    if isinstance(value, str):
+        return value[:500]
+    if isinstance(value, (bool, int, float)) or value is None:
+        return value
+    return str(value)[:500]
 
 
 def _skill_error(
@@ -808,6 +850,133 @@ def list_items(**payload: Any) -> dict[str, Any]:
     return library(**payload)
 
 
+@tool(
+    summary="Run bounded local and federated agent search stages.",
+    side_effects="none",
+)
+def deep_search(
+    query: str = "",
+    profile_id: str = "default",
+    media_kind: str = "playable",
+    limit: int = 30,
+    max_agents: int = 4,
+    **_: Any,
+) -> dict[str, Any]:
+    token = str(query or "").strip()
+    bounded = max(1, min(30, int(limit or 30)))
+    if not token:
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "query": "",
+            "items": [],
+            "count": 0,
+            "partial": False,
+            "stages": [],
+            "failures": [],
+        }
+    catalog = _coordinator()
+    local = catalog.list_items(
+        query=token,
+        profile_id=profile_id,
+        media_kind=media_kind,
+        limit=bounded,
+        sort="title",
+    )
+    items = [
+        dict(item) | {"deep_match": {"stage": "coordinator_fts"}}
+        for item in local.get("items") or []
+    ]
+    seen = {str(item.get("source_id") or "") for item in items}
+    stages: list[dict[str, Any]] = [
+        {"id": "coordinator_fts", "status": "completed", "count": len(items)}
+    ]
+    failures: list[dict[str, Any]] = []
+    agent_limit = max(1, min(16, int(max_agents or 4)))
+    try:
+        instances = _topology().agent_instances(limit=agent_limit)
+    except Exception as exc:
+        instances = []
+        failures.append(
+            {"stage": "agent_technical_fts", "error": str(exc)[:500]}
+        )
+    if not instances:
+        instances = [None]
+    for instance in instances[:agent_limit]:
+        if len(items) >= bounded:
+            break
+        instance_id = str((instance or {}).get("instance_id") or "")
+        try:
+            if instance_id:
+                page = _topology().invoke_agent(
+                    instance_id,
+                    "search_sources",
+                    {"query": token, "limit": min(30, bounded - len(items))},
+                    timeout_seconds=20.0,
+                )
+            else:
+                page, error = _invoke_agent(
+                    "search_sources",
+                    {"query": token, "limit": min(30, bounded - len(items))},
+                    timeout=20.0,
+                )
+                if page is None:
+                    raise RuntimeError(error or "media_library_agent_unavailable")
+        except Exception as exc:
+            failures.append(
+                {
+                    "stage": "agent_technical_fts",
+                    "instance_id": instance_id,
+                    "error": str(exc)[:500],
+                }
+            )
+            continue
+        agent = (
+            page.get("agent") if isinstance(page.get("agent"), Mapping) else {}
+        )
+        agent_id = str(agent.get("id") or "")
+        resolved = catalog.resolve_agent_hits(
+            page.get("items") or [],
+            agent_id=agent_id,
+            profile_id=profile_id,
+            limit=bounded - len(items),
+        )
+        for item in resolved:
+            source_id = str(item.get("source_id") or "")
+            if source_id and source_id in seen:
+                continue
+            if source_id:
+                seen.add(source_id)
+            items.append(item)
+            if len(items) >= bounded:
+                break
+        stages.append(
+            {
+                "id": "agent_technical_fts",
+                "status": "completed",
+                "instance_id": instance_id,
+                "agent_id": agent_id,
+                "count": len(resolved),
+                "has_more": bool(page.get("has_more")),
+            }
+        )
+    return {
+        "ok": True,
+        "schema": COORDINATOR_SCHEMA,
+        "query": token,
+        "items": items[:bounded],
+        "count": min(len(items), bounded),
+        "limit": bounded,
+        "partial": bool(failures) or bool(local.get("partial")),
+        "stages": stages,
+        "failures": failures,
+        "ranking": {
+            "version": "federated-deterministic-fts-v1",
+            "stage_order": ["coordinator_fts", "agent_technical_fts"],
+        },
+    }
+
+
 @tool(summary="Read one media-center catalog item.", side_effects="none")
 def get_item(item_id: str = "", **_: Any) -> dict[str, Any]:
     return _repository().get_item(item_id)
@@ -899,6 +1068,83 @@ def playback_plan(
     return result
 
 
+@tool(
+    summary="Plan and queue a compatible rendition on the source-owning agent.",
+    side_effects="local_write",
+)
+def ensure_rendition(
+    item_id: str = "",
+    endpoint_capabilities: Mapping[str, Any] | None = None,
+    profile_id: str = "default",
+    rendition_profile: str = "browser-mp4-v1",
+    priority: int = 50,
+    force: bool = False,
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    plan = catalog.playback_plan(
+        item_id,
+        endpoint_capabilities=endpoint_capabilities,
+        profile_id=profile_id,
+    )
+    if not plan.get("ok"):
+        return plan
+    if bool((plan.get("decision") or {}).get("derived")):
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "status": "ready",
+            "playback_plan": plan,
+            "rendition": None,
+        }
+    binding = catalog.source_binding(
+        source_id=str(plan.get("source_id") or ""), item_id=item_id
+    )
+    arguments = {
+        "source_id": str(plan.get("source_id") or ""),
+        "endpoint_capabilities": dict(endpoint_capabilities or {}),
+        "profile": rendition_profile,
+        "priority": max(0, min(1000, int(priority or 50))),
+        "force": bool(force),
+    }
+    instance_id = str((binding or {}).get("instance_id") or "")
+    try:
+        if instance_id:
+            rendition = _topology().invoke_agent(
+                instance_id,
+                "plan_rendition",
+                arguments,
+                timeout_seconds=20.0,
+            )
+        else:
+            rendition, error = _invoke_agent(
+                "plan_rendition", arguments, timeout=20.0
+            )
+            if rendition is None:
+                raise RuntimeError(error or "media_library_agent_unavailable")
+    except Exception as exc:
+        return _skill_error(
+            "rendition_agent_unavailable",
+            "The source agent could not prepare a compatible media version.",
+            detail=str(exc),
+            retryable=True,
+        )
+    return {
+        "ok": bool(rendition.get("ok")),
+        "schema": COORDINATOR_SCHEMA,
+        "status": (
+            "queued" if rendition.get("asynchronous") else "source_compatible"
+        ),
+        "source_binding": {
+            "agent_id": str((binding or {}).get("agent_id") or ""),
+            "node_id": str((binding or {}).get("node_id") or ""),
+            "instance_id": instance_id,
+        },
+        "playback_plan": plan,
+        "rendition": rendition,
+    }
+
+
 @tool(summary="Build a bounded playback queue from a catalog source.", side_effects="none")
 def build_playback_queue(
     source_type: str = "item",
@@ -951,6 +1197,72 @@ def status(**_: Any) -> dict[str, Any]:
         "summary": repo.summary(),
         "facets": repo.facets(),
         "coordinator": catalog.diagnostics(),
+    }
+
+
+@tool(
+    summary="Export bounded sanitized Media Center diagnostics and repair proposals.",
+    side_effects="none",
+)
+def diagnostic_export(
+    deployment_id: str = "media-center-home",
+    browser_diagnostics: Mapping[str, Any] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    components: dict[str, Any] = {"coordinator": catalog.diagnostics()}
+    failures: list[dict[str, Any]] = []
+    probes = (
+        (
+            "deployment",
+            lambda: _topology().deployment_status(deployment_id, limit=30),
+        ),
+        ("topology", lambda: _topology().distributed_status(limit=30)),
+        ("library_agent", lambda: _invoke_agent("status", {}, timeout=10.0)),
+        (
+            "playback_control",
+            lambda: _invoke_skill("media_control_skill", "status", {}, timeout=10.0),
+        ),
+        (
+            "playback_qoe",
+            lambda: _invoke_skill(
+                "media_control_skill", "qoe_summary", {"limit": 30}, timeout=10.0
+            ),
+        ),
+    )
+    for name, probe in probes:
+        try:
+            value = probe()
+            if isinstance(value, tuple):
+                payload, error = value
+                if payload is None:
+                    raise RuntimeError(error or f"{name}_unavailable")
+                value = payload
+            components[name] = value
+        except Exception as exc:
+            components[name] = {"status": "unavailable"}
+            failures.append({"component": name, "error": str(exc)[:300]})
+    if browser_diagnostics:
+        components["browser"] = dict(browser_diagnostics)
+    sanitized = _sanitize_diagnostic(components)
+    return {
+        "ok": True,
+        "schema": "adaos.media_center.diagnostic_export.v1",
+        "generated_at": now_iso(),
+        "deployment_id": str(deployment_id or "media-center-home"),
+        "components": sanitized,
+        "failures": _sanitize_diagnostic(failures),
+        "partial": bool(failures),
+        "repair_recommendations": _sanitize_diagnostic(
+            catalog.diagnostics().get("repair_recommendations") or []
+        ),
+        "privacy": {
+            "paths": "redacted",
+            "credentials": "redacted",
+            "payloads": "bounded",
+            "media_bytes": "not_included",
+            "automatic_repair": False,
+        },
     }
 
 

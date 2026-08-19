@@ -7,6 +7,7 @@
   "runtime.media_center.error.deployment_remove_failed": "Не удалось удалить агент Media Center.",
   "runtime.media_center.error.topology_define_failed": "Не удалось настроить распределенную топологию Media Center.",
   "runtime.media_center.error.route_explain_failed": "Не удалось получить объяснение маршрута Media Center.",
+  "runtime.media_center.error.rendition_agent_unavailable": "Агент источника не смог подготовить совместимую версию медиаматериала.",
   "runtime.media_center.voice.invalid": "Не удалось определить команду воспроизведения.",
   "runtime.media_center.voice.control_unavailable": "Управление воспроизведением временно недоступно.",
   "runtime.media_center.voice.status": "Медиатека готова к работе.",

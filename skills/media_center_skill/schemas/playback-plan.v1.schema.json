@@ -30,7 +30,10 @@
         "candidate_count": {"type": "integer", "minimum": 1},
         "requested_variant_id": {"type": "string"},
         "preferred_quality": {"type": "string"},
-        "preferred_language": {"type": "string"}
+        "preferred_language": {"type": "string"},
+        "derived": {"type": "boolean"},
+        "exact_source_id": {"type": "string"},
+        "exact_source_revision": {"type": "integer", "minimum": 0}
       },
       "additionalProperties": false
     }

@@ -1,6 +1,6 @@
 name: media_center_skill
-version: 0.6.1
-description: Distributed Media Center coordinator with bounded catalog, collection, personalization, and playback projections.
+version: 0.7.0
+description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
 - ru
@@ -50,9 +50,11 @@ exports:
   - import_folder
   - library
   - list_items
+  - deep_search
   - get_item
   - playback_queue
   - playback_plan
+  - ensure_rendition
   - build_playback_queue
   - set_favorite
   - sync_agent
@@ -79,6 +81,7 @@ exports:
   - operations
   - dispose
   - status
+  - diagnostic_export
   - deployment_status
   - configure_deployment
   - apply_deployment
@@ -315,6 +318,21 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: deep_search
+  description: Run bounded coordinator and source-agent full-text search stages.
+  entry: handlers.main:deep_search
+  side_effects: none
+  input_schema:
+    type: object
+    required: [query]
+    properties:
+      query: {type: string, minLength: 1, maxLength: 500}
+      profile_id: {type: string, default: default}
+      media_kind: {type: string, default: playable}
+      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
+      max_agents: {type: integer, minimum: 1, maximum: 16, default: 4}
+    additionalProperties: true
+  output_schema: {type: object}
 - name: playback_queue
   description: Return the selected item first and at most ten playable queue entries.
   entry: handlers.main:playback_queue
@@ -378,6 +396,23 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: ensure_rendition
+  description: Plan and queue one browser-compatible rendition on the source-owning agent.
+  entry: handlers.main:ensure_rendition
+  side_effects: local_write
+  timeout_seconds: 30
+  input_schema:
+    type: object
+    required: [item_id]
+    properties:
+      item_id: {type: string, minLength: 1}
+      endpoint_capabilities: {type: object, additionalProperties: true}
+      profile_id: {type: string, default: default}
+      rendition_profile: {type: string, default: browser-mp4-v1}
+      priority: {type: integer, minimum: 0, maximum: 1000, default: 50}
+      force: {type: boolean, default: false}
+    additionalProperties: true
+  output_schema: {type: object}
 - name: build_playback_queue
   description: Build up to 500 ordered playback plans from an item, work, collection, folder, or playlist.
   entry: handlers.main:build_playback_queue
@@ -750,6 +785,17 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: diagnostic_export
+  description: Export bounded path- and secret-redacted operations diagnostics and reviewed repair proposals.
+  entry: handlers.main:diagnostic_export
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      deployment_id: {type: string, default: media-center-home}
+      browser_diagnostics: {type: object, additionalProperties: true}
+    additionalProperties: true
+  output_schema: {type: object}
 - name: deployment_status
   description: Return bounded Project deployment and per-node activation state.
   entry: handlers.main:deployment_status
@@ -1139,6 +1185,21 @@ data_routes:
     max_request_hz: 1
     preserve_last_value: true
     invalidation_tags: [media_center.operations]
+- surface: widget:media-center-diagnostics
+  route: tool/details
+  tool: diagnostic_export
+  owner: skill:media_center_skill
+  first_paint: bounded sanitized component status and repair recommendations
+  recovery: repeat diagnostic_export after a targeted invalidation
+  guard_visibility: paths, credentials, media bytes, and unbounded logs are excluded
+  budget: {max_payload_bytes: 524288, max_items: 100, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, targeted_invalidation]
+    cache_ttl_ms: 1000
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags: [media_center.diagnostics]
 - surface: media-center catalog store
   route: skill-local
   path: data/db/media_center.sqlite3
