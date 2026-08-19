@@ -667,7 +667,23 @@ def stage_quality_issues(
             r"(?i)(?:test.{0,40}(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445)|"
             r"(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445).{0,40}test)"
         )
-        if any(per_epoch_test.search(item) for item in obligations):
+        prohibition = re.compile(
+            r"(?i)(?:must\s+not|never|do\s+not|prohibit\w*|forbid\w*|prevent\w*|"
+            r"reject\w*|fail\w*|without|only\s+once|"
+            r"\u043d\u0435\s+\w{0,20}|\u0437\u0430\u043f\u0440\u0435\u0449\w*|\u043d\u0435\u043b\u044c\u0437\u044f|\u0438\u0441\u043a\u043b\u044e\u0447\w*|\u043f\u0440\u0435\u0434\u043e\u0442\u0432\u0440\u0430\u0449\w*|"
+            r"\u043e\u0442\u043a\u043b\u043e\u043d\w*|\u043e\u0448\u0438\u0431\w*)"
+        )
+
+        def requires_per_epoch_final_test(text: str) -> bool:
+            """Reject affirmative test-per-epoch obligations, not prohibitions quoting them."""
+
+            match = per_epoch_test.search(text)
+            if match is None:
+                return False
+            context = text[max(0, match.start() - 80) : min(len(text), match.end() + 80)]
+            return prohibition.search(context) is None
+
+        if any(requires_per_epoch_final_test(item) for item in obligations):
             issues.append("implementation contract must not observe final-test metrics per epoch")
         signature = dict(expected_experimental_signature or {})
         bindings = dict(payload.get("scientific_bindings") or {})

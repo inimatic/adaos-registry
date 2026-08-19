@@ -421,6 +421,18 @@ def test_implementation_contract_rejects_per_epoch_final_test_observation() -> N
     ]
 
 
+def test_implementation_contract_allows_explicit_per_epoch_final_test_prohibition() -> None:
+    implementation = _implementation()
+    implementation["requirements_by_category"]["evidence"][0]["requirement"] = (
+        "Never store final-test metrics per epoch; expose them only once after the evaluation seal."
+    )
+    implementation["checks_by_category"]["workflow"][0]["check"] = (
+        "Отклонить запуск, если test metrics вычислялись на каждой эпохе."
+    )
+
+    assert stage_quality_issues("implementation_contract", implementation) == []
+
+
 def test_hypothesis_and_decision_direction_must_match() -> None:
     protocol = _protocol()
     protocol["decision_spec"]["effect_direction"] = "increase"
