@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 
 from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.environment import runtime_identity as sdk_runtime_identity
 
 _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
@@ -25,6 +26,13 @@ def _manager() -> ResearchManager:
 def ensure_schema() -> dict[str, Any]:
     manager = _manager()
     return {"ok": True, "binding": manager.repository._db.binding.to_dict(), "health": dict(manager.repository._db.health())}
+
+
+@tool("environment_identity")
+def environment_identity(**_: Any) -> dict[str, Any]:
+    """Return the exact ResearchManager runtime used by consumer-side evaluation."""
+
+    return {"ok": True, "runtime_identity": sdk_runtime_identity()}
 
 
 @tool("rehydrate")
