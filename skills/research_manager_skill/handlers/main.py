@@ -36,7 +36,18 @@ def rehydrate() -> dict[str, Any]:
 def validate_development_candidate(request: Mapping[str, Any]) -> dict[str, Any]:
     """Return consumer-owned acceptance evidence for one active DEV runner."""
 
-    return _manager().validate_development_candidate(request)
+    value = dict(request or {})
+    value["execute_workflow_smoke"] = False
+    return _manager().validate_development_candidate(value)
+
+
+@tool("evaluate_development_candidate")
+def evaluate_development_candidate(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Run the consumer-owned DEV conformance probe and bounded workflow smoke."""
+
+    value = dict(request or {})
+    value["execute_workflow_smoke"] = True
+    return _manager().validate_development_candidate(value)
 
 
 @tool("get_runner_contract")

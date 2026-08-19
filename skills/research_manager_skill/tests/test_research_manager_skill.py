@@ -157,6 +157,7 @@ def _acceptance_envelope(profile: str) -> dict:
             "automation_brief": {
                 "digest": brief_digest,
                 "compilation_digest": compilation_digest,
+                "prototype_digest": "sha256:" + "c" * 64,
             },
             "consumer_contract": consumer_contract,
         },
@@ -255,6 +256,100 @@ def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) 
     assert receipt["ok"] is True
     assert [item[0] for item in invocations] == ["dataset_status", "prepare_attempt"]
     assert receipt["evidence"]["scientific_execution_started"] is False
+
+
+def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
+    monkeypatch,
+) -> None:
+    from adaos.sdk.developer import validation as developer_validation
+
+    calls: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        developer_validation,
+        "validate_skill",
+        lambda *_args, **_kwargs: {"ok": True, "digest": "sha256:" + "1" * 64},
+    )
+    monkeypatch.setattr(
+        developer_validation,
+        "activate_skill",
+        lambda project_id: {"ok": True, "project_id": project_id, "version": "0.1.0"},
+    )
+    split_values = {
+        role: {**item, "sealed": role == "test"} for role, item in _splits().items()
+    }
+
+    def invoke(project_id: str, operation_id: str, arguments: dict, **_kwargs):
+        calls.append((operation_id, dict(arguments)))
+        if operation_id == "dataset_status":
+            return {
+                "dataset_id": "stl10_torchvision",
+                "ready": True,
+                "split_bindings": split_values,
+            }
+        if operation_id == "prepare_attempt":
+            return {
+                "contract": "adaos.research.runner.v1",
+                "provider_id": project_id,
+                "package_ref": {
+                    "uri": "skill-data:files/acceptance/package.json",
+                    "digest": "sha256:" + "2" * 64,
+                    "size_bytes": 42,
+                    "media_type": "application/json",
+                    "owner_ref": f"skill:{project_id}",
+                },
+                "command": [sys.executable, str(Path(__file__).resolve())],
+                "working_directory": str(Path(__file__).resolve().parent),
+                "code_digest": "sha256:" + "3" * 64,
+                "environment_digest": "sha256:" + "4" * 64,
+                "output_ref": "skill-data:files/acceptance/output",
+                "spec_id": "acceptance-spec",
+                "expected_outputs": ["result.json"],
+            }
+        if operation_id == "collect_attempt":
+            assert arguments == {"output_ref": "skill-data:files/acceptance/output"}
+            return {
+                "provider_id": project_id,
+                "complete": True,
+                "observations": [],
+                "artifacts": [
+                    {
+                        "uri": "skill-data:files/acceptance/result.json",
+                        "digest": "sha256:" + "5" * 64,
+                    }
+                ],
+            }
+        assert operation_id == "verify_artifact"
+        assert arguments == {
+            "uri": "skill-data:files/acceptance/result.json",
+            "digest": "sha256:" + "5" * 64,
+        }
+        return {"ok": True}
+
+    monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
+    monkeypatch.setattr(
+        developer_validation,
+        "execute_spec",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "digest": "sha256:" + "6" * 64,
+            "documents": {"result.json": {"ok": True}},
+            "outputs": [],
+        },
+    )
+    envelope = _acceptance_envelope("research.consumer-contracts")
+    envelope["execute_workflow_smoke"] = True
+
+    receipt = ResearchManager().validate_development_candidate(envelope)
+
+    assert receipt["ok"] is True, receipt["errors"]
+    assert [item[0] for item in calls] == [
+        "dataset_status",
+        "prepare_attempt",
+        "collect_attempt",
+        "verify_artifact",
+    ]
+    assert receipt["evidence"]["workflow_smoke_executed"] is True
+    assert receipt["evidence"]["verified_artifacts"] == [{"ok": True}]
 
 
 def test_compiled_study_binds_exact_realization_and_is_idempotent() -> None:

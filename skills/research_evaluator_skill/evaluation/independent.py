@@ -161,12 +161,18 @@ def build_independent_candidate(
             )
         )
     verifier_ok = len(verified_artifacts) == len(evidence_files) and all(
-        bool(item.get("verified")) for item in verified_artifacts
+        bool(item.get("ok") or item.get("verified")) for item in verified_artifacts
+    )
+    collected_artifacts = (
+        list(collected.get("artifacts") or collected.get("artifact_refs") or [])
+        if isinstance(collected, Mapping)
+        else []
     )
     collection_ok = bool(collected) and all(
         (
             int(collected.get("tracker_session_calls") or 0) == 0,
-            len(collected.get("artifact_refs") or []) == len(evidence_files),
+            bool(collected.get("complete")),
+            len(collected_artifacts) == len(evidence_files),
         )
     )
     runner_ok = bool(dataset is not None) and bool(prepare and prepare.get("ok")) and verifier_ok and collection_ok

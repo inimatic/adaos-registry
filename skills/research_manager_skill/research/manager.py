@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlsplit
 
+from adaos.domain.execution import ExecutionSpec
 from adaos.domain.runtime_bindings import ServiceBinding
 from adaos.sdk.data.secrets import get as get_secret
 from adaos.sdk.skills import invoke as invoke_skill
@@ -220,6 +221,7 @@ class ResearchManager:
         """
 
         value = dict(request or {})
+        execute_workflow_smoke = bool(value.get("execute_workflow_smoke"))
         profile = str(value.get("profile") or "").strip()
         checks: list[dict[str, Any]] = []
         errors: list[str] = []
@@ -334,6 +336,11 @@ class ResearchManager:
             errors.append("accepted ResearchCompilation has no ExperimentPlan payload")
             return self._acceptance_receipt(profile, checks=checks, errors=errors)
 
+        consumer_evidence: dict[str, Any] = {
+            "candidate_ref": candidate_ref,
+            "compilation_digest": compilation.get("digest"),
+            "scientific_execution_started": False,
+        }
         try:
             from adaos.sdk.developer import validation as developer_validation
 
@@ -369,6 +376,7 @@ class ResearchManager:
             if not isinstance(dataset_status, Mapping):
                 raise ValueError("dataset_status returned a non-object value")
             dataset_status = dict(dataset_status)
+            consumer_evidence["dataset_status"] = dataset_status
             splits = self._acceptance_split_bindings(dataset_status)
             expected_dataset = str(dict(plan["dataset"])["id"])
             actual_dataset = str(
@@ -464,6 +472,85 @@ class ResearchManager:
                 for key in ("code_digest", "environment_digest")
             ):
                 raise ValueError("runner code or environment identity is not a SHA-256 digest")
+            protocol_digest = str(brief.get("prototype_digest") or "")
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", protocol_digest):
+                raise ValueError("AutomationBrief has no immutable ResearchPrototype identity")
+            execution_spec = ExecutionSpec(
+                spec_id=required_fields["spec_id"],
+                owner_ref=f"skill:{candidate_id}",
+                command=tuple(command),
+                working_directory=required_fields["working_directory"],
+                trial_id=smoke_request["trial_id"],
+                run_id=smoke_request["run_id"],
+                package_ref=ContentRef(
+                    uri=str(package["uri"]),
+                    digest=str(package["digest"]),
+                    size_bytes=int(package["size_bytes"]),
+                    media_type=str(package["media_type"]),
+                    owner_ref=str(package["owner_ref"]),
+                    kind=str(package.get("kind") or "execution-package"),
+                    metadata=dict(package.get("metadata") or {}),
+                ),
+                code_digest=required_fields["code_digest"],
+                environment_digest=required_fields["environment_digest"],
+                environment={
+                    str(key): str(item)
+                    for key, item in dict(prepared.get("environment") or {}).items()
+                },
+                resources=ExecutionResourceRequest(
+                    cpu_cores=int(profile_conditions.get("cpu_threads") or 2),
+                    memory_mb=int(profile_conditions.get("memory_mb") or 4096),
+                    wall_time_s=int(profile_conditions.get("wall_time_s") or 1800),
+                    max_log_bytes=int(
+                        profile_conditions.get("max_log_bytes") or 2 * 1024 * 1024
+                    ),
+                ),
+                network=ExecutionNetworkPolicy(mode="offline"),
+                determinism=ExecutionDeterminism(
+                    mode="exploratory",
+                    rng_streams={
+                        name: int(seeds[0]) + index
+                        for index, name in enumerate(
+                            ExecutionDeterminism.REQUIRED_STREAMS
+                        )
+                    },
+                    deterministic_algorithms=True,
+                ),
+                budget=ExecutionBudget(
+                    max_attempts=1,
+                    max_compute_seconds=int(
+                        profile_conditions.get("max_compute_seconds")
+                        or profile_conditions.get("wall_time_s")
+                        or 1800
+                    ),
+                    max_storage_bytes=int(
+                        profile_conditions.get("max_storage_bytes")
+                        or 2 * 1024 * 1024 * 1024
+                    ),
+                ),
+                expected_outputs=tuple(
+                    str(item) for item in prepared.get("expected_outputs") or ()
+                ),
+                metadata={
+                    "protocol_digest": protocol_digest,
+                    "stage": "workflow_smoke",
+                    "evidence_class": "workflow_smoke",
+                    "epochs": int(profile_conditions["epochs"]),
+                    "seeds": [f"seed-{int(item)}" for item in seeds],
+                    "inference_allowed": bool(
+                        profile_conditions.get("inference_allowed")
+                    ),
+                    "runner_output_ref": required_fields["output_ref"],
+                    "manager_profile": manager_profile,
+                },
+            )
+            consumer_evidence.update(
+                {
+                    "experiment_plan_digest": plan.get("digest"),
+                    "prepared_attempt": prepared,
+                    "execution_spec": execution_spec.to_dict(),
+                }
+            )
             checks.append(
                 {
                     "id": "runner.prepare_attempt",
@@ -477,6 +564,91 @@ class ResearchManager:
                     "seed": seeds[0],
                 }
             )
+            if execute_workflow_smoke:
+                trial = developer_validation.execute_spec(
+                    candidate_id,
+                    execution_spec.to_dict(),
+                    idempotency_key=(
+                        "consumer-smoke-"
+                        + digest(
+                            {
+                                "candidate_id": candidate_id,
+                                "protocol_digest": protocol_digest,
+                                "spec_digest": execution_spec.digest,
+                            }
+                        ).removeprefix("sha256:")[:24]
+                    ),
+                    timeout=min(float(profile_conditions.get("wall_time_s") or 1800), 3600),
+                )
+                consumer_evidence["trial"] = trial
+                if not bool(trial.get("ok")):
+                    raise RuntimeError(
+                        "consumer workflow smoke failed: "
+                        + str(trial.get("failure") or trial.get("missing_outputs") or "unknown")
+                    )
+                collected = developer_validation.invoke_skill(
+                    candidate_id,
+                    "collect_attempt",
+                    {"output_ref": required_fields["output_ref"]},
+                    timeout=120,
+                )
+                if not isinstance(collected, Mapping):
+                    raise ValueError("collect_attempt returned a non-object value")
+                collected = dict(collected)
+                artifacts = [
+                    dict(item)
+                    for item in collected.get("artifacts") or []
+                    if isinstance(item, Mapping)
+                ]
+                verified_artifacts = []
+                for artifact in artifacts:
+                    verified = developer_validation.invoke_skill(
+                        candidate_id,
+                        "verify_artifact",
+                        {
+                            "uri": str(artifact.get("uri") or ""),
+                            "digest": str(artifact.get("digest") or ""),
+                        },
+                        timeout=60,
+                    )
+                    verified_artifacts.append(dict(verified or {}))
+                collection_ok = bool(collected.get("complete")) and bool(artifacts)
+                verification_ok = len(verified_artifacts) == len(artifacts) and all(
+                    bool(item.get("ok")) for item in verified_artifacts
+                )
+                checks.extend(
+                    [
+                        {
+                            "id": "runner.workflow_smoke",
+                            "ok": bool(trial.get("ok")),
+                            "trial_digest": trial.get("digest"),
+                        },
+                        {
+                            "id": "runner.collection",
+                            "ok": collection_ok,
+                            "artifact_count": len(artifacts),
+                        },
+                        {
+                            "id": "runner.artifact_verification",
+                            "ok": verification_ok,
+                            "verified_count": sum(
+                                1 for item in verified_artifacts if item.get("ok")
+                            ),
+                        },
+                    ]
+                )
+                if not collection_ok:
+                    errors.append("collect_attempt did not return complete portable evidence")
+                if not verification_ok:
+                    errors.append("verify_artifact rejected one or more collected identities")
+                consumer_evidence.update(
+                    {
+                        "collected": collected,
+                        "verified_artifacts": verified_artifacts,
+                        "scientific_execution_started": False,
+                        "workflow_smoke_executed": True,
+                    }
+                )
         except Exception as exc:
             errors.append(f"{type(exc).__name__}: {exc}")
             checks.append(
@@ -490,12 +662,7 @@ class ResearchManager:
             profile,
             checks=checks,
             errors=errors,
-            evidence={
-                "candidate_ref": candidate_ref,
-                "compilation_digest": compilation.get("digest"),
-                "experiment_plan_digest": plan.get("digest"),
-                "scientific_execution_started": False,
-            },
+            evidence=consumer_evidence,
         )
 
     def create_study(

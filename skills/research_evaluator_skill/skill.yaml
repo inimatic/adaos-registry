@@ -294,6 +294,7 @@ tools:
     candidate.
   entry: handlers.main:evaluate_builder_attempt
   side_effect_class: local_write
+  timeout_seconds: 3600
   input_schema:
     type: object
     required:
@@ -416,4 +417,3 @@ compatibility:
     min_commit: c434feefbb0a4a4d4325f92b58b43faf13ec5aae
     min_short_commit: c434feef
     build_date: '2026-08-19T12:24:30+03:00'
-

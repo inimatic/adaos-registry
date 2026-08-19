@@ -11,7 +11,6 @@ from adaos.sdk.core.decorators import tool
 from adaos.sdk.core.environment import runtime_identity as sdk_runtime_identity
 from adaos.domain.runtime_bindings import ContentRef
 from adaos.sdk.builder import automation, development_sessions
-from adaos.sdk.developer import validation as developer_validation
 from adaos.sdk.data.blob import store as blob_store
 from adaos.sdk.skills import invoke as invoke_skill
 
@@ -137,6 +136,19 @@ def derive_compact_calibration(
     )
     if not isinstance(response, Mapping) or not response.get("ok"):
         raise RuntimeError("research orchestrator did not return compact execution contracts")
+    consumer_contract = invoke_skill(
+        "research_manager_skill",
+        "get_runner_contract",
+        {},
+        timeout=120,
+    )
+    if (
+        not isinstance(consumer_contract, Mapping)
+        or consumer_contract.get("schema") != "adaos.contract.operation_set.v1"
+        or consumer_contract.get("contract") != "adaos.research.runner.v1"
+        or not consumer_contract.get("digest")
+    ):
+        raise RuntimeError("research manager did not return its exact runner consumer ABI")
     orchestrator_identity = response.get("runtime_identity")
     if not isinstance(orchestrator_identity, Mapping):
         raise RuntimeError("research orchestrator returned no runtime identity")
@@ -195,6 +207,7 @@ def derive_compact_calibration(
     projected_inputs = {
         "research_compilation": dict(response["research_compilation"]),
         "automation_brief": dict(response["automation_brief"]),
+        "conformance_fixture": dict(consumer_contract),
     }
     replacements = {}
     for kind, value in projected_inputs.items():
@@ -402,12 +415,14 @@ def evaluate_builder_attempt(
     packet = repository.get_packet(task_id, arm_id, attempt_index, budget_view)
     session = development_sessions.get(development_session_id)
     enriched_instructions = []
+    instruction_values: dict[str, Any] = {}
     for descriptor in session.get("instruction_inputs") or []:
         restored = development_sessions.get_instruction(
             development_session_id, str(descriptor["kind"])
         )
         item = dict(descriptor)
         value = restored.get("value")
+        instruction_values[str(descriptor["kind"])] = value
         if isinstance(value, Mapping) and value.get("digest"):
             item["declared_digest"] = str(value["digest"])
         enriched_instructions.append(item)
@@ -430,42 +445,85 @@ def evaluate_builder_attempt(
     errors = []
     if projection.get("status") == "completed":
         try:
-            validation = developer_validation.validate_skill(candidate_id)
-            if validation.get("ok"):
-                developer_validation.activate_skill(candidate_id)
-                prepare = developer_validation.invoke_skill(
-                    candidate_id,
-                    "prepare_attempt",
-                    {"request_id": f"evaluation-{packet['packet_id']}", "stage": "workflow_smoke"},
-                    timeout=120,
-                )
-                if prepare and prepare.get("execution_spec"):
-                    trial = developer_validation.execute_spec(
-                        candidate_id,
-                        dict(prepare["execution_spec"]),
-                        idempotency_key=f"smoke-{arm_id.lower()}-{attempt_index}",
-                        timeout=300,
+            visible_inputs = {str(item["kind"]): dict(item) for item in task["inputs"]}
+            for kind in ("research_compilation", "automation_brief"):
+                if not isinstance(instruction_values.get(kind), Mapping):
+                    source = Path(str(visible_inputs[kind]["path"])).resolve()
+                    instruction_values[kind] = json.loads(
+                        source.read_text(encoding="utf-8-sig")
                     )
-                dataset = developer_validation.invoke_skill(candidate_id, "dataset_status", {}, timeout=60)
-                refs = [
-                    dict(item.get("content_ref") or {})
-                    for item in dict((trial or {}).get("documents") or {}).get("artifacts_index.json", {}).get("files", [])
-                ]
-                for ref in refs:
-                    verified.append(
-                        developer_validation.invoke_skill(
-                            candidate_id,
-                            "verify_artifact",
-                            {"artifact": ref},
-                            timeout=60,
-                        )
-                    )
-                collected = developer_validation.invoke_skill(
-                    candidate_id,
-                    "collect_attempt",
-                    {"attempt": {"status": "succeeded", "outputs": refs}},
-                    timeout=60,
+            contract_response = invoke_skill(
+                "research_manager_skill",
+                "get_runner_contract",
+                {},
+                timeout=120,
+            )
+            if not isinstance(contract_response, Mapping):
+                raise RuntimeError("ResearchManager runner contract is unavailable")
+            instruction_values["consumer_contract"] = dict(contract_response)
+            contract_inputs = [
+                {
+                    "kind": kind,
+                    "digest": str(dict(instruction_values[kind]).get("digest") or ""),
+                }
+                for kind in (
+                    "research_compilation",
+                    "automation_brief",
+                    "consumer_contract",
                 )
+            ]
+            consumer = invoke_skill(
+                "research_manager_skill",
+                "evaluate_development_candidate",
+                {
+                    "request": {
+                        "schema": "adaos.builder.acceptance_candidate.v1",
+                        "profile": "research.consumer-contracts",
+                        "development_session_id": development_session_id,
+                        "project_ref": session.get("project_ref"),
+                        "candidate_ref": f"skill:{candidate_id}",
+                        "candidate": {"id": candidate_id},
+                        "contract_inputs": contract_inputs,
+                        "instructions": {
+                            kind: instruction_values[kind]
+                            for kind in (
+                                "research_compilation",
+                                "automation_brief",
+                                "consumer_contract",
+                            )
+                        },
+                    }
+                },
+                timeout=3600,
+            )
+            if not isinstance(consumer, Mapping):
+                raise RuntimeError("ResearchManager consumer evaluation returned no receipt")
+            consumer = dict(consumer)
+            evidence = dict(consumer.get("evidence") or {})
+            check_rows = {
+                str(item.get("id") or ""): dict(item)
+                for item in consumer.get("checks") or []
+                if isinstance(item, Mapping)
+            }
+            native = check_rows.get("candidate.native_validation") or {}
+            validation = {
+                "ok": bool(native.get("ok")),
+                "digest": native.get("digest"),
+            }
+            prepare = {
+                "ok": bool(consumer.get("ok")),
+                "execution_spec": dict(evidence.get("execution_spec") or {}),
+                "consumer_receipt_digest": consumer.get("receipt_digest"),
+            }
+            trial = dict(evidence.get("trial") or {}) or None
+            dataset = dict(evidence.get("dataset_status") or {}) or None
+            verified = [
+                dict(item)
+                for item in evidence.get("verified_artifacts") or []
+                if isinstance(item, Mapping)
+            ]
+            collected = dict(evidence.get("collected") or {}) or None
+            errors.extend(str(item) for item in consumer.get("errors") or [])
         except Exception as exc:
             errors.append(f"{type(exc).__name__}: {exc}")
     else:
