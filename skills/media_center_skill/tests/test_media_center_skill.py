@@ -3,6 +3,7 @@ from __future__ import annotations
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,6 +15,7 @@ if str(SKILL_ROOT) not in sys.path:
 from handlers import main  # noqa: E402
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
+from media_center.topology import MediaCenterTopology  # noqa: E402
 
 
 def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") -> dict:
@@ -511,3 +513,43 @@ def test_twenty_thousand_item_catalog_remains_server_paged(monkeypatch, tmp_path
     assert found["count"] == 1
     assert found["items"][0]["name"] == "movie-19999.mp4"
     assert time.monotonic() - started < 30
+
+
+def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkeypatch):
+    from media_center import topology as topology_module
+
+    source = (SKILL_ROOT / "media_center" / "topology.py").read_text(encoding="utf-8")
+    assert "from adaos.sdk import deployment" in source
+    assert "from adaos.sdk import distributed" in source
+    assert "adaos.services" not in source
+
+    captured = {}
+
+    def fake_define(desired, *, expected_revision, reason):
+        captured["desired"] = desired
+        captured["expected_revision"] = expected_revision
+        captured["reason"] = reason
+        return desired
+
+    monkeypatch.setattr(topology_module.deployment_sdk, "define", fake_define)
+    monkeypatch.setattr(
+        topology_module.deployment_sdk,
+        "plan",
+        lambda deployment_id: SimpleNamespace(
+            status="ready",
+            to_dict=lambda: {"deployment_id": deployment_id, "status": "ready", "digest": "plan-1"},
+        ),
+    )
+
+    result = MediaCenterTopology().configure_deployment(
+        release_digest=f"sha256:{'a' * 64}",
+        subnet_id="subnet-home",
+    )
+
+    placements = {item.component_ref: item for item in captured["desired"].placements}
+    assert result["ok"] is True
+    assert result["dry_run"] is True
+    assert placements["skill:media_center_skill"].mode == "singleton"
+    assert placements["skill:media_library_agent"].mode == "co_located_with"
+    assert placements["skill:media_library_agent"].co_located_with == "skill:media_center_skill"
+    assert captured["expected_revision"] == 0

@@ -6,7 +6,7 @@ import threading
 from pathlib import Path
 from typing import Any, Mapping
 
-from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data.i18n import _
 
 
@@ -14,9 +14,10 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from media_library_agent.contracts import SCHEMA_VERSION, compact_error, text  # noqa: E402
+from media_library_agent.contracts import PROGRESS_SCHEMA, SCHEMA_VERSION, compact_error, now_iso, text  # noqa: E402
 from media_library_agent.repository import MediaLibraryAgentRepository, default_db_path  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
+from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
 
 
 _runtime_lock = threading.Lock()
@@ -58,6 +59,14 @@ def _publish_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
         return
 
 
+def _event_payload(event: Any) -> dict[str, Any]:
+    if isinstance(event, Mapping):
+        nested = event.get("payload")
+        return dict(nested) if isinstance(nested, Mapping) else dict(event)
+    nested = getattr(event, "payload", None)
+    return dict(nested) if isinstance(nested, Mapping) else {}
+
+
 def _runtime() -> tuple[MediaLibraryAgentRepository, MediaLibraryAgentWorker]:
     global _repository_instance, _runtime_path, _worker_instance
     path = str(default_db_path().resolve())
@@ -69,6 +78,10 @@ def _runtime() -> tuple[MediaLibraryAgentRepository, MediaLibraryAgentWorker]:
             _worker_instance = MediaLibraryAgentWorker(_repository_instance, publish=_publish_progress)
             _runtime_path = path
         return _repository_instance, _worker_instance
+
+
+def _topology() -> LibraryAgentTopology:
+    return LibraryAgentTopology()
 
 
 @tool(summary="Ensure the durable media-library agent schema.", side_effects="local_write")
@@ -89,6 +102,35 @@ def recover_interrupted_runtime() -> dict[str, Any]:
     requeued = repository.requeue_interrupted_jobs()
     worker.ensure_started()
     return {**repository.summary(), "requeued_job_count": requeued}
+
+
+@subscribe("sys.ready")
+def on_sys_ready(_: Any) -> None:
+    recover_interrupted_runtime()
+
+
+@subscribe("webio.stream.snapshot.requested", receivers=("media_library_agent.progress",))
+def on_progress_snapshot_requested(event: Any) -> None:
+    payload = _event_payload(event)
+    if text(payload.get("receiver")) != "media_library_agent.progress":
+        return
+    repository, worker = _runtime()
+    jobs = repository.list_jobs(limit=1).get("items") or []
+    job = dict(jobs[0]) if jobs else {}
+    snapshot = {
+        "schema": PROGRESS_SCHEMA,
+        "job_id": text(job.get("id")),
+        "agent_id": repository.agent_id,
+        "node_id": repository.node_id,
+        "root_id": text(job.get("root_id")),
+        "root_label": "",
+        "status": text(job.get("status")) or "idle",
+        "progress": dict(job.get("progress") or {}),
+        "current_path": text((job.get("progress") or {}).get("current_path"))[-500:],
+        "resource_pressure": worker.resource_pressure,
+        "updated_at": now_iso(),
+    }
+    _publish_progress(snapshot, text(payload.get("webspace_id")))
 
 
 @tool(summary="Add a local media root without copying its files.", side_effects="local_write")
@@ -281,6 +323,85 @@ def status(**_: Any) -> dict[str, Any]:
             "progress_publish_hz": 2,
         },
     }
+
+
+@tool(summary="Join the logical Media Center agent group through an exact activation.", side_effects="local_write")
+def join_topology(
+    instance: Mapping[str, Any] | None = None,
+    expected_revision: int = 0,
+    lease_seconds: int = 90,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().join(
+            instance or {},
+            expected_revision=expected_revision,
+            lease_seconds=lease_seconds,
+        )
+    except Exception as exc:
+        return _human_error(
+            "topology_join_failed",
+            "This library agent could not join the Media Center topology.",
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Renew this agent membership with current health and resource pressure.", side_effects="local_write")
+def renew_topology(
+    instance_id: str = "",
+    expected_revision: int = 1,
+    readiness: bool = True,
+    status: str = "ready",
+    health: Mapping[str, Any] | None = None,
+    pressure: Mapping[str, Any] | None = None,
+    lease_seconds: int = 90,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        repository, _worker = _runtime()
+        return _topology().renew(
+            instance_id,
+            expected_revision=expected_revision,
+            readiness=readiness,
+            status=status,
+            health=health or repository.summary(),
+            pressure=pressure or {"level": "normal"},
+            lease_seconds=lease_seconds,
+        )
+    except Exception as exc:
+        return _human_error(
+            "topology_renew_failed",
+            "This library agent could not renew its Media Center membership.",
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Publish one root partition and replica observation.", side_effects="local_write")
+def observe_topology(
+    partition: Mapping[str, Any] | None = None,
+    replica: Mapping[str, Any] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().observe(partition or {}, replica or {})
+    except Exception as exc:
+        return _human_error(
+            "topology_observe_failed",
+            "This library agent could not publish its shard state.",
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Drain this agent from distributed reads before deactivation.", side_effects="local_write")
+def drain_topology(instance_id: str = "", expected_revision: int = 1, **_: Any) -> dict[str, Any]:
+    try:
+        return _topology().drain(instance_id, expected_revision=expected_revision)
+    except Exception as exc:
+        return _human_error(
+            "topology_drain_failed",
+            "This library agent could not leave the Media Center topology.",
+            detail=str(exc)[:300],
+        )
 
 
 @tool(summary="Stop process-local media-library workers.", side_effects="local_write")

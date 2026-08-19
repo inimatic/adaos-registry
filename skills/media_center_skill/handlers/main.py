@@ -17,6 +17,7 @@ if str(_SKILL_ROOT) not in sys.path:
 
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
 from media_center.coordinator import COORDINATOR_SCHEMA, MediaCatalogCoordinator  # noqa: E402
+from media_center.topology import MediaCenterTopology  # noqa: E402
 
 
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".ogv"}
@@ -35,6 +36,10 @@ def _repository() -> MediaCenterRepository:
 
 def _coordinator(repository: MediaCenterRepository | None = None) -> MediaCatalogCoordinator:
     return MediaCatalogCoordinator(repository or _repository())
+
+
+def _topology() -> MediaCenterTopology:
+    return MediaCenterTopology()
 
 
 def _invoke_agent(operation: str, arguments: Mapping[str, Any] | None = None, *, timeout: float = 15.0) -> tuple[dict[str, Any] | None, str]:
@@ -675,6 +680,132 @@ def status(**_: Any) -> dict[str, Any]:
         "facets": repo.facets(),
         "coordinator": catalog.diagnostics(),
     }
+
+
+@tool(summary="Return Media Center deployment and node administration state.", side_effects="none")
+def deployment_status(deployment_id: str = "media-center-home", limit: int = 50, **_: Any) -> dict[str, Any]:
+    return _topology().deployment_status(deployment_id, limit=limit)
+
+
+@tool(summary="Create a reviewed dry-run Media Center deployment plan.", side_effects="local_write")
+def configure_deployment(
+    release_digest: str = "",
+    subnet_id: str = "",
+    coordinator_node_id: str = "",
+    agent_node_ids: list[str] | None = None,
+    all_matching_agents: bool = False,
+    expected_revision: int = 0,
+    allow_release_skew: bool = False,
+    reason: str = "Media Center placement update",
+    deployment_id: str = "media-center-home",
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().configure_deployment(
+            release_digest=release_digest,
+            subnet_id=subnet_id,
+            coordinator_node_id=coordinator_node_id,
+            agent_node_ids=agent_node_ids or [],
+            all_matching_agents=all_matching_agents,
+            expected_revision=expected_revision,
+            allow_release_skew=allow_release_skew,
+            reason=reason,
+            deployment_id=deployment_id,
+        )
+    except Exception as exc:
+        key = "runtime.media_center.error.deployment_plan_failed"
+        return _skill_error(
+            "deployment_plan_failed",
+            human_message=_skill_text(key, "Could not create the Media Center deployment plan."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Apply one explicitly reviewed Media Center deployment plan.", side_effects="remote_write")
+def apply_deployment(plan_digest: str = "", idempotency_key: str = "", **_: Any) -> dict[str, Any]:
+    try:
+        return _topology().apply_deployment(plan_digest, idempotency_key=idempotency_key)
+    except Exception as exc:
+        key = "runtime.media_center.error.deployment_apply_failed"
+        return _skill_error(
+            "deployment_apply_failed",
+            human_message=_skill_text(key, "Could not apply the Media Center deployment plan."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Cordon and drain one Media Center component activation.", side_effects="remote_write")
+def drain_activation(activation_id: str = "", idempotency_key: str = "", **_: Any) -> dict[str, Any]:
+    try:
+        return _topology().drain_activation(activation_id, idempotency_key=idempotency_key)
+    except Exception as exc:
+        key = "runtime.media_center.error.deployment_drain_failed"
+        return _skill_error(
+            "deployment_drain_failed",
+            human_message=_skill_text(key, "Could not drain the Media Center agent."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Remove one drained Media Center activation while retaining media and derived data.", side_effects="remote_write")
+def remove_activation(activation_id: str = "", idempotency_key: str = "", **_: Any) -> dict[str, Any]:
+    try:
+        return _topology().remove_activation(activation_id, idempotency_key=idempotency_key)
+    except Exception as exc:
+        key = "runtime.media_center.error.deployment_remove_failed"
+        return _skill_error(
+            "deployment_remove_failed",
+            human_message=_skill_text(key, "Could not remove the Media Center agent."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Define Media Center logical service and datasets through the public SDK.", side_effects="local_write")
+def define_topology(
+    service_definition: Mapping[str, Any] | None = None,
+    service_group: Mapping[str, Any] | None = None,
+    datasets: list[Mapping[str, Any]] | None = None,
+    expected_group_revision: int = 0,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().define_topology(
+            service_definition=service_definition or {},
+            service_group=service_group or {},
+            datasets=datasets or [],
+            expected_group_revision=expected_group_revision,
+        )
+    except Exception as exc:
+        key = "runtime.media_center.error.topology_define_failed"
+        return _skill_error(
+            "topology_define_failed",
+            human_message=_skill_text(key, "Could not define Media Center service topology."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Return bounded generic distributed topology state for Media Center.", side_effects="none")
+def topology_status(limit: int = 50, **_: Any) -> dict[str, Any]:
+    return _topology().distributed_status(limit=limit)
+
+
+@tool(summary="Explain route eligibility and partial participation for Media Center shards.", side_effects="none")
+def explain_route(partition_ids: list[str] | None = None, **_: Any) -> dict[str, Any]:
+    try:
+        return {"ok": True, **_topology().explain_route(partition_ids or [])}
+    except Exception as exc:
+        key = "runtime.media_center.error.route_explain_failed"
+        return _skill_error(
+            "route_explain_failed",
+            human_message=_skill_text(key, "Could not explain the Media Center route."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
 
 
 @tool(summary="Return bounded home shelves for one media profile.", side_effects="none")

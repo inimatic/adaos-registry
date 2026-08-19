@@ -1,4 +1,10 @@
 {
   "runtime.media_center.error.no_active_media_roots": "Сначала добавьте папку с медиа, затем запустите импорт.",
-  "runtime.media_center.error.invalid_media_catalog_cursor": "Страница каталога изменилась. Обновите список."
+  "runtime.media_center.error.invalid_media_catalog_cursor": "Страница каталога изменилась. Обновите список.",
+  "runtime.media_center.error.deployment_plan_failed": "Не удалось создать план развертывания Media Center.",
+  "runtime.media_center.error.deployment_apply_failed": "Не удалось применить план развертывания Media Center.",
+  "runtime.media_center.error.deployment_drain_failed": "Не удалось вывести агент Media Center из обслуживания.",
+  "runtime.media_center.error.deployment_remove_failed": "Не удалось удалить агент Media Center.",
+  "runtime.media_center.error.topology_define_failed": "Не удалось настроить распределенную топологию Media Center.",
+  "runtime.media_center.error.route_explain_failed": "Не удалось получить объяснение маршрута Media Center."
 }

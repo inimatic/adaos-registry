@@ -8,5 +8,9 @@
   "runtime.media_library_agent.error.scan_job_not_found": "The media scan is no longer available.",
   "runtime.media_library_agent.error.invalid_cursor": "The catalog cursor has expired or is invalid.",
   "runtime.media_library_agent.error.invalid_resource_pressure": "The resource pressure level is invalid.",
-  "runtime.media_library_agent.error.source_not_found": "The media source is no longer available."
+  "runtime.media_library_agent.error.source_not_found": "The media source is no longer available.",
+  "runtime.media_library_agent.error.topology_join_failed": "This library agent could not join the Media Center topology.",
+  "runtime.media_library_agent.error.topology_renew_failed": "This library agent could not renew its Media Center membership.",
+  "runtime.media_library_agent.error.topology_observe_failed": "This library agent could not publish its shard state.",
+  "runtime.media_library_agent.error.topology_drain_failed": "This library agent could not leave the Media Center topology."
 }

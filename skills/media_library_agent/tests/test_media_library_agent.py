@@ -4,6 +4,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,6 +15,7 @@ if str(SKILL_ROOT) not in sys.path:
 
 from handlers import main  # noqa: E402
 from media_library_agent.repository import MediaLibraryAgentRepository  # noqa: E402
+from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
 
 
@@ -38,6 +40,38 @@ def _wait(job_id: str, timeout: float = 5.0) -> dict:
             return job
         time.sleep(0.02)
     raise AssertionError(f"scan job {job_id} did not finish")
+
+
+def test_agent_topology_uses_public_sdk_and_bounds_membership_lease(monkeypatch):
+    from media_library_agent import topology as topology_module
+
+    source = (SKILL_ROOT / "media_library_agent" / "topology.py").read_text(encoding="utf-8")
+    assert "from adaos.sdk import distributed" in source
+    assert "adaos.services" not in source
+
+    parsed = object()
+    captured = {}
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "ServiceInstance",
+        SimpleNamespace(from_mapping=lambda value: parsed),
+    )
+
+    def fake_register(instance, *, expected_revision, lease_seconds):
+        captured.update(
+            instance=instance,
+            expected_revision=expected_revision,
+            lease_seconds=lease_seconds,
+        )
+        return SimpleNamespace(to_dict=lambda: {"instance_id": "agent-a", "revision": 1})
+
+    monkeypatch.setattr(topology_module.distributed_sdk, "register", fake_register)
+
+    result = LibraryAgentTopology().join({"instance_id": "agent-a"}, lease_seconds=999)
+
+    assert result["ok"] is True
+    assert result["instance"]["instance_id"] == "agent-a"
+    assert captured == {"instance": parsed, "expected_revision": 0, "lease_seconds": 300}
 
 
 def test_import_is_async_reference_only_and_excludes_images(tmp_path):

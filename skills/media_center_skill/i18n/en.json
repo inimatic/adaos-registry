@@ -1,4 +1,10 @@
 {
   "runtime.media_center.error.no_active_media_roots": "Add a media folder first, then run import.",
-  "runtime.media_center.error.invalid_media_catalog_cursor": "The catalog page changed. Refresh the list."
+  "runtime.media_center.error.invalid_media_catalog_cursor": "The catalog page changed. Refresh the list.",
+  "runtime.media_center.error.deployment_plan_failed": "Could not create the Media Center deployment plan.",
+  "runtime.media_center.error.deployment_apply_failed": "Could not apply the Media Center deployment plan.",
+  "runtime.media_center.error.deployment_drain_failed": "Could not drain the Media Center agent.",
+  "runtime.media_center.error.deployment_remove_failed": "Could not remove the Media Center agent.",
+  "runtime.media_center.error.topology_define_failed": "Could not define Media Center service topology.",
+  "runtime.media_center.error.route_explain_failed": "Could not explain the Media Center route."
 }

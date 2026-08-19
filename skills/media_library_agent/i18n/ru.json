@@ -8,5 +8,9 @@
   "runtime.media_library_agent.error.scan_job_not_found": "Задание индексирования больше недоступно.",
   "runtime.media_library_agent.error.invalid_cursor": "Курсор каталога устарел или имеет неверный формат.",
   "runtime.media_library_agent.error.invalid_resource_pressure": "Указан неверный уровень нагрузки.",
-  "runtime.media_library_agent.error.source_not_found": "Источник медиаданных больше недоступен."
+  "runtime.media_library_agent.error.source_not_found": "Источник медиаданных больше недоступен.",
+  "runtime.media_library_agent.error.topology_join_failed": "Агент библиотеки не смог подключиться к топологии Media Center.",
+  "runtime.media_library_agent.error.topology_renew_failed": "Агент библиотеки не смог продлить членство в Media Center.",
+  "runtime.media_library_agent.error.topology_observe_failed": "Агент библиотеки не смог опубликовать состояние раздела.",
+  "runtime.media_library_agent.error.topology_drain_failed": "Агент библиотеки не смог выйти из топологии Media Center."
 }
