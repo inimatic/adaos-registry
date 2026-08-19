@@ -108,6 +108,14 @@ def _agent_page(*deltas: dict) -> dict:
     }
 
 
+def _validate_schema(filename: str, payload: dict) -> None:
+    jsonschema = pytest.importorskip("jsonschema")
+    schema = __import__("json").loads(
+        (SKILL_ROOT / "schemas" / filename).read_text(encoding="utf-8")
+    )
+    jsonschema.Draft202012Validator(schema).validate(payload)
+
+
 def test_catalog_scans_lists_and_plans_playback(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repo = MediaCenterRepository()
@@ -646,3 +654,117 @@ def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path
     assert published[-1][1]["profile_id"] == "alice"
     assert published[-1][1]["personal_revision"] == 1
     assert published[-1][2]["_meta"] == {"webspace_id": "desktop"}
+
+
+def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Shows/Example/Season 2/Example.S02E03.mp4", kind="video"),
+            _agent_delta(2, "Music/Album/Disc 2/04 Track.mp3"),
+            _agent_delta(3, "Books/Novel/Part 1/001.mp3"),
+        )
+    )
+
+    kinds = {item["kind"] for item in catalog.collections(limit=30)["items"]}
+    root = catalog.folders(limit=1)
+    second = catalog.folders(limit=1, cursor=root["pagination"]["next_cursor"])
+    nested = catalog.folders(parent="Shows/Example", limit=30)
+
+    assert {"series", "season", "album", "disc", "audiobook", "book_part"} <= kinds
+    assert root["count"] == 1
+    assert root["pagination"]["has_more"] is True
+    assert second["items"][0]["path"] != root["items"][0]["path"]
+    assert nested["items"][0]["path"] == "Shows/Example/Season 2"
+    assert nested["breadcrumbs"][-1] == {"name": "Example", "path": "Shows/Example"}
+    _validate_schema("folder-node.v1.schema.json", nested["items"][0])
+
+
+def test_playlists_are_profile_scoped_ordered_and_revision_safe(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Music/Album/01.mp3"),
+            _agent_delta(2, "Music/Album/02.mp3"),
+        )
+    )
+    items = catalog.list_items(media_kind="audio", sort="title")["items"]
+
+    created = catalog.create_playlist(
+        profile_id="alice",
+        title="Drive",
+        visibility="private",
+        item_ids=[items[1]["id"], items[0]["id"]],
+    )
+    playlist_id = created["playlist"]["id"]
+    page = catalog.playlist_items(playlist_id, profile_id="alice", limit=30)
+    denied = catalog.get_playlist(playlist_id, profile_id="bob")
+    conflict = catalog.update_playlist(
+        playlist_id,
+        profile_id="alice",
+        expected_revision=99,
+        title="Wrong",
+    )
+    updated = catalog.update_playlist(
+        playlist_id,
+        profile_id="alice",
+        expected_revision=1,
+        visibility="household",
+    )
+
+    assert [item["id"] for item in page["items"]] == [
+        items[1]["id"],
+        items[0]["id"],
+    ]
+    assert denied["error"] == "playlist_not_found"
+    assert conflict["error"] == "playlist_revision_conflict"
+    assert updated["playlist"]["revision"] == 2
+    assert catalog.get_playlist(playlist_id, profile_id="bob")["ok"] is True
+    _validate_schema("playlist.v1.schema.json", updated["playlist"])
+
+
+def test_catalog_corrections_are_audited_reversible_and_non_destructive(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Movies/First.mp4", kind="video"),
+            _agent_delta(2, "Movies/Second.mp4", kind="video"),
+        )
+    )
+    works = catalog.list_items(media_kind="video", sort="title")["items"]
+    target = works[0]["work_id"]
+
+    correction = catalog.apply_correction(
+        operation="metadata",
+        subject_ref=f"work:{target}",
+        values={"canonical_title": "Corrected title"},
+        actor_ref="profile:alice",
+    )
+    claims = catalog.metadata_claims(f"work:{target}")
+    reversed_result = catalog.reverse_correction(
+        correction["correction"]["id"], actor_ref="profile:alice"
+    )
+
+    assert correction["ok"] is True
+    assert correction["source_deletion"] is False
+    assert claims["items"][0]["provenance"] == "profile:alice"
+    assert reversed_result["ok"] is True
+    _validate_schema(
+        "catalog-correction.v1.schema.json", correction["correction"]
+    )
+    with catalog.repository.connect() as connection:
+        title = connection.execute(
+            "SELECT canonical_title FROM media_works WHERE id=?", (target,)
+        ).fetchone()[0]
+    assert title != "Corrected title"

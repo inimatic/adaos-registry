@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_center.playlist.v1",
+  "type": "object",
+  "required": ["schema", "id", "owner_profile_id", "title", "visibility", "revision", "created_at", "updated_at", "item_count"],
+  "properties": {
+    "schema": {"const": "adaos.media_center.playlist.v1"},
+    "id": {"type": "string", "minLength": 1},
+    "owner_profile_id": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "visibility": {"enum": ["private", "household", "shared"]},
+    "revision": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"},
+    "item_count": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": false
+}

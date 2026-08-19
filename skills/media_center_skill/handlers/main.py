@@ -996,6 +996,170 @@ def list_collections(kind: str = "", limit: int = 30, cursor: str = "", **_: Any
         return _skill_error("invalid_media_catalog_cursor", message="The collection page changed. Refresh the list.")
 
 
+@tool(summary="Browse bounded catalog folders through an opaque cursor.", side_effects="none")
+def browse_folders(
+    agent_id: str = "",
+    root_id: str = "",
+    parent: str = "",
+    limit: int = 30,
+    cursor: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _coordinator().folders(
+            agent_id=agent_id,
+            root_id=root_id,
+            parent=parent,
+            limit=limit,
+            cursor=cursor,
+        )
+    except ValueError:
+        return _skill_error(
+            "invalid_media_catalog_cursor",
+            message="The folder page changed. Refresh the list.",
+        )
+
+
+@tool(summary="Create a profile-owned media playlist.", side_effects="local_write")
+def create_playlist(
+    title: str = "",
+    profile_id: str = "default",
+    visibility: str = "private",
+    item_ids: list[str] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    result = catalog.create_playlist(
+        profile_id=profile_id,
+        title=title,
+        visibility=visibility,
+        item_ids=item_ids or [],
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
+
+
+@tool(summary="List playlists visible to one profile.", side_effects="none")
+def list_playlists(
+    profile_id: str = "default",
+    limit: int = 30,
+    cursor: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _coordinator().playlists(
+            profile_id=profile_id, limit=limit, cursor=cursor
+        )
+    except ValueError:
+        return _skill_error("invalid_media_catalog_cursor")
+
+
+@tool(summary="Read one bounded playlist page.", side_effects="none")
+def playlist_items(
+    playlist_id: str = "",
+    profile_id: str = "default",
+    limit: int = 30,
+    cursor: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _coordinator().playlist_items(
+            playlist_id,
+            profile_id=profile_id,
+            limit=limit,
+            cursor=cursor,
+        )
+    except ValueError:
+        return _skill_error("invalid_media_catalog_cursor")
+
+
+@tool(summary="Revision-safely replace playlist metadata and order.", side_effects="local_write")
+def update_playlist(
+    playlist_id: str = "",
+    profile_id: str = "default",
+    expected_revision: int = 1,
+    title: str | None = None,
+    visibility: str | None = None,
+    item_ids: list[str] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    result = catalog.update_playlist(
+        playlist_id,
+        profile_id=profile_id,
+        expected_revision=expected_revision,
+        title=title,
+        visibility=visibility,
+        item_ids=item_ids,
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
+
+
+@tool(summary="Revision-safely delete a playlist without deleting media.", side_effects="local_write")
+def delete_playlist(
+    playlist_id: str = "",
+    profile_id: str = "default",
+    expected_revision: int = 1,
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    result = catalog.delete_playlist(
+        playlist_id,
+        profile_id=profile_id,
+        expected_revision=expected_revision,
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
+
+
+@tool(summary="Apply an audited reversible catalog correction.", side_effects="local_write")
+def apply_correction(
+    operation: str = "",
+    subject_ref: str = "",
+    values: Mapping[str, Any] | None = None,
+    actor_ref: str = "profile:default",
+    **_: Any,
+) -> dict[str, Any]:
+    return _coordinator().apply_correction(
+        operation=operation,
+        subject_ref=subject_ref,
+        values=values or {},
+        actor_ref=actor_ref,
+    )
+
+
+@tool(summary="Reverse one audited catalog correction.", side_effects="local_write")
+def reverse_correction(
+    correction_id: str = "", actor_ref: str = "profile:default", **_: Any
+) -> dict[str, Any]:
+    return _coordinator().reverse_correction(
+        correction_id, actor_ref=actor_ref
+    )
+
+
+@tool(summary="List bounded metadata claims and provenance.", side_effects="none")
+def metadata_claims(
+    subject_ref: str = "", limit: int = 30, **_: Any
+) -> dict[str, Any]:
+    return _coordinator().metadata_claims(subject_ref, limit=limit)
+
+
 @tool(summary="Return cheap non-destructive duplicate and variant candidates.", side_effects="none")
 def duplicate_candidates(limit: int = 30, **_: Any) -> dict[str, Any]:
     return _coordinator().duplicate_candidates(limit=limit)

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_center.catalog_correction.v1",
+  "type": "object",
+  "required": ["schema", "id", "operation", "subject_ref", "before", "after", "actor_ref", "reversible"],
+  "properties": {
+    "schema": {"const": "adaos.media_center.catalog_correction.v1"},
+    "id": {"type": "string", "minLength": 1},
+    "operation": {"enum": ["metadata", "merge", "regroup"]},
+    "subject_ref": {"type": "string", "minLength": 1},
+    "before": {"type": "object"},
+    "after": {"type": "object"},
+    "actor_ref": {"type": "string", "minLength": 1},
+    "reversible": {"const": true}
+  },
+  "additionalProperties": false
+}

@@ -25,10 +25,15 @@ CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
 WORK_SCHEMA = "adaos.media_center.media_work.v1"
 COLLECTION_SCHEMA = "adaos.media_center.media_collection.v1"
 PERSONAL_SCHEMA = "adaos.media_center.personal_state.v1"
+FOLDER_NODE_SCHEMA = "adaos.media_center.folder_node.v1"
+PLAYLIST_SCHEMA = "adaos.media_center.playlist.v1"
+CORRECTION_SCHEMA = "adaos.media_center.catalog_correction.v1"
 MAX_PAGE_SIZE = 30
 
 _SEASON_EPISODE = re.compile(r"(?i)(?:^|[ ._\-])s(?P<season>\d{1,3})e(?P<episode>\d{1,4})(?:[ ._\-]|$)")
 _SEASON_FOLDER = re.compile(r"(?i)^(?:season|сезон)[ ._\-]*(?P<season>\d{1,3})$")
+_DISC_FOLDER = re.compile(r"(?i)^(?:disc|disk|cd|диск)[ ._\-]*(?P<disc>\d{1,3})$")
+_PART_FOLDER = re.compile(r"(?i)^(?:part|book|том|часть)[ ._\-]*(?P<part>\d{1,3})$")
 _LEADING_NUMBER = re.compile(r"^(?P<number>\d{1,4})(?:[ ._\-]+|$)")
 
 
@@ -101,6 +106,8 @@ class MediaCatalogCoordinator:
                 CREATE INDEX IF NOT EXISTS idx_media_center_agent_source ON catalog_items(agent_id, source_id);
                 CREATE INDEX IF NOT EXISTS idx_media_center_work ON catalog_items(work_id, missing);
                 CREATE INDEX IF NOT EXISTS idx_media_center_collection ON catalog_items(collection_id, missing);
+                CREATE INDEX IF NOT EXISTS idx_media_center_folder_browse
+                    ON catalog_items(agent_id, root_id, folder_path, missing);
                 CREATE TABLE IF NOT EXISTS coordinator_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
@@ -392,9 +399,18 @@ class MediaCatalogCoordinator:
         mime_type = _text(source.get("mime_type") or descriptor.get("mime_type") or descriptor.get("mime")) or "application/octet-stream"
         kind = _text(source.get("media_kind")) or _media_kind(mime_type, name)
         title = _text(descriptor.get("title")) or _title_from_name(name)
-        work, collection, membership = self._classify_source(name, kind, folder_path, metadata)
+        work, collections, membership = self._classify_source(
+            name, kind, folder_path, metadata
+        )
         work_id = self._upsert_work(connection, work)
-        collection_id = self._upsert_collection(connection, collection) if collection else ""
+        collection_ids: list[str] = []
+        for collection in collections:
+            value = dict(collection)
+            parent_index = value.pop("parent_index", None)
+            if parent_index is not None:
+                value["parent_id"] = collection_ids[int(parent_index)]
+            collection_ids.append(self._upsert_collection(connection, value))
+        collection_id = collection_ids[-1] if collection_ids else ""
         variant_id = _stable_id("variant", work_id, node_id, source_id, size=24)
         item_id = str(previous["id"]) if previous else _stable_id("mc", agent_id, source_id, size=24)
         content_path = _text(descriptor.get("content_path"))
@@ -402,7 +418,18 @@ class MediaCatalogCoordinator:
         source_path = _text(descriptor.get("source_path") or descriptor.get("path"))
         modified_ns = int(source.get("modified_ns") or 0)
         modified_at = _text(descriptor.get("modified_at")) or (str(modified_ns) if modified_ns else "")
-        search_text = self._search_text(title=title, name=name, relative_path=relative_path, folder_path=folder_path, metadata={**metadata, "collection": collection["title"] if collection else ""})
+        search_text = self._search_text(
+            title=title,
+            name=name,
+            relative_path=relative_path,
+            folder_path=folder_path,
+            metadata={
+                **metadata,
+                "collection": " ".join(
+                    _text(item.get("title")) for item in collections
+                ),
+            },
+        )
         catalog_revision = self._next_catalog_revision(connection)
         connection.execute(
             """
@@ -449,7 +476,7 @@ class MediaCatalogCoordinator:
             """,
             (variant_id, work_id, source_id, node_id, kind, mime_type, _json_dumps(self._quality(descriptor, metadata))),
         )
-        if collection_id:
+        for membership_collection_id in collection_ids:
             connection.execute(
                 """
                 INSERT INTO collection_memberships(
@@ -462,7 +489,7 @@ class MediaCatalogCoordinator:
                     chapter_number=excluded.chapter_number, revision=collection_memberships.revision+1
                 """,
                 (
-                    collection_id, work_id, variant_id, int(membership.get("ordinal") or 0),
+                    membership_collection_id, work_id, variant_id, int(membership.get("ordinal") or 0),
                     membership.get("season_number"), membership.get("episode_number"), membership.get("disc_number"),
                     membership.get("track_number"), membership.get("chapter_number"),
                 ),
@@ -482,31 +509,92 @@ class MediaCatalogCoordinator:
 
     def _classify_source(
         self, name: str, media_kind: str, folder_path: str, metadata: Mapping[str, Any]
-    ) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any]]:
+    ) -> tuple[dict[str, Any], list[dict[str, Any]], dict[str, Any]]:
         parts = [part for part in folder_path.split("/") if part]
         match = _SEASON_EPISODE.search(name)
         membership: dict[str, Any] = {"ordinal": 0}
-        collection: dict[str, Any] | None = None
+        collections: list[dict[str, Any]] = []
         canonical_title = _normalize_title(name)
         if media_kind == "video" and match:
             season = int(match.group("season"))
             episode = int(match.group("episode"))
             series_title = parts[-2] if len(parts) >= 2 and _SEASON_FOLDER.match(parts[-1]) else (parts[-1] if parts else canonical_title)
             canonical_title = f"{series_title} S{season:02d}E{episode:02d}"
-            collection = {"kind": "series", "title": series_title, "parent_id": "", "ownership": "derived"}
+            collections = [
+                {
+                    "kind": "series",
+                    "title": series_title,
+                    "parent_id": "",
+                    "ownership": "derived",
+                },
+                {
+                    "kind": "season",
+                    "title": f"Season {season}",
+                    "parent_index": 0,
+                    "ownership": "derived",
+                    "metadata": {"season_number": season},
+                },
+            ]
             membership.update({"ordinal": season * 10000 + episode, "season_number": season, "episode_number": episode})
         elif media_kind == "audio" and parts:
-            album_title = _text(metadata.get("album")) or parts[-1]
+            disc_match = _DISC_FOLDER.match(parts[-1]) if parts else None
+            part_match = _PART_FOLDER.match(parts[-1]) if parts else None
+            container_title = parts[-2] if len(parts) >= 2 and (disc_match or part_match) else parts[-1]
+            album_title = _text(metadata.get("album")) or container_title
             number_match = _LEADING_NUMBER.match(Path(name).stem)
             ordinal = int(number_match.group("number")) if number_match else 0
-            kind = "audiobook" if len(parts) >= 2 and number_match and not metadata.get("album") else "album"
-            collection = {"kind": kind, "title": album_title, "parent_id": "", "ownership": "derived"}
+            kind = (
+                "audiobook"
+                if len(parts) >= 2
+                and number_match
+                and not metadata.get("album")
+                and not disc_match
+                else "album"
+            )
+            collections = [
+                {
+                    "kind": kind,
+                    "title": album_title,
+                    "parent_id": "",
+                    "ownership": "derived",
+                }
+            ]
+            if disc_match:
+                disc = int(disc_match.group("disc"))
+                collections.append(
+                    {
+                        "kind": "disc",
+                        "title": f"Disc {disc}",
+                        "parent_index": 0,
+                        "ownership": "derived",
+                        "metadata": {"disc_number": disc},
+                    }
+                )
+                membership["disc_number"] = disc
+            elif part_match:
+                part = int(part_match.group("part"))
+                collections.append(
+                    {
+                        "kind": "book_part",
+                        "title": f"Part {part}",
+                        "parent_index": 0,
+                        "ownership": "derived",
+                        "metadata": {"part_number": part},
+                    }
+                )
             key = "chapter_number" if kind == "audiobook" else "track_number"
             membership.update({"ordinal": ordinal, key: ordinal or None})
         elif parts:
-            collection = {"kind": "folder", "title": parts[-1], "parent_id": "", "ownership": "source"}
+            collections = [
+                {
+                    "kind": "folder",
+                    "title": parts[-1],
+                    "parent_id": "",
+                    "ownership": "source",
+                }
+            ]
         work = {"media_kind": media_kind, "canonical_title": canonical_title, "metadata": {"source_title": _title_from_name(name)}}
-        return work, collection, membership
+        return work, collections, membership
 
     def _upsert_work(self, connection: sqlite3.Connection, work: Mapping[str, Any]) -> str:
         title = _text(work.get("canonical_title"))
@@ -829,6 +917,424 @@ class MediaCatalogCoordinator:
             "pagination": {"limit": bounded, "cursor": _encode_cursor(offset, signature), "next_cursor": _encode_cursor(next_offset, signature) if next_offset < total else None, "has_more": next_offset < total},
         }
 
+    def folders(
+        self,
+        *,
+        agent_id: str = "",
+        root_id: str = "",
+        parent: str = "",
+        limit: int = 30,
+        cursor: str = "",
+    ) -> dict[str, Any]:
+        bounded = max(1, min(MAX_PAGE_SIZE, int(limit or MAX_PAGE_SIZE)))
+        agent = _text(agent_id)
+        root = _text(root_id)
+        parent_path = _text(parent).replace("\\", "/").strip("/")
+        signature = _cursor_signature(
+            {"agent": agent, "root": root, "parent": parent_path}
+        )
+        offset = _decode_cursor(cursor, signature) if _text(cursor) else 0
+        filters = ["missing=0"]
+        params: list[Any] = []
+        if agent:
+            filters.append("agent_id=?")
+            params.append(agent)
+        if root:
+            filters.append("root_id=?")
+            params.append(root)
+        if parent_path:
+            filters.append("folder_path LIKE ? ESCAPE '\\'")
+            params.append(
+                parent_path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                + "/%"
+            )
+            relative_start = len(parent_path) + 2
+        else:
+            filters.append("folder_path<>''")
+            relative_start = 1
+        where = " AND ".join(filters)
+        sql = f"""
+            WITH scoped AS (
+                SELECT agent_id, node_id, root_id, catalog_revision,
+                    substr(folder_path, ?) AS relative_path
+                FROM catalog_items WHERE {where}
+            ), projected AS (
+                SELECT agent_id, node_id, root_id, catalog_revision,
+                    CASE WHEN instr(relative_path, '/')>0
+                        THEN substr(relative_path, 1, instr(relative_path, '/')-1)
+                        ELSE relative_path END AS child_name
+                FROM scoped WHERE relative_path<>''
+            )
+            SELECT agent_id, node_id, root_id, child_name,
+                COUNT(*) AS source_count, MAX(catalog_revision) AS revision
+            FROM projected WHERE child_name<>''
+            GROUP BY agent_id, node_id, root_id, child_name
+            ORDER BY lower(child_name), agent_id, root_id
+        """
+        query_params = [relative_start, *params]
+        with self.repository.connect() as connection:
+            total = int(
+                connection.execute(
+                    f"SELECT COUNT(*) FROM ({sql})", tuple(query_params)
+                ).fetchone()[0]
+            )
+            rows = connection.execute(
+                f"{sql} LIMIT ? OFFSET ?",
+                (*query_params, bounded, offset),
+            ).fetchall()
+        items = []
+        for row in rows:
+            name = str(row["child_name"])
+            path = "/".join(item for item in (parent_path, name) if item)
+            items.append(
+                {
+                    "schema": FOLDER_NODE_SCHEMA,
+                    "id": _stable_id(
+                        "folder",
+                        str(row["agent_id"]),
+                        str(row["root_id"]),
+                        path.casefold(),
+                        size=24,
+                    ),
+                    "agent_id": str(row["agent_id"]),
+                    "node_id": str(row["node_id"]),
+                    "root_id": str(row["root_id"]),
+                    "path": path,
+                    "parent": parent_path,
+                    "name": name,
+                    "source_count": int(row["source_count"]),
+                    "revision": int(row["revision"]),
+                }
+            )
+        next_offset = offset + len(items)
+        breadcrumbs = [
+            {
+                "name": segment,
+                "path": "/".join(parent_path.split("/")[: index + 1]),
+            }
+            for index, segment in enumerate(parent_path.split("/"))
+            if segment
+        ]
+        participation = self.participation()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "items": items,
+            "count": len(items),
+            "total_count": total,
+            "parent": parent_path,
+            "breadcrumbs": breadcrumbs,
+            "partial": participation["partial"],
+            "participation": participation,
+            "pagination": {
+                "limit": bounded,
+                "cursor": _encode_cursor(offset, signature),
+                "next_cursor": (
+                    _encode_cursor(next_offset, signature)
+                    if next_offset < total
+                    else None
+                ),
+                "has_more": next_offset < total,
+            },
+        }
+
+    def create_playlist(
+        self,
+        *,
+        profile_id: str,
+        title: str,
+        visibility: str = "private",
+        item_ids: Iterable[str] = (),
+    ) -> dict[str, Any]:
+        profile = _text(profile_id) or "default"
+        playlist_title = _text(title)
+        if not playlist_title:
+            return {"ok": False, "error": "playlist_title_required"}
+        visibility_token = _text(visibility).lower() or "private"
+        if visibility_token not in {"private", "household", "shared"}:
+            return {"ok": False, "error": "playlist_visibility_invalid"}
+        playlist_id = _stable_id(
+            "playlist", profile, playlist_title, now_iso(), size=24
+        )
+        now = now_iso()
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                """
+                INSERT INTO user_playlists(
+                    id, owner_profile_id, title, visibility, revision,
+                    created_at, updated_at
+                ) VALUES (?, ?, ?, ?, 1, ?, ?)
+                """,
+                (playlist_id, profile, playlist_title, visibility_token, now, now),
+            )
+            error = self._replace_playlist_items(
+                connection,
+                playlist_id=playlist_id,
+                profile_id=profile,
+                item_ids=item_ids,
+                now=now,
+            )
+            if error:
+                connection.rollback()
+                return {"ok": False, "error": error}
+            connection.commit()
+        return self.get_playlist(playlist_id, profile_id=profile)
+
+    @staticmethod
+    def _replace_playlist_items(
+        connection: sqlite3.Connection,
+        *,
+        playlist_id: str,
+        profile_id: str,
+        item_ids: Iterable[str],
+        now: str,
+    ) -> str:
+        ordered = list(dict.fromkeys(_text(item) for item in item_ids if _text(item)))
+        if len(ordered) > 500:
+            return "playlist_item_limit_exceeded"
+        if ordered:
+            placeholders = ",".join("?" for _ in ordered)
+            existing = {
+                str(row["id"])
+                for row in connection.execute(
+                    f"SELECT id FROM catalog_items WHERE id IN ({placeholders}) AND missing=0",
+                    tuple(ordered),
+                ).fetchall()
+            }
+            if existing != set(ordered):
+                return "playlist_item_unavailable"
+        connection.execute(
+            "DELETE FROM user_playlist_items WHERE playlist_id=?", (playlist_id,)
+        )
+        connection.executemany(
+            """
+            INSERT INTO user_playlist_items(
+                playlist_id,item_id,ordinal,added_by_profile_id,added_at
+            ) VALUES (?, ?, ?, ?, ?)
+            """,
+            [
+                (playlist_id, item_id, index, profile_id, now)
+                for index, item_id in enumerate(ordered)
+            ],
+        )
+        return ""
+
+    def get_playlist(self, playlist_id: str, *, profile_id: str) -> dict[str, Any]:
+        token = _text(playlist_id)
+        profile = _text(profile_id) or "default"
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM user_playlists WHERE id=?", (token,)
+            ).fetchone()
+            if row is None or (
+                row["visibility"] == "private"
+                and row["owner_profile_id"] != profile
+            ):
+                return {"ok": False, "error": "playlist_not_found"}
+            count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM user_playlist_items WHERE playlist_id=?",
+                    (token,),
+                ).fetchone()[0]
+            )
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "playlist": {"schema": PLAYLIST_SCHEMA, **dict(row), "item_count": count},
+        }
+
+    def playlists(
+        self, *, profile_id: str, limit: int = 30, cursor: str = ""
+    ) -> dict[str, Any]:
+        profile = _text(profile_id) or "default"
+        bounded = max(1, min(MAX_PAGE_SIZE, int(limit or MAX_PAGE_SIZE)))
+        signature = _cursor_signature({"profile": profile})
+        offset = _decode_cursor(cursor, signature) if _text(cursor) else 0
+        where = "owner_profile_id=? OR visibility IN ('household','shared')"
+        with self.repository.connect() as connection:
+            total = int(
+                connection.execute(
+                    f"SELECT COUNT(*) FROM user_playlists WHERE {where}", (profile,)
+                ).fetchone()[0]
+            )
+            rows = connection.execute(
+                f"""
+                SELECT p.*, COUNT(i.item_id) AS item_count
+                FROM user_playlists p
+                LEFT JOIN user_playlist_items i ON i.playlist_id=p.id
+                WHERE {where}
+                GROUP BY p.id ORDER BY lower(p.title), p.id LIMIT ? OFFSET ?
+                """,
+                (profile, bounded, offset),
+            ).fetchall()
+        items = [
+            {"schema": PLAYLIST_SCHEMA, **dict(row), "item_count": int(row["item_count"])}
+            for row in rows
+        ]
+        next_offset = offset + len(items)
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "items": items,
+            "count": len(items),
+            "total_count": total,
+            "pagination": {
+                "limit": bounded,
+                "cursor": _encode_cursor(offset, signature),
+                "next_cursor": _encode_cursor(next_offset, signature)
+                if next_offset < total
+                else None,
+                "has_more": next_offset < total,
+            },
+        }
+
+    def update_playlist(
+        self,
+        playlist_id: str,
+        *,
+        profile_id: str,
+        expected_revision: int,
+        title: str | None = None,
+        visibility: str | None = None,
+        item_ids: Iterable[str] | None = None,
+    ) -> dict[str, Any]:
+        token = _text(playlist_id)
+        profile = _text(profile_id) or "default"
+        now = now_iso()
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM user_playlists WHERE id=?", (token,)
+            ).fetchone()
+            if row is None or row["owner_profile_id"] != profile:
+                connection.rollback()
+                return {"ok": False, "error": "playlist_not_found"}
+            if int(row["revision"]) != int(expected_revision):
+                connection.rollback()
+                return {
+                    "ok": False,
+                    "error": "playlist_revision_conflict",
+                    "current_revision": int(row["revision"]),
+                }
+            next_title = _text(title) if title is not None else str(row["title"])
+            next_visibility = (
+                _text(visibility).lower()
+                if visibility is not None
+                else str(row["visibility"])
+            )
+            if not next_title:
+                connection.rollback()
+                return {"ok": False, "error": "playlist_title_required"}
+            if next_visibility not in {"private", "household", "shared"}:
+                connection.rollback()
+                return {"ok": False, "error": "playlist_visibility_invalid"}
+            if item_ids is not None:
+                error = self._replace_playlist_items(
+                    connection,
+                    playlist_id=token,
+                    profile_id=profile,
+                    item_ids=item_ids,
+                    now=now,
+                )
+                if error:
+                    connection.rollback()
+                    return {"ok": False, "error": error}
+            connection.execute(
+                """
+                UPDATE user_playlists SET title=?, visibility=?, revision=revision+1,
+                    updated_at=? WHERE id=?
+                """,
+                (next_title, next_visibility, now, token),
+            )
+            connection.commit()
+        return self.get_playlist(token, profile_id=profile)
+
+    def delete_playlist(
+        self, playlist_id: str, *, profile_id: str, expected_revision: int
+    ) -> dict[str, Any]:
+        token = _text(playlist_id)
+        profile = _text(profile_id) or "default"
+        with self.repository.connect() as connection:
+            changed = connection.execute(
+                """
+                DELETE FROM user_playlists
+                WHERE id=? AND owner_profile_id=? AND revision=?
+                """,
+                (token, profile, max(1, int(expected_revision))),
+            ).rowcount
+            connection.commit()
+        return {
+            "ok": bool(changed),
+            "schema": COORDINATOR_SCHEMA,
+            "playlist_id": token,
+            **({} if changed else {"error": "playlist_revision_conflict"}),
+        }
+
+    def playlist_items(
+        self,
+        playlist_id: str,
+        *,
+        profile_id: str,
+        limit: int = 30,
+        cursor: str = "",
+    ) -> dict[str, Any]:
+        access = self.get_playlist(playlist_id, profile_id=profile_id)
+        if not access.get("ok"):
+            return access
+        bounded = max(1, min(MAX_PAGE_SIZE, int(limit or MAX_PAGE_SIZE)))
+        signature = _cursor_signature(
+            {"playlist": _text(playlist_id), "profile": _text(profile_id)}
+        )
+        offset = _decode_cursor(cursor, signature) if _text(cursor) else 0
+        with self.repository.connect() as connection:
+            total = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM user_playlist_items WHERE playlist_id=?",
+                    (_text(playlist_id),),
+                ).fetchone()[0]
+            )
+            rows = connection.execute(
+                """
+                SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                    COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                    COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                    COALESCE(ps.completed,0) AS profile_completed,
+                    COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                    COALESCE(ps.revision,0) AS profile_revision,
+                    pi.ordinal AS playlist_ordinal
+                FROM user_playlist_items pi
+                JOIN catalog_items c ON c.id=pi.item_id
+                LEFT JOIN personal_media_state ps
+                    ON ps.item_id=c.id AND ps.profile_id=?
+                WHERE pi.playlist_id=? AND c.missing=0
+                ORDER BY pi.ordinal LIMIT ? OFFSET ?
+                """,
+                (_text(profile_id) or "default", _text(playlist_id), bounded, offset),
+            ).fetchall()
+        items = [
+            self._public_coordinator_item(row, _text(profile_id) or "default")
+            | {"playlist_ordinal": int(row["playlist_ordinal"])}
+            for row in rows
+        ]
+        next_offset = offset + len(items)
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "playlist": access["playlist"],
+            "items": items,
+            "count": len(items),
+            "total_count": total,
+            "pagination": {
+                "limit": bounded,
+                "cursor": _encode_cursor(offset, signature),
+                "next_cursor": _encode_cursor(next_offset, signature)
+                if next_offset < total
+                else None,
+                "has_more": next_offset < total,
+            },
+        }
+
     def home(self, *, profile_id: str = "default", limit: int = 12) -> dict[str, Any]:
         bounded = max(1, min(20, int(limit or 12)))
         shelves = []
@@ -841,7 +1347,47 @@ class MediaCatalogCoordinator:
         ):
             page = self.list_items(profile_id=profile_id, limit=bounded, **options)
             shelves.append({"id": shelf_id, "title": title, "layout": "rail", "items": page["items"], "partial": page["partial"]})
-        return {"ok": True, "schema": COORDINATOR_SCHEMA, "profile_id": _text(profile_id) or "default", "shelves": shelves}
+        for shelf_id, title, kind in (
+            ("series", "Series", "series"),
+            ("albums", "Albums", "album"),
+            ("audiobooks", "Audiobooks", "audiobook"),
+        ):
+            page = self.collections(kind=kind, limit=bounded)
+            shelves.append(
+                {
+                    "id": shelf_id,
+                    "title": title,
+                    "layout": "rail",
+                    "items": page["items"],
+                    "partial": self.participation()["partial"],
+                }
+            )
+        playlist_page = self.playlists(profile_id=profile_id, limit=bounded)
+        shelves.append(
+            {
+                "id": "playlists",
+                "title": "Playlists",
+                "layout": "rail",
+                "items": playlist_page["items"],
+                "partial": False,
+            }
+        )
+        folder_page = self.folders(limit=bounded)
+        shelves.append(
+            {
+                "id": "folders",
+                "title": "Folders",
+                "layout": "rail",
+                "items": folder_page["items"],
+                "partial": folder_page["partial"],
+            }
+        )
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "profile_id": _text(profile_id) or "default",
+            "shelves": shelves,
+        }
 
     def duplicate_candidates(self, *, limit: int = 30) -> dict[str, Any]:
         bounded = max(1, min(100, int(limit or 30)))
@@ -860,6 +1406,216 @@ class MediaCatalogCoordinator:
             for row in rows
         ]
         return {"ok": True, "schema": COORDINATOR_SCHEMA, "items": items, "count": len(items), "source_deletion": False}
+
+    def apply_correction(
+        self,
+        *,
+        operation: str,
+        subject_ref: str,
+        values: Mapping[str, Any],
+        actor_ref: str,
+    ) -> dict[str, Any]:
+        action = _text(operation).lower()
+        subject = _text(subject_ref)
+        actor = _text(actor_ref) or "profile:default"
+        if action not in {"metadata", "merge", "regroup"}:
+            return {"ok": False, "error": "catalog_correction_unsupported"}
+        before: dict[str, Any]
+        after: dict[str, Any]
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if action == "metadata":
+                work_id = subject.removeprefix("work:")
+                row = connection.execute(
+                    "SELECT * FROM media_works WHERE id=?", (work_id,)
+                ).fetchone()
+                title = _text(values.get("canonical_title"))
+                if row is None or not title:
+                    connection.rollback()
+                    return {"ok": False, "error": "catalog_correction_subject_invalid"}
+                before = {"canonical_title": str(row["canonical_title"])}
+                after = {"canonical_title": title}
+                connection.execute(
+                    """
+                    UPDATE media_works SET canonical_title=?, sort_title=?,
+                        revision=revision+1, updated_at=? WHERE id=?
+                    """,
+                    (title, title.casefold(), now_iso(), work_id),
+                )
+                claim_id = _stable_id(
+                    "claim", work_id, "canonical_title", title, actor, size=24
+                )
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO metadata_claims(
+                        id,subject_ref,field_name,value_json,provenance,
+                        confidence,preferred,revision,created_at
+                    ) VALUES (?, ?, 'canonical_title', ?, ?, 1, 1, 1, ?)
+                    """,
+                    (claim_id, f"work:{work_id}", _json_dumps(title), actor, now_iso()),
+                )
+            elif action == "merge":
+                duplicate_id = subject.removeprefix("work:")
+                canonical_id = _text(values.get("canonical_work_id"))
+                rows = connection.execute(
+                    "SELECT id, alias_of FROM media_works WHERE id IN (?, ?)",
+                    (duplicate_id, canonical_id),
+                ).fetchall()
+                if len(rows) != 2 or duplicate_id == canonical_id:
+                    connection.rollback()
+                    return {"ok": False, "error": "catalog_correction_subject_invalid"}
+                before = {"alias_of": next(str(row["alias_of"]) for row in rows if row["id"] == duplicate_id)}
+                after = {"alias_of": canonical_id}
+                alias_id = _stable_id("alias", duplicate_id, canonical_id, size=24)
+                connection.execute(
+                    "UPDATE media_works SET alias_of=?, revision=revision+1, updated_at=? WHERE id=?",
+                    (canonical_id, now_iso(), duplicate_id),
+                )
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO catalog_aliases(
+                        alias_id,canonical_id,reason,actor_ref,reversible,created_at
+                    ) VALUES (?, ?, 'user_merge', ?, 1, ?)
+                    """,
+                    (alias_id, canonical_id, actor, now_iso()),
+                )
+            else:
+                item_id = subject.removeprefix("item:")
+                collection_id = _text(values.get("collection_id"))
+                row = connection.execute(
+                    "SELECT work_id,variant_id,collection_id FROM catalog_items WHERE id=?",
+                    (item_id,),
+                ).fetchone()
+                collection = connection.execute(
+                    "SELECT id FROM media_collections WHERE id=?", (collection_id,)
+                ).fetchone()
+                if row is None or collection is None:
+                    connection.rollback()
+                    return {"ok": False, "error": "catalog_correction_subject_invalid"}
+                before = {"collection_id": str(row["collection_id"])}
+                after = {"collection_id": collection_id}
+                connection.execute(
+                    "UPDATE catalog_items SET collection_id=? WHERE id=?",
+                    (collection_id, item_id),
+                )
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO collection_memberships(
+                        collection_id,work_id,variant_id,ordinal,revision
+                    ) VALUES (?, ?, ?, 0, 1)
+                    """,
+                    (collection_id, str(row["work_id"]), str(row["variant_id"])),
+                )
+            correction_id = _stable_id(
+                "correction", action, subject, actor, now_iso(), size=24
+            )
+            connection.execute(
+                """
+                INSERT INTO catalog_corrections(
+                    id,operation,subject_ref,before_json,after_json,actor_ref,created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    correction_id,
+                    action,
+                    subject,
+                    _json_dumps(before),
+                    _json_dumps(after),
+                    actor,
+                    now_iso(),
+                ),
+            )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "correction": {
+                "schema": CORRECTION_SCHEMA,
+                "id": correction_id,
+                "operation": action,
+                "subject_ref": subject,
+                "before": before,
+                "after": after,
+                "actor_ref": actor,
+                "reversible": True,
+            },
+            "source_deletion": False,
+        }
+
+    def reverse_correction(
+        self, correction_id: str, *, actor_ref: str
+    ) -> dict[str, Any]:
+        token = _text(correction_id)
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM catalog_corrections WHERE id=?", (token,)
+            ).fetchone()
+            if row is None or row["reversed_by"]:
+                connection.rollback()
+                return {"ok": False, "error": "catalog_correction_not_reversible"}
+            action = str(row["operation"])
+            subject = str(row["subject_ref"])
+            before = _json_loads(row["before_json"]) or {}
+            if action == "metadata":
+                work_id = subject.removeprefix("work:")
+                title = _text(before.get("canonical_title"))
+                connection.execute(
+                    """
+                    UPDATE media_works SET canonical_title=?, sort_title=?,
+                        revision=revision+1, updated_at=? WHERE id=?
+                    """,
+                    (title, title.casefold(), now_iso(), work_id),
+                )
+            elif action == "merge":
+                duplicate_id = subject.removeprefix("work:")
+                connection.execute(
+                    "UPDATE media_works SET alias_of=?, revision=revision+1, updated_at=? WHERE id=?",
+                    (_text(before.get("alias_of")), now_iso(), duplicate_id),
+                )
+            elif action == "regroup":
+                item_id = subject.removeprefix("item:")
+                connection.execute(
+                    "UPDATE catalog_items SET collection_id=? WHERE id=?",
+                    (_text(before.get("collection_id")), item_id),
+                )
+            reversal_id = _stable_id(
+                "correction-reversal", token, _text(actor_ref), now_iso(), size=24
+            )
+            connection.execute(
+                "UPDATE catalog_corrections SET reversed_by=? WHERE id=?",
+                (reversal_id, token),
+            )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "correction_id": token,
+            "reversed_by": reversal_id,
+            "source_deletion": False,
+        }
+
+    def metadata_claims(
+        self, subject_ref: str, *, limit: int = 30
+    ) -> dict[str, Any]:
+        bounded = max(1, min(100, int(limit or 30)))
+        with self.repository.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM metadata_claims WHERE subject_ref=?
+                ORDER BY preferred DESC, confidence DESC, created_at DESC LIMIT ?
+                """,
+                (_text(subject_ref), bounded),
+            ).fetchall()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "items": [
+                dict(row) | {"value": _json_loads(row["value_json"])}
+                for row in rows
+            ],
+            "count": len(rows),
+        }
 
     def participation(self) -> dict[str, Any]:
         with self.repository.connect() as connection:

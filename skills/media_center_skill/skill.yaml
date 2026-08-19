@@ -56,6 +56,15 @@ exports:
   - sync_agent
   - home
   - list_collections
+  - browse_folders
+  - create_playlist
+  - list_playlists
+  - playlist_items
+  - update_playlist
+  - delete_playlist
+  - apply_correction
+  - reverse_correction
+  - metadata_claims
   - duplicate_candidates
   - save_checkpoint
   - queue_background_job
@@ -396,6 +405,127 @@ tools:
       kind: {type: string}
       limit: {type: integer, minimum: 1, maximum: 30, default: 30}
       cursor: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: browse_folders
+  description: Browse lazy folder children through an opaque cursor.
+  entry: handlers.main:browse_folders
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      agent_id: {type: string}
+      root_id: {type: string}
+      parent: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
+      cursor: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: create_playlist
+  description: Create a profile-owned personal, household, or shared playlist.
+  entry: handlers.main:create_playlist
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [title]
+    properties:
+      title: {type: string, minLength: 1, maxLength: 200}
+      profile_id: {type: string, default: default}
+      visibility: {type: string, enum: [private, household, shared], default: private}
+      item_ids: {type: array, maxItems: 500, items: {type: string}}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: list_playlists
+  description: List playlists visible to one profile.
+  entry: handlers.main:list_playlists
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      profile_id: {type: string, default: default}
+      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
+      cursor: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: playlist_items
+  description: Read one bounded playlist page.
+  entry: handlers.main:playlist_items
+  side_effects: none
+  input_schema:
+    type: object
+    required: [playlist_id]
+    properties:
+      playlist_id: {type: string}
+      profile_id: {type: string, default: default}
+      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
+      cursor: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: update_playlist
+  description: Revision-safely replace playlist metadata and order.
+  entry: handlers.main:update_playlist
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [playlist_id, expected_revision]
+    properties:
+      playlist_id: {type: string}
+      profile_id: {type: string, default: default}
+      expected_revision: {type: integer, minimum: 1}
+      title: {type: string, minLength: 1, maxLength: 200}
+      visibility: {type: string, enum: [private, household, shared]}
+      item_ids: {type: array, maxItems: 500, items: {type: string}}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: delete_playlist
+  description: Revision-safely remove a playlist without deleting media.
+  entry: handlers.main:delete_playlist
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [playlist_id, expected_revision]
+    properties:
+      playlist_id: {type: string}
+      profile_id: {type: string, default: default}
+      expected_revision: {type: integer, minimum: 1}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: apply_correction
+  description: Apply an audited reversible metadata, merge, or regroup correction.
+  entry: handlers.main:apply_correction
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [operation, subject_ref, values]
+    properties:
+      operation: {type: string, enum: [metadata, merge, regroup]}
+      subject_ref: {type: string}
+      values: {type: object}
+      actor_ref: {type: string, default: 'profile:default'}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: reverse_correction
+  description: Reverse one audited catalog correction.
+  entry: handlers.main:reverse_correction
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [correction_id]
+    properties:
+      correction_id: {type: string}
+      actor_ref: {type: string, default: 'profile:default'}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: metadata_claims
+  description: List bounded metadata claims with provenance.
+  entry: handlers.main:metadata_claims
+  side_effects: none
+  input_schema:
+    type: object
+    required: [subject_ref]
+    properties:
+      subject_ref: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 100, default: 30}
     additionalProperties: true
   output_schema: {type: object}
 - name: duplicate_candidates
