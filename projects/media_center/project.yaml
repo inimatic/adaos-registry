@@ -1,0 +1,83 @@
+schema: adaos.project.v1
+kind: project
+id: media_center
+version: 0.2.0
+profiles:
+- adaos.media_center.v1
+- adaos.media_center.tv.v1
+- adaos.media_center.desktop.v1
+- adaos.media_center.mobile_control.v1
+- adaos.media_center.embedded.v1
+components:
+  owned:
+  - ref: scenario:media_center
+    role: primary
+    exposure: application
+    lifecycle: bound
+    relations: [presents]
+  - ref: skill:media_center_skill
+    role: implementation
+    exposure: project_only
+    lifecycle: bound
+    relations: [realizes]
+  - ref: skill:media_library_agent
+    role: supporting
+    exposure: project_only
+    lifecycle: bound
+    relations: [uses]
+  - ref: skill:media_control_skill
+    role: supporting
+    exposure: advanced
+    lifecycle: bound
+    relations: [uses]
+  dependencies:
+  - ref: skill:mediaserver
+    version: '>=0.1.0'
+    lifecycle: shared
+    relations: [uses]
+entrypoints:
+- id: library
+  presentation: scenario:media_center
+  default: true
+  bindings:
+    presentation_profile: desktop
+    media_role: library
+- id: tv
+  presentation: scenario:media_center
+  bindings:
+    presentation_profile: tv
+    media_role: playback_target
+- id: remote
+  presentation: scenario:media_center
+  bindings:
+    presentation_profile: mobile_control
+    media_role: controller
+- id: embedded
+  presentation: scenario:media_center
+  bindings:
+    presentation_profile: embedded
+    media_role: compact
+catalog:
+  title: Media Center
+  description: Distributed in-place household media library, playback, and remote control.
+  categories: [media, home]
+  tags: [audio, video, tv, remote-control, distributed]
+compatibility:
+  required_entrypoints: [library, tv, remote]
+  required_contracts:
+  - adaos.project.deployment.v1
+  - adaos.distributed.service.v1
+  - adaos.media.library_agent.v1
+  - adaos.media.catalog.v1
+  - adaos.media.playback_session.v1
+  validation_profiles:
+  - media_center.local
+  - media_center.distributed
+  - media_center.presentation
+lifecycle:
+  uninstall:
+    components: remove_if_unreferenced
+    runtime_data: retain
+    source_artifacts: retain
+created_at: '2026-08-19T00:00:00+00:00'
+created_by: AdaOS Media Center

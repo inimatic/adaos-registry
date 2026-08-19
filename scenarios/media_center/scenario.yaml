@@ -1,22 +1,25 @@
 id: media_center
 name: media_center
-version: 0.1.7
+version: 0.2.0
 title: Media Center
-description: Compact media-center catalog with in-place folder registration, server-backed pages, and modal playback over AdaOS media resource descriptors.
+description: Distributed Media Center application with in-place library agents, a bounded coordinator catalog, persistent playback, and remote-control surfaces.
 type: desktop
 supported_locales:
 - en
 - ru
 depends:
 - media_center_skill
+- media_library_agent
+- media_control_skill
 - mediaserver
 runtime:
   skills:
     required:
     - media_center_skill
+    - media_library_agent
+    - media_control_skill
     - mediaserver
-    optional:
-    - media_indexer_skill
+    optional: []
 ui:
   manifest: webui.json
 trigger: manual
@@ -43,7 +46,7 @@ guidance:
     help_intent: media_center.help
     next_steps_intent: media_center.next_steps
 llm_hints:
-  description: Media Center MVP scenario for in-place media folders, compact playable filters, server-backed pages, and modal playback.
+  description: Media Center application for distributed in-place libraries, compact bounded browsing, persistent playback, and remote control.
   aliases:
   - Media Center
   - media center
@@ -67,6 +70,8 @@ llm_hints:
   - Add media folder
   owner_hints:
   - skill:media_center_skill
+  - skill:media_library_agent
+  - skill:media_control_skill
 nlu:
   nlu_hints:
     aliases:
@@ -79,4 +84,4 @@ nlu:
     entities: []
 steps: []
 prototype: scenario_default
-updated_at: '2026-08-14T12:00:00+00:00'
+updated_at: '2026-08-19T00:00:00+00:00'
