@@ -1027,6 +1027,7 @@ class MediaCatalogCoordinator:
                     "node_id": str(row["node_id"]),
                     "root_id": str(row["root_id"]),
                     "path": path,
+                    "queue_ref": f"{row['agent_id']}:{path}",
                     "parent": parent_path,
                     "name": name,
                     "source_count": int(row["source_count"]),
@@ -1649,6 +1650,7 @@ class MediaCatalogCoordinator:
     def home(self, *, profile_id: str = "default", limit: int = 12) -> dict[str, Any]:
         bounded = max(1, min(20, int(limit or 12)))
         shelves = []
+        flattened: list[dict[str, Any]] = []
         for shelf_id, title, options in (
             ("continue", "Continue", {"sort": "recent"}),
             ("favorites", "Favorites", {"favorites_only": True, "sort": "favorite"}),
@@ -1658,6 +1660,10 @@ class MediaCatalogCoordinator:
         ):
             page = self.list_items(profile_id=profile_id, limit=bounded, **options)
             shelves.append({"id": shelf_id, "title": title, "layout": "rail", "items": page["items"], "partial": page["partial"]})
+            flattened.extend(
+                dict(item) | {"shelf_id": shelf_id, "shelf_title": title}
+                for item in page["items"]
+            )
         for shelf_id, title, kind in (
             ("series", "Series", "series"),
             ("albums", "Albums", "album"),
@@ -1673,6 +1679,10 @@ class MediaCatalogCoordinator:
                     "partial": self.participation()["partial"],
                 }
             )
+            flattened.extend(
+                dict(item) | {"shelf_id": shelf_id, "shelf_title": title}
+                for item in page["items"]
+            )
         playlist_page = self.playlists(profile_id=profile_id, limit=bounded)
         shelves.append(
             {
@@ -1682,6 +1692,10 @@ class MediaCatalogCoordinator:
                 "items": playlist_page["items"],
                 "partial": False,
             }
+        )
+        flattened.extend(
+            dict(item) | {"shelf_id": "playlists", "shelf_title": "Playlists"}
+            for item in playlist_page["items"]
         )
         folder_page = self.folders(limit=bounded)
         shelves.append(
@@ -1693,11 +1707,16 @@ class MediaCatalogCoordinator:
                 "partial": folder_page["partial"],
             }
         )
+        flattened.extend(
+            dict(item) | {"shelf_id": "folders", "shelf_title": "Folders"}
+            for item in folder_page["items"]
+        )
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "profile_id": _text(profile_id) or "default",
             "shelves": shelves,
+            "items": flattened,
         }
 
     def duplicate_candidates(self, *, limit: int = 30) -> dict[str, Any]:

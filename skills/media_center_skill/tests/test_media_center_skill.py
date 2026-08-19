@@ -680,8 +680,28 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
     assert root["pagination"]["has_more"] is True
     assert second["items"][0]["path"] != root["items"][0]["path"]
     assert nested["items"][0]["path"] == "Shows/Example/Season 2"
+    assert nested["items"][0]["queue_ref"] == "agent-node-a:Shows/Example/Season 2"
     assert nested["breadcrumbs"][-1] == {"name": "Example", "path": "Shows/Example"}
     _validate_schema("folder-node.v1.schema.json", nested["items"][0])
+
+
+def test_home_exposes_bounded_flattened_shelf_items(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Shows/Example/Season 01/Example.S01E01.mp4", kind="video"),
+            _agent_delta(2, "Music/Album/01.mp3"),
+        )
+    )
+
+    home = catalog.home(profile_id="alice", limit=2)
+
+    assert home["items"]
+    assert len(home["items"]) <= len(home["shelves"]) * 2
+    assert all(item["shelf_id"] and item["shelf_title"] for item in home["items"])
 
 
 def test_playlists_are_profile_scoped_ordered_and_revision_safe(monkeypatch, tmp_path):
