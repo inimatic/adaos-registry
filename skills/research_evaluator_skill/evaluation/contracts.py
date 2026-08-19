@@ -117,9 +117,9 @@ def freeze_task(value: Mapping[str, Any]) -> dict[str, Any]:
     seeds = list(validated["repetitions"]["paired_seeds"])
     if validated["repetitions"]["attempts_per_arm"] != len(seeds):
         raise ValueError("attempts_per_arm must equal paired_seeds length")
-    if schema_version in {"1.1.0", "1.2.0", "1.3.0"} and validated["repetitions"]["model_random_seed_control"] != "unsupported_not_claimed":
+    if schema_version in {"1.1.0", "1.2.0", "1.3.0", "1.4.0"} and validated["repetitions"]["model_random_seed_control"] != "unsupported_not_claimed":
         raise ValueError("calibration must not claim unsupported model random-seed control")
-    if schema_version == "1.3.0":
+    if schema_version in {"1.3.0", "1.4.0"}:
         comparison = dict(validated["comparison_plan"])
         if int(comparison["planned_pairs"]) != len(seeds):
             raise ValueError("comparison planned_pairs must equal paired_seeds length")

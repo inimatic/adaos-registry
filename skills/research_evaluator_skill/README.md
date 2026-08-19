@@ -21,7 +21,7 @@ input. The primary endpoint is `evidence_valid_completion`: all mandatory checks
 pass, the protocol has not drifted, the selected budget is respected, and no
 unresolved failure was reported.
 
-For the primary AdaOS-versus-raw claim, calibration task v1.3 preregisters
+For the primary AdaOS-versus-raw claim, calibration task v1.4 preregisters
 `C0_raw` as control and `C3_typed_execution` as treatment. It requires at least
 five pairs, a counterbalanced within-pair execution order, an
 `incomplete_no_claim` missing-data policy, and a one-sided exact paired sign
@@ -52,7 +52,7 @@ confounding but does not justify a universal autonomous-science claim.
 4. A separate judge records deterministic, expert, or LLM-judge check evidence
    through `record_calibration_result`.
 5. `summarize_calibration` reports completion rate, Wilson intervals, resource
-   usage, first-failure stages, and—when v1.3 is used—the independently
+   usage, first-failure stages, and—when v1.3 or later is used—the independently
    recomputed paired C0/C3 result and scoped conclusion for one budget view.
 6. `export_calibration_package` binds the frozen task, exact arm packets,
    immutable results, and recomputed summary into one content-addressed JSON

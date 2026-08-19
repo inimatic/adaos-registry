@@ -50,7 +50,7 @@ def freeze_calibration(task: Mapping[str, Any], **_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="Derive and freeze a compact paired v1.3 calibration from an immutable audit task.", side_effects="local_write")
+@tool(summary="Derive and freeze a compact paired v1.4 calibration from an immutable audit task.", side_effects="local_write")
 def derive_compact_calibration(
     baseline_task_id: str,
     task_id: str,
@@ -62,6 +62,7 @@ def derive_compact_calibration(
     orchestrator_version: str,
     evaluator_version: str,
     runner_version: str,
+    manager_version: str,
     source_direction_id: str | None = None,
     source_task_id: str | None = None,
     reasoning_effort: str = "high",
@@ -149,6 +150,19 @@ def derive_compact_calibration(
         or not consumer_contract.get("digest")
     ):
         raise RuntimeError("research manager did not return its exact runner consumer ABI")
+    manager_response = invoke_skill(
+        "research_manager_skill",
+        "environment_identity",
+        {},
+        timeout=120,
+    )
+    manager_identity = (
+        manager_response.get("runtime_identity")
+        if isinstance(manager_response, Mapping)
+        else None
+    )
+    if not isinstance(manager_identity, Mapping):
+        raise RuntimeError("research manager runtime identity is unavailable")
     orchestrator_identity = response.get("runtime_identity")
     if not isinstance(orchestrator_identity, Mapping):
         raise RuntimeError("research orchestrator returned no runtime identity")
@@ -156,6 +170,7 @@ def derive_compact_calibration(
         "research_orchestrator_skill": str(orchestrator_version),
         "research_evaluator_skill": str(evaluator_version),
         "research_calibration_runner_skill": str(runner_version),
+        "research_manager_skill": str(manager_version),
     }
     actual_components = {
         "research_orchestrator_skill": str(
@@ -166,6 +181,9 @@ def derive_compact_calibration(
         ),
         "research_calibration_runner_skill": str(
             dict(runner_identity.get("current_skill") or {}).get("version") or ""
+        ),
+        "research_manager_skill": str(
+            dict(manager_identity.get("current_skill") or {}).get("version") or ""
         ),
     }
     actual_environment = {
@@ -195,7 +213,7 @@ def derive_compact_calibration(
     mismatches.extend(
         key for key, value in expected_components.items() if actual_components.get(key) != value
     )
-    for identity in (orchestrator_identity, runner_identity):
+    for identity in (orchestrator_identity, runner_identity, manager_identity):
         if str(dict(identity.get("core") or {}).get("git_commit") or "") != str(core_commit):
             mismatches.append("component_core_commit")
     if mismatches:
@@ -224,7 +242,7 @@ def derive_compact_calibration(
     count = int(attempts_per_arm)
     seeds = [int(item) for item in (paired_seeds or [17, 23, 47, 71, 101])]
     if count < 5 or len(seeds) != count or len(set(seeds)) != count:
-        raise ValueError("v1.3 paired calibration requires at least five unique preregistered seeds")
+        raise ValueError("v1.4 paired calibration requires at least five unique preregistered seeds")
     start_with_control = hashlib.sha256(str(task_id).encode("utf-8")).digest()[0] % 2 == 0
     execution_order = []
     for index, seed in enumerate(seeds, start=1):
@@ -239,7 +257,7 @@ def derive_compact_calibration(
         )
     task.update(
         {
-            "schema_version": "1.3.0",
+            "schema_version": "1.4.0",
             "task_id": str(task_id),
             "title": str(baseline["title"]) + " (compact execution contracts)",
             "direction_skill_id": source_direction or str(baseline["direction_skill_id"]),
@@ -262,6 +280,7 @@ def derive_compact_calibration(
                 "standard_prompt_version": str(standard_prompt_version),
                 "core_source_tree_clean": True,
                 "core_source_tree_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "runner_contract_digest": str(consumer_contract["digest"]),
             },
             "measurement_policy": {
                 "model_token_charge": "input_plus_output_including_cached",
