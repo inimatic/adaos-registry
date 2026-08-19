@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -10,8 +11,9 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
-from handlers import main
-from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION
+from handlers import main  # noqa: E402
+from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
+from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
 
 
 def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") -> dict:
@@ -29,6 +31,78 @@ def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") ->
         "content_path": f"/api/node/media/files/content/{resource_id}",
         "routed_content_path": f"/media/files/content/{resource_id}",
         "metadata": {"fixture": True},
+    }
+
+
+def _agent_delta(
+    sequence: int,
+    relative_path: str,
+    *,
+    kind: str = "audio",
+    revision: int = 1,
+    operation: str = "added",
+) -> dict:
+    name = Path(relative_path).name
+    source_id = f"source-{sequence}"
+    mime = "audio/mpeg" if kind == "audio" else "video/mp4"
+    folder = Path(relative_path).parent.as_posix()
+    return {
+        "schema": "adaos.media_library.source_delta.v1",
+        "id": f"delta-{sequence}-{revision}",
+        "sequence": sequence,
+        "agent_id": "agent-node-a",
+        "node_id": "node-a",
+        "root_id": "root-a",
+        "source_id": source_id,
+        "operation": operation,
+        "source_revision": revision,
+        "job_id": "scan-a",
+        "created_at": "2026-08-19T00:00:00+00:00",
+        "source": {
+            "schema": "adaos.media_library.source.v1",
+            "id": source_id,
+            "root_id": "root-a",
+            "node_id": "node-a",
+            "relative_path": relative_path,
+            "folder_path": folder,
+            "name": name,
+            "media_kind": kind,
+            "mime_type": mime,
+            "size_bytes": 1000 + sequence,
+            "modified_ns": sequence,
+            "inode": sequence,
+            "fingerprint": f"fingerprint-{sequence}-{revision}",
+            "resource_id": f"ref-{sequence}",
+            "descriptor": {
+                "schema": "adaos.media.resource.v1",
+                "id": f"ref-{sequence}",
+                "resource_id": f"ref-{sequence}",
+                "name": name,
+                "mime_type": mime,
+                "content_path": f"/api/node/media/resources/content/ref-{sequence}",
+                "routed_content_path": f"/media/resources/content/ref-{sequence}",
+                "source_path": f"/mnt/library/{relative_path}",
+                "metadata": {"storage_mode": "reference", "folder_segments": list(Path(folder).parts)},
+            },
+            "metadata": {"storage_mode": "reference", "folder_segments": list(Path(folder).parts)},
+            "present": operation != "removed",
+            "first_seen_at": "2026-08-19T00:00:00+00:00",
+            "last_seen_at": "2026-08-19T00:00:00+00:00",
+            "revision": revision,
+        },
+    }
+
+
+def _agent_page(*deltas: dict) -> dict:
+    return {
+        "ok": True,
+        "schema": "adaos.media_library_agent.v1",
+        "items": list(deltas),
+        "count": len(deltas),
+        "cursor": "",
+        "next_cursor": f"cursor-{len(deltas)}",
+        "has_more": False,
+        "agent": {"id": "agent-node-a", "node_id": "node-a"},
     }
 
 
@@ -306,3 +380,134 @@ def test_skill_declares_media_center_i18n_resources() -> None:
     assert '"path": "i18n/en.json"' in webui
     assert '"media_center.i18n.ru"' in webui
     assert '"path": "i18n/ru.json"' in webui
+
+
+def test_coordinator_applies_agent_deltas_and_searches_folder_segments(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    page = _agent_page(
+        _agent_delta(1, "Author Name/Important Book/001.mp3"),
+        _agent_delta(2, "Artist/Album/02.mp3"),
+    )
+
+    applied = catalog.apply_agent_page(page)
+    by_folder = catalog.list_items(query="Important Book", media_kind="audio", limit=30)
+    by_filename = catalog.list_items(query="001", media_kind="audio", limit=30)
+    replay = catalog.apply_agent_page(page)
+
+    assert applied["applied_count"] == 2
+    assert [item["name"] for item in by_folder["items"]] == ["001.mp3"]
+    assert [item["name"] for item in by_filename["items"]] == ["001.mp3"]
+    assert by_folder["ranking"] == {"version": "deterministic-fts-v1", "query_mode": "explicit_submit"}
+    assert by_folder["partial"] is False
+    assert replay["applied_count"] == 0
+    assert replay["ignored_count"] == 2
+
+
+def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    deltas = [
+        _agent_delta(index, f"Series Name/Season 01/Series.Name.S01E{index:02d}.mp4", kind="video")
+        for index in range(1, 36)
+    ]
+    catalog.apply_agent_page(_agent_page(*deltas))
+
+    first = catalog.list_items(media_kind="video", sort="title", limit=100)
+    second = catalog.list_items(media_kind="video", sort="title", limit=30, cursor=first["pagination"]["next_cursor"])
+    collections = catalog.collections(kind="series")
+
+    assert first["count"] == 30
+    assert first["pagination"]["has_more"] is True
+    assert second["count"] == 5
+    assert {item["id"] for item in first["items"]}.isdisjoint({item["id"] for item in second["items"]})
+    assert collections["items"][0]["title"] == "Series Name"
+    assert collections["items"][0]["item_count"] == 35
+    assert all(item["work_id"] and item["variant_id"] and item["collection_id"] for item in first["items"])
+
+
+def test_personal_state_is_profile_scoped_and_revisioned(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/Album/01.mp3")))
+    item_id = catalog.list_items(media_kind="audio")["items"][0]["id"]
+
+    alice = catalog.set_favorite(item_id, profile_id="alice", favorite=True)
+    catalog.checkpoint(item_id, profile_id="alice", position_ms=45_000, duration_ms=180_000)
+    alice_page = catalog.list_items(media_kind="audio", profile_id="alice", favorites_only=True)
+    bob_page = catalog.list_items(media_kind="audio", profile_id="bob", favorites_only=True)
+
+    assert alice["revision"] == 1
+    assert alice_page["items"][0]["favorite"] is True
+    assert alice_page["items"][0]["personal"]["resume_ms"] == 45_000
+    assert bob_page["items"] == []
+
+
+def test_unavailable_agent_makes_catalog_truthfully_partial(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/track.mp3")))
+    catalog.mark_agent_unavailable("agent-node-a", node_id="node-a", reason="lease_expired")
+
+    page = catalog.list_items(media_kind="audio")
+
+    assert page["items"]
+    assert page["partial"] is True
+    assert page["participation"]["fresh"] is False
+    assert page["participation"]["unavailable_agent_ids"] == ["agent-node-a"]
+
+
+def test_coordinator_public_contracts_validate_strictly(monkeypatch, tmp_path):
+    jsonschema = pytest.importorskip("jsonschema")
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Artist/Album/01.mp3")))
+    source = catalog.list_items(media_kind="audio")["items"][0]
+    collection = catalog.collections()["items"][0]
+
+    for filename, payload in (
+        ("media-source.v1.schema.json", source),
+        ("media-collection.v1.schema.json", collection),
+    ):
+        schema = __import__("json").loads((SKILL_ROOT / "schemas" / filename).read_text(encoding="utf-8"))
+        jsonschema.Draft202012Validator(schema).validate(payload)
+
+
+def test_twenty_thousand_item_catalog_remains_server_paged(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repo = MediaCenterRepository()
+    rows = []
+    for index in range(20_000):
+        name = f"movie-{index:05d}.mp4"
+        rows.append(
+            (
+                f"mc-{index:05d}", "media_server", name, name, f"Movie {index:05d}", "video", "video/mp4", 1000 + index,
+                "2026-08-19T00:00:00+00:00", f"/api/node/media/files/content/{name}", f"/media/files/content/{name}", "",
+                f"/mnt/library/Movies/{name}", "{}", "{}", f"fp-{index}", "2026-08-19T00:00:00+00:00",
+                "2026-08-19T00:00:00+00:00", 0, 0, 0, "[]",
+            )
+        )
+    with repo.connect() as connection:
+        connection.executemany(
+            """
+            INSERT INTO catalog_items(
+                id,source,resource_id,name,title,media_kind,mime_type,size_bytes,modified_at,
+                content_path,routed_content_path,playback_id,source_path,descriptor_json,metadata_json,
+                fingerprint,indexed_at,last_seen_at,missing,favorite,play_count,tags_json
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            rows,
+        )
+        connection.commit()
+    started = time.monotonic()
+    catalog = MediaCatalogCoordinator(repo)
+
+    first = catalog.list_items(media_kind="video", sort="title", limit=500)
+    found = catalog.list_items(query="movie 19999", media_kind="video", limit=30)
+
+    assert first["count"] == 30
+    assert first["total_count"] == 20_000
+    assert first["pagination"]["has_more"] is True
+    assert found["count"] == 1
+    assert found["items"][0]["name"] == "movie-19999.mp4"
+    assert time.monotonic() - started < 30

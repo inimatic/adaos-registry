@@ -15,7 +15,8 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION
+from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
+from media_center.coordinator import COORDINATOR_SCHEMA, MediaCatalogCoordinator  # noqa: E402
 
 
 VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".ogv"}
@@ -30,6 +31,22 @@ class MediaRootOperationBusy(RuntimeError):
 
 def _repository() -> MediaCenterRepository:
     return MediaCenterRepository()
+
+
+def _coordinator(repository: MediaCenterRepository | None = None) -> MediaCatalogCoordinator:
+    return MediaCatalogCoordinator(repository or _repository())
+
+
+def _invoke_agent(operation: str, arguments: Mapping[str, Any] | None = None, *, timeout: float = 15.0) -> tuple[dict[str, Any] | None, str]:
+    try:
+        from adaos.sdk.skills import invoke
+
+        result = invoke("media_library_agent", operation, dict(arguments or {}), timeout=timeout)
+        if isinstance(result, Mapping):
+            return dict(result), ""
+        return None, "media_library_agent_invalid_response"
+    except Exception as exc:
+        return None, str(exc)
 
 
 @contextmanager
@@ -198,13 +215,89 @@ def _int_limit(value: Any, default: int, maximum: int) -> int:
 
 @tool(summary="Ensure the durable media-center catalog schema.", side_effects="local_write")
 def ensure_schema(**_: Any) -> dict[str, Any]:
-    return _repository().ensure_schema()
+    repo = _repository()
+    legacy = repo.ensure_schema()
+    coordinator = _coordinator(repo).ensure_schema()
+    return {**legacy, "coordinator": coordinator}
 
 
 @tool(summary="Rehydrate the durable media-center catalog after activation.", side_effects="local_write")
 def rehydrate(**_: Any) -> dict[str, Any]:
     repo = _repository()
-    return {"ok": True, "schema": SCHEMA_VERSION, "summary": repo.summary(), "facets": repo.facets()}
+    catalog = _coordinator(repo)
+    sync = _sync_local_agent(catalog, max_pages=4)
+    return {
+        "ok": True,
+        "schema": COORDINATOR_SCHEMA,
+        "summary": repo.summary(),
+        "facets": repo.facets(),
+        "catalog_revision": catalog.catalog_revision(),
+        "agent_sync": sync,
+    }
+
+
+def _sync_local_agent(catalog: MediaCatalogCoordinator, *, max_pages: int = 4, limit: int = 500) -> dict[str, Any]:
+    pages = max(1, min(16, int(max_pages or 4)))
+    page_limit = max(1, min(1000, int(limit or 500)))
+    cursor = catalog.agent_cursor("agent_local")
+    applied = ignored = removed = 0
+    actual_agent_id = ""
+    for _index in range(pages):
+        page, error = _invoke_agent("pull_deltas", {"cursor": cursor, "limit": page_limit}, timeout=20.0)
+        if page is None:
+            if actual_agent_id:
+                catalog.mark_agent_unavailable(actual_agent_id, reason=error or "agent_unavailable")
+            return {
+                "ok": False,
+                "error": "media_library_agent_unavailable",
+                "detail": error[:1000],
+                "applied_count": applied,
+                "retryable": True,
+            }
+        if not page.get("ok"):
+            return {**page, "applied_count": applied}
+        agent = page.get("agent") if isinstance(page.get("agent"), Mapping) else {}
+        actual_agent_id = str(agent.get("id") or "")
+        if actual_agent_id and not cursor:
+            cursor = catalog.agent_cursor(actual_agent_id)
+            if cursor:
+                page, error = _invoke_agent("pull_deltas", {"cursor": cursor, "limit": page_limit}, timeout=20.0)
+                if page is None:
+                    return {"ok": False, "error": "media_library_agent_unavailable", "detail": error[:1000], "retryable": True}
+        result = catalog.apply_agent_page(page)
+        if not result.get("ok"):
+            return result
+        applied += int(result.get("applied_count") or 0)
+        ignored += int(result.get("ignored_count") or 0)
+        removed += int(result.get("removed_count") or 0)
+        cursor = str(page.get("next_cursor") or cursor)
+        if not page.get("has_more"):
+            return {
+                "ok": True,
+                "schema": COORDINATOR_SCHEMA,
+                "agent_id": actual_agent_id,
+                "applied_count": applied,
+                "ignored_count": ignored,
+                "removed_count": removed,
+                "has_more": False,
+                "next_cursor": cursor,
+            }
+    return {
+        "ok": True,
+        "schema": COORDINATOR_SCHEMA,
+        "agent_id": actual_agent_id,
+        "applied_count": applied,
+        "ignored_count": ignored,
+        "removed_count": removed,
+        "has_more": True,
+        "next_cursor": cursor,
+        "bounded": True,
+    }
+
+
+@tool(summary="Pull bounded idempotent deltas from the local library agent.", side_effects="local_write")
+def sync_agent(max_pages: int = 4, limit: int = 500, **_: Any) -> dict[str, Any]:
+    return _sync_local_agent(_coordinator(), max_pages=max_pages, limit=limit)
 
 
 @tool(summary="Scan core-backed media resources into the media-center catalog.", side_effects="local_write")
@@ -218,11 +311,22 @@ def scan_sources(source: str = "all", limit: int = 5000, **_: Any) -> dict[str, 
 
 @tool(summary="List configured media-center library folders.", side_effects="none")
 def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
+    agent, _error = _invoke_agent("list_roots", {"include_disabled": _bool(include_disabled, False)})
+    if agent is not None:
+        agent["owner"] = "media_library_agent"
+        return agent
     return _repository().list_roots(include_disabled=_bool(include_disabled, False))
 
 
 @tool(summary="Add a local library folder to the media-center import set.", side_effects="local_write")
 def add_root(path: str = "", label: str = "", include_images: bool = False, **_: Any) -> dict[str, Any]:
+    agent, _error = _invoke_agent(
+        "add_root",
+        {"path": path, "label": label, "include_images": _bool(include_images, False)},
+    )
+    if agent is not None:
+        agent["owner"] = "media_library_agent"
+        return agent
     repo = _repository()
     try:
         with _root_mutation_lease(repo):
@@ -237,6 +341,10 @@ def add_root(path: str = "", label: str = "", include_images: bool = False, **_:
 
 @tool(summary="Disable a configured media-center library folder.", side_effects="local_write")
 def remove_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
+    agent, _error = _invoke_agent("remove_root", {"root_id": root_id})
+    if agent is not None:
+        agent["owner"] = "media_library_agent"
+        return agent
     repo = _repository()
     try:
         with _root_mutation_lease(repo):
@@ -251,6 +359,15 @@ def remove_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
 
 @tool(summary="Delete a media folder, its catalog rows, and core resource links.", side_effects="local_write")
 def delete_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
+    agent, _error = _invoke_agent("remove_root", {"root_id": root_id})
+    if agent is not None:
+        return {
+            **agent,
+            "owner": "media_library_agent",
+            "disabled": bool(agent.get("ok")),
+            "source_files_deleted": False,
+            "retention": "external_media_and_catalog_evidence_retained",
+        }
     repo = _repository()
     try:
         with _root_mutation_lease(repo):
@@ -282,6 +399,12 @@ def delete_root(root_id: str = "", path: str = "", **_: Any) -> dict[str, Any]:
 
 @tool(summary="Register playable files from configured folders without copying media bytes.", side_effects="local_write")
 def scan_roots(root_id: str = "", path: str = "", limit: int = 1000, **_: Any) -> dict[str, Any]:
+    arguments = {"root_id": root_id, "mode": "incremental"}
+    agent, _error = _invoke_agent("start_scan", arguments)
+    if agent is not None:
+        agent["owner"] = "media_library_agent"
+        agent["legacy_limit_ignored"] = int(limit or 0)
+        return agent
     repo = _repository()
     try:
         with _root_mutation_lease(repo):
@@ -371,6 +494,14 @@ def _scan_roots(repo: MediaCenterRepository, *, root_id: str = "", path: str = "
 
 @tool(summary="Add a folder and register its playable files in place.", side_effects="local_write")
 def import_folder(path: str = "", label: str = "", include_images: bool = False, limit: int = 1000, **_: Any) -> dict[str, Any]:
+    agent, _error = _invoke_agent(
+        "import_folder",
+        {"path": path, "label": label, "include_images": _bool(include_images, False)},
+    )
+    if agent is not None:
+        agent["owner"] = "media_library_agent"
+        agent["legacy_limit_ignored"] = int(limit or 0)
+        return agent
     repo = _repository()
     try:
         with _root_mutation_lease(repo):
@@ -393,42 +524,66 @@ def library(
     query: str = "",
     media_kind: str = "playable",
     source: str = "",
-    limit: int = 100,
+    limit: int = 30,
     offset: int = 0,
+    cursor: str = "",
     include_missing: bool = False,
     favorites_only: bool = False,
     sort: str = "recent",
+    profile_id: str = "default",
+    collection_id: str = "",
     auto_scan: bool = True,
     **_: Any,
 ) -> dict[str, Any]:
     repo = _repository()
+    catalog = _coordinator(repo)
     scan: dict[str, Any] | None = None
+    agent_sync: dict[str, Any] | None = None
     summary = repo.summary()
-    if _bool(auto_scan, True) and int(summary.get("total_count") or 0) == 0:
-        scan = scan_sources(source="all", limit=5000)
-    payload = repo.list_items(
-        query=query,
-        media_kind=media_kind,
-        source=source,
-        limit=limit,
-        offset=offset,
-        include_missing=_bool(include_missing, False),
-        favorites_only=_bool(favorites_only, False),
-        sort=sort,
-    )
+    if _bool(auto_scan, True):
+        agent_sync = _sync_local_agent(catalog, max_pages=2, limit=500)
+        if not agent_sync.get("ok") and int(summary.get("total_count") or 0) == 0:
+            scan = scan_sources(source="all", limit=5000)
+    try:
+        payload = catalog.list_items(
+            query=query,
+            media_kind=media_kind,
+            source=source,
+            limit=limit,
+            offset=offset,
+            cursor=cursor,
+            include_missing=_bool(include_missing, False),
+            favorites_only=_bool(favorites_only, False),
+            sort=sort,
+            profile_id=profile_id,
+            collection_id=collection_id,
+        )
+    except ValueError:
+        return _skill_error(
+            "invalid_media_catalog_cursor",
+            human_message=_skill_text(
+                "runtime.media_center.error.invalid_media_catalog_cursor",
+                "The catalog page changed. Refresh the list.",
+            ),
+            i18n_key="runtime.media_center.error.invalid_media_catalog_cursor",
+        )
     if scan is not None:
         payload["scan"] = scan
+    if agent_sync is not None:
+        payload["agent_sync"] = agent_sync
     payload["runtime"] = {
         "catalog_owner": "media_center_skill",
+        "discovery_owner": "media_library_agent",
         "resource_boundary": "adaos.sdk.io.media.list_media_resources",
-        "publication_boundary": "adaos.sdk.io.media.register_media_file",
+        "agent_delta_boundary": "media_library_agent.pull_deltas",
+        "publication_boundary": "adaos.sdk.io.media.register_media_file via media_library_agent",
         "storage_mode": "reference",
         "playback_contract": "adaos.media.resource.v1",
     }
     payload["capabilities"] = {
-        "catalog": {"status": "mvp", "durable": True},
+        "catalog": {"status": "distributed_coordinator", "durable": True, "max_page_size": 30},
         "playback": {"status": "delegated_to_core_media_resource"},
-        "enrichment": {"status": "planned"},
+        "enrichment": {"status": "background_jobs"},
     }
     return payload
 
@@ -452,15 +607,17 @@ def playback_queue(
     favorites_only: bool = False,
     sort: str = "recent",
     limit: int = 10,
+    profile_id: str = "default",
     **_: Any,
 ) -> dict[str, Any]:
     repo = _repository()
+    catalog = _coordinator(repo)
     selected_result = repo.get_item(item_id)
     if not selected_result.get("ok"):
         return {**selected_result, "items": [], "count": 0, "total_count": 0}
     selected = dict(selected_result["item"])
     queue_limit = _int_limit(limit, 10, 10)
-    listing = repo.list_items(
+    listing = catalog.list_items(
         query=query,
         media_kind=media_kind or "playable",
         source=source,
@@ -468,6 +625,7 @@ def playback_queue(
         limit=queue_limit,
         offset=0,
         sort=sort,
+        profile_id=profile_id,
     )
     items = [selected]
     items.extend(item for item in listing["items"] if item.get("id") != selected.get("id"))
@@ -502,13 +660,67 @@ def playback_plan(item_id: str = "", **_: Any) -> dict[str, Any]:
 
 @tool(summary="Mark or unmark one media-center item as favorite.", side_effects="local_write")
 def set_favorite(item_id: str = "", favorite: bool = True, **_: Any) -> dict[str, Any]:
-    return _repository().set_favorite(item_id, favorite=_bool(favorite, True))
+    profile_id = str(_.get("profile_id") or "default")
+    return _coordinator().set_favorite(item_id, profile_id=profile_id, favorite=_bool(favorite, True))
 
 
 @tool(summary="Return compact media-center catalog status.", side_effects="none")
 def status(**_: Any) -> dict[str, Any]:
     repo = _repository()
-    return {"ok": True, "schema": SCHEMA_VERSION, "summary": repo.summary(), "facets": repo.facets()}
+    catalog = _coordinator(repo)
+    return {
+        "ok": True,
+        "schema": COORDINATOR_SCHEMA,
+        "summary": repo.summary(),
+        "facets": repo.facets(),
+        "coordinator": catalog.diagnostics(),
+    }
+
+
+@tool(summary="Return bounded home shelves for one media profile.", side_effects="none")
+def home(profile_id: str = "default", limit: int = 12, **_: Any) -> dict[str, Any]:
+    return _coordinator().home(profile_id=profile_id, limit=limit)
+
+
+@tool(summary="List typed media collections through an opaque cursor.", side_effects="none")
+def list_collections(kind: str = "", limit: int = 30, cursor: str = "", **_: Any) -> dict[str, Any]:
+    try:
+        return _coordinator().collections(kind=kind, limit=limit, cursor=cursor)
+    except ValueError:
+        return _skill_error("invalid_media_catalog_cursor", message="The collection page changed. Refresh the list.")
+
+
+@tool(summary="Return cheap non-destructive duplicate and variant candidates.", side_effects="none")
+def duplicate_candidates(limit: int = 30, **_: Any) -> dict[str, Any]:
+    return _coordinator().duplicate_candidates(limit=limit)
+
+
+@tool(summary="Persist a bounded profile resume checkpoint.", side_effects="local_write")
+def save_checkpoint(
+    item_id: str = "",
+    profile_id: str = "default",
+    position_ms: int = 0,
+    duration_ms: int = 0,
+    completed: bool = False,
+    **_: Any,
+) -> dict[str, Any]:
+    return _coordinator().checkpoint(
+        item_id,
+        profile_id=profile_id,
+        position_ms=position_ms,
+        duration_ms=duration_ms,
+        completed=_bool(completed, False),
+    )
+
+
+@tool(summary="Queue background media enrichment or technical analysis.", side_effects="local_write")
+def queue_background_job(kind: str = "", subject_ref: str = "", priority: int = 100, **_: Any) -> dict[str, Any]:
+    return _coordinator().queue_background_job(kind, subject_ref, priority=priority)
+
+
+@tool(summary="List bounded background media operations.", side_effects="none")
+def operations(limit: int = 30, **_: Any) -> dict[str, Any]:
+    return _coordinator().operations(limit=limit)
 
 
 @tool(summary="Explain the MVP media-center workflow and admitted next steps.", side_effects="none")

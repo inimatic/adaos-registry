@@ -1,3 +1,4 @@
 {
-  "runtime.media_center.error.no_active_media_roots": "Add a media folder first, then run import."
+  "runtime.media_center.error.no_active_media_roots": "Add a media folder first, then run import.",
+  "runtime.media_center.error.invalid_media_catalog_cursor": "The catalog page changed. Refresh the list."
 }

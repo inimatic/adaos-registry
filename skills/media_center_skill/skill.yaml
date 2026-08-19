@@ -1,6 +1,6 @@
 name: media_center_skill
-version: 0.1.10
-description: Durable MVP media-center catalog built on AdaOS media resource descriptors.
+version: 0.2.0
+description: Distributed Media Center coordinator with bounded catalog, collection, personalization, and playback projections.
 supported_locales:
 - en
 - ru
@@ -14,6 +14,7 @@ capabilities:
 - storage.relational
 - media.catalog
 - media.playback_planning
+- skills.invoke
 dependencies: []
 events:
   subscribe: []
@@ -38,6 +39,13 @@ exports:
   - playback_queue
   - playback_plan
   - set_favorite
+  - sync_agent
+  - home
+  - list_collections
+  - duplicate_candidates
+  - save_checkpoint
+  - queue_background_job
+  - operations
   - status
   - next_steps
   - chat
@@ -210,12 +218,19 @@ tools:
       limit:
         type: integer
         minimum: 1
-        maximum: 500
-        default: 100
+        maximum: 30
+        default: 30
       offset:
         type: integer
         minimum: 0
         default: 0
+      cursor:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      collection_id:
+        type: string
       include_missing:
         type: boolean
         default: false
@@ -320,9 +335,95 @@ tools:
       favorite:
         type: boolean
         default: true
+      profile_id:
+        type: string
+        default: default
     additionalProperties: true
   output_schema:
     type: object
+- name: sync_agent
+  description: Pull bounded idempotent source deltas from the local media library agent.
+  entry: handlers.main:sync_agent
+  side_effects: local_write
+  timeout_seconds: 120
+  input_schema:
+    type: object
+    properties:
+      max_pages: {type: integer, minimum: 1, maximum: 16, default: 4}
+      limit: {type: integer, minimum: 1, maximum: 1000, default: 500}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: home
+  description: Return bounded home shelves for one media profile.
+  entry: handlers.main:home
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      profile_id: {type: string, default: default}
+      limit: {type: integer, minimum: 1, maximum: 20, default: 12}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: list_collections
+  description: List typed media collections through an opaque cursor.
+  entry: handlers.main:list_collections
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      kind: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 30, default: 30}
+      cursor: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: duplicate_candidates
+  description: Return non-destructive duplicate and variant candidates.
+  entry: handlers.main:duplicate_candidates
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      limit: {type: integer, minimum: 1, maximum: 100, default: 30}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: save_checkpoint
+  description: Persist a profile-scoped resume checkpoint.
+  entry: handlers.main:save_checkpoint
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [item_id, position_ms]
+    properties:
+      item_id: {type: string}
+      profile_id: {type: string, default: default}
+      position_ms: {type: integer, minimum: 0}
+      duration_ms: {type: integer, minimum: 0}
+      completed: {type: boolean, default: false}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: queue_background_job
+  description: Queue background enrichment or technical analysis.
+  entry: handlers.main:queue_background_job
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [kind, subject_ref]
+    properties:
+      kind: {type: string, enum: [technical_probe, metadata_enrichment, thumbnail, fingerprint, embedding]}
+      subject_ref: {type: string}
+      priority: {type: integer, minimum: 1, maximum: 1000, default: 100}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: operations
+  description: List bounded observable background media operations.
+  entry: handlers.main:operations
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      limit: {type: integer, minimum: 1, maximum: 100, default: 30}
+    additionalProperties: true
+  output_schema: {type: object}
 - name: status
   description: Return compact media-center catalog status.
   entry: handlers.main:status

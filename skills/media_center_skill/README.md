@@ -1,49 +1,25 @@
-# media_center_skill
+# Media Center Coordinator
 
-`media_center_skill` owns Media Center catalog state only: durable rows, folder
-roots, favorites, filters, and playback plans derived from core media resource
-descriptors.
+`media_center_skill` is the logical Media Center coordinator. It owns the global catalog read model, work/variant/collection identity, profile-scoped favorites and resume state, bounded search, and playback planning. It does not walk filesystems or own source media.
 
-The core media plane remains responsible for media registration and playback
-routes. Folder imports call `adaos.sdk.io.media.register_media_file`, then index
-the returned `adaos.media.resource.v1` descriptors. Registration stores only a
-root-bound reference in `.adaos`; media bytes stay at their original path.
-Catalog migration retires pre-reference `media-center-*-import.*` resources so
-playback cannot silently fall back to an old managed copy. Existing legacy bytes
-are left untouched for an explicit, separately reviewed cleanup operation.
+`media_library_agent` owns node-local roots and asynchronous scans. The coordinator invokes its public tools and consumes ordered `adaos.media_library.source_delta.v1` pages. The agent registers each source through `adaos.sdk.io.media.register_media_file`; only a root-bound reference is stored in `.adaos`, while media bytes stay at their original path.
 
-The default `library()` projection is `media_kind="playable"` so the main Media
-Center catalog stays focused on video/audio resources supported by the current
-Media Server. Image descriptors remain queryable only when a caller explicitly
-requests `media_kind="image"`.
+## Catalog
 
-`playback_queue()` always returns the selected item first and clamps the entire
-queue to ten rows. This is the server-side budget used by the modal player and
-prevents the browser playlist control from loading a catalog page.
+`library()` uses deterministic FTS over normalized title, filename, relative path, meaningful folder segments, tags, people, aliases, and collection names. Queries execute explicitly when the tool is called. Pages use opaque cursors and are clamped to 30 rows; the player queue remains clamped to ten. Images are excluded from the default `playable` view.
 
-`favorites_only=true` is an actual catalog predicate, not a favorite-first sort.
-Folder removal is serialized with folder import across processes, unregisters
-the exact core media reference ids, and then removes the matching catalog/root
-rows. It never deletes the original media files.
+The coordinator derives explicit `MediaSource`, `MediaVariant`, `MediaWork`, `MediaCollection`, and membership rows. Current deterministic grouping covers series episodes, albums, audiobooks, and source folders. Duplicate results are review candidates only and never authorize source deletion. Enrichment, technical probes, fingerprints, thumbnails, and embeddings are represented as observable background jobs rather than blocking catalog reads.
+
+Agent availability is independent from known catalog identity. Reads retain known rows but report `partial=true` when an expected agent is stale or unavailable. Every applied source revision advances a catalog revision, and replayed agent deltas are ignored idempotently.
+
+## Personal State
+
+Favorites, recent playback, resume positions, and completion are keyed by `profile_id`. Mutations return targeted invalidation tags so multiple browsers in one webspace can refresh the same profile projection without publishing a full catalog into synchronized state.
+
+## Compatibility
+
+The old root and Media Server discovery methods remain compatibility fallbacks when `media_library_agent` is not installed or the handler is exercised outside an AdaOS skill context. In a Project deployment, root and scan commands are delegated to the agent and return asynchronous job identifiers.
 
 ## User-Facing Errors
 
-Tools return stable machine codes in `error`/`code` and may include
-`human_message_i18n` for UI presentation. Media Center translations live in
-`i18n/*.json` and are exported by the skill's `webui.json` resource catalog,
-not in the scenario or bundled core client translations.
-
-Example:
-
-```json
-{
-  "ok": false,
-  "error": "no_active_media_roots",
-  "human_message_i18n": {
-    "key": "runtime.media_center.error.no_active_media_roots"
-  }
-}
-```
-
-The direct `human_message` field is a fallback for clients that have not loaded
-runtime dictionaries yet.
+Tools return stable machine codes and may include `human_message_i18n`. Media Center translations live in this skill's `i18n/*.json` resources, not in core, the scenario, or the client. `human_message` remains a fallback for clients that have not loaded the runtime dictionary.

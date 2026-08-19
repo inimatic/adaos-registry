@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_center.media_variant.v1",
+  "type": "object",
+  "required": ["id", "work_id", "source_id", "node_id", "media_kind", "mime_type", "available", "revision"],
+  "properties": {
+    "id": {"type": "string"}, "work_id": {"type": "string"}, "source_id": {"type": "string"}, "node_id": {"type": "string"},
+    "media_kind": {"enum": ["video", "audio", "image", "other"]}, "mime_type": {"type": "string"},
+    "quality_json": {"type": "string"}, "available": {"type": "boolean"}, "revision": {"type": "integer", "minimum": 1}
+  },
+  "additionalProperties": false
+}

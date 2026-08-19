@@ -1,3 +1,4 @@
 {
-  "runtime.media_center.error.no_active_media_roots": "Сначала добавьте папку с медиа, затем запустите импорт."
+  "runtime.media_center.error.no_active_media_roots": "Сначала добавьте папку с медиа, затем запустите импорт.",
+  "runtime.media_center.error.invalid_media_catalog_cursor": "Страница каталога изменилась. Обновите список."
 }

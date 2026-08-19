@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_center.media_source.v1",
+  "type": "object",
+  "required": ["schema", "id", "agent_id", "node_id", "root_id", "source_id", "source_revision", "name", "media_kind", "work_id", "variant_id", "missing"],
+  "properties": {
+    "schema": {"const": "adaos.media_center.media_source.v1"}, "id": {"type": "string"}, "agent_id": {"type": "string"},
+    "node_id": {"type": "string"}, "root_id": {"type": "string"}, "source_id": {"type": "string"},
+    "source_revision": {"type": "integer", "minimum": 0}, "catalog_revision": {"type": "integer", "minimum": 0},
+    "name": {"type": "string"}, "title": {"type": "string"}, "media_kind": {"enum": ["video", "audio", "image", "other"]},
+    "mime_type": {"type": "string"}, "size_bytes": {"type": "integer", "minimum": 0}, "folder_path": {"type": "string"},
+    "work_id": {"type": "string"}, "variant_id": {"type": "string"}, "collection_id": {"type": "string"},
+    "quality": {"type": "object"}, "missing": {"type": "boolean"}, "resource": {"type": "object"}, "personal": {"type": "object"},
+    "source": {"type": "string"}, "resource_id": {"type": "string"}, "subtitle": {"type": "string"}, "kind": {"type": "string"},
+    "icon": {"type": "string"}, "modified_at": {"type": "string"}, "content_path": {"type": "string"},
+    "routed_content_path": {"type": "string"}, "playback_id": {"type": "string"}, "source_path": {"type": "string"},
+    "favorite": {"type": "boolean"}, "play_count": {"type": "integer", "minimum": 0}, "tags": {"type": "array"},
+    "playable": {"type": "boolean"}, "preview": {"type": "string"}
+  },
+  "additionalProperties": false
+}
