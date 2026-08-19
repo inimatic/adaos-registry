@@ -8,6 +8,7 @@ import yaml
 
 SCENARIO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = SCENARIO_ROOT.parents[1] / "skills" / "media_center_skill"
+CONTROL_SKILL_ROOT = SCENARIO_ROOT.parents[1] / "skills" / "media_control_skill"
 
 
 def _walk_dicts(node: object) -> list[dict]:
@@ -63,34 +64,64 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert page["interaction"]["initialFocus"] == "widget:media-search"
     assert page["initialState"]["mediaPageSize"] == 30
     assert page["initialState"]["mediaFavoritesOnly"] is False
-    assert set(widgets) == {
-        "media-center-settings-action",
-        "media-kind-tabs",
+    assert {
+        "media-center-header",
+        "media-profile-selector",
+        "media-section-navigation",
+        "media-view-mode",
         "media-search",
-        "media-search-actions",
-        "media-catalog-table",
-        "media-page-actions",
-    }
+        "media-home",
+        "media-catalog",
+        "media-collections",
+        "media-folders",
+        "media-playlists",
+    } == set(widgets)
     assert all(widget["type"] != "media.videoBrowser" for widget in page["widgets"])
 
-    kind_ids = [button["id"] for button in widgets["media-kind-tabs"]["inputs"]["buttons"]]
-    assert kind_ids == ["playable", "video", "audio"]
     assert widgets["media-search"]["inputs"]["commitMode"] == "manual"
     assert widgets["media-search"]["inputs"]["saveLabel"] == "Search"
-    browse_ids = [button["id"] for button in widgets["media-search-actions"]["inputs"]["buttons"]]
-    assert browse_ids == ["all", "recent", "favorites", "clear-search"]
+    navigation_ids = [
+        button["id"]
+        for button in widgets["media-section-navigation"]["inputs"]["buttons"]
+    ]
+    assert navigation_ids == [
+        "home", "movies", "series", "music", "audiobooks", "folders",
+        "playlists", "favorites", "recent",
+    ]
+    assert [
+        button["id"] for button in widgets["media-view-mode"]["inputs"]["buttons"]
+    ] == ["list", "cards", "rail"]
 
-    catalog = widgets["media-catalog-table"]
+    catalog = widgets["media-catalog"]
+    assert catalog["type"] == "ui.list"
     assert catalog["dataSource"]["params"]["limit"] == "$state.mediaPageSize"
-    assert catalog["dataSource"]["params"]["offset"] == "$state.mediaOffset"
+    assert catalog["dataSource"]["params"]["cursor"] == "$state.mediaCursor"
     assert catalog["dataSource"]["params"]["media_kind"] == "$state.mediaKind"
     assert catalog["dataSource"]["params"]["favorites_only"] == "$state.mediaFavoritesOnly"
+    assert catalog["collection"] == {
+        "display": "cards",
+        "displayModeStateKey": "mediaDisplay",
+        "focusGroup": "media-catalog",
+        "virtualized": True,
+        "cursor": {"enabled": True, "stateKey": "mediaCursor"},
+    }
     assert catalog["actions"][0]["params"]["selectedMediaFavorite"] == "$event.favorite"
     assert [action["type"] for action in catalog["actions"] if action["on"] == "select"] == [
         "updateState",
         "openModal",
     ]
     assert catalog["actions"][1]["params"]["modalId"] == "media_center_player"
+    assert widgets["media-home"]["dataSource"] == {
+        "kind": "stream",
+        "receiver": "media_center.library_state",
+        "path": "home.items",
+        "params": {
+            "profile_id": "$state.profileId",
+            "shared_surface": "$state.sharedSurface",
+        },
+        "scope": "workspace",
+    }
+    assert widgets["media-profile-selector"]["inputs"]["selectedStateKey"] == "profileId"
 
 
 def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
@@ -100,17 +131,16 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     player_widgets = {widget["id"]: widget for widget in modals["media_center_player"]["schema"]["widgets"]}
     player = player_widgets["media-center-player"]
     assert player["type"] == "media.videoBrowser"
-    assert player["dataSource"]["name"] == "media_center_skill.playback_queue"
-    assert player["dataSource"]["params"]["item_id"] == "$state.selectedMediaItemId"
-    assert player["dataSource"]["params"]["media_kind"] == "$state.mediaKind"
-    assert player["dataSource"]["params"]["favorites_only"] == "$state.mediaFavoritesOnly"
+    assert player["dataSource"]["name"] == "media_center_skill.build_playback_queue"
+    assert player["dataSource"]["params"]["source_type"] == "$state.playbackSourceType"
+    assert player["dataSource"]["params"]["source_id"] == "$state.playbackSourceId"
     assert player["dataSource"]["params"]["limit"] == 10
     assert player["inputs"]["playlistLimit"] == 10
     assert player["inputs"]["autoSelectFirst"] is True
     assert player["inputs"]["showDiagnostics"] is False
     assert {
-        "media-center-player-mark-favorite",
-        "media-center-player-remove-favorite",
+        "media-center-player-favorite",
+        "media-center-player-unfavorite",
     } <= set(player_widgets)
 
     settings_ids = {
@@ -121,11 +151,11 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-settings-actions",
         "media-center-summary",
         "media-root-path",
-        "media-roots-actions",
         "media-roots-table",
-        "media-source-tabs",
+        "media-autoplay-settings",
+        "media-fullscreen-settings",
+        "media-deployment-status",
     } <= settings_ids
-    assert "media-sort-tabs" not in settings_ids
     roots = next(
         widget
         for widget in modals["media_center_settings"]["schema"]["widgets"]
@@ -138,6 +168,14 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     delete_actions = modals["media_center_delete_root"]["schema"]["widgets"][1]["actions"]
     assert delete_actions[0]["target"] == "media_center_skill.delete_root"
 
+    remote = {
+        widget["id"]: widget
+        for widget in modals["media_center_remote"]["schema"]["widgets"]
+    }
+    assert remote["media-targets"]["dataSource"]["name"] == "media_control_skill.list_targets"
+    assert remote["media-now-playing"]["dataSource"]["receiver"] == "media_control.now_playing"
+    assert remote["media-remote-transport"]["actions"][1]["target"] == "media_control_skill.voice_command"
+
 
 def test_media_center_skill_data_source_params_use_supported_scalar_state_refs() -> None:
     webui = json.loads((SCENARIO_ROOT / "webui.json").read_text(encoding="utf-8"))
@@ -149,16 +187,24 @@ def test_media_center_skill_data_source_params_use_supported_scalar_state_refs()
 
 def test_media_center_skill_data_sources_match_data_route_read_policies() -> None:
     webui = json.loads((SCENARIO_ROOT / "webui.json").read_text(encoding="utf-8"))
-    skill = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    manifests = {
+        "media_center_skill": yaml.safe_load(
+            (SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8")
+        ),
+        "media_control_skill": yaml.safe_load(
+            (CONTROL_SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8")
+        ),
+    }
     policies = {
-        route["tool"]: route["read_policy"]
-        for route in skill["data_routes"]
+        (skill_name, route["tool"]): route["read_policy"]
+        for skill_name, manifest in manifests.items()
+        for route in manifest["data_routes"]
         if str(route.get("route", "")).startswith("tool") and route.get("tool")
     }
 
     for data_source in _skill_data_sources(webui):
-        tool_name = data_source["name"].split(".", 1)[1]
-        policy = policies[tool_name]
+        skill_name, tool_name = data_source["name"].split(".", 1)
+        policy = policies[(skill_name, tool_name)]
         assert data_source["invalidationTags"] == policy["invalidation_tags"]
         assert data_source["preserveLastValue"] == policy["preserve_last_value"]
         assert data_source["maxRequestHz"] == policy["max_request_hz"]

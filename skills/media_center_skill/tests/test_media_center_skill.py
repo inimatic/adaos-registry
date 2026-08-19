@@ -454,6 +454,56 @@ def test_personal_state_is_profile_scoped_and_revisioned(monkeypatch, tmp_path):
     assert bob_page["items"] == []
 
 
+def test_profiles_enforce_query_playback_and_shared_surface_policy(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    clean = _agent_delta(1, "Movies/Family.mp4", kind="video")
+    restricted = _agent_delta(2, "Movies/Restricted.mp4", kind="video")
+    restricted["source"]["metadata"].update(
+        {"maturity_rating": 18, "explicit": True}
+    )
+    catalog.apply_agent_page(_agent_page(clean, restricted))
+    items = catalog.list_items(media_kind="video", profile_id="default", sort="title")
+    restricted_item = next(item for item in items["items"] if item["title"] == "Restricted")
+
+    kids = catalog.list_items(media_kind="video", profile_id="kids", sort="title")
+    denied = catalog.playback_plan(restricted_item["id"], profile_id="kids")
+    personal = catalog.set_personal_state(
+        restricted_item["id"], profile_id="default", rating=4, hidden=True
+    )
+    hidden = catalog.list_items(media_kind="video", profile_id="default")
+    household_home = catalog.home(
+        profile_id="household", limit=3, shared_surface=True
+    )
+    profile = catalog.get_profile("alice")["profile"]
+    conflict = catalog.set_profile_policy(
+        "alice", expected_revision=9, values={"maximum_maturity_rating": 16}
+    )
+    updated = catalog.set_profile_policy(
+        "alice", expected_revision=1, values={"maximum_maturity_rating": 16}
+    )
+
+    assert [item["title"] for item in kids["items"]] == ["Family"]
+    assert denied == {
+        "ok": False,
+        "error": "playback_policy_denied",
+        "reason": "maturity_rating_exceeded",
+        "item_id": restricted_item["id"],
+        "profile_id": "kids",
+        "profile_revision": 1,
+    }
+    assert personal["state"]["rating"] == 4
+    assert personal["state"]["hidden"] is True
+    assert restricted_item["id"] not in {item["id"] for item in hidden["items"]}
+    assert {shelf["id"] for shelf in household_home["shelves"]}.isdisjoint(
+        {"continue", "recent"}
+    )
+    assert profile["kind"] == "personal"
+    assert conflict["error"] == "media_profile_revision_conflict"
+    assert updated["profile"]["policy"]["maximum_maturity_rating"] == 16
+    _validate_schema("profile.v1.schema.json", updated["profile"])
+
+
 def test_unavailable_agent_makes_catalog_truthfully_partial(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())

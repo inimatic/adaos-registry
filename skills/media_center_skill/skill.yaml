@@ -57,6 +57,10 @@ exports:
   - set_favorite
   - sync_agent
   - home
+  - list_profiles
+  - get_profile
+  - set_profile_policy
+  - set_personal_state
   - list_collections
   - browse_folders
   - create_playlist
@@ -366,6 +370,9 @@ tools:
         type: string
       variant_id:
         type: string
+      profile_id:
+        type: string
+        default: default
     additionalProperties: true
   output_schema:
     type: object
@@ -448,6 +455,65 @@ tools:
     properties:
       profile_id: {type: string, default: default}
       limit: {type: integer, minimum: 1, maximum: 20, default: 12}
+      shared_surface: {type: boolean, default: false}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: list_profiles
+  description: List bounded Media Center profiles and their library policies.
+  entry: handlers.main:list_profiles
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      limit: {type: integer, minimum: 1, maximum: 50, default: 20}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: get_profile
+  description: Read one Media Center profile and its library policy.
+  entry: handlers.main:get_profile
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      profile_id: {type: string, default: default}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: set_profile_policy
+  description: Revision-safely update media-kind, maturity, explicit-content, and shared-surface policy.
+  entry: handlers.main:set_profile_policy
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [profile_id, expected_revision, values]
+    properties:
+      profile_id: {type: string, minLength: 1}
+      expected_revision: {type: integer, minimum: 1}
+      values:
+        type: object
+        properties:
+          allowed_media_kinds:
+            type: array
+            minItems: 1
+            maxItems: 2
+            items: {type: string, enum: [audio, video]}
+          maximum_maturity_rating: {type: integer, minimum: 0, maximum: 21}
+          allow_explicit: {type: boolean}
+          show_history_on_shared_surface: {type: boolean}
+        additionalProperties: false
+    additionalProperties: true
+  output_schema: {type: object}
+- name: set_personal_state
+  description: Set a profile-scoped rating or hidden flag for one catalog item.
+  entry: handlers.main:set_personal_state
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [item_id]
+    properties:
+      item_id: {type: string, minLength: 1}
+      profile_id: {type: string, default: default}
+      rating: {type: integer, minimum: 0, maximum: 5}
+      hidden: {type: boolean}
     additionalProperties: true
   output_schema: {type: object}
 - name: list_collections
@@ -930,6 +996,81 @@ data_routes:
     preserve_last_value: true
     invalidation_tags:
     - media_center.catalog
+- surface: widget:media-center-collections
+  route: tool
+  tool: list_collections
+  owner: skill:media_center_skill
+  first_paint: one bounded collection page
+  recovery: repeat list_collections with the current opaque cursor
+  guard_visibility: catalog collection metadata only
+  budget: {max_payload_bytes: 524288, max_items: 30, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, state_dependency_changed, targeted_invalidation]
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags: [media_center.catalog]
+- surface: widget:media-center-folders
+  route: tool
+  tool: browse_folders
+  owner: skill:media_center_skill
+  first_paint: one bounded folder page
+  recovery: repeat browse_folders with the current opaque cursor
+  guard_visibility: logical folder names and node identity; no source bytes
+  budget: {max_payload_bytes: 524288, max_items: 30, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, state_dependency_changed, targeted_invalidation]
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags: [media_center.catalog]
+- surface: widget:media-center-playlists
+  route: tool
+  tool: list_playlists
+  owner: skill:media_center_skill
+  first_paint: one bounded profile-visible playlist page
+  recovery: repeat list_playlists with the current opaque cursor
+  guard_visibility: profile and household playlist metadata only
+  budget: {max_payload_bytes: 524288, max_items: 30, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, state_dependency_changed, targeted_invalidation]
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags: [media_center.catalog]
+- surface: widget:media-center-queue-builder
+  route: tool
+  tool: build_playback_queue
+  owner: skill:media_center_skill
+  first_paint: first ten playback entries for the selected source
+  recovery: repeat build_playback_queue after catalog invalidation
+  guard_visibility: playback descriptors and safe route candidates only
+  budget: {max_payload_bytes: 1048576, max_items: 500, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, state_dependency_changed, targeted_invalidation]
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags: [media_center.catalog]
+- surface: widget:media-center-deployment
+  route: tool/details
+  tool: deployment_status
+  owner: skill:media_center_skill
+  first_paint: bounded deployment and agent participation status
+  recovery: repeat deployment_status after a topology transition
+  guard_visibility: deployment topology and health; no credentials
+  budget: {max_payload_bytes: 524288, max_items: 50, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, targeted_invalidation]
+    cache_ttl_ms: 1000
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags: [media_center.deployment]
 - surface: media-center catalog store
   route: skill-local
   path: data/db/media_center.sqlite3

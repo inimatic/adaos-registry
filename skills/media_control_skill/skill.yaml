@@ -299,6 +299,51 @@ data_routes:
     degraded_state: keep the endpoint-local session and mark command delivery delayed
     log: skill:media_control_skill.runtime
     quarantine: false
+- surface: widget:media-playback-targets
+  route: tool
+  tool: list_targets
+  owner: skill:media_control_skill
+  first_paint: bounded available playback targets
+  recovery: repeat list_targets after endpoint registration
+  guard_visibility: endpoint labels, capabilities and availability only
+  budget: {max_payload_bytes: 262144, max_items: 100, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, targeted_invalidation]
+    cache_ttl_ms: 1000
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags: [media_control.targets]
+- surface: widget:media-playback-qoe
+  route: tool/details
+  tool: qoe_summary
+  owner: skill:media_control_skill
+  first_paint: bounded playback QoE aggregates and recent evidence
+  recovery: repeat qoe_summary after an endpoint reconnect
+  guard_visibility: quality metrics without source paths or media bytes
+  budget: {max_payload_bytes: 262144, max_items: 100, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, targeted_invalidation]
+    cache_ttl_ms: 1000
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags: [media_control.qoe]
+- surface: widget:media-playback-settings
+  route: tool/details
+  tool: get_settings
+  owner: skill:media_control_skill
+  first_paint: effective profile and target playback defaults
+  recovery: repeat get_settings after a settings mutation
+  guard_visibility: profile playback preferences only
+  budget: {max_payload_bytes: 65536, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, targeted_invalidation]
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags: [media_control.settings]
 - surface: media-control store
   route: skill-local
   path: data/db/media_control.sqlite3

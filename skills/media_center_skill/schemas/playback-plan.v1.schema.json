@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "adaos.media_center.playback_plan.v1",
   "type": "object",
-  "required": ["ok", "schema", "item_id", "work_id", "variant_id", "source_id", "descriptor", "route", "decision"],
+  "required": ["ok", "schema", "item_id", "work_id", "variant_id", "source_id", "profile_id", "descriptor", "route", "decision"],
   "properties": {
     "ok": {"const": true},
     "schema": {"const": "adaos.media_center.playback_plan.v1"},
@@ -10,6 +10,7 @@
     "work_id": {"type": "string"},
     "variant_id": {"type": "string"},
     "source_id": {"type": "string"},
+    "profile_id": {"type": "string"},
     "media_kind": {"enum": ["video", "audio"]},
     "mime_type": {"type": "string"},
     "title": {"type": "string"},

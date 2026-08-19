@@ -29,7 +29,18 @@ FOLDER_NODE_SCHEMA = "adaos.media_center.folder_node.v1"
 PLAYLIST_SCHEMA = "adaos.media_center.playlist.v1"
 CORRECTION_SCHEMA = "adaos.media_center.catalog_correction.v1"
 PLAYBACK_PLAN_SCHEMA = "adaos.media_center.playback_plan.v1"
+PROFILE_SCHEMA = "adaos.media_center.profile.v1"
 MAX_PAGE_SIZE = 30
+
+
+def _default_profile_policy(kind: str = "personal") -> dict[str, Any]:
+    shared = _text(kind).lower() in {"household", "kids"}
+    return {
+        "allowed_media_kinds": ["audio", "video"],
+        "maximum_maturity_rating": 12 if _text(kind).lower() == "kids" else 18,
+        "allow_explicit": _text(kind).lower() != "kids",
+        "show_history_on_shared_surface": not shared,
+    }
 
 _SEASON_EPISODE = re.compile(r"(?i)(?:^|[ ._\-])s(?P<season>\d{1,3})e(?P<episode>\d{1,4})(?:[ ._\-]|$)")
 _SEASON_FOLDER = re.compile(r"(?i)^(?:season|сезон)[ ._\-]*(?P<season>\d{1,3})$")
@@ -199,6 +210,8 @@ class MediaCatalogCoordinator:
                     resume_ms INTEGER NOT NULL DEFAULT 0,
                     duration_ms INTEGER NOT NULL DEFAULT 0,
                     completed INTEGER NOT NULL DEFAULT 0,
+                    rating INTEGER NOT NULL DEFAULT 0,
+                    hidden INTEGER NOT NULL DEFAULT 0,
                     play_count INTEGER NOT NULL DEFAULT 0,
                     last_played_at TEXT NOT NULL DEFAULT '',
                     revision INTEGER NOT NULL DEFAULT 1,
@@ -206,6 +219,15 @@ class MediaCatalogCoordinator:
                     PRIMARY KEY(profile_id, item_id)
                 );
                 CREATE INDEX IF NOT EXISTS idx_personal_media_recent ON personal_media_state(profile_id, last_played_at DESC);
+                CREATE TABLE IF NOT EXISTS media_profiles (
+                    id TEXT PRIMARY KEY,
+                    label TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    policy_json TEXT NOT NULL DEFAULT '{}',
+                    revision INTEGER NOT NULL DEFAULT 1,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS user_playlists (
                     id TEXT PRIMARY KEY,
                     owner_profile_id TEXT NOT NULL,
@@ -262,6 +284,20 @@ class MediaCatalogCoordinator:
                     connection.execute(
                         f"ALTER TABLE media_background_jobs ADD COLUMN {name} {definition}"
                     )
+            personal_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(personal_media_state)"
+                ).fetchall()
+            }
+            for name, definition in {
+                "rating": "INTEGER NOT NULL DEFAULT 0",
+                "hidden": "INTEGER NOT NULL DEFAULT 0",
+            }.items():
+                if name not in personal_columns:
+                    connection.execute(
+                        f"ALTER TABLE personal_media_state ADD COLUMN {name} {definition}"
+                    )
             agent_columns = {
                 str(row["name"])
                 for row in connection.execute(
@@ -274,6 +310,28 @@ class MediaCatalogCoordinator:
                 )
             connection.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS catalog_search USING fts5(item_id UNINDEXED, text, tokenize='unicode61 remove_diacritics 2')"
+            )
+            now = now_iso()
+            default_profiles = (
+                ("default", "Personal", "personal", _default_profile_policy()),
+                (
+                    "household",
+                    "Household",
+                    "household",
+                    _default_profile_policy("household"),
+                ),
+                ("kids", "Kids", "kids", _default_profile_policy("kids")),
+            )
+            connection.executemany(
+                """
+                INSERT OR IGNORE INTO media_profiles(
+                    id,label,kind,policy_json,created_at,updated_at
+                ) VALUES (?,?,?,?,?,?)
+                """,
+                [
+                    (profile_id, label, kind, _json_dumps(policy), now, now)
+                    for profile_id, label, kind, policy in default_profiles
+                ],
             )
             connection.execute("INSERT OR REPLACE INTO coordinator_meta(key, value) VALUES ('schema_version', ?)", (COORDINATOR_SCHEMA,))
             self._backfill_search(connection)
@@ -728,6 +786,210 @@ class MediaCatalogCoordinator:
             ).fetchone()
         return int(row["revision"] or 0)
 
+    def list_profiles(self, *, limit: int = 20) -> dict[str, Any]:
+        bounded = max(1, min(50, int(limit or 20)))
+        with self.repository.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM media_profiles ORDER BY lower(label),id LIMIT ?",
+                (bounded,),
+            ).fetchall()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "items": [self._public_profile(row) for row in rows],
+            "count": len(rows),
+            "bounded": True,
+        }
+
+    def get_profile(self, profile_id: str) -> dict[str, Any]:
+        token = _text(profile_id) or "default"
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM media_profiles WHERE id=?", (token,)
+            ).fetchone()
+            if row is None:
+                now = now_iso()
+                label = " ".join(
+                    part for part in re.split(r"[._\-]+", token) if part
+                ).strip().title() or "Personal"
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO media_profiles(
+                        id,label,kind,policy_json,created_at,updated_at
+                    ) VALUES (?,?,'personal',?,?,?)
+                    """,
+                    (token, label[:100], _json_dumps(_default_profile_policy()), now, now),
+                )
+                connection.commit()
+                row = connection.execute(
+                    "SELECT * FROM media_profiles WHERE id=?", (token,)
+                ).fetchone()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "profile": self._public_profile(row),
+        }
+
+    @staticmethod
+    def _policy_denial(
+        row: sqlite3.Row, policy: Mapping[str, Any]
+    ) -> str:
+        media_kind = _text(row["media_kind"]).lower()
+        allowed = {
+            _text(item).lower()
+            for item in policy.get("allowed_media_kinds") or []
+            if _text(item)
+        }
+        if media_kind not in allowed:
+            return "media_kind_not_allowed"
+        metadata = _json_loads(row["metadata_json"]) or {}
+        try:
+            maturity = max(0, int(metadata.get("maturity_rating") or 0))
+        except (TypeError, ValueError):
+            maturity = 0
+        maximum = max(
+            0, min(21, int(policy.get("maximum_maturity_rating") or 0))
+        )
+        if maturity > maximum:
+            return "maturity_rating_exceeded"
+        explicit = metadata.get("explicit", False)
+        if isinstance(explicit, str):
+            explicit = explicit.strip().lower() in {"1", "true", "yes", "on"}
+        if bool(explicit) and not bool(policy.get("allow_explicit", False)):
+            return "explicit_content_not_allowed"
+        return ""
+
+    def set_profile_policy(
+        self,
+        profile_id: str,
+        *,
+        expected_revision: int,
+        values: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        token = _text(profile_id) or "default"
+        accepted = {
+            "allowed_media_kinds",
+            "maximum_maturity_rating",
+            "allow_explicit",
+            "show_history_on_shared_surface",
+        }
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM media_profiles WHERE id=?", (token,)
+            ).fetchone()
+            if row is None:
+                connection.rollback()
+                return {"ok": False, "error": "media_profile_not_found"}
+            if int(row["revision"]) != int(expected_revision):
+                connection.rollback()
+                return {
+                    "ok": False,
+                    "error": "media_profile_revision_conflict",
+                    "current_revision": int(row["revision"]),
+                }
+            current = _json_loads(row["policy_json"]) or {}
+            policy = {
+                **current,
+                **{key: value for key, value in values.items() if key in accepted},
+            }
+            kinds = list(
+                dict.fromkeys(
+                    _text(item).lower()
+                    for item in policy.get("allowed_media_kinds") or []
+                    if _text(item).lower() in {"audio", "video"}
+                )
+            )
+            if not kinds:
+                connection.rollback()
+                return {"ok": False, "error": "media_profile_policy_invalid"}
+            policy["allowed_media_kinds"] = kinds
+            policy["maximum_maturity_rating"] = max(
+                0, min(21, int(policy.get("maximum_maturity_rating") or 0))
+            )
+            policy["allow_explicit"] = bool(policy.get("allow_explicit", False))
+            policy["show_history_on_shared_surface"] = bool(
+                policy.get("show_history_on_shared_surface", False)
+            )
+            connection.execute(
+                """
+                UPDATE media_profiles SET policy_json=?,revision=revision+1,
+                    updated_at=? WHERE id=?
+                """,
+                (_json_dumps(policy), now_iso(), token),
+            )
+            connection.commit()
+        return self.get_profile(token)
+
+    @staticmethod
+    def _public_profile(row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "schema": PROFILE_SCHEMA,
+            "id": str(row["id"]),
+            "label": str(row["label"]),
+            "kind": str(row["kind"]),
+            "policy": _json_loads(row["policy_json"]) or {},
+            "revision": int(row["revision"]),
+            "created_at": str(row["created_at"]),
+            "updated_at": str(row["updated_at"]),
+        }
+
+    def set_personal_state(
+        self,
+        item_id: str,
+        *,
+        profile_id: str,
+        rating: int | None = None,
+        hidden: bool | None = None,
+    ) -> dict[str, Any]:
+        token = _text(item_id)
+        profile = _text(profile_id) or "default"
+        self.get_profile(profile)
+        with self.repository.connect() as connection:
+            if not connection.execute(
+                "SELECT id FROM catalog_items WHERE id=?", (token,)
+            ).fetchone():
+                return {"ok": False, "error": "item_not_found", "item_id": token}
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO personal_media_state(
+                    profile_id,item_id,updated_at
+                ) VALUES (?,?,?)
+                """,
+                (profile, token, now_iso()),
+            )
+            updates: dict[str, Any] = {}
+            if rating is not None:
+                updates["rating"] = max(0, min(5, int(rating)))
+            if hidden is not None:
+                updates["hidden"] = int(bool(hidden))
+            if updates:
+                updates["revision"] = connection.execute(
+                    "SELECT revision+1 FROM personal_media_state WHERE profile_id=? AND item_id=?",
+                    (profile, token),
+                ).fetchone()[0]
+                updates["updated_at"] = now_iso()
+                assignments = ",".join(f"{name}=?" for name in updates)
+                connection.execute(
+                    f"UPDATE personal_media_state SET {assignments} WHERE profile_id=? AND item_id=?",
+                    (*updates.values(), profile, token),
+                )
+            row = connection.execute(
+                "SELECT * FROM personal_media_state WHERE profile_id=? AND item_id=?",
+                (profile, token),
+            ).fetchone()
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": PERSONAL_SCHEMA,
+            "state": dict(row)
+            | {
+                "favorite": bool(row["favorite"]),
+                "completed": bool(row["completed"]),
+                "hidden": bool(row["hidden"]),
+            },
+        }
+
     def list_items(
         self,
         *,
@@ -745,12 +1007,23 @@ class MediaCatalogCoordinator:
     ) -> dict[str, Any]:
         page_size = max(1, min(MAX_PAGE_SIZE, int(limit or MAX_PAGE_SIZE)))
         profile = _text(profile_id) or "default"
+        profile_result = self.get_profile(profile)
+        if not profile_result.get("ok"):
+            return profile_result
+        profile_record = profile_result["profile"]
+        policy = dict(profile_record.get("policy") or {})
+        allowed_kinds = {
+            _text(item).lower()
+            for item in policy.get("allowed_media_kinds") or []
+            if _text(item)
+        }
         query_token = _text(query)
         sort_token = _text(sort).lower() or "recent"
         signature = _cursor_signature(
             {
                 "q": query_token.casefold(), "kind": media_kind, "source": source, "missing": bool(include_missing),
-                "favorites": bool(favorites_only), "sort": sort_token, "profile": profile, "collection": collection_id,
+                "favorites": bool(favorites_only), "sort": sort_token, "profile": profile,
+                "profile_revision": int(profile_record["revision"]), "collection": collection_id,
             }
         )
         resolved_offset = _decode_cursor(cursor, signature) if _text(cursor) else max(0, int(offset or 0))
@@ -758,14 +1031,35 @@ class MediaCatalogCoordinator:
         params: list[Any] = [profile]
         if not include_missing:
             filters.append("c.missing=0")
+        filters.append("COALESCE(ps.hidden,0)=0")
         if favorites_only:
             filters.append("COALESCE(ps.favorite, c.favorite)=1")
         kind = _text(media_kind).lower()
         if kind == "playable":
-            filters.append("c.media_kind IN ('audio','video')")
+            admitted = sorted(allowed_kinds & {"audio", "video"})
+            if admitted:
+                placeholders = ",".join("?" for _ in admitted)
+                filters.append(f"c.media_kind IN ({placeholders})")
+                params.extend(admitted)
+            else:
+                filters.append("1=0")
         elif kind in {"audio", "video", "image", "other"}:
-            filters.append("c.media_kind=?")
-            params.append(kind)
+            if kind not in allowed_kinds:
+                filters.append("1=0")
+            else:
+                filters.append("c.media_kind=?")
+                params.append(kind)
+        maximum_rating = max(
+            0, min(21, int(policy.get("maximum_maturity_rating") or 0))
+        )
+        filters.append(
+            "COALESCE(CAST(json_extract(c.metadata_json,'$.maturity_rating') AS INTEGER),0)<=?"
+        )
+        params.append(maximum_rating)
+        if not bool(policy.get("allow_explicit", False)):
+            filters.append(
+                "COALESCE(CAST(json_extract(c.metadata_json,'$.explicit') AS INTEGER),0)=0"
+            )
         if _text(source) and _text(source) != "all":
             filters.append("c.source=?")
             params.append(_text(source))
@@ -802,6 +1096,8 @@ class MediaCatalogCoordinator:
                     COALESCE(ps.resume_ms,0) AS profile_resume_ms,
                     COALESCE(ps.duration_ms,0) AS profile_duration_ms,
                     COALESCE(ps.completed,0) AS profile_completed,
+                    COALESCE(ps.rating,0) AS profile_rating,
+                    COALESCE(ps.hidden,0) AS profile_hidden,
                     COALESCE(ps.last_played_at,'') AS profile_last_played_at,
                     COALESCE(ps.revision,0) AS profile_revision
                 FROM {from_sql} {where} ORDER BY {order} LIMIT ? OFFSET ?
@@ -832,6 +1128,7 @@ class MediaCatalogCoordinator:
             },
             "summary": self.repository.summary(),
             "facets": self.repository.facets(),
+            "profile_policy": policy,
         }
 
     @staticmethod
@@ -849,6 +1146,7 @@ class MediaCatalogCoordinator:
                 "personal": {
                     "schema": PERSONAL_SCHEMA, "profile_id": profile_id, "resume_ms": int(row["profile_resume_ms"]),
                     "duration_ms": int(row["profile_duration_ms"]), "completed": bool(row["profile_completed"]),
+                    "rating": int(row["profile_rating"]), "hidden": bool(row["profile_hidden"]),
                     "last_played_at": str(row["profile_last_played_at"]), "revision": int(row["profile_revision"]),
                 },
             }
@@ -858,6 +1156,7 @@ class MediaCatalogCoordinator:
     def set_favorite(self, item_id: str, *, profile_id: str, favorite: bool) -> dict[str, Any]:
         token = _text(item_id)
         profile = _text(profile_id) or "default"
+        self.get_profile(profile)
         now = now_iso()
         with self.repository.connect() as connection:
             exists = connection.execute("SELECT id FROM catalog_items WHERE id=?", (token,)).fetchone()
@@ -895,6 +1194,7 @@ class MediaCatalogCoordinator:
     ) -> dict[str, Any]:
         token = _text(item_id)
         profile = _text(profile_id) or "default"
+        self.get_profile(profile)
         position = max(0, int(position_ms or 0))
         duration = max(position, int(duration_ms or 0))
         done = bool(completed or (duration > 0 and position >= duration * 0.95))
@@ -1328,6 +1628,8 @@ class MediaCatalogCoordinator:
                     COALESCE(ps.resume_ms,0) AS profile_resume_ms,
                     COALESCE(ps.duration_ms,0) AS profile_duration_ms,
                     COALESCE(ps.completed,0) AS profile_completed,
+                    COALESCE(ps.rating,0) AS profile_rating,
+                    COALESCE(ps.hidden,0) AS profile_hidden,
                     COALESCE(ps.last_played_at,'') AS profile_last_played_at,
                     COALESCE(ps.revision,0) AS profile_revision,
                     pi.ordinal AS playlist_ordinal
@@ -1373,8 +1675,12 @@ class MediaCatalogCoordinator:
         preferred_quality: str = "auto",
         preferred_language: str = "",
         variant_id: str = "",
+        profile_id: str = "default",
     ) -> dict[str, Any]:
         token = _text(item_id)
+        profile = _text(profile_id) or "default"
+        profile_result = self.get_profile(profile)
+        policy = dict(profile_result["profile"].get("policy") or {})
         capabilities = dict(endpoint_capabilities or {})
         with self.repository.connect() as connection:
             selected_item = connection.execute(
@@ -1382,6 +1688,16 @@ class MediaCatalogCoordinator:
             ).fetchone()
             if selected_item is None:
                 return {"ok": False, "error": "item_not_found", "item_id": token}
+            denial = self._policy_denial(selected_item, policy)
+            if denial:
+                return {
+                    "ok": False,
+                    "error": "playback_policy_denied",
+                    "reason": denial,
+                    "item_id": token,
+                    "profile_id": profile,
+                    "profile_revision": int(profile_result["profile"]["revision"]),
+                }
             rows = connection.execute(
                 """
                 SELECT c.*, v.quality_json AS variant_quality_json,
@@ -1509,6 +1825,7 @@ class MediaCatalogCoordinator:
             "media_kind": str(selected["media_kind"]),
             "mime_type": str(selected["mime_type"]),
             "title": str(selected["title"]),
+            "profile_id": profile,
             "quality": quality,
             "descriptor": descriptor,
             "route": route,
@@ -1620,17 +1937,26 @@ class MediaCatalogCoordinator:
                 endpoint_capabilities=endpoint_capabilities,
                 preferred_quality=preferred_quality,
                 preferred_language=preferred_language,
+                profile_id=profile,
             )
             if not plan.get("ok"):
                 continue
             queue.append(
                 {
                     "schema": "adaos.media_control.playback_queue_item.v1",
+                    "id": plan["item_id"],
                     "item_id": plan["item_id"],
                     "work_id": plan["work_id"],
                     "variant_id": plan["variant_id"],
                     "source_id": plan["source_id"],
                     "title": plan["title"],
+                    "name": plan["title"],
+                    "media_kind": plan["media_kind"],
+                    "mime_type": plan["mime_type"],
+                    "resource_id": _text(plan["descriptor"].get("resource_id")),
+                    "content_path": _text(plan["route"].get("node_path")),
+                    "routed_content_path": _text(plan["route"].get("routed_path")),
+                    "node_id": _text(plan["route"].get("source_node_id")),
                     "available": True,
                     "descriptor": plan["descriptor"],
                     "route": plan["route"],
@@ -1647,8 +1973,18 @@ class MediaCatalogCoordinator:
             "partial": self.participation()["partial"],
         }
 
-    def home(self, *, profile_id: str = "default", limit: int = 12) -> dict[str, Any]:
+    def home(
+        self,
+        *,
+        profile_id: str = "default",
+        limit: int = 12,
+        shared_surface: bool = False,
+    ) -> dict[str, Any]:
         bounded = max(1, min(20, int(limit or 12)))
+        profile = self.get_profile(profile_id)["profile"]
+        show_shared_history = bool(
+            profile["policy"].get("show_history_on_shared_surface", False)
+        )
         shelves = []
         flattened: list[dict[str, Any]] = []
         for shelf_id, title, options in (
@@ -1658,10 +1994,21 @@ class MediaCatalogCoordinator:
             ("movies", "Movies", {"media_kind": "video", "sort": "title"}),
             ("music", "Music", {"media_kind": "audio", "sort": "title"}),
         ):
+            if shared_surface and not show_shared_history and shelf_id in {
+                "continue",
+                "recent",
+            }:
+                continue
             page = self.list_items(profile_id=profile_id, limit=bounded, **options)
             shelves.append({"id": shelf_id, "title": title, "layout": "rail", "items": page["items"], "partial": page["partial"]})
             flattened.extend(
-                dict(item) | {"shelf_id": shelf_id, "shelf_title": title}
+                dict(item)
+                | {
+                    "shelf_id": shelf_id,
+                    "shelf_title": title,
+                    "queue_source_type": "item",
+                    "queue_source_id": _text(item.get("id")),
+                }
                 for item in page["items"]
             )
         for shelf_id, title, kind in (
@@ -1680,7 +2027,13 @@ class MediaCatalogCoordinator:
                 }
             )
             flattened.extend(
-                dict(item) | {"shelf_id": shelf_id, "shelf_title": title}
+                dict(item)
+                | {
+                    "shelf_id": shelf_id,
+                    "shelf_title": title,
+                    "queue_source_type": "collection",
+                    "queue_source_id": _text(item.get("id")),
+                }
                 for item in page["items"]
             )
         playlist_page = self.playlists(profile_id=profile_id, limit=bounded)
@@ -1694,7 +2047,13 @@ class MediaCatalogCoordinator:
             }
         )
         flattened.extend(
-            dict(item) | {"shelf_id": "playlists", "shelf_title": "Playlists"}
+            dict(item)
+            | {
+                "shelf_id": "playlists",
+                "shelf_title": "Playlists",
+                "queue_source_type": "playlist",
+                "queue_source_id": _text(item.get("id")),
+            }
             for item in playlist_page["items"]
         )
         folder_page = self.folders(limit=bounded)
@@ -1708,13 +2067,21 @@ class MediaCatalogCoordinator:
             }
         )
         flattened.extend(
-            dict(item) | {"shelf_id": "folders", "shelf_title": "Folders"}
+            dict(item)
+            | {
+                "shelf_id": "folders",
+                "shelf_title": "Folders",
+                "queue_source_type": "folder",
+                "queue_source_id": _text(item.get("queue_ref")),
+            }
             for item in folder_page["items"]
         )
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "profile_id": _text(profile_id) or "default",
+            "profile": profile,
+            "shared_surface": bool(shared_surface),
             "shelves": shelves,
             "items": flattened,
         }

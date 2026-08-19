@@ -1,52 +1,25 @@
 # Media Center
 
-Media Center is an MVP scenario for a production-grade media-center direction.
-It intentionally starts with the correct boundary:
+Media Center is a Project-composed household media application. Its scenario is UI-as-data only; domain identity, indexing, playback, control, and byte delivery remain in skills, app shell, and core boundaries.
 
-- core media plane owns reference registration, safe content paths, resource descriptors, and streaming;
-- `media_center_skill` owns catalog state, filters, favorites, and playback planning;
-- legacy `media_indexer_skill` can contribute resources only through SDK-normalized descriptors.
+## Surfaces
 
-## MVP Workflow
+The main page follows familiar media-center navigation: Home, Movies, Series, Music, Audiobooks, Folders, Playlists, Favorites, and Recent. Search is explicit-submit. Every catalog read uses opaque server cursors with 30 records per page. The universal `ui.list` renderer switches between list, grid, and rail layouts, uses browser rendering virtualization, and provides deterministic spatial keyboard/D-pad focus.
 
-1. Open **Settings** and add one or more media folders.
-2. The skill registers playable video/audio files through
-   `adaos.sdk.io.media.register_media_file`; files remain at their original
-   paths and `.adaos` stores only catalog/reference metadata.
-   Legacy managed imports are hidden from discovery and retired from the active
-   catalog; their existing bytes are not deleted automatically.
-3. Use **Refresh catalog** in Settings to reconcile existing `media_server` and
-   compatibility `media_indexer` resources.
-4. The main surface contains only playable type filters, explicit text search,
-   a catalog, and page navigation. Source and sort options live in Settings.
-5. The catalog requests 30 rows per server-backed `limit`/`offset` page.
-6. Select a row to open playback immediately in a modal.
-7. The modal loads a server-bounded queue of at most ten items and streams the
-   selected original file through core ranged media routes.
+Home consumes the subscription-backed `media_center.library_state` snapshot. Favorites, recent state, catalog revision, and partial-agent status therefore converge across browsers in the same webspace without synchronizing the full catalog. Folder navigation remains an alternative first-class workflow.
 
-The **Catalog** is intentionally broader than the configured **Media folders** list.
-An empty folders list only means that no new import roots were configured through
-Media Center yet. The catalog may still contain resources already known to the
-core Media Server or compatibility `media_indexer_skill`.
-The primary library view requests `playable` media by default, so image
-descriptors from slideshow/legacy sources do not crowd the playback catalog.
+Selecting an item, collection, folder, or playlist opens the playback modal. `build_playback_queue` returns endpoint-independent variant/route plans; the modal exposes only ten entries, while the control plane can persist a full bounded queue of 500. Closing the modal leaves the app-shell media element alive in the mini-player. Stop remains explicit.
 
-Folder registration actions are long-running skill calls. The scenario requests a
-bounded 600 second timeout, and `media_center_skill` declares the same runtime
-budget for `scan_roots` and `import_folder`. Skill-specific user-facing errors
-are represented as structured machine codes plus `human_message_i18n` keys; the
-Media Center dictionaries are declared by `media_center_skill` and live in
-`media_center_skill/i18n`, not in the scenario or bundled core client
-translations.
+The Remote modal is a controller surface for another webspace or TV. It lists registered playback targets, observes `media_control.now_playing`, and sends revision-safe transport intents through `media_control_skill`. A phone does not enter the media byte path.
 
-The playlist and catalog limits are enforced on both sides of the UI boundary:
-the scenario requests 30 catalog rows and ten playback rows, the skill clamps
-the playback queue to ten, and the universal client player clamps its dropdown
-before rendering.
+Settings contains library roots, scan/import operations, profile playback defaults, and distributed deployment status. Folder import and scan calls have a ten-minute client budget and return asynchronous agent jobs when the distributed agent is active. Images remain disabled by policy. Original media bytes stay at their source paths; `.adaos` stores references, catalog state, jobs, and playback state only.
 
-## Deliberate Non-Goals For This Milestone
+## Ownership
 
-The MVP does not implement movie/episode metadata enrichment, recommendations,
-watch queues, remote TV/player control, transcoding, subtitles, or rich media
-library source policies. Those belong in the later production media-center
-scenario and skills built on top of this catalog foundation.
+- Core owns reference registration, range delivery, project deployment, distributed service discovery/invocation, leases, fencing, and bounded topology projections.
+- `media_library_agent` owns node-local roots, scans, probes, source revisions, and ordered deltas.
+- `media_center_skill` owns the global read model, search, works/variants/collections, playlists, personalization projections, enrichment jobs, and playback plans.
+- `media_control_skill` owns targets, persistent sessions, queues, commands, endpoint reconciliation, settings, and QoE.
+- The client app shell owns the single live media element, Media Session integration, mini/full/PiP presentation, local high-frequency state, and direct-to-routed playback fallback.
+
+Skill-specific human-readable errors and translations stay in each skill. The scenario does not bundle skill error dictionaries.

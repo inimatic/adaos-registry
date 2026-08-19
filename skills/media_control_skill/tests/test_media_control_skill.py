@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import importlib.util
 from pathlib import Path
 
 import pytest
@@ -10,8 +11,15 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
-from handlers import main  # noqa: E402
 from media_control.repository import MediaControlRepository  # noqa: E402
+
+
+_HANDLER_SPEC = importlib.util.spec_from_file_location(
+    "media_control_skill_handlers_main", SKILL_ROOT / "handlers" / "main.py"
+)
+assert _HANDLER_SPEC and _HANDLER_SPEC.loader
+main = importlib.util.module_from_spec(_HANDLER_SPEC)
+_HANDLER_SPEC.loader.exec_module(main)
 
 
 @pytest.fixture(autouse=True)

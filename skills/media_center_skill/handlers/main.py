@@ -859,6 +859,7 @@ def playback_plan(
     preferred_quality: str = "auto",
     preferred_language: str = "",
     variant_id: str = "",
+    profile_id: str = "default",
     **_: Any,
 ) -> dict[str, Any]:
     repo = _repository()
@@ -870,6 +871,7 @@ def playback_plan(
         preferred_quality=preferred_quality,
         preferred_language=preferred_language,
         variant_id=variant_id,
+        profile_id=profile_id,
     )
     if result.get("error") == "playback_source_unavailable":
         legacy = repo.playback_plan(item_id)
@@ -1061,8 +1063,73 @@ def explain_route(partition_ids: list[str] | None = None, **_: Any) -> dict[str,
 
 
 @tool(summary="Return bounded home shelves for one media profile.", side_effects="none")
-def home(profile_id: str = "default", limit: int = 12, **_: Any) -> dict[str, Any]:
-    return _coordinator().home(profile_id=profile_id, limit=limit)
+def home(
+    profile_id: str = "default",
+    limit: int = 12,
+    shared_surface: bool = False,
+    **_: Any,
+) -> dict[str, Any]:
+    return _coordinator().home(
+        profile_id=profile_id,
+        limit=limit,
+        shared_surface=_bool(shared_surface, False),
+    )
+
+
+@tool(summary="List bounded Media Center profiles and their policies.", side_effects="none")
+def list_profiles(limit: int = 20, **_: Any) -> dict[str, Any]:
+    return _coordinator().list_profiles(limit=limit)
+
+
+@tool(summary="Read one Media Center profile and its policy.", side_effects="none")
+def get_profile(profile_id: str = "default", **_: Any) -> dict[str, Any]:
+    return _coordinator().get_profile(profile_id)
+
+
+@tool(summary="Revision-safely update one Media Center profile policy.", side_effects="local_write")
+def set_profile_policy(
+    profile_id: str = "default",
+    expected_revision: int = 1,
+    values: Mapping[str, Any] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    result = catalog.set_profile_policy(
+        profile_id,
+        expected_revision=expected_revision,
+        values=values or {},
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
+
+
+@tool(summary="Set profile-scoped rating or hidden state for one media item.", side_effects="local_write")
+def set_personal_state(
+    item_id: str = "",
+    profile_id: str = "default",
+    rating: int | None = None,
+    hidden: bool | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    result = catalog.set_personal_state(
+        item_id,
+        profile_id=profile_id,
+        rating=rating,
+        hidden=hidden,
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
 
 
 @tool(summary="List typed media collections through an opaque cursor.", side_effects="none")

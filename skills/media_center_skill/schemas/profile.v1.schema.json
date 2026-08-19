@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_center.profile.v1",
+  "type": "object",
+  "required": ["schema", "id", "label", "kind", "policy", "revision", "created_at", "updated_at"],
+  "properties": {
+    "schema": {"const": "adaos.media_center.profile.v1"},
+    "id": {"type": "string", "minLength": 1},
+    "label": {"type": "string", "minLength": 1},
+    "kind": {"enum": ["personal", "household", "kids", "shared"]},
+    "policy": {
+      "type": "object",
+      "required": ["allowed_media_kinds", "maximum_maturity_rating", "allow_explicit", "show_history_on_shared_surface"],
+      "properties": {
+        "allowed_media_kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"enum": ["audio", "video"]}
+        },
+        "maximum_maturity_rating": {"type": "integer", "minimum": 0, "maximum": 21},
+        "allow_explicit": {"type": "boolean"},
+        "show_history_on_shared_surface": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "revision": {"type": "integer", "minimum": 1},
+    "created_at": {"type": "string"},
+    "updated_at": {"type": "string"}
+  },
+  "additionalProperties": false
+}
