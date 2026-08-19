@@ -6,11 +6,17 @@
 
 ## Catalog
 
-`library()` uses deterministic FTS over normalized title, filename, relative path, meaningful folder segments, tags, people, aliases, and collection names. Queries execute explicitly when the tool is called. Pages use opaque cursors and are clamped to 30 rows; the player queue remains clamped to ten. Images are excluded from the default `playable` view.
+`library()` uses deterministic FTS over normalized title, filename, relative path, meaningful folder segments, tags, people, aliases, and collection names. Queries execute explicitly when the tool is called. Catalog pages use opaque cursors and are clamped to 30 rows. The compact player projection remains clamped to ten entries, while durable playback sessions can request a bounded queue of up to 500 entries. Images are excluded from the default `playable` view.
 
 The coordinator derives explicit `MediaSource`, `MediaVariant`, `MediaWork`, `MediaCollection`, and membership rows. Deterministic grouping preserves series/season/episode, album/disc/track, audiobook/part/chapter, and source-folder levels. Folder navigation is a separate lazy, cursor-backed read model with breadcrumbs. Duplicate results are review candidates only and never authorize source deletion. Metadata, merge, and regroup corrections are audited and reversible.
 
 Profile-owned playlists have revision-safe ordered membership and explicit `private`, `household`, or `shared` visibility. Playlist reads remain cursor-backed and catalog/player limits remain independent; deleting a playlist never deletes source media.
+
+## Playback Planning
+
+`playback_plan()` deterministically selects one available variant for the target endpoint. The decision considers an explicit user override, advertised codecs, maximum video height and bitrate, quality/language preferences, and source/endpoint co-location. Its result includes bounded decision evidence rather than hiding policy inside the client.
+
+Every plan carries an `adaos.media_center.playback_route.v1` contract. A source-agent direct URL is preferred when available; the plan always describes a root-routed HTTP fallback tied to the source node. `build_playback_queue()` creates ordered snapshots from an item, work, collection, folder, or profile-visible playlist. Queue construction is bounded to 500 and never copies media bytes.
 
 Delta ingestion queues durable enrichment jobs. One low-priority worker selects a versioned provider, records bounded `MetadataClaim` rows with provenance/confidence, and publishes terminal operation progress. The built-in deterministic provider uses only indexed filename, folder, tag, and technical evidence. Technical probes, fingerprints, thumbnails, and embeddings use the same provider/job boundary; unavailable providers fail explicitly rather than blocking catalog reads or touching source bytes.
 

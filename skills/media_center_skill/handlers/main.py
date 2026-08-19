@@ -850,9 +850,59 @@ def playback_queue(
     }
 
 
-@tool(summary="Return a core-media playback plan for one catalog item.", side_effects="local_write")
-def playback_plan(item_id: str = "", **_: Any) -> dict[str, Any]:
-    return _repository().playback_plan(item_id)
+@tool(summary="Select a media variant and route for one playback endpoint.", side_effects="none")
+def playback_plan(
+    item_id: str = "",
+    endpoint_id: str = "",
+    endpoint_node_id: str = "",
+    endpoint_capabilities: Mapping[str, Any] | None = None,
+    preferred_quality: str = "auto",
+    preferred_language: str = "",
+    variant_id: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    repo = _repository()
+    result = _coordinator(repo).playback_plan(
+        item_id,
+        endpoint_id=endpoint_id,
+        endpoint_node_id=endpoint_node_id,
+        endpoint_capabilities=endpoint_capabilities,
+        preferred_quality=preferred_quality,
+        preferred_language=preferred_language,
+        variant_id=variant_id,
+    )
+    if result.get("error") == "playback_source_unavailable":
+        legacy = repo.playback_plan(item_id)
+        if legacy.get("ok"):
+            legacy["compatibility_mode"] = "legacy_catalog_row"
+            return legacy
+    return result
+
+
+@tool(summary="Build a bounded playback queue from a catalog source.", side_effects="none")
+def build_playback_queue(
+    source_type: str = "item",
+    source_id: str = "",
+    profile_id: str = "default",
+    limit: int = 500,
+    endpoint_id: str = "",
+    endpoint_node_id: str = "",
+    endpoint_capabilities: Mapping[str, Any] | None = None,
+    preferred_quality: str = "auto",
+    preferred_language: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    return _coordinator().build_queue(
+        source_type=source_type,
+        source_id=source_id,
+        profile_id=profile_id,
+        limit=limit,
+        endpoint_id=endpoint_id,
+        endpoint_node_id=endpoint_node_id,
+        endpoint_capabilities=endpoint_capabilities,
+        preferred_quality=preferred_quality,
+        preferred_language=preferred_language,
+    )
 
 
 @tool(summary="Mark or unmark one media-center item as favorite.", side_effects="local_write")

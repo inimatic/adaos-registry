@@ -730,6 +730,125 @@ def test_playlists_are_profile_scoped_ordered_and_revision_safe(monkeypatch, tmp
     _validate_schema("playlist.v1.schema.json", updated["playlist"])
 
 
+def test_playback_plan_selects_endpoint_compatible_variant_and_route(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    high = _agent_delta(1, "Movies/UHD/Example.mp4", kind="video")
+    high["source"]["metadata"]["technical"] = {
+        "height": 2160,
+        "bitrate": 24_000_000,
+        "codec": "hevc",
+    }
+    high["source"]["descriptor"]["direct_urls"] = [
+        "http://node-a.local/media/ref-1"
+    ]
+    catalog.apply_agent_page(_agent_page(high), instance_id="instance-a")
+
+    compatible = _agent_delta(2, "Movies/FHD/Example.mp4", kind="video")
+    compatible["node_id"] = compatible["source"]["node_id"] = "node-b"
+    compatible["agent_id"] = "agent-node-b"
+    compatible["source"]["metadata"]["technical"] = {
+        "height": 1080,
+        "bitrate": 8_000_000,
+        "codec": "h264",
+    }
+    compatible["source"]["descriptor"]["direct_urls"] = [
+        "http://node-b.local/media/ref-2"
+    ]
+    page = _agent_page(compatible)
+    page["agent"] = {"id": "agent-node-b", "node_id": "node-b"}
+    catalog.apply_agent_page(page, instance_id="instance-b")
+
+    item = catalog.list_items(media_kind="video", sort="title")["items"][0]
+    plan = catalog.playback_plan(
+        item["id"],
+        endpoint_id="living-room-tv",
+        endpoint_node_id="node-b",
+        endpoint_capabilities={
+            "codecs": ["h264"],
+            "max_video_height": 1080,
+            "max_bitrate": 10_000_000,
+        },
+        preferred_quality="fhd",
+    )
+    with catalog.repository.connect() as connection:
+        high_variant_id = connection.execute(
+            "SELECT variant_id FROM catalog_items WHERE source_id='source-1'"
+        ).fetchone()[0]
+    override = catalog.playback_plan(item["id"], variant_id=high_variant_id)
+    invalid_override = catalog.playback_plan(
+        item["id"], variant_id="variant-does-not-exist"
+    )
+
+    assert plan["ok"] is True
+    assert plan["source_id"] == "source-2"
+    assert plan["route"]["mode"] == "direct_agent_to_endpoint"
+    assert plan["route"]["source_node_id"] == "node-b"
+    assert plan["route"]["fallback"]["target_node_id"] == "node-b"
+    assert "codec_supported" in plan["decision"]["reasons"]
+    assert plan["decision"]["candidate_count"] == 2
+    assert override["source_id"] == "source-1"
+    assert invalid_override["error"] == "playback_source_unavailable"
+    _validate_schema("playback-plan.v1.schema.json", plan)
+    _validate_schema("playback-route.v1.schema.json", plan["route"])
+
+
+def test_queue_builder_preserves_large_playlist_order_and_bounds_sources(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    deltas = [
+        _agent_delta(
+            index,
+            f"Shows/Example/Season 01/Example.S01E{index:02d}.mp4",
+            kind="video",
+        )
+        for index in range(1, 36)
+    ]
+    catalog.apply_agent_page(_agent_page(*deltas))
+    items = catalog.list_items(media_kind="video", limit=30)["items"]
+    next_page = catalog.list_items(
+        media_kind="video",
+        limit=30,
+        cursor=catalog.list_items(media_kind="video", limit=30)["pagination"][
+            "next_cursor"
+        ],
+    )["items"]
+    ordered = [item["id"] for item in items + next_page]
+    playlist = catalog.create_playlist(
+        profile_id="alice", title="Season", item_ids=ordered
+    )["playlist"]
+    playlist_queue = catalog.build_queue(
+        source_type="playlist",
+        source_id=playlist["id"],
+        profile_id="alice",
+        limit=500,
+    )
+    collection = catalog.collections(kind="season")["items"][0]
+    collection_queue = catalog.build_queue(
+        source_type="collection", source_id=collection["id"], limit=500
+    )
+    folder_queue = catalog.build_queue(
+        source_type="folder",
+        source_id="agent-node-a:Shows/Example/Season 01",
+        limit=5,
+    )
+
+    assert playlist_queue["count"] == 35
+    assert [item["item_id"] for item in playlist_queue["items"]] == ordered
+    assert collection_queue["count"] == 35
+    assert folder_queue["count"] == 5
+    assert folder_queue["limit"] == 5
+    _validate_schema("queue-source.v1.schema.json", playlist_queue)
+
+
 def test_catalog_corrections_are_audited_reversible_and_non_destructive(
     monkeypatch, tmp_path
 ):

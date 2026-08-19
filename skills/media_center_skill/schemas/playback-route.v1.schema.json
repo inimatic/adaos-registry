@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_center.playback_route.v1",
+  "type": "object",
+  "required": ["schema", "mode", "source_node_id", "direct_candidates", "fallback"],
+  "properties": {
+    "schema": {"const": "adaos.media_center.playback_route.v1"},
+    "mode": {"enum": ["direct_agent_to_endpoint", "root_routed_http_relay"]},
+    "source_node_id": {"type": "string"},
+    "endpoint_id": {"type": "string"},
+    "endpoint_node_id": {"type": "string"},
+    "direct_candidates": {"type": "array", "maxItems": 8, "items": {"type": "string", "format": "uri"}},
+    "routed_path": {"type": "string"},
+    "node_path": {"type": "string"},
+    "resource_id": {"type": "string"},
+    "fallback": {
+      "type": "object",
+      "required": ["mode", "path", "target_node_id", "reason"],
+      "properties": {
+        "mode": {"const": "root_routed_http_relay"},
+        "path": {"type": "string"},
+        "target_node_id": {"type": "string"},
+        "reason": {"enum": ["direct_candidate_failed", "no_direct_candidate"]}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

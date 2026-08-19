@@ -28,6 +28,7 @@ PERSONAL_SCHEMA = "adaos.media_center.personal_state.v1"
 FOLDER_NODE_SCHEMA = "adaos.media_center.folder_node.v1"
 PLAYLIST_SCHEMA = "adaos.media_center.playlist.v1"
 CORRECTION_SCHEMA = "adaos.media_center.catalog_correction.v1"
+PLAYBACK_PLAN_SCHEMA = "adaos.media_center.playback_plan.v1"
 MAX_PAGE_SIZE = 30
 
 _SEASON_EPISODE = re.compile(r"(?i)(?:^|[ ._\-])s(?P<season>\d{1,3})e(?P<episode>\d{1,4})(?:[ ._\-]|$)")
@@ -1359,6 +1360,290 @@ class MediaCatalogCoordinator:
                 else None,
                 "has_more": next_offset < total,
             },
+        }
+
+    def playback_plan(
+        self,
+        item_id: str,
+        *,
+        endpoint_id: str = "",
+        endpoint_node_id: str = "",
+        endpoint_capabilities: Mapping[str, Any] | None = None,
+        preferred_quality: str = "auto",
+        preferred_language: str = "",
+        variant_id: str = "",
+    ) -> dict[str, Any]:
+        token = _text(item_id)
+        capabilities = dict(endpoint_capabilities or {})
+        with self.repository.connect() as connection:
+            selected_item = connection.execute(
+                "SELECT * FROM catalog_items WHERE id=?", (token,)
+            ).fetchone()
+            if selected_item is None:
+                return {"ok": False, "error": "item_not_found", "item_id": token}
+            rows = connection.execute(
+                """
+                SELECT c.*, v.quality_json AS variant_quality_json,
+                    v.available AS variant_available
+                FROM catalog_items c
+                JOIN media_variants v ON v.id=c.variant_id
+                WHERE c.work_id=?
+                ORDER BY c.id
+                """,
+                (str(selected_item["work_id"]),),
+            ).fetchall()
+        codec_support = {
+            _text(item).lower()
+            for item in capabilities.get("codecs") or []
+            if _text(item)
+        }
+        maximum_height = max(0, int(capabilities.get("max_video_height") or 0))
+        maximum_bitrate = max(0, int(capabilities.get("max_bitrate") or 0))
+        quality_preference = _text(preferred_quality).lower() or "auto"
+        language_preference = _text(preferred_language).lower()
+        override = _text(variant_id)
+        ranked: list[tuple[float, sqlite3.Row, dict[str, Any], list[str]]] = []
+        for row in rows:
+            quality = _json_loads(row["variant_quality_json"]) or {}
+            reasons: list[str] = []
+            available = bool(row["variant_available"]) and not bool(row["missing"])
+            score = 1000.0 if available else -10000.0
+            if override:
+                score += 100000.0 if str(row["variant_id"]) == override else -100000.0
+                reasons.append("user_variant_override")
+            codec = _text(quality.get("codec")).lower()
+            if codec_support and codec:
+                if codec in codec_support:
+                    score += 100.0
+                    reasons.append("codec_supported")
+                else:
+                    score -= 1000.0
+                    reasons.append("codec_not_advertised")
+            height = max(0, int(quality.get("height") or 0))
+            bitrate = max(0, int(quality.get("bitrate") or 0))
+            if maximum_height and height > maximum_height:
+                score -= 500.0 + (height - maximum_height) / 10
+                reasons.append("height_above_endpoint_limit")
+            else:
+                score += min(height, maximum_height or height) / 100
+            if maximum_bitrate and bitrate > maximum_bitrate:
+                score -= 500.0 + (bitrate - maximum_bitrate) / 100000
+                reasons.append("bitrate_above_network_limit")
+            target_height = {
+                "4k": 2160,
+                "2160p": 2160,
+                "fhd": 1080,
+                "1080p": 1080,
+                "hd": 720,
+                "720p": 720,
+                "sd": 480,
+            }.get(quality_preference)
+            if target_height and height:
+                score += max(0.0, 80.0 - abs(target_height - height) / 10)
+                reasons.append("quality_preference")
+            language = _text(quality.get("language")).lower()
+            if language_preference and language == language_preference:
+                score += 50.0
+                reasons.append("language_preference")
+            if endpoint_node_id and str(row["node_id"]) == _text(endpoint_node_id):
+                score += 25.0
+                reasons.append("source_colocated_with_endpoint")
+            ranked.append((score, row, quality, reasons))
+        ranked.sort(key=lambda item: (-item[0], str(item[1]["variant_id"])))
+        if not ranked or ranked[0][0] < -9000:
+            return {
+                "ok": False,
+                "error": "playback_source_unavailable",
+                "item_id": token,
+            }
+        score, selected, quality, reasons = ranked[0]
+        descriptor = _json_loads(selected["descriptor_json"]) or {}
+        direct_candidates = [
+            _text(item)
+            for item in (
+                descriptor.get("direct_urls")
+                or descriptor.get("content_url_candidates")
+                or []
+            )
+            if _text(item).startswith(("http://", "https://"))
+        ][:8]
+        routed_path = _text(
+            descriptor.get("routed_content_path")
+            or descriptor.get("browser_path")
+            or selected["routed_content_path"]
+        )
+        node_path = _text(descriptor.get("content_path") or selected["content_path"])
+        route = {
+            "schema": "adaos.media_center.playback_route.v1",
+            "mode": (
+                "direct_agent_to_endpoint"
+                if direct_candidates
+                else "root_routed_http_relay"
+            ),
+            "source_node_id": str(selected["node_id"]),
+            "endpoint_id": _text(endpoint_id),
+            "endpoint_node_id": _text(endpoint_node_id),
+            "direct_candidates": direct_candidates,
+            "routed_path": routed_path,
+            "node_path": node_path,
+            "resource_id": str(selected["resource_id"]),
+            "fallback": {
+                "mode": "root_routed_http_relay",
+                "path": routed_path or node_path,
+                "target_node_id": str(selected["node_id"]),
+                "reason": (
+                    "direct_candidate_failed"
+                    if direct_candidates
+                    else "no_direct_candidate"
+                ),
+            },
+        }
+        return {
+            "ok": True,
+            "schema": PLAYBACK_PLAN_SCHEMA,
+            "item_id": str(selected["id"]),
+            "work_id": str(selected["work_id"]),
+            "variant_id": str(selected["variant_id"]),
+            "source_id": str(selected["source_id"]),
+            "media_kind": str(selected["media_kind"]),
+            "mime_type": str(selected["mime_type"]),
+            "title": str(selected["title"]),
+            "quality": quality,
+            "descriptor": descriptor,
+            "route": route,
+            "decision": {
+                "policy": "deterministic_variant_route_v1",
+                "score": round(score, 3),
+                "reasons": reasons,
+                "candidate_count": len(ranked),
+                "requested_variant_id": override,
+                "preferred_quality": quality_preference,
+                "preferred_language": language_preference,
+            },
+        }
+
+    def build_queue(
+        self,
+        *,
+        source_type: str,
+        source_id: str,
+        profile_id: str = "default",
+        limit: int = 500,
+        endpoint_id: str = "",
+        endpoint_node_id: str = "",
+        endpoint_capabilities: Mapping[str, Any] | None = None,
+        preferred_quality: str = "auto",
+        preferred_language: str = "",
+    ) -> dict[str, Any]:
+        kind = _text(source_type).lower()
+        token = _text(source_id)
+        bounded = max(1, min(500, int(limit or 500)))
+        profile = _text(profile_id) or "default"
+        if kind not in {"item", "work", "collection", "folder", "playlist"}:
+            return {"ok": False, "error": "playback_queue_source_invalid"}
+        if kind == "playlist":
+            access = self.get_playlist(token, profile_id=profile)
+            if not access.get("ok"):
+                return access
+            with self.repository.connect() as connection:
+                rows = connection.execute(
+                    """
+                    SELECT c.id
+                    FROM user_playlist_items pi
+                    JOIN catalog_items c ON c.id=pi.item_id
+                    WHERE pi.playlist_id=? AND c.missing=0
+                    ORDER BY pi.ordinal LIMIT ?
+                    """,
+                    (token, bounded),
+                ).fetchall()
+            item_ids = [str(row["id"]) for row in rows]
+            ownership = "user_playlist"
+        else:
+            filters = ["missing=0", "media_kind IN ('audio','video')"]
+            params: list[Any] = []
+            order = "lower(title), id"
+            if kind == "item":
+                filters.append("id=?")
+                params.append(token)
+            elif kind == "work":
+                filters.append("work_id=?")
+                params.append(token)
+            elif kind == "collection":
+                filters.append("m.collection_id=?")
+                params.append(token)
+                order = "MIN(m.ordinal), catalog_items.work_id"
+            else:
+                agent_id, separator, path = token.partition(":")
+                if not separator:
+                    return {"ok": False, "error": "playback_folder_ref_invalid"}
+                prefix = f"{path.rstrip('/')}/" if path else ""
+                filters.extend(
+                    [
+                        "agent_id=?",
+                        "(folder_path=? OR substr(folder_path,1,?)=?)",
+                    ]
+                )
+                params.extend([agent_id, path, len(prefix), prefix])
+                order = "folder_path, lower(title), id"
+            with self.repository.connect() as connection:
+                if kind == "collection":
+                    rows = connection.execute(
+                        f"""
+                        SELECT MIN(catalog_items.id) AS id
+                        FROM catalog_items
+                        JOIN collection_memberships m
+                            ON m.work_id=catalog_items.work_id
+                        WHERE {' AND '.join(filters)}
+                        GROUP BY catalog_items.work_id
+                        ORDER BY {order} LIMIT ?
+                        """,
+                        (*params, bounded),
+                    ).fetchall()
+                else:
+                    rows = connection.execute(
+                        f"""
+                        SELECT id FROM catalog_items
+                        WHERE {' AND '.join(filters)}
+                        ORDER BY {order} LIMIT ?
+                        """,
+                        (*params, bounded),
+                    ).fetchall()
+            item_ids = [str(row["id"]) for row in rows]
+            ownership = "derived_snapshot"
+        queue = []
+        for item_id_value in item_ids[:bounded]:
+            plan = self.playback_plan(
+                item_id_value,
+                endpoint_id=endpoint_id,
+                endpoint_node_id=endpoint_node_id,
+                endpoint_capabilities=endpoint_capabilities,
+                preferred_quality=preferred_quality,
+                preferred_language=preferred_language,
+            )
+            if not plan.get("ok"):
+                continue
+            queue.append(
+                {
+                    "schema": "adaos.media_control.playback_queue_item.v1",
+                    "item_id": plan["item_id"],
+                    "work_id": plan["work_id"],
+                    "variant_id": plan["variant_id"],
+                    "source_id": plan["source_id"],
+                    "title": plan["title"],
+                    "available": True,
+                    "descriptor": plan["descriptor"],
+                    "route": plan["route"],
+                }
+            )
+        return {
+            "ok": True,
+            "schema": "adaos.media_center.queue_source.v1",
+            "source": {"type": kind, "id": token, "ownership": ownership},
+            "items": queue,
+            "count": len(queue),
+            "limit": bounded,
+            "bounded": True,
+            "partial": self.participation()["partial"],
         }
 
     def home(self, *, profile_id: str = "default", limit: int = 12) -> dict[str, Any]:

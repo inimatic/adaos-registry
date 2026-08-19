@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_center.playback_plan.v1",
+  "type": "object",
+  "required": ["ok", "schema", "item_id", "work_id", "variant_id", "source_id", "descriptor", "route", "decision"],
+  "properties": {
+    "ok": {"const": true},
+    "schema": {"const": "adaos.media_center.playback_plan.v1"},
+    "item_id": {"type": "string"},
+    "work_id": {"type": "string"},
+    "variant_id": {"type": "string"},
+    "source_id": {"type": "string"},
+    "media_kind": {"enum": ["video", "audio"]},
+    "mime_type": {"type": "string"},
+    "title": {"type": "string"},
+    "quality": {"type": "object"},
+    "descriptor": {"type": "object"},
+    "route": {
+      "type": "object",
+      "required": ["schema", "mode", "source_node_id", "direct_candidates", "fallback"]
+    },
+    "decision": {
+      "type": "object",
+      "required": ["policy", "score", "reasons", "candidate_count"],
+      "properties": {
+        "policy": {"const": "deterministic_variant_route_v1"},
+        "score": {"type": "number"},
+        "reasons": {"type": "array", "items": {"type": "string"}},
+        "candidate_count": {"type": "integer", "minimum": 1},
+        "requested_variant_id": {"type": "string"},
+        "preferred_quality": {"type": "string"},
+        "preferred_language": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

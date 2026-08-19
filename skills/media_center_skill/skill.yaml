@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.4.0
+version: 0.5.0
 description: Distributed Media Center coordinator with bounded catalog, collection, personalization, and playback projections.
 supported_locales:
 - en
@@ -53,6 +53,7 @@ exports:
   - get_item
   - playback_queue
   - playback_plan
+  - build_playback_queue
   - set_favorite
   - sync_agent
   - home
@@ -341,15 +342,67 @@ tools:
   output_schema:
     type: object
 - name: playback_plan
-  description: Return a playback plan based on the item's core MediaResource descriptor.
+  description: Select a deterministic media variant and direct or routed delivery plan for one endpoint.
   entry: handlers.main:playback_plan
-  side_effects: local_write
+  side_effects: none
   input_schema:
     type: object
     required:
     - item_id
     properties:
       item_id:
+        type: string
+      endpoint_id:
+        type: string
+      endpoint_node_id:
+        type: string
+      endpoint_capabilities:
+        type: object
+        additionalProperties: true
+      preferred_quality:
+        type: string
+        default: auto
+      preferred_language:
+        type: string
+      variant_id:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: build_playback_queue
+  description: Build up to 500 ordered playback plans from an item, work, collection, folder, or playlist.
+  entry: handlers.main:build_playback_queue
+  side_effects: none
+  input_schema:
+    type: object
+    required:
+    - source_type
+    - source_id
+    properties:
+      source_type:
+        type: string
+        enum: [item, work, collection, folder, playlist]
+      source_id:
+        type: string
+      profile_id:
+        type: string
+        default: default
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 500
+      endpoint_id:
+        type: string
+      endpoint_node_id:
+        type: string
+      endpoint_capabilities:
+        type: object
+        additionalProperties: true
+      preferred_quality:
+        type: string
+        default: auto
+      preferred_language:
         type: string
     additionalProperties: true
   output_schema:

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_center.queue_source.v1",
+  "type": "object",
+  "required": ["ok", "schema", "source", "items", "count", "limit", "bounded", "partial"],
+  "properties": {
+    "ok": {"const": true},
+    "schema": {"const": "adaos.media_center.queue_source.v1"},
+    "source": {
+      "type": "object",
+      "required": ["type", "id", "ownership"],
+      "properties": {
+        "type": {"enum": ["item", "work", "collection", "folder", "playlist"]},
+        "id": {"type": "string"},
+        "ownership": {"enum": ["user_playlist", "derived_snapshot"]}
+      },
+      "additionalProperties": false
+    },
+    "items": {"type": "array", "maxItems": 500, "items": {"type": "object"}},
+    "count": {"type": "integer", "minimum": 0, "maximum": 500},
+    "limit": {"type": "integer", "minimum": 1, "maximum": 500},
+    "bounded": {"const": true},
+    "partial": {"type": "boolean"}
+  },
+  "additionalProperties": false
+}
