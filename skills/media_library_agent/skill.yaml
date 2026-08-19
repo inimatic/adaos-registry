@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.1.1
+version: 0.2.0
 description: Distributed node-local media discovery agent with durable asynchronous scans and ordered catalog deltas.
 supported_locales:
 - en
@@ -24,6 +24,7 @@ capabilities:
 - distributed.service.renew
 - distributed.service.drain
 - distributed.topology.manage
+- distributed.topology.inspect
 - distributed.replica.observe
 dependencies: []
 events:
@@ -59,6 +60,7 @@ exports:
   - renew_topology
   - observe_topology
   - drain_topology
+  - distributed_topology_phase
   - dispose
 tools:
 - name: ensure_schema
@@ -297,6 +299,29 @@ tools:
     properties:
       instance_id: {type: string, minLength: 1}
       expected_revision: {type: integer, minimum: 1}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: distributed_topology_phase
+  entry: handlers.main:distributed_topology_phase
+  description: Execute one reviewed idempotent topology adapter phase.
+  side_effects: local_write
+  timeout_seconds: 600
+  input_schema:
+    type: object
+    required: [schema, target_node_id, selected_instance_id, operation_id, plan_digest, plan, phase, authority_epoch, idempotency_key, step, dataset, partition]
+    properties:
+      schema: {const: adaos.distributed.topology_phase_request.v1}
+      target_node_id: {type: string}
+      selected_instance_id: {type: string}
+      operation_id: {type: string}
+      plan_digest: {type: string}
+      plan: {type: object}
+      phase: {type: string}
+      authority_epoch: {type: integer, minimum: 0}
+      idempotency_key: {type: string, minLength: 1}
+      step: {type: object}
+      dataset: {type: object}
+      partition: {type: object}
     additionalProperties: true
   output_schema: {type: object}
 - name: dispose

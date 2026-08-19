@@ -154,6 +154,16 @@ class MediaLibraryAgentRepository:
                     next_run_at TEXT NOT NULL DEFAULT '',
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS topology_phase_receipts (
+                    idempotency_key TEXT PRIMARY KEY,
+                    request_digest TEXT NOT NULL,
+                    operation_id TEXT NOT NULL,
+                    phase TEXT NOT NULL,
+                    result_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_media_agent_topology_operation
+                    ON topology_phase_receipts(operation_id, phase);
                 """
             )
             connection.execute("INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('schema_version', ?)", (SCHEMA_VERSION,))
@@ -590,6 +600,97 @@ class MediaLibraryAgentRepository:
             "delta_cursor": encode_cursor(int(delta["sequence"] or 0)),
             "storage": {"mode": "external_reference", "media_bytes_copied": False},
         }
+
+    def topology_root_witness(self, root_id: str) -> dict[str, Any] | None:
+        root = self.get_root(root_id)
+        if root is None:
+            return None
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT COUNT(*) AS total,
+                    SUM(CASE WHEN present=1 THEN 1 ELSE 0 END) AS available,
+                    SUM(CASE WHEN present=1 THEN size_bytes ELSE 0 END) AS bytes,
+                    MAX(revision) AS source_revision,
+                    MAX(last_seen_at) AS observed_at
+                FROM sources WHERE root_id=?
+                """,
+                (text(root_id),),
+            ).fetchone()
+            delta = connection.execute(
+                "SELECT MAX(sequence) AS sequence FROM source_deltas WHERE root_id=?",
+                (text(root_id),),
+            ).fetchone()
+        source_revision = int(row["source_revision"] or 0)
+        sequence = int(delta["sequence"] or 0)
+        manifest = {
+            "root_id": root["id"],
+            "root_revision": int(root["revision"]),
+            "source_revision": source_revision,
+            "delta_sequence": sequence,
+            "total": int(row["total"] or 0),
+            "available": int(row["available"] or 0),
+            "bytes": int(row["bytes"] or 0),
+            "observed_at": text(row["observed_at"]),
+        }
+        import hashlib
+
+        return {
+            **manifest,
+            "checkpoint": f"root:{root['revision']}:source:{source_revision}:delta:{sequence}",
+            "content_witness": "sha256:"
+            + hashlib.sha256(json_dumps(manifest).encode("utf-8")).hexdigest(),
+        }
+
+    def topology_phase_receipt(self, idempotency_key: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM topology_phase_receipts WHERE idempotency_key=?",
+                (text(idempotency_key),),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "request_digest": str(row["request_digest"]),
+            "operation_id": str(row["operation_id"]),
+            "phase": str(row["phase"]),
+            "result": json_loads(row["result_json"], {}),
+            "created_at": str(row["created_at"]),
+        }
+
+    def save_topology_phase_receipt(
+        self,
+        *,
+        idempotency_key: str,
+        request_digest: str,
+        operation_id: str,
+        phase: str,
+        result: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO topology_phase_receipts(
+                    idempotency_key, request_digest, operation_id, phase,
+                    result_json, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    text(idempotency_key),
+                    text(request_digest),
+                    text(operation_id),
+                    text(phase),
+                    json_dumps(dict(result)),
+                    now_iso(),
+                ),
+            )
+            connection.commit()
+        saved = self.topology_phase_receipt(idempotency_key)
+        if saved is None:
+            raise RuntimeError("topology_phase_receipt_not_saved")
+        if saved["request_digest"] != request_digest:
+            raise RuntimeError("topology_phase_idempotency_conflict")
+        return dict(saved["result"])
 
     def _public_root(self, row: sqlite3.Row) -> dict[str, Any]:
         return {

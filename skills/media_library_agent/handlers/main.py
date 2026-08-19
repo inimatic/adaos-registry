@@ -404,6 +404,26 @@ def drain_topology(instance_id: str = "", expected_revision: int = 1, **_: Any) 
         )
 
 
+@tool(
+    summary="Execute one reviewed distributed topology phase for an agent shard.",
+    side_effects="local_write",
+)
+def distributed_topology_phase(**payload: Any) -> dict[str, Any]:
+    repository, worker = _runtime()
+    try:
+        return _topology().execute_phase(
+            repository,
+            payload,
+            resource_pressure=worker.resource_pressure,
+        )
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error_code": "media_agent_topology_phase_failed",
+            "detail": str(exc)[:300],
+        }
+
+
 @tool(summary="Stop process-local media-library workers.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
     _repository, worker = _runtime()

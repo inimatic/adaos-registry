@@ -214,3 +214,98 @@ def test_contract_examples_validate_against_strict_schemas(tmp_path):
     for filename, payload in fixtures.items():
         schema = json.loads((SKILL_ROOT / "schemas" / filename).read_text(encoding="utf-8"))
         jsonschema.Draft202012Validator(schema).validate(payload)
+
+
+def _topology_payload(root, *, phase="inspect", idempotency_key="phase-1"):
+    instance = {
+        "schema": "adaos.distributed.service_instance.v1",
+        "instance_id": "media-agent-node-a",
+        "group_id": "media-library-home",
+        "node_id": "node-a",
+        "activation_id": "activation-node-a",
+        "release_digest": "sha256:" + "a" * 64,
+        "component_ref": "skill:media_library_agent",
+        "runtime_generation": 1,
+        "protocol_version": "1",
+        "topology_generation": 1,
+        "lease_id": "lease-node-a",
+        "status": "ready",
+        "readiness": True,
+        "health": {},
+        "pressure": {},
+        "capabilities": [],
+        "endpoints": [],
+        "observed_at": "2026-08-19T00:00:00+00:00",
+        "revision": 1,
+    }
+    return {
+        "schema": "adaos.distributed.topology_phase_request.v1",
+        "target_node_id": "node-a",
+        "selected_instance_id": instance["instance_id"],
+        "operation_id": "topology-operation-1",
+        "phase": phase,
+        "authority_epoch": 0,
+        "idempotency_key": idempotency_key,
+        "partition": {
+            "partition_id": f"media-sources:{root['id']}",
+            "selector": {"root_id": root["id"]},
+        },
+        "dataset": {"consistency_profile": "external_authority"},
+        "step": {"replica_role": "follower"},
+        "source_instance": instance,
+        "target_instance": None,
+    }
+
+
+def test_topology_phase_receipts_are_idempotent_and_do_not_copy_media(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "track.mp3").write_bytes(b"audio")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "topology.sqlite3",
+        node_id="node-a",
+    )
+    root = repository.add_root(str(library))["root"]
+    topology = LibraryAgentTopology()
+    payload = _topology_payload(root)
+
+    first = topology.execute_phase(repository, payload, resource_pressure="normal")
+    repeated = topology.execute_phase(repository, payload, resource_pressure="normal")
+
+    assert first == repeated
+    assert first["receipt"]["external_media_copied"] is False
+    assert repository.get_root(root["id"])["path"] == str(library.resolve())
+    conflict = topology.execute_phase(
+        repository,
+        {**payload, "phase": "verify"},
+        resource_pressure="normal",
+    )
+    assert conflict["error_code"] == "topology_phase_idempotency_conflict"
+
+
+def test_topology_phase_rejects_external_root_on_wrong_node(tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "wrong-node.sqlite3",
+        node_id="node-b",
+    )
+    payload = _topology_payload(
+        {"id": "root_missing"},
+        phase="prepare",
+    )
+    payload["target_node_id"] = "node-b"
+    payload["selected_instance_id"] = "media-agent-node-b"
+    payload["source_instance"] = None
+    payload["target_instance"] = {
+        **_topology_payload({"id": "root_missing"})["source_instance"],
+        "instance_id": "media-agent-node-b",
+        "node_id": "node-b",
+    }
+
+    result = LibraryAgentTopology().execute_phase(
+        repository,
+        payload,
+        resource_pressure="normal",
+    )
+
+    assert result["ok"] is False
+    assert result["error_code"] == "external_root_not_present_on_target"
