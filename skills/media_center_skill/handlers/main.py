@@ -34,6 +34,9 @@ LEGACY_MANAGED_COPY_RE = re.compile(r"^media-center-[0-9a-f]{24}-import\.[^.]+$"
 _enrichment_lock = threading.Lock()
 _enrichment_path = ""
 _enrichment_worker: MediaEnrichmentWorker | None = None
+_coordinator_lock = threading.Lock()
+_coordinator_path = ""
+_coordinator_cached: MediaCatalogCoordinator | None = None
 
 
 class MediaRootOperationBusy(RuntimeError):
@@ -45,7 +48,14 @@ def _repository() -> MediaCenterRepository:
 
 
 def _coordinator(repository: MediaCenterRepository | None = None) -> MediaCatalogCoordinator:
-    return MediaCatalogCoordinator(repository or _repository())
+    global _coordinator_cached, _coordinator_path
+    repo = repository or _repository()
+    path = str(repo.db_path.resolve())
+    with _coordinator_lock:
+        if _coordinator_cached is None or _coordinator_path != path:
+            _coordinator_cached = MediaCatalogCoordinator(repo)
+            _coordinator_path = path
+        return _coordinator_cached
 
 
 def _topology() -> MediaCenterTopology:
@@ -564,7 +574,10 @@ def scan_sources(source: str = "all", limit: int = 5000, **_: Any) -> dict[str, 
     if not discovery.get("ok"):
         repo = _repository()
         return {**discovery, "schema": SCHEMA_VERSION, "summary": repo.summary(), "facets": repo.facets()}
-    return _repository().scan_resources(resources, source=source or "all")
+    repo = _repository()
+    result = repo.scan_resources(resources, source=source or "all")
+    _coordinator(repo).refresh_search_index(force_legacy=True)
+    return result
 
 
 @tool(summary="List configured media-center library folders.", side_effects="none")
@@ -739,6 +752,8 @@ def _scan_roots(repo: MediaCenterRepository, *, root_id: str = "", path: str = "
         "missing_count": 0,
         "summary": repo.summary(),
     }
+    if descriptors:
+        _coordinator(repo).refresh_search_index(force_legacy=True)
     return {
         **scan,
         "roots": repo.list_roots()["items"],
@@ -2211,12 +2226,15 @@ def operations(limit: int = 30, **_: Any) -> dict[str, Any]:
 
 @tool(summary="Stop the process-local enrichment worker.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
-    global _enrichment_worker
+    global _coordinator_cached, _coordinator_path, _enrichment_worker
     with _enrichment_lock:
         worker = _enrichment_worker
         _enrichment_worker = None
     if worker is not None:
         worker.dispose()
+    with _coordinator_lock:
+        _coordinator_cached = None
+        _coordinator_path = ""
     return {"ok": True, "schema": COORDINATOR_SCHEMA, "disposed": True}
 
 

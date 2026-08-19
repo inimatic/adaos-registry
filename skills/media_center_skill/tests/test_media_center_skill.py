@@ -685,7 +685,9 @@ def test_twenty_thousand_item_catalog_remains_server_paged(monkeypatch, tmp_path
     found = catalog.list_items(query="movie 19999", media_kind="video", limit=30)
 
     assert first["count"] == 30
-    assert first["total_count"] == 20_000
+    assert first["total_count"] == 31
+    assert first["total_count_exact"] is False
+    assert first["total_count_lower_bound"] == 31
     assert first["pagination"]["has_more"] is True
     assert found["count"] == 1
     assert found["items"][0]["name"] == "movie-19999.mp4"

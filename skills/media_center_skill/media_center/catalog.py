@@ -251,7 +251,11 @@ class MediaCenterRepository:
                     )
                     missing_count += 1
 
-            run_id = hashlib.sha256(f"{started_at}:{source}:{len(items)}".encode("utf-8")).hexdigest()[:20]
+            run_id = hashlib.sha256(
+                f"{started_at}:{source}:{len(items)}:{time.monotonic_ns()}".encode(
+                    "utf-8"
+                )
+            ).hexdigest()[:20]
             connection.execute(
                 """
                 INSERT INTO scan_runs(id, started_at, finished_at, source, discovered_count, updated_count, missing_count, status, message)

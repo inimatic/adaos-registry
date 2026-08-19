@@ -19,7 +19,7 @@ from .catalog import (
     _title_from_name,
     now_iso,
 )
-from .discovery import discovery_score
+from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
@@ -140,6 +140,10 @@ class MediaCatalogCoordinator:
                 CREATE INDEX IF NOT EXISTS idx_media_center_collection ON catalog_items(collection_id, missing);
                 CREATE INDEX IF NOT EXISTS idx_media_center_folder_browse
                     ON catalog_items(agent_id, root_id, folder_path, missing);
+                CREATE INDEX IF NOT EXISTS idx_media_center_browse_title
+                    ON catalog_items(missing,media_kind,title COLLATE NOCASE,id);
+                CREATE INDEX IF NOT EXISTS idx_media_center_browse_size
+                    ON catalog_items(missing,media_kind,size_bytes DESC,id);
                 CREATE TABLE IF NOT EXISTS coordinator_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
@@ -204,6 +208,8 @@ class MediaCatalogCoordinator:
                     revision INTEGER NOT NULL DEFAULT 1,
                     created_at TEXT NOT NULL
                 );
+                CREATE INDEX IF NOT EXISTS idx_media_center_claim_lookup
+                    ON metadata_claims(subject_ref,field_name,confidence DESC,created_at DESC);
                 CREATE TABLE IF NOT EXISTS catalog_aliases (
                     alias_id TEXT PRIMARY KEY,
                     canonical_id TEXT NOT NULL,
@@ -349,6 +355,9 @@ class MediaCatalogCoordinator:
             connection.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS catalog_search USING fts5(item_id UNINDEXED, text, tokenize='unicode61 remove_diacritics 2')"
             )
+            connection.execute(
+                "CREATE VIRTUAL TABLE IF NOT EXISTS catalog_fuzzy_search USING fts5(item_id UNINDEXED, tokens, tokenize='unicode61')"
+            )
             now = now_iso()
             default_profiles = (
                 ("default", "Personal", "personal", _default_profile_policy()),
@@ -418,22 +427,86 @@ class MediaCatalogCoordinator:
             item_id = str(row["id"])
             updates.append((search_text, item_id))
             search_rows.append((item_id, search_text))
-        if not updates:
-            return
-        connection.executemany("UPDATE catalog_items SET search_text=? WHERE id=?", updates)
-        for start in range(0, len(search_rows), 400):
-            batch = search_rows[start : start + 400]
-            placeholders = ",".join("?" for _ in batch)
-            connection.execute(
-                f"DELETE FROM catalog_search WHERE item_id IN ({placeholders})",
-                tuple(item_id for item_id, _value in batch),
+        if updates:
+            connection.executemany("UPDATE catalog_items SET search_text=? WHERE id=?", updates)
+            for start in range(0, len(search_rows), 400):
+                batch = search_rows[start : start + 400]
+                placeholders = ",".join("?" for _ in batch)
+                connection.execute(
+                    f"DELETE FROM catalog_search WHERE item_id IN ({placeholders})",
+                    tuple(item_id for item_id, _value in batch),
+                )
+                connection.execute(
+                    f"DELETE FROM catalog_fuzzy_search WHERE item_id IN ({placeholders})",
+                    tuple(item_id for item_id, _value in batch),
+                )
+            connection.executemany("INSERT INTO catalog_search(item_id, text) VALUES (?, ?)", search_rows)
+            connection.executemany(
+                "INSERT INTO catalog_fuzzy_search(item_id,tokens) VALUES (?,?)",
+                [
+                    (item_id, self._fuzzy_tokens(search_text))
+                    for item_id, search_text in search_rows
+                ],
             )
-        connection.executemany("INSERT INTO catalog_search(item_id, text) VALUES (?, ?)", search_rows)
+        catalog_count = int(
+            connection.execute("SELECT COUNT(*) FROM catalog_items").fetchone()[0]
+        )
+        fuzzy_count = int(
+            connection.execute("SELECT COUNT(*) FROM catalog_fuzzy_search").fetchone()[0]
+        )
+        if catalog_count != fuzzy_count:
+            connection.execute("DELETE FROM catalog_fuzzy_search")
+            rows = connection.execute(
+                "SELECT id,search_text FROM catalog_items ORDER BY id"
+            ).fetchall()
+            connection.executemany(
+                "INSERT INTO catalog_fuzzy_search(item_id,tokens) VALUES (?,?)",
+                [
+                    (str(row["id"]), self._fuzzy_tokens(row["search_text"]))
+                    for row in rows
+                ],
+            )
+
+    def refresh_search_index(self, *, force_legacy: bool = False) -> dict[str, Any]:
+        with self.repository.connect() as connection:
+            if force_legacy:
+                connection.execute(
+                    "UPDATE catalog_items SET search_text='' WHERE agent_id=''"
+                )
+            self._backfill_search(connection)
+            connection.commit()
+            indexed = int(
+                connection.execute("SELECT COUNT(*) FROM catalog_search").fetchone()[0]
+            )
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "indexed_count": indexed,
+            "force_legacy": bool(force_legacy),
+        }
 
     @staticmethod
     def _replace_search(connection: sqlite3.Connection, item_id: str, search_text: str) -> None:
         connection.execute("DELETE FROM catalog_search WHERE item_id=?", (item_id,))
         connection.execute("INSERT INTO catalog_search(item_id, text) VALUES (?, ?)", (item_id, search_text))
+        connection.execute("DELETE FROM catalog_fuzzy_search WHERE item_id=?", (item_id,))
+        connection.execute(
+            "INSERT INTO catalog_fuzzy_search(item_id,tokens) VALUES (?,?)",
+            (item_id, MediaCatalogCoordinator._fuzzy_tokens(search_text)),
+        )
+
+    @staticmethod
+    def _fuzzy_tokens(value: Any) -> str:
+        compact = fold_text(value).replace(" ", "_")[:1024]
+        trigrams = {
+            compact[index : index + 3]
+            for index in range(max(0, len(compact) - 2))
+        }
+        return " ".join(
+            token.encode("ascii", errors="ignore").hex()
+            for token in sorted(trigrams)
+            if token
+        )
 
     @staticmethod
     def _search_text(*, title: Any, name: Any, relative_path: Any, folder_path: Any, metadata: Mapping[str, Any]) -> str:
@@ -1406,18 +1479,16 @@ class MediaCatalogCoordinator:
         where = f"WHERE {' AND '.join(filters)}" if filters else ""
         from_sql = f"catalog_items c {join_search} LEFT JOIN personal_media_state ps ON ps.item_id=c.id AND ps.profile_id=?"
         if query_token:
-            order = "bm25(catalog_search), lower(c.title), c.id"
+            order = "catalog_search.rank, c.title COLLATE NOCASE, c.id"
         else:
             order = {
-                "title": "lower(c.title), c.id",
+                "title": "c.title COLLATE NOCASE, c.id",
                 "size": "c.size_bytes DESC, c.id",
                 "source": "c.source, lower(c.title), c.id",
-                "favorite": "COALESCE(ps.favorite,c.favorite) DESC, lower(c.title), c.id",
+                "favorite": "COALESCE(ps.favorite,c.favorite) DESC, c.title COLLATE NOCASE, c.id",
                 "recent": "COALESCE(ps.last_played_at,c.modified_at) DESC, c.id",
             }.get(sort_token, "COALESCE(ps.last_played_at,c.modified_at) DESC, c.id")
         with self.repository.connect() as connection:
-            self._backfill_search(connection)
-            total = int(connection.execute(f"SELECT COUNT(*) FROM {from_sql} {where}", tuple(params)).fetchone()[0])
             rows = connection.execute(
                 f"""
                 SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
@@ -1430,18 +1501,22 @@ class MediaCatalogCoordinator:
                     COALESCE(ps.revision,0) AS profile_revision
                 FROM {from_sql} {where} ORDER BY {order} LIMIT ? OFFSET ?
                 """,
-                (*params, page_size, resolved_offset),
+                (*params, page_size + 1, resolved_offset),
             ).fetchall()
-        items = [self._public_coordinator_item(row, profile) for row in rows]
+        has_more = len(rows) > page_size
+        visible_rows = rows[:page_size]
+        items = [self._public_coordinator_item(row, profile) for row in visible_rows]
         next_offset = resolved_offset + len(items)
-        has_more = next_offset < total
+        total_count = next_offset + (1 if has_more else 0)
         participation = self.participation()
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "items": items,
             "count": len(items),
-            "total_count": total,
+            "total_count": total_count,
+            "total_count_exact": not has_more,
+            "total_count_lower_bound": total_count,
             "catalog_revision": self.catalog_revision(),
             "ranking": {"version": "deterministic-fts-v1", "query_mode": "explicit_submit"},
             "participation": participation,
@@ -1454,8 +1529,6 @@ class MediaCatalogCoordinator:
                 "next_cursor": _encode_cursor(next_offset, signature) if has_more else None,
                 "has_more": has_more,
             },
-            "summary": self.repository.summary(),
-            "facets": self.repository.facets(),
             "profile_policy": policy,
         }
 
@@ -1500,35 +1573,75 @@ class MediaCatalogCoordinator:
         except ValueError:
             candidate_limit = 5000
         candidate_limit = max(100, min(20_000, candidate_limit))
-        placeholders = ",".join("?" for _ in sorted(admitted)) or "''"
+        try:
+            score_limit = int(
+                os.environ.get("MEDIA_CENTER_DISCOVERY_SCORE_CANDIDATES") or 600
+            )
+        except ValueError:
+            score_limit = 600
+        score_limit = max(100, min(candidate_limit, score_limit, 5000))
+        query_trigrams = self._fuzzy_tokens(token).split()
+        if not query_trigrams:
+            return {
+                "ok": True,
+                "schema": COORDINATOR_SCHEMA,
+                "query": token,
+                "items": [],
+                "count": 0,
+                "bounded": True,
+                "candidate_count": 0,
+                "candidate_limit": candidate_limit,
+                "truncated_candidates": False,
+                "partial": self.participation()["partial"],
+                "ranking": {"version": "local-discovery-v1"},
+            }
+        expression = " OR ".join(query_trigrams[:96])
+        rows: list[sqlite3.Row] = []
         with self.repository.connect() as connection:
-            rows = connection.execute(
-                f"""
-                SELECT c.*,
-                    COALESCE(ps.favorite,c.favorite) AS profile_favorite,
-                    COALESCE(ps.resume_ms,0) AS profile_resume_ms,
-                    COALESCE(ps.duration_ms,0) AS profile_duration_ms,
-                    COALESCE(ps.completed,0) AS profile_completed,
-                    COALESCE(ps.rating,0) AS profile_rating,
-                    COALESCE(ps.hidden,0) AS profile_hidden,
-                    COALESCE(ps.last_played_at,'') AS profile_last_played_at,
-                    COALESCE(ps.revision,0) AS profile_revision,
-                    (
-                        SELECT value_json FROM metadata_claims mc
-                        WHERE mc.subject_ref='item:' || c.id
-                            AND mc.field_name='text_embedding_v1'
-                        ORDER BY mc.confidence DESC,mc.created_at DESC LIMIT 1
-                    ) AS discovery_embedding
-                FROM catalog_items c
-                LEFT JOIN personal_media_state ps
-                    ON ps.item_id=c.id AND ps.profile_id=?
-                WHERE c.missing=0 AND COALESCE(ps.hidden,0)=0
-                    AND c.media_kind IN ({placeholders})
-                ORDER BY c.catalog_revision DESC,c.id
-                LIMIT ?
+            candidate_rows = connection.execute(
+                """
+                SELECT item_id,rank FROM catalog_fuzzy_search
+                WHERE catalog_fuzzy_search MATCH ?
+                ORDER BY rank,item_id LIMIT ?
                 """,
-                (profile, *sorted(admitted), candidate_limit + 1),
+                (expression, score_limit + 1),
             ).fetchall()
+            candidate_ids = [str(row["item_id"]) for row in candidate_rows]
+            admitted_values = sorted(admitted)
+            admitted_placeholders = (
+                ",".join("?" for _ in admitted_values) or "''"
+            )
+            for start in range(0, min(score_limit, len(candidate_ids)), 400):
+                batch = candidate_ids[start : start + 400]
+                id_placeholders = ",".join("?" for _ in batch)
+                rows.extend(
+                    connection.execute(
+                        f"""
+                        SELECT c.*,
+                            COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                            COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                            COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                            COALESCE(ps.completed,0) AS profile_completed,
+                            COALESCE(ps.rating,0) AS profile_rating,
+                            COALESCE(ps.hidden,0) AS profile_hidden,
+                            COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                            COALESCE(ps.revision,0) AS profile_revision,
+                            (
+                                SELECT value_json FROM metadata_claims mc
+                                WHERE mc.subject_ref='item:' || c.id
+                                    AND mc.field_name='text_embedding_v1'
+                                ORDER BY mc.confidence DESC,mc.created_at DESC LIMIT 1
+                            ) AS discovery_embedding
+                        FROM catalog_items c
+                        LEFT JOIN personal_media_state ps
+                            ON ps.item_id=c.id AND ps.profile_id=?
+                        WHERE c.id IN ({id_placeholders}) AND c.missing=0
+                            AND COALESCE(ps.hidden,0)=0
+                            AND c.media_kind IN ({admitted_placeholders})
+                        """,
+                        (profile, *batch, *admitted_values),
+                    ).fetchall()
+                )
         scored: list[tuple[float, str, sqlite3.Row, list[str]]] = []
         for row in rows[:candidate_limit]:
             denial = self._policy_denial(row, policy)
@@ -1562,9 +1675,10 @@ class MediaCatalogCoordinator:
             "items": items,
             "count": len(items),
             "bounded": True,
-            "candidate_count": min(len(rows), candidate_limit),
+            "candidate_count": min(len(candidate_rows), score_limit),
             "candidate_limit": candidate_limit,
-            "truncated_candidates": len(rows) > candidate_limit,
+            "score_limit": score_limit,
+            "truncated_candidates": len(candidate_rows) > score_limit,
             "partial": self.participation()["partial"],
             "ranking": {
                 "version": "local-discovery-v1",

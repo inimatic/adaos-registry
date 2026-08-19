@@ -5,6 +5,7 @@ import math
 import re
 import unicodedata
 from collections.abc import Iterable
+from functools import lru_cache
 from typing import Any
 
 
@@ -57,14 +58,19 @@ _PHONETIC_GROUPS = {
 }
 
 
-def fold_text(value: Any) -> str:
-    normalized = unicodedata.normalize("NFKD", str(value or "").casefold())
+@lru_cache(maxsize=8192)
+def _fold_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKD", value.casefold())
     without_marks = "".join(
         character
         for character in normalized
         if not unicodedata.combining(character)
     )
     return " ".join(_WORD.findall(without_marks.translate(_CYRILLIC)))
+
+
+def fold_text(value: Any) -> str:
+    return _fold_text(str(value or ""))
 
 
 def phonetic_code(value: Any) -> str:
@@ -90,21 +96,26 @@ def phonetic_terms(value: Any) -> set[str]:
     }
 
 
-def text_embedding(value: Any, *, dimensions: int = EMBEDDING_DIMENSIONS) -> list[float]:
-    bounded_dimensions = max(16, min(256, int(dimensions)))
+@lru_cache(maxsize=4096)
+def _text_embedding(value: str, dimensions: int) -> tuple[float, ...]:
     folded = fold_text(value)[:4096]
-    vector = [0.0] * bounded_dimensions
+    vector = [0.0] * dimensions
     features: list[str] = folded.split()
     compact = folded.replace(" ", "_")
     features.extend(compact[index : index + 3] for index in range(max(0, len(compact) - 2)))
     for feature in features[:8192]:
         digest = hashlib.blake2b(feature.encode("utf-8"), digest_size=8).digest()
-        bucket = int.from_bytes(digest[:4], "big") % bounded_dimensions
+        bucket = int.from_bytes(digest[:4], "big") % dimensions
         vector[bucket] += 1.0 if digest[4] & 1 else -1.0
-    magnitude = math.sqrt(sum(value * value for value in vector))
+    magnitude = math.sqrt(sum(item * item for item in vector))
     if magnitude:
-        vector = [round(value / magnitude, 6) for value in vector]
-    return vector
+        vector = [round(item / magnitude, 6) for item in vector]
+    return tuple(vector)
+
+
+def text_embedding(value: Any, *, dimensions: int = EMBEDDING_DIMENSIONS) -> list[float]:
+    bounded_dimensions = max(16, min(256, int(dimensions)))
+    return list(_text_embedding(str(value or ""), bounded_dimensions))
 
 
 def cosine_similarity(left: Iterable[Any], right: Iterable[Any]) -> float:

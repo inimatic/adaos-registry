@@ -25,3 +25,14 @@ Settings contains library roots, scan/import operations, profile/access and home
 - The client app shell owns the single live media element, Media Session integration, mini/full/PiP presentation, local high-frequency state, and direct-to-routed playback fallback.
 
 Skill-specific human-readable errors and translations stay in each skill. The scenario does not bundle skill error dictionaries.
+
+## Validation
+
+`tests/fixtures/library-profile.v1.json` is the versioned 20,000-source household profile. Run the steady-state budget gate from the registry root:
+
+```powershell
+$env:PYTHONPATH='..\adaos\src'
+python scenarios/media_center/benchmarks/run_library_benchmark.py --enforce
+```
+
+The harness reports one-time FTS/trigram backfill separately from p50/p95/max catalog FTS, cursor-page and local-discovery latency, encoded page bytes, process RSS, sample counts and the exact enforced budgets. It uses generated descriptors and never needs private media bytes.
