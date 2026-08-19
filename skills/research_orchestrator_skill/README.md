@@ -72,7 +72,9 @@ stable arm ids and one exact primary minuend/subtrahend. Since formulation
 stage contract v1.2, `problem_frame.experimental_signature` freezes only the
 cross-stage scientific identity: subject, dataset, baseline, intervention,
 intervention boundary, and primary outcome. Protocol admission requires exact
-machine identities and exact outcome/boundary copies from that signature;
+machine identities and exact outcome/boundary copies from that signature.
+The legacy comparator array may use either the complete ordered ids or the
+complete ordered labels; mixed or foreign identities fail closed;
 `implementation_contract.scientific_bindings` then binds the exact protocol
 digest, those identities, and `adaos.research.runner.v1`. This narrow typed
 spine prevents a locally schema-valid protocol for a different experiment

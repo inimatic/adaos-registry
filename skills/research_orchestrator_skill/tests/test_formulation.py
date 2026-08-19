@@ -492,6 +492,21 @@ def test_cross_stage_gate_rejects_a_locally_valid_but_unrelated_protocol() -> No
         raise AssertionError("expected a semantically unrelated protocol to be rejected")
 
 
+def test_protocol_accepts_a_complete_ordered_comparator_id_projection() -> None:
+    protocol = _protocol()
+    protocol["experimental_plan"]["comparators"] = ["maxpool", "tlp"]
+
+    issues = stage_quality_issues(
+        "protocol_design",
+        protocol,
+        expected_effect_direction="difference",
+        expected_experimental_signature=_problem()["experimental_signature"],
+        required_workflow_smoke={"device": "cpu", "epochs": 3, "seed_values": [17], "inference_allowed": False},
+    )
+
+    assert issues == []
+
+
 def test_engineering_contract_is_bound_to_exact_protocol_and_scientific_identity() -> None:
     protocol = _protocol()
     implementation = _implementation(protocol)

@@ -438,8 +438,9 @@ def stage_quality_issues(
         arm_labels = [str(item["label"]) for item in arms]
         if len(arm_ids) != len(set(arm_ids)):
             issues.append("comparison_design arm ids must be unique")
-        if arm_labels != [str(item) for item in plan["comparators"]]:
-            issues.append("comparison_design arm labels must exactly preserve comparator order")
+        comparator_values = [str(item) for item in plan["comparators"]]
+        if comparator_values not in (arm_labels, arm_ids):
+            issues.append("comparators must be either the exact ordered arm ids or exact ordered arm labels")
         contrast = comparison["primary_contrast"]
         if contrast["minuend"] == contrast["subtrahend"]:
             issues.append("primary contrast must reference two distinct arms")
@@ -525,8 +526,10 @@ def stage_quality_issues(
             actual_primary_arms = [(str(item["id"]), str(item["label"]), str(item["role"])) for item in arms]
             if actual_primary_arms != expected_arms:
                 issues.append("comparison_design must exactly preserve baseline and intervention identity from experimental_signature")
-            if [str(item) for item in plan["comparators"]] != [item[1] for item in expected_arms]:
-                issues.append("comparators must exactly preserve labels and order from experimental_signature")
+            expected_ids = [item[0] for item in expected_arms]
+            expected_labels = [item[1] for item in expected_arms]
+            if comparator_values not in (expected_ids, expected_labels):
+                issues.append("comparators must exactly preserve ordered ids or labels from experimental_signature")
             if contrast != {"minuend": expected_arms[1][0], "subtrahend": expected_arms[0][0]}:
                 issues.append("primary contrast must be intervention minus baseline from experimental_signature")
             data_policy = plan["data_policy"]
