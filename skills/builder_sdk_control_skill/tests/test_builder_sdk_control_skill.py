@@ -92,6 +92,66 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert push_schema["properties"]["checkpoint_id"]["minLength"] == 1
 
 
+def test_release_preflight_requires_bound_consumer_acceptance(monkeypatch) -> None:
+    module = _module()
+    policy = {
+        "session_id": "dev-research",
+        "acceptance_requirements": [
+            {
+                "id": "research.consumer-contracts",
+                "required": True,
+            }
+        ],
+    }
+    monkeypatch.setattr(
+        module,
+        "_bound_development_session",
+        lambda *_args, **_kwargs: {"session": policy, "binding": {}},
+    )
+    monkeypatch.setattr(
+        module.automation,
+        "get_state",
+        lambda **_kwargs: {
+            "session": {
+                "development_session_id": "dev-research",
+                "completion_readiness": {
+                    "acceptance": {
+                        "ok": False,
+                        "errors": ["prepare_attempt incompatible"],
+                    }
+                },
+            }
+        },
+    )
+    with pytest.raises(ValueError, match="consumer-owned acceptance"):
+        module._required_acceptance_evidence("skill", "research", "research-dev")
+
+    receipt = {
+        "requirement_id": "research.consumer-contracts",
+        "required": True,
+        "ok": True,
+        "digest": "sha256:" + "1" * 64,
+    }
+    acceptance = {
+        "ok": True,
+        "digest": "sha256:" + "2" * 64,
+        "receipts": [receipt],
+    }
+    monkeypatch.setattr(
+        module.automation,
+        "get_state",
+        lambda **_kwargs: {
+            "session": {
+                "development_session_id": "dev-research",
+                "completion_readiness": {"acceptance": acceptance},
+            }
+        },
+    )
+    assert module._required_acceptance_evidence(
+        "skill", "research", "research-dev"
+    ) == acceptance
+
+
 def test_subscription_update_projection_exposes_review_contract(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(

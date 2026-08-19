@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.10.0
+version: 0.11.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -27,6 +27,7 @@ capabilities:
 - execution.jobs
 - secrets.read
 - skills.invoke
+- builder.project_validation
 dependencies: []
 data_migration:
   file: migrations/data_migration.py
@@ -46,6 +47,27 @@ tools:
     additionalProperties: false
   output_schema:
     type: object
+- name: validate_development_candidate
+  description: Evaluate one active DEV research runner against the exact digest-bound
+    compilation and ResearchManager consumer contract without starting scientific execution.
+  entry: handlers.main:validate_development_candidate
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - request
+    properties:
+      request:
+        type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - schema
+    - profile
+    - ok
+    - checks
+    - errors
 - name: rehydrate
   description: Re-open the durable repository after activation or restart.
   entry: handlers.main:rehydrate
@@ -851,7 +873,7 @@ data_routes:
     - research-experiment
     - research-tracking
     - research-evidence
-updated_at: '2026-08-19T07:55:21+00:00'
+updated_at: '2026-08-19T09:55:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.866+5275.49974a61
@@ -860,4 +882,3 @@ compatibility:
     min_commit: 49974a61b8894b07139d42dd94355f333f12a554
     min_short_commit: 49974a61
     build_date: '2026-08-19T10:52:16+03:00'
-

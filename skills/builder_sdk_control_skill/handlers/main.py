@@ -135,6 +135,54 @@ def _bound_automation_instruction(
     return {**instruction, **admitted}
 
 
+def _required_acceptance_evidence(
+    kind: str,
+    project_id: str,
+    source_webspace_id: str,
+) -> dict[str, Any] | None:
+    """Fail closed when a bound Development Session has executable gates."""
+
+    admitted = _bound_development_session(kind, project_id, source_webspace_id)
+    if not admitted:
+        return None
+    policy = admitted["session"]
+    requirements = [
+        dict(item)
+        for item in policy.get("acceptance_requirements") or []
+        if isinstance(item, Mapping) and bool(item.get("required"))
+    ]
+    if not requirements:
+        return None
+    state = automation.get_state(
+        object_type=kind,
+        object_id=project_id,
+        webspace_id=source_webspace_id,
+    )
+    automation_session = state.get("session") if isinstance(state.get("session"), Mapping) else {}
+    if str(automation_session.get("development_session_id") or "") != str(policy["session_id"]):
+        raise ValueError("release is not bound to the required Development Session acceptance evidence")
+    readiness = (
+        automation_session.get("completion_readiness")
+        if isinstance(automation_session.get("completion_readiness"), Mapping)
+        else {}
+    )
+    acceptance = readiness.get("acceptance") if isinstance(readiness.get("acceptance"), Mapping) else {}
+    if not bool(acceptance.get("ok")):
+        raise ValueError("required consumer-owned acceptance has not passed")
+    receipts = [dict(item) for item in acceptance.get("receipts") or [] if isinstance(item, Mapping)]
+    passed_ids = {
+        str(item.get("requirement_id") or "")
+        for item in receipts
+        if bool(item.get("ok")) and bool(item.get("required")) and str(item.get("digest") or "")
+    }
+    missing = sorted(str(item["id"]) for item in requirements if str(item["id"]) not in passed_ids)
+    if missing:
+        raise ValueError(
+            "required consumer acceptance receipts are missing or failed: " + ", ".join(missing)
+        )
+    return dict(acceptance)
+
+
 def _instruction_text(value: Mapping[str, Any]) -> str:
     return json.dumps(dict(value), ensure_ascii=False, indent=2, sort_keys=True)
 
@@ -3260,6 +3308,12 @@ def publish_project(
         operation = "Trial activation" if dry_run else "Publication"
         raise ValueError(f"{operation} requires explicit user confirmation")
     if dry_run:
+        source_webspace_id = _preview_source_webspace_id(webspace_id, _meta)
+        acceptance_evidence = _required_acceptance_evidence(
+            kind,
+            project_id,
+            source_webspace_id,
+        )
         if not bool(capabilities.get("can_prepare_candidate")):
             raise ValueError(
                 "Candidate preparation requires the current completed Automation result "
@@ -3277,6 +3331,11 @@ def publish_project(
             "change_set_id": change_set_workflow.get("change_set_id"),
             "canonical_change_id": canonical_change_id or None,
             "context_packet_digest": context_packet_digest or None,
+            "acceptance_digest": (
+                acceptance_evidence.get("digest")
+                if isinstance(acceptance_evidence, Mapping)
+                else None
+            ),
         }
         candidate_change_ids = list(
             dict.fromkeys(

@@ -31,6 +31,13 @@ def rehydrate() -> dict[str, Any]:
     return ensure_schema()
 
 
+@tool("validate_development_candidate")
+def validate_development_candidate(request: Mapping[str, Any]) -> dict[str, Any]:
+    """Return consumer-owned acceptance evidence for one active DEV runner."""
+
+    return _manager().validate_development_candidate(request)
+
+
 @tool("create_study")
 def create_study(
     title: str,

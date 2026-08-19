@@ -3414,6 +3414,24 @@ class ResearchOrchestrator:
                     "research.consumer-contracts",
                     "research.traceability",
                 ],
+                acceptance_requirements=[
+                    {
+                        "id": "research.consumer-contracts",
+                        "profile": "research.consumer-contracts",
+                        "provider_ref": "skill:research_manager_skill",
+                        "operation": "validate_development_candidate",
+                        "required": True,
+                        "timeout_seconds": 300,
+                    },
+                    {
+                        "id": "research.traceability",
+                        "profile": "research.traceability",
+                        "provider_ref": "skill:research_manager_skill",
+                        "operation": "validate_development_candidate",
+                        "required": True,
+                        "timeout_seconds": 120,
+                    },
+                ],
                 context_members=list(stored["development_scope"]["context_members"]),
                 prohibited_actions=list(stored["prohibited_actions"]),
                 base_release={

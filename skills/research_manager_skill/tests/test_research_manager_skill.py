@@ -83,6 +83,161 @@ def _realization() -> dict[str, str]:
     }
 
 
+def _acceptance_plan() -> dict:
+    return {
+        "digest": "sha256:" + "d" * 64,
+        "dataset": {
+            "id": "stl10_torchvision",
+            "logical_name": "STL-10",
+            "policy_digest": "sha256:" + "e" * 64,
+            "split_strategy": "fixed",
+            "evaluation_seal": "sealed",
+        },
+        "operators": {
+            "arms": [
+                {"id": "maxpool", "role": "baseline"},
+                {"id": "tlp", "role": "intervention"},
+            ]
+        },
+        "execution": {
+            "stage_smoke_cpu": {
+                "device": "cpu",
+                "epochs": 3,
+                "evidence_class": "workflow_smoke",
+                "inference_allowed": False,
+                "max_wall_time_minutes": 60,
+                "seeds": [17],
+            }
+        },
+        "randomization": {
+            "named_streams": ["initialization", "sampling", "augmentation", "analysis"],
+            "unit": "seed",
+            "invariant_fields": ["initialization"],
+            "varied_fields": ["pool2"],
+        },
+        "analysis": {
+            "primary_metric": "accuracy",
+            "primary_estimand": "paired delta",
+            "primary_contrast": {"minuend": "tlp", "subtrahend": "maxpool"},
+            "uncertainty": {"method": "paired bootstrap"},
+            "stopping_rule": {"kind": "fixed_budget"},
+        },
+        "runner_contract": {
+            "result_record": {
+                "primary_metric_path": "primary_metric",
+                "step_path": "step",
+                "pairing_identity_path": "pairing_identity_digest",
+            }
+        },
+    }
+
+
+def _acceptance_envelope(profile: str) -> dict:
+    compilation_digest = "sha256:" + "a" * 64
+    brief_digest = "sha256:" + "b" * 64
+    return {
+        "schema": "adaos.builder.acceptance_candidate.v1",
+        "profile": profile,
+        "development_session_id": "dev_acceptance",
+        "project_ref": "project:tlp",
+        "candidate_ref": "skill:tlp_runner",
+        "candidate": {"id": "tlp_runner", "version": "0.1.0"},
+        "contract_inputs": [
+            {"kind": "research_compilation", "digest": compilation_digest},
+            {"kind": "automation_brief", "digest": brief_digest},
+        ],
+        "instructions": {
+            "research_compilation": {
+                "digest": compilation_digest,
+                "facets": {"experiment_plan": {"payload": _acceptance_plan()}},
+            },
+            "automation_brief": {
+                "digest": brief_digest,
+                "compilation_digest": compilation_digest,
+            },
+        },
+    }
+
+
+def test_development_traceability_acceptance_is_digest_bound() -> None:
+    manager = ResearchManager()
+    accepted = manager.validate_development_candidate(
+        _acceptance_envelope("research.traceability")
+    )
+    assert accepted["ok"] is True
+
+    drifted = _acceptance_envelope("research.traceability")
+    drifted["contract_inputs"][0]["digest"] = "sha256:" + "f" * 64
+    rejected = manager.validate_development_candidate(drifted)
+    assert rejected["ok"] is False
+    assert "research_compilation digest" in rejected["errors"][0]
+
+
+def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) -> None:
+    from adaos.sdk.developer import validation as developer_validation
+
+    invocations: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        developer_validation,
+        "validate_skill",
+        lambda *_args, **_kwargs: {"ok": True, "digest": "sha256:" + "1" * 64},
+    )
+    monkeypatch.setattr(
+        developer_validation,
+        "activate_skill",
+        lambda project_id: {"ok": True, "project_id": project_id, "version": "0.1.0"},
+    )
+
+    split_values = {
+        role: {
+            **item,
+            "sealed": role == "test",
+        }
+        for role, item in _splits().items()
+    }
+
+    def invoke(project_id: str, operation_id: str, arguments: dict, **_kwargs):
+        invocations.append((operation_id, arguments))
+        if operation_id == "dataset_status":
+            return {
+                "dataset_id": "stl10_torchvision",
+                "ready": True,
+                "split_bindings": split_values,
+            }
+        assert operation_id == "prepare_attempt"
+        request = arguments["request"]
+        assert request["profile"] == "preflight"
+        assert request["seed"] == 17
+        assert request["arm"]["id"] == "maxpool"
+        return {
+            "contract": "adaos.research.runner.v1",
+            "provider_id": project_id,
+            "package_ref": {
+                "uri": "skill-data:files/acceptance/package.json",
+                "digest": "sha256:" + "2" * 64,
+                "size_bytes": 42,
+                "media_type": "application/json",
+                "owner_ref": f"skill:{project_id}",
+            },
+            "command": [sys.executable, "runner.py"],
+            "working_directory": "skill-data:files/acceptance",
+            "code_digest": "sha256:" + "3" * 64,
+            "environment_digest": "sha256:" + "4" * 64,
+            "output_ref": "skill-data:files/acceptance/output",
+            "spec_id": "acceptance-spec",
+            "expected_outputs": ["result.json"],
+        }
+
+    monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
+    receipt = ResearchManager().validate_development_candidate(
+        _acceptance_envelope("research.consumer-contracts")
+    )
+    assert not receipt["errors"], receipt["errors"]
+    assert receipt["ok"] is True
+    assert [item[0] for item in invocations] == ["dataset_status", "prepare_attempt"]
+    assert receipt["evidence"]["scientific_execution_started"] is False
+
+
 def test_compiled_study_binds_exact_realization_and_is_idempotent() -> None:
     manager = ResearchManager()
     suffix = f"compiled-{uuid.uuid4().hex}"

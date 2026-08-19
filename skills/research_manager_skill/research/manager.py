@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import time
 from pathlib import Path
@@ -88,6 +89,383 @@ class ResearchManager:
 
     def _tracker_for_binding(self, binding: ResearchRecord):
         return self._tracker_provider(str(binding.payload.get("tracker_provider") or "local-tracker"))
+
+    @staticmethod
+    def _acceptance_receipt(
+        profile: str,
+        *,
+        checks: Sequence[Mapping[str, Any]],
+        errors: Sequence[str],
+        evidence: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        identity = {
+            "schema": "adaos.builder.acceptance_receipt.v1",
+            "profile": str(profile),
+            "ok": not errors,
+            "checks": [dict(item) for item in checks],
+            "errors": [str(item) for item in errors],
+            "evidence": dict(evidence or {}),
+        }
+        return {**identity, "receipt_digest": digest(identity)}
+
+    @staticmethod
+    def _acceptance_split_bindings(value: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+        raw = value.get("split_bindings") if isinstance(value.get("split_bindings"), Mapping) else value.get("splits")
+        if not isinstance(raw, Mapping):
+            raise ValueError("runner dataset_status must return split_bindings")
+        result: dict[str, dict[str, Any]] = {}
+        for role in ("validation", "robustness", "test"):
+            item = raw.get(role)
+            if not isinstance(item, Mapping):
+                raise ValueError(f"runner dataset_status omits the {role} split binding")
+            projected = {
+                "digest": str(item.get("digest") or "").strip(),
+                "dataset_digest": str(item.get("dataset_digest") or "").strip(),
+                "locator": str(item.get("locator") or "").strip(),
+                "sealed": bool(item.get("sealed")),
+            }
+            if any(not projected[key] for key in ("digest", "dataset_digest", "locator")):
+                raise ValueError(f"runner {role} split binding has incomplete immutable identity")
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", projected["digest"]):
+                raise ValueError(f"runner {role} split digest is not sha256")
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", projected["dataset_digest"]):
+                raise ValueError(f"runner {role} dataset digest is not sha256")
+            result[role] = projected
+        if len({item["digest"] for item in result.values()}) != 3:
+            raise ValueError("validation, robustness, and sealed test split digests must be distinct")
+        if len({item["dataset_digest"] for item in result.values()}) != 1:
+            raise ValueError("all split bindings must resolve to one immutable dataset")
+        if result["test"]["sealed"] is not True:
+            raise ValueError("runner test split binding must be sealed")
+        return result
+
+    @staticmethod
+    def _acceptance_conditions(
+        plan: Mapping[str, Any],
+        *,
+        runner_id: str,
+        dataset_digest: str,
+    ) -> dict[str, Any]:
+        execution: dict[str, Any] = {}
+        for stage_id, raw_profile in dict(plan["execution"]).items():
+            profile = dict(raw_profile)
+            evidence_class = str(profile["evidence_class"])
+            manager_profile = (
+                "preflight"
+                if evidence_class == "workflow_smoke"
+                else "confirmatory"
+                if evidence_class == "confirmatory"
+                else str(stage_id)
+            )
+            if manager_profile in execution:
+                raise ValueError(f"ExperimentPlan maps multiple stages to {manager_profile}")
+            execution[manager_profile] = {
+                "source_stage_id": str(stage_id),
+                "epochs": int(profile["epochs"]),
+                "seeds": [int(item) for item in profile["seeds"]],
+                "device": str(profile["device"]),
+                "workers": 0,
+                "wall_time_s": int(profile["max_wall_time_minutes"]) * 60,
+                "evidence_class": evidence_class,
+                "inference_allowed": bool(profile["inference_allowed"]),
+            }
+        analysis = dict(plan["analysis"])
+        randomization = dict(plan["randomization"])
+        dataset = dict(plan["dataset"])
+        result_record = dict(dict(plan["runner_contract"])["result_record"])
+        return {
+            "dataset": {
+                "name": str(dataset["logical_name"]),
+                "version": str(dataset_digest),
+                "policy_digest": str(dataset["policy_digest"]),
+                "split_strategy": str(dataset["split_strategy"]),
+                "evaluation_seal": str(dataset["evaluation_seal"]),
+            },
+            "operators": dict(plan["operators"]),
+            "execution": execution,
+            "randomization": {
+                "named_streams": list(randomization["named_streams"]),
+                "paired": True,
+                "unit": str(randomization["unit"]),
+                "invariant_fields": list(randomization["invariant_fields"]),
+                "varied_fields": list(randomization["varied_fields"]),
+            },
+            "analysis": {
+                "primary_metric": str(analysis["primary_metric"]),
+                "primary_estimand": str(analysis["primary_estimand"]),
+                "primary_contrast": dict(analysis["primary_contrast"]),
+                "paired": True,
+                "result_metric_path": str(result_record["primary_metric_path"]),
+                "result_step_path": str(result_record["step_path"]),
+                "initialization_digest_path": str(result_record["pairing_identity_path"]),
+                "uncertainty": dict(analysis["uncertainty"]),
+                "stopping_rule": dict(analysis["stopping_rule"]),
+            },
+            "tracker": {"provider": "local-tracker", "required_delivery": "durable-before-finalize"},
+            "runner": {
+                "provider": runner_id,
+                "contract": "adaos.research.runner.v1",
+                "data_owner": runner_id,
+            },
+        }
+
+    def validate_development_candidate(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        """Evaluate a DEV runner from the consumer side, without scientific execution.
+
+        Builder supplies a digest-verified Development Session envelope.  This
+        method deliberately invokes the active DEV skill through the platform
+        SDK instead of importing candidate code or trusting candidate tests.
+        The real three-epoch run remains a governed Study action after release.
+        """
+
+        value = dict(request or {})
+        profile = str(value.get("profile") or "").strip()
+        checks: list[dict[str, Any]] = []
+        errors: list[str] = []
+        candidate_ref = str(value.get("candidate_ref") or "").strip()
+        kind, separator, candidate_id = candidate_ref.partition(":")
+        if separator != ":" or kind != "skill" or not candidate_id:
+            errors.append("candidate_ref must identify one DEV skill")
+            return self._acceptance_receipt(profile, checks=checks, errors=errors)
+        instructions = (
+            dict(value.get("instructions"))
+            if isinstance(value.get("instructions"), Mapping)
+            else {}
+        )
+        compilation = (
+            dict(instructions.get("research_compilation"))
+            if isinstance(instructions.get("research_compilation"), Mapping)
+            else {}
+        )
+        brief = (
+            dict(instructions.get("automation_brief"))
+            if isinstance(instructions.get("automation_brief"), Mapping)
+            else {}
+        )
+        contract_inputs = {
+            str(item.get("kind") or ""): dict(item)
+            for item in value.get("contract_inputs") or []
+            if isinstance(item, Mapping)
+        }
+
+        if profile == "research.traceability":
+            expected = {
+                "research_compilation": str(compilation.get("digest") or ""),
+                "automation_brief": str(brief.get("digest") or ""),
+            }
+            for contract_kind, expected_digest in expected.items():
+                descriptor = contract_inputs.get(contract_kind) or {}
+                actual = str(descriptor.get("digest") or "")
+                ok = bool(expected_digest) and actual == expected_digest
+                checks.append(
+                    {
+                        "id": f"traceability.{contract_kind}",
+                        "ok": ok,
+                        "expected_digest": expected_digest or None,
+                        "actual_digest": actual or None,
+                    }
+                )
+                if not ok:
+                    errors.append(f"{contract_kind} digest is absent or differs from its contract input")
+            brief_compilation = str(brief.get("compilation_digest") or "")
+            compilation_digest = str(compilation.get("digest") or "")
+            linked = bool(compilation_digest) and brief_compilation == compilation_digest
+            checks.append(
+                {
+                    "id": "traceability.brief_to_compilation",
+                    "ok": linked,
+                    "compilation_digest": compilation_digest or None,
+                }
+            )
+            if not linked:
+                errors.append("AutomationBrief is not linked to the exact ResearchCompilation")
+            return self._acceptance_receipt(
+                profile,
+                checks=checks,
+                errors=errors,
+                evidence={
+                    "candidate_ref": candidate_ref,
+                    "development_session_id": value.get("development_session_id"),
+                },
+            )
+
+        if profile != "research.consumer-contracts":
+            errors.append(f"unsupported acceptance profile: {profile}")
+            return self._acceptance_receipt(profile, checks=checks, errors=errors)
+
+        plan_facet = (
+            dict(dict(compilation.get("facets") or {}).get("experiment_plan") or {})
+            if isinstance(compilation.get("facets"), Mapping)
+            else {}
+        )
+        plan = dict(plan_facet.get("payload") or {}) if isinstance(plan_facet.get("payload"), Mapping) else {}
+        if not plan:
+            errors.append("accepted ResearchCompilation has no ExperimentPlan payload")
+            return self._acceptance_receipt(profile, checks=checks, errors=errors)
+
+        try:
+            from adaos.sdk.developer import validation as developer_validation
+
+            native = developer_validation.validate_skill(
+                candidate_id,
+                strict=True,
+                probe_tools=True,
+                run_tests=True,
+            )
+            checks.append(
+                {
+                    "id": "candidate.native_validation",
+                    "ok": bool(native.get("ok")),
+                    "digest": native.get("digest"),
+                }
+            )
+            if not bool(native.get("ok")):
+                errors.append("candidate failed native DEV validation or packaged tests")
+            activation = developer_validation.activate_skill(candidate_id)
+            checks.append(
+                {
+                    "id": "candidate.dev_activation",
+                    "ok": bool(activation.get("ok")),
+                    "version": activation.get("version"),
+                }
+            )
+            dataset_status = developer_validation.invoke_skill(
+                candidate_id,
+                "dataset_status",
+                {},
+                timeout=60,
+            )
+            if not isinstance(dataset_status, Mapping):
+                raise ValueError("dataset_status returned a non-object value")
+            dataset_status = dict(dataset_status)
+            splits = self._acceptance_split_bindings(dataset_status)
+            expected_dataset = str(dict(plan["dataset"])["id"])
+            actual_dataset = str(
+                dataset_status.get("dataset_id")
+                or dataset_status.get("logical_name")
+                or dataset_status.get("id")
+                or ""
+            )
+            dataset_matches = actual_dataset == expected_dataset
+            checks.append(
+                {
+                    "id": "runner.dataset_binding",
+                    "ok": dataset_matches,
+                    "expected_dataset": expected_dataset,
+                    "actual_dataset": actual_dataset or None,
+                    "dataset_digest": splits["validation"]["dataset_digest"],
+                    "ready": dataset_status.get("ready"),
+                }
+            )
+            if not dataset_matches:
+                errors.append("runner dataset identity differs from the accepted ExperimentPlan")
+
+            conditions = self._acceptance_conditions(
+                plan,
+                runner_id=candidate_id,
+                dataset_digest=splits["validation"]["dataset_digest"],
+            )
+            smoke_profile = next(
+                (
+                    (profile_id, dict(profile_value))
+                    for profile_id, profile_value in dict(conditions["execution"]).items()
+                    if str(dict(profile_value).get("evidence_class") or "") == "workflow_smoke"
+                ),
+                None,
+            )
+            if smoke_profile is None:
+                raise ValueError("ExperimentPlan has no workflow_smoke execution profile")
+            manager_profile, profile_conditions = smoke_profile
+            seeds = list(profile_conditions.get("seeds") or [])
+            if len(seeds) != 1:
+                raise ValueError("workflow_smoke must expose one bounded seed")
+            arms = [dict(item) for item in dict(plan["operators"])["arms"] if isinstance(item, Mapping)]
+            baseline = next((item for item in arms if item.get("role") == "baseline"), None)
+            if baseline is None:
+                raise ValueError("ExperimentPlan has no baseline arm")
+            smoke_request = {
+                "experiment_id": f"acceptance:{str(compilation.get('digest') or '')[-16:]}",
+                "experiment_revision_id": str(plan.get("digest") or "acceptance-plan"),
+                "trial_id": "acceptance-trial",
+                "run_id": "acceptance-run",
+                "attempt_number": 1,
+                "profile": str(manager_profile),
+                "seed": int(seeds[0]),
+                "arm": baseline,
+                "conditions": conditions,
+                "profile_conditions": profile_conditions,
+            }
+            prepared = developer_validation.invoke_skill(
+                candidate_id,
+                "prepare_attempt",
+                {"request": smoke_request},
+                timeout=120,
+            )
+            if not isinstance(prepared, Mapping):
+                raise ValueError("prepare_attempt returned a non-object value")
+            prepared = dict(prepared)
+            if prepared.get("contract") != "adaos.research.runner.v1":
+                raise ValueError("prepare_attempt returned an incompatible runner contract")
+            if str(prepared.get("provider_id") or "") != candidate_id:
+                raise ValueError("prepare_attempt returned another provider identity")
+            package = dict(prepared.get("package_ref") or {})
+            ContentRef(
+                uri=str(package["uri"]),
+                digest=str(package["digest"]),
+                size_bytes=int(package["size_bytes"]),
+                media_type=str(package["media_type"]),
+                owner_ref=str(package["owner_ref"]),
+                kind=str(package.get("kind") or "execution-package"),
+                metadata=dict(package.get("metadata") or {}),
+            )
+            command = [str(item) for item in prepared.get("command") or []]
+            required_fields = {
+                "code_digest": str(prepared.get("code_digest") or ""),
+                "environment_digest": str(prepared.get("environment_digest") or ""),
+                "working_directory": str(prepared.get("working_directory") or ""),
+                "output_ref": str(prepared.get("output_ref") or ""),
+                "spec_id": str(prepared.get("spec_id") or ""),
+            }
+            if len(command) < 2 or any(not item for item in required_fields.values()):
+                raise ValueError("prepare_attempt returned an incomplete executable package")
+            if not all(
+                re.fullmatch(r"sha256:[0-9a-f]{64}", required_fields[key])
+                for key in ("code_digest", "environment_digest")
+            ):
+                raise ValueError("runner code or environment identity is not a SHA-256 digest")
+            checks.append(
+                {
+                    "id": "runner.prepare_attempt",
+                    "ok": True,
+                    "contract": prepared["contract"],
+                    "provider_id": prepared["provider_id"],
+                    "package_digest": package["digest"],
+                    "code_digest": required_fields["code_digest"],
+                    "environment_digest": required_fields["environment_digest"],
+                    "profile": manager_profile,
+                    "seed": seeds[0],
+                }
+            )
+        except Exception as exc:
+            errors.append(f"{type(exc).__name__}: {exc}")
+            checks.append(
+                {
+                    "id": "runner.consumer_probe",
+                    "ok": False,
+                    "error": f"{type(exc).__name__}: {exc}",
+                }
+            )
+        return self._acceptance_receipt(
+            profile,
+            checks=checks,
+            errors=errors,
+            evidence={
+                "candidate_ref": candidate_ref,
+                "compilation_digest": compilation.get("digest"),
+                "experiment_plan_digest": plan.get("digest"),
+                "scientific_execution_started": False,
+            },
+        )
 
     def create_study(
         self,
