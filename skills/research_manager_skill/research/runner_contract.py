@@ -7,17 +7,70 @@ from typing import Any
 from research.contracts import digest
 
 
+def _sha256_schema() -> dict[str, Any]:
+    return {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+
+
+def _content_ref_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "required": ["uri", "digest", "size_bytes", "media_type", "owner_ref"],
+        "properties": {
+            "uri": {"type": "string", "minLength": 1},
+            "digest": _sha256_schema(),
+            "size_bytes": {"type": "integer", "minimum": 0},
+            "media_type": {"type": "string", "minLength": 1},
+            "owner_ref": {"type": "string", "pattern": "^skill:[A-Za-z0-9_.-]+$"},
+            "kind": {"type": "string", "minLength": 1},
+            "metadata": {"type": "object"},
+        },
+        "additionalProperties": True,
+    }
+
+
+def _split_binding_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "required": ["digest", "dataset_digest", "locator", "sealed"],
+        "properties": {
+            "digest": _sha256_schema(),
+            "dataset_digest": _sha256_schema(),
+            "locator": {"type": "string", "minLength": 1},
+            "sealed": {"type": "boolean"},
+        },
+        "additionalProperties": True,
+    }
+
+
 def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
             "dataset_status": {
                 "input_schema": {"type": "object", "additionalProperties": False},
                 "output_required": ["dataset_id", "split_bindings"],
+                "output_schema": {
+                    "type": "object",
+                    "required": ["dataset_id", "split_bindings"],
+                    "properties": {
+                        "dataset_id": {"type": "string", "minLength": 1},
+                        "ready": {"type": "boolean"},
+                        "split_bindings": {
+                            "type": "object",
+                            "required": ["validation", "robustness", "test"],
+                            "properties": {
+                                role: _split_binding_schema()
+                                for role in ("validation", "robustness", "test")
+                            },
+                            "additionalProperties": False,
+                        },
+                    },
+                    "additionalProperties": True,
+                },
                 "split_roles": ["validation", "robustness", "test"],
                 "split_identity_fields": ["digest", "dataset_digest", "locator", "sealed"],
                 "invariants": [
@@ -123,6 +176,46 @@ def descriptor() -> dict[str, Any]:
                     "output_ref",
                     "expected_outputs",
                 ],
+                "output_schema": {
+                    "type": "object",
+                    "required": [
+                        "contract",
+                        "provider_id",
+                        "package_ref",
+                        "code_digest",
+                        "environment_digest",
+                        "spec_id",
+                        "command",
+                        "working_directory",
+                        "output_ref",
+                        "expected_outputs",
+                    ],
+                    "properties": {
+                        "contract": {"const": "adaos.research.runner.v1"},
+                        "provider_id": {"type": "string", "minLength": 1},
+                        "package_ref": _content_ref_schema(),
+                        "code_digest": _sha256_schema(),
+                        "environment_digest": _sha256_schema(),
+                        "spec_id": {"type": "string", "minLength": 1},
+                        "command": {
+                            "type": "array",
+                            "items": {"type": "string", "minLength": 1},
+                            "minItems": 2,
+                        },
+                        "working_directory": {"type": "string", "minLength": 1},
+                        "output_ref": {"type": "string", "minLength": 1},
+                        "expected_outputs": {
+                            "type": "array",
+                            "items": {"type": "string", "minLength": 1},
+                            "minItems": 1,
+                        },
+                        "environment": {
+                            "type": "object",
+                            "additionalProperties": {"type": "string"},
+                        },
+                    },
+                    "additionalProperties": True,
+                },
                 "invariants": [
                     "contract equals adaos.research.runner.v1",
                     "provider_id equals the direction skill id",
@@ -144,6 +237,22 @@ def descriptor() -> dict[str, Any]:
                     "additionalProperties": False,
                 },
                 "output_required": ["provider_id", "observations", "artifacts", "complete"],
+                "output_schema": {
+                    "type": "object",
+                    "required": ["provider_id", "observations", "artifacts", "complete"],
+                    "properties": {
+                        "provider_id": {"type": "string", "minLength": 1},
+                        "observations": {
+                            "type": ["array", "object"],
+                        },
+                        "artifacts": {
+                            "type": "array",
+                            "items": _content_ref_schema(),
+                        },
+                        "complete": {"type": "boolean"},
+                    },
+                    "additionalProperties": True,
+                },
                 "invariants": [
                     "provider_id equals the direction skill id",
                     "observations use the canonical result_record paths",
@@ -161,6 +270,12 @@ def descriptor() -> dict[str, Any]:
                     "additionalProperties": False,
                 },
                 "output_required": ["ok"],
+                "output_schema": {
+                    "type": "object",
+                    "required": ["ok"],
+                    "properties": {"ok": {"type": "boolean"}},
+                    "additionalProperties": True,
+                },
                 "invariants": ["recompute or provider-verify the exact requested content identity"],
             },
         },

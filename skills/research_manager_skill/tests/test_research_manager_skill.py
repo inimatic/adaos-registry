@@ -191,6 +191,34 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     assert contract["operations"]["prepare_attempt"]["input_schema"]["required"] == [
         "request"
     ]
+    for operation in contract["operations"].values():
+        jsonschema.Draft202012Validator.check_schema(operation["input_schema"])
+        jsonschema.Draft202012Validator.check_schema(operation["output_schema"])
+
+    dataset_schema = contract["operations"]["dataset_status"]["output_schema"]
+    split_values = {
+        role: {**item, "sealed": role == "test"}
+        for role, item in _splits().items()
+    }
+    jsonschema.validate(
+        {
+            "dataset_id": "stl10_torchvision",
+            "ready": True,
+            "split_bindings": split_values,
+        },
+        dataset_schema,
+    )
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(
+            {
+                "dataset_id": "stl10_torchvision",
+                "split_bindings": [
+                    {"role": role, **item, "sealed": role == "test"}
+                    for role, item in split_values.items()
+                ],
+            },
+            dataset_schema,
+        )
 
 
 def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) -> None:
