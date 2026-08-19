@@ -1,5 +1,5 @@
 name: research_evaluator_skill
-version: 0.1.16
+version: 0.1.17
 description: Independent, contamination-aware evaluator for AdaOS research-compilation
   calibrations.
 supported_locales:
@@ -75,7 +75,8 @@ tools:
       runner_version:
         type: string
       source_direction_id:
-        description: Optional accepted ResearchDirection whose exact Compilation and AutomationBrief replace the baseline task contracts.
+        description: Optional accepted ResearchDirection whose exact Compilation and
+          AutomationBrief replace the baseline task contracts.
         type:
         - string
         - 'null'
@@ -406,12 +407,13 @@ data_routes:
     into candidate context
   budget:
     max_payload_bytes: 4194304
-updated_at: '2026-08-19T08:45:43+00:00'
+updated_at: '2026-08-19T09:27:15+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.866+5278.1d481bbb
-    recorded_at: '2026-08-19T08:45:43+00:00'
+    min_version: 0.1.867+5281.c434feef
+    recorded_at: '2026-08-19T09:27:15+00:00'
     source: skill_push
-    min_commit: 1d481bbb26acadd6ef9c37831c524943743fccf3
-    min_short_commit: 1d481bbb
-    build_date: '2026-08-19T11:40:48+03:00'
+    min_commit: c434feefbb0a4a4d4325f92b58b43faf13ec5aae
+    min_short_commit: c434feef
+    build_date: '2026-08-19T12:24:30+03:00'
+
