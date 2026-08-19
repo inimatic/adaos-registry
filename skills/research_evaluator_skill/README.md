@@ -50,7 +50,10 @@ confounding but does not justify a universal autonomous-science claim.
 3. For every arm, seed, and budget view call `prepare_calibration_arm` and give
    only the returned packet to the Builder/Codex execution boundary.
 4. A separate judge records deterministic, expert, or LLM-judge check evidence
-   through `record_calibration_result`.
+   through `record_calibration_result`. `evaluate_builder_attempt` instead
+   invokes the active ResearchManager consumer with
+   `execute_workflow_smoke=true`; a terminal Builder status alone is never
+   treated as evidence-valid completion.
 5. `summarize_calibration` reports completion rate, Wilson intervals, resource
    usage, first-failure stages, and—when v1.3 or later is used—the independently
    recomputed paired C0/C3 result and scoped conclusion for one budget view.
@@ -63,3 +66,9 @@ The evaluator owns its database. Research-direction skills own primary source
 artifacts. Candidate packets contain materialized audience views and selected
 instruction files; evaluator oracles and legacy implementations remain outside
 those roots.
+
+The C3 conformance fixture is the active public ResearchManager runner ABI,
+including the JSON Schemas for `run_log.json`, `evaluation_audit.json`, and
+`artifacts_index.json`. The judge may remain hidden, but it must not require an
+undisclosed filename, shape, or seed-label convention. This separates genuine
+implementation failure from benchmark-harness ambiguity.

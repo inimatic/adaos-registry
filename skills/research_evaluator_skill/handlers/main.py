@@ -509,6 +509,7 @@ def evaluate_builder_attempt(
                         "project_ref": session.get("project_ref"),
                         "candidate_ref": f"skill:{candidate_id}",
                         "candidate": {"id": candidate_id},
+                        "execute_workflow_smoke": True,
                         "contract_inputs": contract_inputs,
                         "instructions": {
                             kind: instruction_values[kind]
