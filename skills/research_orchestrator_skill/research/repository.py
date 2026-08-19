@@ -64,6 +64,22 @@ MIGRATIONS = (
             "UPDATE research_formulation_stages SET task_id=(SELECT active_task_id FROM research_directions WHERE research_directions.direction_id=research_formulation_stages.direction_id) WHERE task_id IS NULL",
         ),
     ),
+    RelationalMigration(
+        version=4,
+        name="project release study realization and federated activity lineage",
+        idempotent=True,
+        statements=(
+            "ALTER TABLE research_implementation_tracks ADD COLUMN project_release_ref TEXT",
+            "ALTER TABLE research_implementation_tracks ADD COLUMN project_release_digest TEXT",
+            "ALTER TABLE research_implementation_tracks ADD COLUMN study_id TEXT",
+            "ALTER TABLE research_implementation_tracks ADD COLUMN study_realization_ref TEXT",
+            "ALTER TABLE research_implementation_tracks ADD COLUMN study_realization_digest TEXT",
+            "ALTER TABLE research_implementation_tracks ADD COLUMN runner_ref TEXT",
+            "ALTER TABLE research_implementation_tracks ADD COLUMN experiment_id TEXT",
+            "ALTER TABLE research_activity ADD COLUMN source_event_id TEXT",
+            "CREATE UNIQUE INDEX research_activity_external_event ON research_activity(origin, source_event_id)",
+        ),
+    ),
 )
 
 
@@ -464,6 +480,13 @@ class OrchestratorRepository:
             "primary_target_ref": row.get("primary_target_ref"),
             "development_session_id": row.get("development_session_id"),
             "candidate_release_digest": row.get("candidate_release_digest"),
+            "project_release_ref": row.get("project_release_ref"),
+            "project_release_digest": row.get("project_release_digest"),
+            "study_id": row.get("study_id"),
+            "study_realization_ref": row.get("study_realization_ref"),
+            "study_realization_digest": row.get("study_realization_digest"),
+            "runner_ref": row.get("runner_ref"),
+            "experiment_id": row.get("experiment_id"),
             "metadata": json.loads(str(row.get("metadata_json") or "{}")),
             "created_at": str(row["created_at"]),
             "updated_at": str(row["updated_at"]),
@@ -605,6 +628,80 @@ class OrchestratorRepository:
         if not result:
             raise ValueError("implementation track does not exist")
         return result
+
+    def bind_track_release(
+        self,
+        track_id: str,
+        *,
+        candidate_release_digest: str,
+        project_release_ref: str | None = None,
+        project_release_digest: str | None = None,
+    ) -> dict[str, Any]:
+        current = self.get_track(track_id)
+        if not current:
+            raise ValueError("implementation track does not exist")
+        candidate_digest = str(candidate_release_digest or "").strip()
+        if not candidate_digest:
+            raise ValueError("candidate_release_digest is required")
+        release_ref = str(project_release_ref or "").strip() or None
+        release_digest = str(project_release_digest or "").strip() or None
+        if bool(release_ref) != bool(release_digest):
+            raise ValueError("project release ref and digest must be bound together")
+        if release_digest and release_digest != candidate_digest:
+            raise ValueError("promoted ProjectRelease digest differs from the prepared candidate")
+        status = "release_ready" if release_ref else "trial_ready"
+        if (
+            current.get("candidate_release_digest") == candidate_digest
+            and current.get("project_release_ref") == release_ref
+            and current.get("project_release_digest") == release_digest
+            and current.get("status") == status
+        ):
+            return current
+        self._db.execute(
+            "UPDATE research_implementation_tracks SET candidate_release_digest=:candidate_digest, project_release_ref=:release_ref, project_release_digest=:release_digest, status=:status, revision=revision+1, updated_at=:updated_at WHERE track_id=:track_id",
+            {
+                "track_id": track_id,
+                "candidate_digest": candidate_digest,
+                "release_ref": release_ref,
+                "release_digest": release_digest,
+                "status": status,
+                "updated_at": now(),
+            },
+        )
+        return dict(self.get_track(track_id) or {})
+
+    def bind_track_study(
+        self,
+        track_id: str,
+        *,
+        study_id: str,
+        study_realization_ref: str,
+        study_realization_digest: str,
+        runner_ref: str,
+        experiment_id: str | None = None,
+    ) -> dict[str, Any]:
+        current = self.get_track(track_id)
+        if not current:
+            raise ValueError("implementation track does not exist")
+        values = {
+            "study_id": str(study_id or "").strip(),
+            "study_realization_ref": str(study_realization_ref or "").strip(),
+            "study_realization_digest": str(study_realization_digest or "").strip(),
+            "runner_ref": str(runner_ref or "").strip(),
+            "experiment_id": str(experiment_id or "").strip() or None,
+        }
+        if any(not values[key] for key in ("study_id", "study_realization_ref", "study_realization_digest", "runner_ref")):
+            raise ValueError("complete StudyRealization identity is required")
+        if current.get("project_release_digest") is None:
+            raise ValueError("implementation track has no promoted ProjectRelease")
+        status = "experiment_ready" if values["experiment_id"] else "study_ready"
+        if all(current.get(key) == value for key, value in values.items()) and current.get("status") == status:
+            return current
+        self._db.execute(
+            "UPDATE research_implementation_tracks SET study_id=:study_id, study_realization_ref=:study_realization_ref, study_realization_digest=:study_realization_digest, runner_ref=:runner_ref, experiment_id=:experiment_id, status=:status, revision=revision+1, updated_at=:updated_at WHERE track_id=:track_id",
+            {**values, "track_id": track_id, "status": status, "updated_at": now()},
+        )
+        return dict(self.get_track(track_id) or {})
 
     def get_track(self, track_id: str | None) -> dict[str, Any] | None:
         if not track_id:
@@ -762,21 +859,30 @@ class OrchestratorRepository:
         actor: str = "system:research_orchestrator",
         origin: str = "research_orchestrator",
         subject_ref: str | None = None,
+        source_event_id: str | None = None,
     ) -> dict[str, Any]:
+        external_id = str(source_event_id or "").strip() or None
         with self._db.transaction() as tx:
+            if external_id:
+                existing = tx.fetch_one(
+                    "SELECT event_id, direction_id, seq, stage, status, message, detail_json, actor, origin, subject_ref, source_event_id, created_at FROM research_activity WHERE origin=:origin AND source_event_id=:source_event_id",
+                    {"origin": origin, "source_event_id": external_id},
+                )
+                if existing:
+                    return {**dict(existing), "detail": json.loads(str(existing["detail_json"]))}
             row = tx.fetch_one("SELECT COALESCE(MAX(seq), 0) AS seq FROM research_activity WHERE direction_id=:direction_id", {"direction_id": direction_id})
             seq = int(row["seq"] if row else 0) + 1
             event_id = f"activity-{direction_id}-{seq:06d}"
-            event = {"event_id": event_id, "direction_id": direction_id, "seq": seq, "stage": stage, "status": status, "message": message, "detail": dict(detail or {}), "actor": actor, "origin": origin, "subject_ref": subject_ref, "created_at": now()}
+            event = {"event_id": event_id, "direction_id": direction_id, "seq": seq, "stage": stage, "status": status, "message": message, "detail": dict(detail or {}), "actor": actor, "origin": origin, "subject_ref": subject_ref, "source_event_id": external_id, "created_at": now()}
             tx.execute(
-                "INSERT INTO research_activity(event_id, direction_id, seq, stage, status, message, detail_json, actor, origin, subject_ref, created_at) VALUES (:event_id, :direction_id, :seq, :stage, :status, :message, :detail_json, :actor, :origin, :subject_ref, :created_at)",
+                "INSERT INTO research_activity(event_id, direction_id, seq, stage, status, message, detail_json, actor, origin, subject_ref, source_event_id, created_at) VALUES (:event_id, :direction_id, :seq, :stage, :status, :message, :detail_json, :actor, :origin, :subject_ref, :source_event_id, :created_at)",
                 {**event, "detail_json": canonical_json(event["detail"])},
             )
         return event
 
     def activities(self, direction_id: str, limit: int = 200) -> list[dict[str, Any]]:
         rows = self._db.fetch_all(
-            "SELECT event_id, direction_id, seq, stage, status, message, detail_json, actor, origin, subject_ref, created_at FROM research_activity WHERE direction_id=:direction_id ORDER BY seq DESC",
+            "SELECT event_id, direction_id, seq, stage, status, message, detail_json, actor, origin, subject_ref, source_event_id, created_at FROM research_activity WHERE direction_id=:direction_id ORDER BY seq DESC",
             {"direction_id": direction_id},
         )[: max(1, min(int(limit), 500))]
         return [{**dict(row), "detail": json.loads(str(row["detail_json"]))} for row in reversed(rows)]

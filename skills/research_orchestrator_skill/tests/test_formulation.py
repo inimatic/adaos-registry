@@ -37,6 +37,13 @@ def _protocol(*, unresolved: bool = False) -> dict:
         "assistant_message": "Предложен двухстадийный протокол.",
         "experimental_plan": {
             "comparators": ["MaxPool", "TLP"],
+            "comparison_design": {
+                "arms": [
+                    {"id": "maxpool", "label": "MaxPool", "role": "baseline", "specification": "Ordinary MaxPool at the selected pooling boundary."},
+                    {"id": "tlp", "label": "TLP", "role": "intervention", "specification": "Centered trainable max-plus pooling at the same boundary."},
+                ],
+                "primary_contrast": {"minuend": "tlp", "subtrahend": "maxpool"},
+            },
             "system_specification": {
                 "subject": "Paired STL-10 pooling classifier",
                 "components": [
@@ -169,7 +176,7 @@ def test_candidate_assembly_canonicalizes_repeated_source_refs() -> None:
     assert candidate["source_grounding"][0]["source_refs"] == [EXACT_REF]
 
 
-def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceability() -> None:
+def test_research_compiler_emits_execution_plan_and_source_to_acceptance_traceability() -> None:
     bundle = {
         "digest": "sha256:" + "9" * 64,
         "audience": "research.formulation",
@@ -221,6 +228,7 @@ def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceabili
         "research_problem",
         "experimental_protocol",
         "engineering_contract",
+        "experiment_plan",
     ]
     assert package["context_receipt"]["excluded_count"] == 1
     assert package["traceability_coverage"]["valid"] is True
@@ -230,6 +238,11 @@ def test_research_compiler_emits_four_facets_and_source_to_acceptance_traceabili
     projection = project_execution_compilation(package)
     assert projection["compilation_digest"] == package["digest"]
     assert projection["traceability"]["protocol_digest"] == package["facets"]["experimental_protocol"]["digest"]
+    plan = projection["experiment_plan"]
+    assert [item["id"] for item in plan["operators"]["arms"]] == ["maxpool", "tlp"]
+    assert plan["analysis"]["primary_contrast"] == {"minuend": "tlp", "subtrahend": "maxpool"}
+    assert plan["execution"]["smoke"]["epochs"] == 3
+    assert plan["runner_contract"]["dataset_binding"]["required_roles"] == ["validation", "robustness", "test"]
     assert "inventory" not in projection["source_analysis"]
     assert all(node["kind"] != "acceptance_check" for node in projection["traceability"]["nodes"])
 

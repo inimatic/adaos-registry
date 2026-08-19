@@ -499,7 +499,7 @@ def materialize_automation_brief(
                 "role": "provider",
                 "consumer_ref": "skill:research_manager_skill",
                 "operations": ["prepare_attempt", "collect_attempt", "verify_artifact", "dataset_status"],
-                "boundary": "The direction skill prepares an ExecutionSpec-compatible command and returns normalized observations and portable artifact refs; research_manager_skill owns attempt submission, tracker sessions, ingestion, and finalization.",
+                "boundary": "The direction skill prepares an ExecutionSpec-compatible command and returns normalized observations and portable artifact refs; dataset_status returns immutable validation, robustness, and sealed-test split bindings with digest, dataset_digest, and portable locator. research_manager_skill owns attempt submission, tracker sessions, ingestion, and finalization.",
             },
             {
                 "id": "research.tracker.indirect",
@@ -515,6 +515,7 @@ def materialize_automation_brief(
             {"id": "adaos.direction_boundary", "check": "Preserve the Project-owned direction-skill boundary; do not create a direction-specific scenario.", "evidence": "Project manifest and package inventory"},
             {"id": "adaos.data_ownership", "check": "Keep primary experimental data in this direction skill's scoped runtime data bucket.", "evidence": "Resolved capability bindings and runtime paths"},
             {"id": "adaos.runner_contract", "check": "Provide adaos.research.runner.v1 through prepare_attempt, collect_attempt, verify_artifact, and dataset_status; let research_manager_skill orchestrate attempts and tracking.", "evidence": "Consumer-driven runner conformance, installation, and bounded smoke reports"},
+            {"id": "adaos.dataset_binding", "check": "Return distinct immutable validation, robustness, and sealed-test identities from dataset_status without exposing sealed test labels or host-private paths.", "evidence": "ResearchManager Study admission and dataset binding conformance"},
             {"id": "adaos.tracker_boundary", "check": "Return normalized observations and portable ContentRefs without creating a direction-owned Tracker implementation.", "evidence": "ResearchManager ingestion conformance and absence of direct tracker-session calls"},
             {"id": "adaos.content_identity", "check": "Bind experiment inputs, code, environment, metrics and evidence by digest.", "evidence": "ContentRef and tracker records"},
             {"id": "adaos.historical_evidence", "check": "Treat imported notebook outputs as untrusted exploratory source material.", "evidence": "Evidence classification in produced records"},

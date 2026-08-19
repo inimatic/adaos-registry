@@ -9,7 +9,7 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.compilation_package.v1"},
-    "schema_version": {"const": "1.0.0"},
+    "schema_version": {"enum": ["1.0.0", "1.1.0"]},
     "direction_id": {"type": "string", "minLength": 1},
     "task": {"$ref": "#/$defs/taskRef"},
     "run_id": {"type": "string", "minLength": 1},
@@ -32,7 +32,8 @@
         "source_analysis": {"$ref": "#/$defs/facet"},
         "research_problem": {"$ref": "#/$defs/facet"},
         "experimental_protocol": {"$ref": "#/$defs/facet"},
-        "engineering_contract": {"$ref": "#/$defs/facet"}
+        "engineering_contract": {"$ref": "#/$defs/facet"},
+        "experiment_plan": {"$ref": "#/$defs/facet"}
       },
       "additionalProperties": false
     },
@@ -65,7 +66,7 @@
       "required": ["schema", "stage", "source_stage", "payload", "digest"],
       "properties": {
         "schema": {"const": "adaos.research.compilation_facet.v1"},
-        "stage": {"enum": ["source_analysis", "research_problem", "experimental_protocol", "engineering_contract"]},
+        "stage": {"enum": ["source_analysis", "research_problem", "experimental_protocol", "engineering_contract", "experiment_plan"]},
         "source_stage": {"type": "string", "minLength": 1},
         "payload": {"type": "object"},
         "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
@@ -73,5 +74,11 @@
       "additionalProperties": false
     }
   },
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.1.0"}}},
+      "then": {"properties": {"facets": {"required": ["source_analysis", "research_problem", "experimental_protocol", "engineering_contract", "experiment_plan"]}}}
+    }
+  ],
   "additionalProperties": false
 }

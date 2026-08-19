@@ -9,7 +9,7 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.compilation_projection.v1"},
-    "schema_version": {"const": "1.0.0"},
+    "schema_version": {"enum": ["1.0.0", "1.1.0"]},
     "direction_id": {"type": "string", "minLength": 1},
     "task": {
       "type": "object",
@@ -37,6 +37,7 @@
     },
     "research_problem": {"type": "object"},
     "experimental_protocol": {"type": "object"},
+    "experiment_plan": {"type": "object"},
     "traceability": {
       "type": "object",
       "required": ["protocol_digest", "nodes", "edges"],
@@ -50,5 +51,11 @@
     "readiness": {"type": "object"},
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.1.0"}}},
+      "then": {"required": ["experiment_plan"]}
+    }
+  ],
   "additionalProperties": false
 }

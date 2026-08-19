@@ -581,6 +581,140 @@ def open_builder_session(
     )
 
 
+@tool(summary="Start one-shot Builder Automation from the exact bound Development Session.", side_effects="external_write")
+def start_implementation(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    builder_webspace_id: str | None = None,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().start_implementation(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        builder_webspace_id=builder_webspace_id,
+        actor=actor,
+    )
+
+
+@tool(summary="Synchronize Builder Automation into the durable research activity ledger.", side_effects="local_write")
+def sync_implementation(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    builder_webspace_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().sync_implementation(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        builder_webspace_id=builder_webspace_id,
+        actor=actor,
+    )
+
+
+@tool(summary="Prepare an isolated reviewed ProjectRelease candidate through Builder.", side_effects="external_write")
+def prepare_project_release(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    builder_webspace_id: str | None = None,
+    bump: str = "patch",
+    confirmed: bool = False,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().prepare_project_release(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        builder_webspace_id=builder_webspace_id,
+        bump=bump,
+        confirmed=confirmed,
+        actor=actor,
+    )
+
+
+@tool(summary="Promote the exact reviewed ProjectRelease candidate through Builder.", side_effects="external_write")
+def publish_project_release(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    builder_webspace_id: str | None = None,
+    bump: str = "patch",
+    confirmed: bool = False,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().publish_project_release(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        builder_webspace_id=builder_webspace_id,
+        bump=bump,
+        confirmed=confirmed,
+        actor=actor,
+    )
+
+
+@tool(summary="Bind an exact ProjectRelease and runner to a ResearchManager Study and Experiment.", side_effects="external_write")
+def instantiate_study(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().instantiate_study(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
+@tool(summary="Lock the compiled protocol and submit its bounded CPU workflow smoke.", side_effects="external_write")
+def start_study_smoke(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    confirmed: bool = False,
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().start_study_smoke(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        confirmed=confirmed,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
+@tool(summary="Reconcile ResearchManager attempts into the durable research activity ledger.", side_effects="local_write")
+def sync_study(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().sync_study(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+    )
+
+
 @tool(summary="Read durable research formulation activity.", side_effects="none")
 def get_activity(
     direction_id: str,

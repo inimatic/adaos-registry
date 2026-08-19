@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.27.0
+version: 0.28.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -648,6 +648,232 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: start_implementation
+  description: Start one-shot Builder Automation using only the exact digest-bound
+    Development Session inputs.
+  entry: handlers.main:start_implementation
+  side_effects: external_write
+  timeout_seconds: 240
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      builder_webspace_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: sync_implementation
+  description: Import a durable idempotent Builder Automation status snapshot into
+    research activity.
+  entry: handlers.main:sync_implementation
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      builder_webspace_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: prepare_project_release
+  description: Prepare a Builder candidate trial and bind its immutable release digest
+    to the implementation track.
+  entry: handlers.main:prepare_project_release
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - confirmed
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      builder_webspace_id:
+        type:
+        - string
+        - 'null'
+      bump:
+        enum:
+        - major
+        - minor
+        - patch
+        default: patch
+      confirmed:
+        const: true
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: publish_project_release
+  description: Promote the exact reviewed Builder candidate and bind its ProjectRelease
+    identity.
+  entry: handlers.main:publish_project_release
+  side_effects: external_write
+  timeout_seconds: 360
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - confirmed
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      builder_webspace_id:
+        type:
+        - string
+        - 'null'
+      bump:
+        enum:
+        - major
+        - minor
+        - patch
+        default: patch
+      confirmed:
+        const: true
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: instantiate_study
+  description: Create an exact ResearchManager StudyRealization and draft Experiment
+    from the accepted ExperimentPlan.
+  entry: handlers.main:instantiate_study
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: start_study_smoke
+  description: Explicitly lock the compiled protocol and submit its non-inferential
+    CPU preflight through ResearchManager.
+  entry: handlers.main:start_study_smoke
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    - confirmed
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
+      confirmed:
+        const: true
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: sync_study
+  description: Reconcile ResearchManager execution and import an idempotent Study
+    activity snapshot.
+  entry: handlers.main:sync_study
+  side_effects: local_write
+  timeout_seconds: 240
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: get_activity
   description: Read durable stage activity for chat and widget projections.
   entry: handlers.main:get_activity
@@ -1097,13 +1323,13 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-18T15:04:30+00:00'
+updated_at: '2026-08-19T08:23:39+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.863+5255.a81c7a26
-    recorded_at: '2026-08-18T15:04:30+00:00'
+    min_version: 0.1.866+5277.9ba7e61e
+    recorded_at: '2026-08-19T08:23:39+00:00'
     source: skill_push
-    min_commit: a81c7a26c1e3516880555b7662f893509fbc4883
-    min_short_commit: a81c7a26
-    build_date: '2026-08-18T17:54:03+03:00'
+    min_commit: 9ba7e61e23a9c54382dd8fe9199242f83ae2a98d
+    min_short_commit: 9ba7e61e
+    build_date: '2026-08-19T11:07:07+03:00'
 

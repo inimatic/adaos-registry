@@ -8,7 +8,7 @@ from typing import Any
 from adaos.services.traceability import build_graph, evaluate_paths
 
 from research.contracts import digest, validate
-from research.formulation import validate_stage
+from research.formulation import assemble_candidate, validate_stage
 
 
 def _facet(stage: str, source_stage: str, payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -25,6 +25,98 @@ def _facet(stage: str, source_stage: str, payload: Mapping[str, Any]) -> dict[st
 def _node_token(value: str) -> str:
     token = re.sub(r"[^A-Za-z0-9_.:#/-]+", "-", str(value or "")).strip("-./:#")
     return token[:180] or "unknown"
+
+
+def _build_experiment_plan(
+    *,
+    direction_id: str,
+    task: Mapping[str, Any] | None,
+    source_bundle_digest: str,
+    protocol: Mapping[str, Any],
+    compiled_evaluation: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Compile scientific choices into the provider-neutral ResearchManager input.
+
+    No runtime provider, data locator, or release identity is invented here.  Those
+    are bound later by StudyRealization after the implementation is published.
+    """
+
+    experimental = dict(protocol["experimental_plan"])
+    comparison = dict(experimental["comparison_design"])
+    data_policy = dict(experimental["data_policy"])
+    reproducibility = dict(experimental["reproducibility"])
+    pairing = dict(reproducibility["pairing"])
+    evaluation = dict(compiled_evaluation)
+    estimand = dict(evaluation["primary_estimand"])
+    execution: dict[str, Any] = {}
+    for stage in experimental["stages"]:
+        stage_value = dict(stage)
+        budget = dict(stage_value["budget"])
+        profile = dict(stage_value["execution_profile"])
+        stage_id = str(stage_value["id"])
+        execution[stage_id] = {
+            "stage_id": stage_id,
+            "evidence_class": str(stage_value["evidence_class"]),
+            "epochs": int(budget["epochs"]),
+            "seeds": copy.deepcopy(list(budget["seed_values"])),
+            "device": str(profile["device"]),
+            "node": str(profile["node"]),
+            "max_wall_time_minutes": int(budget["max_wall_time_minutes"]),
+            "inference_allowed": bool(stage_value["inference_allowed"]),
+            "stop_conditions": copy.deepcopy(list(stage_value["stop_conditions"])),
+        }
+    task_id = str((task or {}).get("task_id") or f"{direction_id}.task-001")
+    plan: dict[str, Any] = {
+        "schema": "adaos.research.experiment_plan.v1",
+        "schema_version": "1.0.0",
+        "direction_ref": f"research-direction:{direction_id}",
+        "task_ref": str((task or {}).get("ref") or f"research-task:{task_id}"),
+        "source_bundle_digest": str(source_bundle_digest),
+        "dataset": {
+            "logical_name": str(data_policy["dataset"]),
+            "policy_digest": digest(data_policy),
+            "split_strategy": str(data_policy["split_strategy"]),
+            "evaluation_seal": str(data_policy["evaluation_seal"]),
+            "leakage_controls": copy.deepcopy(list(data_policy["leakage_controls"])),
+            "evaluation_access": copy.deepcopy(dict(data_policy["evaluation_access"])),
+        },
+        "operators": {"arms": copy.deepcopy(list(comparison["arms"]))},
+        "execution": execution,
+        "randomization": {
+            "paired": True,
+            "unit": str(pairing["unit"]),
+            "named_streams": [str(item["id"]) for item in reproducibility["rng_streams"]],
+            "invariant_fields": copy.deepcopy(list(pairing["invariant_fields"])),
+            "varied_fields": copy.deepcopy(list(pairing["varied_fields"])),
+            "allocation": copy.deepcopy(dict(pairing["allocation"])),
+        },
+        "analysis": {
+            "primary_metric": "best_validation_accuracy",
+            "primary_estimand": str(estimand["name"]),
+            "primary_contrast": copy.deepcopy(dict(comparison["primary_contrast"])),
+            "uncertainty": copy.deepcopy(dict(evaluation["uncertainty"])),
+            "stopping_rule": copy.deepcopy(dict(evaluation["stopping_rule"])),
+            "decision_rules": copy.deepcopy(list(evaluation["decision_rules"])),
+            "practical_significance": str(evaluation["practical_significance"]),
+            "negative_result_policy": str(evaluation["negative_result_policy"]),
+        },
+        "evidence_policy": {
+            "historical_results": "exploratory_source_only",
+            "workflow_smoke": "workflow_evidence_only",
+            "negative_results": "retain_and_report",
+        },
+        "runner_contract": {
+            "contract": "adaos.research.runner.v1",
+            "operations": ["prepare_attempt", "collect_attempt", "verify_artifact", "dataset_status"],
+            "dataset_binding": {
+                "required_roles": ["validation", "robustness", "test"],
+                "test_sealed": True,
+                "identity_fields": ["digest", "dataset_digest", "locator"],
+            },
+        },
+    }
+    plan["digest"] = digest(plan)
+    return validate("research.experiment_plan.v1.schema.json", plan)
 
 
 def build_compilation(
@@ -44,6 +136,12 @@ def build_compilation(
     problem = validate_stage("problem_frame", problem_frame)
     protocol = validate_stage("protocol_design", protocol_design)
     implementation = validate_stage("implementation_contract", implementation_contract)
+    assembled = assemble_candidate(
+        problem,
+        protocol,
+        implementation,
+        source_ref_map=source_ref_map,
+    )
     reference_map = {str(key): str(value) for key, value in source_ref_map.items()}
 
     coverage = copy.deepcopy(dict(source_context.get("coverage") or {}))
@@ -115,11 +213,19 @@ def build_compilation(
             "open_questions",
         )
     }
+    experiment_plan = _build_experiment_plan(
+        direction_id=direction_id,
+        task=task,
+        source_bundle_digest=str(source_bundle["digest"]),
+        protocol=protocol,
+        compiled_evaluation=dict(assembled["evaluation_plan"]),
+    )
     facets = {
         "source_analysis": _facet("source_analysis", "problem_frame+deterministic_extraction", source_analysis),
         "research_problem": _facet("research_problem", "problem_frame", research_problem),
         "experimental_protocol": _facet("experimental_protocol", "protocol_design", protocol),
         "engineering_contract": _facet("engineering_contract", "implementation_contract", implementation),
+        "experiment_plan": _facet("experiment_plan", "deterministic_protocol_compiler", experiment_plan),
     }
 
     nodes: list[dict[str, Any]] = []
@@ -219,7 +325,7 @@ def build_compilation(
         blockers.append("the primary hypothesis has no admitted source reference")
     package: dict[str, Any] = {
         "schema": "adaos.research.compilation_package.v1",
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "direction_id": str(direction_id),
         "run_id": str(run_id),
         "source_bundle_digest": str(source_bundle["digest"]),
@@ -275,7 +381,7 @@ def project_execution_compilation(value: Mapping[str, Any]) -> dict[str, Any]:
     ]
     projected = {
         "schema": "adaos.research.compilation_projection.v1",
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0" if "experiment_plan" in source["facets"] else "1.0.0",
         "direction_id": source["direction_id"],
         "compilation_digest": source["digest"],
         "source_bundle_digest": source["source_bundle_digest"],
@@ -291,6 +397,11 @@ def project_execution_compilation(value: Mapping[str, Any]) -> dict[str, Any]:
         },
         "research_problem": problem,
         "experimental_protocol": copy.deepcopy(protocol_facet["payload"]),
+        **(
+            {"experiment_plan": copy.deepcopy(source["facets"]["experiment_plan"]["payload"])}
+            if "experiment_plan" in source["facets"]
+            else {}
+        ),
         "traceability": {
             "protocol_digest": protocol_facet["digest"],
             "nodes": nodes,

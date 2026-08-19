@@ -27,7 +27,7 @@ experimental data or post-handoff scientific governance records.
    outputs remain explicitly exploratory/untrusted. Every supplied fragment has
    an exact `artifact://...#cell/lines` reference.
 4. Inspect `get_compilation`: Source Analysis, Research Problem, Experimental
-   Protocol, and Engineering Contract have independent digests and a
+   Protocol, Engineering Contract, and the deterministic Experiment Plan have independent digests and a
    source-to-acceptance traceability report. Resolve blocking questions.
 5. Call `accept_prototype` with the exact prototype digest, current generation,
    and an idempotency key. The command creates an ImplementationTrack, its
@@ -36,7 +36,17 @@ experimental data or post-handoff scientific governance records.
    Project-scoped Builder Development Session. It uploads neither the direction
    source nor its intake artifacts.
 6. Inspect the brief and use `open_builder_session`. Codex is deliberately not
-   started by acceptance.
+   started by acceptance. `start_implementation` is the explicit one-shot
+   transition; it can only use the exact Development Session instruction.
+7. Use `sync_implementation`, then explicitly prepare and promote the normal
+   Builder candidate with `prepare_project_release` and
+   `publish_project_release`. The track stores both the candidate digest and
+   the exact promoted `ProjectRelease` identity.
+8. `instantiate_study` asks the installed runner for immutable validation,
+   robustness, and sealed-test split bindings, creates a manager-owned
+   `StudyRealization` and Experiment, and binds both back to the track.
+   `start_study_smoke` is the separate confirmed transition that locks the
+   compiled protocol and submits the non-inferential CPU preflight.
 
 `get_activity` exposes compact durable stages used by grouped chat progress and
 future Research Workbench widgets. `get_formulation_run` exposes the exact stage
@@ -56,7 +66,12 @@ Callers outside chat should pass stable `actor` and `invocation_origin` values.
 The default path uses three bounded LLM stages: `problem_frame`,
 `protocol_design`, and `implementation_contract`. AdaOS then compiles four
 stable facets: `source_analysis`, `research_problem`,
-`experimental_protocol`, and `engineering_contract`. It also creates a
+`experimental_protocol`, and `engineering_contract`, plus a fifth
+provider-neutral `experiment_plan` facet. The protocol stage must assign
+stable arm ids and one exact primary minuend/subtrahend. The deterministic
+plan then carries exact execution profiles, integer-or-string allocation
+units, evidence classes, data policy, RNG streams, estimand and the public
+runner/split-binding ABI without selecting a runtime provider. It also creates a
 digest-bound traceability graph and fails the compilation gate when required
 source-to-acceptance paths are absent. The Root LLM proposes only each bounded
 stage artifact. AdaOS materializes and
@@ -127,3 +142,8 @@ are not present under Codex's read-only artifact roots.
   authority transition required before formulation may write that task.
 - `research_manager_skill` remains the deterministic governance truth after
   Automation.
+
+Builder, manager, and later evaluator status snapshots are federated into the
+orchestrator journal with `(origin, source_event_id)` replay identity. The
+Workbench therefore observes one durable lifecycle without copying another
+component's private database or making UI connectivity part of execution.

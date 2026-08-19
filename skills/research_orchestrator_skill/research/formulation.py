@@ -11,7 +11,7 @@ from jsonschema import Draft202012Validator
 from research.contracts import prototype_candidate_schema
 
 
-STAGE_SCHEMA_VERSION = "1.0.0"
+STAGE_SCHEMA_VERSION = "1.1.0"
 REQUIREMENT_CATEGORIES = ("execution", "data", "reproducibility", "observability", "evidence", "recovery", "analysis", "security")
 CHECK_CATEGORIES = ("workflow", "data_integrity", "reproducibility", "evidence", "analysis", "failure_recovery", "security")
 PROTOCOL_DECISION_AREAS = (
@@ -165,6 +165,31 @@ def protocol_design_schema() -> dict[str, Any]:
     experimental_plan = _object(
         {
             "comparators": properties["experimental_plan"]["properties"]["comparators"],
+            "comparison_design": _object(
+                {
+                    "arms": {
+                        "type": "array",
+                        "minItems": 2,
+                        "items": _object(
+                            {
+                                "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+                                "label": {"type": "string", "minLength": 2},
+                                "role": {"enum": ["baseline", "intervention", "diagnostic"]},
+                                "specification": {"type": "string", "minLength": 10},
+                            },
+                            ["id", "label", "role", "specification"],
+                        ),
+                    },
+                    "primary_contrast": _object(
+                        {
+                            "minuend": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+                            "subtrahend": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+                        },
+                        ["minuend", "subtrahend"],
+                    ),
+                },
+                ["arms", "primary_contrast"],
+            ),
             "system_specification": system_specification,
             "stages": {
                 "type": "array",
@@ -188,7 +213,7 @@ def protocol_design_schema() -> dict[str, Any]:
             ),
             "reproducibility": properties["experimental_plan"]["properties"]["reproducibility"],
         },
-        ["comparators", "system_specification", "stages", "data_policy", "reproducibility"],
+        ["comparators", "comparison_design", "system_specification", "stages", "data_policy", "reproducibility"],
     )
     experimental_plan["properties"]["reproducibility"]["properties"]["environment"]["additionalProperties"] = False
     decision = _object(
@@ -347,6 +372,23 @@ def stage_quality_issues(
             issues.append("a two-sided difference hypothesis cannot treat the opposite direction as falsification")
     elif stage == "protocol_design":
         plan = payload["experimental_plan"]
+        comparison = plan["comparison_design"]
+        arms = [dict(item) for item in comparison["arms"]]
+        arm_ids = [str(item["id"]) for item in arms]
+        arm_labels = [str(item["label"]) for item in arms]
+        if len(arm_ids) != len(set(arm_ids)):
+            issues.append("comparison_design arm ids must be unique")
+        if arm_labels != [str(item) for item in plan["comparators"]]:
+            issues.append("comparison_design arm labels must exactly preserve comparator order")
+        contrast = comparison["primary_contrast"]
+        if contrast["minuend"] == contrast["subtrahend"]:
+            issues.append("primary contrast must reference two distinct arms")
+        if not {str(contrast["minuend"]), str(contrast["subtrahend"])}.issubset(set(arm_ids)):
+            issues.append("primary contrast must reference declared comparison arms")
+        if sum(1 for item in arms if item["role"] == "baseline") != 1:
+            issues.append("comparison_design must declare exactly one baseline arm")
+        if not any(item["role"] == "intervention" for item in arms):
+            issues.append("comparison_design must declare at least one intervention arm")
         system_spec = plan["system_specification"]
         component_ids = [str(item["id"]) for item in system_spec["components"]]
         if len(component_ids) != len(set(component_ids)):
@@ -644,6 +686,10 @@ def assemble_candidate(
                 }
             )
     experimental_plan = copy.deepcopy(protocol["experimental_plan"])
+    # Machine arm identities belong to the compiled ExperimentPlan.  The
+    # ResearchPrototype retains the human-facing comparator descriptions and
+    # remains backward compatible with the established scientific schema.
+    experimental_plan.pop("comparison_design", None)
     for component in experimental_plan["system_specification"]["components"]:
         component["source_refs"] = resolve_refs(component)
     evaluation_access = experimental_plan["data_policy"]["evaluation_access"]

@@ -526,9 +526,11 @@ class ResearchOrchestrator:
         repository: OrchestratorRepository | None = None,
         *,
         checkpoint: Callable[..., Mapping[str, Any]] | None = None,
+        skill_invoker: Callable[..., Mapping[str, Any]] | None = None,
     ) -> None:
         self.repository = repository or OrchestratorRepository()
         self._checkpoint = checkpoint or builder_artifacts.local_checkpoint
+        self._invoke_skill = skill_invoker or invoke_skill
 
     def _artifact_owner_id(self, direction_id: str) -> str:
         state = self.repository.get_direction(direction_id)
@@ -1502,7 +1504,7 @@ class ResearchOrchestrator:
         task = self.repository.get_task(direction.get("active_task_id"))
         if not task:
             raise ValueError("research direction has no active task")
-        response = invoke_skill(
+        response = self._invoke_skill(
             "research_evaluator_skill",
             "get_calibration_lineage",
             {
@@ -2501,10 +2503,13 @@ class ResearchOrchestrator:
                         "pairing": "predeclare every paired unit; vary only the intervention",
                         "negative_results": "retain_and_report",
                         "ray": "deferred",
+                        "runner_contract": "adaos.research.runner.v1",
+                        "comparison_identity": "stable lowercase arm ids plus one exact primary minuend/subtrahend",
                     },
                 },
                 rules=[
                     "Design exactly separated workflow_smoke and confirmatory stages; smoke never supports a scientific claim.",
+                    "In comparison_design give every comparator a stable lowercase machine id, preserve the comparators array order exactly in arm labels, declare exactly one baseline and at least one intervention, and bind the primary estimand to two declared arm ids as minuend and subtrahend.",
                     "In experimental_plan.system_specification enumerate the concrete system, baseline, intervention, data, and measurement components needed to reproduce the protocol. Record exact ordered settings such as layers, algorithms, transforms, optimizer, schedules, and metric definitions; words such as style, suitable, standard, or equivalent are not implementation specifications.",
                     "Mark each system component source_derived, policy_default, or proposed. Cite supplied SRC-### ids for every source-derived component, keep source_refs empty for the other statuses, and put every intentionally invariant detail in locked_invariants.",
                     "Make intervention_boundary identify the only allowed experimental difference. unresolved_choices must contain every missing implementation decision; it must be empty before ready_for_automation.",
@@ -3433,8 +3438,777 @@ class ResearchOrchestrator:
                 "automation_brief": stored,
                 "development_session": session,
                 "builder_checkpoint": checkpoint,
-                "codex_started": False,
+            "codex_started": False,
+        }
+
+    @staticmethod
+    def _component_identity(ref: str) -> tuple[str, str]:
+        kind, separator, component_id = str(ref or "").strip().partition(":")
+        if separator != ":" or kind not in {"skill", "scenario"} or not component_id:
+            raise ValueError("implementation target must be an exact skill: or scenario: ref")
+        return kind, component_id
+
+    @staticmethod
+    def _release_identity(value: Mapping[str, Any]) -> dict[str, str | None]:
+        candidate = value.get("candidate") if isinstance(value.get("candidate"), Mapping) else {}
+        release = value.get("release") if isinstance(value.get("release"), Mapping) else {}
+        workflow = value.get("workflow") if isinstance(value.get("workflow"), Mapping) else {}
+        delivery = workflow.get("delivery") if isinstance(workflow.get("delivery"), Mapping) else {}
+        return {
+            "candidate_id": str(
+                candidate.get("candidate_id")
+                or delivery.get("candidate_id")
+                or value.get("candidate_id")
+                or ""
+            ).strip() or None,
+            "release_digest": str(
+                candidate.get("release_digest")
+                or release.get("release_digest")
+                or delivery.get("release_digest")
+                or value.get("release_digest")
+                or ""
+            ).strip() or None,
+            "package_digest": str(
+                candidate.get("package_digest")
+                or delivery.get("package_digest")
+                or value.get("package_digest")
+                or ""
+            ).strip() or None,
+            "version": str(
+                release.get("version")
+                or value.get("version")
+                or value.get("published_version")
+                or ""
+            ).strip() or None,
+        }
+
+    def start_implementation(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        builder_webspace_id: str | None = None,
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        state = self.get(
+            direction_id,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+        )
+        track = state.get("active_implementation_track")
+        session = state.get("development_session")
+        if not isinstance(track, Mapping) or not isinstance(session, Mapping):
+            raise ValueError("an accepted compilation and bound Development Session are required")
+        kind, target_id = self._component_identity(str(track.get("primary_target_ref") or ""))
+        webspace = str(builder_webspace_id or "").strip() or (
+            "research-dev-" + hashlib.sha256(str(track["ref"]).encode("utf-8")).hexdigest()[:20]
+        )
+        development_sessions.bind(str(session["session_id"]), webspace)
+        current = self._invoke_skill(
+            "builder_sdk_control_skill",
+            "get_automation",
+            {"object_type": kind, "object_id": target_id, "webspace_id": webspace},
+            timeout=120,
+        )
+        current_status = str((current or {}).get("status") or "").lower()
+        if current_status in {"queued", "starting", "working", "running", "completed"}:
+            response = dict(current)
+            reused = True
+        else:
+            response = dict(
+                self._invoke_skill(
+                    "builder_sdk_control_skill",
+                    "start_automation",
+                    {"object_type": kind, "object_id": target_id, "webspace_id": webspace},
+                    timeout=180,
+                )
+            )
+            reused = False
+        projection = response.get("automation") if isinstance(response.get("automation"), Mapping) else response
+        status = str(projection.get("status") or response.get("status") or "submitted")
+        task_ref = str(projection.get("task_id") or response.get("task_id") or "")
+        event_source = task_ref or contract_digest(
+            {"track_ref": track["ref"], "status": status, "session_id": session["session_id"]}
+        )
+        self.repository.activity(
+            str(state["direction"]["direction_id"]),
+            "implementation",
+            status,
+            f"Builder Automation {'reused' if reused else 'started'} for the exact Development Session.",
+            {
+                "task_ref": (state.get("selected_task") or {}).get("ref"),
+                "implementation_track_ref": track["ref"],
+                "development_session_id": session["session_id"],
+                "builder_webspace_id": webspace,
+                "automation_task_id": task_ref or None,
+                "actor": actor,
+            },
+            actor=actor,
+            origin="skill:builder_sdk_control_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"automation-start:{event_source}",
+        )
+        return {
+            "ok": bool(response.get("ok", True)),
+            "reused": reused,
+            "direction_ref": state["direction"]["ref"],
+            "task_ref": (state.get("selected_task") or {}).get("ref"),
+            "implementation_track_ref": track["ref"],
+            "development_session_id": session["session_id"],
+            "builder_webspace_id": webspace,
+            "automation": response,
+        }
+
+    def sync_implementation(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        builder_webspace_id: str | None = None,
+        actor: str = "system:research_orchestrator",
+    ) -> dict[str, Any]:
+        state = self.get(
+            direction_id,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+        )
+        track = state.get("active_implementation_track")
+        session = state.get("development_session")
+        if not isinstance(track, Mapping) or not isinstance(session, Mapping):
+            raise ValueError("implementation track has no Development Session")
+        kind, target_id = self._component_identity(str(track.get("primary_target_ref") or ""))
+        webspace = str(builder_webspace_id or "").strip() or (
+            "research-dev-" + hashlib.sha256(str(track["ref"]).encode("utf-8")).hexdigest()[:20]
+        )
+        development_sessions.bind(str(session["session_id"]), webspace)
+        response = dict(
+            self._invoke_skill(
+                "builder_sdk_control_skill",
+                "get_automation",
+                {"object_type": kind, "object_id": target_id, "webspace_id": webspace},
+                timeout=120,
+            )
+        )
+        projection = response.get("automation") if isinstance(response.get("automation"), Mapping) else response
+        status = str(projection.get("status") or response.get("status") or "unknown").lower()
+        normalized = {
+            "completed": "implementation_complete",
+            "succeeded": "implementation_complete",
+            "failed": "implementation_failed",
+            "cancelled": "implementation_failed",
+            "working": "implementation_running",
+            "running": "implementation_running",
+            "queued": "implementation_running",
+            "starting": "implementation_running",
+        }.get(status, str(track.get("status") or "development_ready"))
+        metadata = {
+            **dict(track.get("metadata") or {}),
+            "automation": {
+                "status": status,
+                "task_id": projection.get("task_id") or response.get("task_id"),
+                "phase": projection.get("phase") or response.get("phase"),
+                "updated_at": projection.get("updated_at") or response.get("updated_at"),
+                "failure_id": projection.get("failure_id") or response.get("failure_id"),
+                "failure_stage": projection.get("failure_stage") or response.get("failure_stage"),
+                "failure_message": projection.get("error") or response.get("failure_message"),
+                "progress_message": response.get("progress_message"),
+            },
+        }
+        updated_track = self.repository.record_track_evaluation(
+            str(track["track_id"]),
+            status=normalized,
+            metadata=metadata,
+        )
+        event_identity = contract_digest(
+            {
+                "task_id": metadata["automation"].get("task_id"),
+                "status": status,
+                "phase": metadata["automation"].get("phase"),
+                "updated_at": metadata["automation"].get("updated_at"),
+                "failure_id": metadata["automation"].get("failure_id"),
             }
+        )
+        self.repository.activity(
+            str(state["direction"]["direction_id"]),
+            "implementation",
+            status,
+            str(
+                metadata["automation"].get("progress_message")
+                or metadata["automation"].get("failure_message")
+                or f"Builder Automation is {status}."
+            ),
+            {
+                "task_ref": (state.get("selected_task") or {}).get("ref"),
+                "implementation_track_ref": track["ref"],
+                "development_session_id": session["session_id"],
+                "automation": metadata["automation"],
+            },
+            actor=actor,
+            origin="skill:builder_sdk_control_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"automation-state:{event_identity}",
+        )
+        return {"ok": bool(response.get("ok", True)), "track": updated_track, "automation": response}
+
+    def prepare_project_release(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        builder_webspace_id: str | None = None,
+        bump: str = "patch",
+        confirmed: bool = False,
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        if not confirmed:
+            raise ValueError("candidate trial preparation requires explicit confirmation")
+        synced = self.sync_implementation(
+            direction_id,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+            builder_webspace_id=builder_webspace_id,
+            actor=actor,
+        )
+        track = dict(synced["track"])
+        if track.get("candidate_release_digest"):
+            return {"ok": True, "reused": True, "track": track}
+        if track.get("status") != "implementation_complete":
+            raise ValueError("ProjectRelease candidate requires a completed Builder Automation")
+        kind, target_id = self._component_identity(str(track["primary_target_ref"]))
+        webspace = str(builder_webspace_id or "").strip() or (
+            "research-dev-" + hashlib.sha256(str(track["ref"]).encode("utf-8")).hexdigest()[:20]
+        )
+        response = dict(
+            self._invoke_skill(
+                "builder_sdk_control_skill",
+                "publish_project",
+                {
+                    "object_type": kind,
+                    "object_id": target_id,
+                    "webspace_id": webspace,
+                    "bump": bump,
+                    "dry_run": True,
+                    "confirmed": True,
+                },
+                timeout=240,
+            )
+        )
+        identity = self._release_identity(response)
+        if not identity["candidate_id"] or not identity["release_digest"] or not identity["package_digest"]:
+            raise ValueError("Builder candidate did not return complete immutable release identity")
+        track = self.repository.bind_track_release(
+            str(track["track_id"]),
+            candidate_release_digest=str(identity["release_digest"]),
+        )
+        self.repository.activity(
+            str(track["direction_id"]),
+            "release",
+            "trial_ready",
+            "Builder prepared an isolated ProjectRelease candidate for review.",
+            {"implementation_track_ref": track["ref"], **identity},
+            actor=actor,
+            origin="skill:builder_sdk_control_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"release-candidate:{identity['candidate_id']}:{identity['release_digest']}",
+        )
+        return {"ok": True, "reused": False, "track": track, "candidate": response, "identity": identity}
+
+    def publish_project_release(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        builder_webspace_id: str | None = None,
+        bump: str = "patch",
+        confirmed: bool = False,
+        actor: str = "user:local",
+    ) -> dict[str, Any]:
+        if not confirmed:
+            raise ValueError("ProjectRelease promotion requires explicit confirmation")
+        state = self.get(direction_id, task_id=task_id, implementation_track_id=implementation_track_id)
+        track = state.get("active_implementation_track")
+        if not isinstance(track, Mapping):
+            raise ValueError("implementation track is required")
+        if track.get("project_release_ref"):
+            return {"ok": True, "reused": True, "track": dict(track)}
+        candidate_digest = str(track.get("candidate_release_digest") or "").strip()
+        if not candidate_digest:
+            raise ValueError("prepare and review a ProjectRelease candidate before promotion")
+        kind, target_id = self._component_identity(str(track["primary_target_ref"]))
+        webspace = str(builder_webspace_id or "").strip() or (
+            "research-dev-" + hashlib.sha256(str(track["ref"]).encode("utf-8")).hexdigest()[:20]
+        )
+        response = dict(
+            self._invoke_skill(
+                "builder_sdk_control_skill",
+                "publish_project",
+                {
+                    "object_type": kind,
+                    "object_id": target_id,
+                    "webspace_id": webspace,
+                    "bump": bump,
+                    "dry_run": False,
+                    "confirmed": True,
+                },
+                timeout=300,
+            )
+        )
+        if response.get("error") or response.get("ok") is False or response.get("requires_reapply"):
+            raise RuntimeError(f"Builder did not promote the candidate: {response.get('error') or response.get('status')}")
+        identity = self._release_identity(response)
+        promoted_digest = str(identity.get("release_digest") or candidate_digest)
+        if promoted_digest != candidate_digest:
+            raise ValueError("promoted ProjectRelease digest differs from the reviewed candidate")
+        project_id = str(track.get("project_ref") or "project:unknown").partition(":")[2]
+        project_release_ref = f"project-release:{project_id}:{promoted_digest}"
+        updated = self.repository.bind_track_release(
+            str(track["track_id"]),
+            candidate_release_digest=candidate_digest,
+            project_release_ref=project_release_ref,
+            project_release_digest=promoted_digest,
+        )
+        self.repository.activity(
+            str(track["direction_id"]),
+            "release",
+            "release_ready",
+            "The reviewed ProjectRelease candidate was promoted through Builder.",
+            {"implementation_track_ref": track["ref"], "project_release_ref": project_release_ref, **identity},
+            actor=actor,
+            origin="skill:builder_sdk_control_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"project-release:{promoted_digest}",
+        )
+        return {"ok": True, "reused": False, "track": updated, "release": response}
+
+    @staticmethod
+    def _validated_split_bindings(value: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+        raw = value.get("split_bindings") if isinstance(value.get("split_bindings"), Mapping) else value.get("splits")
+        if not isinstance(raw, Mapping):
+            raise ValueError("runner dataset_status must return split_bindings")
+        result: dict[str, dict[str, Any]] = {}
+        for role in ("validation", "robustness", "test"):
+            item = raw.get(role)
+            if not isinstance(item, Mapping):
+                raise ValueError(f"runner dataset_status omits the {role} split binding")
+            projected = {
+                "digest": str(item.get("digest") or "").strip(),
+                "dataset_digest": str(item.get("dataset_digest") or "").strip(),
+                "locator": str(item.get("locator") or "").strip(),
+                "sealed": bool(item.get("sealed")),
+            }
+            if any(not projected[key] for key in ("digest", "dataset_digest", "locator")):
+                raise ValueError(f"runner {role} split binding has incomplete immutable identity")
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", projected["digest"]):
+                raise ValueError(f"runner {role} split digest is not sha256")
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}", projected["dataset_digest"]):
+                raise ValueError(f"runner {role} dataset digest is not sha256")
+            result[role] = projected
+        if len({item["digest"] for item in result.values()}) != 3:
+            raise ValueError("validation, robustness, and sealed test split digests must be distinct")
+        if len({item["dataset_digest"] for item in result.values()}) != 1:
+            raise ValueError("all split bindings must resolve to one immutable dataset")
+        if result["test"]["sealed"] is not True:
+            raise ValueError("runner test split binding must be sealed")
+        return result
+
+    @staticmethod
+    def _manager_conditions(plan: Mapping[str, Any], *, runner_id: str, dataset_digest: str) -> dict[str, Any]:
+        execution: dict[str, Any] = {}
+        for profile_id, profile in dict(plan["execution"]).items():
+            seeds = list(dict(profile)["seeds"])
+            if any(isinstance(seed, bool) or not isinstance(seed, int) for seed in seeds):
+                raise ValueError("the current ResearchManager execution ABI requires integer seed units")
+            profile_value = dict(profile)
+            evidence_class = str(profile_value["evidence_class"])
+            manager_profile = (
+                "preflight" if evidence_class == "workflow_smoke"
+                else "confirmatory" if evidence_class == "confirmatory"
+                else str(profile_id)
+            )
+            if manager_profile in execution:
+                raise ValueError(f"ExperimentPlan maps multiple stages to ResearchManager profile {manager_profile}")
+            execution[manager_profile] = {
+                "source_stage_id": str(profile_id),
+                "epochs": int(profile_value["epochs"]),
+                "seeds": seeds,
+                "device": str(profile_value["device"]),
+                "workers": 0,
+                "wall_time_s": int(profile_value["max_wall_time_minutes"]) * 60,
+                "evidence_class": evidence_class,
+                "inference_allowed": bool(profile_value["inference_allowed"]),
+            }
+        analysis = dict(plan["analysis"])
+        randomization = dict(plan["randomization"])
+        dataset = dict(plan["dataset"])
+        return {
+            "dataset": {
+                "name": str(dataset["logical_name"]),
+                "version": str(dataset_digest),
+                "policy_digest": str(dataset["policy_digest"]),
+                "split_strategy": str(dataset["split_strategy"]),
+                "evaluation_seal": str(dataset["evaluation_seal"]),
+            },
+            "operators": copy.deepcopy(dict(plan["operators"])),
+            "execution": execution,
+            "randomization": {
+                "named_streams": copy.deepcopy(list(randomization["named_streams"])),
+                "paired": True,
+                "unit": str(randomization["unit"]),
+                "invariant_fields": copy.deepcopy(list(randomization["invariant_fields"])),
+                "varied_fields": copy.deepcopy(list(randomization["varied_fields"])),
+            },
+            "analysis": {
+                "primary_metric": str(analysis["primary_metric"]),
+                "primary_estimand": str(analysis["primary_estimand"]),
+                "primary_contrast": copy.deepcopy(dict(analysis["primary_contrast"])),
+                "paired": True,
+                "result_metric_path": "best_validation_accuracy",
+                "result_step_path": "best_epoch",
+                "initialization_digest_path": "initial_state_digest",
+                "uncertainty": copy.deepcopy(dict(analysis["uncertainty"])),
+                "stopping_rule": copy.deepcopy(dict(analysis["stopping_rule"])),
+            },
+            "tracker": {"provider": "local-tracker", "required_delivery": "durable-before-finalize"},
+            "runner": {
+                "provider": runner_id,
+                "contract": "adaos.research.runner.v1",
+                "data_owner": runner_id,
+            },
+        }
+
+    def instantiate_study(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        actor: str = "user:local",
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        state = self.get(direction_id, task_id=task_id, implementation_track_id=implementation_track_id)
+        track = state.get("active_implementation_track")
+        compilation_record = state.get("accepted_compilation_record")
+        session = state.get("development_session")
+        if not isinstance(track, Mapping) or not isinstance(compilation_record, Mapping) or not isinstance(session, Mapping):
+            raise ValueError("accepted compilation, implementation track, and Development Session are required")
+        if not track.get("project_release_ref") or not track.get("project_release_digest"):
+            raise ValueError("Study instantiation requires an exact promoted ProjectRelease")
+        compilation = dict(compilation_record["payload"])
+        facet = dict(dict(compilation.get("facets") or {}).get("experiment_plan") or {})
+        plan = facet.get("payload") if isinstance(facet.get("payload"), Mapping) else None
+        if not isinstance(plan, Mapping):
+            raise ValueError("accepted ResearchCompilation has no compiled ExperimentPlan")
+        _, runner_id = self._component_identity(str(track["primary_target_ref"]))
+        dataset_status = dict(
+            self._invoke_skill(runner_id, "dataset_status", {}, timeout=180)
+        )
+        if dataset_status.get("ready") is False:
+            raise ValueError("runner dataset is not ready for Study instantiation")
+        splits = self._validated_split_bindings(dataset_status)
+        problem = dict(dict(compilation["facets"])["research_problem"]["payload"])
+        hypotheses = [dict(item) for item in problem.get("hypotheses") or [] if isinstance(item, Mapping)]
+        if not hypotheses:
+            raise ValueError("accepted compilation has no falsifiable hypothesis")
+        realization = {
+            "direction_ref": state["direction"]["ref"],
+            "task_ref": compilation_record["task_ref"],
+            "compilation_ref": compilation_record["ref"],
+            "compilation_digest": compilation_record["digest"],
+            "implementation_track_ref": track["ref"],
+            "development_session_id": session["session_id"],
+            "project_release_ref": track["project_release_ref"],
+            "project_release_digest": track["project_release_digest"],
+            "runner_ref": f"skill:{runner_id}",
+            "runner_contract": "adaos.research.runner.v1",
+        }
+        study = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "create_compiled_study",
+                {
+                    "title": str(problem.get("title") or state["direction"]["title"]),
+                    "hypothesis": str(hypotheses[0]["statement"]),
+                    "protocol": {
+                        "schema": "adaos.research.compiled_protocol.v1",
+                        "compilation_ref": compilation_record["ref"],
+                        "compilation_digest": compilation_record["digest"],
+                        "experimental_protocol": dict(compilation["facets"])["experimental_protocol"]["payload"],
+                        "experiment_plan_digest": plan["digest"],
+                    },
+                    "analysis_plan": dict(plan["analysis"]),
+                    "splits": splits,
+                    "realization": realization,
+                    "mode": "confirmatory" if any(item["evidence_class"] == "confirmatory" for item in dict(plan["execution"]).values()) else "exploratory",
+                    "study_id": None,
+                    "idempotency_key": f"{idempotency_key}:study",
+                },
+                timeout=180,
+            )
+        )
+        study_record = dict(study.get("study") or {})
+        realization_record = dict(study.get("realization") or {})
+        study_id = str(study_record.get("record_id") or study_record.get("study_id") or "")
+        if not study_id or not realization_record.get("record_id") or not realization_record.get("digest"):
+            raise RuntimeError("ResearchManager returned incomplete StudyRealization identity")
+        conditions = self._manager_conditions(
+            plan,
+            runner_id=runner_id,
+            dataset_digest=splits["validation"]["dataset_digest"],
+        )
+        experiment = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "create_experiment",
+                {
+                    "study_id": study_id,
+                    "slug": "primary",
+                    "title": str(problem.get("title") or "Primary experiment"),
+                    "purpose": str(problem.get("research_question") or hypotheses[0]["statement"]),
+                    "conditions": conditions,
+                    "experiment_id": None,
+                    "idempotency_key": f"{idempotency_key}:experiment",
+                },
+                timeout=180,
+            )
+        )
+        experiment_record = dict(experiment.get("experiment") or {})
+        experiment_id = str(experiment_record.get("record_id") or "")
+        if not experiment_id:
+            raise RuntimeError("ResearchManager returned no Experiment identity")
+        track = self.repository.bind_track_study(
+            str(track["track_id"]),
+            study_id=study_id,
+            study_realization_ref=f"study-realization:{realization_record['record_id']}",
+            study_realization_digest=str(realization_record["digest"]),
+            runner_ref=f"skill:{runner_id}",
+            experiment_id=experiment_id,
+        )
+        selected_task = state.get("selected_task") or state.get("active_task") or {}
+        existing_studies = list(dict(selected_task.get("metadata") or {}).get("matched_studies") or [])
+        study_ref = {
+            "schema": "adaos.research.study_ref.v1",
+            "study_id": study_id,
+            "ref": f"study:{study_id}",
+            "owner_ref": "skill:research_manager_skill",
+            "status": "draft",
+            "compilation_digest": compilation_record["digest"],
+            "project_release_digest": track["project_release_digest"],
+            "realization_ref": track["study_realization_ref"],
+            "experiment_ref": f"experiment:{experiment_id}",
+        }
+        studies_by_ref = {str(item.get("ref")): dict(item) for item in existing_studies if isinstance(item, Mapping)}
+        studies_by_ref[study_ref["ref"]] = study_ref
+        self.repository.merge_task_metadata(
+            str(selected_task["task_id"]),
+            {"matched_studies": list(studies_by_ref.values())},
+        )
+        self.repository.activity(
+            str(state["direction"]["direction_id"]),
+            "study",
+            "experiment_ready",
+            "ResearchManager bound the accepted compilation and ProjectRelease to a draft CPU-capable Study and Experiment.",
+            {
+                "task_ref": compilation_record["task_ref"],
+                "implementation_track_ref": track["ref"],
+                "study_ref": study_ref["ref"],
+                "study_realization_ref": track["study_realization_ref"],
+                "experiment_ref": study_ref["experiment_ref"],
+                "runner_ref": track["runner_ref"],
+            },
+            actor=actor,
+            origin="skill:research_manager_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"study-realization:{realization_record['record_id']}",
+        )
+        return {
+            "ok": True,
+            "track": track,
+            "study": study,
+            "experiment": experiment,
+            "experiment_plan": dict(plan),
+            "dataset_status": dataset_status,
+        }
+
+    def start_study_smoke(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        confirmed: bool = False,
+        actor: str = "user:local",
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        if not confirmed:
+            raise ValueError("locking the compiled protocol and starting CPU smoke requires explicit confirmation")
+        state = self.get(direction_id, task_id=task_id, implementation_track_id=implementation_track_id)
+        track = state.get("active_implementation_track")
+        if not isinstance(track, Mapping) or not track.get("study_id") or not track.get("experiment_id"):
+            raise ValueError("instantiate the Study and Experiment before starting smoke")
+        study_id = str(track["study_id"])
+        experiment_id = str(track["experiment_id"])
+        study = dict(
+            self._invoke_skill(
+                "research_manager_skill", "get_study", {"study_id": study_id}, timeout=120
+            )
+        )
+        study_lifecycle = dict(study.get("workflow") or {})
+        if study_lifecycle.get("state") == "draft":
+            self._invoke_skill(
+                "research_manager_skill",
+                "advance_workflow",
+                {
+                    "study_id": study_id,
+                    "command": "submit_protocol_review",
+                    "expected_generation": int(study_lifecycle.get("generation") or 0),
+                    "idempotency_key": f"{idempotency_key}:study-review",
+                    "actor": actor,
+                    "evidence_refs": [str(track["study_realization_digest"])],
+                },
+                timeout=120,
+            )
+        experiment = dict(
+            self._invoke_skill(
+                "research_manager_skill", "get_experiment", {"experiment_id": experiment_id}, timeout=120
+            )
+        )
+        lifecycle = dict(experiment.get("lifecycle") or {})
+        if lifecycle.get("state") == "draft":
+            self._invoke_skill(
+                "research_manager_skill",
+                "submit_experiment_review",
+                {
+                    "experiment_id": experiment_id,
+                    "expected_generation": int(lifecycle.get("generation") or 0),
+                    "idempotency_key": f"{idempotency_key}:experiment-review",
+                    "actor": actor,
+                },
+                timeout=120,
+            )
+            experiment = dict(
+                self._invoke_skill(
+                    "research_manager_skill", "get_experiment", {"experiment_id": experiment_id}, timeout=120
+                )
+            )
+            lifecycle = dict(experiment.get("lifecycle") or {})
+        if lifecycle.get("state") == "review":
+            self._invoke_skill(
+                "research_manager_skill",
+                "lock_experiment",
+                {
+                    "experiment_id": experiment_id,
+                    "expected_generation": int(lifecycle.get("generation") or 0),
+                    "idempotency_key": f"{idempotency_key}:lock",
+                    "actor": actor,
+                },
+                timeout=120,
+            )
+            experiment = dict(
+                self._invoke_skill(
+                    "research_manager_skill", "get_experiment", {"experiment_id": experiment_id}, timeout=120
+                )
+            )
+            lifecycle = dict(experiment.get("lifecycle") or {})
+        reused = lifecycle.get("state") in {"running", "results_ready", "finalized"}
+        if lifecycle.get("state") == "locked":
+            started = dict(
+                self._invoke_skill(
+                    "research_manager_skill",
+                    "start_experiment",
+                    {
+                        "experiment_id": experiment_id,
+                        "profile": "preflight",
+                        "expected_generation": int(lifecycle.get("generation") or 0),
+                        "idempotency_key": f"{idempotency_key}:start-preflight",
+                        "actor": actor,
+                    },
+                    timeout=240,
+                )
+            )
+            reused = False
+        elif reused:
+            started = {"ok": True, "reused": True, "lifecycle": lifecycle}
+        else:
+            raise ValueError(f"Experiment cannot start smoke from lifecycle state {lifecycle.get('state')}")
+        self.repository.activity(
+            str(track["direction_id"]),
+            "study",
+            "smoke_started" if not reused else "smoke_reused",
+            "ResearchManager admitted the exact compiled preflight and submitted its CPU attempts.",
+            {
+                "implementation_track_ref": track["ref"],
+                "study_ref": f"study:{study_id}",
+                "experiment_ref": f"experiment:{experiment_id}",
+                "profile": "preflight",
+            },
+            actor=actor,
+            origin="skill:research_manager_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"experiment-start:{experiment_id}:preflight",
+        )
+        return {"ok": True, "reused": reused, "track": dict(track), "start": started}
+
+    def sync_study(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        actor: str = "system:research_orchestrator",
+    ) -> dict[str, Any]:
+        state = self.get(direction_id, task_id=task_id, implementation_track_id=implementation_track_id)
+        track = state.get("active_implementation_track")
+        if not isinstance(track, Mapping) or not track.get("experiment_id"):
+            raise ValueError("implementation track has no ResearchManager Experiment")
+        experiment_id = str(track["experiment_id"])
+        reconciled = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "reconcile_experiment",
+                {"experiment_id": experiment_id, "actor": actor},
+                timeout=180,
+            )
+        )
+        experiment = dict(
+            self._invoke_skill(
+                "research_manager_skill", "get_experiment", {"experiment_id": experiment_id}, timeout=120
+            )
+        )
+        lifecycle = dict(experiment.get("lifecycle") or {})
+        attempts = list(experiment.get("attempts") or [])
+        event_identity = contract_digest(
+            {
+                "experiment_id": experiment_id,
+                "lifecycle": lifecycle,
+                "attempts": [
+                    {"attempt_id": item.get("attempt_id"), "status": item.get("status")}
+                    for item in attempts
+                    if isinstance(item, Mapping)
+                ],
+            }
+        )
+        self.repository.activity(
+            str(track["direction_id"]),
+            "study",
+            str(lifecycle.get("state") or "unknown"),
+            f"ResearchManager reconciliation observed {len(attempts)} attempt(s); Experiment is {lifecycle.get('state') or 'unknown'}.",
+            {
+                "implementation_track_ref": track["ref"],
+                "study_ref": f"study:{track['study_id']}",
+                "experiment_ref": f"experiment:{experiment_id}",
+                "lifecycle": lifecycle,
+                "attempts": attempts,
+            },
+            actor=actor,
+            origin="skill:research_manager_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"experiment-state:{event_identity}",
+        )
+        return {"ok": True, "track": dict(track), "reconciliation": reconciled, "experiment": experiment}
 
         return self.repository.once(str(idempotency_key or "").strip(), "accept_prototype", operation)
 
