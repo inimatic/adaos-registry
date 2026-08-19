@@ -469,6 +469,23 @@ def stage_quality_issues(
         if system_spec.get("unresolved_choices"):
             issues.append("system_specification unresolved_choices must be empty before automation")
         stages = [item for item in plan["stages"] if isinstance(item, Mapping)]
+        stage_ids = [str(item.get("id") or "") for item in stages]
+        if len(stage_ids) != len(set(stage_ids)):
+            issues.append("experimental stages must have unique ids")
+        for item in stages:
+            seed_values = list(dict(item.get("budget") or {}).get("seed_values") or [])
+            if not seed_values or any(
+                isinstance(seed, bool) or not isinstance(seed, int)
+                for seed in seed_values
+            ):
+                issues.append(
+                    f"stage {item.get('id')} budget.seed_values must contain "
+                    "non-empty integer RNG seeds, not pairing-unit labels"
+                )
+            elif len(seed_values) != len(set(seed_values)):
+                issues.append(
+                    f"stage {item.get('id')} budget.seed_values must be unique"
+                )
         smoke = [item for item in stages if item.get("evidence_class") == "workflow_smoke"]
         confirmation = [item for item in stages if item.get("evidence_class") == "confirmatory"]
         if not smoke or not all(item.get("inference_allowed") is False for item in smoke):
@@ -486,6 +503,16 @@ def stage_quality_issues(
         allocation = pairing["allocation"]
         if int(allocation["sample_size"]) != len(allocation["planned_units"]):
             issues.append("pairing allocation sample_size must equal planned_units length")
+        confirmatory_seed_values = [
+            seed
+            for item in confirmation
+            for seed in dict(item.get("budget") or {}).get("seed_values") or []
+        ]
+        if list(allocation["planned_units"]) != confirmatory_seed_values:
+            issues.append(
+                "pairing allocation planned_units must exactly equal the ordered "
+                "confirmatory budget.seed_values; unit labels and RNG seeds must not be conflated"
+            )
         outcome_dependent_stop = re.compile(
             r"(?i)(?:statistically significant|significant (?:result|difference|improvement)|"
             r"target (?:accuracy|metric|score)|desired (?:accuracy|metric|score))"

@@ -82,8 +82,10 @@ from being assembled with the original question while leaving rationale,
 method detail, and implementation strategy open to the model. Repairs always
 receive the original directive and upstream typed artifacts as immutable
 authority; a rejected candidate is never their only context. The deterministic
-plan then carries exact execution profiles, integer-or-string allocation
-units, evidence classes, data policy, RNG streams, estimand and the public
+plan then carries exact execution profiles and integer RNG seeds. Pairing
+allocation units must be the same ordered integer values; symbolic labels such
+as `S1` cannot masquerade as executable seeds. It also carries evidence
+classes, data policy, RNG streams, estimand and the public
 runner/split-binding ABI without selecting a runtime provider. Runner results
 use the domain-neutral canonical fields `primary_metric`, `step`,
 `pairing_identity_digest`, `arm_id`, `seed`, and `evidence_class`; scientific
@@ -111,6 +113,8 @@ The deterministic review rejects or downgrades a handoff unless it has:
 - separate workflow-smoke and confirmatory stages with correct evidence
   classes, including exactly one AdaOS-policy CPU smoke with three epochs and
   seed 17;
+- non-empty unique integer `budget.seed_values`, with the confirmatory values
+  exactly mirrored by `pairing.allocation.planned_units`;
 - exact cross-stage preservation of experimental identity and an engineering
   binding to the accepted protocol digest;
 - explicit comparators, paired invariants/varied factors, a predeclared

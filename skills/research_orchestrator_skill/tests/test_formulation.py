@@ -277,9 +277,11 @@ def test_research_compiler_emits_execution_plan_and_source_to_acceptance_traceab
     assert projection["compilation_digest"] == package["digest"]
     assert projection["traceability"]["protocol_digest"] == package["facets"]["experimental_protocol"]["digest"]
     plan = projection["experiment_plan"]
+    assert plan["schema_version"] == "1.2.0"
     assert [item["id"] for item in plan["operators"]["arms"]] == ["maxpool", "tlp"]
     assert plan["analysis"]["primary_contrast"] == {"minuend": "tlp", "subtrahend": "maxpool"}
     assert plan["execution"]["smoke"]["epochs"] == 3
+    assert plan["execution"]["confirmatory"]["seeds"] == [17, 23]
     assert plan["runner_contract"]["dataset_binding"]["required_roles"] == ["validation", "robustness", "test"]
     assert "inventory" not in projection["source_analysis"]
     assert all(node["kind"] != "acceptance_check" for node in projection["traceability"]["nodes"])
@@ -505,6 +507,26 @@ def test_protocol_accepts_a_complete_ordered_comparator_id_projection() -> None:
     )
 
     assert issues == []
+
+
+def test_protocol_rejects_pair_labels_in_numeric_seed_values() -> None:
+    protocol = _protocol()
+    confirmatory = next(
+        item
+        for item in protocol["experimental_plan"]["stages"]
+        if item["evidence_class"] == "confirmatory"
+    )
+    confirmatory["budget"]["seed_values"] = ["S1", "S2"]
+    protocol["experimental_plan"]["reproducibility"]["pairing"]["allocation"][
+        "planned_units"
+    ] = ["S1", "S2"]
+
+    try:
+        validate_stage("protocol_design", protocol)
+    except ValueError as exc:
+        assert "not of type 'integer'" in str(exc)
+    else:
+        raise AssertionError("symbolic pair labels must not pass as RNG seeds")
 
 
 def test_engineering_contract_is_bound_to_exact_protocol_and_scientific_identity() -> None:

@@ -68,7 +68,7 @@ def _build_experiment_plan(
     task_id = str((task or {}).get("task_id") or f"{direction_id}.task-001")
     plan: dict[str, Any] = {
         "schema": "adaos.research.experiment_plan.v1",
-        "schema_version": "1.1.0",
+        "schema_version": "1.2.0",
         "direction_ref": f"research-direction:{direction_id}",
         "task_ref": str((task or {}).get("ref") or f"research-task:{task_id}"),
         "source_bundle_digest": str(source_bundle_digest),

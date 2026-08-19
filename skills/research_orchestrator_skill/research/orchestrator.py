@@ -2548,7 +2548,7 @@ class ResearchOrchestrator:
                     "For each decision use blocking_question only when status is unresolved; otherwise it must be the empty string. Do not repeat the same uncertainty in multiple areas.",
                     "In data_policy.evaluation_access separate development/model selection from the final evaluation. Choose selection_source truthfully; AdaOS compiles its exact selection rule. Expose final test only once per trained unit after the seal and prohibit test feedback.",
                     "Follow any source requirement for train/validation/untouched-test separation. Never evaluate final test per epoch or use it to choose checkpoints, hyperparameters, variants, or stopping.",
-                    "Declare exact seed_values and make pairing allocation planned_units and sample_size identical to the confirmatory units.",
+                    "Declare exact integer RNG seed_values. Never use labels such as S1 as seeds. Make pairing allocation planned_units exactly equal, in the same order, to the confirmatory integer seed_values and make sample_size equal their count.",
                     "Use named RNG streams initialization, sampling, augmentation, and analysis; within each pair keep initialization, data order, sampling and augmentation invariant and vary only the intervention.",
                     "Confirmatory stopping must depend only on predeclared budget or safety/failure conditions, never on a desired metric or significance.",
                     "Declare exactly one primary outcome, an operational estimand, uncertainty unit/method, stopping and multiplicity.",
@@ -3013,8 +3013,8 @@ class ResearchOrchestrator:
                 "experimental_plan": {
                     "comparators": ["control", "intervention"],
                     "stages": [
-                        {"id": "smoke", "purpose": "...", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current_or_member", "device": "cpu"}, "budget": {"epochs": 3, "seeds": 1}, "inference_allowed": False, "stop_conditions": ["bounded operational condition"]},
-                        {"id": "confirmatory", "purpose": "...", "evidence_class": "confirmatory", "execution_profile": {"node": "declared_member"}, "budget": {"seeds": 10}, "inference_allowed": True, "stop_conditions": ["predeclared fixed or sequential condition"]}
+                        {"id": "smoke", "purpose": "...", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current_or_member", "device": "cpu"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 180}, "inference_allowed": False, "stop_conditions": ["bounded operational condition"]},
+                        {"id": "confirmatory", "purpose": "...", "evidence_class": "confirmatory", "execution_profile": {"node": "declared_member", "device": "cuda"}, "budget": {"epochs": 120, "seed_values": [1, 2, 3], "max_wall_time_minutes": 10080}, "inference_allowed": True, "stop_conditions": ["predeclared fixed or sequential condition"]}
                     ],
                     "data_policy": {
                         "dataset": "exact dataset and version",
@@ -3042,8 +3042,8 @@ class ResearchOrchestrator:
                             "varied_fields": ["field deliberately changed between arms"],
                             "allocation": {
                                 "strategy": "enumerated_units|digest_bound_manifest|exhaustive",
-                                "planned_units": ["predeclared unit id"],
-                                "sample_size": 1,
+                                "planned_units": [1, 2, 3],
+                                "sample_size": 3,
                                 "predeclared": True,
                             },
                         },
