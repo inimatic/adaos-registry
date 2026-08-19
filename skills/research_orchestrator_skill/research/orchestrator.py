@@ -3604,6 +3604,27 @@ class ResearchOrchestrator:
         if current_status in {"queued", "starting", "working", "running", "completed"}:
             response = dict(current)
             reused = True
+            recovery_iteration = False
+        elif current_status in {"failed", "cancelled"}:
+            response = dict(
+                self._invoke_skill(
+                    "builder_sdk_control_skill",
+                    "submit_automation",
+                    {
+                        "object_type": kind,
+                        "object_id": target_id,
+                        "webspace_id": webspace,
+                        "text": (
+                            "Retry the unchanged digest-bound Development Session after a "
+                            "recorded infrastructure failure. Do not add, remove, reinterpret, "
+                            "or broaden any scientific or engineering requirement."
+                        ),
+                    },
+                    timeout=180,
+                )
+            )
+            reused = False
+            recovery_iteration = True
         else:
             response = dict(
                 self._invoke_skill(
@@ -3614,6 +3635,7 @@ class ResearchOrchestrator:
                 )
             )
             reused = False
+            recovery_iteration = False
         projection = response.get("automation") if isinstance(response.get("automation"), Mapping) else response
         status = str(projection.get("status") or response.get("status") or "submitted")
         task_ref = str(projection.get("task_id") or response.get("task_id") or "")
@@ -3643,13 +3665,19 @@ class ResearchOrchestrator:
             str(state["direction"]["direction_id"]),
             "implementation",
             status,
-            f"Builder Automation {'reused' if reused else 'started'} for the exact Development Session.",
+            (
+                "Builder Automation recovery iteration started for the unchanged exact "
+                "Development Session."
+                if recovery_iteration
+                else f"Builder Automation {'reused' if reused else 'started'} for the exact Development Session."
+            ),
             {
                 "task_ref": (state.get("selected_task") or {}).get("ref"),
                 "implementation_track_ref": track["ref"],
                 "development_session_id": session["session_id"],
                 "builder_webspace_id": webspace,
                 "automation_task_id": task_ref or None,
+                "recovery_iteration": recovery_iteration,
                 "actor": actor,
             },
             actor=actor,
@@ -3660,6 +3688,7 @@ class ResearchOrchestrator:
         return {
             "ok": bool(response.get("ok", True)),
             "reused": reused,
+            "recovery_iteration": recovery_iteration,
             "direction_ref": state["direction"]["ref"],
             "task_ref": (state.get("selected_task") or {}).get("ref"),
             "implementation_track_ref": track["ref"],
