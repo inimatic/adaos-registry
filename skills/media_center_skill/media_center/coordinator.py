@@ -40,6 +40,7 @@ def _default_profile_policy(kind: str = "personal") -> dict[str, Any]:
         "maximum_maturity_rating": 12 if _text(kind).lower() == "kids" else 18,
         "allow_explicit": _text(kind).lower() != "kids",
         "show_history_on_shared_surface": not shared,
+        "recommendations_enabled": True,
     }
 
 _SEASON_EPISODE = re.compile(r"(?i)(?:^|[ ._\-])s(?P<season>\d{1,3})e(?P<episode>\d{1,4})(?:[ ._\-]|$)")
@@ -333,6 +334,26 @@ class MediaCatalogCoordinator:
                     for profile_id, label, kind, policy in default_profiles
                 ],
             )
+            for profile_row in connection.execute(
+                "SELECT id,kind,policy_json FROM media_profiles"
+            ).fetchall():
+                current_policy = _json_loads(profile_row["policy_json"]) or {}
+                migrated_policy = {
+                    **_default_profile_policy(str(profile_row["kind"])),
+                    **current_policy,
+                }
+                if migrated_policy != current_policy:
+                    connection.execute(
+                        """
+                        UPDATE media_profiles SET policy_json=?,revision=revision+1,
+                            updated_at=? WHERE id=?
+                        """,
+                        (
+                            _json_dumps(migrated_policy),
+                            now,
+                            str(profile_row["id"]),
+                        ),
+                    )
             connection.execute("INSERT OR REPLACE INTO coordinator_meta(key, value) VALUES ('schema_version', ?)", (COORDINATOR_SCHEMA,))
             self._backfill_search(connection)
             connection.commit()
@@ -872,6 +893,7 @@ class MediaCatalogCoordinator:
             "maximum_maturity_rating",
             "allow_explicit",
             "show_history_on_shared_surface",
+            "recommendations_enabled",
         }
         with self.repository.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -910,6 +932,9 @@ class MediaCatalogCoordinator:
             policy["allow_explicit"] = bool(policy.get("allow_explicit", False))
             policy["show_history_on_shared_surface"] = bool(
                 policy.get("show_history_on_shared_surface", False)
+            )
+            policy["recommendations_enabled"] = bool(
+                policy.get("recommendations_enabled", True)
             )
             connection.execute(
                 """
@@ -2076,6 +2101,29 @@ class MediaCatalogCoordinator:
             }
             for item in folder_page["items"]
         )
+        recommendation_page = self.recommendations(
+            profile_id=profile_id, limit=bounded
+        )
+        if recommendation_page["enabled"]:
+            shelves.append(
+                {
+                    "id": "recommended",
+                    "title": "Recommended",
+                    "layout": "rail",
+                    "items": recommendation_page["items"],
+                    "partial": recommendation_page["partial"],
+                }
+            )
+            flattened.extend(
+                dict(item)
+                | {
+                    "shelf_id": "recommended",
+                    "shelf_title": "Recommended",
+                    "queue_source_type": "item",
+                    "queue_source_id": _text(item.get("id")),
+                }
+                for item in recommendation_page["items"]
+            )
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
@@ -2084,6 +2132,107 @@ class MediaCatalogCoordinator:
             "shared_surface": bool(shared_surface),
             "shelves": shelves,
             "items": flattened,
+        }
+
+    def recommendations(
+        self, *, profile_id: str = "default", limit: int = 12
+    ) -> dict[str, Any]:
+        bounded = max(1, min(20, int(limit or 12)))
+        profile = self.get_profile(profile_id)["profile"]
+        if not bool(profile["policy"].get("recommendations_enabled", True)):
+            return {
+                "ok": True,
+                "schema": COORDINATOR_SCHEMA,
+                "profile_id": profile["id"],
+                "enabled": False,
+                "items": [],
+                "count": 0,
+                "partial": self.participation()["partial"],
+                "algorithm": "disabled_by_profile",
+            }
+        favorites = self.list_items(
+            profile_id=profile["id"],
+            favorites_only=True,
+            sort="favorite",
+            limit=MAX_PAGE_SIZE,
+        )["items"]
+        recent = self.list_items(
+            profile_id=profile["id"], sort="recent", limit=MAX_PAGE_SIZE
+        )["items"]
+        recent = [
+            item
+            for item in recent
+            if _text(item.get("personal", {}).get("last_played_at"))
+        ]
+        signals = favorites + [item for item in recent if item not in favorites]
+        preferred_kinds: dict[str, int] = {}
+        preferred_folders: dict[str, int] = {}
+        for item in signals[:60]:
+            kind = _text(item.get("media_kind"))
+            if kind:
+                preferred_kinds[kind] = preferred_kinds.get(kind, 0) + 1
+            folder = _text(item.get("folder_path")).strip("/").split("/", 1)[0]
+            if folder:
+                preferred_folders[folder.casefold()] = (
+                    preferred_folders.get(folder.casefold(), 0) + 1
+                )
+        candidates: list[dict[str, Any]] = []
+        cursor = ""
+        for _page in range(3):
+            page = self.list_items(
+                profile_id=profile["id"],
+                sort="title",
+                limit=MAX_PAGE_SIZE,
+                cursor=cursor,
+            )
+            candidates.extend(page["items"])
+            cursor = _text(page["pagination"].get("next_cursor"))
+            if not cursor:
+                break
+        scored: list[tuple[int, str, dict[str, Any], list[str]]] = []
+        for item in candidates:
+            if item.get("favorite") or item.get("personal", {}).get("last_played_at"):
+                continue
+            reasons: list[str] = []
+            score = 1
+            kind = _text(item.get("media_kind"))
+            if preferred_kinds.get(kind):
+                score += min(20, preferred_kinds[kind] * 2)
+                reasons.append(f"preferred_media_kind:{kind}")
+            folder = _text(item.get("folder_path")).strip("/").split("/", 1)[0]
+            if folder and preferred_folders.get(folder.casefold()):
+                score += min(30, preferred_folders[folder.casefold()] * 3)
+                reasons.append(f"related_library_section:{folder}")
+            if not reasons:
+                reasons.append("unplayed_library_item")
+            scored.append((score, _text(item.get("title")).casefold(), item, reasons))
+        scored.sort(key=lambda value: (-value[0], value[1], _text(value[2].get("id"))))
+        items = [
+            dict(item)
+            | {
+                "recommendation": {
+                    "algorithm": "bounded_household_signals_v1",
+                    "score": score,
+                    "reasons": reasons,
+                    "uses_external_profile": False,
+                }
+            }
+            for score, _title, item, reasons in scored[:bounded]
+        ]
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "profile_id": profile["id"],
+            "enabled": True,
+            "items": items,
+            "count": len(items),
+            "partial": self.participation()["partial"],
+            "algorithm": "bounded_household_signals_v1",
+            "privacy": {
+                "profile_scoped": True,
+                "external_provider": False,
+                "history_opt_out": True,
+            },
         }
 
     def duplicate_candidates(self, *, limit: int = 30) -> dict[str, Any]:

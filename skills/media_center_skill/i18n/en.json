@@ -6,5 +6,10 @@
   "runtime.media_center.error.deployment_drain_failed": "Could not drain the Media Center agent.",
   "runtime.media_center.error.deployment_remove_failed": "Could not remove the Media Center agent.",
   "runtime.media_center.error.topology_define_failed": "Could not define Media Center service topology.",
-  "runtime.media_center.error.route_explain_failed": "Could not explain the Media Center route."
+  "runtime.media_center.error.route_explain_failed": "Could not explain the Media Center route.",
+  "runtime.media_center.voice.invalid": "I could not determine the playback command.",
+  "runtime.media_center.voice.control_unavailable": "Playback control is temporarily unavailable.",
+  "runtime.media_center.voice.status": "The media library status is ready.",
+  "runtime.media_center.voice.not_found": "I could not find matching media.",
+  "runtime.media_center.voice.which_media": "Which media item should I use?"
 }

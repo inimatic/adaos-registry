@@ -504,6 +504,87 @@ def test_profiles_enforce_query_playback_and_shared_surface_policy(monkeypatch, 
     _validate_schema("profile.v1.schema.json", updated["profile"])
 
 
+def test_recommendations_are_bounded_explainable_and_support_opt_out(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Music/Artist/Album/01 Favorite.mp3"),
+            _agent_delta(2, "Music/Artist/Album/02 Suggested.mp3"),
+            _agent_delta(3, "Books/Other/01 Unrelated.mp3"),
+        )
+    )
+    items = catalog.list_items(media_kind="audio", sort="title")["items"]
+    favorite = next(item for item in items if item["title"].endswith("Favorite"))
+    catalog.set_favorite(favorite["id"], profile_id="alice", favorite=True)
+
+    recommended = catalog.recommendations(profile_id="alice", limit=2)
+    profile = catalog.get_profile("alice")["profile"]
+    catalog.set_profile_policy(
+        "alice",
+        expected_revision=profile["revision"],
+        values={"recommendations_enabled": False},
+    )
+    disabled = catalog.recommendations(profile_id="alice", limit=2)
+
+    assert recommended["count"] == 2
+    assert recommended["items"][0]["title"].endswith("Suggested")
+    assert recommended["items"][0]["recommendation"]["reasons"] == [
+        "preferred_media_kind:audio",
+        "related_library_section:Music",
+    ]
+    assert recommended["privacy"]["external_provider"] is False
+    assert disabled["enabled"] is False
+    assert disabled["items"] == []
+
+
+def test_voice_request_uses_catalog_policy_and_existing_control_tools(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/Track.mp3")))
+    monkeypatch.setattr(main, "_coordinator", lambda repository=None: catalog)
+    calls = []
+
+    def fake_invoke(skill_name, operation, arguments=None, *, timeout=15.0):
+        calls.append((skill_name, operation, arguments))
+        if operation == "list_targets":
+            return {
+                "ok": True,
+                "items": [
+                    {
+                        "id": "target-tv",
+                        "endpoint_id": "tv",
+                        "label": "Living room",
+                        "node_id": "node-a",
+                        "kind": "tv",
+                        "status": "available",
+                        "capabilities": {"codecs": ["mp3"], "room_id": "living-room"},
+                    }
+                ],
+            }, ""
+        if operation == "create_session":
+            return {"ok": True, "session": {"id": "session-1"}}, ""
+        raise AssertionError(operation)
+
+    monkeypatch.setattr(main, "_invoke_skill", fake_invoke)
+
+    search = main.voice_request(intent="search", query="Track", profile_id="alice")
+    played = main.voice_request(
+        intent="play",
+        query="Track",
+        profile_id="alice",
+        room_id="living-room",
+    )
+
+    assert search["ok"] is True
+    assert search["visual_results"][0]["title"] == "Track"
+    assert played["session"]["id"] == "session-1"
+    assert played["resolved_target"]["id"] == "target-tv"
+    assert [call[1] for call in calls] == ["list_targets", "create_session"]
+    assert calls[-1][2]["actor_ref"] == "profile:alice"
+    assert len(calls[-1][2]["queue"]) == 1
+
+
 def test_unavailable_agent_makes_catalog_truthfully_partial(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())

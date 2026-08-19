@@ -24,7 +24,9 @@ Agent availability is independent from known catalog identity. The coordinator d
 
 ## Personal State
 
-Favorites, recent playback, resume positions, and completion are keyed by `profile_id`. Mutations publish the bounded replace-mode `media_center.library_state` stream with catalog and personal revisions, participation, home shelves, and recent operations. Multiple browsers can therefore converge without putting a full catalog into synchronized state. The stream supports snapshot replay after reconnect.
+Favorites, recent playback, resume positions, completion, ratings, hidden items, playlists, and recommendations are keyed by `profile_id`. Catalog queries and playback plans enforce media-kind, maturity, explicit-content, hidden-item, and shared-screen history policy. Mutations publish the bounded replace-mode `media_center.library_state` stream with catalog and personal revisions, participation, home shelves, and recent operations. Multiple browsers can therefore converge without putting a full catalog into synchronized state. The stream supports snapshot replay after reconnect.
+
+Recommendations evaluate at most three catalog pages, use only local favorite and history signals, include bounded machine-readable reasons, and can be disabled per profile. `voice_request` is the structured entrypoint for search, collections, favorites, status, target discovery, playback, and transport control. It returns at most ten visual candidates, asks for clarification when media or targets are ambiguous, and delegates sessions and commands to `media_control_skill` so voice and direct controls share policy, leases, and revisions.
 
 ## Compatibility
 

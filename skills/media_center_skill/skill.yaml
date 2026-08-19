@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.5.0
+version: 0.6.0
 description: Distributed Media Center coordinator with bounded catalog, collection, personalization, and playback projections.
 supported_locales:
 - en
@@ -61,6 +61,8 @@ exports:
   - get_profile
   - set_profile_policy
   - set_personal_state
+  - recommendations
+  - voice_request
   - list_collections
   - browse_folders
   - create_playlist
@@ -499,6 +501,7 @@ tools:
           maximum_maturity_rating: {type: integer, minimum: 0, maximum: 21}
           allow_explicit: {type: boolean}
           show_history_on_shared_surface: {type: boolean}
+          recommendations_enabled: {type: boolean}
         additionalProperties: false
     additionalProperties: true
   output_schema: {type: object}
@@ -514,6 +517,41 @@ tools:
       profile_id: {type: string, default: default}
       rating: {type: integer, minimum: 0, maximum: 5}
       hidden: {type: boolean}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: recommendations
+  description: Return bounded profile-scoped recommendations with explainable local signals and opt-out.
+  entry: handlers.main:recommendations
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      profile_id: {type: string, default: default}
+      limit: {type: integer, minimum: 1, maximum: 20, default: 12}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: voice_request
+  description: Resolve structured voice discovery, collection, favorite, target, status, playback, and transport intents.
+  entry: handlers.main:voice_request
+  side_effects: local_write
+  input_schema:
+    type: object
+    properties:
+      intent: {type: string, enum: ['', search, browse, play, favorite, unfavorite, collections, status, targets, control]}
+      text: {type: string}
+      query: {type: string}
+      profile_id: {type: string, default: default}
+      room_id: {type: string}
+      target_id: {type: string}
+      item_id: {type: string}
+      focused_item_id: {type: string}
+      collection_kind: {type: string}
+      media_kind: {type: string, enum: [playable, audio, video], default: playable}
+      action: {type: string, enum: ['', play, pause, seek, volume, mute, next, previous, stop, handoff, tracks, rate, sleep_timer]}
+      arguments: {type: object}
+      dialog_context: {type: object}
+      actor_ref: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 10, default: 5}
     additionalProperties: true
   output_schema: {type: object}
 - name: list_collections
@@ -1108,6 +1146,13 @@ llm_hints:
     examples:
     - Show media center
     - Browse videos
+  - id: media_center_skill.voice_request
+    intent: media_center.voice
+    tool: voice_request
+    side_effect_class: local_write
+    examples:
+    - Play Example in the living room
+    - Find an audiobook by title
   owner_hints:
   - skill:media_center_skill
 nlu_hints:
@@ -1118,6 +1163,19 @@ nlu_hints:
   examples:
   - refresh media center
   - show media library
-  slot_schemas: {}
+  - play music in the living room
+  - find a movie by title
+  slot_schemas:
+    media_center.voice:
+      type: object
+      properties:
+        intent: {type: string}
+        query: {type: string}
+        profile_id: {type: string}
+        room_id: {type: string}
+        target_id: {type: string}
+        focused_item_id: {type: string}
+        dialog_context: {type: object}
+      additionalProperties: true
   entities: []
-updated_at: '2026-08-19T00:00:00+00:00'
+updated_at: '2026-08-20T00:00:00+00:00'

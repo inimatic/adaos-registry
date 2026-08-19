@@ -119,6 +119,24 @@ def _invoke_agent(operation: str, arguments: Mapping[str, Any] | None = None, *,
         return None, str(exc)
 
 
+def _invoke_skill(
+    skill_name: str,
+    operation: str,
+    arguments: Mapping[str, Any] | None = None,
+    *,
+    timeout: float = 15.0,
+) -> tuple[dict[str, Any] | None, str]:
+    try:
+        from adaos.sdk.skills import invoke
+
+        result = invoke(skill_name, operation, dict(arguments or {}), timeout=timeout)
+        if isinstance(result, Mapping):
+            return dict(result), ""
+        return None, f"{skill_name}_invalid_response"
+    except Exception as exc:
+        return None, str(exc)
+
+
 @contextmanager
 def _root_mutation_lease(repo: MediaCenterRepository) -> Iterator[None]:
     lock_path = repo.db_path.with_suffix(".root-mutation.lock")
@@ -1130,6 +1148,334 @@ def set_personal_state(
             webspace_id=str(_.get("webspace_id") or ""),
         )
     return result
+
+
+@tool(summary="Return bounded explainable profile recommendations.", side_effects="none")
+def recommendations(
+    profile_id: str = "default", limit: int = 12, **_: Any
+) -> dict[str, Any]:
+    return _coordinator().recommendations(profile_id=profile_id, limit=limit)
+
+
+def _voice_item(item: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "id": str(item.get("id") or ""),
+        "title": str(item.get("title") or item.get("name") or ""),
+        "media_kind": str(item.get("media_kind") or ""),
+        "folder_path": str(item.get("folder_path") or ""),
+        "work_id": str(item.get("work_id") or ""),
+        "collection_id": str(item.get("collection_id") or ""),
+        "favorite": bool(item.get("favorite")),
+        "quality": dict(item.get("quality") or {}),
+    }
+
+
+@tool(summary="Resolve bounded Media Center voice discovery and playback intents.", side_effects="local_write")
+def voice_request(
+    intent: str = "",
+    text: str = "",
+    query: str = "",
+    profile_id: str = "default",
+    room_id: str = "",
+    target_id: str = "",
+    item_id: str = "",
+    focused_item_id: str = "",
+    collection_kind: str = "",
+    media_kind: str = "playable",
+    action: str = "",
+    arguments: Mapping[str, Any] | None = None,
+    dialog_context: Mapping[str, Any] | None = None,
+    actor_ref: str = "",
+    limit: int = 5,
+    **_: Any,
+) -> dict[str, Any]:
+    catalog = _coordinator()
+    profile = str(profile_id or "default").strip() or "default"
+    bounded = max(1, min(10, int(limit or 5)))
+    raw = str(text or "").strip()
+    operation = str(intent or "").strip().lower()
+    transport_actions = {
+        "play", "pause", "seek", "volume", "mute", "next", "previous",
+        "stop", "handoff", "tracks", "rate", "sleep_timer",
+    }
+    if not operation:
+        first = raw.casefold().split(" ", 1)[0] if raw else ""
+        operation = (
+            "control"
+            if first in transport_actions
+            else "play"
+            if first in {"watch", "listen"}
+            else "search"
+        )
+        if first in transport_actions and not action:
+            action = first
+    context = dict(dialog_context or {})
+    selected_item = str(
+        item_id
+        or focused_item_id
+        or context.get("item_id")
+        or context.get("focused_item_id")
+        or ""
+    ).strip()
+    resolved_query = str(query or context.get("query") or raw).strip()
+    resolved_query = re.sub(
+        r"^(?:play|watch|listen(?: to)?|find|search(?: for)?)\s+",
+        "",
+        resolved_query,
+        flags=re.IGNORECASE,
+    ).strip()
+
+    if operation == "control":
+        command_action = str(action or context.get("action") or "").strip().lower()
+        if command_action not in transport_actions:
+            return _skill_error(
+                "voice_intent_invalid",
+                human_message=_skill_text(
+                    "runtime.media_center.voice.invalid",
+                    "I could not determine the playback command.",
+                ),
+            )
+        result, error = _invoke_skill(
+            "media_control_skill",
+            "voice_command",
+            {
+                "action": command_action,
+                "profile_id": profile,
+                "target_id": target_id or context.get("target_id") or "",
+                "session_id": context.get("session_id") or "",
+                "actor_ref": actor_ref or f"profile:{profile}",
+                "arguments": dict(arguments or {}),
+            },
+        )
+        if result is not None:
+            return result | {"intent": "control", "resolved_action": command_action}
+        return _skill_error(
+            "media_control_unavailable",
+            human_message=_skill_text(
+                "runtime.media_center.voice.control_unavailable",
+                "Playback control is temporarily unavailable.",
+            ),
+            detail=error[:300],
+        )
+
+    if operation in {"status", "library_status"}:
+        return status() | {
+            "intent": "status",
+            "speech_text": _skill_text(
+                "runtime.media_center.voice.status",
+                "The media library status is ready.",
+            ),
+        }
+    if operation in {"target", "targets", "list_targets"}:
+        targets, error = _invoke_skill(
+            "media_control_skill", "list_targets", {"limit": bounded}
+        )
+        if targets is None:
+            return _skill_error(
+                "media_control_unavailable",
+                human_message="Playback targets are temporarily unavailable.",
+                detail=error[:300],
+            )
+        return targets | {
+            "intent": "targets",
+            "visual_results": [
+                {
+                    "id": target.get("id"),
+                    "label": target.get("label"),
+                    "kind": target.get("kind"),
+                    "status": target.get("status"),
+                }
+                for target in (targets.get("items") or [])[:bounded]
+            ],
+        }
+    if operation in {"collection", "collections"}:
+        result = catalog.collections(kind=collection_kind, limit=bounded)
+        return result | {
+            "intent": "collections",
+            "visual_results": result["items"][:bounded],
+            "speech_text": f"Found {result['count']} media collections.",
+        }
+
+    candidates: list[dict[str, Any]] = []
+    if selected_item:
+        page = catalog.list_items(profile_id=profile, limit=30, sort="title")
+        candidates = [item for item in page["items"] if item["id"] == selected_item]
+        if not candidates:
+            plan = catalog.playback_plan(selected_item, profile_id=profile)
+            if plan.get("ok"):
+                candidates = [{"id": selected_item, "title": plan["title"]}]
+            elif plan.get("error") == "playback_policy_denied":
+                return plan
+    elif resolved_query:
+        try:
+            page = catalog.list_items(
+                query=resolved_query,
+                media_kind=media_kind,
+                profile_id=profile,
+                sort="title",
+                limit=bounded,
+            )
+        except ValueError:
+            return _skill_error(
+                "invalid_media_catalog_cursor",
+                human_message="The media results changed. Please try again.",
+            )
+        candidates = page["items"]
+    if operation in {"search", "browse"}:
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "intent": "search",
+            "query": resolved_query,
+            "items": candidates,
+            "visual_results": [_voice_item(item) for item in candidates[:bounded]],
+            "count": len(candidates),
+            "bounded": True,
+            "speech_text": f"Found {len(candidates)} media items.",
+        }
+    if not candidates:
+        return _skill_error(
+            "voice_media_not_found",
+            human_message=_skill_text(
+                "runtime.media_center.voice.not_found",
+                "I could not find matching media.",
+            ),
+            query=resolved_query,
+            visual_results=[],
+        )
+    exact = [
+        item
+        for item in candidates
+        if str(item.get("title") or "").strip().casefold()
+        == resolved_query.casefold()
+    ]
+    if len(exact) == 1:
+        candidates = exact
+    if len(candidates) > 1:
+        return {
+            "ok": False,
+            "schema": SCHEMA_VERSION,
+            "error": "voice_media_ambiguous",
+            "intent": operation,
+            "clarification": {
+                "prompt": _skill_text(
+                    "runtime.media_center.voice.which_media",
+                    "Which media item should I use?",
+                ),
+                "options": [_voice_item(item) for item in candidates[:bounded]],
+            },
+            "visual_results": [_voice_item(item) for item in candidates[:bounded]],
+        }
+    resolved_item_id = str(candidates[0]["id"])
+    if operation in {"favorite", "unfavorite"}:
+        favorite = operation == "favorite"
+        result = catalog.set_favorite(
+            resolved_item_id, profile_id=profile, favorite=favorite
+        )
+        if result.get("ok"):
+            _publish_library_snapshot(
+                catalog,
+                profile_id=profile,
+                webspace_id=str(_.get("webspace_id") or ""),
+            )
+        return result | {
+            "intent": operation,
+            "visual_results": [_voice_item(candidates[0])],
+        }
+    if operation != "play":
+        return _skill_error(
+            "voice_intent_invalid",
+            human_message="I could not determine the media action.",
+        )
+
+    targets, target_error = _invoke_skill(
+        "media_control_skill", "list_targets", {"limit": 20}
+    )
+    if targets is None:
+        return _skill_error(
+            "media_control_unavailable",
+            human_message="Playback targets are temporarily unavailable.",
+            detail=target_error[:300],
+        )
+    target_candidates = list(targets.get("items") or [])
+    requested_target = str(
+        target_id or context.get("target_id") or room_id or context.get("room_id") or ""
+    ).strip()
+    if requested_target:
+        needle = requested_target.casefold()
+        target_candidates = [
+            target
+            for target in target_candidates
+            if needle
+            in {
+                str(target.get("id") or "").casefold(),
+                str(target.get("endpoint_id") or "").casefold(),
+                str(target.get("label") or "").casefold(),
+                str((target.get("capabilities") or {}).get("room_id") or "").casefold(),
+            }
+        ]
+    if len(target_candidates) != 1:
+        return {
+            "ok": False,
+            "schema": SCHEMA_VERSION,
+            "error": "playback_target_ambiguous" if target_candidates else "playback_target_unavailable",
+            "intent": "play",
+            "clarification": {
+                "prompt": "Which playback target should I use?",
+                "options": [
+                    {
+                        "target_id": target.get("id"),
+                        "label": target.get("label"),
+                        "kind": target.get("kind"),
+                    }
+                    for target in target_candidates[:bounded]
+                ],
+            },
+            "visual_results": [_voice_item(candidates[0])],
+        }
+    queue = catalog.build_queue(
+        source_type="item",
+        source_id=resolved_item_id,
+        profile_id=profile,
+        endpoint_id=str(target_candidates[0].get("endpoint_id") or ""),
+        endpoint_node_id=str(target_candidates[0].get("node_id") or ""),
+        endpoint_capabilities=dict(target_candidates[0].get("capabilities") or {}),
+        limit=10,
+    )
+    if not queue.get("ok") or not queue.get("items"):
+        return _skill_error(
+            "playback_queue_empty",
+            human_message="No playable source is currently available.",
+        )
+    created, create_error = _invoke_skill(
+        "media_control_skill",
+        "create_session",
+        {
+            "target_id": target_candidates[0]["id"],
+            "profile_id": profile,
+            "actor_ref": actor_ref or f"profile:{profile}",
+            "queue": queue["items"],
+            "route": queue["items"][0].get("route") or {},
+            "queue_source": queue["source"],
+            "webspace_id": str(_.get("webspace_id") or ""),
+        },
+    )
+    if created is None:
+        return _skill_error(
+            "playback_session_create_failed",
+            human_message="Playback could not be started.",
+            detail=create_error[:300],
+        )
+    return created | {
+        "intent": "play",
+        "resolved_item": _voice_item(candidates[0]),
+        "resolved_target": {
+            "id": target_candidates[0].get("id"),
+            "label": target_candidates[0].get("label"),
+        },
+        "visual_results": [_voice_item(candidates[0])],
+        "speech_text": f"Playing {candidates[0].get('title') or candidates[0].get('name')}.",
+    }
 
 
 @tool(summary="List typed media collections through an opaque cursor.", side_effects="none")
