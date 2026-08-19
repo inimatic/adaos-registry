@@ -211,6 +211,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     ]
     for schema in smoke_contract["documents"].values():
         jsonschema.Draft202012Validator.check_schema(schema)
+    assert "MUST NOT index itself" in smoke_contract["collection"]["index_boundary"]
 
     dataset_schema = contract["operations"]["dataset_status"]["output_schema"]
     split_values = {
@@ -391,6 +392,7 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         role: {**item, "sealed": role == "test"} for role, item in _splits().items()
     }
     smoke_outputs = _smoke_expected_outputs()
+    indexed_output_names = smoke_outputs[:2]
     artifact_rows = [
         {
             "uri": f"skill-data:files/acceptance/{name}",
@@ -401,7 +403,7 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
             "kind": "workflow-smoke-evidence",
             "metadata": {"evidence_class": "workflow_smoke"},
         }
-        for index, name in enumerate(smoke_outputs, start=5)
+        for index, name in enumerate(indexed_output_names, start=5)
     ]
     smoke_documents = {
         "run_log.json": {
@@ -423,7 +425,7 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
                     "digest": artifact["digest"],
                     "content_ref": artifact,
                 }
-                for name, artifact in zip(smoke_outputs, artifact_rows, strict=True)
+                for name, artifact in zip(indexed_output_names, artifact_rows, strict=True)
             ]
         },
     }
@@ -481,8 +483,9 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
             "documents": smoke_documents,
             "outputs": [
                 {"path": name, "digest": artifact["digest"]}
-                for name, artifact in zip(smoke_outputs, artifact_rows, strict=True)
-            ],
+                for name, artifact in zip(indexed_output_names, artifact_rows, strict=True)
+            ]
+            + [{"path": "artifacts_index.json", "digest": "sha256:" + "7" * 64}],
         },
     )
     envelope = _acceptance_envelope("research.consumer-contracts")
@@ -497,14 +500,59 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         "collect_attempt",
         "verify_artifact",
         "verify_artifact",
-        "verify_artifact",
     ]
     assert receipt["evidence"]["workflow_smoke_executed"] is True
     assert receipt["evidence"]["verified_artifacts"] == [
         {"ok": True},
         {"ok": True},
-        {"ok": True},
     ]
+
+
+def test_workflow_smoke_index_rejects_self_referential_digest() -> None:
+    self_ref = {
+        "uri": "skill-data:files/acceptance/artifacts_index.json",
+        "digest": "sha256:" + "7" * 64,
+        "size_bytes": 42,
+        "media_type": "application/json",
+        "owner_ref": "skill:tlp_runner",
+        "metadata": {"evidence_class": "workflow_smoke"},
+    }
+    with pytest.raises(ValueError, match="must not index itself"):
+        ResearchManager._validate_workflow_smoke_evidence(
+            trial={
+                "documents": {
+                    "run_log.json": {
+                        "stage": "workflow_smoke",
+                        "device": "cpu",
+                        "epochs_completed": 3,
+                        "seeds": ["seed-17"],
+                        "inference_allowed": False,
+                        "evidence_class": "workflow_smoke",
+                    },
+                    "evaluation_audit.json": {
+                        "per_stage": {
+                            "workflow_smoke": {"test_evaluations_count": 0}
+                        },
+                        "test_access": [],
+                    },
+                    "artifacts_index.json": {
+                        "files": [
+                            {
+                                "path": "artifacts_index.json",
+                                "digest": self_ref["digest"],
+                                "content_ref": self_ref,
+                            }
+                        ]
+                    },
+                },
+                "outputs": [
+                    {"path": "artifacts_index.json", "digest": self_ref["digest"]}
+                ],
+            },
+            collected={"complete": True, "artifacts": [self_ref]},
+            verified_artifacts=[{"ok": True}],
+            expected_seed_labels=["seed-17"],
+        )
 
 
 def test_compiled_study_binds_exact_realization_and_is_idempotent() -> None:

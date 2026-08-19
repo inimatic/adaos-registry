@@ -273,6 +273,11 @@ class ResearchManager:
             for item in dict(documents["artifacts_index.json"]).get("files") or []
             if isinstance(item, Mapping)
         ]
+        if any(str(item.get("path") or "") == "artifacts_index.json" for item in index_files):
+            raise ValueError(
+                "workflow-smoke artifacts_index.json must not index itself; "
+                "self-indexing cannot have a stable content digest"
+            )
         artifacts = [
             dict(item)
             for item in collected.get("artifacts") or []

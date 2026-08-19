@@ -153,6 +153,11 @@ def _workflow_smoke_documents() -> dict[str, Any]:
                 "each artifacts_index entry must resolve to one trial output and one "
                 "collect_attempt ContentRef with the same SHA-256 digest"
             ),
+            "index_boundary": (
+                "artifacts_index.json indexes collected evidence artifacts and MUST "
+                "NOT index itself; self-indexing would require an impossible stable "
+                "digest of a document that contains its own digest"
+            ),
         },
         "canonicalization": {
             "rng_seed_type": "integer",
