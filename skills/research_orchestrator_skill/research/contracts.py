@@ -584,12 +584,18 @@ def project_execution_automation_brief(
     compilation_projection_digest: str,
     protocol_digest: str,
 ) -> dict[str, Any]:
-    """Remove audit-only duplication while preserving the executable obligations."""
+    """Compile a compact engineering handoff without weakening obligations.
+
+    The exact scientific protocol lives in the paired ResearchCompilation.
+    This projection keeps the bridge to AdaOS contracts and every requirement
+    identity, but removes prose verification recipes duplicated by acceptance
+    checks and by the consumer-owned conformance fixture.
+    """
 
     portable = project_portable_automation_brief(value)
     projected = copy.deepcopy(portable)
     predecessor_digest = str(projected.pop("digest"))
-    projected["schema_version"] = "1.4.0"
+    projected["schema_version"] = "1.6.0"
     projected["predecessor_digest"] = predecessor_digest
     execution_digest = str(compilation_projection_digest or "").strip()
     accepted_protocol_digest = str(protocol_digest or "").strip()
@@ -605,6 +611,24 @@ def project_execution_automation_brief(
     projected.pop("research_prototype", None)
     projected.pop("source_inventory", None)
     projected.pop("builder_checkpoint", None)
+    projected["implementation_requirements"] = [
+        {
+            key: copy.deepcopy(item[key])
+            for key in ("id", "category", "requirement")
+            if key in item
+        }
+        for item in projected.get("implementation_requirements") or []
+        if isinstance(item, Mapping)
+    ]
+    projected["acceptance_checks"] = [
+        {
+            key: copy.deepcopy(item[key])
+            for key in ("id", "check")
+            if key in item
+        }
+        for item in projected.get("acceptance_checks") or []
+        if isinstance(item, Mapping)
+    ]
     projected["digest"] = digest(projected)
     return validate("research.automation_brief.v1.schema.json", projected)
 

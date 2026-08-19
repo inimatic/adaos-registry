@@ -170,3 +170,10 @@ Builder, manager, and later evaluator status snapshots are federated into the
 orchestrator journal with `(origin, source_event_id)` replay identity. The
 Workbench therefore observes one durable lifecycle without copying another
 component's private database or making UI connectivity part of execution.
+
+The Codex-facing AutomationBrief v1.6 is an executable projection rather than
+a second prose specification. It preserves every implementation requirement
+and acceptance identity plus the exact runner/provider boundary, while
+removing verification prose already carried by the scientific compilation and
+the consumer-owned conformance fixture. Its predecessor digest keeps the full
+accepted brief auditable.

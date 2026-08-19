@@ -274,8 +274,8 @@ def test_legacy_compiled_automation_brief_has_host_neutral_projection() -> None:
         "artifact_groups": [{"ref": "artifact://skill/tlp_direction_skill/part0", "group_id": "part0", "manifest_digest": "sha256:" + "6" * 64, "root_path": "C:/host/view/files", "manifest_path": "C:/host/view/manifest.json"}],
         "development_scope": {"targets": [{"ref": "skill:tlp_direction_skill", "access": "read-write", "context": "full", "source_path": "C:/host/skill"}], "context_members": [], "artifact_inputs": [{"ref": "artifact://skill/tlp_direction_skill/part0", "access": "read-only", "manifest_digest": "sha256:" + "6" * 64, "root_path": "C:/host/view/files"}]},
         "contract_requirements": [{"id": "runner", "contract": "adaos.research.runner.v1", "role": "provider", "operations": [], "boundary": "observable"}],
-        "implementation_requirements": [{}],
-        "acceptance_checks": [{}],
+        "implementation_requirements": [{"id": "REQ-1", "category": "execution", "requirement": "Run the exact path.", "verification": "Inspect run_log.json."}],
+        "acceptance_checks": [{"id": "AC-1", "check": "The path executes.", "evidence": "run_log.json"}],
         "prohibited_actions": ["no hidden access"],
         "handoff_state": "ready_for_codex",
         "created_at": "2026-08-18T00:00:00Z",
@@ -294,12 +294,18 @@ def test_legacy_compiled_automation_brief_has_host_neutral_projection() -> None:
         compilation_projection_digest="sha256:" + "7" * 64,
         protocol_digest="sha256:" + "8" * 64,
     )
-    assert execution["schema_version"] == "1.4.0"
+    assert execution["schema_version"] == "1.6.0"
     assert execution["predecessor_digest"] == projected["digest"]
     assert execution["scientific_contract_ref"]["execution_projection_digest"] == "sha256:" + "7" * 64
     assert "research_prototype" not in execution
     assert "source_inventory" not in execution
     assert "builder_checkpoint" not in execution
+    assert execution["implementation_requirements"] == [
+        {"id": "REQ-1", "category": "execution", "requirement": "Run the exact path."}
+    ]
+    assert execution["acceptance_checks"] == [
+        {"id": "AC-1", "check": "The path executes."}
+    ]
 
 
 def test_llm_candidate_schema_matches_the_typed_contract_and_reports_all_violations() -> None:
