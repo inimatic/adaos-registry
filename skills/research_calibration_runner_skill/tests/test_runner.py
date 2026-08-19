@@ -119,6 +119,11 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
         **identity,
         "current_skill": {"name": "research_evaluator_skill", "version": "0.1.9"},
     }
+    manager_identity = {
+        **identity,
+        "current_skill": {"name": "research_manager_skill", "version": "0.13.0"},
+    }
+    runner_contract_digest = "sha256:" + "2" * 64
     task = {
         "digest": "sha256:" + "1" * 64,
         "environment_spec": {
@@ -131,18 +136,29 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
                 "research_orchestrator_skill": "0.19.1",
                 "research_evaluator_skill": "0.1.9",
                 "research_calibration_runner_skill": "0.1.4",
+                "research_manager_skill": "0.13.0",
             },
+            "runner_contract_digest": runner_contract_digest,
         },
     }
     monkeypatch.setattr(module, "sdk_runtime_identity", lambda: identity)
+    def invoke(_skill, method, *_args, **_kwargs):
+        if method == "get_task":
+            return {
+                "ok": True,
+                "task": task,
+                "runtime_identity": evaluator_identity,
+            }
+        if method == "environment_identity":
+            return {"ok": True, "runtime_identity": manager_identity}
+        if method == "get_runner_contract":
+            return {"digest": runner_contract_digest}
+        raise AssertionError(method)
+
     monkeypatch.setattr(
         module,
         "invoke_skill",
-        lambda *_args, **_kwargs: {
-            "ok": True,
-            "task": task,
-            "runtime_identity": evaluator_identity,
-        },
+        invoke,
     )
 
     receipt = module._environment_preflight("tlp-calibration-v1")

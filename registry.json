@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-19T11:10:29+00:00",
+  "updated_at": "2026-08-19T11:10:45+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -732,8 +732,8 @@
       "kind": "skill",
       "id": "research_calibration_runner_skill",
       "name": "research_calibration_runner_skill",
-      "version": "0.1.9",
-      "updated_at": "2026-08-18T14:16:14+00:00",
+      "version": "0.1.10",
+      "updated_at": "2026-08-19T11:10:45+00:00",
       "path": "skills/research_calibration_runner_skill",
       "manifest": "skills/research_calibration_runner_skill/skill.yaml",
       "source": {

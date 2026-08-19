@@ -89,6 +89,27 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
     evaluator_identity = response.get("runtime_identity")
     if not isinstance(task, Mapping) or not isinstance(evaluator_identity, Mapping):
         raise RuntimeError("frozen task environment identity is unavailable")
+    manager_response = invoke_skill(
+        "research_manager_skill",
+        "environment_identity",
+        {},
+        timeout=120,
+    )
+    manager_contract = invoke_skill(
+        "research_manager_skill",
+        "get_runner_contract",
+        {},
+        timeout=120,
+    )
+    manager_identity = (
+        manager_response.get("runtime_identity")
+        if isinstance(manager_response, Mapping)
+        else None
+    )
+    if not isinstance(manager_identity, Mapping):
+        raise RuntimeError("research manager environment identity is unavailable")
+    if not isinstance(manager_contract, Mapping) or not manager_contract.get("digest"):
+        raise RuntimeError("research manager runner contract is unavailable")
     expected = task.get("environment_spec")
     if not isinstance(expected, Mapping):
         raise RuntimeError("calibration task does not freeze its environment")
@@ -116,6 +137,13 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
         "evaluator_core_commit": str(
             dict(evaluator_identity.get("core") or {}).get("git_commit") or ""
         ),
+        "manager_version": str(
+            dict(manager_identity.get("current_skill") or {}).get("version") or ""
+        ),
+        "manager_core_commit": str(
+            dict(manager_identity.get("core") or {}).get("git_commit") or ""
+        ),
+        "runner_contract_digest": str(manager_contract.get("digest") or ""),
     }
     required = {
         "core_commit": str(expected.get("core_commit") or ""),
@@ -126,6 +154,9 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
         "runner_version": str(components.get("research_calibration_runner_skill") or ""),
         "evaluator_version": str(components.get("research_evaluator_skill") or ""),
         "evaluator_core_commit": str(expected.get("core_commit") or ""),
+        "manager_version": str(components.get("research_manager_skill") or ""),
+        "manager_core_commit": str(expected.get("core_commit") or ""),
+        "runner_contract_digest": str(expected.get("runner_contract_digest") or ""),
     }
     mismatches = [key for key, value in required.items() if actual.get(key) != value]
     if mismatches:
