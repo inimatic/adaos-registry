@@ -1306,6 +1306,37 @@ def test_catalog_corrections_are_audited_reversible_and_non_destructive(
         ).fetchone()[0]
     assert title != "Corrected title"
 
+    canonical = works[1]["work_id"]
+    merged = catalog.apply_correction(
+        operation="merge",
+        subject_ref=f"work:{target}",
+        values={"canonical_work_id": canonical},
+        actor_ref="profile:alice",
+    )
+    split = catalog.apply_correction(
+        operation="split",
+        subject_ref=f"work:{target}",
+        values={},
+        actor_ref="profile:alice",
+    )
+    restored = catalog.reverse_correction(
+        split["correction"]["id"], actor_ref="profile:alice"
+    )
+    with catalog.repository.connect() as connection:
+        alias = connection.execute(
+            "SELECT alias_of FROM media_works WHERE id=?", (target,)
+        ).fetchone()[0]
+        active = connection.execute(
+            "SELECT active FROM catalog_aliases WHERE canonical_id=?", (canonical,)
+        ).fetchone()[0]
+    assert merged["ok"] is True
+    assert split["correction"]["before"] == {"alias_of": canonical}
+    assert split["correction"]["after"] == {"alias_of": ""}
+    assert restored["ok"] is True
+    assert alias == canonical
+    assert active == 1
+    _validate_schema("catalog-correction.v1.schema.json", split["correction"])
+
 
 def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
     monkeypatch, tmp_path

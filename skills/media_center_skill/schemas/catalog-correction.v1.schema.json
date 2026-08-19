@@ -6,7 +6,7 @@
   "properties": {
     "schema": {"const": "adaos.media_center.catalog_correction.v1"},
     "id": {"type": "string", "minLength": 1},
-    "operation": {"enum": ["metadata", "merge", "regroup"]},
+    "operation": {"enum": ["metadata", "merge", "split", "regroup"]},
     "subject_ref": {"type": "string", "minLength": 1},
     "before": {"type": "object"},
     "after": {"type": "object"},

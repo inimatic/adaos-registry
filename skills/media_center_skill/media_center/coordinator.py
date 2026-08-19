@@ -216,7 +216,8 @@ class MediaCatalogCoordinator:
                     reason TEXT NOT NULL,
                     actor_ref TEXT NOT NULL,
                     reversible INTEGER NOT NULL DEFAULT 1,
-                    created_at TEXT NOT NULL
+                    created_at TEXT NOT NULL,
+                    active INTEGER NOT NULL DEFAULT 1
                 );
                 CREATE TABLE IF NOT EXISTS agent_catalog_state (
                     agent_id TEXT PRIMARY KEY,
@@ -328,6 +329,16 @@ class MediaCatalogCoordinator:
                     connection.execute(
                         f"ALTER TABLE media_variants ADD COLUMN {name} {definition}"
                     )
+            alias_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(catalog_aliases)"
+                ).fetchall()
+            }
+            if "active" not in alias_columns:
+                connection.execute(
+                    "ALTER TABLE catalog_aliases ADD COLUMN active INTEGER NOT NULL DEFAULT 1"
+                )
             personal_columns = {
                 str(row["name"])
                 for row in connection.execute(
@@ -2883,7 +2894,7 @@ class MediaCatalogCoordinator:
         action = _text(operation).lower()
         subject = _text(subject_ref)
         actor = _text(actor_ref) or "profile:default"
-        if action not in {"metadata", "merge", "regroup"}:
+        if action not in {"metadata", "merge", "split", "regroup"}:
             return {"ok": False, "error": "catalog_correction_unsupported"}
         before: dict[str, Any]
         after: dict[str, Any]
@@ -2919,31 +2930,52 @@ class MediaCatalogCoordinator:
                     """,
                     (claim_id, f"work:{work_id}", _json_dumps(title), actor, now_iso()),
                 )
-            elif action == "merge":
+            elif action in {"merge", "split"}:
                 duplicate_id = subject.removeprefix("work:")
-                canonical_id = _text(values.get("canonical_work_id"))
-                rows = connection.execute(
-                    "SELECT id, alias_of FROM media_works WHERE id IN (?, ?)",
-                    (duplicate_id, canonical_id),
-                ).fetchall()
-                if len(rows) != 2 or duplicate_id == canonical_id:
-                    connection.rollback()
-                    return {"ok": False, "error": "catalog_correction_subject_invalid"}
-                before = {"alias_of": next(str(row["alias_of"]) for row in rows if row["id"] == duplicate_id)}
-                after = {"alias_of": canonical_id}
-                alias_id = _stable_id("alias", duplicate_id, canonical_id, size=24)
-                connection.execute(
-                    "UPDATE media_works SET alias_of=?, revision=revision+1, updated_at=? WHERE id=?",
-                    (canonical_id, now_iso(), duplicate_id),
-                )
-                connection.execute(
-                    """
-                    INSERT OR REPLACE INTO catalog_aliases(
-                        alias_id,canonical_id,reason,actor_ref,reversible,created_at
-                    ) VALUES (?, ?, 'user_merge', ?, 1, ?)
-                    """,
-                    (alias_id, canonical_id, actor, now_iso()),
-                )
+                if action == "merge":
+                    canonical_id = _text(values.get("canonical_work_id"))
+                    rows = connection.execute(
+                        "SELECT id, alias_of FROM media_works WHERE id IN (?, ?)",
+                        (duplicate_id, canonical_id),
+                    ).fetchall()
+                    if len(rows) != 2 or duplicate_id == canonical_id:
+                        connection.rollback()
+                        return {"ok": False, "error": "catalog_correction_subject_invalid"}
+                    before = {"alias_of": next(str(row["alias_of"]) for row in rows if row["id"] == duplicate_id)}
+                    after = {"alias_of": canonical_id}
+                    alias_id = _stable_id("alias", duplicate_id, canonical_id, size=24)
+                    connection.execute(
+                        "UPDATE media_works SET alias_of=?, revision=revision+1, updated_at=? WHERE id=?",
+                        (canonical_id, now_iso(), duplicate_id),
+                    )
+                    connection.execute(
+                        """
+                        INSERT OR REPLACE INTO catalog_aliases(
+                            alias_id,canonical_id,reason,actor_ref,reversible,
+                            created_at,active
+                        ) VALUES (?, ?, 'user_merge', ?, 1, ?, 1)
+                        """,
+                        (alias_id, canonical_id, actor, now_iso()),
+                    )
+                else:
+                    row = connection.execute(
+                        "SELECT id,alias_of FROM media_works WHERE id=?",
+                        (duplicate_id,),
+                    ).fetchone()
+                    canonical_id = str(row["alias_of"] or "") if row else ""
+                    if not canonical_id:
+                        connection.rollback()
+                        return {"ok": False, "error": "catalog_correction_subject_invalid"}
+                    before = {"alias_of": canonical_id}
+                    after = {"alias_of": ""}
+                    connection.execute(
+                        "UPDATE media_works SET alias_of='',revision=revision+1,updated_at=? WHERE id=?",
+                        (now_iso(), duplicate_id),
+                    )
+                    connection.execute(
+                        "UPDATE catalog_aliases SET active=0 WHERE alias_id=?",
+                        (_stable_id("alias", duplicate_id, canonical_id, size=24),),
+                    )
             else:
                 item_id = subject.removeprefix("item:")
                 collection_id = _text(values.get("collection_id"))
@@ -3037,6 +3069,28 @@ class MediaCatalogCoordinator:
                 connection.execute(
                     "UPDATE media_works SET alias_of=?, revision=revision+1, updated_at=? WHERE id=?",
                     (_text(before.get("alias_of")), now_iso(), duplicate_id),
+                )
+                connection.execute(
+                    "UPDATE catalog_aliases SET active=0 WHERE alias_id=?",
+                    (
+                        _stable_id(
+                            "alias",
+                            duplicate_id,
+                            _text((_json_loads(row["after_json"]) or {}).get("alias_of")),
+                            size=24,
+                        ),
+                    ),
+                )
+            elif action == "split":
+                duplicate_id = subject.removeprefix("work:")
+                canonical_id = _text(before.get("alias_of"))
+                connection.execute(
+                    "UPDATE media_works SET alias_of=?,revision=revision+1,updated_at=? WHERE id=?",
+                    (canonical_id, now_iso(), duplicate_id),
+                )
+                connection.execute(
+                    "UPDATE catalog_aliases SET active=1 WHERE alias_id=?",
+                    (_stable_id("alias", duplicate_id, canonical_id, size=24),),
                 )
             elif action == "regroup":
                 item_id = subject.removeprefix("item:")

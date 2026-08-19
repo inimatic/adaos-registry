@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.0
+version: 0.8.1
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -685,14 +685,14 @@ tools:
     additionalProperties: true
   output_schema: {type: object}
 - name: apply_correction
-  description: Apply an audited reversible metadata, merge, or regroup correction.
+  description: Apply an audited reversible metadata, merge, split, or regroup correction.
   entry: handlers.main:apply_correction
   side_effects: local_write
   input_schema:
     type: object
     required: [operation, subject_ref, values]
     properties:
-      operation: {type: string, enum: [metadata, merge, regroup]}
+      operation: {type: string, enum: [metadata, merge, split, regroup]}
       subject_ref: {type: string}
       values: {type: object}
       actor_ref: {type: string, default: 'profile:default'}
