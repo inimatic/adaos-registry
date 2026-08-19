@@ -1840,7 +1840,10 @@ class ResearchOrchestrator:
         if not state:
             raise ValueError("research direction is not initialized")
         if state.get("accepted_prototype_digest"):
-            raise ValueError("accepted formulation is immutable; create a new Builder change before revising it")
+            raise ValueError(
+                "active ResearchTask has an accepted immutable formulation; create and "
+                "activate a new branch ResearchTask before recording a revision"
+            )
         bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("at least one source artifact is required")
@@ -2390,6 +2393,11 @@ class ResearchOrchestrator:
         if requested_task_id and requested_task_id != active_task_id:
             raise ValueError(
                 "selected ResearchTask is read-only until it is explicitly activated for formulation"
+            )
+        if state.get("accepted_prototype_digest"):
+            raise ValueError(
+                "active ResearchTask has an accepted immutable formulation; create and "
+                "activate a new branch ResearchTask before requesting a revision"
             )
         bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):

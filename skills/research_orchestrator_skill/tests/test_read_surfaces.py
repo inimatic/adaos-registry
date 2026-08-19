@@ -81,3 +81,30 @@ def test_uninitialized_direction_read_tools_return_empty_data_not_errors(monkeyp
     assert automation["ok"] is True
     assert automation["available"] is False
     assert automation["initialized"] is False
+
+
+def test_staged_discussion_rejects_accepted_task_before_source_or_llm_work(monkeypatch) -> None:
+    repository = SimpleNamespace(
+        get_direction=lambda _direction_id: {
+            "direction_id": "accepted-direction",
+            "active_task_id": "accepted-direction.task-001",
+            "accepted_prototype_digest": "sha256:" + "a" * 64,
+        }
+    )
+    orchestrator = ResearchOrchestrator(repository=repository)
+
+    def _unexpected_source_access(*_args, **_kwargs):
+        raise AssertionError("source compaction must not run for an immutable task")
+
+    monkeypatch.setattr(
+        orchestrator_module.artifact_context,
+        "source_bundle",
+        _unexpected_source_access,
+    )
+
+    with pytest.raises(ValueError, match="new branch ResearchTask"):
+        orchestrator._discuss_staged(
+            "accepted-direction",
+            "Revise this accepted formulation.",
+            dialog_payload={"task_id": "accepted-direction.task-001"},
+        )
