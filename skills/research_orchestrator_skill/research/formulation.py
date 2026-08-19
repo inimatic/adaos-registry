@@ -11,7 +11,13 @@ from jsonschema import Draft202012Validator
 from research.contracts import prototype_candidate_schema
 
 
-STAGE_SCHEMA_VERSION = "1.1.0"
+STAGE_SCHEMA_VERSION = "1.2.0"
+DEFAULT_WORKFLOW_SMOKE_POLICY = {
+    "device": "cpu",
+    "epochs": 3,
+    "seed_values": [17],
+    "inference_allowed": False,
+}
 REQUIREMENT_CATEGORIES = ("execution", "data", "reproducibility", "observability", "evidence", "recovery", "analysis", "security")
 CHECK_CATEGORIES = ("workflow", "data_integrity", "reproducibility", "evidence", "analysis", "failure_recovery", "security")
 PROTOCOL_DECISION_AREAS = (
@@ -109,6 +115,32 @@ def problem_frame_schema() -> dict[str, Any]:
         },
         ["sufficiency", "observed_facts", "author_interpretations", "coverage_limitations", "unresolved_decisions"],
     )
+    scientific_entity = _object(
+        {
+            "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+            "label": {"type": "string", "minLength": 2},
+            "specification": {"type": "string", "minLength": 10},
+        },
+        ["id", "label", "specification"],
+    )
+    selected["experimental_signature"] = _object(
+        {
+            "subject": {"type": "string", "minLength": 10},
+            "dataset": scientific_entity,
+            "baseline": scientific_entity,
+            "intervention": scientific_entity,
+            "intervention_boundary": {"type": "string", "minLength": 10},
+            "primary_outcome": _object(
+                {
+                    "name": {"type": "string", "minLength": 2},
+                    "measurement": {"type": "string", "minLength": 10},
+                    "unit": {"type": "string", "minLength": 1},
+                },
+                ["name", "measurement", "unit"],
+            ),
+        },
+        ["subject", "dataset", "baseline", "intervention", "intervention_boundary", "primary_outcome"],
+    )
     return _object(selected, list(selected))
 
 
@@ -144,6 +176,10 @@ def protocol_design_schema() -> dict[str, Any]:
     data_policy_properties = copy.deepcopy(
         properties["experimental_plan"]["properties"]["data_policy"]["properties"]
     )
+    data_policy_properties["dataset_id"] = {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9_.-]*$",
+    }
     data_policy_properties["evaluation_access"] = _object(
         {
             "development_split": {"type": "string", "minLength": 10},
@@ -209,7 +245,7 @@ def protocol_design_schema() -> dict[str, Any]:
             },
             "data_policy": _object(
                 data_policy_properties,
-                ["dataset", "split_strategy", "evaluation_seal", "leakage_controls", "evaluation_access"],
+                ["dataset", "dataset_id", "split_strategy", "evaluation_seal", "leakage_controls", "evaluation_access"],
             ),
             "reproducibility": properties["experimental_plan"]["properties"]["reproducibility"],
         },
@@ -277,6 +313,24 @@ def implementation_contract_schema() -> dict[str, Any]:
     return _object(
         {
             "assistant_message": {"type": "string"},
+            "scientific_bindings": _object(
+                {
+                    "protocol_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+                    "dataset_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+                    "baseline_arm_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+                    "intervention_arm_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+                    "primary_outcome_name": {"type": "string", "minLength": 2},
+                    "runner_contract": {"const": "adaos.research.runner.v1"},
+                },
+                [
+                    "protocol_digest",
+                    "dataset_id",
+                    "baseline_arm_id",
+                    "intervention_arm_id",
+                    "primary_outcome_name",
+                    "runner_contract",
+                ],
+            ),
             "requirements_by_category": _object(
                 {
                     category: {"type": "array", "minItems": 1 if category in required_requirements else 0, "items": requirement}
@@ -292,7 +346,7 @@ def implementation_contract_schema() -> dict[str, Any]:
                 list(CHECK_CATEGORIES),
             ),
         },
-        ["assistant_message", "requirements_by_category", "checks_by_category"],
+        ["assistant_message", "scientific_bindings", "requirements_by_category", "checks_by_category"],
     )
 
 
@@ -346,6 +400,9 @@ def stage_quality_issues(
     *,
     allowed_source_refs: set[str] | None = None,
     expected_effect_direction: str | None = None,
+    expected_experimental_signature: Mapping[str, Any] | None = None,
+    required_workflow_smoke: Mapping[str, Any] | None = None,
+    expected_protocol_digest: str | None = None,
 ) -> list[str]:
     payload = validate_stage(stage, value)
     issues: list[str] = []
@@ -370,6 +427,9 @@ def stage_quality_issues(
             str(primary.get("falsification") or ""),
         ):
             issues.append("a two-sided difference hypothesis cannot treat the opposite direction as falsification")
+        signature = payload["experimental_signature"]
+        if signature["baseline"]["id"] == signature["intervention"]["id"]:
+            issues.append("experimental_signature baseline and intervention ids must be distinct")
     elif stage == "protocol_design":
         plan = payload["experimental_plan"]
         comparison = plan["comparison_design"]
@@ -452,6 +512,53 @@ def stage_quality_issues(
                 "decision_spec.effect_direction must match the primary hypothesis "
                 f"({expected_effect_direction})"
             )
+        signature = dict(expected_experimental_signature or {})
+        if signature:
+            baseline = dict(signature.get("baseline") or {})
+            intervention = dict(signature.get("intervention") or {})
+            dataset = dict(signature.get("dataset") or {})
+            outcome = dict(signature.get("primary_outcome") or {})
+            expected_arms = [
+                (str(baseline.get("id") or ""), str(baseline.get("label") or ""), "baseline"),
+                (str(intervention.get("id") or ""), str(intervention.get("label") or ""), "intervention"),
+            ]
+            actual_primary_arms = [(str(item["id"]), str(item["label"]), str(item["role"])) for item in arms]
+            if actual_primary_arms != expected_arms:
+                issues.append("comparison_design must exactly preserve baseline and intervention identity from experimental_signature")
+            if [str(item) for item in plan["comparators"]] != [item[1] for item in expected_arms]:
+                issues.append("comparators must exactly preserve labels and order from experimental_signature")
+            if contrast != {"minuend": expected_arms[1][0], "subtrahend": expected_arms[0][0]}:
+                issues.append("primary contrast must be intervention minus baseline from experimental_signature")
+            data_policy = plan["data_policy"]
+            if str(data_policy.get("dataset_id") or "") != str(dataset.get("id") or ""):
+                issues.append("data_policy.dataset_id must exactly preserve experimental_signature dataset id")
+            if str(data_policy.get("dataset") or "") != str(dataset.get("label") or ""):
+                issues.append("data_policy.dataset must exactly preserve experimental_signature dataset label")
+            if str(system_spec.get("subject") or "") != str(signature.get("subject") or ""):
+                issues.append("system_specification.subject must exactly preserve experimental_signature subject")
+            if str(system_spec.get("intervention_boundary") or "") != str(signature.get("intervention_boundary") or ""):
+                issues.append("system_specification.intervention_boundary must exactly preserve experimental_signature boundary")
+            primary_outcomes = [item for item in outcomes if item.get("role") == "primary"]
+            expected_outcome = {
+                "name": str(outcome.get("name") or ""),
+                "measurement": str(outcome.get("measurement") or ""),
+                "unit": str(outcome.get("unit") or ""),
+            }
+            if len(primary_outcomes) != 1 or {
+                key: str(primary_outcomes[0].get(key) or "") for key in expected_outcome
+            } != expected_outcome:
+                issues.append("primary outcome must exactly preserve experimental_signature name, measurement, and unit")
+        smoke_policy = dict(required_workflow_smoke or {})
+        if smoke_policy:
+            if len(smoke) != 1:
+                issues.append("protocol must contain exactly one workflow_smoke stage")
+            elif (
+                str(smoke[0]["execution_profile"]["device"]) != str(smoke_policy.get("device"))
+                or int(smoke[0]["budget"]["epochs"]) != int(smoke_policy.get("epochs") or 0)
+                or list(smoke[0]["budget"]["seed_values"]) != list(smoke_policy.get("seed_values") or [])
+                or bool(smoke[0]["inference_allowed"]) is not bool(smoke_policy.get("inference_allowed"))
+            ):
+                issues.append("workflow_smoke must exactly preserve the AdaOS execution policy")
     elif stage == "implementation_contract":
         obligations = [
             str(value)
@@ -470,6 +577,20 @@ def stage_quality_issues(
         )
         if any(per_epoch_test.search(item) for item in obligations):
             issues.append("implementation contract must not observe final-test metrics per epoch")
+        signature = dict(expected_experimental_signature or {})
+        bindings = dict(payload.get("scientific_bindings") or {})
+        if expected_protocol_digest and bindings.get("protocol_digest") != expected_protocol_digest:
+            issues.append("scientific_bindings.protocol_digest must bind the exact protocol_design artifact")
+        if signature:
+            expected_bindings = {
+                "dataset_id": str((signature.get("dataset") or {}).get("id") or ""),
+                "baseline_arm_id": str((signature.get("baseline") or {}).get("id") or ""),
+                "intervention_arm_id": str((signature.get("intervention") or {}).get("id") or ""),
+                "primary_outcome_name": str((signature.get("primary_outcome") or {}).get("name") or ""),
+                "runner_contract": "adaos.research.runner.v1",
+            }
+            if any(str(bindings.get(key) or "") != value for key, value in expected_bindings.items()):
+                issues.append("scientific_bindings must exactly preserve the experimental_signature and runner contract")
     return list(dict.fromkeys(issues))
 
 
@@ -632,6 +753,21 @@ def assemble_candidate(
     problem = validate_stage("problem_frame", problem_frame)
     protocol = validate_stage("protocol_design", protocol_design)
     implementation = validate_stage("implementation_contract", implementation_contract)
+    protocol_issues = stage_quality_issues(
+        "protocol_design",
+        protocol,
+        expected_effect_direction=str(problem["hypotheses"][0]["effect_direction"]),
+        expected_experimental_signature=problem["experimental_signature"],
+        required_workflow_smoke=DEFAULT_WORKFLOW_SMOKE_POLICY,
+    )
+    implementation_issues = stage_quality_issues(
+        "implementation_contract",
+        implementation,
+        expected_experimental_signature=problem["experimental_signature"],
+        expected_protocol_digest=stage_digest(protocol),
+    )
+    if protocol_issues or implementation_issues:
+        raise ValueError("cross-stage formulation contract: " + "; ".join(protocol_issues + implementation_issues))
     hypothesis_direction = str(problem["hypotheses"][0]["effect_direction"])
     decision_spec = protocol["decision_spec"]
     if str(decision_spec["effect_direction"]) != hypothesis_direction:
@@ -741,6 +877,7 @@ def assemble_candidate(
 
 __all__ = [
     "CHECK_CATEGORIES",
+    "DEFAULT_WORKFLOW_SMOKE_POLICY",
     "PROTOCOL_DECISION_AREAS",
     "REQUIREMENT_CATEGORIES",
     "STAGES",

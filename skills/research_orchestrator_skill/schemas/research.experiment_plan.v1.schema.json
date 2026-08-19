@@ -17,6 +17,7 @@
       "type": "object",
       "required": ["logical_name", "policy_digest", "split_strategy", "evaluation_seal", "leakage_controls", "evaluation_access"],
       "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
         "logical_name": {"type": "string", "minLength": 3},
         "policy_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
         "split_strategy": {"type": "string", "minLength": 10},

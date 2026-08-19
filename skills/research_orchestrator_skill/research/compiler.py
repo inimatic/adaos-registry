@@ -73,6 +73,7 @@ def _build_experiment_plan(
         "task_ref": str((task or {}).get("ref") or f"research-task:{task_id}"),
         "source_bundle_digest": str(source_bundle_digest),
         "dataset": {
+            "id": str(data_policy["dataset_id"]),
             "logical_name": str(data_policy["dataset"]),
             "policy_digest": digest(data_policy),
             "split_strategy": str(data_policy["split_strategy"]),
@@ -219,6 +220,7 @@ def build_compilation(
             "constraints",
             "assumptions",
             "open_questions",
+            "experimental_signature",
         )
     }
     experiment_plan = _build_experiment_plan(

@@ -35,6 +35,7 @@ from research.contracts import (
 )
 from research.compiler import build_compilation
 from research.formulation import (
+    DEFAULT_WORKFLOW_SMOKE_POLICY,
     assemble_candidate,
     provider_schema,
     schema_text_format,
@@ -2047,6 +2048,9 @@ class ResearchOrchestrator:
         request_id_prefix: str,
         max_tokens: int,
         expected_effect_direction: str | None = None,
+        expected_experimental_signature: Mapping[str, Any] | None = None,
+        required_workflow_smoke: Mapping[str, Any] | None = None,
+        expected_protocol_digest: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         schema = stage_schema(stage_name, allowed_source_refs=allowed_source_refs)
         constrained_schema = provider_schema(schema)
@@ -2221,6 +2225,9 @@ class ResearchOrchestrator:
                         candidate,
                         allowed_source_refs=allowed_source_refs,
                         expected_effect_direction=expected_effect_direction,
+                        expected_experimental_signature=expected_experimental_signature,
+                        required_workflow_smoke=required_workflow_smoke,
+                        expected_protocol_digest=expected_protocol_digest,
                     )
                     if quality:
                         raise ValueError("; ".join(quality))
@@ -2254,11 +2261,13 @@ class ResearchOrchestrator:
                     "max_repairs": max_repairs,
                     "validation_errors": str(validation_error),
                     "rejected_stage": candidate,
+                    "input": copy.deepcopy(dict(stage_input)),
                     "rules": list(rules),
                     "allowed_source_refs": sorted(allowed_source_refs),
                     "instruction": (
                         "Correct every listed violation in this stage and no later stage. "
-                        "Preserve valid grounded content, do not invent source facts, and remove every field not admitted by the schema. "
+                        "Treat input, including the directive and upstream typed artifacts, as immutable authority; rejected_stage is not authoritative. "
+                        "Preserve only content that remains semantically aligned with that input, do not invent source facts, and remove every field not admitted by the schema. "
                         "Before returning, check each validation_errors clause against the corrected object."
                     ),
                 }
@@ -2455,7 +2464,7 @@ class ResearchOrchestrator:
             current_problem = (
                 {
                     key: current.get(key)
-                    for key in ("title", "background", "research_question", "hypotheses", "source_grounding", "constraints", "assumptions", "open_questions")
+                    for key in ("title", "background", "research_question", "hypotheses", "source_grounding", "constraints", "assumptions", "open_questions", "experimental_signature")
                 }
                 if current
                 else None
@@ -2488,6 +2497,8 @@ class ResearchOrchestrator:
                     "Give every hypothesis its motivating SRC-### ids. Keep source observations and author interpretations in source_assessment; AdaOS compiles provenance records deterministically.",
                     "Use exact supplied SRC-### ids only. Never treat historical notebook outputs as confirmation.",
                     "Assess whether the supplied material is sufficient for a question versus an automation-ready protocol.",
+                    "Emit experimental_signature as the immutable typed identity for later stages: stable dataset, baseline and intervention ids/labels/specifications, the single intervention boundary, and the primary outcome. Copy agreed directive semantics exactly even when the sources only motivate rather than prove them.",
+                    "The experimental_signature baseline and intervention ids must be distinct. It identifies the proposed experiment and is not a claim that its effect is already established.",
                     "Write substantive fields in Russian unless a precise technical identifier is clearer in English.",
                 ],
                 allowed_source_refs=allowed_refs,
@@ -2515,7 +2526,7 @@ class ResearchOrchestrator:
                     "problem_frame": problem,
                     "current_protocol": current_protocol,
                     "adaos_policy": {
-                        "workflow_smoke": {"device": "cpu", "epochs": 3, "seed_values": [17], "inference_allowed": False},
+                        "workflow_smoke": copy.deepcopy(DEFAULT_WORKFLOW_SMOKE_POLICY),
                         "confirmation": "must be separately budgeted and is the only inferential stage",
                         "pairing": "predeclare every paired unit; vary only the intervention",
                         "negative_results": "retain_and_report",
@@ -2527,6 +2538,7 @@ class ResearchOrchestrator:
                 rules=[
                     "Design exactly separated workflow_smoke and confirmatory stages; smoke never supports a scientific claim.",
                     "In comparison_design give every comparator a stable lowercase machine id, preserve the comparators array order exactly in arm labels, declare exactly one baseline and at least one intervention, and bind the primary estimand to two declared arm ids as minuend and subtrahend.",
+                    "Copy experimental_signature identity fields exactly: comparator ids and labels, dataset_id and dataset label, system subject, intervention boundary, and primary outcome name/measurement/unit. Do not substitute a related experiment or rephrase these identity fields.",
                     "In experimental_plan.system_specification enumerate the concrete system, baseline, intervention, data, and measurement components needed to reproduce the protocol. Record exact ordered settings such as layers, algorithms, transforms, optimizer, schedules, and metric definitions; words such as style, suitable, standard, or equivalent are not implementation specifications.",
                     "Mark each system component source_derived, policy_default, or proposed. Cite supplied SRC-### ids for every source-derived component, keep source_refs empty for the other statuses, and put every intentionally invariant detail in locked_invariants.",
                     "Make intervention_boundary identify the only allowed experimental difference. unresolved_choices must contain every missing implementation decision; it must be empty before ready_for_automation.",
@@ -2552,6 +2564,8 @@ class ResearchOrchestrator:
                 request_id_prefix=request_prefix,
                 max_tokens=5_500,
                 expected_effect_direction=str(problem["hypotheses"][0]["effect_direction"]),
+                expected_experimental_signature=problem["experimental_signature"],
+                required_workflow_smoke=DEFAULT_WORKFLOW_SMOKE_POLICY,
             )
             stage_telemetry["protocol_design"] = telemetry
             total_repairs += int(telemetry.get("repair_attempts") or 0)
@@ -2565,6 +2579,7 @@ class ResearchOrchestrator:
                     "directive": directive["text"],
                     "problem_frame": problem,
                     "protocol_design": protocol,
+                    "protocol_digest": stage_digest(protocol),
                     "target": {
                         "kind": "adaos_skill",
                         "ref": f"skill:{token}",
@@ -2574,6 +2589,7 @@ class ResearchOrchestrator:
                 },
                 rules=[
                     "Translate the accepted scientific semantics into independently testable obligations; do not change the protocol.",
+                    "Copy protocol_digest and experimental_signature ids/outcome exactly into scientific_bindings and bind runner_contract=adaos.research.runner.v1.",
                     "Populate every category key. Required categories need at least one item; optional categories may be empty arrays.",
                     "Do not generate ids or enum variants; the AdaOS compiler owns ids and category flattening.",
                     "Verification must name an observable command, assertion, report or artifact rather than subjective review.",
@@ -2588,6 +2604,8 @@ class ResearchOrchestrator:
                 group_id=group_id,
                 request_id_prefix=request_prefix,
                 max_tokens=4_500,
+                expected_experimental_signature=problem["experimental_signature"],
+                expected_protocol_digest=stage_digest(protocol),
             )
             stage_telemetry["implementation_contract"] = telemetry
             total_repairs += int(telemetry.get("repair_attempts") or 0)

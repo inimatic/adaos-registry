@@ -68,7 +68,18 @@ The default path uses three bounded LLM stages: `problem_frame`,
 stable facets: `source_analysis`, `research_problem`,
 `experimental_protocol`, `engineering_contract`, and the provider-neutral
 `experiment_plan`. The protocol stage must assign
-stable arm ids and one exact primary minuend/subtrahend. The deterministic
+stable arm ids and one exact primary minuend/subtrahend. Since formulation
+stage contract v1.2, `problem_frame.experimental_signature` freezes only the
+cross-stage scientific identity: subject, dataset, baseline, intervention,
+intervention boundary, and primary outcome. Protocol admission requires exact
+machine identities and exact outcome/boundary copies from that signature;
+`implementation_contract.scientific_bindings` then binds the exact protocol
+digest, those identities, and `adaos.research.runner.v1`. This narrow typed
+spine prevents a locally schema-valid protocol for a different experiment
+from being assembled with the original question while leaving rationale,
+method detail, and implementation strategy open to the model. Repairs always
+receive the original directive and upstream typed artifacts as immutable
+authority; a rejected candidate is never their only context. The deterministic
 plan then carries exact execution profiles, integer-or-string allocation
 units, evidence classes, data policy, RNG streams, estimand and the public
 runner/split-binding ABI without selecting a runtime provider. Runner results
@@ -96,7 +107,10 @@ The deterministic review rejects or downgrades a handoff unless it has:
   hypothesis, with hypothesis claims forbidden from masquerading as observed
   source facts;
 - separate workflow-smoke and confirmatory stages with correct evidence
-  classes;
+  classes, including exactly one AdaOS-policy CPU smoke with three epochs and
+  seed 17;
+- exact cross-stage preservation of experimental identity and an engineering
+  binding to the accepted protocol digest;
 - explicit comparators, paired invariants/varied factors, a predeclared
   allocation of paired units, named RNG streams, data sealing, and leakage
   controls;

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import copy
 from collections.abc import Mapping
 
-from research.formulation import STAGES, assemble_candidate, provider_schema, stage_quality_issues, stage_schema, validate_stage
+from research.formulation import STAGES, assemble_candidate, provider_schema, stage_digest, stage_quality_issues, stage_schema, validate_stage
 from research.compiler import build_compilation, project_execution_compilation
 
 
@@ -26,6 +27,30 @@ def _problem() -> dict:
             "author_interpretations": [],
             "coverage_limitations": ["Исторические outputs не являются подтверждением."],
             "unresolved_decisions": [],
+        },
+        "experimental_signature": {
+            "subject": "Paired STL-10 pooling classifier",
+            "dataset": {
+                "id": "stl10_torchvision",
+                "label": "STL-10 version torchvision",
+                "specification": "Torchvision STL-10 with a fixed development split and sealed test split.",
+            },
+            "baseline": {
+                "id": "maxpool",
+                "label": "MaxPool",
+                "specification": "Ordinary MaxPool at the selected pooling boundary.",
+            },
+            "intervention": {
+                "id": "tlp",
+                "label": "TLP",
+                "specification": "Centered trainable max-plus pooling at the same boundary.",
+            },
+            "intervention_boundary": "Only the pool2 operator and its trainability may differ between arms.",
+            "primary_outcome": {
+                "name": "validation accuracy delta",
+                "measurement": "paired TLP minus MaxPool top-1 accuracy",
+                "unit": "proportion",
+            },
         },
     }
 
@@ -77,6 +102,7 @@ def _protocol(*, unresolved: bool = False) -> dict:
             ],
             "data_policy": {
                 "dataset": "STL-10 version torchvision",
+                "dataset_id": "stl10_torchvision",
                 "split_strategy": "Фиксированный train/validation split до запуска.",
                 "evaluation_seal": "Test labels не используются до финальной оценки.",
                 "leakage_controls": ["Не выбирать конфигурацию по test metric."],
@@ -120,7 +146,7 @@ def _protocol(*, unresolved: bool = False) -> dict:
     }
 
 
-def _implementation() -> dict:
+def _implementation(protocol: Mapping[str, object] | None = None) -> dict:
     requirement_categories = ("execution", "data", "reproducibility", "observability", "evidence", "recovery", "analysis", "security")
     check_categories = ("workflow", "data_integrity", "reproducibility", "evidence", "analysis", "failure_recovery", "security")
     requirements = {category: [] for category in requirement_categories}
@@ -129,7 +155,19 @@ def _implementation() -> dict:
         requirements[category] = [{"requirement": f"Implement a concrete {category} obligation.", "verification": f"Verify {category} with a deterministic report."}]
     for category in check_categories[:4]:
         checks[category] = [{"check": f"The {category} condition is observably satisfied.", "evidence": f"Stored {category} report"}]
-    return {"assistant_message": "Инженерный контракт скомпилирован.", "requirements_by_category": requirements, "checks_by_category": checks}
+    return {
+        "assistant_message": "Инженерный контракт скомпилирован.",
+        "scientific_bindings": {
+            "protocol_digest": stage_digest(protocol or _protocol()),
+            "dataset_id": "stl10_torchvision",
+            "baseline_arm_id": "maxpool",
+            "intervention_arm_id": "tlp",
+            "primary_outcome_name": "validation accuracy delta",
+            "runner_contract": "adaos.research.runner.v1",
+        },
+        "requirements_by_category": requirements,
+        "checks_by_category": checks,
+    }
 
 
 def _assert_strict_objects(value: object) -> None:
@@ -331,7 +369,8 @@ def test_provider_schema_removes_unsupported_keywords_without_weakening_local_va
 
 
 def test_unresolved_protocol_decision_is_a_deterministic_readiness_blocker() -> None:
-    candidate = assemble_candidate(_problem(), _protocol(unresolved=True), _implementation(), source_ref_map={REF: EXACT_REF})
+    protocol = _protocol(unresolved=True)
+    candidate = assemble_candidate(_problem(), protocol, _implementation(protocol), source_ref_map={REF: EXACT_REF})
     assert candidate["readiness"]["decision"] == "needs_discussion"
     assert "Какой confirmatory budget" in candidate["readiness"]["blocking_questions"][0]
 
@@ -404,4 +443,69 @@ def test_two_sided_hypothesis_cannot_call_the_other_direction_falsification() ->
 
     assert stage_quality_issues("problem_frame", problem, allowed_source_refs={REF}) == [
         "a two-sided difference hypothesis cannot treat the opposite direction as falsification"
+    ]
+
+
+def test_cross_stage_gate_rejects_a_locally_valid_but_unrelated_protocol() -> None:
+    protocol = copy.deepcopy(_protocol())
+    plan = protocol["experimental_plan"]
+    plan["comparators"] = ["baseline_cnn", "intervention_cnn_aug"]
+    plan["comparison_design"] = {
+        "arms": [
+            {"id": "baseline_cnn", "label": "baseline_cnn", "role": "baseline", "specification": "CNN without data augmentation."},
+            {"id": "intervention_cnn_aug", "label": "intervention_cnn_aug", "role": "intervention", "specification": "CNN with rotation and flip augmentation."},
+        ],
+        "primary_contrast": {"minuend": "intervention_cnn_aug", "subtrahend": "baseline_cnn"},
+    }
+    plan["system_specification"]["subject"] = "CIFAR-10 augmentation classifier"
+    plan["system_specification"]["intervention_boundary"] = "Only random crop and flip augmentation differs between arms."
+    plan["data_policy"]["dataset_id"] = "cifar10"
+    plan["data_policy"]["dataset"] = "CIFAR-10"
+    plan["stages"][0]["execution_profile"]["device"] = "cuda"
+    plan["stages"][0]["budget"]["epochs"] = 1
+    plan["stages"][0]["budget"]["seed_values"] = [42]
+    protocol["evaluation_plan"]["outcomes"][0].update(
+        {
+            "name": "augmentation accuracy delta",
+            "measurement": "augmented minus baseline CIFAR-10 accuracy",
+            "unit": "percentage point",
+        }
+    )
+
+    issues = stage_quality_issues(
+        "protocol_design",
+        protocol,
+        expected_effect_direction="difference",
+        expected_experimental_signature=_problem()["experimental_signature"],
+        required_workflow_smoke={"device": "cpu", "epochs": 3, "seed_values": [17], "inference_allowed": False},
+    )
+
+    assert "comparison_design must exactly preserve baseline and intervention identity from experimental_signature" in issues
+    assert "data_policy.dataset_id must exactly preserve experimental_signature dataset id" in issues
+    assert "primary outcome must exactly preserve experimental_signature name, measurement, and unit" in issues
+    assert "workflow_smoke must exactly preserve the AdaOS execution policy" in issues
+    try:
+        assemble_candidate(_problem(), protocol, _implementation(protocol), source_ref_map={REF: EXACT_REF})
+    except ValueError as exc:
+        assert "cross-stage formulation contract" in str(exc)
+    else:
+        raise AssertionError("expected a semantically unrelated protocol to be rejected")
+
+
+def test_engineering_contract_is_bound_to_exact_protocol_and_scientific_identity() -> None:
+    protocol = _protocol()
+    implementation = _implementation(protocol)
+    implementation["scientific_bindings"]["protocol_digest"] = "sha256:" + "0" * 64
+    implementation["scientific_bindings"]["intervention_arm_id"] = "other"
+
+    issues = stage_quality_issues(
+        "implementation_contract",
+        implementation,
+        expected_experimental_signature=_problem()["experimental_signature"],
+        expected_protocol_digest=stage_digest(protocol),
+    )
+
+    assert issues == [
+        "scientific_bindings.protocol_digest must bind the exact protocol_design artifact",
+        "scientific_bindings must exactly preserve the experimental_signature and runner contract",
     ]
