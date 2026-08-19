@@ -321,6 +321,8 @@ def configure_schedule(
     enabled: bool = True,
     interval_seconds: int = 21600,
     debounce_seconds: int = 30,
+    watch_enabled: bool = False,
+    watch_poll_seconds: int = 30,
     **_: Any,
 ) -> dict[str, Any]:
     repository, worker = _runtime()
@@ -329,6 +331,8 @@ def configure_schedule(
         enabled=bool(enabled),
         interval_seconds=interval_seconds,
         debounce_seconds=debounce_seconds,
+        watch_enabled=bool(watch_enabled),
+        watch_poll_seconds=watch_poll_seconds,
     )
     worker.ensure_started()
     return result
@@ -358,11 +362,18 @@ def status(**_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
     return {
         **repository.summary(),
-        "worker": {"resource_pressure": worker.resource_pressure, "max_concurrent_scans": 1},
+        "worker": {
+            "resource_pressure": worker.resource_pressure,
+            "max_concurrent_scans": 1,
+            "watch": worker.watch_status(),
+        },
         "limits": {
             "max_files_per_scan": int(os.environ.get("MEDIA_LIBRARY_AGENT_MAX_FILES") or 1_000_000),
             "max_delta_page": 1000,
             "progress_publish_hz": 2,
+            "watch_max_entries": int(
+                os.environ.get("MEDIA_LIBRARY_AGENT_WATCH_MAX_ENTRIES") or 50_000
+            ),
         },
     }
 

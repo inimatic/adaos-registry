@@ -153,6 +153,8 @@ class MediaLibraryAgentRepository:
                     enabled INTEGER NOT NULL DEFAULT 0,
                     interval_seconds INTEGER NOT NULL DEFAULT 21600,
                     debounce_seconds INTEGER NOT NULL DEFAULT 30,
+                    watch_enabled INTEGER NOT NULL DEFAULT 0,
+                    watch_poll_seconds INTEGER NOT NULL DEFAULT 30,
                     next_run_at TEXT NOT NULL DEFAULT '',
                     updated_at TEXT NOT NULL
                 );
@@ -168,6 +170,20 @@ class MediaLibraryAgentRepository:
                     ON topology_phase_receipts(operation_id, phase);
                 """
             )
+            schedule_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(schedules)"
+                ).fetchall()
+            }
+            for name, definition in {
+                "watch_enabled": "INTEGER NOT NULL DEFAULT 0",
+                "watch_poll_seconds": "INTEGER NOT NULL DEFAULT 30",
+            }.items():
+                if name not in schedule_columns:
+                    connection.execute(
+                        f"ALTER TABLE schedules ADD COLUMN {name} {definition}"
+                    )
             connection.execute("INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('schema_version', ?)", (SCHEMA_VERSION,))
             connection.commit()
         return {"ok": True, "schema": SCHEMA_VERSION, "db_path": str(self.db_path), "node_id": self.node_id}
@@ -647,21 +663,38 @@ class MediaLibraryAgentRepository:
             },
         }
 
-    def configure_schedule(self, root_id: str, *, enabled: bool, interval_seconds: int = 21600, debounce_seconds: int = 30) -> dict[str, Any]:
+    def configure_schedule(
+        self,
+        root_id: str,
+        *,
+        enabled: bool,
+        interval_seconds: int = 21600,
+        debounce_seconds: int = 30,
+        watch_enabled: bool = False,
+        watch_poll_seconds: int = 30,
+    ) -> dict[str, Any]:
         if self.get_root(root_id) is None:
             return {"ok": False, "error": "root_not_found", "root_id": text(root_id), "schema": SCHEMA_VERSION}
         interval = max(300, min(604800, int(interval_seconds or 21600)))
         debounce = max(1, min(3600, int(debounce_seconds or 30)))
+        watch_poll = max(5, min(3600, int(watch_poll_seconds or 30)))
         with self.connect() as connection:
             connection.execute(
                 """
-                INSERT INTO schedules(root_id, enabled, interval_seconds, debounce_seconds, next_run_at, updated_at)
-                VALUES (?, ?, ?, ?, '', ?)
+                INSERT INTO schedules(
+                    root_id, enabled, interval_seconds, debounce_seconds,
+                    watch_enabled, watch_poll_seconds, next_run_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, '', ?)
                 ON CONFLICT(root_id) DO UPDATE SET enabled=excluded.enabled,
                     interval_seconds=excluded.interval_seconds, debounce_seconds=excluded.debounce_seconds,
+                    watch_enabled=excluded.watch_enabled,
+                    watch_poll_seconds=excluded.watch_poll_seconds,
                     updated_at=excluded.updated_at
                 """,
-                (text(root_id), int(enabled), interval, debounce, now_iso()),
+                (
+                    text(root_id), int(enabled), interval, debounce,
+                    int(watch_enabled), watch_poll, now_iso(),
+                ),
             )
             connection.commit()
         return {"ok": True, "schema": SCHEMA_VERSION, "schedule": self.get_schedule(root_id)}
@@ -669,7 +702,15 @@ class MediaLibraryAgentRepository:
     def get_schedule(self, root_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM schedules WHERE root_id=?", (text(root_id),)).fetchone()
-        return dict(row) | {"enabled": bool(row["enabled"])} if row else None
+        return (
+            dict(row)
+            | {
+                "enabled": bool(row["enabled"]),
+                "watch_enabled": bool(row["watch_enabled"]),
+            }
+            if row
+            else None
+        )
 
     def due_schedules(self, *, now: str | None = None) -> list[dict[str, Any]]:
         moment = text(now) or now_iso()
@@ -679,6 +720,27 @@ class MediaLibraryAgentRepository:
                 (moment,),
             ).fetchall()
         return [dict(row) | {"enabled": True} for row in rows]
+
+    def watch_schedules(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT s.*, r.path, r.follow_symlinks, r.exclusions_json
+                FROM schedules s JOIN roots r ON r.id=s.root_id
+                WHERE s.enabled=1 AND s.watch_enabled=1 AND r.enabled=1
+                ORDER BY s.root_id
+                """
+            ).fetchall()
+        return [
+            dict(row)
+            | {
+                "enabled": True,
+                "watch_enabled": True,
+                "follow_symlinks": bool(row["follow_symlinks"]),
+                "exclusions": json_loads(row["exclusions_json"], []),
+            }
+            for row in rows
+        ]
 
     def advance_schedule(self, root_id: str, next_run_at: str) -> None:
         with self.connect() as connection:

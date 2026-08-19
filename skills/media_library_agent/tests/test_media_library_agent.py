@@ -180,6 +180,66 @@ def test_playback_pressure_pauses_worker_until_released(tmp_path):
     worker.dispose()
 
 
+def test_bounded_watcher_debounces_changes_into_incremental_scan(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "first.mp3").write_bytes(b"first")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "watch.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    schedule = repository.configure_schedule(
+        root["id"],
+        enabled=True,
+        interval_seconds=604800,
+        debounce_seconds=1,
+        watch_enabled=True,
+        watch_poll_seconds=5,
+    )["schedule"]
+    worker = MediaLibraryAgentWorker(repository)
+
+    worker._poll_watch_schedules(force=True)
+    (library / "second.mp3").write_bytes(b"second")
+    worker._poll_watch_schedules(force=True)
+    detected_at, overflow = worker._watch_pending[root["id"]]
+    worker._watch_pending[root["id"]] = (detected_at - 2, overflow)
+    worker._poll_watch_schedules(force=True)
+    queued = repository.next_queued_job()
+
+    assert schedule["watch_enabled"] is True
+    assert schedule["watch_poll_seconds"] == 5
+    assert queued["root_id"] == root["id"]
+    assert queued["mode"] == "incremental"
+    assert worker.watch_status()["pending_root_ids"] == []
+
+
+def test_watcher_overflow_queues_authoritative_reconcile(monkeypatch, tmp_path):
+    library = tmp_path / "large-library"
+    library.mkdir()
+    for index in range(110):
+        (library / f"track-{index:03d}.mp3").write_bytes(b"audio")
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_WATCH_MAX_ENTRIES", "100")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "watch-overflow.sqlite3", node_id="node-a"
+    )
+    root = repository.add_root(str(library))["root"]
+    repository.configure_schedule(
+        root["id"],
+        enabled=True,
+        debounce_seconds=1,
+        watch_enabled=True,
+    )
+    worker = MediaLibraryAgentWorker(repository)
+
+    worker._poll_watch_schedules(force=True)
+    detected_at, overflow = worker._watch_pending[root["id"]]
+    worker._watch_pending[root["id"]] = (detected_at - 2, overflow)
+    worker._poll_watch_schedules(force=True)
+
+    assert overflow is True
+    assert repository.next_queued_job()["mode"] == "reconcile"
+
+
 def test_folder_browse_and_opaque_cursor_validation(tmp_path):
     library = tmp_path / "library"
     book = library / "Author" / "Book One"

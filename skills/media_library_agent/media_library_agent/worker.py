@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
 import mimetypes
 import os
@@ -53,6 +54,8 @@ class MediaLibraryAgentWorker:
         self._last_publish_monotonic = 0.0
         self._job_started: dict[str, float] = {}
         self._wait_reason = ""
+        self._watch_state: dict[str, tuple[str, float, bool]] = {}
+        self._watch_pending: dict[str, tuple[float, bool]] = {}
 
     def ensure_started(self) -> bool:
         with self._lock:
@@ -87,6 +90,7 @@ class MediaLibraryAgentWorker:
 
     def run_once(self) -> dict[str, Any] | None:
         self._enqueue_due_schedules()
+        self._poll_watch_schedules()
         queued = self.repository.next_queued_job()
         if queued is None:
             return None
@@ -113,6 +117,117 @@ class MediaLibraryAgentWorker:
             self.repository.create_job(root_id, mode="incremental")
             next_run = datetime.now(tz=timezone.utc) + timedelta(seconds=int(schedule.get("interval_seconds") or 21600))
             self.repository.advance_schedule(root_id, next_run.isoformat())
+
+    def _poll_watch_schedules(self, *, force: bool = False) -> None:
+        now = time.monotonic()
+        active_ids = set()
+        for schedule in self.repository.watch_schedules():
+            root_id = text(schedule.get("root_id"))
+            active_ids.add(root_id)
+            previous = self._watch_state.get(root_id)
+            poll_seconds = max(5, int(schedule.get("watch_poll_seconds") or 30))
+            if not force and previous and now - previous[1] < poll_seconds:
+                self._enqueue_debounced_watch(schedule, now)
+                continue
+            witness, overflow = self._filesystem_witness(schedule)
+            self._watch_state[root_id] = (witness, now, overflow)
+            if previous is None:
+                if overflow:
+                    self._watch_pending[root_id] = (now, True)
+            elif previous[0] != witness or overflow != previous[2]:
+                self._watch_pending[root_id] = (now, overflow)
+            self._enqueue_debounced_watch(schedule, now)
+        for root_id in set(self._watch_state).difference(active_ids):
+            self._watch_state.pop(root_id, None)
+            self._watch_pending.pop(root_id, None)
+
+    def _enqueue_debounced_watch(
+        self, schedule: Mapping[str, Any], now: float
+    ) -> None:
+        root_id = text(schedule.get("root_id"))
+        pending = self._watch_pending.get(root_id)
+        if pending is None:
+            return
+        detected_at, overflow = pending
+        debounce = max(1, int(schedule.get("debounce_seconds") or 30))
+        if now - detected_at < debounce:
+            return
+        self.repository.create_job(
+            root_id,
+            mode="reconcile" if overflow else "incremental",
+        )
+        self._watch_pending.pop(root_id, None)
+        self._wake.set()
+
+    @staticmethod
+    def _filesystem_witness(schedule: Mapping[str, Any]) -> tuple[str, bool]:
+        root_path = Path(text(schedule.get("path")))
+        exclusions = [
+            text(item) for item in schedule.get("exclusions") or [] if text(item)
+        ]
+        follow_symlinks = bool(schedule.get("follow_symlinks"))
+        try:
+            maximum = max(
+                100,
+                min(
+                    500_000,
+                    int(os.environ.get("MEDIA_LIBRARY_AGENT_WATCH_MAX_ENTRIES") or 50_000),
+                ),
+            )
+        except ValueError:
+            maximum = 50_000
+        digest = hashlib.sha256()
+        count = 0
+        overflow = False
+        stack = [root_path]
+        visited: set[tuple[int, int]] = set()
+        while stack and not overflow:
+            directory = stack.pop()
+            try:
+                directory_stat = directory.stat(follow_symlinks=follow_symlinks)
+                identity = (int(directory_stat.st_dev), int(directory_stat.st_ino))
+                if identity in visited:
+                    continue
+                visited.add(identity)
+                entries = sorted(os.scandir(directory), key=lambda item: item.name.casefold())
+            except (OSError, PermissionError):
+                digest.update(f"unavailable:{directory}".encode("utf-8", errors="replace"))
+                continue
+            for entry in entries:
+                path = Path(entry.path)
+                try:
+                    relative = path.relative_to(root_path).as_posix()
+                except ValueError:
+                    continue
+                if MediaLibraryAgentWorker._excluded(relative, exclusions):
+                    continue
+                try:
+                    stat = entry.stat(follow_symlinks=follow_symlinks)
+                    is_directory = entry.is_dir(follow_symlinks=follow_symlinks)
+                except (OSError, PermissionError):
+                    continue
+                digest.update(
+                    f"{relative}\0{int(is_directory)}\0{int(stat.st_size)}\0{int(stat.st_mtime_ns)}\n".encode(
+                        "utf-8", errors="replace"
+                    )
+                )
+                count += 1
+                if count >= maximum:
+                    overflow = True
+                    break
+                if is_directory and (follow_symlinks or not entry.is_symlink()):
+                    stack.append(path)
+        digest.update(f"count:{count}:overflow:{int(overflow)}".encode("ascii"))
+        return digest.hexdigest(), overflow
+
+    def watch_status(self) -> dict[str, Any]:
+        schedules = self.repository.watch_schedules()
+        return {
+            "enabled_root_count": len(schedules),
+            "observed_root_count": len(self._watch_state),
+            "pending_root_ids": sorted(self._watch_pending),
+            "mode": "bounded_polling_with_periodic_reconcile",
+        }
 
     def _run_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
         job_id = text(job.get("id"))

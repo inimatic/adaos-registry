@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.3.0
+version: 0.4.0
 description: Distributed node-local media discovery agent with durable asynchronous scans and ordered catalog deltas.
 supported_locales:
 - en
@@ -220,6 +220,8 @@ tools:
       enabled: {type: boolean, default: true}
       interval_seconds: {type: integer, minimum: 300, maximum: 604800, default: 21600}
       debounce_seconds: {type: integer, minimum: 1, maximum: 3600, default: 30}
+      watch_enabled: {type: boolean, default: false}
+      watch_poll_seconds: {type: integer, minimum: 5, maximum: 3600, default: 30}
     additionalProperties: true
   output_schema: {type: object}
 - name: set_resource_pressure
@@ -383,4 +385,4 @@ llm_hints:
     intent: media_center.scan
     tool: start_scan
     side_effect_class: local_write
-updated_at: '2026-08-19T00:00:00+00:00'
+updated_at: '2026-08-20T00:00:00+00:00'
