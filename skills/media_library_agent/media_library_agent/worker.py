@@ -765,6 +765,16 @@ class MediaLibraryAgentWorker:
             "mime_type": mime_type,
             "size_bytes": int(stat.st_size),
         }
+        perceptual_hash = MediaLibraryAgentWorker._perceptual_hash(
+            path, mime_type=mime_type
+        )
+        if perceptual_hash:
+            result.update(
+                {
+                    "perceptual_hash": perceptual_hash,
+                    "perceptual_hash_algorithm": "ffmpeg_sample_sha256_v1",
+                }
+            )
         mode = text(os.environ.get("MEDIA_LIBRARY_AGENT_PROBE_MODE") or "basic").lower()
         executable = shutil.which("ffprobe") if mode == "ffprobe" else None
         if not executable:
@@ -817,6 +827,79 @@ class MediaLibraryAgentWorker:
             }
         except Exception:
             return result | {"probe_status": "failed"}
+
+    @staticmethod
+    def _perceptual_hash(path: Path, *, mime_type: str) -> str:
+        mode = text(
+            os.environ.get("MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_MODE") or "off"
+        ).lower()
+        executable = shutil.which("ffmpeg") if mode == "ffmpeg" else None
+        if not executable:
+            return ""
+        if mime_type.startswith("video/"):
+            transform = [
+                "-an",
+                "-vf",
+                "fps=1/30,scale=16:16,format=gray",
+                "-frames:v",
+                "8",
+                "-f",
+                "rawvideo",
+            ]
+        elif mime_type.startswith("audio/"):
+            transform = [
+                "-vn",
+                "-t",
+                "30",
+                "-ac",
+                "1",
+                "-ar",
+                "2000",
+                "-f",
+                "s16le",
+            ]
+        else:
+            return ""
+        try:
+            timeout = max(
+                2.0,
+                min(
+                    30.0,
+                    float(
+                        os.environ.get(
+                            "MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_TIMEOUT_SECONDS"
+                        )
+                        or 10
+                    ),
+                ),
+            )
+            completed = subprocess.run(
+                [
+                    executable,
+                    "-nostdin",
+                    "-hide_banner",
+                    "-loglevel",
+                    "error",
+                    "-threads",
+                    "1",
+                    "-i",
+                    str(path),
+                    *transform,
+                    "pipe:1",
+                ],
+                capture_output=True,
+                check=False,
+                timeout=timeout,
+            )
+        except (OSError, subprocess.SubprocessError, ValueError):
+            return ""
+        if (
+            completed.returncode != 0
+            or not completed.stdout
+            or len(completed.stdout) > 512 * 1024
+        ):
+            return ""
+        return hashlib.sha256(completed.stdout).hexdigest()
 
 
 def register_media_reference(path: Path, root: Mapping[str, Any], metadata: Mapping[str, Any]) -> Mapping[str, Any]:

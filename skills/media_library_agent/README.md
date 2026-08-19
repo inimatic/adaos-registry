@@ -19,6 +19,7 @@ Original media bytes remain at their original paths. The agent calls `adaos.sdk.
 - Active roots may not overlap. Scan windows use node-local `HH:MM` times and weekday numbers (`0` is Monday); invalid windows fail closed.
 - `MEDIA_LIBRARY_AGENT_MAX_BYTES_PER_SECOND` optionally throttles scanner read throughput. Progress reports phase, elapsed time, throughput, wait reason, and checkpoint age in a replace-mode variable.
 - Every changed source receives a cheap basic technical descriptor. `MEDIA_LIBRARY_AGENT_PROBE_MODE=ffprobe` enables a bounded external probe when `ffprobe` is installed; `MEDIA_LIBRARY_AGENT_PROBE_TIMEOUT_SECONDS` is clamped to 1-30 seconds.
+- `MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_MODE=ffmpeg` optionally hashes a standardized bounded audio/video sample. It is off by default, uses one thread, emits at most 512 KiB, and has a 10-second default/30-second hard timeout. Only the hash enters catalog claims; sampled bytes are discarded and original files are unchanged.
 
 ## Rendition model
 

@@ -716,3 +716,35 @@ def test_agent_deep_search_covers_unicode_folders_and_technical_metadata(tmp_pat
     assert by_folder["items"][0]["name"] == "01.mkv"
     assert by_codec["items"][0]["match"]["stage"] == "agent_technical_fts"
     assert by_codec["has_more"] is False
+
+
+def test_perceptual_sampling_is_opt_in_bounded_and_never_publishes_bytes(
+    monkeypatch, tmp_path
+):
+    from media_library_agent import worker as worker_module
+
+    source = tmp_path / "sample.mp4"
+    source.write_bytes(b"original-media")
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_MODE", "ffmpeg")
+    monkeypatch.setenv(
+        "MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_TIMEOUT_SECONDS", "7"
+    )
+    monkeypatch.setattr(worker_module.shutil, "which", lambda name: f"/{name}")
+    captured = {}
+
+    def fake_run(command, **kwargs):
+        captured.update(command=command, kwargs=kwargs)
+        return SimpleNamespace(returncode=0, stdout=b"normalized-samples")
+
+    monkeypatch.setattr(worker_module.subprocess, "run", fake_run)
+
+    result = MediaLibraryAgentWorker._technical_metadata(
+        source, stat=source.stat()
+    )
+
+    assert result["perceptual_hash_algorithm"] == "ffmpeg_sample_sha256_v1"
+    assert result["perceptual_hash"]
+    assert captured["kwargs"]["timeout"] == 7
+    assert captured["command"][captured["command"].index("-threads") + 1] == "1"
+    assert captured["command"][-1] == "pipe:1"
+    assert source.read_bytes() == b"original-media"
