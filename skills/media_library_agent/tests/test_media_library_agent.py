@@ -746,5 +746,8 @@ def test_perceptual_sampling_is_opt_in_bounded_and_never_publishes_bytes(
     assert result["perceptual_hash"]
     assert captured["kwargs"]["timeout"] == 7
     assert captured["command"][captured["command"].index("-threads") + 1] == "1"
+    assert captured["command"][
+        captured["command"].index("-protocol_whitelist") + 1
+    ] == "file,pipe"
     assert captured["command"][-1] == "pipe:1"
     assert source.read_bytes() == b"original-media"

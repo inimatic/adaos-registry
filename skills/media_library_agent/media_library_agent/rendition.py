@@ -171,7 +171,18 @@ def transcode_with_ffmpeg(
     partial = target_path.with_suffix(target_path.suffix + ".partial")
     partial.unlink(missing_ok=True)
     target = dict(job.get("target") or {})
-    command = [executable, "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", str(source_path)]
+    command = [
+        executable,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-protocol_whitelist",
+        "file,pipe",
+        "-y",
+        "-i",
+        str(source_path),
+    ]
     if text(job.get("media_kind")) == "video":
         command.extend(["-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-preset", "veryfast", "-crf", "22"])
         max_width = max(0, int(target.get("max_width") or 0))
