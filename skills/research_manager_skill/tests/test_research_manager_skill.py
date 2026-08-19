@@ -16,6 +16,7 @@ if str(_SKILL_ROOT) not in sys.path:
 import research.manager as manager_module
 from research.contracts import ResearchRecord, identity
 from research.manager import ResearchManager
+from research.runner_contract import descriptor as runner_contract_descriptor
 from research.tracker import MlflowTracker, TrackerConflict
 from research.workflow import TRANSITIONS
 from migrations.data_migration import migrate as migrate_runtime_data
@@ -135,6 +136,7 @@ def _acceptance_plan() -> dict:
 def _acceptance_envelope(profile: str) -> dict:
     compilation_digest = "sha256:" + "a" * 64
     brief_digest = "sha256:" + "b" * 64
+    consumer_contract = runner_contract_descriptor()
     return {
         "schema": "adaos.builder.acceptance_candidate.v1",
         "profile": profile,
@@ -145,6 +147,7 @@ def _acceptance_envelope(profile: str) -> dict:
         "contract_inputs": [
             {"kind": "research_compilation", "digest": compilation_digest},
             {"kind": "automation_brief", "digest": brief_digest},
+            {"kind": "consumer_contract", "digest": consumer_contract["digest"]},
         ],
         "instructions": {
             "research_compilation": {
@@ -155,6 +158,7 @@ def _acceptance_envelope(profile: str) -> dict:
                 "digest": brief_digest,
                 "compilation_digest": compilation_digest,
             },
+            "consumer_contract": consumer_contract,
         },
     }
 
@@ -171,6 +175,21 @@ def test_development_traceability_acceptance_is_digest_bound() -> None:
     rejected = manager.validate_development_candidate(drifted)
     assert rejected["ok"] is False
     assert "research_compilation digest" in rejected["errors"][0]
+
+
+def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
+    contract = runner_contract_descriptor()
+    identity = {key: item for key, item in contract.items() if key != "digest"}
+    assert contract["digest"] == manager_module.digest(identity)
+    assert set(contract["operations"]) == {
+        "prepare_attempt",
+        "collect_attempt",
+        "verify_artifact",
+        "dataset_status",
+    }
+    assert contract["operations"]["prepare_attempt"]["input_schema"]["required"] == [
+        "request"
+    ]
 
 
 def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) -> None:

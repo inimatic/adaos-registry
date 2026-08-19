@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.11.0
+version: 0.12.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -68,6 +68,21 @@ tools:
     - ok
     - checks
     - errors
+- name: get_runner_contract
+  description: Return the canonical content-addressed adaos.research.runner.v1
+    consumer ABI used by Builder and direction skills.
+  entry: handlers.main:get_runner_contract
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - schema
+    - contract
+    - version
+    - operations
+    - digest
 - name: rehydrate
   description: Re-open the durable repository after activation or restart.
   entry: handlers.main:rehydrate
@@ -873,7 +888,7 @@ data_routes:
     - research-experiment
     - research-tracking
     - research-evidence
-updated_at: '2026-08-19T09:55:00+00:00'
+updated_at: '2026-08-19T10:08:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.866+5275.49974a61

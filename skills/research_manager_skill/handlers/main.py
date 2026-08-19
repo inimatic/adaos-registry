@@ -14,6 +14,7 @@ if str(_SKILL_ROOT) not in sys.path:
 
 from research.manager import ResearchManager
 from research.contracts import digest
+from research.runner_contract import descriptor as runner_contract_descriptor
 
 
 def _manager() -> ResearchManager:
@@ -36,6 +37,13 @@ def validate_development_candidate(request: Mapping[str, Any]) -> dict[str, Any]
     """Return consumer-owned acceptance evidence for one active DEV runner."""
 
     return _manager().validate_development_candidate(request)
+
+
+@tool("get_runner_contract")
+def get_runner_contract() -> dict[str, Any]:
+    """Return the canonical content-addressed research runner consumer ABI."""
+
+    return runner_contract_descriptor()
 
 
 @tool("create_study")

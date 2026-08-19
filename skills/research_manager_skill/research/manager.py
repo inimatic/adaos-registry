@@ -30,6 +30,7 @@ from adaos.sdk.execution import (
 from research import evidence, experiment, guidance
 from research.contracts import ResearchRecord, canonical_json, digest, identity, now
 from research.repository import ResearchRepository
+from research.runner_contract import descriptor as runner_contract_descriptor
 from research.tracker import LocalTracker, MlflowTracker, normalize_observation
 from research.workflow import state as workflow_state
 from research.workflow import transition
@@ -242,6 +243,11 @@ class ResearchManager:
             if isinstance(instructions.get("automation_brief"), Mapping)
             else {}
         )
+        consumer_contract = (
+            dict(instructions.get("consumer_contract"))
+            if isinstance(instructions.get("consumer_contract"), Mapping)
+            else {}
+        )
         contract_inputs = {
             str(item.get("kind") or ""): dict(item)
             for item in value.get("contract_inputs") or []
@@ -252,6 +258,7 @@ class ResearchManager:
             expected = {
                 "research_compilation": str(compilation.get("digest") or ""),
                 "automation_brief": str(brief.get("digest") or ""),
+                "consumer_contract": str(consumer_contract.get("digest") or ""),
             }
             for contract_kind, expected_digest in expected.items():
                 descriptor = contract_inputs.get(contract_kind) or {}
@@ -292,6 +299,30 @@ class ResearchManager:
         if profile != "research.consumer-contracts":
             errors.append(f"unsupported acceptance profile: {profile}")
             return self._acceptance_receipt(profile, checks=checks, errors=errors)
+
+        canonical_contract = runner_contract_descriptor()
+        supplied_contract_digest = str(consumer_contract.get("digest") or "")
+        if supplied_contract_digest != canonical_contract["digest"] or consumer_contract != canonical_contract:
+            errors.append("Development Session consumer_contract differs from the active ResearchManager ABI")
+            return self._acceptance_receipt(
+                profile,
+                checks=[
+                    {
+                        "id": "runner.consumer_contract_identity",
+                        "ok": False,
+                        "expected_digest": canonical_contract["digest"],
+                        "actual_digest": supplied_contract_digest or None,
+                    }
+                ],
+                errors=errors,
+            )
+        checks.append(
+            {
+                "id": "runner.consumer_contract_identity",
+                "ok": True,
+                "digest": supplied_contract_digest,
+            }
+        )
 
         plan_facet = (
             dict(dict(compilation.get("facets") or {}).get("experiment_plan") or {})

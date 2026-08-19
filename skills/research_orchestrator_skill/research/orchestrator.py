@@ -3334,6 +3334,24 @@ class ResearchOrchestrator:
             implementation_bundle = artifact_context.source_bundle(
                 owner_skill_id, audience=_IMPLEMENTATION_AUDIENCE
             )
+            consumer_contract = dict(
+                self._invoke_skill(
+                    "research_manager_skill",
+                    "get_runner_contract",
+                    {},
+                    timeout=60,
+                )
+            )
+            declared_consumer_digest = str(consumer_contract.get("digest") or "")
+            if (
+                consumer_contract.get("schema") != "adaos.contract.operation_set.v1"
+                or consumer_contract.get("contract") != "adaos.research.runner.v1"
+                or declared_consumer_digest
+                != contract_digest(
+                    {key: item for key, item in consumer_contract.items() if key != "digest"}
+                )
+            ):
+                raise ValueError("ResearchManager returned an invalid runner consumer contract")
             brief = materialize_automation_brief(
                 direction_id=token,
                 project=project,
@@ -3408,6 +3426,12 @@ class ResearchOrchestrator:
                         "digest": str(stored["digest"]),
                         "media_type": "application/json",
                     },
+                    {
+                        "kind": "consumer_contract",
+                        "ref": "contract:adaos.research.runner.v1",
+                        "digest": declared_consumer_digest,
+                        "media_type": "application/json",
+                    },
                 ],
                 acceptance_profiles=[
                     "project.conformance",
@@ -3455,7 +3479,13 @@ class ResearchOrchestrator:
                 compilation,
                 expected_digest=str(compilation["digest"]),
             )
-            session = compiled_instruction["session"]
+            consumer_instruction = development_sessions.attach_instruction(
+                str(compiled_instruction["session"]["session_id"]),
+                "consumer_contract",
+                consumer_contract,
+                expected_digest=declared_consumer_digest,
+            )
+            session = consumer_instruction["session"]
             track = self.repository.bind_track_development(
                 track_id,
                 project_ref=str(project["ref"]),
