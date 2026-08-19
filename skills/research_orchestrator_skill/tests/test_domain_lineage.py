@@ -141,3 +141,45 @@ def test_task_relations_cannot_cross_direction_boundary() -> None:
             title="Invalid dependency",
             dependency_refs=[f"research-task:{left['active_task_id']}"],
         )
+
+
+def test_prototype_revisions_are_scoped_to_each_research_task() -> None:
+    repository = OrchestratorRepository()
+    direction = repository.initialize("branched-prototypes", "Branched prototypes")
+    first_task_id = direction["active_task_id"]
+    first = {
+        "digest": "sha256:" + "1" * 64,
+        "direction_id": "branched-prototypes",
+        "revision": 1,
+        "parent_digest": None,
+        "source_bundle_digest": "sha256:" + "a" * 64,
+        "research_question": "Does the first formulation hold?",
+        "created_at": "2026-08-19T00:00:00Z",
+    }
+    repository.put_prototype(
+        "branched-prototypes",
+        first,
+        task_id=first_task_id,
+    )
+
+    second_task = repository.create_task(
+        "branched-prototypes",
+        task_id="branched-prototypes.task-002",
+        title="Protocol correction",
+        branch_of_task_id=first_task_id,
+    )
+    repository.set_active_task("branched-prototypes", second_task["task_id"])
+    second = {
+        **first,
+        "digest": "sha256:" + "2" * 64,
+        "research_question": "Does the corrected formulation hold?",
+    }
+    repository.put_prototype(
+        "branched-prototypes",
+        second,
+        task_id=second_task["task_id"],
+    )
+
+    assert [item["revision"] for item in repository.list_prototypes("branched-prototypes")] == [1, 1]
+    assert repository.get_task(first_task_id)["current_prototype_digest"] == first["digest"]
+    assert repository.get_task(second_task["task_id"])["current_prototype_digest"] == second["digest"]

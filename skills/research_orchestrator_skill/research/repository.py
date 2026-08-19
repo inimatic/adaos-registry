@@ -80,6 +80,15 @@ MIGRATIONS = (
             "CREATE UNIQUE INDEX research_activity_external_event ON research_activity(origin, source_event_id)",
         ),
     ),
+    RelationalMigration(
+        version=5,
+        name="scope research prototype revisions to tasks",
+        idempotent=True,
+        statements=(
+            "DROP INDEX research_prototypes_revision",
+            "CREATE UNIQUE INDEX research_prototypes_task_revision ON research_prototypes(task_id, revision)",
+        ),
+    ),
 )
 
 
