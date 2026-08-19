@@ -258,6 +258,62 @@ def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) 
     assert receipt["evidence"]["scientific_execution_started"] is False
 
 
+def test_development_consumer_acceptance_reads_public_compilation_projection(
+    monkeypatch,
+) -> None:
+    from adaos.sdk.developer import validation as developer_validation
+
+    monkeypatch.setattr(
+        developer_validation,
+        "validate_skill",
+        lambda *_args, **_kwargs: {"ok": True, "digest": "sha256:" + "1" * 64},
+    )
+    monkeypatch.setattr(
+        developer_validation,
+        "activate_skill",
+        lambda project_id: {"ok": True, "project_id": project_id, "version": "0.1.0"},
+    )
+
+    def invoke(project_id: str, operation_id: str, arguments: dict, **_kwargs):
+        if operation_id == "dataset_status":
+            return {
+                "dataset_id": "stl10_torchvision",
+                "ready": True,
+                "split_bindings": {
+                    role: {**item, "sealed": role == "test"}
+                    for role, item in _splits().items()
+                },
+            }
+        return {
+            "contract": "adaos.research.runner.v1",
+            "provider_id": project_id,
+            "package_ref": {
+                "uri": "skill-data:files/acceptance/package.json",
+                "digest": "sha256:" + "2" * 64,
+                "size_bytes": 42,
+                "media_type": "application/json",
+                "owner_ref": f"skill:{project_id}",
+            },
+            "command": [sys.executable, "runner.py"],
+            "working_directory": "skill-data:files/acceptance",
+            "code_digest": "sha256:" + "3" * 64,
+            "environment_digest": "sha256:" + "4" * 64,
+            "output_ref": "skill-data:files/acceptance/output",
+            "spec_id": "acceptance-spec",
+            "expected_outputs": ["result.json"],
+        }
+
+    monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
+    envelope = _acceptance_envelope("research.consumer-contracts")
+    compilation = envelope["instructions"]["research_compilation"]
+    compilation["schema"] = "adaos.research.compilation_projection.v1"
+    compilation["experiment_plan"] = compilation.pop("facets")["experiment_plan"]["payload"]
+
+    receipt = ResearchManager().validate_development_candidate(envelope)
+
+    assert receipt["ok"] is True, receipt["errors"]
+
+
 def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
     monkeypatch,
 ) -> None:

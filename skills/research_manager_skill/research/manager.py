@@ -326,12 +326,25 @@ class ResearchManager:
             }
         )
 
-        plan_facet = (
-            dict(dict(compilation.get("facets") or {}).get("experiment_plan") or {})
-            if isinstance(compilation.get("facets"), Mapping)
-            else {}
-        )
-        plan = dict(plan_facet.get("payload") or {}) if isinstance(plan_facet.get("payload"), Mapping) else {}
+        if (
+            compilation.get("schema") == "adaos.research.compilation_projection.v1"
+            and isinstance(compilation.get("experiment_plan"), Mapping)
+        ):
+            # Builder receives the compact, content-addressed public execution
+            # projection.  It deliberately omits audit-only facet wrappers but
+            # carries the exact accepted ExperimentPlan at the top level.
+            plan = dict(compilation["experiment_plan"])
+        else:
+            plan_facet = (
+                dict(dict(compilation.get("facets") or {}).get("experiment_plan") or {})
+                if isinstance(compilation.get("facets"), Mapping)
+                else {}
+            )
+            plan = (
+                dict(plan_facet.get("payload") or {})
+                if isinstance(plan_facet.get("payload"), Mapping)
+                else {}
+            )
         if not plan:
             errors.append("accepted ResearchCompilation has no ExperimentPlan payload")
             return self._acceptance_receipt(profile, checks=checks, errors=errors)
