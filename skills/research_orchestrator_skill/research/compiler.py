@@ -68,7 +68,7 @@ def _build_experiment_plan(
     task_id = str((task or {}).get("task_id") or f"{direction_id}.task-001")
     plan: dict[str, Any] = {
         "schema": "adaos.research.experiment_plan.v1",
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "direction_ref": f"research-direction:{direction_id}",
         "task_ref": str((task or {}).get("ref") or f"research-task:{task_id}"),
         "source_bundle_digest": str(source_bundle_digest),
@@ -91,7 +91,7 @@ def _build_experiment_plan(
             "allocation": copy.deepcopy(dict(pairing["allocation"])),
         },
         "analysis": {
-            "primary_metric": "best_validation_accuracy",
+            "primary_metric": str(estimand["metric"]),
             "primary_estimand": str(estimand["name"]),
             "primary_contrast": copy.deepcopy(dict(comparison["primary_contrast"])),
             "uncertainty": copy.deepcopy(dict(evaluation["uncertainty"])),
@@ -112,6 +112,14 @@ def _build_experiment_plan(
                 "required_roles": ["validation", "robustness", "test"],
                 "test_sealed": True,
                 "identity_fields": ["digest", "dataset_digest", "locator"],
+            },
+            "result_record": {
+                "primary_metric_path": "primary_metric",
+                "step_path": "step",
+                "pairing_identity_path": "pairing_identity_digest",
+                "arm_id_path": "arm_id",
+                "seed_path": "seed",
+                "evidence_class_path": "evidence_class",
             },
         },
     }

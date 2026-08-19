@@ -64,14 +64,17 @@ Callers outside chat should pass stable `actor` and `invocation_origin` values.
 ## Hard formulation boundary
 
 The default path uses three bounded LLM stages: `problem_frame`,
-`protocol_design`, and `implementation_contract`. AdaOS then compiles four
+`protocol_design`, and `implementation_contract`. AdaOS then compiles five
 stable facets: `source_analysis`, `research_problem`,
-`experimental_protocol`, and `engineering_contract`, plus a fifth
-provider-neutral `experiment_plan` facet. The protocol stage must assign
+`experimental_protocol`, `engineering_contract`, and the provider-neutral
+`experiment_plan`. The protocol stage must assign
 stable arm ids and one exact primary minuend/subtrahend. The deterministic
 plan then carries exact execution profiles, integer-or-string allocation
 units, evidence classes, data policy, RNG streams, estimand and the public
-runner/split-binding ABI without selecting a runtime provider. It also creates a
+runner/split-binding ABI without selecting a runtime provider. Runner results
+use the domain-neutral canonical fields `primary_metric`, `step`,
+`pairing_identity_digest`, `arm_id`, `seed`, and `evidence_class`; scientific
+metric names remain plan data rather than framework code. It also creates a
 digest-bound traceability graph and fails the compilation gate when required
 source-to-acceptance paths are absent. The Root LLM proposes only each bounded
 stage artifact. AdaOS materializes and

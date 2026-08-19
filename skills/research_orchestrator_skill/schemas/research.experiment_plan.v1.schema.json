@@ -9,7 +9,7 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.experiment_plan.v1"},
-    "schema_version": {"const": "1.0.0"},
+    "schema_version": {"enum": ["1.0.0", "1.1.0"]},
     "direction_ref": {"type": "string", "pattern": "^research-direction:.+"},
     "task_ref": {"type": "string", "pattern": "^research-task:.+"},
     "source_bundle_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
@@ -120,11 +120,30 @@
             "identity_fields": {"const": ["digest", "dataset_digest", "locator"]}
           },
           "additionalProperties": false
+        },
+        "result_record": {
+          "type": "object",
+          "required": ["primary_metric_path", "step_path", "pairing_identity_path", "arm_id_path", "seed_path", "evidence_class_path"],
+          "properties": {
+            "primary_metric_path": {"const": "primary_metric"},
+            "step_path": {"const": "step"},
+            "pairing_identity_path": {"const": "pairing_identity_digest"},
+            "arm_id_path": {"const": "arm_id"},
+            "seed_path": {"const": "seed"},
+            "evidence_class_path": {"const": "evidence_class"}
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
     },
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.1.0"}}},
+      "then": {"properties": {"runner_contract": {"required": ["result_record"]}}}
+    }
+  ],
   "additionalProperties": false
 }

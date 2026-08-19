@@ -45,11 +45,18 @@ def _plan() -> dict:
             "varied_fields": ["operator"],
         },
         "analysis": {
-            "primary_metric": "best_validation_accuracy",
+            "primary_metric": "validation accuracy",
             "primary_estimand": "paired_accuracy_delta",
             "primary_contrast": {"minuend": "candidate", "subtrahend": "baseline"},
             "uncertainty": {"method": "paired bootstrap"},
             "stopping_rule": {"kind": "fixed_budget"},
+        },
+        "runner_contract": {
+            "result_record": {
+                "primary_metric_path": "primary_metric",
+                "step_path": "step",
+                "pairing_identity_path": "pairing_identity_digest",
+            }
         },
     }
 
@@ -78,11 +85,26 @@ def test_experiment_plan_projects_without_scientific_inference_or_provider_heuri
     assert conditions["execution"]["preflight"]["source_stage_id"] == "cpu-smoke"
     assert conditions["execution"]["preflight"]["epochs"] == 3
     assert conditions["analysis"]["primary_contrast"] == {"minuend": "candidate", "subtrahend": "baseline"}
+    assert conditions["analysis"]["primary_metric"] == "validation accuracy"
+    assert conditions["analysis"]["result_metric_path"] == "primary_metric"
+    assert conditions["analysis"]["result_step_path"] == "step"
+    assert conditions["analysis"]["initialization_digest_path"] == "pairing_identity_digest"
     assert conditions["runner"] == {
         "provider": "direction_skill",
         "contract": "adaos.research.runner.v1",
         "data_owner": "direction_skill",
     }
+
+
+def test_legacy_plan_without_canonical_result_record_fails_closed() -> None:
+    plan = _plan()
+    plan["runner_contract"].pop("result_record")
+    with pytest.raises(ValueError, match="canonical result_record"):
+        ResearchOrchestrator._manager_conditions(
+            plan,
+            runner_id="direction_skill",
+            dataset_digest="sha256:" + "a" * 64,
+        )
 
 
 def test_study_split_admission_fails_closed_on_alias_or_unsealed_test() -> None:

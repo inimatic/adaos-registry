@@ -26,6 +26,11 @@
             "researchCanAccept": false,
             "researchAutomationBriefDigest": null,
             "builderUrl": null,
+            "implementationStatus": null,
+            "candidateReleaseDigest": null,
+            "projectReleaseRef": null,
+            "studyRealizationRef": null,
+            "researchExperimentId": null,
             "selectedArtifactId": null,
             "selectedArtifactGroupId": null,
             "selectedArtifactTitle": null,
@@ -43,21 +48,34 @@
             ],
             "variants": [
               {
+                "id": "compilation",
+                "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null && $state.activeResearchTab === 'compilation'",
+                "type": "single",
+                "pattern": "stack",
+                "areas": [
+                  {
+                    "id": "workspace",
+                    "role": "main",
+                    "label": "Research compilation"
+                  }
+                ]
+              },
+              {
                 "id": "direction",
                 "when": "$state.researchViewMode === 'direction' && $state.selectedDirectionId != null",
                 "type": "split",
-                "pattern": "outline-detail",
+                "pattern": "focus-detail",
                 "sidebarWidth": 340,
                 "areas": [
-                  {
-                    "id": "navigation",
-                    "role": "sidebar",
-                    "label": "Research structure"
-                  },
                   {
                     "id": "workspace",
                     "role": "main",
                     "label": "Selected research object"
+                  },
+                  {
+                    "id": "context",
+                    "role": "sidebar",
+                    "label": "Research structure"
                   }
                 ]
               },
@@ -156,6 +174,11 @@
                     "researchAdmissionDecision": "needs_discussion",
                     "researchCanAccept": false,
                     "builderUrl": null,
+                    "implementationStatus": null,
+                    "candidateReleaseDigest": null,
+                    "projectReleaseRef": null,
+                    "studyRealizationRef": null,
+                    "researchExperimentId": null,
                     "activeResearchTab": "overview"
                     ,"activeCompilationFacet": "source_analysis"
                   }
@@ -226,7 +249,12 @@
                     "researchPrototypeDigest": null,
                     "researchAdmissionDecision": "needs_discussion",
                     "researchCanAccept": false,
-                    "builderUrl": null
+                    "builderUrl": null,
+                    "implementationStatus": null,
+                    "candidateReleaseDigest": null,
+                    "projectReleaseRef": null,
+                    "studyRealizationRef": null,
+                    "researchExperimentId": null
                   }
                 }
               ]
@@ -234,7 +262,7 @@
             {
               "id": "research-outline",
               "type": "navigation.outline",
-              "area": "navigation",
+              "area": "context",
               "title": "Research structure",
               "visibleIf": "$state.selectedDirectionId != null",
               "dataSource": {
@@ -347,6 +375,22 @@
                   {
                     "key": "development_session.session_id",
                     "label": "Development Session"
+                  },
+                  {
+                    "key": "selected_implementation_track.status",
+                    "label": "Implementation state"
+                  },
+                  {
+                    "key": "selected_implementation_track.project_release_ref",
+                    "label": "ProjectRelease"
+                  },
+                  {
+                    "key": "selected_implementation_track.study_realization_ref",
+                    "label": "StudyRealization"
+                  },
+                  {
+                    "key": "selected_implementation_track.experiment_id",
+                    "label": "Experiment"
                   }
                 ],
                 "stateBindings": {
@@ -356,6 +400,11 @@
                   "researchCanAccept": "formulation.can_accept",
                   "researchAutomationBriefDigest": "automation_brief.digest",
                   "builderUrl": "builder_url",
+                  "implementationStatus": "selected_implementation_track.status",
+                  "candidateReleaseDigest": "selected_implementation_track.candidate_release_digest",
+                  "projectReleaseRef": "selected_implementation_track.project_release_ref",
+                  "studyRealizationRef": "selected_implementation_track.study_realization_ref",
+                  "researchExperimentId": "selected_implementation_track.experiment_id",
                   "selectedDirectionTitle": "direction.title",
                   "researchConversationId": "conversation_id",
                   "activeResearchTaskId": "active_task.task_id"
@@ -395,7 +444,7 @@
                     "id": "compilation",
                     "label": "Compilation",
                     "icon": "git-network-outline",
-                    "title": "Inspect Source Analysis, Research Problem, Experimental Protocol, Engineering Contract, and traceability before acceptance."
+                    "title": "Inspect Source Analysis, Research Problem, Experimental Protocol, Engineering Contract, Experiment Plan, and traceability before acceptance."
                   },
                   {
                     "id": "development",
@@ -747,6 +796,12 @@
                     "title": "Bounded implementation obligations and independently checkable acceptance evidence."
                   },
                   {
+                    "id": "experiment_plan",
+                    "label": "Execution plan",
+                    "icon": "options-outline",
+                    "title": "Provider-neutral dataset, arms, execution profiles, randomization, estimand, evidence policy, and runner ABI compiled for ResearchManager."
+                  },
+                  {
                     "id": "traceability",
                     "label": "Traceability",
                     "icon": "git-network-outline",
@@ -815,6 +870,55 @@
                     "title": "Open a named Builder window and bind this exact Development Session. The target skill is read-write; Workbench, orchestrator, and artifact groups are read-only context."
                   },
                   {
+                    "id": "start-implementation",
+                    "label": "Start one-shot",
+                    "icon": "play-outline",
+                    "enabledIf": "$state.researchAutomationBriefDigest != null && $state.implementationStatus === 'development_ready'",
+                    "title": "Start one bounded Builder Automation from the accepted ResearchCompilation and AutomationBrief. No post-start human directives are added."
+                  },
+                  {
+                    "id": "sync-implementation",
+                    "label": "Sync Builder",
+                    "icon": "sync-outline",
+                    "enabledIf": "$state.researchAutomationBriefDigest != null && $state.projectReleaseRef == null",
+                    "title": "Read Builder Automation status and append an idempotent snapshot to the durable research activity journal."
+                  },
+                  {
+                    "id": "prepare-release",
+                    "label": "Prepare release",
+                    "icon": "cube-outline",
+                    "enabledIf": "$state.implementationStatus === 'implementation_complete' && $state.candidateReleaseDigest == null",
+                    "title": "Run the Builder Project trial and freeze an immutable candidate digest. This does not promote the release."
+                  },
+                  {
+                    "id": "publish-release",
+                    "label": "Publish reviewed release",
+                    "icon": "cloud-upload-outline",
+                    "enabledIf": "$state.candidateReleaseDigest != null && $state.projectReleaseRef == null",
+                    "title": "Promote exactly the reviewed candidate digest and bind it as the ProjectRelease for this implementation track."
+                  },
+                  {
+                    "id": "instantiate-study",
+                    "label": "Instantiate Study",
+                    "icon": "flask-outline",
+                    "enabledIf": "$state.projectReleaseRef != null && $state.studyRealizationRef == null",
+                    "title": "Ask the installed release for immutable dataset split identities, then bind compilation, release, runner, Study, and Experiment."
+                  },
+                  {
+                    "id": "start-smoke",
+                    "label": "Start CPU smoke",
+                    "icon": "hardware-chip-outline",
+                    "enabledIf": "$state.researchExperimentId != null",
+                    "title": "Lock the compiled protocol and start only its preregistered non-inferential workflow-smoke profile on the local CPU."
+                  },
+                  {
+                    "id": "sync-study",
+                    "label": "Sync Study",
+                    "icon": "refresh-circle-outline",
+                    "enabledIf": "$state.researchExperimentId != null",
+                    "title": "Reconcile runner attempts through ResearchManager and join the resulting state into the Workbench activity journal."
+                  },
+                  {
                     "id": "help-modal",
                     "label": "How this works",
                     "icon": "help-circle-outline",
@@ -863,6 +967,90 @@
                   "invalidates": [
                     "builder.project.preview"
                   ]
+                },
+                {
+                  "on": "click:start-implementation",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.start_implementation",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "implementation_track_id": "$state.selectedImplementationTrackId"
+                  },
+                  "invalidates": ["research.activity", "research.implementation"]
+                },
+                {
+                  "on": "click:sync-implementation",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.sync_implementation",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "implementation_track_id": "$state.selectedImplementationTrackId"
+                  },
+                  "invalidates": ["research.activity", "research.implementation"]
+                },
+                {
+                  "on": "click:prepare-release",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.prepare_project_release",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "implementation_track_id": "$state.selectedImplementationTrackId",
+                    "confirmed": true,
+                    "bump": "patch"
+                  },
+                  "invalidates": ["research.activity", "research.implementation", "research.release"]
+                },
+                {
+                  "on": "click:publish-release",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.publish_project_release",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "implementation_track_id": "$state.selectedImplementationTrackId",
+                    "confirmed": true,
+                    "bump": "patch"
+                  },
+                  "invalidates": ["research.activity", "research.implementation", "research.release"]
+                },
+                {
+                  "on": "click:instantiate-study",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.instantiate_study",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "implementation_track_id": "$state.selectedImplementationTrackId",
+                    "idempotency_key": "workbench-study-$state.selectedDirectionId-$state.selectedImplementationTrackId"
+                  },
+                  "invalidates": ["research.activity", "research.implementation", "research.study", "research.evidence"]
+                },
+                {
+                  "on": "click:start-smoke",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.start_study_smoke",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "implementation_track_id": "$state.selectedImplementationTrackId",
+                    "confirmed": true,
+                    "idempotency_key": "workbench-smoke-$state.selectedDirectionId-$state.selectedImplementationTrackId"
+                  },
+                  "invalidates": ["research.activity", "research.study", "research.evidence"]
+                },
+                {
+                  "on": "click:sync-study",
+                  "type": "callSkill",
+                  "target": "research_orchestrator_skill.sync_study",
+                  "params": {
+                    "direction_id": "$state.selectedDirectionId",
+                    "task_id": "$state.selectedResearchTaskId",
+                    "implementation_track_id": "$state.selectedImplementationTrackId"
+                  },
+                  "invalidates": ["research.activity", "research.study", "research.evidence"]
                 },
                 {
                   "on": "click:help-modal",
@@ -1050,12 +1238,41 @@
             },
             {
               "id": "releases-placeholder",
-              "type": "static.markdown",
+              "type": "item.details",
               "area": "workspace",
-              "title": "Releases",
+              "title": "Implementation lineage",
               "visibleIf": "$state.selectedDirectionId != null && $state.activeResearchTab === 'releases'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "research_orchestrator_skill.get_direction",
+                "params": {
+                  "direction_id": "$state.selectedDirectionId",
+                  "task_id": "$state.selectedResearchTaskId",
+                  "implementation_track_id": "$state.selectedImplementationTrackId"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "research.formulation",
+                  "research.activity",
+                  "research.automation_brief"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 2
+              },
               "inputs": {
-                "content": "## No research releases yet\n\nA portable release will freeze the direction snapshot and exact Project composition without making Project the owner of the scientific lifecycle."
+                "emptyText": "No implementation track is selected.",
+                "fields": [
+                  {"key": "selected_implementation_track.ref", "label": "Implementation track"},
+                  {"key": "selected_implementation_track.status", "label": "State"},
+                  {"key": "development_session.session_id", "label": "Development Session"},
+                  {"key": "selected_implementation_track.candidate_release_digest", "label": "Reviewed candidate"},
+                  {"key": "selected_implementation_track.project_release_ref", "label": "ProjectRelease"},
+                  {"key": "selected_implementation_track.project_release_digest", "label": "Release digest"},
+                  {"key": "selected_implementation_track.runner_ref", "label": "Installed runner"},
+                  {"key": "selected_implementation_track.study_realization_ref", "label": "StudyRealization"},
+                  {"key": "selected_implementation_track.study_realization_digest", "label": "Realization digest"},
+                  {"key": "selected_implementation_track.experiment_id", "label": "ResearchManager Experiment"}
+                ]
               }
             },
             {

@@ -1188,7 +1188,7 @@ class ResearchOrchestrator:
             "automation_brief": brief,
             "development_session": development_session,
             "builder_url": builder_url,
-            "next_steps": self._next_steps(state, bundle, prototype),
+            "next_steps": self._next_steps(state, bundle, prototype, track=selected_track),
         }
 
     def outline(self, direction_id: str) -> dict[str, Any]:
@@ -1790,9 +1790,26 @@ class ResearchOrchestrator:
         }
 
     @staticmethod
-    def _next_steps(state: Mapping[str, Any], bundle: Mapping[str, Any], prototype: Mapping[str, Any] | None) -> list[dict[str, str]]:
+    def _next_steps(
+        state: Mapping[str, Any],
+        bundle: Mapping[str, Any],
+        prototype: Mapping[str, Any] | None,
+        *,
+        track: Mapping[str, Any] | None = None,
+    ) -> list[dict[str, str]]:
         if prototype and str(prototype.get("source_bundle_digest") or "") != str(bundle.get("digest") or ""):
             return [{"id": "refresh_formulation", "label": "Обновить постановку", "reason": "Artifact groups изменились; новая ревизия должна сослаться на актуальный digest."}]
+        track_state = str((track or {}).get("status") or "")
+        if (track or {}).get("experiment_id"):
+            return [{"id": "sync_study", "label": "Sync Study", "reason": "Import the latest ResearchManager attempts and evidence into the durable activity journal."}]
+        if (track or {}).get("project_release_ref"):
+            return [{"id": "instantiate_study", "label": "Instantiate Study", "reason": "Bind the accepted compilation, exact ProjectRelease, runner, and sealed dataset splits."}]
+        if (track or {}).get("candidate_release_digest"):
+            return [{"id": "publish_project_release", "label": "Publish reviewed release", "reason": "Promote only the exact candidate digest reviewed in Builder."}]
+        if track_state == "implementation_complete":
+            return [{"id": "prepare_project_release", "label": "Prepare release candidate", "reason": "Run the Project trial and freeze a reviewable ProjectRelease digest."}]
+        if track_state in {"implementation_running", "implementation_failed"}:
+            return [{"id": "sync_implementation", "label": "Sync Builder", "reason": "Import the current Builder Automation state and failure diagnostics."}]
         if state.get("status") == "handoff_ready":
             return [
                 {"id": "inspect_brief", "label": "Проверить Automation Brief", "reason": "Он фиксирует точное задание для Codex."},
@@ -2620,7 +2637,7 @@ class ResearchOrchestrator:
                 token,
                 "compilation",
                 "completed",
-                "Research compilation produced four facets and passed traceability coverage.",
+                "Research compilation produced five facets and passed traceability coverage.",
                 {
                     "run_id": run_id,
                     "compilation_digest": compilation["digest"],
@@ -3438,8 +3455,14 @@ class ResearchOrchestrator:
                 "automation_brief": stored,
                 "development_session": session,
                 "builder_checkpoint": checkpoint,
-            "codex_started": False,
-        }
+                "codex_started": False,
+            }
+
+        return self.repository.once(
+            str(idempotency_key or "").strip(),
+            "accept_prototype",
+            operation,
+        )
 
     @staticmethod
     def _component_identity(ref: str) -> tuple[str, str]:
@@ -3528,6 +3551,25 @@ class ResearchOrchestrator:
         projection = response.get("automation") if isinstance(response.get("automation"), Mapping) else response
         status = str(projection.get("status") or response.get("status") or "submitted")
         task_ref = str(projection.get("task_id") or response.get("task_id") or "")
+        normalized = {
+            "completed": "implementation_complete",
+            "succeeded": "implementation_complete",
+            "failed": "implementation_failed",
+            "cancelled": "implementation_failed",
+        }.get(status.lower(), "implementation_running")
+        track = self.repository.record_track_evaluation(
+            str(track["track_id"]),
+            status=normalized,
+            metadata={
+                **dict(track.get("metadata") or {}),
+                "automation": {
+                    "status": status.lower(),
+                    "task_id": task_ref or None,
+                    "phase": projection.get("phase") or response.get("phase"),
+                    "updated_at": projection.get("updated_at") or response.get("updated_at"),
+                },
+            },
+        )
         event_source = task_ref or contract_digest(
             {"track_ref": track["ref"], "status": status, "session_id": session["session_id"]}
         )
@@ -3844,6 +3886,12 @@ class ResearchOrchestrator:
         analysis = dict(plan["analysis"])
         randomization = dict(plan["randomization"])
         dataset = dict(plan["dataset"])
+        runner_contract = dict(plan["runner_contract"])
+        result_record = runner_contract.get("result_record")
+        if not isinstance(result_record, Mapping):
+            raise ValueError(
+                "Study instantiation requires ExperimentPlan v1.1 canonical result_record paths"
+            )
         return {
             "dataset": {
                 "name": str(dataset["logical_name"]),
@@ -3866,9 +3914,15 @@ class ResearchOrchestrator:
                 "primary_estimand": str(analysis["primary_estimand"]),
                 "primary_contrast": copy.deepcopy(dict(analysis["primary_contrast"])),
                 "paired": True,
-                "result_metric_path": "best_validation_accuracy",
-                "result_step_path": "best_epoch",
-                "initialization_digest_path": "initial_state_digest",
+                "result_metric_path": str(
+                    result_record["primary_metric_path"]
+                ),
+                "result_step_path": str(
+                    result_record["step_path"]
+                ),
+                "initialization_digest_path": str(
+                    result_record["pairing_identity_path"]
+                ),
                 "uncertainty": copy.deepcopy(dict(analysis["uncertainty"])),
                 "stopping_rule": copy.deepcopy(dict(analysis["stopping_rule"])),
             },
@@ -4113,6 +4167,26 @@ class ResearchOrchestrator:
                 )
             )
             lifecycle = dict(experiment.get("lifecycle") or {})
+        study = dict(
+            self._invoke_skill(
+                "research_manager_skill", "get_study", {"study_id": study_id}, timeout=120
+            )
+        )
+        study_lifecycle = dict(study.get("workflow") or {})
+        if study_lifecycle.get("state") == "locked":
+            self._invoke_skill(
+                "research_manager_skill",
+                "advance_workflow",
+                {
+                    "study_id": study_id,
+                    "command": "approve_smoke",
+                    "expected_generation": int(study_lifecycle.get("generation") or 0),
+                    "idempotency_key": f"{idempotency_key}:study-smoke",
+                    "actor": actor,
+                    "evidence_refs": [str(track["study_realization_digest"])],
+                },
+                timeout=120,
+            )
         reused = lifecycle.get("state") in {"running", "results_ready", "finalized"}
         if lifecycle.get("state") == "locked":
             started = dict(
@@ -4209,8 +4283,6 @@ class ResearchOrchestrator:
             source_event_id=f"experiment-state:{event_identity}",
         )
         return {"ok": True, "track": dict(track), "reconciliation": reconciled, "experiment": experiment}
-
-        return self.repository.once(str(idempotency_key or "").strip(), "accept_prototype", operation)
 
 
 __all__ = ["ResearchOrchestrator"]

@@ -20,7 +20,7 @@ direction.
    evaluation plan, uncertainty, constraints, and unresolved decisions. Chat is
    not canonical state; each candidate is a typed ResearchPrototype revision.
 5. Open the full-width **Compilation** view. Inspect Source Analysis, Research
-   Problem, Experimental Protocol, Engineering Contract, and the required
+   Problem, Experimental Protocol, Engineering Contract, Experiment Plan, and the required
    source-to-acceptance traceability paths. Each facet and the aggregate
    package has an immutable digest.
 6. Review the current exact prototype, source-context coverage, provenance,
@@ -33,6 +33,17 @@ direction.
    orchestrator are contract context, while artifact inputs are immutable
    audience-scoped filesystem views. Hidden files are physically absent from
    Codex's artifact roots.
+9. Choose **Start one-shot** to run Builder from those exact inputs. Use
+   **Sync Builder** to import progress and failures into the durable Workbench
+   journal; synchronization does not steer the agent.
+10. After completion, prepare an isolated Project trial, inspect its candidate
+    digest, and promote exactly that digest as a ProjectRelease.
+11. Instantiate a Study. The installed direction skill must return immutable,
+    distinct validation/robustness/test bindings with a sealed test split.
+    Workbench then binds ResearchCompilation, ProjectRelease, runner,
+    StudyRealization, and ResearchManager Experiment.
+12. Start the bounded CPU smoke separately. It is workflow evidence only; use
+    **Sync Study** to join attempt state and evidence into the same journal.
 
 ## Example formulation discussion
 
@@ -75,10 +86,13 @@ can grow independently without being constrained to a permanent side panel.
 The selected direction title opens the searchable selector. The outline may
 select any task or implementation track for read-only inspection; formulation
 writes remain bound to one explicitly activated task.
-Compilation is itself a full-width conditional layout because the four facets
+Compilation is itself a full-width conditional layout because the five facets
 and traceability graph are primary work surfaces rather than sidebar metadata.
 
-## What this milestone does not do
+## Current boundary
 
-It does not run Codex, execute experiments, publish a paper, ingest directories
-or archives, or use Ray. Those stages consume the accepted handoff later.
+The Workbench now governs one bounded autonomous implementation through an
+installed local CPU Study. It does not yet authorize confirmatory inference,
+autonomous protocol amendment, paper drafting, directory/archive ingestion,
+or Ray execution. A three-epoch smoke validates workflow and instrumentation,
+not the scientific hypothesis.

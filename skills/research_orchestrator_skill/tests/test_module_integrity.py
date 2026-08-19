@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import importlib.util
 import sys
 from pathlib import Path
@@ -33,3 +34,25 @@ def test_skill_manifest_and_entrypoint_are_valid() -> None:
 
     report = SkillValidationService(None).validate_path(root, install_mode=True)  # type: ignore[arg-type]
     assert report.ok is True, [f"{item.code}: {item.message}" for item in report.issues]
+
+
+def test_acceptance_method_returns_through_atomic_idempotency_boundary() -> None:
+    root = Path(__file__).resolve().parents[1]
+    module = ast.parse(
+        (root / "research" / "orchestrator.py").read_text(encoding="utf-8")
+    )
+    orchestrator = next(
+        node
+        for node in module.body
+        if isinstance(node, ast.ClassDef) and node.name == "ResearchOrchestrator"
+    )
+    method = next(
+        node
+        for node in orchestrator.body
+        if isinstance(node, ast.FunctionDef) and node.name == "accept"
+    )
+    final = method.body[-1]
+    assert isinstance(final, ast.Return)
+    assert isinstance(final.value, ast.Call)
+    assert isinstance(final.value.func, ast.Attribute)
+    assert final.value.func.attr == "once"

@@ -61,6 +61,7 @@ def test_compilation_has_full_width_facets_and_traceability_projection() -> None
         "research_problem",
         "experimental_protocol",
         "engineering_contract",
+        "experiment_plan",
         "traceability",
     ]
     assert source["name"] == "research_orchestrator_skill.get_compilation"
