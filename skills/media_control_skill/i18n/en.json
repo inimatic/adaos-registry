@@ -1,0 +1,8 @@
+{
+  "runtime.media_control.error.playback_target_unavailable": "The selected playback target is unavailable.",
+  "runtime.media_control.error.playback_session_not_found": "The playback session is no longer available.",
+  "runtime.media_control.error.playback_revision_conflict": "Playback changed on another controller. Refresh and retry.",
+  "runtime.media_control.error.playback_queue_revision_conflict": "The queue changed on another controller. Refresh and retry.",
+  "runtime.media_control.error.playback_control_lease_conflict": "Another controller currently owns this playback session.",
+  "runtime.media_control.error.no_active_playback": "There is no active playback session."
+}

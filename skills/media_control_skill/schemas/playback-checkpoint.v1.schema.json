@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "adaos.media_control.playback_checkpoint.v1", "type": "object",
+  "required": ["id", "session_id", "profile_id", "item_id", "position_ms", "duration_ms", "completed", "source", "session_revision", "created_at"],
+  "properties": {
+    "id": {"type": "string"}, "session_id": {"type": "string"}, "profile_id": {"type": "string"}, "item_id": {"type": "string"},
+    "position_ms": {"type": "integer", "minimum": 0}, "duration_ms": {"type": "integer", "minimum": 0}, "completed": {"type": "boolean"},
+    "source": {"type": "string"}, "session_revision": {"type": "integer", "minimum": 1}, "created_at": {"type": "string"}
+  }, "additionalProperties": false
+}

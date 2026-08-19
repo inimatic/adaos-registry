@@ -1,0 +1,278 @@
+name: media_control_skill
+version: 0.1.0
+description: Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.
+supported_locales: [en, ru]
+entry: handlers/main.py
+runtime:
+  python: '3.11'
+capabilities:
+- media.playback_planning
+dependencies: []
+events:
+  subscribe:
+  - sys.ready
+  - webio.stream.snapshot.requested
+  publish:
+  - io.out.stream.publish
+lifecycle:
+  after_activate: ensure_schema
+  rehydrate: rehydrate
+default_tool: now_playing
+exports:
+  tools: [ensure_schema, rehydrate, register_target, list_targets, create_session, get_session, command, update_queue, checkpoint, pull_commands, acknowledge_command, get_settings, set_settings, now_playing, record_qoe, voice_command, status]
+tools:
+- name: ensure_schema
+  entry: handlers.main:ensure_schema
+  description: Ensure the durable control-plane schema.
+  side_effects: local_write
+  input_schema: {type: object, additionalProperties: true}
+  output_schema: {type: object}
+- name: rehydrate
+  entry: handlers.main:rehydrate
+  description: Rehydrate bounded now-playing state.
+  side_effects: none
+  input_schema:
+    type: object
+    properties: {webspace_id: {type: string}}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: register_target
+  entry: handlers.main:register_target
+  description: Register a browser, TV, phone, speaker, or native playback endpoint.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [endpoint_id]
+    properties:
+      endpoint_id: {type: string, minLength: 1}
+      webspace_id: {type: string}
+      label: {type: string}
+      kind: {type: string, enum: [browser, tv, mobile, speaker, native], default: browser}
+      node_id: {type: string}
+      capabilities: {type: object}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: list_targets
+  entry: handlers.main:list_targets
+  description: List bounded playback targets.
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      include_unavailable: {type: boolean, default: false}
+      limit: {type: integer, minimum: 1, maximum: 100, default: 50}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: create_session
+  entry: handlers.main:create_session
+  description: Create a persistent playback session and bounded queue.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [target_id, queue]
+    properties:
+      target_id: {type: string}
+      profile_id: {type: string, default: default}
+      actor_ref: {type: string}
+      queue: {type: array, minItems: 1, maxItems: 500, items: {type: object}}
+      active_index: {type: integer, minimum: 0, default: 0}
+      route: {type: object}
+      lease_seconds: {type: integer, minimum: 30, maximum: 900, default: 120}
+      webspace_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: get_session
+  entry: handlers.main:get_session
+  description: Read one session and a bounded queue page.
+  side_effects: none
+  input_schema:
+    type: object
+    required: [session_id]
+    properties:
+      session_id: {type: string}
+      queue_limit: {type: integer, minimum: 1, maximum: 30, default: 10}
+      queue_cursor: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: command
+  entry: handlers.main:command
+  description: Send one revision-safe idempotent playback command.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [session_id, command, expected_revision, idempotency_key]
+    properties:
+      session_id: {type: string}
+      command: {type: string, enum: [play, pause, seek, volume, mute, next, previous, stop, handoff, tracks, rate]}
+      arguments: {type: object}
+      actor_ref: {type: string}
+      expected_revision: {type: integer, minimum: 1}
+      idempotency_key: {type: string, minLength: 1}
+      lease_seconds: {type: integer, minimum: 30, maximum: 900, default: 120}
+      webspace_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: update_queue
+  entry: handlers.main:update_queue
+  description: Replace a queue under optimistic revision control.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [session_id, queue, expected_queue_revision]
+    properties:
+      session_id: {type: string}
+      queue: {type: array, minItems: 1, maxItems: 500, items: {type: object}}
+      expected_queue_revision: {type: integer, minimum: 1}
+      actor_ref: {type: string}
+      webspace_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: checkpoint
+  entry: handlers.main:checkpoint
+  description: Persist an endpoint checkpoint for interruption recovery.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [session_id, expected_revision]
+    properties:
+      session_id: {type: string}
+      position_ms: {type: integer, minimum: 0}
+      duration_ms: {type: integer, minimum: 0}
+      state: {type: string}
+      source: {type: string}
+      expected_revision: {type: integer, minimum: 1}
+      webspace_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: pull_commands
+  entry: handlers.main:pull_commands
+  description: Pull ordered endpoint commands through an opaque cursor.
+  side_effects: none
+  input_schema:
+    type: object
+    required: [target_id]
+    properties:
+      target_id: {type: string}
+      cursor: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 100, default: 50}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: acknowledge_command
+  entry: handlers.main:acknowledge_command
+  description: Acknowledge endpoint application of one command.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [command_id, status]
+    properties:
+      command_id: {type: string}
+      status: {type: string, enum: [applied, rejected, failed]}
+      result: {type: object}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: get_settings
+  entry: handlers.main:get_settings
+  description: Read effective profile and endpoint playback settings.
+  side_effects: none
+  input_schema:
+    type: object
+    properties: {profile_id: {type: string, default: default}, target_id: {type: string}}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: set_settings
+  entry: handlers.main:set_settings
+  description: Update profile and endpoint playback settings.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [values]
+    properties:
+      profile_id: {type: string, default: default}
+      target_id: {type: string}
+      values: {type: object}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: now_playing
+  entry: handlers.main:now_playing
+  description: Return bounded now-playing sessions for remote controls.
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      profile_id: {type: string}
+      target_id: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 50, default: 20}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: record_qoe
+  entry: handlers.main:record_qoe
+  description: Record one bounded playback quality metric.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [session_id, metric, value]
+    properties:
+      session_id: {type: string}
+      metric: {type: string, enum: [plan_latency_ms, first_frame_ms, seek_latency_ms, rebuffer_ms, route_change, interruption, completion]}
+      value: {type: number}
+      dimensions: {type: object}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: voice_command
+  entry: handlers.main:voice_command
+  description: Resolve a voice transport command against current playback context.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [action]
+    properties:
+      action: {type: string, enum: [play, pause, seek, volume, mute, next, previous, stop, handoff, tracks, rate]}
+      profile_id: {type: string, default: default}
+      target_id: {type: string}
+      session_id: {type: string}
+      actor_ref: {type: string}
+      arguments: {type: object}
+      idempotency_key: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: status
+  entry: handlers.main:status
+  description: Return compact control-plane diagnostics.
+  side_effects: none
+  input_schema: {type: object, additionalProperties: true}
+  output_schema: {type: object}
+data_routes:
+- surface: app-shell:media-playback
+  route: stream
+  receiver: media_control.now_playing
+  owner: skill:media_control_skill
+  first_paint: no active playback session
+  recovery: now_playing and get_session restore durable state after reconnect
+  update_source: [media_control_skill.command, media_control_skill.checkpoint, webio.stream.snapshot.requested]
+  budget:
+    max_payload_bytes: 131072
+    max_publish_hz: 2
+    max_items: 20
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: keep the endpoint-local session and mark command delivery delayed
+    log: skill:media_control_skill.runtime
+    quarantine: false
+- surface: media-control store
+  route: skill-local
+  path: data/db/media_control.sqlite3
+  owner: skill:media_control_skill
+  first_paint: empty target and session registry
+  recovery: WAL recovery followed by bounded now-playing projection
+  guard_visibility: profile policy gates history; source paths are not stored in commands
+  budget: {max_payload_bytes: 1048576}
+memory_budget:
+  expected_rss_mb: 64
+  caches:
+  - {name: now_playing_projection, route: process, max_items: 20}
+llm_hints:
+  description: Persistent remote-control plane for Media Center playback targets and sessions.
+  aliases: [media remote, playback control, now playing]
+  primary_actions:
+  - {id: media_control_skill.voice_command, intent: media.playback.control, tool: voice_command, side_effect_class: local_write}
+updated_at: '2026-08-19T00:00:00+00:00'

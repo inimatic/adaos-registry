@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "adaos.media_control.playback_target.v1", "type": "object",
+  "required": ["schema", "id", "endpoint_id", "webspace_id", "label", "kind", "capabilities", "status", "last_seen_at", "revision"],
+  "properties": {
+    "schema": {"const": "adaos.media_control.playback_target.v1"}, "id": {"type": "string"}, "endpoint_id": {"type": "string"},
+    "webspace_id": {"type": "string"}, "node_id": {"type": "string"}, "label": {"type": "string"},
+    "kind": {"enum": ["browser", "tv", "mobile", "speaker", "native"]}, "capabilities": {"type": "object"},
+    "status": {"enum": ["available", "unavailable", "draining"]}, "last_seen_at": {"type": "string"}, "revision": {"type": "integer", "minimum": 1}
+  }, "additionalProperties": false
+}

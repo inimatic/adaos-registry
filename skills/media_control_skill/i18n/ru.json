@@ -1,0 +1,8 @@
+{
+  "runtime.media_control.error.playback_target_unavailable": "Выбранная поверхность воспроизведения недоступна.",
+  "runtime.media_control.error.playback_session_not_found": "Сессия воспроизведения больше недоступна.",
+  "runtime.media_control.error.playback_revision_conflict": "Воспроизведение изменено с другого пульта. Обновите состояние и повторите.",
+  "runtime.media_control.error.playback_queue_revision_conflict": "Очередь изменена с другого пульта. Обновите состояние и повторите.",
+  "runtime.media_control.error.playback_control_lease_conflict": "Сейчас этой сессией управляет другой пульт.",
+  "runtime.media_control.error.no_active_playback": "Активная сессия воспроизведения отсутствует."
+}

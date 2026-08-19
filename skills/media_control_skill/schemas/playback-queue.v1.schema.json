@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "adaos.media_control.playback_queue.v1", "type": "object",
+  "required": ["schema", "items", "count", "total_count", "revision", "pagination"],
+  "properties": {
+    "schema": {"const": "adaos.media_control.playback_queue.v1"}, "items": {"type": "array", "maxItems": 30, "items": {"type": "object"}},
+    "count": {"type": "integer", "minimum": 0, "maximum": 30}, "total_count": {"type": "integer", "minimum": 0, "maximum": 500},
+    "revision": {"type": "integer", "minimum": 1}, "pagination": {"type": "object"}
+  }, "additionalProperties": false
+}
