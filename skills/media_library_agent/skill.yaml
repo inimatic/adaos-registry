@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.4.0
+version: 0.4.1
 description: Distributed node-local media discovery agent with durable asynchronous scans and ordered catalog deltas.
 supported_locales:
 - en
@@ -336,6 +336,21 @@ tools:
   input_schema: {type: object, additionalProperties: true}
   output_schema: {type: object}
 data_routes:
+- surface: widget:media-library-agent-status
+  route: tool/details
+  tool: status
+  owner: skill:media_library_agent
+  first_paint: bounded local agent health, capacity, schedules, and pressure
+  recovery: repeat status after scan or pressure invalidation
+  guard_visibility: aggregate counts and limits; no configured root paths
+  budget: {max_payload_bytes: 131072, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, targeted_invalidation]
+    cache_ttl_ms: 1000
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags: [media_center.agent]
 - surface: modal:media-center-settings
   route: stream
   receiver: media_library_agent.progress

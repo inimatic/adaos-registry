@@ -1,7 +1,7 @@
 schema: adaos.project.v1
 kind: project
 id: media_center
-version: 0.3.0
+version: 0.4.0
 profiles:
 - adaos.media_center.v1
 - adaos.media_center.tv.v1
@@ -42,21 +42,25 @@ entrypoints:
   bindings:
     presentation_profile: desktop
     media_role: library
+    shared_surface: false
 - id: tv
   presentation: scenario:media_center
   bindings:
     presentation_profile: tv
     media_role: playback_target
+    shared_surface: true
 - id: remote
   presentation: scenario:media_center
   bindings:
     presentation_profile: mobile_control
     media_role: controller
+    shared_surface: false
 - id: embedded
   presentation: scenario:media_center
   bindings:
     presentation_profile: embedded
     media_role: compact
+    shared_surface: false
 catalog:
   title: Media Center
   description: Distributed in-place household media library, playback, and remote control.

@@ -4,6 +4,8 @@ Media Center is a Project-composed household media application. Its scenario is 
 
 ## Surfaces
 
+The Project entrypoints declare explicit `desktop`, `tv`, `mobile_control`, and `embedded` presentation profiles independently of viewport width. The client selects the profile from `surfaceProfile` (or the `presentation_profile` entrypoint query), applies stable density/overscan/input semantics, and keeps the same catalog and control contracts. TV uses content rails and D-pad focus; mobile control puts Now Playing, target selection, and transport first while retaining Browse/Search below them.
+
 The main page follows familiar media-center navigation: Home, Movies, Series, Music, Audiobooks, Folders, Playlists, Favorites, and Recent. Search is explicit-submit. Every catalog read uses opaque server cursors with 30 records per page. The universal `ui.list` renderer switches between list, grid, and rail layouts, uses browser rendering virtualization, and provides deterministic spatial keyboard/D-pad focus.
 
 Home consumes the subscription-backed `media_center.library_state` snapshot. Favorites, recent state, catalog revision, and partial-agent status therefore converge across browsers in the same webspace without synchronizing the full catalog. Folder navigation remains an alternative first-class workflow.
@@ -12,7 +14,7 @@ Selecting an item, collection, folder, or playlist opens the playback modal. `bu
 
 The Remote modal is a controller surface for another webspace or TV. It lists registered playback targets, observes `media_control.now_playing`, and sends revision-safe transport intents through `media_control_skill`. A phone does not enter the media byte path.
 
-Settings contains library roots, scan/import operations, profile playback defaults, and distributed deployment status. Folder import and scan calls have a ten-minute client budget and return asynchronous agent jobs when the distributed agent is active. Images remain disabled by policy. Original media bytes stay at their source paths; `.adaos` stores references, catalog state, jobs, and playback state only.
+Settings contains library roots, scan/import operations, profile/access policy, playback defaults, metadata operations, agent resource/watch status, QoE, diagnostics, and distributed deployment administration. Operators create a reviewed all-matching placement plan, explicitly apply its digest, and separately drain or remove an activation through public deployment tools. Folder import and scan calls have a ten-minute client budget and return asynchronous agent jobs when the distributed agent is active. Images remain disabled by policy. Original media bytes stay at their source paths; `.adaos` stores references, catalog state, jobs, and playback state only.
 
 ## Ownership
 

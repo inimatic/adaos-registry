@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.6.0
+version: 0.6.1
 description: Distributed Media Center coordinator with bounded catalog, collection, personalization, and playback projections.
 supported_locales:
 - en
@@ -1109,6 +1109,36 @@ data_routes:
     max_request_hz: 1
     preserve_last_value: true
     invalidation_tags: [media_center.deployment]
+- surface: widget:media-center-profile
+  route: tool/details
+  tool: get_profile
+  owner: skill:media_center_skill
+  first_paint: selected profile and effective access policy
+  recovery: repeat get_profile after a profile policy mutation
+  guard_visibility: selected profile policy without another profile's history
+  budget: {max_payload_bytes: 65536, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, state_dependency_changed, targeted_invalidation]
+    cache_ttl_ms: 0
+    max_request_hz: 2
+    preserve_last_value: true
+    invalidation_tags: [media_center.profile]
+- surface: widget:media-center-operations
+  route: tool
+  tool: operations
+  owner: skill:media_center_skill
+  first_paint: bounded recent enrichment and rendition operations
+  recovery: repeat operations after an operation invalidation
+  guard_visibility: sanitized operation phases and machine error codes
+  budget: {max_payload_bytes: 262144, max_items: 30, snapshot_policy: manual}
+  read_policy:
+    mode: explicit
+    triggers: [mount, explicit_refresh, targeted_invalidation]
+    cache_ttl_ms: 1000
+    max_request_hz: 1
+    preserve_last_value: true
+    invalidation_tags: [media_center.operations]
 - surface: media-center catalog store
   route: skill-local
   path: data/db/media_center.sqlite3

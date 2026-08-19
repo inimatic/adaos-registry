@@ -9,6 +9,7 @@ import yaml
 SCENARIO_ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = SCENARIO_ROOT.parents[1] / "skills" / "media_center_skill"
 CONTROL_SKILL_ROOT = SCENARIO_ROOT.parents[1] / "skills" / "media_control_skill"
+AGENT_SKILL_ROOT = SCENARIO_ROOT.parents[1] / "skills" / "media_library_agent"
 
 
 def _walk_dicts(node: object) -> list[dict]:
@@ -67,6 +68,9 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert {
         "media-center-header",
         "media-profile-selector",
+        "media-mobile-now-playing",
+        "media-mobile-targets",
+        "media-mobile-transport",
         "media-section-navigation",
         "media-view-mode",
         "media-search",
@@ -122,6 +126,27 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
         "scope": "workspace",
     }
     assert widgets["media-profile-selector"]["inputs"]["selectedStateKey"] == "profileId"
+    assert page["presentation"]["profileStateKey"] == "surfaceProfile"
+    assert set(page["presentation"]["profiles"]) == {
+        "desktop", "tv", "mobile_control", "embedded",
+    }
+    assert page["presentation"]["profiles"]["tv"] == {
+        "inputMode": "dpad",
+        "density": "ten_foot",
+        "overscanPx": 36,
+        "maxContentWidthPx": 1920,
+    }
+    assert page["initialStateQuery"]["map"] == {
+        "surfaceProfile": "presentation_profile",
+        "sharedSurface": "shared_surface",
+    }
+    assert widgets["media-mobile-now-playing"]["visibleIf"] == (
+        "$state.surfaceProfile == 'mobile_control'"
+    )
+    assert widgets["media-mobile-targets"]["dataSource"]["name"] == (
+        "media_control_skill.list_targets"
+    )
+    assert len(widgets["media-mobile-transport"]["actions"]) == 5
 
 
 def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
@@ -154,6 +179,14 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-roots-table",
         "media-autoplay-settings",
         "media-fullscreen-settings",
+        "media-profile-policy",
+        "media-metadata-operations",
+        "media-agent-performance",
+        "media-playback-qoe",
+        "media-deployment-plan-actions",
+        "media-deployment-plan-digest",
+        "media-deployment-activation",
+        "media-deployment-agent-actions",
         "media-deployment-status",
     } <= settings_ids
     roots = next(
@@ -193,6 +226,9 @@ def test_media_center_skill_data_sources_match_data_route_read_policies() -> Non
         ),
         "media_control_skill": yaml.safe_load(
             (CONTROL_SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8")
+        ),
+        "media_library_agent": yaml.safe_load(
+            (AGENT_SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8")
         ),
     }
     policies = {

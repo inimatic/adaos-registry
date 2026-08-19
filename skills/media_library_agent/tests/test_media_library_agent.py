@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sys
 import time
+import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -13,10 +14,17 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
-from handlers import main  # noqa: E402
 from media_library_agent.repository import MediaLibraryAgentRepository  # noqa: E402
 from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
+
+
+_HANDLER_SPEC = importlib.util.spec_from_file_location(
+    "media_library_agent_handlers_main", SKILL_ROOT / "handlers" / "main.py"
+)
+assert _HANDLER_SPEC and _HANDLER_SPEC.loader
+main = importlib.util.module_from_spec(_HANDLER_SPEC)
+_HANDLER_SPEC.loader.exec_module(main)
 
 
 @pytest.fixture(autouse=True)

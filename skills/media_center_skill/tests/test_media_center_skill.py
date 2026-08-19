@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import time
+import importlib.util
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,11 +13,18 @@ SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
-from handlers import main  # noqa: E402
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
 from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
+
+
+_HANDLER_SPEC = importlib.util.spec_from_file_location(
+    "media_center_skill_handlers_main", SKILL_ROOT / "handlers" / "main.py"
+)
+assert _HANDLER_SPEC and _HANDLER_SPEC.loader
+main = importlib.util.module_from_spec(_HANDLER_SPEC)
+_HANDLER_SPEC.loader.exec_module(main)
 
 
 def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") -> dict:

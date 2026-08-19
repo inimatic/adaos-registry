@@ -40,6 +40,10 @@ def test_media_center_project_is_a_complete_distribution_boundary() -> None:
         "remote",
         "embedded",
     }
+    bindings = {item["id"]: item["bindings"] for item in manifest["entrypoints"]}
+    assert bindings["tv"]["presentation_profile"] == "tv"
+    assert bindings["tv"]["shared_surface"] is True
+    assert bindings["remote"]["presentation_profile"] == "mobile_control"
     assert manifest["lifecycle"]["uninstall"]["runtime_data"] == "retain"
     assert manifest["lifecycle"]["uninstall"]["source_artifacts"] == "retain"
 

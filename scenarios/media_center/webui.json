@@ -29,13 +29,41 @@
             "selectedPlaybackTargetId": "",
             "autoplay": true,
             "autoFullscreen": true,
+            "deploymentReleaseDigest": "",
+            "deploymentSubnetId": "",
+            "deploymentCoordinatorNodeId": "",
+            "deploymentExpectedRevision": 0,
+            "deploymentPlanDigest": "",
+            "deploymentActivationId": "",
             "sharedSurface": false,
             "surfaceProfile": "desktop"
+          },
+          "initialStateQuery": {
+            "map": {
+              "surfaceProfile": "presentation_profile",
+              "sharedSurface": "shared_surface"
+            }
+          },
+          "presentation": {
+            "profileStateKey": "surfaceProfile",
+            "defaultProfile": "desktop",
+            "profiles": {
+              "desktop": {"inputMode": "pointer_keyboard", "density": "compact", "overscanPx": 0, "maxContentWidthPx": 1440},
+              "tv": {"inputMode": "dpad", "density": "ten_foot", "overscanPx": 36, "maxContentWidthPx": 1920},
+              "mobile_control": {"inputMode": "touch", "density": "comfortable", "overscanPx": 0, "maxContentWidthPx": 720},
+              "embedded": {"inputMode": "embedded", "density": "compact", "overscanPx": 0, "maxContentWidthPx": 960}
+            }
           },
           "layout": {
             "type": "single",
             "pattern": "stack",
-            "areas": [{"id": "main", "role": "main", "label": "Media Center"}]
+            "areas": [{"id": "main", "role": "main", "label": "Media Center"}],
+            "variants": [
+              {"id": "tv", "when": "$state.surfaceProfile == 'tv'", "type": "single", "pattern": "stack", "areas": [{"id": "main", "role": "main", "label": "Media Center TV"}]},
+              {"id": "mobile-control", "when": "$state.surfaceProfile == 'mobile_control'", "type": "single", "pattern": "stack", "areas": [{"id": "main", "role": "main", "label": "Media Center Remote"}]},
+              {"id": "embedded", "when": "$state.surfaceProfile == 'embedded'", "type": "single", "pattern": "stack", "areas": [{"id": "main", "role": "main", "label": "Media Center Embedded"}]},
+              {"id": "desktop", "default": true, "type": "single", "pattern": "stack", "areas": [{"id": "main", "role": "main", "label": "Media Center"}]}
+            ]
           },
           "widgets": [
             {
@@ -43,6 +71,7 @@
               "type": "ui.actions",
               "area": "main",
               "title": "Media Center",
+              "visibleIf": "$state.surfaceProfile == 'desktop' || $state.surfaceProfile == 'embedded'",
               "inputs": {
                 "variant": "toolbar",
                 "size": "small",
@@ -54,6 +83,41 @@
               "actions": [
                 {"on": "click:remote", "type": "openModal", "params": {"modalId": "media_center_remote"}},
                 {"on": "click:settings", "type": "openModal", "params": {"modalId": "media_center_settings"}}
+              ]
+            },
+            {
+              "id": "media-mobile-now-playing",
+              "type": "item.details",
+              "area": "main",
+              "title": "Now Playing",
+              "visibleIf": "$state.surfaceProfile == 'mobile_control'",
+              "dataSource": {"kind": "stream", "receiver": "media_control.now_playing", "path": "items.0", "params": {"profile_id": "$state.profileId"}, "scope": "workspace", "invalidationTags": ["media_control.sessions"]},
+              "inputs": {"presentation": "body"}
+            },
+            {
+              "id": "media-mobile-targets",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Playback target",
+              "visibleIf": "$state.surfaceProfile == 'mobile_control'",
+              "dataSource": {"kind": "skill", "name": "media_control_skill.list_targets", "params": {"limit": 20}, "cacheTtlMs": 1000, "invalidationTags": ["media_control.targets"], "preserveLastValue": true, "maxRequestHz": 1},
+              "inputs": {"itemKey": "id", "primaryKey": "label", "secondaryKey": "kind", "emptyText": "No playback targets are available."},
+              "collection": {"display": "list", "focusGroup": "media-mobile-targets", "virtualized": true, "cursor": {"enabled": false, "stateKey": "mediaCursor"}},
+              "actions": [{"on": "select", "type": "updateState", "params": {"selectedPlaybackTargetId": "$event.id"}}]
+            },
+            {
+              "id": "media-mobile-transport",
+              "type": "ui.actions",
+              "area": "main",
+              "title": "Transport",
+              "visibleIf": "$state.surfaceProfile == 'mobile_control'",
+              "inputs": {"variant": "toolbar", "buttons": [{"id": "previous", "icon": "play-skip-back-outline", "label": "Previous"}, {"id": "play", "icon": "play-outline", "label": "Play"}, {"id": "pause", "icon": "pause-outline", "label": "Pause"}, {"id": "next", "icon": "play-skip-forward-outline", "label": "Next"}, {"id": "stop", "icon": "stop-outline", "label": "Stop"}]},
+              "actions": [
+                {"on": "click:previous", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "previous", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
+                {"on": "click:play", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "play", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
+                {"on": "click:pause", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "pause", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
+                {"on": "click:next", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "next", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
+                {"on": "click:stop", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "stop", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]}
               ]
             },
             {
@@ -111,6 +175,7 @@
               "id": "media-view-mode",
               "type": "ui.actions",
               "area": "main",
+              "visibleIf": "$state.surfaceProfile != 'mobile_control'",
               "inputs": {
                 "variant": "segmented",
                 "size": "small",
@@ -448,6 +513,99 @@
                   {"on": "click:off", "type": "callSkill", "target": "media_control_skill.set_settings", "params": {"profile_id": "$state.profileId", "values": {"auto_fullscreen": false}}, "invalidates": ["media_control.settings"]},
                   {"on": "click:off", "type": "updateState", "params": {"autoFullscreen": false}}
                 ]
+              },
+              {
+                "id": "media-profile-policy",
+                "type": "item.details",
+                "area": "main",
+                "title": "Profiles and access",
+                "dataSource": {"kind": "skill", "name": "media_center_skill.get_profile", "params": {"profile_id": "$state.profileId"}, "cacheTtlMs": 0, "invalidationTags": ["media_center.profile"], "preserveLastValue": true, "maxRequestHz": 2},
+                "inputs": {"presentation": "body"}
+              },
+              {
+                "id": "media-metadata-operations",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Metadata operations",
+                "dataSource": {"kind": "skill", "name": "media_center_skill.operations", "params": {"limit": 30}, "cacheTtlMs": 1000, "invalidationTags": ["media_center.operations"], "preserveLastValue": true, "maxRequestHz": 1},
+                "inputs": {"itemKey": "id", "primaryKey": "kind", "secondaryKey": "status", "metaKey": "error_code", "emptyText": "No background operations."},
+                "collection": {"display": "list", "focusGroup": "media-metadata-operations", "virtualized": true, "cursor": {"enabled": false, "stateKey": "mediaCursor"}}
+              },
+              {
+                "id": "media-agent-performance",
+                "type": "item.details",
+                "area": "main",
+                "title": "Storage and performance",
+                "dataSource": {"kind": "skill", "name": "media_library_agent.status", "params": {}, "cacheTtlMs": 1000, "invalidationTags": ["media_center.agent"], "preserveLastValue": true, "maxRequestHz": 1},
+                "inputs": {"presentation": "body"}
+              },
+              {
+                "id": "media-playback-qoe",
+                "type": "item.details",
+                "area": "main",
+                "title": "Playback diagnostics",
+                "dataSource": {"kind": "skill", "name": "media_control_skill.qoe_summary", "params": {"limit": 30}, "cacheTtlMs": 1000, "invalidationTags": ["media_control.qoe"], "preserveLastValue": true, "maxRequestHz": 1},
+                "inputs": {"presentation": "body"}
+              },
+              {
+                "id": "media-deployment-release",
+                "type": "input.text",
+                "area": "main",
+                "title": "Project release digest",
+                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentReleaseDigest"}},
+                "inputs": {"placeholder": "sha256:...", "initialValue": "", "commitMode": "manual", "saveLabel": "Use release"},
+                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentReleaseDigest": "$event.value"}}]
+              },
+              {
+                "id": "media-deployment-subnet",
+                "type": "input.text",
+                "area": "main",
+                "title": "Target subnet",
+                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentSubnetId"}},
+                "inputs": {"placeholder": "home", "initialValue": "", "commitMode": "manual", "saveLabel": "Use subnet"},
+                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentSubnetId": "$event.value"}}]
+              },
+              {
+                "id": "media-deployment-coordinator",
+                "type": "input.text",
+                "area": "main",
+                "title": "Coordinator node",
+                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentCoordinatorNodeId"}},
+                "inputs": {"placeholder": "node-id", "initialValue": "", "commitMode": "manual", "saveLabel": "Use node"},
+                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentCoordinatorNodeId": "$event.value"}}]
+              },
+              {
+                "id": "media-deployment-plan-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "title": "Nodes and agents",
+                "inputs": {"variant": "toolbar", "buttons": [{"id": "plan", "label": "Plan deployment", "icon": "git-network-outline"}]},
+                "actions": [{"on": "click:plan", "type": "callSkill", "target": "media_center_skill.configure_deployment", "params": {"release_digest": "$state.deploymentReleaseDigest", "subnet_id": "$state.deploymentSubnetId", "coordinator_node_id": "$state.deploymentCoordinatorNodeId", "all_matching_agents": true, "expected_revision": "$state.deploymentExpectedRevision", "reason": "Media Center settings"}, "invalidates": ["media_center.deployment"]}]
+              },
+              {
+                "id": "media-deployment-plan-digest",
+                "type": "input.text",
+                "area": "main",
+                "title": "Reviewed plan digest",
+                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentPlanDigest"}},
+                "inputs": {"placeholder": "sha256:...", "initialValue": "", "commitMode": "manual", "saveLabel": "Apply plan"},
+                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentPlanDigest": "$event.value"}}, {"on": "change", "type": "callSkill", "target": "media_center_skill.apply_deployment", "params": {"plan_digest": "$event.value"}, "invalidates": ["media_center.deployment"]}]
+              },
+              {
+                "id": "media-deployment-activation",
+                "type": "input.text",
+                "area": "main",
+                "title": "Agent activation",
+                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentActivationId"}},
+                "inputs": {"placeholder": "activation-id", "initialValue": "", "commitMode": "manual", "saveLabel": "Select activation"},
+                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentActivationId": "$event.value"}}]
+              },
+              {
+                "id": "media-deployment-agent-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {"variant": "toolbar", "buttons": [{"id": "drain", "label": "Drain", "icon": "pause-circle-outline"}, {"id": "remove", "label": "Remove", "icon": "trash-outline", "kind": "danger"}]},
+                "actions": [{"on": "click:drain", "type": "callSkill", "target": "media_center_skill.drain_activation", "params": {"activation_id": "$state.deploymentActivationId"}, "invalidates": ["media_center.deployment"]}, {"on": "click:remove", "type": "callSkill", "target": "media_center_skill.remove_activation", "params": {"activation_id": "$state.deploymentActivationId"}, "invalidates": ["media_center.deployment"]}]
               },
               {
                 "id": "media-deployment-status",
