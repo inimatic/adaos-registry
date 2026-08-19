@@ -18,6 +18,50 @@ def _dict(value: Any) -> dict[str, Any]:
 class MediaCenterTopology:
     """Media policy projected over public deployment and distributed SDKs."""
 
+    def agent_instances(self, *, limit: int = 100) -> list[dict[str, Any]]:
+        """Return ready library agents without exposing core runtime internals."""
+
+        bounded = max(1, min(int(limit or 100), 1000))
+        cursor: str | None = None
+        instances: list[dict[str, Any]] = []
+        while len(instances) < bounded:
+            inspection = distributed_sdk.inspect(
+                cursors={"instances": cursor} if cursor else None,
+                limit=min(100, bounded - len(instances)),
+            )
+            for instance in inspection.instances:
+                if instance.component_ref != "skill:media_library_agent":
+                    continue
+                if instance.status != "ready" or not instance.readiness:
+                    continue
+                instances.append(instance.to_dict())
+                if len(instances) >= bounded:
+                    break
+            cursor = inspection.cursors.get("instances")
+            if not cursor:
+                break
+        return instances
+
+    def invoke_agent(
+        self,
+        instance_id: str,
+        operation: str,
+        arguments: Mapping[str, Any] | None = None,
+        *,
+        timeout_seconds: float = 30.0,
+        request_id: str = "",
+    ) -> dict[str, Any]:
+        result = distributed_sdk.invoke(
+            instance_id,
+            operation,
+            arguments or {},
+            request_id=request_id or f"media-center-agent-{uuid4().hex}",
+            timeout_seconds=max(1.0, min(float(timeout_seconds), 600.0)),
+        )
+        if not isinstance(result, Mapping):
+            raise RuntimeError("media_library_agent_invalid_response")
+        return dict(result)
+
     def deployment_status(self, deployment_id: str = DEPLOYMENT_ID, *, limit: int = 50) -> dict[str, Any]:
         try:
             inspection = deployment_sdk.inspect(deployment_id, limit=max(1, min(int(limit), 100)))

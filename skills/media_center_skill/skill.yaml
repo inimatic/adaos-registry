@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.2.1
+version: 0.3.0
 description: Distributed Media Center coordinator with bounded catalog, collection, personalization, and playback projections.
 supported_locales:
 - en
@@ -24,10 +24,15 @@ capabilities:
 - distributed.service.manage
 - distributed.topology.manage
 - distributed.topology.inspect
+- distributed.service.invoke
 dependencies: []
 events:
-  subscribe: []
-  publish: []
+  subscribe:
+  - sys.ready
+  - webio.stream.snapshot.requested
+  - media_library_agent.catalog.changed
+  publish:
+  - io.out.stream.publish
 lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
@@ -585,6 +590,27 @@ tools:
   output_schema:
     type: object
 data_routes:
+- surface: app-shell:media-library
+  route: stream
+  receiver: media_center.library_state
+  owner: skill:media_center_skill
+  first_paint: bounded empty home shelves and catalog revision
+  recovery: rehydrate durable catalog and request a fresh stream snapshot
+  update_source:
+  - media_center_skill.sync_agent
+  - media_center_skill.set_favorite
+  - media_center_skill.save_checkpoint
+  - media_library_agent.catalog.changed
+  - webio.stream.snapshot.requested
+  budget:
+    max_payload_bytes: 524288
+    max_publish_hz: 2
+    max_items: 50
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: preserve the last revision and mark shard participation partial
+    log: skill:media_center_skill.runtime
+    quarantine: false
 - surface: widget:media-center-summary
   route: tool/details
   tool: status

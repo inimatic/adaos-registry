@@ -10,15 +10,15 @@
 
 The coordinator derives explicit `MediaSource`, `MediaVariant`, `MediaWork`, `MediaCollection`, and membership rows. Current deterministic grouping covers series episodes, albums, audiobooks, and source folders. Duplicate results are review candidates only and never authorize source deletion. Enrichment, technical probes, fingerprints, thumbnails, and embeddings are represented as observable background jobs rather than blocking catalog reads.
 
-Agent availability is independent from known catalog identity. Reads retain known rows but report `partial=true` when an expected agent is stale or unavailable. Every applied source revision advances a catalog revision, and replayed agent deltas are ignored idempotently.
+Agent availability is independent from known catalog identity. The coordinator discovers ready `skill:media_library_agent` service instances through `adaos.sdk.distributed`, invokes each exact instance through the public service boundary, and stores one cursor per instance/agent binding. Reads retain known rows but report `partial=true` when an expected instance is stale, missing, or unavailable. Every applied source revision advances a catalog revision, and replayed agent deltas are ignored idempotently.
 
 ## Personal State
 
-Favorites, recent playback, resume positions, and completion are keyed by `profile_id`. Mutations return targeted invalidation tags so multiple browsers in one webspace can refresh the same profile projection without publishing a full catalog into synchronized state.
+Favorites, recent playback, resume positions, and completion are keyed by `profile_id`. Mutations publish the bounded replace-mode `media_center.library_state` stream with catalog and personal revisions, participation, home shelves, and recent operations. Multiple browsers can therefore converge without putting a full catalog into synchronized state. The stream supports snapshot replay after reconnect.
 
 ## Compatibility
 
-The old root and Media Server discovery methods remain compatibility fallbacks when `media_library_agent` is not installed or the handler is exercised outside an AdaOS skill context. In a Project deployment, root and scan commands are delegated to the agent and return asynchronous job identifiers.
+The local public-tool invocation and old Media Server discovery methods remain bounded compatibility fallbacks when no distributed agent instance is registered or the handler is exercised outside an AdaOS skill context. In a Project deployment, exact service-instance invocation is authoritative; root and scan commands return asynchronous job identifiers.
 
 ## User-Facing Errors
 

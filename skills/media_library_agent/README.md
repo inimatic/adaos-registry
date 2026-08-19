@@ -12,6 +12,7 @@ Media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.
 - One background scan runs per agent process. Duplicate requests for a root resolve to the active job.
 - Jobs survive process restart. The service requeues interrupted work and incremental fingerprints avoid re-registering unchanged files.
 - Progress is persisted and published as the bounded replace-mode stream variable `media_library_agent.current_scan` at no more than 2 Hz.
+- Terminal job transitions publish `media_library_agent.catalog.changed`, allowing the coordinator to pull bounded deltas without polling from the browser.
 - `set_resource_pressure(playback)` pauses scanning so playback retains priority.
 - Images are excluded unless enabled for a root. Symlinks are not followed by default; exclusions and periodic reconciliation are root policy.
 

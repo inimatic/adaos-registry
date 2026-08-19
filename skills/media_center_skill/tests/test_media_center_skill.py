@@ -553,3 +553,96 @@ def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkey
     assert placements["skill:media_library_agent"].mode == "co_located_with"
     assert placements["skill:media_library_agent"].co_located_with == "skill:media_center_skill"
     assert captured["expected_revision"] == 0
+
+
+def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+
+    class FakeTopology:
+        active = ["instance-a", "instance-b"]
+
+        def agent_instances(self, *, limit=100):
+            return [
+                {
+                    "instance_id": instance_id,
+                    "node_id": instance_id.replace("instance", "node"),
+                }
+                for instance_id in self.active[:limit]
+            ]
+
+        def invoke_agent(
+            self,
+            instance_id,
+            operation,
+            arguments,
+            *,
+            timeout_seconds,
+        ):
+            assert operation == "pull_deltas"
+            suffix = "a" if instance_id.endswith("a") else "b"
+            page = _agent_page(
+                _agent_delta(
+                    1,
+                    f"Library {suffix.upper()}/track-{suffix}.mp3",
+                )
+            )
+            page["agent"] = {"id": f"agent-{suffix}", "node_id": f"node-{suffix}"}
+            page["next_cursor"] = f"cursor-{suffix}"
+            for delta in page["items"]:
+                delta["agent_id"] = f"agent-{suffix}"
+                delta["node_id"] = f"node-{suffix}"
+            return page
+
+    topology = FakeTopology()
+    monkeypatch.setattr(main, "_topology", lambda: topology)
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+
+    first = main._sync_agents(catalog, max_pages=2, limit=100)
+    topology.active = ["instance-a"]
+    second = main._sync_agents(catalog, max_pages=1, limit=100)
+
+    assert first["ok"] is True
+    assert first["mode"] == "distributed"
+    assert first["agent_count"] == 2
+    assert catalog.agent_binding("instance-a")["cursor"] == "cursor-a"
+    assert catalog.agent_binding("instance-b")["cursor"] == "cursor-b"
+    assert second["participation"]["partial"] is True
+    assert second["participation"]["unavailable_agent_ids"] == ["agent-b"]
+
+
+def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/track.mp3")))
+    item_id = catalog.list_items(media_kind="audio")["items"][0]["id"]
+    published = []
+
+    import adaos.sdk.io as sdk_io
+
+    monkeypatch.setattr(
+        sdk_io,
+        "stream_variable_publish",
+        lambda receiver, value, **kwargs: published.append(
+            (receiver, value, kwargs)
+        ),
+    )
+    monkeypatch.setattr(main, "_coordinator", lambda repository=None: catalog)
+
+    result = main.set_favorite(
+        item_id=item_id,
+        profile_id="alice",
+        favorite=True,
+        webspace_id="desktop",
+    )
+
+    assert result["ok"] is True
+    assert published[-1][0] == "media_center.library_state"
+    assert published[-1][1]["profile_id"] == "alice"
+    assert published[-1][1]["personal_revision"] == 1
+    assert published[-1][2]["_meta"] == {"webspace_id": "desktop"}

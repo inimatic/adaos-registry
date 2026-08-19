@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 
-from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data.i18n import _
 
 
@@ -40,6 +40,48 @@ def _coordinator(repository: MediaCenterRepository | None = None) -> MediaCatalo
 
 def _topology() -> MediaCenterTopology:
     return MediaCenterTopology()
+
+
+def _event_payload(event: Any) -> dict[str, Any]:
+    if isinstance(event, Mapping):
+        nested = event.get("payload")
+        return dict(nested) if isinstance(nested, Mapping) else dict(event)
+    nested = getattr(event, "payload", None)
+    return dict(nested) if isinstance(nested, Mapping) else {}
+
+
+def _publish_library_snapshot(
+    catalog: MediaCatalogCoordinator,
+    *,
+    profile_id: str = "default",
+    webspace_id: str = "",
+) -> None:
+    try:
+        from adaos.sdk.io import stream_variable_publish
+
+        profile = str(profile_id or "default").strip() or "default"
+        snapshot = {
+            "schema": "adaos.media_center.library_state.v1",
+            "profile_id": profile,
+            "catalog_revision": catalog.catalog_revision(),
+            "personal_revision": catalog.profile_revision(profile),
+            "participation": catalog.participation(),
+            "home": catalog.home(profile_id=profile, limit=8),
+            "operations": catalog.operations(limit=10),
+        }
+        stream_variable_publish(
+            "media_center.library_state",
+            snapshot,
+            var_id=f"media_center.library.{profile}",
+            seq=max(
+                int(snapshot["catalog_revision"]),
+                int(snapshot["personal_revision"]),
+            ),
+            ttl_ms=120000,
+            _meta={"webspace_id": webspace_id} if webspace_id else None,
+        )
+    except Exception:
+        return
 
 
 def _invoke_agent(operation: str, arguments: Mapping[str, Any] | None = None, *, timeout: float = 15.0) -> tuple[dict[str, Any] | None, str]:
@@ -230,7 +272,12 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
 def rehydrate(**_: Any) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
-    sync = _sync_local_agent(catalog, max_pages=4)
+    sync = _sync_agents(catalog, max_pages=4)
+    _publish_library_snapshot(
+        catalog,
+        profile_id=str(_.get("profile_id") or "default"),
+        webspace_id=str(_.get("webspace_id") or ""),
+    )
     return {
         "ok": True,
         "schema": COORDINATOR_SCHEMA,
@@ -241,35 +288,60 @@ def rehydrate(**_: Any) -> dict[str, Any]:
     }
 
 
-def _sync_local_agent(catalog: MediaCatalogCoordinator, *, max_pages: int = 4, limit: int = 500) -> dict[str, Any]:
+def _sync_one_agent(
+    catalog: MediaCatalogCoordinator,
+    *,
+    instance: Mapping[str, Any] | None,
+    max_pages: int,
+    limit: int,
+) -> dict[str, Any]:
     pages = max(1, min(16, int(max_pages or 4)))
     page_limit = max(1, min(1000, int(limit or 500)))
-    cursor = catalog.agent_cursor("agent_local")
+    instance_id = str((instance or {}).get("instance_id") or "")
+    node_id = str((instance or {}).get("node_id") or "")
+    binding = catalog.agent_binding(instance_id) if instance_id else None
+    actual_agent_id = str((binding or {}).get("agent_id") or "")
+    cursor = str((binding or {}).get("cursor") or "")
     applied = ignored = removed = 0
-    actual_agent_id = ""
     for _index in range(pages):
-        page, error = _invoke_agent("pull_deltas", {"cursor": cursor, "limit": page_limit}, timeout=20.0)
+        if instance_id:
+            try:
+                page = _topology().invoke_agent(
+                    instance_id,
+                    "pull_deltas",
+                    {"cursor": cursor, "limit": page_limit},
+                    timeout_seconds=30.0,
+                )
+                error = ""
+            except Exception as exc:
+                page, error = None, str(exc)
+        else:
+            page, error = _invoke_agent(
+                "pull_deltas",
+                {"cursor": cursor, "limit": page_limit},
+                timeout=30.0,
+            )
         if page is None:
             if actual_agent_id:
-                catalog.mark_agent_unavailable(actual_agent_id, reason=error or "agent_unavailable")
+                catalog.mark_agent_unavailable(
+                    actual_agent_id,
+                    node_id=node_id,
+                    reason=error or "agent_unavailable",
+                )
             return {
                 "ok": False,
                 "error": "media_library_agent_unavailable",
                 "detail": error[:1000],
                 "applied_count": applied,
                 "retryable": True,
+                "instance_id": instance_id,
+                "node_id": node_id,
             }
         if not page.get("ok"):
             return {**page, "applied_count": applied}
         agent = page.get("agent") if isinstance(page.get("agent"), Mapping) else {}
         actual_agent_id = str(agent.get("id") or "")
-        if actual_agent_id and not cursor:
-            cursor = catalog.agent_cursor(actual_agent_id)
-            if cursor:
-                page, error = _invoke_agent("pull_deltas", {"cursor": cursor, "limit": page_limit}, timeout=20.0)
-                if page is None:
-                    return {"ok": False, "error": "media_library_agent_unavailable", "detail": error[:1000], "retryable": True}
-        result = catalog.apply_agent_page(page)
+        result = catalog.apply_agent_page(page, instance_id=instance_id)
         if not result.get("ok"):
             return result
         applied += int(result.get("applied_count") or 0)
@@ -286,6 +358,8 @@ def _sync_local_agent(catalog: MediaCatalogCoordinator, *, max_pages: int = 4, l
                 "removed_count": removed,
                 "has_more": False,
                 "next_cursor": cursor,
+                "instance_id": instance_id,
+                "node_id": node_id or str(agent.get("node_id") or ""),
             }
     return {
         "ok": True,
@@ -297,12 +371,103 @@ def _sync_local_agent(catalog: MediaCatalogCoordinator, *, max_pages: int = 4, l
         "has_more": True,
         "next_cursor": cursor,
         "bounded": True,
+        "instance_id": instance_id,
+        "node_id": node_id,
     }
 
 
-@tool(summary="Pull bounded idempotent deltas from the local library agent.", side_effects="local_write")
+def _sync_agents(
+    catalog: MediaCatalogCoordinator, *, max_pages: int = 4, limit: int = 500
+) -> dict[str, Any]:
+    topology_error = ""
+    try:
+        instances = _topology().agent_instances(limit=100)
+    except Exception as exc:
+        instances = []
+        topology_error = str(exc)
+    if instances:
+        catalog.reconcile_agent_instances(
+            str(item.get("instance_id") or "") for item in instances
+        )
+        results = [
+            _sync_one_agent(
+                catalog,
+                instance=instance,
+                max_pages=max_pages,
+                limit=limit,
+            )
+            for instance in instances
+        ]
+        return {
+            "ok": all(bool(item.get("ok")) for item in results),
+            "schema": COORDINATOR_SCHEMA,
+            "mode": "distributed",
+            "agents": results,
+            "agent_count": len(results),
+            "applied_count": sum(int(item.get("applied_count") or 0) for item in results),
+            "has_more": any(bool(item.get("has_more")) for item in results),
+            "participation": catalog.participation(),
+        }
+    local = _sync_one_agent(
+        catalog,
+        instance=None,
+        max_pages=max_pages,
+        limit=limit,
+    )
+    return {
+        **local,
+        "mode": "local_compatibility",
+        "topology_error": topology_error[:300],
+        "agents": [local],
+        "agent_count": int(bool(local.get("agent_id"))),
+        "participation": catalog.participation(),
+    }
+
+
+@subscribe("sys.ready")
+def on_sys_ready(_: Any) -> None:
+    catalog = _coordinator()
+    _sync_agents(catalog, max_pages=4, limit=1000)
+    _publish_library_snapshot(catalog)
+
+
+@subscribe(
+    "webio.stream.snapshot.requested",
+    receivers=("media_center.library_state",),
+)
+def on_library_snapshot_requested(event: Any) -> None:
+    payload = _event_payload(event)
+    if str(payload.get("receiver") or "") != "media_center.library_state":
+        return
+    _publish_library_snapshot(
+        _coordinator(),
+        profile_id=str(payload.get("profile_id") or "default"),
+        webspace_id=str(payload.get("webspace_id") or ""),
+    )
+
+
+@subscribe("media_library_agent.catalog.changed")
+def on_agent_catalog_changed(event: Any) -> None:
+    payload = _event_payload(event)
+    catalog = _coordinator()
+    _sync_agents(catalog, max_pages=8, limit=1000)
+    _publish_library_snapshot(
+        catalog,
+        profile_id=str(payload.get("profile_id") or "default"),
+        webspace_id=str(payload.get("webspace_id") or ""),
+    )
+
+
+@tool(summary="Pull bounded idempotent deltas from ready library agents.", side_effects="local_write")
 def sync_agent(max_pages: int = 4, limit: int = 500, **_: Any) -> dict[str, Any]:
-    return _sync_local_agent(_coordinator(), max_pages=max_pages, limit=limit)
+    catalog = _coordinator()
+    result = _sync_agents(catalog, max_pages=max_pages, limit=limit)
+    _publish_library_snapshot(
+        catalog,
+        profile_id=str(_.get("profile_id") or "default"),
+        webspace_id=str(_.get("webspace_id") or ""),
+    )
+    return result
 
 
 @tool(summary="Scan core-backed media resources into the media-center catalog.", side_effects="local_write")
@@ -546,7 +711,7 @@ def library(
     agent_sync: dict[str, Any] | None = None
     summary = repo.summary()
     if _bool(auto_scan, True):
-        agent_sync = _sync_local_agent(catalog, max_pages=2, limit=500)
+        agent_sync = _sync_agents(catalog, max_pages=1, limit=500)
         if not agent_sync.get("ok") and int(summary.get("total_count") or 0) == 0:
             scan = scan_sources(source="all", limit=5000)
     try:
@@ -666,7 +831,17 @@ def playback_plan(item_id: str = "", **_: Any) -> dict[str, Any]:
 @tool(summary="Mark or unmark one media-center item as favorite.", side_effects="local_write")
 def set_favorite(item_id: str = "", favorite: bool = True, **_: Any) -> dict[str, Any]:
     profile_id = str(_.get("profile_id") or "default")
-    return _coordinator().set_favorite(item_id, profile_id=profile_id, favorite=_bool(favorite, True))
+    catalog = _coordinator()
+    result = catalog.set_favorite(
+        item_id, profile_id=profile_id, favorite=_bool(favorite, True)
+    )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
 
 
 @tool(summary="Return compact media-center catalog status.", side_effects="none")
@@ -835,13 +1010,21 @@ def save_checkpoint(
     completed: bool = False,
     **_: Any,
 ) -> dict[str, Any]:
-    return _coordinator().checkpoint(
+    catalog = _coordinator()
+    result = catalog.checkpoint(
         item_id,
         profile_id=profile_id,
         position_ms=position_ms,
         duration_ms=duration_ms,
         completed=_bool(completed, False),
     )
+    if result.get("ok"):
+        _publish_library_snapshot(
+            catalog,
+            profile_id=profile_id,
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
 
 
 @tool(summary="Queue background media enrichment or technical analysis.", side_effects="local_write")

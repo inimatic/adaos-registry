@@ -55,6 +55,21 @@ def _publish_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
             ttl_ms=120000,
             _meta=meta,
         )
+        if text(payload.get("status")) in {"completed", "canceled", "failed"}:
+            from adaos.sdk.data.events import publish as publish_event
+
+            publish_event(
+                "media_library_agent.catalog.changed",
+                {
+                    "schema": "adaos.media_library.catalog_changed.v1",
+                    "agent_id": text(payload.get("agent_id")),
+                    "node_id": text(payload.get("node_id")),
+                    "root_id": text(payload.get("root_id")),
+                    "job_id": text(payload.get("job_id")),
+                    "status": text(payload.get("status")),
+                },
+                source="media_library_agent",
+            )
     except Exception:
         return
 

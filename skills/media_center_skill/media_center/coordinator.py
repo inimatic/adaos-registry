@@ -175,6 +175,7 @@ class MediaCatalogCoordinator:
                 );
                 CREATE TABLE IF NOT EXISTS agent_catalog_state (
                     agent_id TEXT PRIMARY KEY,
+                    instance_id TEXT NOT NULL DEFAULT '',
                     node_id TEXT NOT NULL,
                     cursor TEXT NOT NULL DEFAULT '',
                     last_sequence INTEGER NOT NULL DEFAULT 0,
@@ -238,6 +239,16 @@ class MediaCatalogCoordinator:
                 );
                 """
             )
+            agent_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(agent_catalog_state)"
+                ).fetchall()
+            }
+            if "instance_id" not in agent_columns:
+                connection.execute(
+                    "ALTER TABLE agent_catalog_state ADD COLUMN instance_id TEXT NOT NULL DEFAULT ''"
+                )
             connection.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS catalog_search USING fts5(item_id UNINDEXED, text, tokenize='unicode61 remove_diacritics 2')"
             )
@@ -297,7 +308,9 @@ class MediaCatalogCoordinator:
         values.extend([_text(metadata.get("album")), _text(metadata.get("series")), _text(metadata.get("root_label"))])
         return " ".join(part for part in values if part)
 
-    def apply_agent_page(self, page: Mapping[str, Any]) -> dict[str, Any]:
+    def apply_agent_page(
+        self, page: Mapping[str, Any], *, instance_id: str = ""
+    ) -> dict[str, Any]:
         agent = page.get("agent") if isinstance(page.get("agent"), Mapping) else {}
         agent_id = _text(agent.get("id"))
         node_id = _text(agent.get("node_id"))
@@ -317,13 +330,21 @@ class MediaCatalogCoordinator:
             last_sequence = max([int(item.get("sequence") or 0) for item in items] or [0])
             connection.execute(
                 """
-                INSERT INTO agent_catalog_state(agent_id, node_id, cursor, last_sequence, availability, freshness, last_error, updated_at)
-                VALUES (?, ?, ?, ?, 'available', 'fresh', '', ?)
-                ON CONFLICT(agent_id) DO UPDATE SET node_id=excluded.node_id, cursor=excluded.cursor,
+                INSERT INTO agent_catalog_state(agent_id, instance_id, node_id, cursor, last_sequence, availability, freshness, last_error, updated_at)
+                VALUES (?, ?, ?, ?, ?, 'available', 'fresh', '', ?)
+                ON CONFLICT(agent_id) DO UPDATE SET instance_id=excluded.instance_id,
+                    node_id=excluded.node_id, cursor=excluded.cursor,
                     last_sequence=MAX(agent_catalog_state.last_sequence, excluded.last_sequence),
                     availability='available', freshness='fresh', last_error='', updated_at=excluded.updated_at
                 """,
-                (agent_id, node_id, _text(page.get("next_cursor")), last_sequence, now_iso()),
+                (
+                    agent_id,
+                    _text(instance_id),
+                    node_id,
+                    _text(page.get("next_cursor")),
+                    last_sequence,
+                    now_iso(),
+                ),
             )
             connection.commit()
         return {
@@ -539,6 +560,58 @@ class MediaCatalogCoordinator:
                 (_text(agent_id),),
             ).fetchone()
         return str(row["cursor"] or "") if row else ""
+
+    def agent_binding(self, instance_id: str) -> dict[str, Any] | None:
+        token = _text(instance_id)
+        if not token:
+            return None
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM agent_catalog_state WHERE instance_id=?",
+                (token,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def reconcile_agent_instances(
+        self, active_instance_ids: Iterable[str]
+    ) -> dict[str, Any]:
+        active = {_text(item) for item in active_instance_ids if _text(item)}
+        now = now_iso()
+        with self.repository.connect() as connection:
+            rows = connection.execute(
+                "SELECT agent_id, instance_id FROM agent_catalog_state WHERE instance_id<>''"
+            ).fetchall()
+            missing = [
+                str(row["agent_id"])
+                for row in rows
+                if str(row["instance_id"]) not in active
+            ]
+            for agent_id in missing:
+                connection.execute(
+                    """
+                    UPDATE agent_catalog_state
+                    SET availability='unavailable', freshness='stale',
+                        last_error='service_instance_not_ready', updated_at=?
+                    WHERE agent_id=?
+                    """,
+                    (now, agent_id),
+                )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "missing_agent_ids": missing,
+            "participation": self.participation(),
+        }
+
+    def profile_revision(self, profile_id: str) -> int:
+        profile = _text(profile_id) or "default"
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                "SELECT COALESCE(MAX(revision),0) AS revision FROM personal_media_state WHERE profile_id=?",
+                (profile,),
+            ).fetchone()
+        return int(row["revision"] or 0)
 
     def list_items(
         self,
