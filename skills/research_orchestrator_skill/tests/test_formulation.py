@@ -417,7 +417,9 @@ def test_implementation_contract_rejects_per_epoch_final_test_observation() -> N
     )
 
     assert stage_quality_issues("implementation_contract", implementation) == [
-        "implementation contract must not observe final-test metrics per epoch"
+        "requirements_by_category.evidence.0.requirement must not require final-test metrics per epoch; "
+        "replace it with one sealed final-test evaluation after selection. Rejected text: "
+        "Store train, validation, and test metrics after every epoch."
     ]
 
 
@@ -428,6 +430,9 @@ def test_implementation_contract_allows_explicit_per_epoch_final_test_prohibitio
     )
     implementation["checks_by_category"]["workflow"][0]["check"] = (
         "Отклонить запуск, если test metrics вычислялись на каждой эпохе."
+    )
+    implementation["checks_by_category"]["workflow"][0]["evidence"] = (
+        "Audit shows test metrics per epoch are absent."
     )
 
     assert stage_quality_issues("implementation_contract", implementation) == []

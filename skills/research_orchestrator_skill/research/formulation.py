@@ -653,25 +653,23 @@ def stage_quality_issues(
                 issues.append("workflow_smoke must exactly preserve the AdaOS execution policy")
     elif stage == "implementation_contract":
         obligations = [
-            str(value)
-            for grouped in (
-                payload.get("requirements_by_category") or {},
-                payload.get("checks_by_category") or {},
-            )
-            for items in grouped.values()
-            for item in items or []
+            (f"{group_name}.{category}.{index}.{field}", str(value))
+            for group_name in ("requirements_by_category", "checks_by_category")
+            for category, items in (payload.get(group_name) or {}).items()
+            for index, item in enumerate(items or [])
             if isinstance(item, Mapping)
-            for value in item.values()
+            for field, value in item.items()
         ]
         per_epoch_test = re.compile(
             r"(?i)(?:test.{0,40}(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445)|"
             r"(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445).{0,40}test)"
         )
         prohibition = re.compile(
-            r"(?i)(?:must\s+not|never|do\s+not|prohibit\w*|forbid\w*|prevent\w*|"
+            r"(?i)(?:must\s+not|never|do\s+not|\bnot\b|\bno\b|prohibit\w*|forbid\w*|prevent\w*|"
             r"reject\w*|fail\w*|without|only\s+once|"
+            r"absen\w*|disabled|zero\s+occurrences|"
             r"\u043d\u0435\s+\w{0,20}|\u0437\u0430\u043f\u0440\u0435\u0449\w*|\u043d\u0435\u043b\u044c\u0437\u044f|\u0438\u0441\u043a\u043b\u044e\u0447\w*|\u043f\u0440\u0435\u0434\u043e\u0442\u0432\u0440\u0430\u0449\w*|"
-            r"\u043e\u0442\u043a\u043b\u043e\u043d\w*|\u043e\u0448\u0438\u0431\w*)"
+            r"\u043e\u0442\u043a\u043b\u043e\u043d\w*|\u043e\u0448\u0438\u0431\w*|\u043e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\w*|\u043d\u043e\u043b\u044c\w*)"
         )
 
         def requires_per_epoch_final_test(text: str) -> bool:
@@ -683,8 +681,13 @@ def stage_quality_issues(
             context = text[max(0, match.start() - 80) : min(len(text), match.end() + 80)]
             return prohibition.search(context) is None
 
-        if any(requires_per_epoch_final_test(item) for item in obligations):
-            issues.append("implementation contract must not observe final-test metrics per epoch")
+        for path, text in obligations:
+            if requires_per_epoch_final_test(text):
+                excerpt = re.sub(r"\s+", " ", text).strip()[:240]
+                issues.append(
+                    f"{path} must not require final-test metrics per epoch; replace it with one sealed "
+                    f"final-test evaluation after selection. Rejected text: {excerpt}"
+                )
         signature = dict(expected_experimental_signature or {})
         bindings = dict(payload.get("scientific_bindings") or {})
         if expected_protocol_digest and bindings.get("protocol_digest") != expected_protocol_digest:
