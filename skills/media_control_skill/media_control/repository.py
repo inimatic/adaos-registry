@@ -11,12 +11,14 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 
-SCHEMA_VERSION = "adaos.media_control.v1"
+SCHEMA_VERSION = "adaos.media_control.v2"
 SESSION_SCHEMA = "adaos.media_control.playback_session.v1"
 TARGET_SCHEMA = "adaos.media_control.playback_target.v1"
 COMMAND_SCHEMA = "adaos.media_control.playback_command.v1"
 QUEUE_SCHEMA = "adaos.media_control.playback_queue.v1"
 CHECKPOINT_SCHEMA = "adaos.media_control.playback_checkpoint.v1"
+RECONCILIATION_SCHEMA = "adaos.media_control.endpoint_reconciliation.v1"
+QOE_SUMMARY_SCHEMA = "adaos.media_control.qoe_summary.v1"
 MAX_QUEUE_ITEMS = 500
 MAX_QUEUE_PAGE = 30
 MAX_COMMAND_PAGE = 100
@@ -132,8 +134,14 @@ class MediaControlRepository:
                     tracks_json TEXT NOT NULL DEFAULT '{}',
                     autoplay INTEGER NOT NULL DEFAULT 1,
                     auto_fullscreen INTEGER NOT NULL DEFAULT 1,
+                    queue_source_json TEXT NOT NULL DEFAULT '{}',
                     queue_revision INTEGER NOT NULL DEFAULT 1,
                     command_revision INTEGER NOT NULL DEFAULT 0,
+                    observed_command_revision INTEGER NOT NULL DEFAULT 0,
+                    endpoint_observation_revision INTEGER NOT NULL DEFAULT 0,
+                    endpoint_last_seen_at TEXT NOT NULL DEFAULT '',
+                    endpoint_state_json TEXT NOT NULL DEFAULT '{}',
+                    sleep_timer_at REAL NOT NULL DEFAULT 0,
                     control_actor_ref TEXT NOT NULL,
                     control_lease_expires_at REAL NOT NULL,
                     control_lease_revision INTEGER NOT NULL DEFAULT 1,
@@ -168,6 +176,7 @@ class MediaControlRepository:
                     arguments_json TEXT NOT NULL DEFAULT '{}',
                     expected_revision INTEGER NOT NULL,
                     resulting_revision INTEGER NOT NULL,
+                    command_revision INTEGER NOT NULL DEFAULT 0,
                     status TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     acknowledged_at TEXT NOT NULL DEFAULT '',
@@ -197,6 +206,9 @@ class MediaControlRepository:
                     preferred_quality TEXT NOT NULL DEFAULT 'auto',
                     audio_language TEXT NOT NULL DEFAULT '',
                     subtitle_language TEXT NOT NULL DEFAULT '',
+                    preferred_rate REAL NOT NULL DEFAULT 1.0,
+                    resume_after_reconnect INTEGER NOT NULL DEFAULT 1,
+                    checkpoint_interval_seconds INTEGER NOT NULL DEFAULT 15,
                     revision INTEGER NOT NULL DEFAULT 1,
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY(profile_id, target_id)
@@ -210,8 +222,74 @@ class MediaControlRepository:
                     dimensions_json TEXT NOT NULL DEFAULT '{}',
                     created_at TEXT NOT NULL
                 );
+                CREATE INDEX IF NOT EXISTS idx_media_control_qoe_session
+                    ON playback_qoe_events(session_id, sequence DESC);
+                CREATE TABLE IF NOT EXISTS playback_endpoint_observations (
+                    session_id TEXT NOT NULL REFERENCES playback_sessions(id) ON DELETE CASCADE,
+                    target_id TEXT NOT NULL,
+                    endpoint_revision INTEGER NOT NULL,
+                    acknowledged_command_revision INTEGER NOT NULL,
+                    observed_json TEXT NOT NULL,
+                    action_json TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    PRIMARY KEY(session_id, target_id, endpoint_revision)
+                );
                 """
             )
+            session_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(playback_sessions)"
+                ).fetchall()
+            }
+            for name, definition in {
+                "queue_source_json": "TEXT NOT NULL DEFAULT '{}'",
+                "observed_command_revision": "INTEGER NOT NULL DEFAULT 0",
+                "endpoint_observation_revision": "INTEGER NOT NULL DEFAULT 0",
+                "endpoint_last_seen_at": "TEXT NOT NULL DEFAULT ''",
+                "endpoint_state_json": "TEXT NOT NULL DEFAULT '{}'",
+                "sleep_timer_at": "REAL NOT NULL DEFAULT 0",
+            }.items():
+                if name not in session_columns:
+                    connection.execute(
+                        f"ALTER TABLE playback_sessions ADD COLUMN {name} {definition}"
+                    )
+            command_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(playback_commands)"
+                ).fetchall()
+            }
+            if "command_revision" not in command_columns:
+                connection.execute(
+                    "ALTER TABLE playback_commands ADD COLUMN command_revision INTEGER NOT NULL DEFAULT 0"
+                )
+            connection.execute(
+                """
+                UPDATE playback_commands AS command
+                SET command_revision=(
+                    SELECT COUNT(*) FROM playback_commands AS earlier
+                    WHERE earlier.session_id=command.session_id
+                        AND earlier.sequence<=command.sequence
+                )
+                WHERE command_revision=0
+                """
+            )
+            settings_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(playback_settings)"
+                ).fetchall()
+            }
+            for name, definition in {
+                "preferred_rate": "REAL NOT NULL DEFAULT 1.0",
+                "resume_after_reconnect": "INTEGER NOT NULL DEFAULT 1",
+                "checkpoint_interval_seconds": "INTEGER NOT NULL DEFAULT 15",
+            }.items():
+                if name not in settings_columns:
+                    connection.execute(
+                        f"ALTER TABLE playback_settings ADD COLUMN {name} {definition}"
+                    )
             connection.commit()
         return {"ok": True, "schema": SCHEMA_VERSION, "db_path": str(self.db_path)}
 
@@ -264,6 +342,7 @@ class MediaControlRepository:
         queue: Iterable[Mapping[str, Any]],
         active_index: int = 0,
         route: Mapping[str, Any] | None = None,
+        queue_source: Mapping[str, Any] | None = None,
         lease_seconds: int = 120,
     ) -> dict[str, Any]:
         target = self.get_target(target_id)
@@ -286,15 +365,16 @@ class MediaControlRepository:
                 """
                 INSERT INTO playback_sessions(
                     id,profile_id,target_id,state,active_queue_index,active_item_id,work_id,
-                    variant_id,source_id,route_json,autoplay,auto_fullscreen,control_actor_ref,
+                    variant_id,source_id,route_json,rate,autoplay,auto_fullscreen,queue_source_json,control_actor_ref,
                     control_lease_expires_at,created_at,updated_at
-                ) VALUES (?,?,?,'ready',?,?,?,?,?,?,?, ?,?,?,?,?)
+                ) VALUES (?,?,?,'ready',?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """,
                 (
                     session_id, profile, target["id"], index, text(active.get("item_id") or active.get("id")),
                     text(active.get("work_id")), text(active.get("variant_id")), text(active.get("source_id")),
-                    dumps(dict(route or active.get("route") or {})), int(settings["autoplay"]), int(settings["auto_fullscreen"]),
-                    actor, lease_expires, created_at, created_at,
+                    dumps(dict(route or active.get("route") or {})), float(settings["preferred_rate"]),
+                    int(settings["autoplay"]), int(settings["auto_fullscreen"]),
+                    dumps(dict(queue_source or {})), actor, lease_expires, created_at, created_at,
                 ),
             )
             self._replace_queue(connection, session_id, items)
@@ -332,7 +412,20 @@ class MediaControlRepository:
     ) -> dict[str, Any]:
         token = text(session_id)
         command_token = text(command).lower()
-        supported = {"play", "pause", "seek", "volume", "mute", "next", "previous", "stop", "handoff", "tracks", "rate"}
+        supported = {
+            "play",
+            "pause",
+            "seek",
+            "volume",
+            "mute",
+            "next",
+            "previous",
+            "stop",
+            "handoff",
+            "tracks",
+            "rate",
+            "sleep_timer",
+        }
         if command_token not in supported:
             return {"ok": False, "error": "unsupported_playback_command"}
         key = text(idempotency_key)
@@ -377,10 +470,22 @@ class MediaControlRepository:
                 """
                 INSERT INTO playback_commands(
                     id,idempotency_key,session_id,target_id,actor_ref,command,arguments_json,
-                    expected_revision,resulting_revision,status,created_at
-                ) VALUES (?,?,?,?,?,?,?,?,?,'pending',?)
+                    expected_revision,resulting_revision,command_revision,status,created_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,'pending',?)
                 """,
-                (command_id, key, token, str(row["target_id"]), actor, command_token, dumps(args), current_revision, next_revision, now_iso()),
+                (
+                    command_id,
+                    key,
+                    token,
+                    str(row["target_id"]),
+                    actor,
+                    command_token,
+                    dumps(args),
+                    current_revision,
+                    next_revision,
+                    command_revision,
+                    now_iso(),
+                ),
             )
             changed = connection.execute("SELECT * FROM playback_commands WHERE id=?", (command_id,)).fetchone()
             connection.commit()
@@ -404,6 +509,9 @@ class MediaControlRepository:
             updates["rate"] = max(0.25, min(4.0, float(args.get("rate") or 1.0)))
         elif command == "tracks":
             updates["tracks_json"] = dumps(dict(args.get("tracks") or {}))
+        elif command == "sleep_timer":
+            seconds = max(0, min(24 * 60 * 60, int(args.get("seconds") or 0)))
+            updates["sleep_timer_at"] = time.time() + seconds if seconds else 0
         elif command in {"next", "previous"}:
             direction = 1 if command == "next" else -1
             next_item = self._next_available(connection, str(row["id"]), int(row["active_queue_index"]), direction)
@@ -505,6 +613,7 @@ class MediaControlRepository:
         return {"ok": True, "schema": CHECKPOINT_SCHEMA, "checkpoint_id": checkpoint_id, "session": self.get_session(token)["session"]}
 
     def pull_commands(self, target_id: str, *, cursor: str = "", limit: int = 50) -> dict[str, Any]:
+        self.apply_due_sleep_timers()
         after = decode_cursor(cursor)
         bounded = max(1, min(MAX_COMMAND_PAGE, int(limit or 50)))
         target = self.get_target(target_id)
@@ -519,6 +628,64 @@ class MediaControlRepository:
         visible = rows[:bounded]
         next_sequence = int(visible[-1]["sequence"]) if visible else after
         return {"ok": True, "schema": SCHEMA_VERSION, "items": [self._public_command(row) for row in visible], "count": len(visible), "next_cursor": encode_cursor(next_sequence), "has_more": has_more}
+
+    def apply_due_sleep_timers(self) -> dict[str, Any]:
+        applied: list[str] = []
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute(
+                """
+                SELECT * FROM playback_sessions
+                WHERE sleep_timer_at>0 AND sleep_timer_at<=?
+                    AND state NOT IN ('paused','stopped','ended')
+                ORDER BY sleep_timer_at LIMIT 100
+                """,
+                (time.time(),),
+            ).fetchall()
+            for row in rows:
+                current_revision = int(row["revision"])
+                next_revision = current_revision + 1
+                command_revision = int(row["command_revision"]) + 1
+                deadline = float(row["sleep_timer_at"])
+                key = f"sleep-expire:{row['id']}:{int(deadline)}"
+                command_id = stable_id("command", row["id"], key, size=24)
+                connection.execute(
+                    """
+                    UPDATE playback_sessions SET state='paused',sleep_timer_at=0,
+                        revision=?,command_revision=?,updated_at=? WHERE id=?
+                    """,
+                    (next_revision, command_revision, now_iso(), row["id"]),
+                )
+                connection.execute(
+                    """
+                    INSERT OR IGNORE INTO playback_commands(
+                        id,idempotency_key,session_id,target_id,actor_ref,command,
+                        arguments_json,expected_revision,resulting_revision,
+                        command_revision,status,created_at
+                    ) VALUES (?,?,?,?,?,'pause',?,?,?,?,'pending',?)
+                    """,
+                    (
+                        command_id,
+                        key,
+                        row["id"],
+                        row["target_id"],
+                        "system:sleep_timer",
+                        dumps({"reason": "sleep_timer", "deadline": deadline}),
+                        current_revision,
+                        next_revision,
+                        command_revision,
+                        now_iso(),
+                    ),
+                )
+                applied.append(str(row["id"]))
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "applied_session_ids": applied,
+            "count": len(applied),
+            "bounded": True,
+        }
 
     def acknowledge_command(self, command_id: str, *, status: str, result: Mapping[str, Any] | None = None) -> dict[str, Any]:
         status_token = text(status).lower()
@@ -535,36 +702,310 @@ class MediaControlRepository:
             return {"ok": False, "error": "playback_command_not_found"}
         return {"ok": True, "schema": SCHEMA_VERSION, "changed": bool(changed), "command": self._public_command(row)}
 
+    def reconcile_endpoint(
+        self,
+        session_id: str,
+        *,
+        target_id: str,
+        endpoint_revision: int,
+        acknowledged_command_revision: int,
+        observed: Mapping[str, Any] | None = None,
+        authority: str = "endpoint_preferred",
+    ) -> dict[str, Any]:
+        token = text(session_id)
+        target = self.get_target(target_id)
+        if target is None:
+            return {"ok": False, "error": "playback_target_not_found"}
+        observation_revision = int(endpoint_revision or 0)
+        if observation_revision < 1:
+            return {"ok": False, "error": "endpoint_revision_required"}
+        authority_token = text(authority).lower() or "endpoint_preferred"
+        if authority_token not in {"endpoint_preferred", "coordinator_preferred"}:
+            return {"ok": False, "error": "invalid_reconciliation_authority"}
+        payload = dict(observed or {})
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT * FROM playback_sessions WHERE id=?", (token,)
+            ).fetchone()
+            if row is None:
+                connection.rollback()
+                return {
+                    "ok": False,
+                    "error": "playback_session_not_found",
+                    "session_id": token,
+                }
+            if str(row["target_id"]) != target["id"]:
+                connection.rollback()
+                return {"ok": False, "error": "playback_target_session_mismatch"}
+            replay = connection.execute(
+                """
+                SELECT action_json FROM playback_endpoint_observations
+                WHERE session_id=? AND target_id=? AND endpoint_revision=?
+                """,
+                (token, target["id"], observation_revision),
+            ).fetchone()
+            if replay is not None:
+                connection.commit()
+                return {
+                    "ok": True,
+                    "schema": RECONCILIATION_SCHEMA,
+                    "idempotent_replay": True,
+                    "action": loads(replay["action_json"], {}),
+                    "session": self.get_session(token)["session"],
+                }
+            if observation_revision < int(row["endpoint_observation_revision"]):
+                connection.rollback()
+                return {
+                    "ok": False,
+                    "error": "stale_endpoint_observation",
+                    "current_endpoint_revision": int(
+                        row["endpoint_observation_revision"]
+                    ),
+                }
+            acknowledged = max(0, int(acknowledged_command_revision or 0))
+            if acknowledged > int(row["command_revision"]):
+                connection.rollback()
+                return {
+                    "ok": False,
+                    "error": "invalid_acknowledged_command_revision",
+                    "current_command_revision": int(row["command_revision"]),
+                }
+            connection.execute(
+                """
+                UPDATE playback_commands
+                SET status='applied', acknowledged_at=?
+                WHERE session_id=? AND target_id=? AND status='pending'
+                    AND command_revision>0 AND command_revision<=?
+                """,
+                (now_iso(), token, target["id"], acknowledged),
+            )
+            pending_rows = connection.execute(
+                """
+                SELECT * FROM playback_commands
+                WHERE session_id=? AND target_id=? AND status='pending'
+                    AND command_revision>?
+                ORDER BY command_revision LIMIT 30
+                """,
+                (token, target["id"], acknowledged),
+            ).fetchall()
+            observed_item_id = text(payload.get("active_item_id"))
+            desired_item_id = str(row["active_item_id"])
+            action: dict[str, Any]
+            if observed_item_id and observed_item_id != desired_item_id:
+                active = connection.execute(
+                    """
+                    SELECT descriptor_json FROM playback_queue_items
+                    WHERE session_id=? AND ordinal=?
+                    """,
+                    (token, int(row["active_queue_index"])),
+                ).fetchone()
+                action = {
+                    "type": "load",
+                    "item_id": desired_item_id,
+                    "position_ms": int(row["position_ms"]),
+                    "state": str(row["state"]),
+                    "descriptor": loads(active["descriptor_json"], {}) if active else {},
+                    "reason": "endpoint_item_differs",
+                }
+            elif pending_rows:
+                action = {
+                    "type": "replay_commands",
+                    "from_command_revision": acknowledged + 1,
+                    "commands": [self._public_command(item) for item in pending_rows],
+                }
+            elif authority_token == "coordinator_preferred":
+                observed_position = max(0, int(payload.get("position_ms") or 0))
+                desired_position = int(row["position_ms"])
+                if abs(observed_position - desired_position) > 1500:
+                    action = {
+                        "type": "seek",
+                        "position_ms": desired_position,
+                        "reason": "coordinator_checkpoint_newer",
+                    }
+                elif text(payload.get("state")) != str(row["state"]):
+                    action = {
+                        "type": "transport",
+                        "state": str(row["state"]),
+                        "reason": "coordinator_state_newer",
+                    }
+                else:
+                    action = {"type": "noop", "reason": "already_converged"}
+            else:
+                updates = {
+                    "state": text(payload.get("state")) or str(row["state"]),
+                    "position_ms": max(0, int(payload.get("position_ms") or 0)),
+                    "duration_ms": max(0, int(payload.get("duration_ms") or 0)),
+                    "rate": max(
+                        0.25,
+                        min(4.0, float(payload.get("rate") or row["rate"])),
+                    ),
+                    "volume": max(
+                        0.0,
+                        min(
+                            1.0,
+                            float(
+                                payload.get("volume")
+                                if payload.get("volume") is not None
+                                else row["volume"]
+                            ),
+                        ),
+                    ),
+                    "muted": int(bool(payload.get("muted", row["muted"]))),
+                }
+                connection.execute(
+                    """
+                    UPDATE playback_sessions SET state=?,position_ms=?,duration_ms=?,
+                        rate=?,volume=?,muted=?,revision=revision+1,updated_at=?
+                    WHERE id=?
+                    """,
+                    (*updates.values(), now_iso(), token),
+                )
+                action = {"type": "noop", "reason": "endpoint_state_accepted"}
+            seen_at = now_iso()
+            connection.execute(
+                """
+                UPDATE playback_sessions
+                SET observed_command_revision=?,endpoint_observation_revision=?,
+                    endpoint_last_seen_at=?,endpoint_state_json=?,updated_at=?
+                WHERE id=?
+                """,
+                (
+                    acknowledged,
+                    observation_revision,
+                    seen_at,
+                    dumps(payload),
+                    seen_at,
+                    token,
+                ),
+            )
+            connection.execute(
+                """
+                INSERT INTO playback_endpoint_observations(
+                    session_id,target_id,endpoint_revision,
+                    acknowledged_command_revision,observed_json,action_json,created_at
+                ) VALUES (?,?,?,?,?,?,?)
+                """,
+                (
+                    token,
+                    target["id"],
+                    observation_revision,
+                    acknowledged,
+                    dumps(payload),
+                    dumps(action),
+                    seen_at,
+                ),
+            )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": RECONCILIATION_SCHEMA,
+            "idempotent_replay": False,
+            "action": action,
+            "session": self.get_session(token)["session"],
+        }
+
     def get_settings(self, *, profile_id: str, target_id: str = "") -> dict[str, Any]:
         profile = text(profile_id) or "default"
         target = text(target_id) or "*"
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM playback_settings WHERE profile_id=? AND target_id=?", (profile, target)).fetchone()
-        settings = self._public_settings(row) if row else {
-            "profile_id": profile, "target_id": target, "autoplay": True, "auto_fullscreen": True,
-            "background_audio": True, "video_close_policy": "pip_or_pause", "preferred_quality": "auto",
-            "audio_language": "", "subtitle_language": "", "revision": 0, "updated_at": "",
+            global_row = connection.execute(
+                "SELECT * FROM playback_settings WHERE profile_id=? AND target_id='*'",
+                (profile,),
+            ).fetchone()
+            target_row = (
+                connection.execute(
+                    "SELECT * FROM playback_settings WHERE profile_id=? AND target_id=?",
+                    (profile, target),
+                ).fetchone()
+                if target != "*"
+                else global_row
+            )
+        defaults = {
+            "profile_id": profile,
+            "target_id": target,
+            "autoplay": True,
+            "auto_fullscreen": True,
+            "background_audio": True,
+            "video_close_policy": "pip_or_pause",
+            "preferred_quality": "auto",
+            "audio_language": "",
+            "subtitle_language": "",
+            "preferred_rate": 1.0,
+            "resume_after_reconnect": True,
+            "checkpoint_interval_seconds": 15,
+            "revision": 0,
+            "updated_at": "",
         }
+        inherited = (
+            {**defaults, **self._public_settings(global_row)}
+            if global_row is not None
+            else defaults
+        )
+        settings = (
+            {**inherited, **self._public_settings(target_row)}
+            if target_row is not None
+            else inherited
+        )
+        settings["profile_id"] = profile
+        settings["target_id"] = target
+        settings["inherited_from_profile"] = bool(target != "*" and target_row is None)
         return {"ok": True, "schema": SCHEMA_VERSION, "settings": settings}
 
     def set_settings(self, *, profile_id: str, target_id: str = "", values: Mapping[str, Any]) -> dict[str, Any]:
         profile = text(profile_id) or "default"
         target = text(target_id) or "*"
         current = self.get_settings(profile_id=profile, target_id=target)["settings"]
-        merged = {**current, **{key: value for key, value in values.items() if key in {"autoplay", "auto_fullscreen", "background_audio", "video_close_policy", "preferred_quality", "audio_language", "subtitle_language"}}}
+        accepted = {
+            "autoplay",
+            "auto_fullscreen",
+            "background_audio",
+            "video_close_policy",
+            "preferred_quality",
+            "audio_language",
+            "subtitle_language",
+            "preferred_rate",
+            "resume_after_reconnect",
+            "checkpoint_interval_seconds",
+        }
+        merged = {
+            **current,
+            **{key: value for key, value in values.items() if key in accepted},
+        }
         if text(merged["video_close_policy"]) not in {"pip_or_pause", "audio_only", "pause"}:
             return {"ok": False, "error": "invalid_video_close_policy"}
+        preferred_rate = max(0.25, min(4.0, float(merged["preferred_rate"])))
+        checkpoint_interval = max(
+            5, min(120, int(merged["checkpoint_interval_seconds"] or 15))
+        )
         with self.connect() as connection:
             connection.execute(
                 """
-                INSERT INTO playback_settings(profile_id,target_id,autoplay,auto_fullscreen,background_audio,video_close_policy,preferred_quality,audio_language,subtitle_language,updated_at)
-                VALUES (?,?,?,?,?,?,?,?,?,?)
+                INSERT INTO playback_settings(profile_id,target_id,autoplay,auto_fullscreen,background_audio,video_close_policy,preferred_quality,audio_language,subtitle_language,preferred_rate,resume_after_reconnect,checkpoint_interval_seconds,updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                 ON CONFLICT(profile_id,target_id) DO UPDATE SET autoplay=excluded.autoplay,auto_fullscreen=excluded.auto_fullscreen,
                     background_audio=excluded.background_audio,video_close_policy=excluded.video_close_policy,
                     preferred_quality=excluded.preferred_quality,audio_language=excluded.audio_language,
-                    subtitle_language=excluded.subtitle_language,revision=playback_settings.revision+1,updated_at=excluded.updated_at
+                    subtitle_language=excluded.subtitle_language,preferred_rate=excluded.preferred_rate,
+                    resume_after_reconnect=excluded.resume_after_reconnect,
+                    checkpoint_interval_seconds=excluded.checkpoint_interval_seconds,
+                    revision=playback_settings.revision+1,updated_at=excluded.updated_at
                 """,
-                (profile, target, int(bool(merged["autoplay"])), int(bool(merged["auto_fullscreen"])), int(bool(merged["background_audio"])), text(merged["video_close_policy"]), text(merged["preferred_quality"]), text(merged["audio_language"]), text(merged["subtitle_language"]), now_iso()),
+                (
+                    profile,
+                    target,
+                    int(bool(merged["autoplay"])),
+                    int(bool(merged["auto_fullscreen"])),
+                    int(bool(merged["background_audio"])),
+                    text(merged["video_close_policy"]),
+                    text(merged["preferred_quality"]),
+                    text(merged["audio_language"]),
+                    text(merged["subtitle_language"]),
+                    preferred_rate,
+                    int(bool(merged["resume_after_reconnect"])),
+                    checkpoint_interval,
+                    now_iso(),
+                ),
             )
             connection.commit()
         return self.get_settings(profile_id=profile, target_id=target)
@@ -586,7 +1027,75 @@ class MediaControlRepository:
             connection.commit()
         return {"ok": True, "schema": SCHEMA_VERSION, "metric": metric_token}
 
+    def qoe_summary(
+        self,
+        *,
+        session_id: str = "",
+        target_id: str = "",
+        limit: int = 30,
+    ) -> dict[str, Any]:
+        filters = ["1=1"]
+        params: list[Any] = []
+        if text(session_id):
+            filters.append("session_id=?")
+            params.append(text(session_id))
+        if text(target_id):
+            target = self.get_target(target_id)
+            if target is None:
+                return {"ok": False, "error": "playback_target_not_found"}
+            filters.append("target_id=?")
+            params.append(target["id"])
+        where = " AND ".join(filters)
+        bounded = max(1, min(100, int(limit or 30)))
+        with self.connect() as connection:
+            aggregates = connection.execute(
+                f"""
+                SELECT metric,COUNT(*) AS sample_count,AVG(value) AS average,
+                    MAX(value) AS maximum,SUM(value) AS total
+                FROM playback_qoe_events WHERE {where}
+                GROUP BY metric ORDER BY metric
+                """,
+                tuple(params),
+            ).fetchall()
+            recent = connection.execute(
+                f"""
+                SELECT sequence,session_id,target_id,metric,value,dimensions_json,
+                    created_at FROM playback_qoe_events WHERE {where}
+                ORDER BY sequence DESC LIMIT ?
+                """,
+                (*params, bounded),
+            ).fetchall()
+        return {
+            "ok": True,
+            "schema": QOE_SUMMARY_SCHEMA,
+            "metrics": [
+                {
+                    "metric": str(row["metric"]),
+                    "sample_count": int(row["sample_count"]),
+                    "average": float(row["average"]),
+                    "maximum": float(row["maximum"]),
+                    "total": float(row["total"]),
+                }
+                for row in aggregates
+            ],
+            "recent": [
+                {
+                    "sequence": int(row["sequence"]),
+                    "session_id": str(row["session_id"]),
+                    "target_id": str(row["target_id"]),
+                    "metric": str(row["metric"]),
+                    "value": float(row["value"]),
+                    "dimensions": loads(row["dimensions_json"], {}),
+                    "created_at": str(row["created_at"]),
+                }
+                for row in recent
+            ],
+            "count": len(recent),
+            "bounded": True,
+        }
+
     def now_playing(self, *, profile_id: str = "", target_id: str = "", limit: int = 20) -> dict[str, Any]:
+        self.apply_due_sleep_timers()
         filters = ["state NOT IN ('stopped','ended')"]
         params: list[Any] = []
         if text(profile_id):
@@ -681,16 +1190,21 @@ class MediaControlRepository:
             "work_id": str(row["work_id"]), "variant_id": str(row["variant_id"]), "source_id": str(row["source_id"]),
             "route": loads(row["route_json"], {}), "position_ms": int(row["position_ms"]), "duration_ms": int(row["duration_ms"]),
             "rate": float(row["rate"]), "volume": float(row["volume"]), "muted": bool(row["muted"]), "tracks": loads(row["tracks_json"], {}),
-            "autoplay": bool(row["autoplay"]), "auto_fullscreen": bool(row["auto_fullscreen"]), "queue_revision": int(row["queue_revision"]),
-            "command_revision": int(row["command_revision"]), "control_lease": {"actor_ref": str(row["control_actor_ref"]), "expires_at": float(row["control_lease_expires_at"]), "revision": int(row["control_lease_revision"])},
+            "autoplay": bool(row["autoplay"]), "auto_fullscreen": bool(row["auto_fullscreen"]),
+            "queue_source": loads(row["queue_source_json"], {}), "queue_revision": int(row["queue_revision"]),
+            "command_revision": int(row["command_revision"]), "observed_command_revision": int(row["observed_command_revision"]),
+            "endpoint_observation_revision": int(row["endpoint_observation_revision"]),
+            "endpoint_last_seen_at": str(row["endpoint_last_seen_at"]), "endpoint_state": loads(row["endpoint_state_json"], {}),
+            "sleep_timer_at": float(row["sleep_timer_at"]),
+            "control_lease": {"actor_ref": str(row["control_actor_ref"]), "expires_at": float(row["control_lease_expires_at"]), "revision": int(row["control_lease_revision"])},
             "interruption": loads(row["interruption_json"], {}), "checkpoint_at": str(row["checkpoint_at"]), "created_at": str(row["created_at"]),
             "updated_at": str(row["updated_at"]), "revision": int(row["revision"]),
         }
 
     @staticmethod
     def _public_command(row: sqlite3.Row) -> dict[str, Any]:
-        return {"schema": COMMAND_SCHEMA, "sequence": int(row["sequence"]), "id": str(row["id"]), "idempotency_key": str(row["idempotency_key"]), "session_id": str(row["session_id"]), "target_id": str(row["target_id"]), "actor_ref": str(row["actor_ref"]), "command": str(row["command"]), "arguments": loads(row["arguments_json"], {}), "expected_revision": int(row["expected_revision"]), "resulting_revision": int(row["resulting_revision"]), "status": str(row["status"]), "created_at": str(row["created_at"]), "acknowledged_at": str(row["acknowledged_at"]), "result": loads(row["result_json"], {})}
+        return {"schema": COMMAND_SCHEMA, "sequence": int(row["sequence"]), "id": str(row["id"]), "idempotency_key": str(row["idempotency_key"]), "session_id": str(row["session_id"]), "target_id": str(row["target_id"]), "actor_ref": str(row["actor_ref"]), "command": str(row["command"]), "arguments": loads(row["arguments_json"], {}), "expected_revision": int(row["expected_revision"]), "resulting_revision": int(row["resulting_revision"]), "command_revision": int(row["command_revision"]), "status": str(row["status"]), "created_at": str(row["created_at"]), "acknowledged_at": str(row["acknowledged_at"]), "result": loads(row["result_json"], {})}
 
     @staticmethod
     def _public_settings(row: sqlite3.Row) -> dict[str, Any]:
-        return {"profile_id": str(row["profile_id"]), "target_id": str(row["target_id"]), "autoplay": bool(row["autoplay"]), "auto_fullscreen": bool(row["auto_fullscreen"]), "background_audio": bool(row["background_audio"]), "video_close_policy": str(row["video_close_policy"]), "preferred_quality": str(row["preferred_quality"]), "audio_language": str(row["audio_language"]), "subtitle_language": str(row["subtitle_language"]), "revision": int(row["revision"]), "updated_at": str(row["updated_at"])}
+        return {"profile_id": str(row["profile_id"]), "target_id": str(row["target_id"]), "autoplay": bool(row["autoplay"]), "auto_fullscreen": bool(row["auto_fullscreen"]), "background_audio": bool(row["background_audio"]), "video_close_policy": str(row["video_close_policy"]), "preferred_quality": str(row["preferred_quality"]), "audio_language": str(row["audio_language"]), "subtitle_language": str(row["subtitle_language"]), "preferred_rate": float(row["preferred_rate"]), "resume_after_reconnect": bool(row["resume_after_reconnect"]), "checkpoint_interval_seconds": int(row["checkpoint_interval_seconds"]), "revision": int(row["revision"]), "updated_at": str(row["updated_at"])}

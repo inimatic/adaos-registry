@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "adaos.media_control.playback_session.v1", "type": "object",
-  "required": ["schema", "id", "profile_id", "target_id", "state", "active_queue_index", "active_item_id", "route", "position_ms", "duration_ms", "rate", "volume", "muted", "tracks", "autoplay", "auto_fullscreen", "queue_revision", "command_revision", "control_lease", "revision"],
+  "required": ["schema", "id", "profile_id", "target_id", "state", "active_queue_index", "active_item_id", "route", "position_ms", "duration_ms", "rate", "volume", "muted", "tracks", "autoplay", "auto_fullscreen", "queue_source", "queue_revision", "command_revision", "observed_command_revision", "endpoint_observation_revision", "endpoint_state", "sleep_timer_at", "control_lease", "revision"],
   "properties": {
     "schema": {"const": "adaos.media_control.playback_session.v1"}, "id": {"type": "string"}, "profile_id": {"type": "string"}, "target_id": {"type": "string"},
     "state": {"enum": ["ready", "playing", "paused", "stopped", "ended", "recovering", "error"]}, "active_queue_index": {"type": "integer", "minimum": 0},
@@ -8,7 +8,10 @@
     "route": {"type": "object"}, "position_ms": {"type": "integer", "minimum": 0}, "duration_ms": {"type": "integer", "minimum": 0},
     "rate": {"type": "number", "minimum": 0.25, "maximum": 4}, "volume": {"type": "number", "minimum": 0, "maximum": 1}, "muted": {"type": "boolean"},
     "tracks": {"type": "object"}, "autoplay": {"type": "boolean"}, "auto_fullscreen": {"type": "boolean"},
-    "queue_revision": {"type": "integer", "minimum": 1}, "command_revision": {"type": "integer", "minimum": 0}, "control_lease": {"type": "object"},
+    "queue_source": {"type": "object"}, "queue_revision": {"type": "integer", "minimum": 1},
+    "command_revision": {"type": "integer", "minimum": 0}, "observed_command_revision": {"type": "integer", "minimum": 0},
+    "endpoint_observation_revision": {"type": "integer", "minimum": 0}, "endpoint_last_seen_at": {"type": "string"},
+    "endpoint_state": {"type": "object"}, "sleep_timer_at": {"type": "number", "minimum": 0}, "control_lease": {"type": "object"},
     "interruption": {"type": "object"}, "checkpoint_at": {"type": "string"}, "created_at": {"type": "string"}, "updated_at": {"type": "string"},
     "revision": {"type": "integer", "minimum": 1}, "queue": {"type": "object"}, "target": {"type": ["object", "null"]}
   }, "additionalProperties": false

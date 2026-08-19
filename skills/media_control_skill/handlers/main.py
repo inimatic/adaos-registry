@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
-from adaos.sdk.core.decorators import tool
+from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data.i18n import _
 
 
@@ -68,8 +68,41 @@ def _result_or_error(result: dict[str, Any]) -> dict[str, Any]:
         "idempotency_key_required": "The command could not be sent safely. Retry from the current state.",
         "unsupported_playback_command": "This playback command is not supported.",
         "invalid_media_control_cursor": "The playback list changed. Refresh it.",
+        "endpoint_revision_required": "The playback endpoint revision is missing.",
+        "stale_endpoint_observation": "A newer playback endpoint state is already known.",
+        "invalid_acknowledged_command_revision": "The endpoint acknowledged an unknown playback command.",
+        "playback_target_session_mismatch": "This playback session belongs to another endpoint.",
+        "invalid_reconciliation_authority": "The playback recovery policy is invalid.",
     }
     return {**result, **_error(code, fallbacks.get(code, "The media control operation failed."))}
+
+
+def _event_payload(event: Any) -> dict[str, Any]:
+    if isinstance(event, Mapping):
+        payload = event.get("payload")
+        return dict(payload) if isinstance(payload, Mapping) else dict(event)
+    payload = getattr(event, "payload", None)
+    return dict(payload) if isinstance(payload, Mapping) else {}
+
+
+@subscribe("sys.ready")
+def on_sys_ready(_: Any) -> None:
+    repository = _repository()
+    repository.apply_due_sleep_timers()
+    _publish_snapshot(repository)
+
+
+@subscribe(
+    "webio.stream.snapshot.requested",
+    receivers=("media_control.now_playing",),
+)
+def on_now_playing_snapshot_requested(event: Any) -> None:
+    payload = _event_payload(event)
+    if text(payload.get("receiver")) != "media_control.now_playing":
+        return
+    _publish_snapshot(
+        _repository(), webspace_id=text(payload.get("webspace_id"))
+    )
 
 
 @tool(summary="Ensure the durable Media Center control-plane schema.", side_effects="local_write")
@@ -118,6 +151,7 @@ def create_session(
     queue: list[Mapping[str, Any]] | None = None,
     active_index: int = 0,
     route: Mapping[str, Any] | None = None,
+    queue_source: Mapping[str, Any] | None = None,
     lease_seconds: int = 120,
     webspace_id: str = "",
     **_: Any,
@@ -130,6 +164,7 @@ def create_session(
         queue=queue or [],
         active_index=active_index,
         route=route,
+        queue_source=queue_source,
         lease_seconds=lease_seconds,
     )
     if result.get("ok"):
@@ -234,6 +269,31 @@ def acknowledge_command(command_id: str = "", status: str = "applied", result: M
     return _result_or_error(_repository().acknowledge_command(command_id, status=status, result=result))
 
 
+@tool(summary="Reconcile one endpoint after reconnect without duplicate actions.", side_effects="local_write")
+def reconcile_endpoint(
+    session_id: str = "",
+    target_id: str = "",
+    endpoint_revision: int = 0,
+    acknowledged_command_revision: int = 0,
+    observed: Mapping[str, Any] | None = None,
+    authority: str = "endpoint_preferred",
+    webspace_id: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    repository = _repository()
+    result = repository.reconcile_endpoint(
+        session_id,
+        target_id=target_id,
+        endpoint_revision=endpoint_revision,
+        acknowledged_command_revision=acknowledged_command_revision,
+        observed=observed,
+        authority=authority,
+    )
+    if result.get("ok"):
+        _publish_snapshot(repository, webspace_id=webspace_id)
+    return _result_or_error(result)
+
+
 @tool(summary="Read effective profile and target playback settings.", side_effects="none")
 def get_settings(profile_id: str = "default", target_id: str = "", **_: Any) -> dict[str, Any]:
     return _repository().get_settings(profile_id=profile_id, target_id=target_id)
@@ -252,6 +312,20 @@ def now_playing(profile_id: str = "", target_id: str = "", limit: int = 20, **_:
 @tool(summary="Record one bounded playback quality metric.", side_effects="local_write")
 def record_qoe(session_id: str = "", metric: str = "", value: float = 0, dimensions: Mapping[str, Any] | None = None, **_: Any) -> dict[str, Any]:
     return _result_or_error(_repository().record_qoe(session_id, metric=metric, value=value, dimensions=dimensions))
+
+
+@tool(summary="Return bounded aggregate and recent playback QoE evidence.", side_effects="none")
+def qoe_summary(
+    session_id: str = "",
+    target_id: str = "",
+    limit: int = 30,
+    **_: Any,
+) -> dict[str, Any]:
+    return _result_or_error(
+        _repository().qoe_summary(
+            session_id=session_id, target_id=target_id, limit=limit
+        )
+    )
 
 
 @tool(summary="Resolve a voice transport command against current playback context.", side_effects="local_write")

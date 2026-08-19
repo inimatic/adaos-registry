@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_control.qoe_summary.v1",
+  "type": "object",
+  "required": ["ok", "schema", "metrics", "recent", "count", "bounded"],
+  "properties": {
+    "ok": {"const": true},
+    "schema": {"const": "adaos.media_control.qoe_summary.v1"},
+    "metrics": {"type": "array", "items": {"type": "object"}},
+    "recent": {"type": "array", "maxItems": 100, "items": {"type": "object"}},
+    "count": {"type": "integer", "minimum": 0, "maximum": 100},
+    "bounded": {"const": true}
+  },
+  "additionalProperties": false
+}

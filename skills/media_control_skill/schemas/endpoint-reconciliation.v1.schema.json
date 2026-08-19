@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_control.endpoint_reconciliation.v1",
+  "type": "object",
+  "required": ["ok", "schema", "idempotent_replay", "action", "session"],
+  "properties": {
+    "ok": {"const": true},
+    "schema": {"const": "adaos.media_control.endpoint_reconciliation.v1"},
+    "idempotent_replay": {"type": "boolean"},
+    "action": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {"enum": ["noop", "load", "seek", "transport", "replay_commands"]}
+      },
+      "additionalProperties": true
+    },
+    "session": {"type": "object"}
+  },
+  "additionalProperties": false
+}

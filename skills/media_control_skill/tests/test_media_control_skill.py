@@ -215,3 +215,191 @@ def test_public_playback_contracts_validate_strictly():
     for filename, payload in payloads.items():
         schema = json.loads((SKILL_ROOT / "schemas" / filename).read_text(encoding="utf-8"))
         jsonschema.Draft202012Validator(schema).validate(payload)
+
+
+def test_endpoint_reconciliation_is_idempotent_and_acks_command_revisions():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    played = repository.command(
+        session["id"],
+        command="play",
+        arguments={},
+        actor_ref="profile:alice",
+        expected_revision=session["revision"],
+        idempotency_key="reconcile-play",
+    )
+    observed = {
+        "active_item_id": session["active_item_id"],
+        "state": "playing",
+        "position_ms": 42_000,
+        "duration_ms": 180_000,
+        "rate": 1.0,
+        "volume": 0.8,
+        "muted": False,
+    }
+
+    pending = repository.reconcile_endpoint(
+        session["id"],
+        target_id=session["target_id"],
+        endpoint_revision=1,
+        acknowledged_command_revision=0,
+        observed=observed,
+    )
+    replay = repository.reconcile_endpoint(
+        session["id"],
+        target_id=session["target_id"],
+        endpoint_revision=1,
+        acknowledged_command_revision=0,
+        observed=observed,
+    )
+    converged = repository.reconcile_endpoint(
+        session["id"],
+        target_id=session["target_id"],
+        endpoint_revision=2,
+        acknowledged_command_revision=played["command"]["command_revision"],
+        observed=observed,
+    )
+
+    assert pending["action"]["type"] == "replay_commands"
+    assert replay["idempotent_replay"] is True
+    assert replay["action"] == pending["action"]
+    assert converged["action"] == {
+        "type": "noop",
+        "reason": "endpoint_state_accepted",
+    }
+    assert converged["session"]["position_ms"] == 42_000
+    assert converged["session"]["observed_command_revision"] == 1
+    assert repository.pull_commands(session["target_id"])["items"][0]["status"] == "applied"
+
+    import json
+
+    schema = json.loads(
+        (SKILL_ROOT / "schemas" / "endpoint-reconciliation.v1.schema.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    pytest.importorskip("jsonschema").Draft202012Validator(schema).validate(
+        converged
+    )
+
+
+def test_coordinator_preferred_reconcile_does_not_repeat_seek():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    checkpoint = repository.checkpoint(
+        session["id"],
+        position_ms=60_000,
+        duration_ms=180_000,
+        state="paused",
+        source="app_shell",
+        expected_revision=session["revision"],
+    )
+    observed = {
+        "active_item_id": session["active_item_id"],
+        "state": "paused",
+        "position_ms": 10_000,
+        "duration_ms": 180_000,
+    }
+
+    first = repository.reconcile_endpoint(
+        session["id"],
+        target_id=session["target_id"],
+        endpoint_revision=1,
+        acknowledged_command_revision=0,
+        observed=observed,
+        authority="coordinator_preferred",
+    )
+    replay = repository.reconcile_endpoint(
+        session["id"],
+        target_id=session["target_id"],
+        endpoint_revision=1,
+        acknowledged_command_revision=0,
+        observed=observed,
+        authority="coordinator_preferred",
+    )
+
+    assert checkpoint["session"]["position_ms"] == 60_000
+    assert first["action"] == {
+        "type": "seek",
+        "position_ms": 60_000,
+        "reason": "coordinator_checkpoint_newer",
+    }
+    assert replay["action"] == first["action"]
+    assert replay["idempotent_replay"] is True
+
+
+def test_sleep_timer_expires_to_a_durable_pause_command():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    playing = repository.command(
+        session["id"],
+        command="play",
+        arguments={},
+        actor_ref="profile:alice",
+        expected_revision=session["revision"],
+        idempotency_key="timer-play",
+    )
+    timer = repository.command(
+        session["id"],
+        command="sleep_timer",
+        arguments={"seconds": 60},
+        actor_ref="profile:alice",
+        expected_revision=playing["session"]["revision"],
+        idempotency_key="timer-arm",
+    )
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE playback_sessions SET sleep_timer_at=? WHERE id=?",
+            (1, session["id"]),
+        )
+        connection.commit()
+
+    expired = repository.apply_due_sleep_timers()
+    current = repository.get_session(session["id"])["session"]
+    commands = repository.pull_commands(session["target_id"])["items"]
+
+    assert timer["session"]["sleep_timer_at"] > 0
+    assert expired["applied_session_ids"] == [session["id"]]
+    assert current["state"] == "paused"
+    assert current["sleep_timer_at"] == 0
+    assert commands[-1]["command"] == "pause"
+    assert commands[-1]["arguments"]["reason"] == "sleep_timer"
+
+
+def test_settings_inherit_profile_defaults_and_qoe_is_observable():
+    repository = MediaControlRepository()
+    session = _session(repository)
+    repository.set_settings(
+        profile_id="alice",
+        values={
+            "auto_fullscreen": False,
+            "preferred_rate": 1.5,
+            "checkpoint_interval_seconds": 20,
+        },
+    )
+    inherited = repository.get_settings(
+        profile_id="alice", target_id=session["target_id"]
+    )["settings"]
+    repository.record_qoe(session["id"], metric="first_frame_ms", value=450)
+    repository.record_qoe(session["id"], metric="first_frame_ms", value=550)
+    repository.record_qoe(
+        session["id"], metric="rebuffer_ms", value=100, dimensions={"route": "direct"}
+    )
+    summary = repository.qoe_summary(session_id=session["id"], limit=2)
+
+    assert inherited["auto_fullscreen"] is False
+    assert inherited["preferred_rate"] == 1.5
+    assert inherited["checkpoint_interval_seconds"] == 20
+    assert inherited["inherited_from_profile"] is True
+    metrics = {item["metric"]: item for item in summary["metrics"]}
+    assert metrics["first_frame_ms"]["average"] == 500
+    assert summary["count"] == 2
+    assert summary["bounded"] is True
+
+
+def test_declared_stream_subscriptions_have_runtime_handlers():
+    source = (SKILL_ROOT / "handlers" / "main.py").read_text(encoding="utf-8")
+
+    assert '@subscribe("sys.ready")' in source
+    assert '"webio.stream.snapshot.requested"' in source
+    assert 'receivers=("media_control.now_playing",)' in source
