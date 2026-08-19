@@ -15,6 +15,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from media_library_agent.repository import MediaLibraryAgentRepository  # noqa: E402
+from media_library_agent.rendition import rendition_plan  # noqa: E402
 from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
 
@@ -475,3 +476,243 @@ def test_topology_phase_rejects_external_root_on_wrong_node(tmp_path):
 
     assert result["ok"] is False
     assert result["error_code"] == "external_root_not_present_on_target"
+
+
+def _rendition_source(repository, worker, library: Path) -> dict:
+    root = repository.add_root(str(library))["root"]
+    scan = repository.create_job(root["id"], mode="full")
+    completed = worker.run_once()
+    assert completed and completed["id"] == scan["job"]["id"]
+    page = repository.pull_deltas(limit=10)
+    return page["items"][0]["source"]
+
+
+def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    original = library / "legacy.mkv"
+    original.write_bytes(b"original-media")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "rendition.sqlite3", node_id="node-a"
+    )
+    published = (
+        tmp_path / "published" / "media-library-rendition-test-browser-mp4-v1.mp4"
+    )
+
+    def register(path, _root, metadata):
+        return {
+            "resource_id": "original-ref",
+            "path": str(path),
+            "source_path": str(path),
+            "mime_type": "video/x-matroska",
+            "metadata": {
+                **metadata,
+                "technical": {
+                    "probe": "ffprobe",
+                    "container": "mkv",
+                    "codec": "hevc",
+                    "height": 1080,
+                },
+            },
+        }
+
+    def transcode(_source, target, _job, *, cancelled):
+        assert cancelled() is False
+        target.write_bytes(b"browser-compatible")
+        return {"size_bytes": target.stat().st_size, "mime_type": "video/mp4"}
+
+    def publish(target, _job):
+        published.parent.mkdir()
+        published.write_bytes(target.read_bytes())
+        return {
+            "resource_id": published.name,
+            "filename": published.name,
+            "path": str(published),
+            "mime_type": "video/mp4",
+            "size_bytes": published.stat().st_size,
+            "direct_urls": ["http://node-a/media/derived"],
+            "metadata": {"namespace": "media-library-rendition"},
+        }
+
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=register,
+        transcode=transcode,
+        publish_derived=publish,
+    )
+    source = _rendition_source(repository, worker, library)
+    plan = rendition_plan(
+        source,
+        endpoint_capabilities={
+            "codecs": ["h264"],
+            "mime_types": ["video/mp4"],
+            "containers": ["mp4"],
+            "max_video_height": 720,
+        },
+    )
+    assert plan["required"] is True
+    assert set(plan["reasons"]) == {
+        "codec_not_supported",
+        "mime_type_not_supported",
+        "container_not_supported",
+        "height_above_endpoint_limit",
+    }
+    queued = repository.create_rendition_job(
+        source["id"], profile="browser-mp4-v1", target=plan["target"]
+    )
+    result = worker.run_once()
+    assert result and result["id"] == queued["job"]["id"]
+    assert result["status"] == "completed"
+    changed = repository.get_source(source["id"])
+    rendition = changed["metadata"]["derived_renditions"][0]
+    assert rendition["exact_source_id"] == source["id"]
+    assert rendition["exact_source_revision"] == source["revision"]
+    assert rendition["exact_source_fingerprint"] == source["fingerprint"]
+    assert rendition["descriptor"]["metadata"]["storage_mode"] == "derived_copy"
+    assert published.read_bytes() == b"browser-compatible"
+    assert original.read_bytes() == b"original-media"
+    assert list((tmp_path / "renditions").glob("*")) == []
+
+    schema_dir = SKILL_ROOT / "schemas"
+    from jsonschema import Draft202012Validator
+
+    Draft202012Validator(
+        json.loads(
+            (schema_dir / "media-library-rendition-plan.v1.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    ).validate(plan)
+    Draft202012Validator(
+        json.loads(
+            (schema_dir / "media-library-rendition-job.v1.schema.json").read_text(
+                encoding="utf-8"
+            )
+        )
+    ).validate(result)
+
+
+def test_rendition_source_change_after_publish_is_not_advertised_and_is_cleaned(
+    tmp_path,
+):
+    library = tmp_path / "library"
+    library.mkdir()
+    original = library / "legacy.mkv"
+    original.write_bytes(b"v1")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "race.sqlite3", node_id="node-a"
+    )
+    published = tmp_path / "media-library-rendition-race.mp4"
+
+    def register(path, _root, metadata):
+        return {
+            "resource_id": "source",
+            "path": str(path),
+            "source_path": str(path),
+            "mime_type": "video/x-matroska",
+            "metadata": {
+                **metadata,
+                "technical": {"codec": "hevc", "container": "mkv"},
+            },
+        }
+
+    def transcode(_source, target, _job, *, cancelled):
+        assert cancelled() is False
+        target.write_bytes(b"derived")
+        return {"size_bytes": 7}
+
+    def publish(target, job):
+        published.write_bytes(target.read_bytes())
+        current = repository.get_source(job["source_id"])
+        repository.upsert_source(
+            {**current, "fingerprint": "changed-after-publish"},
+            job_id="concurrent-scan",
+        )
+        return {
+            "resource_id": published.name,
+            "filename": published.name,
+            "path": str(published),
+            "mime_type": "video/mp4",
+            "size_bytes": 7,
+            "metadata": {"namespace": "media-library-rendition"},
+        }
+
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=register,
+        transcode=transcode,
+        publish_derived=publish,
+    )
+    source = _rendition_source(repository, worker, library)
+    plan = rendition_plan(
+        source,
+        endpoint_capabilities={"codecs": ["h264"], "containers": ["mp4"]},
+    )
+    queued = repository.create_rendition_job(
+        source["id"], profile="browser-mp4-v1", target=plan["target"]
+    )
+    result = worker.run_once()
+    assert result["id"] == queued["job"]["id"]
+    assert result["status"] == "invalidated"
+    assert result["error"]["code"] == "source_changed"
+    assert published.exists() is False
+    changed = repository.get_source(source["id"])
+    assert changed["metadata"].get("derived_renditions") in (None, [])
+
+
+def test_queued_rendition_cancellation_is_terminal_without_worker(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "legacy.mkv").write_bytes(b"v1")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "cancel.sqlite3", node_id="node-a"
+    )
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=lambda path, _root, metadata: {
+            "resource_id": "source",
+            "path": str(path),
+            "mime_type": "video/x-matroska",
+            "metadata": metadata,
+        },
+    )
+    source = _rendition_source(repository, worker, library)
+    plan = rendition_plan(
+        source, endpoint_capabilities={"mime_types": ["video/mp4"]}
+    )
+    queued = repository.create_rendition_job(
+        source["id"], profile="browser-mp4-v1", target=plan["target"]
+    )
+    canceled = repository.request_rendition_cancel(queued["job"]["id"])
+    assert canceled["job"]["status"] == "canceled"
+    assert canceled["job"]["finished_at"]
+    assert repository.next_queued_rendition_job() is None
+
+
+def test_agent_deep_search_covers_unicode_folders_and_technical_metadata(tmp_path):
+    library = tmp_path / "library" / "Аудиокниги"
+    library.mkdir(parents=True)
+    (library / "01.mkv").write_bytes(b"v1")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "search.sqlite3", node_id="node-a"
+    )
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=lambda path, _root, metadata: {
+            "resource_id": "source",
+            "path": str(path),
+            "mime_type": "video/x-matroska",
+            "metadata": {
+                **metadata,
+                "technical": {"codec": "hevc", "container": "matroska"},
+            },
+        },
+    )
+    _rendition_source(repository, worker, library.parent)
+
+    by_folder = repository.search_sources(query="Аудиокниги", limit=1)
+    by_codec = repository.search_sources(query="hevc", limit=1)
+
+    assert by_folder["items"][0]["name"] == "01.mkv"
+    assert by_codec["items"][0]["match"]["stage"] == "agent_technical_fts"
+    assert by_codec["has_more"] is False

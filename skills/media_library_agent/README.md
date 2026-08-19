@@ -1,10 +1,10 @@
 # Media Library Agent
 
-`media_library_agent` is the node-local data-plane component of Media Center. It owns media roots, asynchronous filesystem discovery, reference registration, durable scan jobs, folder navigation, and ordered source deltas. It does not own the global catalog, grouping, personalization, playback sessions, or deployment policy.
+`media_library_agent` is the node-local data-plane component of Media Center. It owns media roots, asynchronous filesystem discovery, reference registration, durable scan and rendition jobs, folder navigation, technical deep search, and ordered source deltas. It does not own the global catalog, grouping, personalization, playback sessions, or deployment policy.
 
 ## Storage boundary
 
-Media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design.
+Original media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design. A browser-compatible rendition is explicitly derived data: its exact source revision and fingerprint are recorded, and only that generated output may be copied to managed media storage.
 
 ## Scan model
 
@@ -20,9 +20,17 @@ Media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.
 - `MEDIA_LIBRARY_AGENT_MAX_BYTES_PER_SECOND` optionally throttles scanner read throughput. Progress reports phase, elapsed time, throughput, wait reason, and checkpoint age in a replace-mode variable.
 - Every changed source receives a cheap basic technical descriptor. `MEDIA_LIBRARY_AGENT_PROBE_MODE=ffprobe` enables a bounded external probe when `ffprobe` is installed; `MEDIA_LIBRARY_AGENT_PROBE_TIMEOUT_SECONDS` is clamped to 1-30 seconds.
 
+## Rendition model
+
+- `plan_rendition` compares source facts with explicit endpoint codecs, MIME types, containers, height, and bitrate. Compatible sources do not create a job.
+- One rendition shares the agent's single background worker with scanning. Playback/critical pressure pauses it. CPU threads, RSS, timeout, output size, temporary disk quota, cancellation, and final publication are bounded by `MEDIA_LIBRARY_AGENT_RENDITION_*` settings.
+- The worker writes a `.partial` temporary file, atomically closes it, rechecks the source witness, publishes the derived resource, and atomically advertises it in a new source delta. A source change before or after publication invalidates the job and removes the generated resource.
+- `media_library_agent.rendition_progress` publishes the latest durable job at a bounded rate. Restart recovery requeues interrupted work; queued cancellation is immediately terminal.
+- `search_sources` uses node-local Unicode FTS over names, folders, embedded metadata, and technical probe fields. Coordinator search remains the fast first stage; this endpoint is a bounded federated deep-search stage.
+
 ## Coordinator contract
 
-The coordinator pulls `adaos.media_library.source_delta.v1` records with an opaque cursor. Deltas are ordered per agent, source revisions are monotonic, and replay is idempotent. Folder segments are included in source metadata so search remains useful for numbered audiobook and album tracks. Node-local folder navigation is separately cursor-backed and never materializes an entire tree.
+The coordinator pulls `adaos.media_library.source_delta.v1` records with an opaque cursor. Deltas are ordered per agent, source revisions are monotonic, and replay is idempotent. Folder segments are included in source metadata so search remains useful for numbered audiobook and album tracks. Derived rendition descriptors remain variants of the existing work and never become duplicate catalog rows. Node-local folder navigation is separately cursor-backed and never materializes an entire tree.
 
 ## Distributed topology adapter
 

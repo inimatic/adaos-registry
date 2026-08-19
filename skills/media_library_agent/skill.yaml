@@ -1,6 +1,6 @@
 name: media_library_agent
-version: 0.4.1
-description: Distributed node-local media discovery agent with durable asynchronous scans and ordered catalog deltas.
+version: 0.5.0
+description: Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.
 supported_locales:
 - en
 - ru
@@ -20,6 +20,7 @@ service:
     timeout_ms: 1000
 capabilities:
 - media.catalog
+- media.rendition
 - distributed.service.register
 - distributed.service.renew
 - distributed.service.drain
@@ -56,6 +57,11 @@ exports:
   - configure_schedule
   - set_resource_pressure
   - inspect_source
+  - search_sources
+  - plan_rendition
+  - rendition_status
+  - list_rendition_jobs
+  - cancel_rendition
   - status
   - join_topology
   - renew_topology
@@ -246,6 +252,68 @@ tools:
       source_id: {type: string}
     additionalProperties: true
   output_schema: {type: object}
+- name: search_sources
+  entry: handlers.main:search_sources
+  description: Search one node-local shard including technical metadata.
+  side_effects: none
+  input_schema:
+    type: object
+    required: [query]
+    properties:
+      query: {type: string, minLength: 1, maxLength: 500}
+      limit: {type: integer, minimum: 1, maximum: 100, default: 30}
+      cursor: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: plan_rendition
+  entry: handlers.main:plan_rendition
+  description: Plan and queue a bounded browser-compatible derived rendition when required.
+  side_effects: local_write
+  timeout_seconds: 15
+  input_schema:
+    type: object
+    required: [source_id]
+    properties:
+      source_id: {type: string, minLength: 1}
+      endpoint_capabilities: {type: object}
+      profile: {type: string, default: browser-mp4-v1}
+      priority: {type: integer, minimum: 0, maximum: 1000, default: 50}
+      force: {type: boolean, default: false}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: rendition_status
+  entry: handlers.main:rendition_status
+  description: Return one bounded durable rendition job.
+  side_effects: none
+  input_schema:
+    type: object
+    required: [job_id]
+    properties:
+      job_id: {type: string, minLength: 1}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: list_rendition_jobs
+  entry: handlers.main:list_rendition_jobs
+  description: List recent bounded rendition jobs.
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      source_id: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 100, default: 20}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: cancel_rendition
+  entry: handlers.main:cancel_rendition
+  description: Cooperatively cancel one queued or running rendition.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [job_id]
+    properties:
+      job_id: {type: string, minLength: 1}
+    additionalProperties: true
+  output_schema: {type: object}
 - name: status
   entry: handlers.main:status
   description: Return compact agent health, progress, and capacity.
@@ -378,6 +446,24 @@ data_routes:
   guard_visibility: only public bounded tools expose metadata; media bytes remain external
   budget:
     max_payload_bytes: 1048576
+- surface: modal:media-center-renditions
+  route: stream
+  receiver: media_library_agent.rendition_progress
+  owner: skill:media_library_agent
+  first_paint: latest bounded rendition job or idle
+  recovery: rendition_status reads the durable job after reconnect
+  update_source:
+  - media_library_agent.worker
+  - webio.stream.snapshot.requested
+  budget:
+    max_payload_bytes: 32768
+    max_publish_hz: 2
+    max_items: 1
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: preserve the last rendition value and mark it stale
+    log: skill:media_library_agent.runtime
+    quarantine: false
 memory_budget:
   expected_rss_mb: 128
   background_workers:
@@ -386,6 +472,10 @@ memory_budget:
   caches:
   - name: scan_batch
     route: process
+    max_items: 100
+    cleanup_hook: dispose
+  - name: rendition_jobs
+    route: skill-local
     max_items: 100
     cleanup_hook: dispose
 llm_hints:

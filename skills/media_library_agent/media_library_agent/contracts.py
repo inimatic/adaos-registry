@@ -13,6 +13,8 @@ ROOT_SCHEMA = "adaos.media_library.root.v1"
 JOB_SCHEMA = "adaos.media_library.scan_job.v1"
 DELTA_SCHEMA = "adaos.media_library.source_delta.v1"
 PROGRESS_SCHEMA = "adaos.media_library.scan_progress.v1"
+RENDITION_JOB_SCHEMA = "adaos.media_library.rendition_job.v1"
+RENDITION_PLAN_SCHEMA = "adaos.media_library.rendition_plan.v1"
 
 VIDEO_EXTENSIONS = frozenset({".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".ogv", ".ts", ".m2ts"})
 AUDIO_EXTENSIONS = frozenset({".mp3", ".wav", ".flac", ".m4a", ".aac", ".opus", ".ogg", ".wma", ".aiff", ".ape", ".mka"})

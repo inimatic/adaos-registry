@@ -14,7 +14,15 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from media_library_agent.contracts import PROGRESS_SCHEMA, SCHEMA_VERSION, compact_error, now_iso, text  # noqa: E402
+from media_library_agent.contracts import (  # noqa: E402
+    PROGRESS_SCHEMA,
+    RENDITION_JOB_SCHEMA,
+    SCHEMA_VERSION,
+    compact_error,
+    now_iso,
+    text,
+)
+from media_library_agent.rendition import rendition_limits, rendition_plan  # noqa: E402
 from media_library_agent.repository import MediaLibraryAgentRepository, default_db_path  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
 from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
@@ -47,11 +55,24 @@ def _publish_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
         from adaos.sdk.io import stream_variable_publish
 
         meta = {"webspace_id": webspace_id} if webspace_id else None
+        is_rendition = text(payload.get("job_type")) == "rendition"
         stream_variable_publish(
-            "media_library_agent.progress",
+            (
+                "media_library_agent.rendition_progress"
+                if is_rendition
+                else "media_library_agent.progress"
+            ),
             dict(payload),
-            var_id="media_library_agent.current_scan",
-            seq=int((payload.get("progress") or {}).get("processed_count") or 0),
+            var_id=(
+                "media_library_agent.current_rendition"
+                if is_rendition
+                else "media_library_agent.current_scan"
+            ),
+            seq=(
+                int(payload.get("revision") or 0)
+                if is_rendition
+                else int((payload.get("progress") or {}).get("processed_count") or 0)
+            ),
             ttl_ms=120000,
             _meta=meta,
         )
@@ -124,12 +145,41 @@ def on_sys_ready(_: Any) -> None:
     recover_interrupted_runtime()
 
 
-@subscribe("webio.stream.snapshot.requested", receivers=("media_library_agent.progress",))
+@subscribe(
+    "webio.stream.snapshot.requested",
+    receivers=(
+        "media_library_agent.progress",
+        "media_library_agent.rendition_progress",
+    ),
+)
 def on_progress_snapshot_requested(event: Any) -> None:
     payload = _event_payload(event)
-    if text(payload.get("receiver")) != "media_library_agent.progress":
+    receiver = text(payload.get("receiver"))
+    if receiver not in {
+        "media_library_agent.progress",
+        "media_library_agent.rendition_progress",
+    }:
         return
     repository, worker = _runtime()
+    if receiver == "media_library_agent.rendition_progress":
+        jobs = repository.list_rendition_jobs(limit=1).get("items") or []
+        job = dict(jobs[0]) if jobs else {
+            "schema": RENDITION_JOB_SCHEMA,
+            "id": "",
+            "status": "idle",
+            "revision": 0,
+        }
+        _publish_progress(
+            {
+                **job,
+                "job_type": "rendition",
+                "agent_id": repository.agent_id,
+                "node_id": repository.node_id,
+                "updated_at": now_iso(),
+            },
+            text(payload.get("webspace_id")),
+        )
+        return
     jobs = repository.list_jobs(limit=1).get("items") or []
     job = dict(jobs[0]) if jobs else {}
     progress = dict(job.get("progress") or {})
@@ -357,6 +407,114 @@ def inspect_source(source_id: str = "", **_: Any) -> dict[str, Any]:
     return {"ok": True, "schema": SCHEMA_VERSION, "source": source}
 
 
+@tool(
+    summary="Search node-local filenames, folders, tags, and technical metadata.",
+    side_effects="none",
+)
+def search_sources(
+    query: str = "", limit: int = 30, cursor: str = "", **_: Any
+) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    try:
+        return repository.search_sources(query=query, limit=limit, cursor=cursor)
+    except ValueError:
+        return _human_error(
+            "invalid_cursor", "The catalog cursor has expired or is invalid."
+        )
+
+
+@tool(
+    summary="Plan and optionally queue one browser-compatible derived rendition.",
+    side_effects="local_write",
+)
+def plan_rendition(
+    source_id: str = "",
+    endpoint_capabilities: Mapping[str, Any] | None = None,
+    profile: str = "browser-mp4-v1",
+    priority: int = 50,
+    force: bool = False,
+    **_: Any,
+) -> dict[str, Any]:
+    repository, worker = _runtime()
+    source = repository.get_source(source_id)
+    if source is None:
+        return _human_error(
+            "source_not_found",
+            "The media source is no longer available.",
+            source_id=text(source_id),
+        )
+    plan = rendition_plan(
+        source,
+        endpoint_capabilities=endpoint_capabilities,
+        profile=profile,
+    )
+    if not plan["required"]:
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "asynchronous": False,
+            "plan": plan,
+            "job": None,
+        }
+    queued = repository.create_rendition_job(
+        source_id,
+        profile=text(profile) or "browser-mp4-v1",
+        target=plan["target"],
+        priority=priority,
+        force=bool(force),
+    )
+    if not queued.get("ok"):
+        return _human_error(
+            text(queued.get("error")) or "rendition_queue_failed",
+            "The compatible media rendition could not be queued.",
+            source_id=text(source_id),
+        )
+    worker.ensure_started()
+    return {
+        "ok": True,
+        "schema": SCHEMA_VERSION,
+        "asynchronous": True,
+        "plan": plan,
+        "job": queued.get("job"),
+        "created": bool(queued.get("created")),
+    }
+
+
+@tool(summary="Inspect one durable rendition job.", side_effects="none")
+def rendition_status(job_id: str = "", **_: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    job = repository.get_rendition_job(job_id)
+    if job is None:
+        return _human_error(
+            "rendition_job_not_found",
+            "The rendition job is no longer available.",
+            job_id=text(job_id),
+        )
+    return {"ok": True, "schema": SCHEMA_VERSION, "job": job}
+
+
+@tool(summary="List recent bounded rendition jobs.", side_effects="none")
+def list_rendition_jobs(
+    source_id: str = "", limit: int = 20, **_: Any
+) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    return repository.list_rendition_jobs(source_id=source_id, limit=limit)
+
+
+@tool(summary="Cooperatively cancel one rendition job.", side_effects="local_write")
+def cancel_rendition(job_id: str = "", **_: Any) -> dict[str, Any]:
+    repository, worker = _runtime()
+    result = repository.request_rendition_cancel(job_id)
+    worker.ensure_started()
+    if result.get("ok"):
+        return result
+    return _human_error(
+        text(result.get("error")) or "rendition_cancel_failed",
+        "The rendition job could not be canceled.",
+        job_id=text(job_id),
+    )
+
+
 @tool(summary="Return compact agent health and capacity state.", side_effects="none")
 def status(**_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
@@ -374,6 +532,7 @@ def status(**_: Any) -> dict[str, Any]:
             "watch_max_entries": int(
                 os.environ.get("MEDIA_LIBRARY_AGENT_WATCH_MAX_ENTRIES") or 50_000
             ),
+            "rendition": rendition_limits(),
         },
     }
 

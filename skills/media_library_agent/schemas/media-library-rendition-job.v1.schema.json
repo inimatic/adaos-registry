@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_library.rendition_job.v1",
+  "type": "object",
+  "required": ["schema", "id", "source_id", "root_id", "source_revision", "source_fingerprint", "media_kind", "profile", "target", "priority", "status", "requested_at", "started_at", "finished_at", "output", "output_bytes", "error", "cancel_requested", "cleaned_at", "revision"],
+  "properties": {
+    "schema": {"const": "adaos.media_library.rendition_job.v1"},
+    "id": {"type": "string", "minLength": 1},
+    "source_id": {"type": "string", "minLength": 1},
+    "root_id": {"type": "string", "minLength": 1},
+    "source_revision": {"type": "integer", "minimum": 1},
+    "source_fingerprint": {"type": "string", "minLength": 1},
+    "media_kind": {"enum": ["audio", "video"]},
+    "profile": {"type": "string", "minLength": 1},
+    "target": {"type": "object"},
+    "priority": {"type": "integer", "minimum": 0, "maximum": 1000},
+    "status": {"enum": ["queued", "running", "waiting_resources", "canceling", "completed", "failed", "canceled", "invalidated"]},
+    "requested_at": {"type": "string"},
+    "started_at": {"type": "string"},
+    "finished_at": {"type": "string"},
+    "output": {"type": "object"},
+    "output_bytes": {"type": "integer", "minimum": 0},
+    "error": {
+      "oneOf": [
+        {"type": "null"},
+        {
+          "type": "object",
+          "required": ["code", "detail"],
+          "properties": {
+            "code": {"type": "string", "minLength": 1},
+            "detail": {"type": "string"}
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "cancel_requested": {"type": "boolean"},
+    "cleaned_at": {"type": "string"},
+    "revision": {"type": "integer", "minimum": 1}
+  },
+  "additionalProperties": false
+}

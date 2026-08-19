@@ -10,6 +10,7 @@ from .contracts import (
     DELTA_SCHEMA,
     JOB_SCHEMA,
     ROOT_SCHEMA,
+    RENDITION_JOB_SCHEMA,
     SCHEMA_VERSION,
     decode_cursor,
     encode_cursor,
@@ -133,6 +134,11 @@ class MediaLibraryAgentRepository:
                 );
                 CREATE INDEX IF NOT EXISTS idx_media_agent_sources_root ON sources(root_id, present, relative_path);
                 CREATE INDEX IF NOT EXISTS idx_media_agent_sources_kind ON sources(media_kind, present);
+                CREATE VIRTUAL TABLE IF NOT EXISTS source_search USING fts5(
+                    source_id UNINDEXED,
+                    text,
+                    tokenize='unicode61 remove_diacritics 2'
+                );
                 CREATE TABLE IF NOT EXISTS source_deltas (
                     sequence INTEGER PRIMARY KEY AUTOINCREMENT,
                     id TEXT NOT NULL UNIQUE,
@@ -168,6 +174,32 @@ class MediaLibraryAgentRepository:
                 );
                 CREATE INDEX IF NOT EXISTS idx_media_agent_topology_operation
                     ON topology_phase_receipts(operation_id, phase);
+                CREATE TABLE IF NOT EXISTS rendition_jobs (
+                    id TEXT PRIMARY KEY,
+                    source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+                    root_id TEXT NOT NULL,
+                    source_revision INTEGER NOT NULL,
+                    source_fingerprint TEXT NOT NULL,
+                    media_kind TEXT NOT NULL,
+                    profile TEXT NOT NULL,
+                    target_json TEXT NOT NULL,
+                    priority INTEGER NOT NULL DEFAULT 50,
+                    status TEXT NOT NULL,
+                    requested_at TEXT NOT NULL,
+                    started_at TEXT NOT NULL DEFAULT '',
+                    finished_at TEXT NOT NULL DEFAULT '',
+                    output_json TEXT NOT NULL DEFAULT '{}',
+                    output_bytes INTEGER NOT NULL DEFAULT 0,
+                    error_code TEXT NOT NULL DEFAULT '',
+                    error_detail TEXT NOT NULL DEFAULT '',
+                    cancel_requested INTEGER NOT NULL DEFAULT 0,
+                    cleaned_at TEXT NOT NULL DEFAULT '',
+                    revision INTEGER NOT NULL DEFAULT 1
+                );
+                CREATE INDEX IF NOT EXISTS idx_media_agent_rendition_queue
+                    ON rendition_jobs(status, priority, requested_at);
+                CREATE INDEX IF NOT EXISTS idx_media_agent_rendition_source
+                    ON rendition_jobs(source_id, source_fingerprint, profile);
                 """
             )
             schedule_columns = {
@@ -185,6 +217,33 @@ class MediaLibraryAgentRepository:
                         f"ALTER TABLE schedules ADD COLUMN {name} {definition}"
                     )
             connection.execute("INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('schema_version', ?)", (SCHEMA_VERSION,))
+            search_count = int(
+                connection.execute("SELECT COUNT(*) FROM source_search").fetchone()[0]
+            )
+            source_count = int(
+                connection.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+            )
+            if search_count != source_count:
+                connection.execute("DELETE FROM source_search")
+                for source_row in connection.execute(
+                    "SELECT id,name,relative_path,folder_path,metadata_json,descriptor_json FROM sources"
+                ).fetchall():
+                    connection.execute(
+                        "INSERT INTO source_search(source_id,text) VALUES (?,?)",
+                        (
+                            str(source_row["id"]),
+                            " ".join(
+                                str(source_row[key] or "")
+                                for key in (
+                                    "name",
+                                    "relative_path",
+                                    "folder_path",
+                                    "metadata_json",
+                                    "descriptor_json",
+                                )
+                            ),
+                        ),
+                    )
             connection.commit()
         return {"ok": True, "schema": SCHEMA_VERSION, "db_path": str(self.db_path), "node_id": self.node_id}
 
@@ -379,6 +438,14 @@ class MediaLibraryAgentRepository:
                 WHERE status IN ('running', 'waiting_resources', 'canceling')
                 """
             ).rowcount
+            count += connection.execute(
+                """
+                UPDATE rendition_jobs SET status='queued', started_at='',
+                    finished_at='', error_code='', error_detail='',
+                    revision=revision+1
+                WHERE status IN ('running', 'waiting_resources', 'canceling')
+                """
+            ).rowcount
             connection.commit()
         return max(0, int(count or 0))
 
@@ -414,7 +481,12 @@ class MediaLibraryAgentRepository:
             return {"ok": False, "error": "scan_job_not_found", "job_id": token, "schema": SCHEMA_VERSION}
         if job["status"] in TERMINAL_JOB_STATUSES:
             return {"ok": True, "schema": SCHEMA_VERSION, "job": job, "changed": False}
-        updated = self.update_job(token, status="canceling", cancel_requested=1)
+        updated = self.update_job(
+            token,
+            status="canceled" if job["status"] == "queued" else "canceling",
+            cancel_requested=1,
+            finished_at=now_iso() if job["status"] == "queued" else "",
+        )
         return {"ok": True, "schema": SCHEMA_VERSION, "job": updated, "changed": True}
 
     def list_jobs(self, *, limit: int = 20, root_id: str = "") -> dict[str, Any]:
@@ -431,6 +503,327 @@ class MediaLibraryAgentRepository:
                 tuple(params),
             ).fetchall()
         return {"ok": True, "schema": SCHEMA_VERSION, "items": [self._public_job(row) for row in rows], "count": len(rows)}
+
+    def create_rendition_job(
+        self,
+        source_id: str,
+        *,
+        profile: str,
+        target: Mapping[str, Any],
+        priority: int = 50,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        source = self.get_source(source_id)
+        if source is None or not source.get("present"):
+            return {
+                "ok": False,
+                "error": "source_not_found",
+                "source_id": text(source_id),
+                "schema": SCHEMA_VERSION,
+            }
+        profile_token = text(profile) or "browser-mp4-v1"
+        target_json = json_dumps(dict(target))
+        with self.connect() as connection:
+            if not force:
+                existing = connection.execute(
+                    """
+                    SELECT * FROM rendition_jobs
+                    WHERE source_id=? AND source_fingerprint=? AND profile=?
+                        AND target_json=?
+                        AND status IN ('queued','running','waiting_resources','canceling','completed')
+                    ORDER BY requested_at DESC LIMIT 1
+                    """,
+                    (
+                        text(source_id),
+                        text(source.get("fingerprint")),
+                        profile_token,
+                        target_json,
+                    ),
+                ).fetchone()
+                if existing:
+                    return {
+                        "ok": True,
+                        "schema": SCHEMA_VERSION,
+                        "created": False,
+                        "job": self._public_rendition_job(existing),
+                    }
+            requested_at = now_iso()
+            job_id = stable_id(
+                "renditionjob",
+                source_id,
+                source.get("revision"),
+                source.get("fingerprint"),
+                profile_token,
+                target_json,
+                requested_at if force else "",
+                size=28,
+            )
+            connection.execute(
+                """
+                INSERT INTO rendition_jobs(
+                    id,source_id,root_id,source_revision,source_fingerprint,
+                    media_kind,profile,target_json,priority,status,requested_at
+                ) VALUES (?,?,?,?,?,?,?,?,?,'queued',?)
+                """,
+                (
+                    job_id,
+                    text(source_id),
+                    text(source.get("root_id")),
+                    int(source.get("revision") or 0),
+                    text(source.get("fingerprint")),
+                    text(source.get("media_kind")),
+                    profile_token,
+                    target_json,
+                    max(0, min(1000, int(priority or 50))),
+                    requested_at,
+                ),
+            )
+            row = connection.execute(
+                "SELECT * FROM rendition_jobs WHERE id=?", (job_id,)
+            ).fetchone()
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "created": True,
+            "job": self._public_rendition_job(row),
+        }
+
+    def get_rendition_job(self, job_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM rendition_jobs WHERE id=?", (text(job_id),)
+            ).fetchone()
+        return self._public_rendition_job(row) if row else None
+
+    def next_queued_rendition_job(self) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT * FROM rendition_jobs WHERE status='queued'
+                ORDER BY priority,requested_at LIMIT 1
+                """
+            ).fetchone()
+        return self._public_rendition_job(row) if row else None
+
+    def claim_rendition_job(self, job_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            changed = connection.execute(
+                """
+                UPDATE rendition_jobs SET status='running',started_at=?,
+                    finished_at='',error_code='',error_detail='',revision=revision+1
+                WHERE id=? AND status='queued'
+                """,
+                (now_iso(), text(job_id)),
+            ).rowcount
+            row = connection.execute(
+                "SELECT * FROM rendition_jobs WHERE id=?", (text(job_id),)
+            ).fetchone()
+            connection.commit()
+        return self._public_rendition_job(row) if changed and row else None
+
+    def update_rendition_job(
+        self, job_id: str, *, status: str | None = None, **fields: Any
+    ) -> dict[str, Any] | None:
+        allowed = {
+            "started_at",
+            "finished_at",
+            "output_json",
+            "output_bytes",
+            "error_code",
+            "error_detail",
+            "cancel_requested",
+            "cleaned_at",
+        }
+        updates: list[str] = []
+        values: list[Any] = []
+        if status is not None:
+            updates.append("status=?")
+            values.append(text(status))
+        for key, value in fields.items():
+            if key not in allowed:
+                continue
+            updates.append(f"{key}=?")
+            values.append(value)
+        if not updates:
+            return self.get_rendition_job(job_id)
+        updates.append("revision=revision+1")
+        values.append(text(job_id))
+        with self.connect() as connection:
+            connection.execute(
+                f"UPDATE rendition_jobs SET {', '.join(updates)} WHERE id=?",
+                tuple(values),
+            )
+            connection.commit()
+        return self.get_rendition_job(job_id)
+
+    def request_rendition_cancel(self, job_id: str) -> dict[str, Any]:
+        job = self.get_rendition_job(job_id)
+        if job is None:
+            return {
+                "ok": False,
+                "error": "rendition_job_not_found",
+                "job_id": text(job_id),
+                "schema": SCHEMA_VERSION,
+            }
+        if job["status"] in {"completed", "failed", "canceled", "invalidated"}:
+            return {"ok": True, "schema": SCHEMA_VERSION, "job": job, "changed": False}
+        updated = self.update_rendition_job(
+            job_id,
+            status="canceled" if job["status"] == "queued" else "canceling",
+            cancel_requested=1,
+            finished_at=now_iso() if job["status"] == "queued" else "",
+            error_code="rendition_canceled" if job["status"] == "queued" else "",
+        )
+        return {"ok": True, "schema": SCHEMA_VERSION, "job": updated, "changed": True}
+
+    def list_rendition_jobs(
+        self, *, limit: int = 20, source_id: str = ""
+    ) -> dict[str, Any]:
+        bounded = max(1, min(100, int(limit or 20)))
+        params: list[Any] = []
+        where = ""
+        if text(source_id):
+            where = "WHERE source_id=?"
+            params.append(text(source_id))
+        params.append(bounded)
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM rendition_jobs {where} ORDER BY requested_at DESC LIMIT ?",
+                tuple(params),
+            ).fetchall()
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "items": [self._public_rendition_job(row) for row in rows],
+            "count": len(rows),
+        }
+
+    def complete_rendition_job(
+        self,
+        job_id: str,
+        *,
+        descriptor: Mapping[str, Any],
+        output_bytes: int,
+    ) -> dict[str, Any]:
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            job = connection.execute(
+                "SELECT * FROM rendition_jobs WHERE id=?", (text(job_id),)
+            ).fetchone()
+            if job is None:
+                connection.rollback()
+                return {"ok": False, "error": "rendition_job_not_found"}
+            source = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (str(job["source_id"]),)
+            ).fetchone()
+            source_matches = bool(
+                source
+                and bool(source["present"])
+                and int(source["revision"]) == int(job["source_revision"])
+                and str(source["fingerprint"]) == str(job["source_fingerprint"])
+            )
+            if not source_matches:
+                connection.execute(
+                    """
+                    UPDATE rendition_jobs SET status='invalidated',finished_at=?,
+                        error_code='source_changed',error_detail='',revision=revision+1
+                    WHERE id=?
+                    """,
+                    (now_iso(), str(job["id"])),
+                )
+                connection.commit()
+                return {
+                    "ok": False,
+                    "error": "source_changed",
+                    "advertised": False,
+                    "cleanup_required": True,
+                }
+            metadata = json_loads(source["metadata_json"], {})
+            if not isinstance(metadata, dict):
+                metadata = {}
+            renditions = [
+                dict(item)
+                for item in metadata.get("derived_renditions") or []
+                if isinstance(item, Mapping)
+                and text(item.get("profile")) != str(job["profile"])
+            ]
+            rendition_id = stable_id(
+                "rendition",
+                source["id"],
+                source["fingerprint"],
+                job["profile"],
+                size=28,
+            )
+            target = json_loads(job["target_json"], {})
+            rendition = {
+                "id": rendition_id,
+                "profile": str(job["profile"]),
+                "exact_source_id": str(source["id"]),
+                "exact_source_revision": int(source["revision"]),
+                "exact_source_fingerprint": str(source["fingerprint"]),
+                "mime_type": text(descriptor.get("mime_type") or descriptor.get("mime")),
+                "descriptor": dict(descriptor),
+                "quality": {
+                    "codec": text(target.get("video_codec") or target.get("audio_codec")),
+                    "container": text(target.get("container")),
+                    "width": int(target.get("max_width") or 0),
+                    "height": int(target.get("max_height") or 0),
+                    "derived": True,
+                },
+                "size_bytes": max(0, int(output_bytes)),
+                "created_at": now_iso(),
+            }
+            renditions.append(rendition)
+            metadata["derived_renditions"] = renditions[-8:]
+            next_revision = int(source["revision"]) + 1
+            connection.execute(
+                """
+                UPDATE sources SET metadata_json=?,revision=?,last_seen_at=? WHERE id=?
+                """,
+                (json_dumps(metadata), next_revision, now_iso(), str(source["id"])),
+            )
+            connection.execute(
+                """
+                UPDATE rendition_jobs SET status='completed',finished_at=?,
+                    output_json=?,output_bytes=?,error_code='',error_detail='',
+                    revision=revision+1 WHERE id=?
+                """,
+                (
+                    now_iso(),
+                    json_dumps(dict(descriptor)),
+                    max(0, int(output_bytes)),
+                    str(job["id"]),
+                ),
+            )
+            changed = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (str(source["id"]),)
+            ).fetchone()
+            public_source = self._public_source(changed)
+            self._insert_delta(
+                connection, "updated", public_source, job_id=str(job["id"])
+            )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "advertised": True,
+            "rendition": rendition,
+            "source": public_source,
+            "job": self.get_rendition_job(job_id),
+        }
+
+    def invalidated_rendition_outputs(self, *, limit: int = 20) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM rendition_jobs
+                WHERE status='invalidated' AND cleaned_at='' AND output_json!='{}'
+                ORDER BY finished_at LIMIT ?
+                """,
+                (max(1, min(100, int(limit or 20))),),
+            ).fetchall()
+        return [self._public_rendition_job(row) for row in rows]
 
     def source_by_path(self, root_id: str, relative_path: str) -> dict[str, Any] | None:
         with self.connect() as connection:
@@ -459,6 +852,15 @@ class MediaLibraryAgentRepository:
                 operation = "restored" if not bool(previous["present"]) else "updated"
                 if str(previous["fingerprint"]) == text(source.get("fingerprint")) and bool(previous["present"]):
                     operation = "unchanged"
+                elif str(previous["fingerprint"]) != text(source.get("fingerprint")):
+                    connection.execute(
+                        """
+                        UPDATE rendition_jobs SET status='invalidated',finished_at=?,
+                            error_code='source_changed',revision=revision+1
+                        WHERE source_id=? AND status='completed'
+                        """,
+                        (now, str(previous["id"])),
+                    )
             revision = int(previous["revision"] or 0) + (0 if operation == "unchanged" else 1) if previous else 1
             source_id = str(previous["id"]) if previous else stable_id("source", self.node_id, root_id, relative_path, size=28)
             first_seen_at = str(previous["first_seen_at"]) if previous else now
@@ -490,6 +892,24 @@ class MediaLibraryAgentRepository:
             row = connection.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
             public = self._public_source(row)
             if operation != "unchanged":
+                connection.execute(
+                    "DELETE FROM source_search WHERE source_id=?", (source_id,)
+                )
+                connection.execute(
+                    "INSERT INTO source_search(source_id,text) VALUES (?,?)",
+                    (
+                        source_id,
+                        " ".join(
+                            (
+                                text(source.get("name")),
+                                relative_path,
+                                text(source.get("folder_path")),
+                                json_dumps(metadata),
+                                json_dumps(descriptor),
+                            )
+                        ),
+                    ),
+                )
                 self._insert_delta(connection, operation, public, job_id=job_id)
             connection.commit()
         return operation, public
@@ -555,6 +975,54 @@ class MediaLibraryAgentRepository:
             "count": len(items),
             "cursor": encode_cursor(after),
             "next_cursor": encode_cursor(next_sequence),
+            "has_more": has_more,
+            "agent": {"id": self.agent_id, "node_id": self.node_id},
+        }
+
+    def search_sources(
+        self, *, query: str, limit: int = 30, cursor: str = ""
+    ) -> dict[str, Any]:
+        token = text(query)
+        bounded = max(1, min(100, int(limit or 30)))
+        offset = decode_cursor(cursor)
+        if not token:
+            return {
+                "ok": True,
+                "schema": SCHEMA_VERSION,
+                "items": [],
+                "count": 0,
+                "next_cursor": None,
+                "has_more": False,
+                "agent": {"id": self.agent_id, "node_id": self.node_id},
+            }
+        terms = [term for term in re.findall(r"[\w]+", token, flags=re.UNICODE) if term][:12]
+        if not terms:
+            terms = [token]
+        expression = " AND ".join(
+            f'"{term.replace(chr(34), chr(34) * 2)}"*' for term in terms
+        )
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT s.*,bm25(source_search) AS rank
+                FROM source_search JOIN sources s ON s.id=source_search.source_id
+                WHERE source_search.text MATCH ? AND s.present=1
+                ORDER BY rank,lower(s.name),s.id LIMIT ? OFFSET ?
+                """,
+                (expression, bounded + 1, offset),
+            ).fetchall()
+        visible = rows[:bounded]
+        has_more = len(rows) > bounded
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "items": [
+                self._public_source(row)
+                | {"match": {"stage": "agent_technical_fts", "rank": float(row["rank"])}}
+                for row in visible
+            ],
+            "count": len(visible),
+            "next_cursor": encode_cursor(offset + len(visible)) if has_more else None,
             "has_more": has_more,
             "agent": {"id": self.agent_id, "node_id": self.node_id},
         }
@@ -764,6 +1232,15 @@ class MediaLibraryAgentRepository:
             active = connection.execute("SELECT COUNT(*) AS count FROM scan_jobs WHERE status IN ('queued','running','waiting_resources','canceling')").fetchone()
             errors = connection.execute("SELECT COUNT(*) AS count FROM scan_jobs WHERE status='failed'").fetchone()
             delta = connection.execute("SELECT MAX(sequence) AS sequence FROM source_deltas").fetchone()
+            rendition = connection.execute(
+                """
+                SELECT COUNT(*) AS total,
+                    SUM(CASE WHEN status IN ('queued','running','waiting_resources','canceling') THEN 1 ELSE 0 END) AS active,
+                    SUM(CASE WHEN status='completed' THEN 1 ELSE 0 END) AS completed,
+                    SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed
+                FROM rendition_jobs
+                """
+            ).fetchone()
         return {
             "ok": True,
             "schema": SCHEMA_VERSION,
@@ -774,6 +1251,12 @@ class MediaLibraryAgentRepository:
             "available_bytes": int(sources["bytes"] or 0),
             "active_job_count": int(active["count"] or 0),
             "failed_job_count": int(errors["count"] or 0),
+            "renditions": {
+                "job_count": int(rendition["total"] or 0),
+                "active_count": int(rendition["active"] or 0),
+                "completed_count": int(rendition["completed"] or 0),
+                "failed_count": int(rendition["failed"] or 0),
+            },
             "delta_cursor": encode_cursor(int(delta["sequence"] or 0)),
             "storage": {"mode": "external_reference", "media_bytes_copied": False},
         }
@@ -912,6 +1395,37 @@ class MediaLibraryAgentRepository:
             "error": {"code": str(row["error_code"]), "detail": str(row["error_detail"])} if row["error_code"] else None,
             "cancel_requested": bool(row["cancel_requested"]),
             "webspace_id": str(row["webspace_id"]),
+            "revision": int(row["revision"]),
+        }
+
+    def _public_rendition_job(self, row: sqlite3.Row) -> dict[str, Any]:
+        return {
+            "schema": RENDITION_JOB_SCHEMA,
+            "id": str(row["id"]),
+            "source_id": str(row["source_id"]),
+            "root_id": str(row["root_id"]),
+            "source_revision": int(row["source_revision"]),
+            "source_fingerprint": str(row["source_fingerprint"]),
+            "media_kind": str(row["media_kind"]),
+            "profile": str(row["profile"]),
+            "target": json_loads(row["target_json"], {}),
+            "priority": int(row["priority"]),
+            "status": str(row["status"]),
+            "requested_at": str(row["requested_at"]),
+            "started_at": str(row["started_at"]),
+            "finished_at": str(row["finished_at"]),
+            "output": json_loads(row["output_json"], {}),
+            "output_bytes": int(row["output_bytes"]),
+            "error": (
+                {
+                    "code": str(row["error_code"]),
+                    "detail": str(row["error_detail"]),
+                }
+                if row["error_code"]
+                else None
+            ),
+            "cancel_requested": bool(row["cancel_requested"]),
+            "cleaned_at": str(row["cleaned_at"]),
             "revision": int(row["revision"]),
         }
 

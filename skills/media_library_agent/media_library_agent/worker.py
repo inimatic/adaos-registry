@@ -17,6 +17,7 @@ from .contracts import (
     AUDIO_EXTENSIONS,
     IMAGE_EXTENSIONS,
     PROGRESS_SCHEMA,
+    RENDITION_JOB_SCHEMA,
     VIDEO_EXTENSIONS,
     fingerprint,
     folder_segments,
@@ -24,11 +25,20 @@ from .contracts import (
     now_iso,
     text,
 )
+from .rendition import (
+    current_disk_usage,
+    output_path,
+    publish_derived_resource,
+    rendition_limits,
+    transcode_with_ffmpeg,
+)
 from .repository import MediaLibraryAgentRepository
 
 
 RegisterCallback = Callable[[Path, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
 PublishCallback = Callable[[Mapping[str, Any], str], None]
+TranscodeCallback = Callable[..., Mapping[str, Any]]
+PublishDerivedCallback = Callable[[Path, Mapping[str, Any]], Mapping[str, Any]]
 
 
 class MediaLibraryAgentWorker:
@@ -40,11 +50,15 @@ class MediaLibraryAgentWorker:
         *,
         register: RegisterCallback | None = None,
         publish: PublishCallback | None = None,
+        transcode: TranscodeCallback | None = None,
+        publish_derived: PublishDerivedCallback | None = None,
         poll_seconds: float = 1.0,
     ):
         self.repository = repository
         self._register = register or register_media_reference
         self._publish_callback = publish
+        self._transcode = transcode or transcode_with_ffmpeg
+        self._publish_derived = publish_derived or publish_derived_resource
         self._poll_seconds = max(0.05, min(10.0, float(poll_seconds)))
         self._stop = threading.Event()
         self._wake = threading.Event()
@@ -91,6 +105,12 @@ class MediaLibraryAgentWorker:
     def run_once(self) -> dict[str, Any] | None:
         self._enqueue_due_schedules()
         self._poll_watch_schedules()
+        self._cleanup_invalidated_renditions()
+        rendition = self.repository.next_queued_rendition_job()
+        if rendition is not None:
+            claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
+            if claimed_rendition is not None:
+                return self._run_rendition_job(claimed_rendition)
         queued = self.repository.next_queued_job()
         if queued is None:
             return None
@@ -98,6 +118,200 @@ class MediaLibraryAgentWorker:
         if claimed is None:
             return None
         return self._run_job(claimed)
+
+    def _run_rendition_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
+        job_id = text(job.get("id"))
+        source = self.repository.get_source(text(job.get("source_id")))
+        if source is None or not source.get("present"):
+            return self._finish_rendition_failed(job_id, "source_not_found")
+        if (
+            int(source.get("revision") or 0) != int(job.get("source_revision") or 0)
+            or text(source.get("fingerprint")) != text(job.get("source_fingerprint"))
+        ):
+            return self._finish_rendition_failed(
+                job_id, "source_changed", status="invalidated"
+            )
+        try:
+            source_path = self._contained_source_path(source)
+        except (OSError, ValueError) as exc:
+            return self._finish_rendition_failed(job_id, "source_path_invalid", str(exc))
+        target_path = output_path(self.repository.db_path, job)
+        limits = rendition_limits()
+        estimated = min(
+            int(limits["max_output_bytes"]), max(1, int(source.get("size_bytes") or 0))
+        )
+        if current_disk_usage(self.repository.db_path) + estimated > int(
+            limits["disk_quota_bytes"]
+        ):
+            return self._finish_rendition_failed(job_id, "rendition_disk_quota_exceeded")
+        self._publish_rendition(job_id)
+        try:
+            self._wait_for_rendition_resources(job_id)
+            if self._rendition_cancelled(job_id):
+                return self._finish_rendition_failed(
+                    job_id, "rendition_canceled", status="canceled"
+                )
+            result = self._transcode(
+                source_path,
+                target_path,
+                job,
+                cancelled=lambda: self._stop.is_set()
+                or self._rendition_cancelled(job_id),
+            )
+            current = self.repository.get_source(text(job.get("source_id")))
+            if (
+                current is None
+                or int(current.get("revision") or 0)
+                != int(job.get("source_revision") or 0)
+                or text(current.get("fingerprint"))
+                != text(job.get("source_fingerprint"))
+            ):
+                return self._finish_rendition_failed(
+                    job_id, "source_changed", status="invalidated"
+                )
+            descriptor = dict(self._publish_derived(target_path, job))
+            descriptor_metadata = dict(descriptor.get("metadata") or {})
+            descriptor_metadata.update(
+                {
+                    "storage_mode": "derived_copy",
+                    "derived_from_source_id": text(job.get("source_id")),
+                    "derived_from_source_revision": int(
+                        job.get("source_revision") or 0
+                    ),
+                    "derived_from_source_fingerprint": text(
+                        job.get("source_fingerprint")
+                    ),
+                    "rendition_profile": text(job.get("profile")),
+                }
+            )
+            descriptor["metadata"] = descriptor_metadata
+            completed = self.repository.complete_rendition_job(
+                job_id,
+                descriptor=descriptor,
+                output_bytes=int(
+                    result.get("size_bytes")
+                    or descriptor.get("size_bytes")
+                    or target_path.stat().st_size
+                ),
+            )
+            if not completed.get("advertised"):
+                self._cleanup_published_descriptor(descriptor)
+            self._publish_rendition(job_id)
+            return dict(
+                completed.get("job")
+                or self.repository.get_rendition_job(job_id)
+                or completed
+            )
+        except Exception as exc:
+            code, _, detail = text(exc).partition(":")
+            return self._finish_rendition_failed(
+                job_id, code or "rendition_failed", detail
+            )
+        finally:
+            target_path.unlink(missing_ok=True)
+            target_path.with_suffix(target_path.suffix + ".partial").unlink(
+                missing_ok=True
+            )
+
+    def _wait_for_rendition_resources(self, job_id: str) -> None:
+        waiting = False
+        while self._resource_pressure in {"playback", "critical"} and not self._stop.is_set():
+            if self._rendition_cancelled(job_id):
+                return
+            if not waiting:
+                self.repository.update_rendition_job(
+                    job_id, status="waiting_resources"
+                )
+                self._publish_rendition(job_id)
+                waiting = True
+            self._wake.wait(0.5)
+            self._wake.clear()
+        if waiting:
+            self.repository.update_rendition_job(job_id, status="running")
+
+    def _rendition_cancelled(self, job_id: str) -> bool:
+        job = self.repository.get_rendition_job(job_id)
+        return bool(job and job.get("cancel_requested"))
+
+    def _finish_rendition_failed(
+        self,
+        job_id: str,
+        code: str,
+        detail: str = "",
+        *,
+        status: str = "failed",
+    ) -> dict[str, Any]:
+        result = self.repository.update_rendition_job(
+            job_id,
+            status=status,
+            finished_at=now_iso(),
+            error_code=text(code),
+            error_detail=text(detail)[:2000],
+        )
+        self._publish_rendition(job_id)
+        return result or {}
+
+    def _publish_rendition(self, job_id: str) -> None:
+        if not self._publish_callback:
+            return
+        job = self.repository.get_rendition_job(job_id)
+        if job is None:
+            return
+        try:
+            self._publish_callback(
+                {
+                    **job,
+                    "schema": RENDITION_JOB_SCHEMA,
+                    "job_type": "rendition",
+                    "agent_id": self.repository.agent_id,
+                    "node_id": self.repository.node_id,
+                    "updated_at": now_iso(),
+                },
+                "",
+            )
+        except Exception:
+            return
+
+    def _cleanup_invalidated_renditions(self) -> None:
+        for job in self.repository.invalidated_rendition_outputs(limit=10):
+            self._cleanup_published_descriptor(job.get("output") or {})
+            self.repository.update_rendition_job(
+                job["id"], cleaned_at=now_iso()
+            )
+
+    @staticmethod
+    def _cleanup_published_descriptor(descriptor: Mapping[str, Any]) -> None:
+        metadata = dict(descriptor.get("metadata") or {})
+        filename = text(descriptor.get("filename") or descriptor.get("resource_id"))
+        if (
+            text(metadata.get("namespace")) != "media-library-rendition"
+            and not filename.startswith("media-library-rendition-")
+        ):
+            return
+        path = Path(text(descriptor.get("path")))
+        if not path.name or path.name != filename:
+            return
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            return
+
+    def _contained_source_path(self, source: Mapping[str, Any]) -> Path:
+        descriptor = dict(source.get("descriptor") or {})
+        path = Path(
+            text(descriptor.get("source_path") or descriptor.get("path"))
+        ).resolve(strict=True)
+        root = self.repository.get_root(text(source.get("root_id")))
+        if root is None:
+            raise ValueError("root_not_found")
+        root_path = Path(text(root.get("path"))).resolve(strict=True)
+        try:
+            path.relative_to(root_path)
+        except ValueError as exc:
+            raise ValueError("source_outside_root") from exc
+        if not path.is_file():
+            raise ValueError("source_not_file")
+        return path
 
     def _loop(self) -> None:
         while not self._stop.is_set():
