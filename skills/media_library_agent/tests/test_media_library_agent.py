@@ -94,6 +94,7 @@ def test_import_is_async_reference_only_and_excludes_images(tmp_path):
     deltas = main.pull_deltas(limit=10)
     assert [item["source"]["name"] for item in deltas["items"]] == ["01.mp3"]
     assert deltas["items"][0]["source"]["metadata"]["folder_segments"] == ["Artist", "Album"]
+    assert deltas["items"][0]["source"]["metadata"]["technical"]["probe"] == "basic"
     assert deltas["items"][0]["source"]["descriptor"]["metadata"]["storage_mode"] == "reference"
     assert song.read_bytes() == b"audio-data"
     assert poster.read_bytes() == b"image-data"
@@ -197,6 +198,68 @@ def test_folder_browse_and_opaque_cursor_validation(tmp_path):
     assert invalid["error"] == "invalid_cursor"
 
 
+def test_root_overlap_is_rejected_without_touching_external_files(tmp_path):
+    library = tmp_path / "library"
+    nested = library / "nested"
+    nested.mkdir(parents=True)
+    source = nested / "track.mp3"
+    source.write_bytes(b"audio")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "overlap.sqlite3", node_id="node-a"
+    )
+
+    parent = repository.add_root(str(library))
+    overlap = repository.add_root(str(nested))
+
+    assert parent["ok"] is True
+    assert overlap["ok"] is False
+    assert overlap["error"] == "root_path_overlap"
+    assert overlap["overlap"]["root_id"] == parent["root"]["id"]
+    assert source.read_bytes() == b"audio"
+
+
+def test_scan_window_contract_fails_closed(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+
+    invalid = main.add_root(
+        path=str(library),
+        scan_window={"start": "25:00", "end": "07:00", "days": [0]},
+    )
+    valid = main.add_root(
+        path=str(library),
+        scan_window={"start": "23:00", "end": "07:00", "days": [0, 1, 2, 3, 4]},
+    )
+
+    assert invalid["ok"] is False
+    assert invalid["error"] == "root_scan_window_invalid"
+    assert valid["root"]["scan_window"]["start"] == "23:00"
+
+
+def test_folder_browse_is_server_paged_and_cursor_backed(tmp_path):
+    library = tmp_path / "library"
+    for name in ("Alpha", "Beta", "Gamma"):
+        folder = library / name
+        folder.mkdir(parents=True)
+        (folder / "track.mp3").write_bytes(name.encode("ascii"))
+    imported = main.import_folder(path=str(library))
+    _wait(imported["job"]["id"])
+
+    first = main.browse_folders(root_id=imported["root"]["id"], limit=1)
+    second = main.browse_folders(
+        root_id=imported["root"]["id"],
+        limit=1,
+        cursor=first["pagination"]["next_cursor"],
+    )
+    invalid = main.browse_folders(cursor="not-a-cursor")
+
+    assert first["count"] == 1
+    assert first["total_count"] == 3
+    assert first["pagination"]["has_more"] is True
+    assert second["items"][0]["name"] == "Beta"
+    assert invalid["error"] == "invalid_cursor"
+
+
 def test_contract_examples_validate_against_strict_schemas(tmp_path):
     jsonschema = pytest.importorskip("jsonschema")
     library = tmp_path / "library"
@@ -205,11 +268,46 @@ def test_contract_examples_validate_against_strict_schemas(tmp_path):
     imported = main.import_folder(path=str(library))
     job = _wait(imported["job"]["id"])
     delta = main.pull_deltas(limit=1)["items"][0]
+    folder = main.browse_folders(root_id=imported["root"]["id"])
+    if not folder["items"]:
+        nested = library / "Nested"
+        nested.mkdir()
+        (nested / "track.mp3").write_bytes(b"audio")
+        rescanned = main.start_scan(root_id=imported["root"]["id"])
+        _wait(rescanned["job"]["id"])
+        folder = main.browse_folders(root_id=imported["root"]["id"])
+
+    published = []
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "progress.sqlite3", node_id="node-progress"
+    )
+    progress_root_path = tmp_path / "progress-library"
+    progress_root_path.mkdir()
+    (progress_root_path / "track.mp3").write_bytes(b"audio")
+    progress_root = repository.add_root(str(progress_root_path))["root"]
+    repository.create_job(progress_root["id"])
+
+    def register(path, _root, metadata):
+        return {
+            "id": f"ref-{path.name}",
+            "resource_id": f"ref-{path.name}",
+            "name": path.name,
+            "mime_type": "audio/mpeg",
+            "source_path": str(path),
+            "metadata": dict(metadata),
+        }
+
+    worker = MediaLibraryAgentWorker(
+        repository, register=register, publish=lambda value, _webspace: published.append(value)
+    )
+    worker.run_once()
 
     fixtures = {
         "media-library-root.v1.schema.json": imported["root"],
         "media-library-scan-job.v1.schema.json": job,
         "media-library-source-delta.v1.schema.json": delta,
+        "media-library-folder-node.v1.schema.json": folder["items"][0],
+        "media-library-scan-progress.v1.schema.json": published[-1],
     }
     for filename, payload in fixtures.items():
         schema = json.loads((SKILL_ROOT / "schemas" / filename).read_text(encoding="utf-8"))

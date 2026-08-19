@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_library.scan_progress.v1",
+  "type": "object",
+  "required": ["schema", "job_id", "agent_id", "node_id", "root_id", "root_label", "status", "progress", "current_path", "resource_pressure", "wait_reason", "updated_at"],
+  "properties": {
+    "schema": {"const": "adaos.media_library.scan_progress.v1"},
+    "job_id": {"type": "string"},
+    "agent_id": {"type": "string", "minLength": 1},
+    "node_id": {"type": "string", "minLength": 1},
+    "root_id": {"type": "string"},
+    "root_label": {"type": "string"},
+    "status": {"enum": ["idle", "queued", "running", "waiting_resources", "canceling", "completed", "failed", "canceled"]},
+    "progress": {
+      "type": "object",
+      "required": ["phase"],
+      "properties": {
+        "discovered_count": {"type": "integer", "minimum": 0},
+        "processed_count": {"type": "integer", "minimum": 0},
+        "added_count": {"type": "integer", "minimum": 0},
+        "updated_count": {"type": "integer", "minimum": 0},
+        "removed_count": {"type": "integer", "minimum": 0},
+        "skipped_count": {"type": "integer", "minimum": 0},
+        "error_count": {"type": "integer", "minimum": 0},
+        "processed_bytes": {"type": "integer", "minimum": 0},
+        "current_path": {"type": "string"},
+        "elapsed_seconds": {"type": "number", "minimum": 0},
+        "throughput_bytes_per_second": {"type": "number", "minimum": 0},
+        "phase": {"enum": ["enumerating", "waiting", "terminal", "idle"]},
+        "checkpoint_age_seconds": {"type": "number", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "current_path": {"type": "string"},
+    "resource_pressure": {"enum": ["normal", "playback", "critical"]},
+    "wait_reason": {"enum": ["", "resource_pressure", "scan_window"]},
+    "updated_at": {"type": "string"}
+  },
+  "additionalProperties": false
+}

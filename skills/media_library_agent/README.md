@@ -15,10 +15,13 @@ Media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.
 - Terminal job transitions publish `media_library_agent.catalog.changed`, allowing the coordinator to pull bounded deltas without polling from the browser.
 - `set_resource_pressure(playback)` pauses scanning so playback retains priority.
 - Images are excluded unless enabled for a root. Symlinks are not followed by default; exclusions and periodic reconciliation are root policy.
+- Active roots may not overlap. Scan windows use node-local `HH:MM` times and weekday numbers (`0` is Monday); invalid windows fail closed.
+- `MEDIA_LIBRARY_AGENT_MAX_BYTES_PER_SECOND` optionally throttles scanner read throughput. Progress reports phase, elapsed time, throughput, wait reason, and checkpoint age in a replace-mode variable.
+- Every changed source receives a cheap basic technical descriptor. `MEDIA_LIBRARY_AGENT_PROBE_MODE=ffprobe` enables a bounded external probe when `ffprobe` is installed; `MEDIA_LIBRARY_AGENT_PROBE_TIMEOUT_SECONDS` is clamped to 1-30 seconds.
 
 ## Coordinator contract
 
-The coordinator pulls `adaos.media_library.source_delta.v1` records with an opaque cursor. Deltas are ordered per agent, source revisions are monotonic, and replay is idempotent. Folder segments are included in source metadata so search remains useful for numbered audiobook and album tracks.
+The coordinator pulls `adaos.media_library.source_delta.v1` records with an opaque cursor. Deltas are ordered per agent, source revisions are monotonic, and replay is idempotent. Folder segments are included in source metadata so search remains useful for numbered audiobook and album tracks. Node-local folder navigation is separately cursor-backed and never materializes an entire tree.
 
 ## Distributed topology adapter
 

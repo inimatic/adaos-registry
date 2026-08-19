@@ -146,6 +146,7 @@ tools:
         type: array
         maxItems: 64
         items: {type: string, maxLength: 300}
+      scan_window: {type: object}
       webspace_id: {type: string}
     additionalProperties: true
   output_schema: {type: object}
@@ -204,6 +205,7 @@ tools:
       root_id: {type: string}
       parent: {type: string}
       limit: {type: integer, minimum: 1, maximum: 500, default: 100}
+      cursor: {type: string}
     additionalProperties: true
   output_schema: {type: object}
 - name: configure_schedule

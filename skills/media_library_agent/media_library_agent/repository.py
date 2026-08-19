@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -22,6 +23,7 @@ from .contracts import (
 
 ACTIVE_JOB_STATUSES = ("queued", "running", "waiting_resources", "canceling")
 TERMINAL_JOB_STATUSES = ("completed", "failed", "canceled")
+_CLOCK = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 
 def default_db_path() -> Path:
@@ -193,9 +195,48 @@ class MediaLibraryAgentRepository:
             return {"ok": False, "error": "root_path_not_found", "path": token, "schema": SCHEMA_VERSION}
         if not resolved.is_dir():
             return {"ok": False, "error": "root_path_not_directory", "path": str(resolved), "schema": SCHEMA_VERSION}
+        for existing in self.list_roots(include_disabled=False)["items"]:
+            existing_path = Path(str(existing["path"]))
+            if existing_path == resolved:
+                continue
+            try:
+                overlaps = resolved.is_relative_to(existing_path) or existing_path.is_relative_to(resolved)
+            except (OSError, ValueError):
+                overlaps = False
+            if overlaps:
+                return {
+                    "ok": False,
+                    "error": "root_path_overlap",
+                    "schema": SCHEMA_VERSION,
+                    "path": str(resolved),
+                    "overlap": {
+                        "root_id": str(existing["id"]),
+                        "path": str(existing_path),
+                    },
+                }
         patterns = [text(item) for item in exclusions if text(item)][:64]
         if any(len(item) > 300 for item in patterns):
             return {"ok": False, "error": "root_exclusion_invalid", "schema": SCHEMA_VERSION}
+        window = dict(scan_window or {})
+        if window:
+            unknown = set(window).difference({"start", "end", "days"})
+            days = window.get("days", [])
+            valid_days = (
+                isinstance(days, list)
+                and len(days) <= 7
+                and all(isinstance(item, int) and 0 <= item <= 6 for item in days)
+            )
+            if (
+                unknown
+                or not _CLOCK.fullmatch(text(window.get("start")))
+                or not _CLOCK.fullmatch(text(window.get("end")))
+                or not valid_days
+            ):
+                return {
+                    "ok": False,
+                    "error": "root_scan_window_invalid",
+                    "schema": SCHEMA_VERSION,
+                }
         now = now_iso()
         root_id = stable_id("root", self.node_id, str(resolved), size=20)
         root_label = text(label) or resolved.name or str(resolved)
@@ -223,7 +264,7 @@ class MediaLibraryAgentRepository:
                     int(include_images),
                     int(follow_symlinks),
                     json_dumps(patterns),
-                    json_dumps(dict(scan_window or {})),
+                    json_dumps(window),
                     created_at,
                     now,
                     revision,
@@ -502,8 +543,16 @@ class MediaLibraryAgentRepository:
             "agent": {"id": self.agent_id, "node_id": self.node_id},
         }
 
-    def browse_folders(self, *, root_id: str = "", parent: str = "", limit: int = 100) -> dict[str, Any]:
+    def browse_folders(
+        self,
+        *,
+        root_id: str = "",
+        parent: str = "",
+        limit: int = 100,
+        cursor: str = "",
+    ) -> dict[str, Any]:
         bounded = max(1, min(500, int(limit or 100)))
+        offset = decode_cursor(cursor)
         root_token = text(root_id)
         parent_token = text(parent).replace("\\", "/").strip("/")
         params: list[Any] = []
@@ -511,26 +560,92 @@ class MediaLibraryAgentRepository:
         if root_token:
             clauses.append("root_id=?")
             params.append(root_token)
-        params.append(bounded * 20)
+        if parent_token:
+            clauses.append("folder_path LIKE ? ESCAPE '\\'")
+            params.append(
+                parent_token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                + "/%"
+            )
+            relative_start = len(parent_token) + 2
+        else:
+            clauses.append("folder_path<>''")
+            relative_start = 1
+        where = " AND ".join(clauses)
+        sql = f"""
+            WITH scoped AS (
+                SELECT root_id, revision, substr(folder_path, ?) AS relative_path
+                FROM sources WHERE {where}
+            ), projected AS (
+                SELECT root_id, revision,
+                    CASE WHEN instr(relative_path, '/')>0
+                        THEN substr(relative_path, 1, instr(relative_path, '/')-1)
+                        ELSE relative_path END AS child_name
+                FROM scoped WHERE relative_path<>''
+            )
+            SELECT root_id, child_name, COUNT(*) AS source_count,
+                MAX(revision) AS revision
+            FROM projected WHERE child_name<>''
+            GROUP BY root_id, child_name
+            ORDER BY lower(child_name), root_id
+        """
+        query_params = [relative_start, *params]
         with self.connect() as connection:
+            total = int(
+                connection.execute(
+                    f"SELECT COUNT(*) FROM ({sql})", tuple(query_params)
+                ).fetchone()[0]
+            )
             rows = connection.execute(
-                f"SELECT root_id, folder_path FROM sources WHERE {' AND '.join(clauses)} ORDER BY folder_path LIMIT ?",
-                tuple(params),
+                f"{sql} LIMIT ? OFFSET ?",
+                (*query_params, bounded, offset),
             ).fetchall()
-        folders: dict[tuple[str, str], dict[str, Any]] = {}
-        prefix = parent_token + "/" if parent_token else ""
+        items = []
         for row in rows:
-            folder = str(row["folder_path"] or "").strip("/")
-            if parent_token and folder != parent_token and not folder.startswith(prefix):
-                continue
-            remainder = folder[len(prefix):] if folder.startswith(prefix) else folder
-            child = remainder.split("/", 1)[0] if remainder else ""
-            child_path = "/".join(item for item in (parent_token, child) if item)
-            key = (str(row["root_id"]), child_path)
-            item = folders.setdefault(key, {"root_id": key[0], "path": child_path, "name": child or Path(self.get_root(key[0])["path"]).name, "source_count": 0})
-            item["source_count"] += 1
-        items = list(folders.values())[:bounded]
-        return {"ok": True, "schema": SCHEMA_VERSION, "items": items, "count": len(items), "parent": parent_token}
+            child = str(row["child_name"])
+            child_path = "/".join(
+                item for item in (parent_token, child) if item
+            )
+            items.append(
+                {
+                    "schema": "adaos.media_library.folder_node.v1",
+                    "id": stable_id(
+                        "folder", self.agent_id, str(row["root_id"]), child_path, size=20
+                    ),
+                    "agent_id": self.agent_id,
+                    "node_id": self.node_id,
+                    "root_id": str(row["root_id"]),
+                    "path": child_path,
+                    "parent": parent_token,
+                    "name": child,
+                    "source_count": int(row["source_count"]),
+                    "revision": int(row["revision"]),
+                }
+            )
+        next_offset = offset + len(items)
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "items": items,
+            "count": len(items),
+            "total_count": total,
+            "parent": parent_token,
+            "breadcrumbs": [
+                {
+                    "name": segment,
+                    "path": "/".join(parent_token.split("/")[: index + 1]),
+                }
+                for index, segment in enumerate(parent_token.split("/"))
+                if segment
+            ],
+            "pagination": {
+                "limit": bounded,
+                "cursor": encode_cursor(offset),
+                "next_cursor": encode_cursor(next_offset)
+                if next_offset < total
+                else None,
+                "has_more": next_offset < total,
+            },
+        }
 
     def configure_schedule(self, root_id: str, *, enabled: bool, interval_seconds: int = 21600, debounce_seconds: int = 30) -> dict[str, Any]:
         if self.get_root(root_id) is None:

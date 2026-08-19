@@ -132,6 +132,15 @@ def on_progress_snapshot_requested(event: Any) -> None:
     repository, worker = _runtime()
     jobs = repository.list_jobs(limit=1).get("items") or []
     job = dict(jobs[0]) if jobs else {}
+    progress = dict(job.get("progress") or {})
+    progress.update(
+        {
+            "elapsed_seconds": 0,
+            "throughput_bytes_per_second": 0,
+            "phase": "idle" if not job else "enumerating",
+            "checkpoint_age_seconds": 0,
+        }
+    )
     snapshot = {
         "schema": PROGRESS_SCHEMA,
         "job_id": text(job.get("id")),
@@ -140,9 +149,10 @@ def on_progress_snapshot_requested(event: Any) -> None:
         "root_id": text(job.get("root_id")),
         "root_label": "",
         "status": text(job.get("status")) or "idle",
-        "progress": dict(job.get("progress") or {}),
+        "progress": progress,
         "current_path": text((job.get("progress") or {}).get("current_path"))[-500:],
         "resource_pressure": worker.resource_pressure,
+        "wait_reason": "",
         "updated_at": now_iso(),
     }
     _publish_progress(snapshot, text(payload.get("webspace_id")))
@@ -175,6 +185,8 @@ def add_root(
         "root_path_not_found": "The media folder does not exist on this node.",
         "root_path_not_directory": "The selected path is not a folder.",
         "root_exclusion_invalid": "One of the exclusion patterns is invalid.",
+        "root_path_overlap": "This folder overlaps another active media folder on this node.",
+        "root_scan_window_invalid": "The scan window must contain valid local start/end times and weekdays.",
     }
     return {**result, **_human_error(code, fallbacks.get(code, "The media folder could not be added."))}
 
@@ -232,6 +244,7 @@ def import_folder(
     include_images: bool = False,
     follow_symlinks: bool = False,
     exclusions: list[str] | None = None,
+    scan_window: Mapping[str, Any] | None = None,
     webspace_id: str = "",
     **_: Any,
 ) -> dict[str, Any]:
@@ -241,6 +254,7 @@ def import_folder(
         include_images=include_images,
         follow_symlinks=follow_symlinks,
         exclusions=exclusions,
+        scan_window=scan_window,
     )
     if not added.get("ok"):
         return added
@@ -283,9 +297,22 @@ def pull_deltas(cursor: str = "", limit: int = 250, root_id: str = "", **_: Any)
 
 
 @tool(summary="Browse indexed folders as an alternative library navigation.", side_effects="none")
-def browse_folders(root_id: str = "", parent: str = "", limit: int = 100, **_: Any) -> dict[str, Any]:
+def browse_folders(
+    root_id: str = "",
+    parent: str = "",
+    limit: int = 100,
+    cursor: str = "",
+    **_: Any,
+) -> dict[str, Any]:
     repository, _worker = _runtime()
-    return repository.browse_folders(root_id=root_id, parent=parent, limit=limit)
+    try:
+        return repository.browse_folders(
+            root_id=root_id, parent=parent, limit=limit, cursor=cursor
+        )
+    except ValueError:
+        return _human_error(
+            "invalid_cursor", "The folder cursor has expired or is invalid."
+        )
 
 
 @tool(summary="Configure periodic reconciliation for one media root.", side_effects="local_write")
