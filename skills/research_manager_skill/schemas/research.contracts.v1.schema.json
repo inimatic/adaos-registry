@@ -7,6 +7,7 @@
     {
       "oneOf": [
         {"$ref": "#/$defs/Study"},
+        {"$ref": "#/$defs/StudyRealization"},
         {"$ref": "#/$defs/Hypothesis"},
         {"$ref": "#/$defs/Protocol"},
         {"$ref": "#/$defs/AnalysisPlan"},
@@ -44,6 +45,35 @@
       "additionalProperties": false
     },
     "Study": {"type": "object", "properties": {"kind": {"const": "study"}, "payload": {"type": "object", "required": ["title", "mode"]}}},
+    "StudyRealization": {
+      "type": "object",
+      "properties": {
+        "kind": {"const": "study_realization"},
+        "payload": {
+          "type": "object",
+          "required": [
+            "schema", "direction_ref", "task_ref", "compilation_ref",
+            "compilation_digest", "implementation_track_ref",
+            "development_session_id", "project_release_ref",
+            "project_release_digest", "runner_ref", "runner_contract"
+          ],
+          "properties": {
+            "schema": {"const": "adaos.research.study_realization.v1"},
+            "direction_ref": {"type": "string", "pattern": "^research-direction:.+"},
+            "task_ref": {"type": "string", "pattern": "^research-task:.+"},
+            "compilation_ref": {"type": "string", "pattern": "^research-compilation:.+"},
+            "compilation_digest": {"$ref": "#/$defs/digest"},
+            "implementation_track_ref": {"type": "string", "pattern": "^implementation-track:.+"},
+            "development_session_id": {"type": "string", "minLength": 1},
+            "project_release_ref": {"type": "string", "pattern": "^project-release:.+"},
+            "project_release_digest": {"$ref": "#/$defs/digest"},
+            "runner_ref": {"type": "string", "pattern": "^skill:.+"},
+            "runner_contract": {"const": "adaos.research.runner.v1"}
+          },
+          "additionalProperties": false
+        }
+      }
+    },
     "Hypothesis": {"type": "object", "properties": {"kind": {"const": "hypothesis"}, "payload": {"type": "object", "required": ["statement", "status"]}}},
     "Protocol": {"type": "object", "properties": {"kind": {"const": "protocol"}, "payload": {"type": "object", "required": ["version", "content", "content_digest", "parent_digest", "amendment_reason"]}}},
     "AnalysisPlan": {"type": "object", "properties": {"kind": {"const": "analysis_plan"}, "payload": {"type": "object", "required": ["version", "content", "content_digest"]}}},

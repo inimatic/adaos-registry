@@ -197,6 +197,125 @@ class ResearchManager:
 
         return self.repository.once(idempotency_key, "create_study", apply)
 
+    @staticmethod
+    def _study_realization_payload(realization: Mapping[str, Any]) -> dict[str, Any]:
+        value = {
+            "schema": "adaos.research.study_realization.v1",
+            **{
+                key: str(realization.get(key) or "").strip()
+                for key in (
+                    "direction_ref",
+                    "task_ref",
+                    "compilation_ref",
+                    "compilation_digest",
+                    "implementation_track_ref",
+                    "development_session_id",
+                    "project_release_ref",
+                    "project_release_digest",
+                    "runner_ref",
+                    "runner_contract",
+                )
+            },
+        }
+        prefixes = {
+            "direction_ref": "research-direction:",
+            "task_ref": "research-task:",
+            "compilation_ref": "research-compilation:",
+            "implementation_track_ref": "implementation-track:",
+            "project_release_ref": "project-release:",
+            "runner_ref": "skill:",
+        }
+        missing = [key for key, prefix in prefixes.items() if not value[key].startswith(prefix)]
+        for key in ("compilation_digest", "project_release_digest"):
+            token = value[key]
+            if len(token) != 71 or not token.startswith("sha256:"):
+                missing.append(key)
+            else:
+                try:
+                    int(token[7:], 16)
+                except ValueError:
+                    missing.append(key)
+        if not value["development_session_id"]:
+            missing.append("development_session_id")
+        if value["runner_contract"] != "adaos.research.runner.v1":
+            missing.append("runner_contract")
+        if missing:
+            raise ValueError(
+                "study realization has invalid or missing bindings: "
+                + ", ".join(sorted(set(missing)))
+            )
+        return value
+
+    def create_compiled_study(
+        self,
+        *,
+        title: str,
+        hypothesis: str,
+        protocol: Mapping[str, Any],
+        analysis_plan: Mapping[str, Any],
+        splits: Mapping[str, Mapping[str, Any]],
+        realization: Mapping[str, Any],
+        mode: str,
+        study_id: str | None,
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        binding = self._study_realization_payload(realization)
+        resolved_study_id = str(study_id or "").strip() or identity(
+            "study",
+            {
+                "compilation_digest": binding["compilation_digest"],
+                "project_release_digest": binding["project_release_digest"],
+            },
+        )
+
+        def apply() -> Mapping[str, Any]:
+            created = self.create_study(
+                title=title,
+                hypothesis=hypothesis,
+                protocol=protocol,
+                analysis_plan=analysis_plan,
+                splits=splits,
+                mode=mode,
+                study_id=resolved_study_id,
+                idempotency_key=f"{idempotency_key}:study",
+            )
+            realization_id = identity(
+                "study_realization",
+                {
+                    "study_id": resolved_study_id,
+                    "compilation_digest": binding["compilation_digest"],
+                    "project_release_digest": binding["project_release_digest"],
+                    "runner_ref": binding["runner_ref"],
+                },
+            )
+            record = self.repository.put(
+                ResearchRecord(
+                    "study_realization",
+                    realization_id,
+                    resolved_study_id,
+                    0,
+                    binding,
+                )
+            )
+            self.repository.event(
+                resolved_study_id,
+                "research.study.realization_bound",
+                {
+                    "realization_id": realization_id,
+                    "realization_digest": record.digest,
+                    "compilation_digest": binding["compilation_digest"],
+                    "project_release_digest": binding["project_release_digest"],
+                    "runner_ref": binding["runner_ref"],
+                },
+            )
+            return {**created, "realization": record.to_dict()}
+
+        return self.repository.once(
+            idempotency_key,
+            "create_compiled_study",
+            apply,
+        )
+
     def advance(
         self,
         *,
@@ -1903,7 +2022,13 @@ class ResearchManager:
         counts: dict[str, int] = {}
         for record in records:
             counts[record.kind] = counts.get(record.kind, 0) + 1
-        return {"study": study.to_dict(), "workflow": workflow_state(self.repository, study_id), "counts": counts, "events": self.repository.events(study_id)}
+        return {
+            "study": study.to_dict(),
+            "realizations": [item.to_dict() for item in self.repository.list(study_id, "study_realization")],
+            "workflow": workflow_state(self.repository, study_id),
+            "counts": counts,
+            "events": self.repository.events(study_id),
+        }
 
 
 __all__ = ["ResearchManager"]

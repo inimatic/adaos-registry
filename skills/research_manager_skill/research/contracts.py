@@ -63,6 +63,7 @@ class ResearchRecord:
 
 ENTITY_KINDS = (
     "study",
+    "study_realization",
     "hypothesis",
     "protocol",
     "analysis_plan",
@@ -81,6 +82,12 @@ ENTITY_KINDS = (
 )
 
 IDENTITY_INPUTS = {
+    "study_realization": (
+        "study_id",
+        "compilation_digest",
+        "project_release_digest",
+        "runner_ref",
+    ),
     "protocol": ("study_id", "version", "content_digest"),
     "analysis_plan": ("study_id", "version", "content_digest"),
     "experiment": ("study_id", "slug"),

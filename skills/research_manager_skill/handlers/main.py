@@ -351,6 +351,31 @@ def describe_experiment(
     )
 
 
+@tool("create_compiled_study")
+def create_compiled_study(
+    title: str,
+    hypothesis: str,
+    protocol: Mapping[str, Any],
+    analysis_plan: Mapping[str, Any],
+    splits: Mapping[str, Mapping[str, Any]],
+    realization: Mapping[str, Any],
+    idempotency_key: str,
+    mode: str = "confirmatory",
+    study_id: str | None = None,
+) -> dict[str, Any]:
+    return _manager().create_compiled_study(
+        title=title,
+        hypothesis=hypothesis,
+        protocol=protocol,
+        analysis_plan=analysis_plan,
+        splits=splits,
+        realization=realization,
+        mode=mode,
+        study_id=study_id,
+        idempotency_key=idempotency_key,
+    )
+
+
 @tool("unblind_test")
 def unblind_test(
     study_id: str,

@@ -68,6 +68,71 @@ def _create(manager: ResearchManager, suffix: str) -> dict:
     )
 
 
+def _realization() -> dict[str, str]:
+    return {
+        "direction_ref": "research-direction:tlp",
+        "task_ref": "research-task:tlp.task-001",
+        "compilation_ref": "research-compilation:tlp.task-001:1",
+        "compilation_digest": "sha256:" + "4" * 64,
+        "implementation_track_ref": "implementation-track:tlp.task-001.track-001",
+        "development_session_id": "development-session.test",
+        "project_release_ref": "project-release:tlp:0.1.0",
+        "project_release_digest": "sha256:" + "5" * 64,
+        "runner_ref": "skill:tlp_generated_runner",
+        "runner_contract": "adaos.research.runner.v1",
+    }
+
+
+def test_compiled_study_binds_exact_realization_and_is_idempotent() -> None:
+    manager = ResearchManager()
+    suffix = f"compiled-{uuid.uuid4().hex}"
+    request = {
+        "title": f"Compiled research fixture {suffix}",
+        "hypothesis": "The exact generated runner preserves the accepted protocol.",
+        "protocol": {"dataset": "fixture", "paired": True},
+        "analysis_plan": {"primary_metric": "accuracy", "paired": True},
+        "splits": _splits(),
+        "realization": _realization(),
+        "mode": "confirmatory",
+        "study_id": None,
+        "idempotency_key": f"create-compiled:{suffix}",
+    }
+    created = manager.create_compiled_study(**request)
+    assert manager.create_compiled_study(**request) == created
+    realization = created["realization"]
+    assert realization["kind"] == "study_realization"
+    assert realization["study_id"] == created["study"]["record_id"]
+    assert realization["payload"] == {
+        "schema": "adaos.research.study_realization.v1",
+        **_realization(),
+    }
+    status = manager.status(created["study"]["record_id"])
+    assert status["counts"]["study_realization"] == 1
+    assert status["realizations"] == [realization]
+    assert any(
+        item["event_type"] == "research.study.realization_bound"
+        for item in status["events"]
+    )
+
+
+def test_compiled_study_rejects_incomplete_release_lineage() -> None:
+    manager = ResearchManager()
+    realization = _realization()
+    realization["project_release_digest"] = "mutable"
+    with pytest.raises(ValueError, match="project_release_digest"):
+        manager.create_compiled_study(
+            title="Rejected compiled study",
+            hypothesis="An immutable release is required.",
+            protocol={"dataset": "fixture"},
+            analysis_plan={"primary_metric": "accuracy"},
+            splits=_splits(),
+            realization=realization,
+            mode="confirmatory",
+            study_id=None,
+            idempotency_key=f"reject-compiled:{uuid.uuid4().hex}",
+        )
+
+
 def _experiment_conditions() -> dict:
     return {
         "schema": "adaos.research.tlp_experiment_conditions.v1",
@@ -295,6 +360,18 @@ def test_versioned_entity_and_evidence_schemas_validate_representative_records()
     jsonschema.Draft202012Validator(entity_schema).validate(created["hypothesis"])
     jsonschema.Draft202012Validator(entity_schema).validate(created["protocol"])
     jsonschema.Draft202012Validator(entity_schema).validate(created["analysis_plan"])
+    compiled = manager.create_compiled_study(
+        title="Schema-bound compiled study",
+        hypothesis="The installed runner preserves the compiled contract.",
+        protocol={"dataset": "fixture"},
+        analysis_plan={"primary_metric": "accuracy"},
+        splits=_splits(),
+        realization=_realization(),
+        mode="confirmatory",
+        study_id=None,
+        idempotency_key=f"schema-compiled:{uuid.uuid4().hex}",
+    )
+    jsonschema.Draft202012Validator(entity_schema).validate(compiled["realization"])
     assert evidence_schema["$id"] == "adaos.research.evidence_manifest.v1"
 
 
