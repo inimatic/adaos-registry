@@ -87,6 +87,11 @@ def derive_compact_calibration(
     runner_identity = runner_response.get("runtime_identity")
     if not isinstance(runner_identity, Mapping):
         raise RuntimeError("calibration runner returned no runtime identity")
+    actual_standard_prompt_version = str(
+        runner_response.get("standard_prompt_version") or ""
+    )
+    if not actual_standard_prompt_version:
+        raise RuntimeError("calibration runner returned no standard prompt identity")
     visible = {str(item["kind"]): dict(item) for item in baseline["inputs"]}
     source_direction = str(source_direction_id or "").strip()
     source_task = str(source_task_id or "").strip()
@@ -213,6 +218,8 @@ def derive_compact_calibration(
     mismatches.extend(
         key for key, value in expected_components.items() if actual_components.get(key) != value
     )
+    if actual_standard_prompt_version != str(standard_prompt_version):
+        mismatches.append("standard_prompt_version")
     for identity in (orchestrator_identity, runner_identity, manager_identity):
         if str(dict(identity.get("core") or {}).get("git_commit") or "") != str(core_commit):
             mismatches.append("component_core_commit")
