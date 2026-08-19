@@ -40,6 +40,13 @@ confounding but does not justify a universal autonomous-science claim.
 
 1. Build a task manifest whose file inputs carry immutable SHA-256 digests.
 2. Call `freeze_calibration`; the task becomes immutable under its `task_id`.
+   To repeat an existing benchmark with a newly accepted formulation, call
+   `derive_compact_calibration` with `source_direction_id` and optional
+   `source_task_id`. The evaluator reads the exact accepted Compilation and
+   AutomationBrief through the Orchestrator API, projects them to compact
+   developer contracts, replaces the expected prototype digest, and points
+   artifact materialization at that direction. It never reads the
+   Orchestrator database or mutable source paths directly.
 3. For every arm, seed, and budget view call `prepare_calibration_arm` and give
    only the returned packet to the Builder/Codex execution boundary.
 4. A separate judge records deterministic, expert, or LLM-judge check evidence

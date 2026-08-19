@@ -63,6 +63,8 @@ def derive_compact_calibration(
     orchestrator_version: str,
     evaluator_version: str,
     runner_version: str,
+    source_direction_id: str | None = None,
+    source_task_id: str | None = None,
     reasoning_effort: str = "high",
     standard_prompt_version: str = "adaos-skill-realization/0.1.0",
     attempts_per_arm: int = 5,
@@ -86,10 +88,47 @@ def derive_compact_calibration(
     if not isinstance(runner_identity, Mapping):
         raise RuntimeError("calibration runner returned no runtime identity")
     visible = {str(item["kind"]): dict(item) for item in baseline["inputs"]}
-    compilation_path = Path(visible["research_compilation"]["path"]).resolve()
-    brief_path = Path(visible["automation_brief"]["path"]).resolve()
-    compilation = json.loads(compilation_path.read_text(encoding="utf-8-sig"))
-    brief = json.loads(brief_path.read_text(encoding="utf-8-sig"))
+    source_direction = str(source_direction_id or "").strip()
+    source_task = str(source_task_id or "").strip()
+    if source_task and not source_direction:
+        raise ValueError("source_task_id requires source_direction_id")
+    if source_direction:
+        request = {"direction_id": source_direction}
+        if source_task:
+            request["task_id"] = source_task
+        compilation_response = invoke_skill(
+            "research_orchestrator_skill",
+            "get_compilation",
+            request,
+            timeout=120,
+        )
+        brief_response = invoke_skill(
+            "research_orchestrator_skill",
+            "get_automation_brief",
+            request,
+            timeout=120,
+        )
+        if (
+            not isinstance(compilation_response, Mapping)
+            or not compilation_response.get("ok")
+            or not compilation_response.get("available")
+            or not isinstance(compilation_response.get("compilation"), Mapping)
+        ):
+            raise RuntimeError("source direction has no accepted ResearchCompilation")
+        if (
+            not isinstance(brief_response, Mapping)
+            or not brief_response.get("ok")
+            or not brief_response.get("available")
+            or not isinstance(brief_response.get("automation_brief"), Mapping)
+        ):
+            raise RuntimeError("source direction has no accepted AutomationBrief")
+        compilation = copy.deepcopy(dict(compilation_response["compilation"]))
+        brief = copy.deepcopy(dict(brief_response["automation_brief"]))
+    else:
+        compilation_path = Path(visible["research_compilation"]["path"]).resolve()
+        brief_path = Path(visible["automation_brief"]["path"]).resolve()
+        compilation = json.loads(compilation_path.read_text(encoding="utf-8-sig"))
+        brief = json.loads(brief_path.read_text(encoding="utf-8-sig"))
     response = invoke_skill(
         "research_orchestrator_skill",
         "project_execution_contracts",
@@ -190,6 +229,8 @@ def derive_compact_calibration(
             "schema_version": "1.3.0",
             "task_id": str(task_id),
             "title": str(baseline["title"]) + " (compact execution contracts)",
+            "direction_skill_id": source_direction or str(baseline["direction_skill_id"]),
+            "expected_protocol_digest": str(brief["prototype_digest"]),
             "agent_profile": {
                 "provider": "openai-codex-cli",
                 "model": str(model),
@@ -261,6 +302,8 @@ def derive_compact_calibration(
         "task_digest": stored["digest"],
         "task": stored,
         "projection_receipt": {
+            "source_direction_ref": f"research-direction:{source_direction}" if source_direction else None,
+            "source_task_ref": f"research-task:{source_task}" if source_task else None,
             "audit_compilation_digest": response["audit_compilation_digest"],
             "audit_automation_brief_digest": response["audit_automation_brief_digest"],
             "execution_compilation_digest": projected_inputs["research_compilation"]["digest"],

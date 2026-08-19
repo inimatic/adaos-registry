@@ -74,6 +74,16 @@ tools:
         type: string
       runner_version:
         type: string
+      source_direction_id:
+        description: Optional accepted ResearchDirection whose exact Compilation and AutomationBrief replace the baseline task contracts.
+        type:
+        - string
+        - 'null'
+      source_task_id:
+        description: Optional accepted ResearchTask selected inside source_direction_id.
+        type:
+        - string
+        - 'null'
       standard_prompt_version:
         type: string
         default: adaos-skill-realization/0.1.0
@@ -405,4 +415,3 @@ compatibility:
     min_commit: 1d481bbb26acadd6ef9c37831c524943743fccf3
     min_short_commit: 1d481bbb
     build_date: '2026-08-19T11:40:48+03:00'
-
