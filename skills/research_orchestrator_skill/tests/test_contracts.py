@@ -70,8 +70,8 @@ def _candidate() -> dict:
                 "unresolved_choices": [],
             },
             "stages": [
-                {"id": "smoke", "purpose": "validate the complete local workflow", "evidence_class": "workflow_smoke", "execution_profile": {"device": "cpu", "node": "current"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30}, "inference_allowed": False, "stop_conditions": ["both paired arms finish or one fails"]},
-                {"id": "series", "purpose": "estimate the locked paired scientific contrasts", "evidence_class": "confirmatory", "execution_profile": {"device": "cuda", "node": "declared_member"}, "budget": {"epochs": 120, "seed_values": [17, 23, 29, 31, 37, 41, 43, 47, 53, 59], "max_wall_time_minutes": 10080}, "inference_allowed": True, "stop_conditions": ["enumerated trials complete or budget exhausts"]},
+                {"id": "smoke", "purpose": "validate the complete local workflow", "evidence_class": "workflow_smoke", "execution_profile": {"device": "cpu", "node": "current", "network_mode": "offline"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30, "workload": {"mode": "bounded", "limits": [{"name": "train_samples", "maximum": 128, "unit": "samples"}]}}, "input_policy": {"source": "deterministic_contract_fixture", "readiness": "required_before_execution", "sampling": "deterministic_seeded"}, "inference_allowed": False, "stop_conditions": ["both paired arms finish or one fails"]},
+                {"id": "series", "purpose": "estimate the locked paired scientific contrasts", "evidence_class": "confirmatory", "execution_profile": {"device": "cuda", "node": "declared_member", "network_mode": "offline"}, "budget": {"epochs": 120, "seed_values": [17, 23, 29, 31, 37, 41, 43, 47, 53, 59], "max_wall_time_minutes": 10080, "workload": {"mode": "full", "limits": []}}, "input_policy": {"source": "accepted_dataset", "readiness": "required_before_execution", "sampling": "full"}, "inference_allowed": True, "stop_conditions": ["enumerated trials complete or budget exhausts"]},
             ],
             "data_policy": {
                 "dataset": "STL-10 pinned release",

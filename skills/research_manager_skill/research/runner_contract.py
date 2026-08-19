@@ -85,6 +85,9 @@ def _workflow_smoke_documents() -> dict[str, Any]:
                     "seeds",
                     "inference_allowed",
                     "evidence_class",
+                    "workload",
+                    "input_policy",
+                    "network",
                 ],
                 "properties": {
                     "stage": {"const": "workflow_smoke"},
@@ -98,6 +101,50 @@ def _workflow_smoke_documents() -> dict[str, Any]:
                     },
                     "inference_allowed": {"const": False},
                     "evidence_class": {"const": "workflow_smoke"},
+                    "workload": {
+                        "type": "object",
+                        "required": ["mode", "limits", "observed"],
+                        "properties": {
+                            "mode": {"enum": ["bounded", "full"]},
+                            "limits": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "required": ["name", "maximum", "unit"],
+                                    "properties": {
+                                        "name": {"type": "string", "minLength": 1},
+                                        "maximum": {"type": "integer", "minimum": 1},
+                                        "unit": {"type": "string", "minLength": 1},
+                                    },
+                                    "additionalProperties": False,
+                                },
+                            },
+                            "observed": {
+                                "type": "object",
+                                "additionalProperties": {"type": "integer", "minimum": 0},
+                            },
+                        },
+                        "additionalProperties": False,
+                    },
+                    "input_policy": {
+                        "type": "object",
+                        "required": ["source", "readiness", "sampling"],
+                        "properties": {
+                            "source": {"enum": ["accepted_dataset", "deterministic_contract_fixture"]},
+                            "readiness": {"enum": ["required_before_execution", "may_prepare_during_execution"]},
+                            "sampling": {"enum": ["deterministic_prefix", "deterministic_seeded", "full"]},
+                        },
+                        "additionalProperties": False,
+                    },
+                    "network": {
+                        "type": "object",
+                        "required": ["mode", "accessed"],
+                        "properties": {
+                            "mode": {"enum": ["offline", "unrestricted"]},
+                            "accessed": {"type": "boolean"},
+                        },
+                        "additionalProperties": False,
+                    },
                 },
                 "additionalProperties": True,
             },
@@ -171,19 +218,20 @@ def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.3.0",
+        "version": "1.4.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
             "dataset_status": {
                 "input_schema": {"type": "object", "additionalProperties": False},
-                "output_required": ["dataset_id", "split_bindings"],
+                "output_required": ["dataset_id", "ready", "execution_ready_without_network", "split_bindings"],
                 "output_schema": {
                     "type": "object",
-                    "required": ["dataset_id", "split_bindings"],
+                    "required": ["dataset_id", "ready", "execution_ready_without_network", "split_bindings"],
                     "properties": {
                         "dataset_id": {"type": "string", "minLength": 1},
                         "ready": {"type": "boolean"},
+                        "execution_ready_without_network": {"type": "boolean"},
                         "split_bindings": {
                             "type": "object",
                             "required": ["validation", "robustness", "test"],
@@ -202,6 +250,8 @@ def descriptor() -> dict[str, Any]:
                     "all split digests are distinct SHA-256 identities",
                     "all split bindings share one dataset_digest",
                     "the test split is sealed",
+                    "dataset_status is observational and performs no acquisition",
+                    "execution_ready_without_network is true only when the selected smoke input can run without egress",
                 ],
             },
             "prepare_attempt": {
@@ -266,6 +316,9 @@ def descriptor() -> dict[str, Any]:
                                         "device",
                                         "evidence_class",
                                         "inference_allowed",
+                                        "network_mode",
+                                        "workload",
+                                        "input_policy",
                                     ],
                                     "properties": {
                                         "source_stage_id": {"type": "string", "minLength": 1},
@@ -280,6 +333,9 @@ def descriptor() -> dict[str, Any]:
                                             "enum": ["workflow_smoke", "confirmatory"],
                                         },
                                         "inference_allowed": {"type": "boolean"},
+                                        "network_mode": {"enum": ["offline", "unrestricted"]},
+                                        "workload": {"type": "object"},
+                                        "input_policy": {"type": "object"},
                                     },
                                     "additionalProperties": True,
                                 },
@@ -351,6 +407,8 @@ def descriptor() -> dict[str, Any]:
                     "working_directory is a pre-created skill-owned attempt directory and every expected output is written beneath it",
                     "output_ref is an opaque portable key that collect_attempt resolves to that same attempt directory",
                     "conditions and profile_conditions are consumer authority; providers may validate them but must not replace their shape with a private one",
+                    "a bounded workload applies every named maximum and reports observed units in run_log.json",
+                    "offline execution starts only after dataset_status reports execution_ready_without_network=true and run_log.network.accessed remains false",
                     "preparation does not start scientific execution",
                     "expected_outputs contains every workflow_smoke_evidence.required_expected_outputs entry for a workflow-smoke request",
                 ],

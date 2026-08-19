@@ -61,14 +61,17 @@ def _build_experiment_plan(
             "seeds": copy.deepcopy(list(budget["seed_values"])),
             "device": str(profile["device"]),
             "node": str(profile["node"]),
+            "network_mode": str(profile["network_mode"]),
             "max_wall_time_minutes": int(budget["max_wall_time_minutes"]),
+            "workload": copy.deepcopy(dict(budget["workload"])),
+            "input_policy": copy.deepcopy(dict(stage_value["input_policy"])),
             "inference_allowed": bool(stage_value["inference_allowed"]),
             "stop_conditions": copy.deepcopy(list(stage_value["stop_conditions"])),
         }
     task_id = str((task or {}).get("task_id") or f"{direction_id}.task-001")
     plan: dict[str, Any] = {
         "schema": "adaos.research.experiment_plan.v1",
-        "schema_version": "1.2.0",
+        "schema_version": "1.3.0",
         "direction_ref": f"research-direction:{direction_id}",
         "task_ref": str((task or {}).get("ref") or f"research-task:{task_id}"),
         "source_bundle_digest": str(source_bundle_digest),

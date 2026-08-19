@@ -2551,6 +2551,8 @@ class ResearchOrchestrator:
                     "Mark each system component source_derived, policy_default, or proposed. Cite supplied SRC-### ids for every source-derived component, keep source_refs empty for the other statuses, and put every intentionally invariant detail in locked_invariants.",
                     "Make intervention_boundary identify the only allowed experimental difference. unresolved_choices must contain every missing implementation decision; it must be empty before ready_for_automation.",
                     "Use the supplied CPU smoke policy. Mark other non-source choices as proposed or policy_default, never source_derived.",
+                    "For workflow_smoke set execution_profile.network_mode=offline, input_policy.readiness=required_before_execution, budget.workload.mode=bounded, and provide non-empty named limits that make the complete run practical on CPU. Epoch count alone is not a bound. A deterministic_contract_fixture is preferred for engineering conformance when the accepted scientific dataset is not preprovisioned; it remains non-inferential.",
+                    "For confirmatory execution use input_policy.source=accepted_dataset. Declare whether its workload is full or bounded without silently inheriting the smoke subset.",
                     "Populate all nine keys in decisions_by_area and cite refs only for source-derived choices; AdaOS owns decision ids.",
                     "Resolve every candidate uncertainty from problem_frame into one of those nine decisions. A bounded proposed choice closes it; an optional extension is out of scope and is not a blocker.",
                     "For each decision use blocking_question only when status is unresolved; otherwise it must be the empty string. Do not repeat the same uncertainty in multiple areas.",
@@ -2597,6 +2599,7 @@ class ResearchOrchestrator:
                 },
                 rules=[
                     "Translate the accepted scientific semantics into independently testable obligations; do not change the protocol.",
+                    "Include explicit execution and data obligations that verify every workflow_smoke workload limit, input source/readiness policy, network mode, and wall-clock bound in machine-readable run evidence.",
                     "Copy protocol_digest and experimental_signature ids/outcome exactly into scientific_bindings and bind runner_contract=adaos.research.runner.v1.",
                     "Populate every category key. Required categories need at least one item; optional categories may be empty arrays.",
                     "Do not generate ids or enum variants; the AdaOS compiler owns ids and category flattening.",
@@ -3021,8 +3024,8 @@ class ResearchOrchestrator:
                 "experimental_plan": {
                     "comparators": ["control", "intervention"],
                     "stages": [
-                        {"id": "smoke", "purpose": "...", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current_or_member", "device": "cpu"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 180}, "inference_allowed": False, "stop_conditions": ["bounded operational condition"]},
-                        {"id": "confirmatory", "purpose": "...", "evidence_class": "confirmatory", "execution_profile": {"node": "declared_member", "device": "cuda"}, "budget": {"epochs": 120, "seed_values": [1, 2, 3], "max_wall_time_minutes": 10080}, "inference_allowed": True, "stop_conditions": ["predeclared fixed or sequential condition"]}
+                        {"id": "smoke", "purpose": "...", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current_or_member", "device": "cpu", "network_mode": "offline"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30, "workload": {"mode": "bounded", "limits": [{"name": "domain_unit", "maximum": 128, "unit": "items"}]}}, "input_policy": {"source": "deterministic_contract_fixture", "readiness": "required_before_execution", "sampling": "deterministic_seeded"}, "inference_allowed": False, "stop_conditions": ["bounded operational condition"]},
+                        {"id": "confirmatory", "purpose": "...", "evidence_class": "confirmatory", "execution_profile": {"node": "declared_member", "device": "cuda", "network_mode": "offline"}, "budget": {"epochs": 120, "seed_values": [1, 2, 3], "max_wall_time_minutes": 10080, "workload": {"mode": "full", "limits": []}}, "input_policy": {"source": "accepted_dataset", "readiness": "required_before_execution", "sampling": "full"}, "inference_allowed": True, "stop_conditions": ["predeclared fixed or sequential condition"]}
                     ],
                     "data_policy": {
                         "dataset": "exact dataset and version",
@@ -3086,6 +3089,7 @@ class ResearchOrchestrator:
                 "Every hypothesis id needs a source_grounding record with stance=hypothesis. Observed source claims require separate non-hypothesis claim ids.",
                 "Historical notebook outputs are exploratory source material, never confirmation.",
                 "Separate workflow smoke execution from scientific confirmation.",
+                "A workflow smoke must be mechanically bounded by named workload limits, use an explicit input source/readiness policy, and fit inside its wall-clock budget; epochs alone are not a workload bound.",
                 "Declare exactly one primary outcome, one operationalized estimand, uncertainty unit/method, multiplicity, practical significance, and a predeclared stopping rule.",
                 "Enumerate or digest-bind every planned paired unit before execution and make sample_size match the declared units.",
                 "Implementation requirements must cover execution, data, reproducibility, observability and evidence; acceptance checks must cover workflow, data integrity, reproducibility and evidence.",

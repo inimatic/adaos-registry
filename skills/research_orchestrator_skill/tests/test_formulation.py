@@ -97,8 +97,8 @@ def _protocol(*, unresolved: bool = False) -> dict:
                 "unresolved_choices": [],
             },
             "stages": [
-                {"id": "smoke", "purpose": "Проверить исполнимость и сбор evidence.", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current", "device": "cpu"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30}, "inference_allowed": False, "stop_conditions": ["Остановить при нечисловом loss."]},
-                {"id": "confirmatory", "purpose": "Оценить заранее объявленный парный контраст.", "evidence_class": "confirmatory", "execution_profile": {"node": "member", "device": "cpu"}, "budget": {"epochs": 30, "seed_values": seed_values, "max_wall_time_minutes": 360}, "inference_allowed": True, "stop_conditions": ["Завершить фиксированный бюджет."]},
+                {"id": "smoke", "purpose": "Проверить исполнимость и сбор evidence.", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current", "device": "cpu", "network_mode": "offline"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30, "workload": {"mode": "bounded", "limits": [{"name": "train_samples", "maximum": 128, "unit": "samples"}]}}, "input_policy": {"source": "deterministic_contract_fixture", "readiness": "required_before_execution", "sampling": "deterministic_seeded"}, "inference_allowed": False, "stop_conditions": ["Остановить при нечисловом loss."]},
+                {"id": "confirmatory", "purpose": "Оценить заранее объявленный парный контраст.", "evidence_class": "confirmatory", "execution_profile": {"node": "member", "device": "cpu", "network_mode": "offline"}, "budget": {"epochs": 30, "seed_values": seed_values, "max_wall_time_minutes": 360, "workload": {"mode": "full", "limits": []}}, "input_policy": {"source": "accepted_dataset", "readiness": "required_before_execution", "sampling": "full"}, "inference_allowed": True, "stop_conditions": ["Завершить фиксированный бюджет."]},
             ],
             "data_policy": {
                 "dataset": "STL-10 version torchvision",
@@ -277,7 +277,10 @@ def test_research_compiler_emits_execution_plan_and_source_to_acceptance_traceab
     assert projection["compilation_digest"] == package["digest"]
     assert projection["traceability"]["protocol_digest"] == package["facets"]["experimental_protocol"]["digest"]
     plan = projection["experiment_plan"]
-    assert plan["schema_version"] == "1.2.0"
+    assert plan["schema_version"] == "1.3.0"
+    assert plan["execution"]["smoke"]["network_mode"] == "offline"
+    assert plan["execution"]["smoke"]["workload"]["mode"] == "bounded"
+    assert plan["execution"]["smoke"]["input_policy"]["readiness"] == "required_before_execution"
     assert [item["id"] for item in plan["operators"]["arms"]] == ["maxpool", "tlp"]
     assert plan["analysis"]["primary_contrast"] == {"minuend": "tlp", "subtrahend": "maxpool"}
     assert plan["execution"]["smoke"]["epochs"] == 3

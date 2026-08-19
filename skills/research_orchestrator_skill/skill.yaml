@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.39.0
+version: 0.40.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -1332,4 +1332,3 @@ compatibility:
     min_commit: 4cd3cf21ae04b33113f794737756920a21459671
     min_short_commit: 4cd3cf21
     build_date: '2026-08-19T19:11:21+03:00'
-

@@ -457,6 +457,12 @@ def test_independent_judge_rejects_string_pair_ids_as_rng_seeds(task_value, monk
 
     statuses = {item["check_id"]: item["status"] for item in candidate["checks"]}
     assert statuses["protocol_fidelity"] == "fail"
+    detail = next(
+        item["detail"]
+        for item in candidate["checks"]
+        if item["check_id"] == "protocol_fidelity"
+    )
+    assert "seeds" in detail
 
 
 def test_independent_judge_preserves_terminal_builder_failure_stage(task_value, monkeypatch) -> None:
@@ -530,3 +536,44 @@ def test_independent_judge_preserves_terminal_builder_failure_stage(task_value, 
         "code": "builder_automation.failed",
         "detail": "worker host unavailable",
     }
+
+
+def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypatch) -> None:
+    from handlers import main as handler_module
+
+    stored = {
+        "digest": "sha256:" + "9" * 64,
+        "metrics": {"evidence_valid_completion": True},
+    }
+
+    class _Repository:
+        @staticmethod
+        def get_task(_task_id: str) -> dict:
+            return {"task_id": "task"}
+
+        @staticmethod
+        def get_packet(*_args, **_kwargs) -> dict:
+            return {"packet_id": "packet"}
+
+        @staticmethod
+        def find_result(*_args, **_kwargs) -> dict:
+            return stored
+
+    monkeypatch.setattr(handler_module, "EvaluationRepository", _Repository)
+    monkeypatch.setattr(
+        handler_module.automation,
+        "get_state",
+        lambda **_kwargs: (_ for _ in ()).throw(AssertionError("must not read Builder state")),
+    )
+
+    response = handler_module.evaluate_builder_attempt(
+        task_id="task",
+        arm_id="C3_typed_execution",
+        attempt_index=1,
+        candidate_id="candidate",
+        development_session_id="session",
+        builder_webspace_id="builder",
+    )
+
+    assert response["idempotent_replay"] is True
+    assert response["result"] is stored

@@ -182,8 +182,11 @@ class ResearchManager:
                 "epochs": int(profile["epochs"]),
                 "seeds": seeds,
                 "device": str(profile["device"]),
+                "network_mode": str(profile.get("network_mode") or "unrestricted"),
                 "workers": 0,
                 "wall_time_s": int(profile["max_wall_time_minutes"]) * 60,
+                "workload": dict(profile.get("workload") or {}),
+                "input_policy": dict(profile.get("input_policy") or {}),
                 "evidence_class": evidence_class,
                 "inference_allowed": bool(profile["inference_allowed"]),
             }
@@ -239,6 +242,7 @@ class ResearchManager:
         collected: Mapping[str, Any],
         verified_artifacts: Sequence[Mapping[str, Any]],
         expected_seed_labels: Sequence[str],
+        expected_profile: Mapping[str, Any],
     ) -> None:
         contract = cls._workflow_smoke_contract()
         documents = dict(trial.get("documents") or {})
@@ -257,6 +261,42 @@ class ResearchManager:
                 ) from exc
 
         run_log = dict(documents["run_log.json"])
+        expected_workload = dict(expected_profile.get("workload") or {})
+        actual_workload = dict(run_log.get("workload") or {})
+        expected_limits = [
+            dict(item)
+            for item in expected_workload.get("limits") or []
+            if isinstance(item, Mapping)
+        ]
+        actual_limits = [
+            dict(item)
+            for item in actual_workload.get("limits") or []
+            if isinstance(item, Mapping)
+        ]
+        if (
+            str(actual_workload.get("mode") or "")
+            != str(expected_workload.get("mode") or "")
+            or actual_limits != expected_limits
+        ):
+            raise ValueError("workflow smoke did not preserve the accepted workload bounds")
+        observed = dict(actual_workload.get("observed") or {})
+        for item in expected_limits:
+            name = str(item.get("name") or "")
+            value = observed.get(name)
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(f"workflow smoke omitted observed workload unit {name}")
+            if int(value) > int(item["maximum"]):
+                raise ValueError(f"workflow smoke exceeded workload limit {name}")
+        if dict(run_log.get("input_policy") or {}) != dict(
+            expected_profile.get("input_policy") or {}
+        ):
+            raise ValueError("workflow smoke did not preserve the accepted input policy")
+        run_network = dict(run_log.get("network") or {})
+        expected_network_mode = str(expected_profile.get("network_mode") or "unrestricted")
+        if str(run_network.get("mode") or "") != expected_network_mode:
+            raise ValueError("workflow smoke did not preserve the accepted network mode")
+        if expected_network_mode == "offline" and run_network.get("accessed") is not False:
+            raise ValueError("workflow smoke reports network access under an offline policy")
         if list(run_log.get("seeds") or []) != list(expected_seed_labels):
             raise ValueError(
                 "workflow smoke run_log.json seeds differ from the authoritative "
@@ -543,6 +583,41 @@ class ResearchManager:
             if smoke_profile is None:
                 raise ValueError("ExperimentPlan has no workflow_smoke execution profile")
             manager_profile, profile_conditions = smoke_profile
+            input_policy = dict(profile_conditions.get("input_policy") or {})
+            network_mode = str(profile_conditions.get("network_mode") or "unrestricted")
+            execution_ready_without_network = bool(
+                dataset_status.get("execution_ready_without_network")
+            )
+            readiness_ok = bool(
+                input_policy.get("readiness") != "required_before_execution"
+                or (
+                    execution_ready_without_network
+                    if network_mode == "offline"
+                    else bool(dataset_status.get("ready"))
+                    or input_policy.get("source") == "deterministic_contract_fixture"
+                )
+            )
+            accepted_dataset_ready = bool(
+                input_policy.get("source") != "accepted_dataset"
+                or dataset_status.get("ready")
+            )
+            checks.append(
+                {
+                    "id": "runner.input_readiness",
+                    "ok": readiness_ok and accepted_dataset_ready,
+                    "source": input_policy.get("source"),
+                    "readiness": input_policy.get("readiness"),
+                    "network_mode": network_mode,
+                    "dataset_ready": bool(dataset_status.get("ready")),
+                    "execution_ready_without_network": execution_ready_without_network,
+                }
+            )
+            if not readiness_ok:
+                raise ValueError(
+                    "workflow smoke input is not ready under the accepted network policy"
+                )
+            if not accepted_dataset_ready:
+                raise ValueError("accepted dataset is not ready before workflow smoke")
             seeds = list(profile_conditions.get("seeds") or [])
             if len(seeds) != 1:
                 raise ValueError("workflow_smoke must expose one bounded seed")
@@ -640,6 +715,18 @@ class ResearchManager:
                 environment={
                     str(key): str(item)
                     for key, item in dict(prepared.get("environment") or {}).items()
+                }
+                | {
+                    "ADAOS_RESEARCH_WORKLOAD_JSON": json.dumps(
+                        dict(profile_conditions.get("workload") or {}),
+                        ensure_ascii=True,
+                        sort_keys=True,
+                    ),
+                    "ADAOS_RESEARCH_INPUT_POLICY_JSON": json.dumps(
+                        input_policy,
+                        ensure_ascii=True,
+                        sort_keys=True,
+                    ),
                 },
                 resources=ExecutionResourceRequest(
                     cpu_cores=int(profile_conditions.get("cpu_threads") or 2),
@@ -649,7 +736,7 @@ class ResearchManager:
                         profile_conditions.get("max_log_bytes") or 2 * 1024 * 1024
                     ),
                 ),
-                network=ExecutionNetworkPolicy(mode="offline"),
+                network=ExecutionNetworkPolicy(mode=network_mode),
                 determinism=ExecutionDeterminism(
                     mode="exploratory",
                     rng_streams={
@@ -678,10 +765,13 @@ class ResearchManager:
                     "stage": "workflow_smoke",
                     "evidence_class": "workflow_smoke",
                     "epochs": int(profile_conditions["epochs"]),
-                    "seeds": [f"seed-{int(item)}" for item in seeds],
+                    "seeds": [int(item) for item in seeds],
                     "inference_allowed": bool(
                         profile_conditions.get("inference_allowed")
                     ),
+                    "workload": dict(profile_conditions.get("workload") or {}),
+                    "input_policy": input_policy,
+                    "network_mode": network_mode,
                     "runner_output_ref": required_fields["output_ref"],
                     "manager_profile": manager_profile,
                 },
@@ -772,6 +862,7 @@ class ResearchManager:
                     collected=collected,
                     verified_artifacts=verified_artifacts,
                     expected_seed_labels=[f"seed-{int(item)}" for item in seeds],
+                    expected_profile=profile_conditions,
                 )
                 checks.extend(
                     [
