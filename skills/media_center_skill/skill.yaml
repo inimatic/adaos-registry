@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.7.0
+version: 0.8.0
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -572,7 +572,7 @@ tools:
   input_schema:
     type: object
     properties:
-      intent: {type: string, enum: ['', search, browse, play, favorite, unfavorite, collections, status, targets, control]}
+      intent: {type: string, enum: ['', search, browse, play, favorite, unfavorite, collections, status, targets, control, compound]}
       text: {type: string}
       query: {type: string}
       profile_id: {type: string, default: default}

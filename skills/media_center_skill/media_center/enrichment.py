@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 
 from .coordinator import MediaCatalogCoordinator
+from .discovery import text_embedding
 
 
 class MetadataProvider(Protocol):
@@ -22,7 +23,7 @@ class DeterministicLocalProvider:
 
     provider_id: str = "media_center.deterministic_local.v1"
     supported_jobs: frozenset[str] = frozenset(
-        {"metadata_enrichment", "technical_probe", "fingerprint"}
+        {"metadata_enrichment", "technical_probe", "fingerprint", "embedding"}
     )
 
     def claims(
@@ -79,13 +80,61 @@ class DeterministicLocalProvider:
                         "confidence": 1.0,
                     }
                 )
+        elif job_kind == "embedding":
+            metadata = subject.get("metadata")
+            search_parts = [
+                str(subject.get("title") or ""),
+                str(subject.get("name") or ""),
+                str(subject.get("folder_path") or ""),
+            ]
+            if isinstance(metadata, Mapping):
+                for field in (
+                    "album",
+                    "artist",
+                    "artists",
+                    "series",
+                    "language",
+                    "folder_segments",
+                    "aliases",
+                ):
+                    value = metadata.get(field)
+                    if isinstance(value, (list, tuple, set)):
+                        search_parts.extend(str(item) for item in value)
+                    elif value:
+                        search_parts.append(str(value))
+            claims.append(
+                {
+                    "subject_ref": subject_ref,
+                    "field_name": "text_embedding_v1",
+                    "value": text_embedding(" ".join(search_parts)),
+                    "confidence": 1.0,
+                }
+            )
         else:
             descriptor = subject.get("descriptor")
+            metadata = subject.get("metadata")
+            technical = (
+                metadata.get("technical")
+                if isinstance(metadata, Mapping)
+                and isinstance(metadata.get("technical"), Mapping)
+                else {}
+            )
+            perceptual_hash = str(technical.get("perceptual_hash") or "").strip()
+            if perceptual_hash:
+                claims.append(
+                    {
+                        "subject_ref": subject_ref,
+                        "field_name": "perceptual_hash_v1",
+                        "value": perceptual_hash,
+                        "confidence": 0.95,
+                    }
+                )
             fingerprint = (
                 descriptor.get("fingerprint")
                 if isinstance(descriptor, Mapping)
                 else None
             )
+            fingerprint = fingerprint or subject.get("fingerprint")
             if fingerprint:
                 claims.append(
                     {

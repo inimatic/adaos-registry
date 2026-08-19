@@ -593,6 +593,35 @@ def test_voice_request_uses_catalog_policy_and_existing_control_tools(monkeypatc
     assert len(calls[-1][2]["queue"]) == 1
 
 
+def test_compound_voice_request_is_bounded_and_requires_governed_approval():
+    result = main.voice_request(
+        text=(
+            "play the next episode in the living room and "
+            "lower volume after 10 PM"
+        ),
+        profile_id="alice",
+        actor_ref="profile:alice",
+    )
+
+    assert result["ok"] is True
+    assert result["status"] == "approval_required"
+    workflow = result["workflow"]
+    assert workflow["workflow_type"] == "media.compound_control"
+    assert workflow["authority"] == "adaos.sdk.workflow"
+    assert workflow["automatic_execution"] is False
+    assert workflow["requires_confirmation"] is True
+    assert workflow["step_count"] == 2
+    assert workflow["steps"][0]["action"] == "resolve_and_play"
+    assert workflow["steps"][1]["action"] == "volume"
+    assert workflow["steps"][1]["schedule"] == {
+        "kind": "local_time_not_before",
+        "hour": 22,
+        "minute": 0,
+        "timezone_source": "target",
+    }
+    assert workflow["target_selector"]["room_id"] == "living room"
+
+
 def test_unavailable_agent_makes_catalog_truthfully_partial(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())
@@ -1301,3 +1330,72 @@ def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
         "title",
         "folder_keywords",
     }
+
+
+def test_local_discovery_is_phonetic_semantic_and_resource_bounded(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "discovery.sqlite3"))
+    monkeypatch.setenv("MEDIA_CENTER_DISCOVERY_MAX_CANDIDATES", "100")
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Аудиокниги/Шерлок Холмс/01.mp3"),
+            _agent_delta(2, "Музыка/Совсем другое/02.mp3"),
+        )
+    )
+    worker = MediaEnrichmentWorker(catalog, poll_seconds=0.2)
+    while worker.run_once() is not None:
+        pass
+
+    result = catalog.discovery_search(
+        "Sherlok Holms", profile_id="default", limit=5
+    )
+
+    assert result["items"][0]["name"] == "01.mp3"
+    assert result["items"][0]["deep_match"]["stage"] == (
+        "coordinator_local_discovery"
+    )
+    assert set(result["items"][0]["deep_match"]["reasons"]) & {
+        "phonetic_overlap",
+        "trigram_similarity",
+        "local_text_embedding",
+    }
+    assert result["candidate_limit"] == 100
+    assert result["bounded"] is True
+
+
+def test_perceptual_duplicate_claims_never_merge_or_delete_sources(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "duplicates.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Movies/A/movie-a.mp4", kind="video"),
+            _agent_delta(2, "Movies/B/movie-b.mp4", kind="video"),
+        )
+    )
+    for item_id in (
+        catalog.list_items(limit=30, sort="title")["items"][0]["id"],
+        catalog.list_items(limit=30, sort="title")["items"][1]["id"],
+    ):
+        catalog.record_metadata_claim(
+            subject_ref=f"item:{item_id}",
+            field_name="perceptual_hash_v1",
+            value="same-sampled-content",
+            provenance="media_library_agent.ffmpeg_sample_sha256_v1",
+            confidence=0.95,
+        )
+
+    result = catalog.duplicate_candidates(limit=10)
+
+    candidate = next(
+        item
+        for item in result["items"]
+        if item["evidence"] == "perceptual_sample_hash_v1"
+    )
+    assert candidate["candidate_count"] == 2
+    assert candidate["disposition"] == "review_only"
+    assert result["automatic_merge"] is False
+    assert result["source_deletion"] is False

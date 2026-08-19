@@ -12,5 +12,6 @@
   "runtime.media_center.voice.control_unavailable": "Playback control is temporarily unavailable.",
   "runtime.media_center.voice.status": "The media library status is ready.",
   "runtime.media_center.voice.not_found": "I could not find matching media.",
-  "runtime.media_center.voice.which_media": "Which media item should I use?"
+  "runtime.media_center.voice.which_media": "Which media item should I use?",
+  "runtime.media_center.voice.confirm_compound": "Please confirm this multi-step media action."
 }

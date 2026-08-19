@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import re
 import sqlite3
 from pathlib import Path
@@ -18,6 +19,7 @@ from .catalog import (
     _title_from_name,
     now_iso,
 )
+from .discovery import discovery_score
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
@@ -728,6 +730,25 @@ class MediaCatalogCoordinator:
             """,
             (enrichment_job_id, f"item:{item_id}", now_iso(), now_iso()),
         )
+        for job_kind, priority in (("embedding", 600), ("fingerprint", 500)):
+            job_id = _stable_id(
+                "mediajob", job_kind, item_id, source_revision, size=24
+            )
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO media_background_jobs(
+                    id,kind,subject_ref,status,priority,created_at,updated_at
+                ) VALUES (?, ?, ?, 'queued', ?, ?, ?)
+                """,
+                (
+                    job_id,
+                    job_kind,
+                    f"item:{item_id}",
+                    priority,
+                    now_iso(),
+                    now_iso(),
+                ),
+            )
         return operation or "updated"
 
     @staticmethod
@@ -1436,6 +1457,125 @@ class MediaCatalogCoordinator:
             "summary": self.repository.summary(),
             "facets": self.repository.facets(),
             "profile_policy": policy,
+        }
+
+    def discovery_search(
+        self,
+        query: str,
+        *,
+        profile_id: str = "default",
+        media_kind: str = "playable",
+        limit: int = 30,
+    ) -> dict[str, Any]:
+        token = _text(query)
+        bounded = max(1, min(MAX_PAGE_SIZE, int(limit or MAX_PAGE_SIZE)))
+        if not token:
+            return {
+                "ok": True,
+                "schema": COORDINATOR_SCHEMA,
+                "items": [],
+                "count": 0,
+                "bounded": True,
+                "ranking": {"version": "local-discovery-v1"},
+            }
+        profile = _text(profile_id) or "default"
+        profile_record = self.get_profile(profile)["profile"]
+        policy = dict(profile_record.get("policy") or {})
+        allowed = {
+            _text(item).lower()
+            for item in policy.get("allowed_media_kinds") or []
+            if _text(item)
+        }
+        kind = _text(media_kind).lower()
+        if kind == "playable":
+            admitted = allowed & {"audio", "video"}
+        elif kind in {"audio", "video", "image", "other"}:
+            admitted = {kind} & allowed
+        else:
+            admitted = allowed
+        try:
+            candidate_limit = int(
+                os.environ.get("MEDIA_CENTER_DISCOVERY_MAX_CANDIDATES") or 5000
+            )
+        except ValueError:
+            candidate_limit = 5000
+        candidate_limit = max(100, min(20_000, candidate_limit))
+        placeholders = ",".join("?" for _ in sorted(admitted)) or "''"
+        with self.repository.connect() as connection:
+            rows = connection.execute(
+                f"""
+                SELECT c.*,
+                    COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                    COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                    COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                    COALESCE(ps.completed,0) AS profile_completed,
+                    COALESCE(ps.rating,0) AS profile_rating,
+                    COALESCE(ps.hidden,0) AS profile_hidden,
+                    COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                    COALESCE(ps.revision,0) AS profile_revision,
+                    (
+                        SELECT value_json FROM metadata_claims mc
+                        WHERE mc.subject_ref='item:' || c.id
+                            AND mc.field_name='text_embedding_v1'
+                        ORDER BY mc.confidence DESC,mc.created_at DESC LIMIT 1
+                    ) AS discovery_embedding
+                FROM catalog_items c
+                LEFT JOIN personal_media_state ps
+                    ON ps.item_id=c.id AND ps.profile_id=?
+                WHERE c.missing=0 AND COALESCE(ps.hidden,0)=0
+                    AND c.media_kind IN ({placeholders})
+                ORDER BY c.catalog_revision DESC,c.id
+                LIMIT ?
+                """,
+                (profile, *sorted(admitted), candidate_limit + 1),
+            ).fetchall()
+        scored: list[tuple[float, str, sqlite3.Row, list[str]]] = []
+        for row in rows[:candidate_limit]:
+            denial = self._policy_denial(row, policy)
+            if denial:
+                continue
+            embedding = _json_loads(row["discovery_embedding"]) or []
+            score, reasons = discovery_score(
+                token,
+                row["search_text"],
+                candidate_embedding=(
+                    embedding if isinstance(embedding, list) else []
+                ),
+            )
+            if score < 0.18:
+                continue
+            scored.append((score, str(row["title"]).casefold(), row, reasons))
+        scored.sort(key=lambda value: (-value[0], value[1], str(value[2]["id"])))
+        items = []
+        for score, _title, row, reasons in scored[:bounded]:
+            item = self._public_coordinator_item(row, profile)
+            item["deep_match"] = {
+                "stage": "coordinator_local_discovery",
+                "score": round(score, 6),
+                "reasons": reasons,
+            }
+            items.append(item)
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "query": token,
+            "items": items,
+            "count": len(items),
+            "bounded": True,
+            "candidate_count": min(len(rows), candidate_limit),
+            "candidate_limit": candidate_limit,
+            "truncated_candidates": len(rows) > candidate_limit,
+            "partial": self.participation()["partial"],
+            "ranking": {
+                "version": "local-discovery-v1",
+                "signals": [
+                    "normalized_text",
+                    "phonetic_code",
+                    "trigram_similarity",
+                    "local_text_embedding",
+                ],
+                "external_provider": False,
+            },
         }
 
     @staticmethod
@@ -2567,11 +2707,56 @@ class MediaCatalogCoordinator:
                 """,
                 (bounded,),
             ).fetchall()
+            perceptual_rows = connection.execute(
+                """
+                SELECT value_json,COUNT(*) AS candidate_count,
+                    GROUP_CONCAT(substr(subject_ref,6)) AS item_ids
+                FROM metadata_claims
+                WHERE field_name='perceptual_hash_v1'
+                GROUP BY value_json HAVING COUNT(*)>1
+                ORDER BY candidate_count DESC,value_json LIMIT ?
+                """,
+                (bounded,),
+            ).fetchall()
         items = [
-            {"work_id": str(row["work_id"]), "size_bytes": int(row["size_bytes"]), "candidate_count": int(row["candidate_count"]), "item_ids": str(row["item_ids"]).split(","), "disposition": "review_only"}
+            {
+                "work_id": str(row["work_id"]),
+                "size_bytes": int(row["size_bytes"]),
+                "candidate_count": int(row["candidate_count"]),
+                "item_ids": str(row["item_ids"]).split(","),
+                "evidence": "same_work_and_size",
+                "confidence": 0.7,
+                "disposition": "review_only",
+            }
             for row in rows
         ]
-        return {"ok": True, "schema": COORDINATOR_SCHEMA, "items": items, "count": len(items), "source_deletion": False}
+        seen = {tuple(sorted(item["item_ids"])) for item in items}
+        for row in perceptual_rows:
+            item_ids = str(row["item_ids"]).split(",")
+            signature = tuple(sorted(item_ids))
+            if signature in seen:
+                continue
+            seen.add(signature)
+            items.append(
+                {
+                    "perceptual_hash": _json_loads(row["value_json"]),
+                    "candidate_count": int(row["candidate_count"]),
+                    "item_ids": item_ids,
+                    "evidence": "perceptual_sample_hash_v1",
+                    "confidence": 0.9,
+                    "disposition": "review_only",
+                }
+            )
+            if len(items) >= bounded:
+                break
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "items": items[:bounded],
+            "count": min(len(items), bounded),
+            "source_deletion": False,
+            "automatic_merge": False,
+        }
 
     def apply_correction(
         self,
@@ -2989,6 +3174,7 @@ class MediaCatalogCoordinator:
                     "title": str(row["title"]),
                     "folder_path": str(row["folder_path"]),
                     "media_kind": str(row["media_kind"]),
+                    "fingerprint": str(row["fingerprint"]),
                     "metadata": _json_loads(row["metadata_json"]) or {},
                     "descriptor": _json_loads(row["descriptor_json"]) or {},
                 }
@@ -3097,7 +3283,12 @@ class MediaCatalogCoordinator:
             "participation": self.participation(),
             "budgets": {"catalog_page": MAX_PAGE_SIZE, "player_queue": 10, "agent_delta_page": 1000},
             "storage": {"media_bytes": "external", "catalog": "skill_local_relational"},
-            "search": {"indexed_rows": search_rows, "ranking_version": "deterministic-fts-v1"},
+            "search": {
+                "indexed_rows": search_rows,
+                "ranking_version": "federated-discovery-v2",
+                "local_discovery_candidate_default": 5000,
+                "local_discovery_candidate_hard_maximum": 20000,
+            },
             "background_jobs": jobs,
             "agents": agents,
             "repair_recommendations": recommendations[:30],

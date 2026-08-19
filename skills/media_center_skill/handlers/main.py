@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import mimetypes
 import re
 import sys
@@ -892,6 +893,36 @@ def deep_search(
         {"id": "coordinator_fts", "status": "completed", "count": len(items)}
     ]
     failures: list[dict[str, Any]] = []
+    if len(items) < bounded:
+        discovery = catalog.discovery_search(
+            token,
+            profile_id=profile_id,
+            media_kind=media_kind,
+            limit=bounded - len(items),
+        )
+        added = 0
+        for item in discovery.get("items") or []:
+            source_id = str(item.get("source_id") or "")
+            if source_id and source_id in seen:
+                continue
+            if source_id:
+                seen.add(source_id)
+            items.append(dict(item))
+            added += 1
+            if len(items) >= bounded:
+                break
+        stages.append(
+            {
+                "id": "coordinator_local_discovery",
+                "status": "completed",
+                "count": added,
+                "candidate_count": discovery.get("candidate_count", 0),
+                "candidate_limit": discovery.get("candidate_limit", 0),
+                "truncated_candidates": bool(
+                    discovery.get("truncated_candidates")
+                ),
+            }
+        )
     agent_limit = max(1, min(16, int(max_agents or 4)))
     try:
         instances = _topology().agent_instances(limit=agent_limit)
@@ -971,8 +1002,12 @@ def deep_search(
         "stages": stages,
         "failures": failures,
         "ranking": {
-            "version": "federated-deterministic-fts-v1",
-            "stage_order": ["coordinator_fts", "agent_technical_fts"],
+            "version": "federated-discovery-v2",
+            "stage_order": [
+                "coordinator_fts",
+                "coordinator_local_discovery",
+                "agent_technical_fts",
+            ],
         },
     }
 
@@ -1482,6 +1517,158 @@ def _voice_item(item: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _compound_voice_plan(
+    text: str,
+    *,
+    profile_id: str,
+    actor_ref: str,
+    room_id: str,
+    target_id: str,
+) -> dict[str, Any] | None:
+    clauses = [
+        item.strip()
+        for item in re.split(
+            r"\s+(?:and\s+then|and|then|и\s+затем|затем|и)\s+",
+            str(text or "").strip(),
+            flags=re.IGNORECASE,
+        )
+        if item.strip()
+    ][:5]
+    if len(clauses) < 2:
+        return None
+    steps: list[dict[str, Any]] = []
+    resolved_room = str(room_id or "").strip()
+    for index, clause in enumerate(clauses):
+        folded = clause.casefold()
+        schedule: dict[str, Any] = {"kind": "immediate"}
+        clock = re.search(
+            r"\b(?:after|at|после|в)\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b",
+            clause,
+            flags=re.IGNORECASE,
+        )
+        if clock:
+            hour = int(clock.group(1))
+            minute = int(clock.group(2) or 0)
+            meridiem = str(clock.group(3) or "").lower()
+            if meridiem == "pm" and hour < 12:
+                hour += 12
+            elif meridiem == "am" and hour == 12:
+                hour = 0
+            if hour > 23 or minute > 59:
+                return None
+            schedule = {
+                "kind": "local_time_not_before",
+                "hour": hour,
+                "minute": minute,
+                "timezone_source": "target",
+            }
+        room_match = re.search(
+            r"\b(?:in|on|в)\s+(?:the\s+)?([\w\- ]+?)$",
+            clause,
+            flags=re.IGNORECASE,
+        )
+        if room_match and not resolved_room:
+            resolved_room = room_match.group(1).strip()
+        step: dict[str, Any] = {
+            "id": f"step-{index + 1}",
+            "schedule": schedule,
+            "idempotency_scope": "workflow_step",
+        }
+        if re.search(r"\b(play|watch|listen|включ|проигр)\w*\b", folded):
+            query = re.sub(
+                r"^(?:play|watch|listen(?:\s+to)?|включи(?:ть)?|проиграй)\s+",
+                "",
+                clause,
+                flags=re.IGNORECASE,
+            )
+            if room_match:
+                query = query[: room_match.start()].strip()
+            step.update(
+                {
+                    "action": "resolve_and_play",
+                    "query": query,
+                    "requires": ["catalog_policy", "target_policy", "playback_lease"],
+                }
+            )
+        elif any(token in folded for token in ("volume", "громк")):
+            percent = re.search(r"(\d{1,3})\s*%", clause)
+            step.update(
+                {
+                    "action": "volume",
+                    "arguments": (
+                        {"volume": min(1.0, int(percent.group(1)) / 100)}
+                        if percent
+                        else {"delta": -0.2}
+                        if any(token in folded for token in ("lower", "quieter", "тише"))
+                        else {"delta": 0.2}
+                    ),
+                    "requires": ["target_policy", "playback_lease"],
+                }
+            )
+        elif any(token in folded for token in ("pause", "stop", "next", "previous", "пауза", "стоп", "следующ", "предыдущ")):
+            action = next(
+                value
+                for token, value in (
+                    ("pause", "pause"),
+                    ("пауза", "pause"),
+                    ("stop", "stop"),
+                    ("стоп", "stop"),
+                    ("next", "next"),
+                    ("следующ", "next"),
+                    ("previous", "previous"),
+                    ("предыдущ", "previous"),
+                )
+                if token in folded
+            )
+            step.update(
+                {
+                    "action": action,
+                    "arguments": {},
+                    "requires": ["target_policy", "playback_lease"],
+                }
+            )
+        else:
+            return None
+        steps.append(step)
+    digest = hashlib.sha256(
+        repr((profile_id, actor_ref, resolved_room, target_id, steps)).encode("utf-8")
+    ).hexdigest()
+    return {
+        "ok": True,
+        "schema": SCHEMA_VERSION,
+        "intent": "compound_control",
+        "status": "approval_required",
+        "workflow": {
+            "schema": "adaos.workflow.request.v1",
+            "workflow_type": "media.compound_control",
+            "request_digest": f"sha256:{digest}",
+            "profile_id": profile_id,
+            "actor_ref": actor_ref or f"profile:{profile_id}",
+            "target_selector": {
+                "target_id": str(target_id or ""),
+                "room_id": resolved_room,
+            },
+            "steps": steps,
+            "step_count": len(steps),
+            "authority": "adaos.sdk.workflow",
+            "automatic_execution": False,
+            "requires_confirmation": True,
+            "reconcile_on_unknown": True,
+        },
+        "clarification": {
+            "prompt": _skill_text(
+                "runtime.media_center.voice.confirm_compound",
+                "Please confirm this multi-step media action.",
+            ),
+            "options": [
+                {"id": "approve", "label": "Confirm"},
+                {"id": "cancel", "label": "Cancel"},
+            ],
+        },
+        "visual_results": steps,
+    }
+
+
 @tool(summary="Resolve bounded Media Center voice discovery and playback intents.", side_effects="local_write")
 def voice_request(
     intent: str = "",
@@ -1506,6 +1693,16 @@ def voice_request(
     bounded = max(1, min(10, int(limit or 5)))
     raw = str(text or "").strip()
     operation = str(intent or "").strip().lower()
+    if operation in {"", "compound"}:
+        compound = _compound_voice_plan(
+            raw,
+            profile_id=profile,
+            actor_ref=actor_ref,
+            room_id=room_id,
+            target_id=target_id,
+        )
+        if compound is not None:
+            return compound
     transport_actions = {
         "play", "pause", "seek", "volume", "mute", "next", "previous",
         "stop", "handoff", "tracks", "rate", "sleep_timer",
@@ -2042,9 +2239,9 @@ def next_steps(**_: Any) -> dict[str, Any]:
             "reason": "Use the core media resource content paths; the catalog does not stream files directly.",
         },
         {
-            "id": "production_media_center",
-            "label": "Add production semantics later",
-            "reason": "Metadata enrichment, people/scenes, queues, remote players, recommendations, and library sources belong above this MVP.",
+            "id": "operations",
+            "label": "Review operations",
+            "reason": "Inspect agent participation, background metadata jobs, playback routes, and bounded diagnostics before changing deployment.",
         },
     ]
     message = " ".join(f"{idx + 1}. {item['label']}: {item['reason']}" for idx, item in enumerate(steps))
