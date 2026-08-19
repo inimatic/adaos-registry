@@ -1,0 +1,62 @@
+{
+  "schema": "adaos.media_center.test_library_profile.v1",
+  "total_items": 20000,
+  "segments": [
+    {
+      "id": "movies",
+      "count": 7000,
+      "path_template": "Movies/{year}/{title}/{title}.{quality}.{codec}.mkv",
+      "qualities": ["SD", "HD", "FHD", "UHD"],
+      "codecs": ["h264", "hevc", "av1", "unsupported_fixture"]
+    },
+    {
+      "id": "series",
+      "count": 6000,
+      "path_template": "Series/{title}/Season {season:02d}/{title}.S{season:02d}E{episode:02d}.mkv",
+      "seasons": 20,
+      "episodes_per_season": 30
+    },
+    {
+      "id": "albums",
+      "count": 3000,
+      "path_template": "Music/{artist}/{album}/Disc {disc}/{track:02d} - {title}.flac",
+      "discs": 4,
+      "tracks_per_disc": 25
+    },
+    {
+      "id": "audiobooks",
+      "count": 3000,
+      "path_template": "Аудиокниги/{author}/{series}/{book}/Часть {part}/{chapter:03d}.mp3",
+      "parts": 8,
+      "chapters_per_part": 50
+    },
+    {
+      "id": "playlists_and_alternatives",
+      "count": 1000,
+      "path_template": "Playlists/{owner}/{playlist}/{ordinal:04d}-{title}.{extension}",
+      "extensions": ["mp3", "flac", "m4a", "mp4"]
+    }
+  ],
+  "edge_cases": {
+    "non_ascii_names": [
+      "Музыка/Ёлка/Всё зависит от нас.flac",
+      "音楽/坂本龍一/01.mp3",
+      "Música/José González/Álbum/01.flac"
+    ],
+    "duplicate_sets": 250,
+    "unavailable_agents": ["agent-offline", "agent-stale"],
+    "slow_roots": ["root-usb2", "root-network-share"],
+    "blocked_roots": ["root-permission-denied", "root-unmounted"],
+    "unsupported_codecs": ["video/x-msvideo:indeo5", "audio/x-realaudio:cook"],
+    "overlapping_roots": ["/media", "/media/Music"],
+    "symlink_cycle": "Music/Loop -> Music",
+    "changed_while_scanning": "Series/Mutable/Season 01/Episode 01.mkv"
+  },
+  "acceptance_views": {
+    "catalog_page_size": 30,
+    "player_queue_size": 10,
+    "deep_search_agent_limit": 4,
+    "profiles": ["default", "household", "kids"],
+    "presentations": ["tv", "desktop", "mobile_control", "embedded"]
+  }
+}
