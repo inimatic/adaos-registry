@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_library.source_delta.v1",
+  "type": "object",
+  "required": ["schema", "id", "sequence", "agent_id", "node_id", "root_id", "source_id", "operation", "source_revision", "job_id", "source", "created_at"],
+  "properties": {
+    "schema": {"const": "adaos.media_library.source_delta.v1"}, "id": {"type": "string"}, "sequence": {"type": "integer", "minimum": 1},
+    "agent_id": {"type": "string"}, "node_id": {"type": "string"}, "root_id": {"type": "string"}, "source_id": {"type": "string"},
+    "operation": {"enum": ["added", "updated", "restored", "removed"]}, "source_revision": {"type": "integer", "minimum": 1},
+    "job_id": {"type": "string"}, "source": {"type": "object"}, "created_at": {"type": "string"}
+  },
+  "additionalProperties": false
+}

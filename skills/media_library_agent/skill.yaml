@@ -1,0 +1,295 @@
+name: media_library_agent
+version: 0.1.0
+description: Distributed node-local media discovery agent with durable asynchronous scans and ordered catalog deltas.
+supported_locales:
+- en
+- ru
+runtime:
+  kind: service
+  python: '3.11'
+  env:
+    mode: venv
+service:
+  host: 127.0.0.1
+  port: 18106
+  command:
+  - -m
+  - handlers.service
+  healthcheck:
+    path: /health
+    timeout_ms: 1000
+capabilities:
+- media.catalog
+dependencies: []
+events:
+  subscribe:
+  - sys.ready
+  - webio.stream.snapshot.requested
+  publish:
+  - io.out.stream.publish
+lifecycle:
+  after_activate: ensure_schema
+  rehydrate: rehydrate
+  dispose: dispose
+default_tool: status
+exports:
+  tools:
+  - ensure_schema
+  - rehydrate
+  - add_root
+  - remove_root
+  - list_roots
+  - start_scan
+  - import_folder
+  - scan_status
+  - list_jobs
+  - cancel_scan
+  - pull_deltas
+  - browse_folders
+  - configure_schedule
+  - set_resource_pressure
+  - inspect_source
+  - status
+  - dispose
+tools:
+- name: ensure_schema
+  entry: handlers.main:ensure_schema
+  description: Ensure the durable agent schema.
+  side_effects: local_write
+  input_schema: {type: object, additionalProperties: true}
+  output_schema: {type: object}
+- name: rehydrate
+  entry: handlers.main:rehydrate
+  description: Resume queued agent work after activation.
+  side_effects: local_write
+  input_schema: {type: object, additionalProperties: true}
+  output_schema: {type: object}
+- name: add_root
+  entry: handlers.main:add_root
+  description: Add a node-local media root without copying media bytes.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [path]
+    properties:
+      path: {type: string, minLength: 1}
+      label: {type: string}
+      include_images: {type: boolean, default: false}
+      follow_symlinks: {type: boolean, default: false}
+      exclusions:
+        type: array
+        maxItems: 64
+        items: {type: string, maxLength: 300}
+      scan_window: {type: object}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: remove_root
+  entry: handlers.main:remove_root
+  description: Disable a root while retaining its external files and indexed evidence.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [root_id]
+    properties:
+      root_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: list_roots
+  entry: handlers.main:list_roots
+  description: List roots owned by this node agent.
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      include_disabled: {type: boolean, default: false}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: start_scan
+  entry: handlers.main:start_scan
+  description: Queue incremental root scans and return durable job identifiers immediately.
+  side_effects: local_write
+  timeout_seconds: 15
+  input_schema:
+    type: object
+    properties:
+      root_id: {type: string}
+      mode: {type: string, enum: [incremental, reconcile, full], default: incremental}
+      webspace_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: import_folder
+  entry: handlers.main:import_folder
+  description: Add a folder and queue its first asynchronous in-place scan.
+  side_effects: local_write
+  timeout_seconds: 15
+  input_schema:
+    type: object
+    required: [path]
+    properties:
+      path: {type: string, minLength: 1}
+      label: {type: string}
+      include_images: {type: boolean, default: false}
+      follow_symlinks: {type: boolean, default: false}
+      exclusions:
+        type: array
+        maxItems: 64
+        items: {type: string, maxLength: 300}
+      webspace_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: scan_status
+  entry: handlers.main:scan_status
+  description: Return one bounded durable scan progress record.
+  side_effects: none
+  input_schema:
+    type: object
+    required: [job_id]
+    properties:
+      job_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: list_jobs
+  entry: handlers.main:list_jobs
+  description: List recent bounded scan jobs.
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      root_id: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 100, default: 20}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: cancel_scan
+  entry: handlers.main:cancel_scan
+  description: Cooperatively cancel one scan.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [job_id]
+    properties:
+      job_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: pull_deltas
+  entry: handlers.main:pull_deltas
+  description: Pull ordered idempotent source deltas through an opaque cursor.
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      cursor: {type: string}
+      root_id: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 1000, default: 250}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: browse_folders
+  entry: handlers.main:browse_folders
+  description: Browse indexed folder hierarchy.
+  side_effects: none
+  input_schema:
+    type: object
+    properties:
+      root_id: {type: string}
+      parent: {type: string}
+      limit: {type: integer, minimum: 1, maximum: 500, default: 100}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: configure_schedule
+  entry: handlers.main:configure_schedule
+  description: Configure periodic root reconciliation.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [root_id]
+    properties:
+      root_id: {type: string}
+      enabled: {type: boolean, default: true}
+      interval_seconds: {type: integer, minimum: 300, maximum: 604800, default: 21600}
+      debounce_seconds: {type: integer, minimum: 1, maximum: 3600, default: 30}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: set_resource_pressure
+  entry: handlers.main:set_resource_pressure
+  description: Pause or resume background scans according to playback pressure.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [level]
+    properties:
+      level: {type: string, enum: [normal, playback, critical]}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: inspect_source
+  entry: handlers.main:inspect_source
+  description: Inspect one source descriptor without reading media bytes.
+  side_effects: none
+  input_schema:
+    type: object
+    required: [source_id]
+    properties:
+      source_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: status
+  entry: handlers.main:status
+  description: Return compact agent health, progress, and capacity.
+  side_effects: none
+  input_schema: {type: object, additionalProperties: true}
+  output_schema: {type: object}
+- name: dispose
+  entry: handlers.main:dispose
+  description: Stop process-local background workers.
+  side_effects: local_write
+  input_schema: {type: object, additionalProperties: true}
+  output_schema: {type: object}
+data_routes:
+- surface: modal:media-center-settings
+  route: stream
+  receiver: media_library_agent.progress
+  owner: skill:media_library_agent
+  first_paint: idle scan progress
+  recovery: scan_status reads the durable job snapshot after reconnect
+  update_source:
+  - media_library_agent.worker
+  - webio.stream.snapshot.requested
+  budget:
+    max_payload_bytes: 16384
+    max_publish_hz: 2
+    max_items: 1
+    snapshot_policy: on_subscribe
+  guard_visibility:
+    degraded_state: preserve the last progress value and mark it stale
+    log: skill:media_library_agent.runtime
+    quarantine: false
+- surface: media-library-agent store
+  route: skill-local
+  path: data/db/media_library_agent.sqlite3
+  owner: skill:media_library_agent
+  first_paint: empty root and scan registry
+  recovery: WAL recovery and queued job rehydration
+  guard_visibility: only public bounded tools expose metadata; media bytes remain external
+  budget:
+    max_payload_bytes: 1048576
+memory_budget:
+  expected_rss_mb: 128
+  background_workers:
+    max_threads: 1
+    cleanup_hook: dispose
+  caches:
+  - name: scan_batch
+    route: process
+    max_items: 100
+    cleanup_hook: dispose
+llm_hints:
+  description: Node-local asynchronous media discovery agent used by the Media Center coordinator.
+  aliases: [media library agent, media scanner]
+  primary_actions:
+  - id: media_library_agent.import_folder
+    intent: media_center.import_folder
+    tool: import_folder
+    side_effect_class: local_write
+  - id: media_library_agent.start_scan
+    intent: media_center.scan
+    tool: start_scan
+    side_effect_class: local_write
+updated_at: '2026-08-19T00:00:00+00:00'

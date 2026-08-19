@@ -1,0 +1,290 @@
+from __future__ import annotations
+
+import os
+import sys
+import threading
+from pathlib import Path
+from typing import Any, Mapping
+
+from adaos.sdk.core.decorators import tool
+from adaos.sdk.data.i18n import _
+
+
+_SKILL_ROOT = Path(__file__).resolve().parents[1]
+if str(_SKILL_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SKILL_ROOT))
+
+from media_library_agent.contracts import SCHEMA_VERSION, compact_error, text  # noqa: E402
+from media_library_agent.repository import MediaLibraryAgentRepository, default_db_path  # noqa: E402
+from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
+
+
+_runtime_lock = threading.Lock()
+_runtime_path = ""
+_repository_instance: MediaLibraryAgentRepository | None = None
+_worker_instance: MediaLibraryAgentWorker | None = None
+
+
+def _human_error(code: str, fallback: str, **extra: Any) -> dict[str, Any]:
+    key = f"runtime.media_library_agent.error.{code}"
+    try:
+        translated = text(_(key))
+    except Exception:
+        translated = ""
+    message = translated if translated and translated != key else fallback
+    return compact_error(
+        code,
+        detail=text(extra.pop("detail", "")),
+        human_message=message,
+        human_message_i18n={"key": key},
+        **extra,
+    )
+
+
+def _publish_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
+    try:
+        from adaos.sdk.io import stream_variable_publish
+
+        meta = {"webspace_id": webspace_id} if webspace_id else None
+        stream_variable_publish(
+            "media_library_agent.progress",
+            dict(payload),
+            var_id="media_library_agent.current_scan",
+            seq=int((payload.get("progress") or {}).get("processed_count") or 0),
+            ttl_ms=120000,
+            _meta=meta,
+        )
+    except Exception:
+        return
+
+
+def _runtime() -> tuple[MediaLibraryAgentRepository, MediaLibraryAgentWorker]:
+    global _repository_instance, _runtime_path, _worker_instance
+    path = str(default_db_path().resolve())
+    with _runtime_lock:
+        if _repository_instance is None or _worker_instance is None or _runtime_path != path:
+            if _worker_instance is not None:
+                _worker_instance.dispose(timeout=0.2)
+            _repository_instance = MediaLibraryAgentRepository(path)
+            _worker_instance = MediaLibraryAgentWorker(_repository_instance, publish=_publish_progress)
+            _runtime_path = path
+        return _repository_instance, _worker_instance
+
+
+@tool(summary="Ensure the durable media-library agent schema.", side_effects="local_write")
+def ensure_schema(**_: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    return repository.ensure_schema()
+
+
+@tool(summary="Resume queued media-library work after activation.", side_effects="local_write")
+def rehydrate(**_: Any) -> dict[str, Any]:
+    repository, worker = _runtime()
+    worker.ensure_started()
+    return {**repository.summary(), "worker": {"running": True, "resource_pressure": worker.resource_pressure}}
+
+
+def recover_interrupted_runtime() -> dict[str, Any]:
+    repository, worker = _runtime()
+    requeued = repository.requeue_interrupted_jobs()
+    worker.ensure_started()
+    return {**repository.summary(), "requeued_job_count": requeued}
+
+
+@tool(summary="Add a local media root without copying its files.", side_effects="local_write")
+def add_root(
+    path: str = "",
+    label: str = "",
+    include_images: bool = False,
+    follow_symlinks: bool = False,
+    exclusions: list[str] | None = None,
+    scan_window: Mapping[str, Any] | None = None,
+    **_: Any,
+) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    result = repository.add_root(
+        path,
+        label=label,
+        include_images=bool(include_images),
+        follow_symlinks=bool(follow_symlinks),
+        exclusions=exclusions or (),
+        scan_window=scan_window,
+    )
+    if result.get("ok"):
+        return result
+    code = text(result.get("error"))
+    fallbacks = {
+        "root_path_required": "Enter a media folder path.",
+        "root_path_not_found": "The media folder does not exist on this node.",
+        "root_path_not_directory": "The selected path is not a folder.",
+        "root_exclusion_invalid": "One of the exclusion patterns is invalid.",
+    }
+    return {**result, **_human_error(code, fallbacks.get(code, "The media folder could not be added."))}
+
+
+@tool(summary="Disable a media root while retaining external files and indexed evidence.", side_effects="local_write")
+def remove_root(root_id: str = "", **_: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    result = repository.disable_root(root_id)
+    if result.get("ok"):
+        return result
+    return {**result, **_human_error("root_not_found", "The media folder is no longer configured.")}
+
+
+@tool(summary="List media roots owned by this node agent.", side_effects="none")
+def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    return repository.list_roots(include_disabled=bool(include_disabled))
+
+
+@tool(summary="Queue bounded incremental scans and return immediately.", side_effects="local_write")
+def start_scan(
+    root_id: str = "",
+    mode: str = "incremental",
+    webspace_id: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    repository, worker = _runtime()
+    root_ids = [text(root_id)] if text(root_id) else [item["id"] for item in repository.list_roots()["items"]]
+    if not root_ids:
+        return _human_error("no_active_media_roots", "No active media folders are configured.", roots=[])
+    jobs: list[dict[str, Any]] = []
+    accepted = 0
+    for candidate in root_ids:
+        result = repository.create_job(candidate, mode=mode, webspace_id=webspace_id)
+        if not result.get("ok"):
+            return {**result, **_human_error(text(result.get("error")), "The media scan could not be queued.")}
+        jobs.append(dict(result["job"]))
+        accepted += int(bool(result.get("accepted")))
+    worker.ensure_started()
+    return {
+        "ok": True,
+        "schema": SCHEMA_VERSION,
+        "accepted": bool(accepted),
+        "accepted_count": accepted,
+        "jobs": jobs,
+        "job": jobs[0] if len(jobs) == 1 else None,
+        "asynchronous": True,
+    }
+
+
+@tool(summary="Add a media root and queue its first asynchronous scan.", side_effects="local_write")
+def import_folder(
+    path: str = "",
+    label: str = "",
+    include_images: bool = False,
+    follow_symlinks: bool = False,
+    exclusions: list[str] | None = None,
+    webspace_id: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    added = add_root(
+        path=path,
+        label=label,
+        include_images=include_images,
+        follow_symlinks=follow_symlinks,
+        exclusions=exclusions,
+    )
+    if not added.get("ok"):
+        return added
+    queued = start_scan(root_id=added["root"]["id"], mode="full", webspace_id=webspace_id)
+    return {**queued, "root": added["root"], "roots": added["roots"], "storage": {"mode": "external_reference", "media_bytes_copied": False}}
+
+
+@tool(summary="Read one durable scan job and compact progress.", side_effects="none")
+def scan_status(job_id: str = "", **_: Any) -> dict[str, Any]:
+    repository, worker = _runtime()
+    job = repository.get_job(job_id)
+    if job is None:
+        return _human_error("scan_job_not_found", "The media scan is no longer available.", job_id=text(job_id))
+    return {"ok": True, "schema": SCHEMA_VERSION, "job": job, "resource_pressure": worker.resource_pressure}
+
+
+@tool(summary="List recent bounded scan jobs.", side_effects="none")
+def list_jobs(root_id: str = "", limit: int = 20, **_: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    return repository.list_jobs(root_id=root_id, limit=limit)
+
+
+@tool(summary="Request cooperative cancellation of one scan.", side_effects="local_write")
+def cancel_scan(job_id: str = "", **_: Any) -> dict[str, Any]:
+    repository, worker = _runtime()
+    result = repository.request_cancel(job_id)
+    worker.ensure_started()
+    if result.get("ok"):
+        return result
+    return {**result, **_human_error("scan_job_not_found", "The media scan is no longer available.")}
+
+
+@tool(summary="Pull ordered idempotent source deltas through an opaque cursor.", side_effects="none")
+def pull_deltas(cursor: str = "", limit: int = 250, root_id: str = "", **_: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    try:
+        return repository.pull_deltas(cursor=cursor, limit=limit, root_id=root_id)
+    except ValueError:
+        return _human_error("invalid_cursor", "The catalog cursor has expired or is invalid.")
+
+
+@tool(summary="Browse indexed folders as an alternative library navigation.", side_effects="none")
+def browse_folders(root_id: str = "", parent: str = "", limit: int = 100, **_: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    return repository.browse_folders(root_id=root_id, parent=parent, limit=limit)
+
+
+@tool(summary="Configure periodic reconciliation for one media root.", side_effects="local_write")
+def configure_schedule(
+    root_id: str = "",
+    enabled: bool = True,
+    interval_seconds: int = 21600,
+    debounce_seconds: int = 30,
+    **_: Any,
+) -> dict[str, Any]:
+    repository, worker = _runtime()
+    result = repository.configure_schedule(
+        root_id,
+        enabled=bool(enabled),
+        interval_seconds=interval_seconds,
+        debounce_seconds=debounce_seconds,
+    )
+    worker.ensure_started()
+    return result
+
+
+@tool(summary="Pause or resume background scans according to playback pressure.", side_effects="local_write")
+def set_resource_pressure(level: str = "normal", **_: Any) -> dict[str, Any]:
+    _repository, worker = _runtime()
+    try:
+        current = worker.set_resource_pressure(level)
+    except ValueError:
+        return _human_error("invalid_resource_pressure", "The resource pressure level is invalid.")
+    return {"ok": True, "schema": SCHEMA_VERSION, "resource_pressure": current}
+
+
+@tool(summary="Inspect one indexed source without reading media bytes.", side_effects="none")
+def inspect_source(source_id: str = "", **_: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    source = repository.get_source(source_id)
+    if source is None:
+        return _human_error("source_not_found", "The media source is no longer available.", source_id=text(source_id))
+    return {"ok": True, "schema": SCHEMA_VERSION, "source": source}
+
+
+@tool(summary="Return compact agent health and capacity state.", side_effects="none")
+def status(**_: Any) -> dict[str, Any]:
+    repository, worker = _runtime()
+    return {
+        **repository.summary(),
+        "worker": {"resource_pressure": worker.resource_pressure, "max_concurrent_scans": 1},
+        "limits": {
+            "max_files_per_scan": int(os.environ.get("MEDIA_LIBRARY_AGENT_MAX_FILES") or 1_000_000),
+            "max_delta_page": 1000,
+            "progress_publish_hz": 2,
+        },
+    }
+
+
+@tool(summary="Stop process-local media-library workers.", side_effects="local_write")
+def dispose(**_: Any) -> dict[str, Any]:
+    _repository, worker = _runtime()
+    worker.dispose()
+    return {"ok": True, "schema": SCHEMA_VERSION, "disposed": True}

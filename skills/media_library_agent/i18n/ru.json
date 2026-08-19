@@ -1,0 +1,12 @@
+{
+  "runtime.media_library_agent.error.root_path_required": "Укажите путь к папке с медиаданными.",
+  "runtime.media_library_agent.error.root_path_not_found": "Папка с медиаданными не найдена на этой ноде.",
+  "runtime.media_library_agent.error.root_path_not_directory": "Указанный путь не является папкой.",
+  "runtime.media_library_agent.error.root_exclusion_invalid": "Одно из правил исключения имеет неверный формат.",
+  "runtime.media_library_agent.error.root_not_found": "Папка с медиаданными больше не настроена.",
+  "runtime.media_library_agent.error.no_active_media_roots": "Активные папки с медиаданными не настроены.",
+  "runtime.media_library_agent.error.scan_job_not_found": "Задание индексирования больше недоступно.",
+  "runtime.media_library_agent.error.invalid_cursor": "Курсор каталога устарел или имеет неверный формат.",
+  "runtime.media_library_agent.error.invalid_resource_pressure": "Указан неверный уровень нагрузки.",
+  "runtime.media_library_agent.error.source_not_found": "Источник медиаданных больше недоступен."
+}

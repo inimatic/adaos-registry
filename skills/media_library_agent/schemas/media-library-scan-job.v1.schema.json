@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "adaos.media_library.scan_job.v1",
+  "type": "object",
+  "required": ["schema", "id", "root_id", "mode", "status", "requested_at", "progress", "cancel_requested", "revision"],
+  "properties": {
+    "schema": {"const": "adaos.media_library.scan_job.v1"}, "id": {"type": "string"}, "root_id": {"type": "string"},
+    "mode": {"enum": ["incremental", "reconcile", "full"]},
+    "status": {"enum": ["queued", "running", "waiting_resources", "canceling", "completed", "failed", "canceled"]},
+    "requested_at": {"type": "string"}, "started_at": {"type": "string"}, "finished_at": {"type": "string"},
+    "progress": {"type": "object"}, "error": {"type": ["object", "null"]}, "cancel_requested": {"type": "boolean"},
+    "webspace_id": {"type": "string"}, "revision": {"type": "integer", "minimum": 1}
+  },
+  "additionalProperties": false
+}

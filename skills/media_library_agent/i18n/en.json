@@ -1,0 +1,12 @@
+{
+  "runtime.media_library_agent.error.root_path_required": "Enter a media folder path.",
+  "runtime.media_library_agent.error.root_path_not_found": "The media folder does not exist on this node.",
+  "runtime.media_library_agent.error.root_path_not_directory": "The selected path is not a folder.",
+  "runtime.media_library_agent.error.root_exclusion_invalid": "One of the exclusion patterns is invalid.",
+  "runtime.media_library_agent.error.root_not_found": "The media folder is no longer configured.",
+  "runtime.media_library_agent.error.no_active_media_roots": "No active media folders are configured.",
+  "runtime.media_library_agent.error.scan_job_not_found": "The media scan is no longer available.",
+  "runtime.media_library_agent.error.invalid_cursor": "The catalog cursor has expired or is invalid.",
+  "runtime.media_library_agent.error.invalid_resource_pressure": "The resource pressure level is invalid.",
+  "runtime.media_library_agent.error.source_not_found": "The media source is no longer available."
+}
