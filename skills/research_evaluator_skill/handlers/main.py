@@ -262,13 +262,39 @@ def derive_compact_calibration(
                 "second_arm": "C3_typed_execution" if control_first else "C0_raw",
             }
         )
+    experiment_plan = dict(dict(response["research_compilation"]).get("experiment_plan") or {})
+    execution_profiles = dict(experiment_plan.get("execution") or {})
+    smoke_profiles = [
+        (str(profile_id), dict(profile))
+        for profile_id, profile in execution_profiles.items()
+        if isinstance(profile, Mapping)
+        and str(profile.get("evidence_class") or "") == "workflow_smoke"
+    ]
+    if len(smoke_profiles) != 1:
+        raise ValueError("accepted execution projection must expose exactly one workflow_smoke profile")
+    smoke_profile_id, smoke_profile = smoke_profiles[0]
+    smoke_seeds = list(smoke_profile.get("seeds") or [])
+    if not smoke_seeds or any(isinstance(item, bool) or not isinstance(item, int) for item in smoke_seeds):
+        raise ValueError("workflow_smoke profile must expose integer RNG seeds")
+    expected_smoke_profile = {
+        "profile_id": smoke_profile_id,
+        "stage_id": str(smoke_profile.get("stage_id") or smoke_profile_id),
+        "device": str(smoke_profile.get("device") or ""),
+        "epochs": int(smoke_profile.get("epochs") or 0),
+        "seeds": [int(item) for item in smoke_seeds],
+        "evidence_class": str(smoke_profile.get("evidence_class") or ""),
+        "inference_allowed": bool(smoke_profile.get("inference_allowed")),
+        "gpu_count": 0 if str(smoke_profile.get("device") or "").lower() == "cpu" else 1,
+        "network_mode": "offline",
+    }
     task.update(
         {
-            "schema_version": "1.4.0",
+            "schema_version": "1.5.0",
             "task_id": str(task_id),
             "title": str(baseline["title"]) + " (compact execution contracts)",
             "direction_skill_id": source_direction or str(baseline["direction_skill_id"]),
             "expected_protocol_digest": str(brief["prototype_digest"]),
+            "expected_smoke_profile": expected_smoke_profile,
             "agent_profile": {
                 "provider": "openai-codex-cli",
                 "model": str(model),

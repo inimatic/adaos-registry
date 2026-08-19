@@ -118,16 +118,26 @@ def build_independent_candidate(
     resources = dict(execution_spec.get("resources") or {})
     network = dict(execution_spec.get("network") or {})
     expected_protocol = str(task.get("expected_protocol_digest") or "")
+    expected_smoke = dict(task.get("expected_smoke_profile") or {})
+    expected_stage = str(expected_smoke.get("stage_id") or "workflow_smoke")
+    expected_evidence_class = str(
+        expected_smoke.get("evidence_class") or "workflow_smoke"
+    )
+    expected_epochs = int(expected_smoke.get("epochs") or 3)
+    expected_seeds = list(expected_smoke.get("seeds") or [17])
+    expected_inference = bool(expected_smoke.get("inference_allowed", False))
+    expected_gpu_count = int(expected_smoke.get("gpu_count") or 0)
+    expected_network_mode = str(expected_smoke.get("network_mode") or "offline")
     protocol_ok = bool(execution_spec) and all(
         (
             str(metadata.get("protocol_digest") or "") == expected_protocol,
-            str(metadata.get("stage") or "") == "workflow_smoke",
-            str(metadata.get("evidence_class") or "") == "workflow_smoke",
-            int(metadata.get("epochs") or 0) == 3,
-            list(metadata.get("seeds") or []) == ["seed-17"],
-            metadata.get("inference_allowed") is False,
-            int(resources.get("gpu_count") or 0) == 0,
-            str(network.get("mode") or "") == "offline",
+            str(metadata.get("stage") or "") == expected_stage,
+            str(metadata.get("evidence_class") or "") == expected_evidence_class,
+            int(metadata.get("epochs") or 0) == expected_epochs,
+            list(metadata.get("seeds") or []) == expected_seeds,
+            metadata.get("inference_allowed") is expected_inference,
+            int(resources.get("gpu_count") or 0) == expected_gpu_count,
+            str(network.get("mode") or "") == expected_network_mode,
         )
     )
     validation_ok = bool(validation and validation.get("ok"))
@@ -138,12 +148,12 @@ def build_independent_candidate(
     trial_outputs = {str(item["path"]): dict(item) for item in (trial or {}).get("outputs") or []}
     smoke_ok = bool(trial and trial.get("ok")) and all(
         (
-            run_log.get("stage") == "workflow_smoke",
-            run_log.get("device") == "cpu",
-            int(run_log.get("epochs_completed") or 0) == 3,
-            list(run_log.get("seeds") or []) == ["seed-17"],
-            run_log.get("inference_allowed") is False,
-            str(run_log.get("evidence_class") or "") == "workflow_smoke",
+            run_log.get("stage") == expected_stage,
+            run_log.get("device") == str(expected_smoke.get("device") or "cpu"),
+            int(run_log.get("epochs_completed") or 0) == expected_epochs,
+            list(run_log.get("seeds") or []) == expected_seeds,
+            run_log.get("inference_allowed") is expected_inference,
+            str(run_log.get("evidence_class") or "") == expected_evidence_class,
             int(dict(audit.get("per_stage") or {}).get("workflow_smoke", {}).get("test_evaluations_count") or 0) == 0,
             not list(audit.get("test_access") or []),
         )

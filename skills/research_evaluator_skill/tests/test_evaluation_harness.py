@@ -53,6 +53,17 @@ def task_value(tmp_path: Path) -> dict:
         "base_request": "Build a clean executable TLP experiment from the supplied source material without using hidden answers.",
         "artifact_groups": ["part0"],
         "expected_protocol_digest": "sha256:" + "a" * 64,
+        "expected_smoke_profile": {
+            "profile_id": "workflow_smoke",
+            "stage_id": "workflow_smoke",
+            "device": "cpu",
+            "epochs": 3,
+            "seeds": [17],
+            "evidence_class": "workflow_smoke",
+            "inference_allowed": False,
+            "gpu_count": 0,
+            "network_mode": "offline",
+        },
         "agent_profile": {
             "provider": "openai-codex-cli",
             "model": "gpt-5.4",
@@ -353,7 +364,7 @@ def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(
             "stage": "workflow_smoke",
             "evidence_class": "workflow_smoke",
             "epochs": 3,
-            "seeds": ["seed-17"],
+            "seeds": [17],
             "inference_allowed": False,
         },
         "resources": {"gpu_count": 0},
@@ -385,6 +396,67 @@ def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(
     evaluated = evaluate_candidate(task, candidate)
     assert evaluated["metrics"]["evidence_valid_completion"] is False
     assert evaluated["failure"]["stage"] == "implementation"
+
+
+def test_independent_judge_rejects_string_pair_ids_as_rng_seeds(task_value, monkeypatch) -> None:
+    task = freeze_task(task_value)
+    monkeypatch.setattr(
+        "evaluation.harness.artifact_context.materialize_context",
+        lambda skill, group, audience: {
+            "source_ref": f"artifact://skill/{skill}/{group}",
+            "audience": audience,
+            "digest": "sha256:" + "b" * 64,
+            "source_manifest_digest": "sha256:" + "c" * 64,
+            "root_path": "/isolated/view/files",
+            "items": [],
+        },
+    )
+    packet = prepare_arm(task, "C3_typed_execution", 1)
+    session = {
+        "session_id": "dev-test",
+        "artifact_inputs": [
+            {
+                "ref": "artifact://skill/tlp_direction/part0",
+                "manifest_digest": "sha256:" + "1" * 64,
+                "context_digest": "sha256:" + "2" * 64,
+                "audience": "research.calibration.c3_typed_execution",
+            }
+        ],
+        "instruction_inputs": [],
+        "targets": {"primary": [{"ref": "skill:candidate"}], "secondary": []},
+        "handoff": {"prohibited_actions": ["no hidden access"]},
+    }
+    packet["instruction_inputs"] = []
+    packet["prohibited_actions"] = ["no hidden access"]
+    spec = {
+        "metadata": {
+            "protocol_digest": task["expected_protocol_digest"],
+            "stage": "workflow_smoke",
+            "evidence_class": "workflow_smoke",
+            "epochs": 3,
+            "seeds": ["seed-17"],
+            "inference_allowed": False,
+        },
+        "resources": {"gpu_count": 0},
+        "network": {"mode": "offline"},
+    }
+
+    candidate = build_independent_candidate(
+        task=task,
+        packet=packet,
+        candidate_id="candidate",
+        session=session,
+        automation={},
+        validation={"ok": True},
+        prepare={"ok": True, "execution_spec": spec},
+        trial=None,
+        dataset={},
+        verified_artifacts=[],
+        collected=None,
+    )
+
+    statuses = {item["check_id"]: item["status"] for item in candidate["checks"]}
+    assert statuses["protocol_fidelity"] == "fail"
 
 
 def test_independent_judge_preserves_terminal_builder_failure_stage(task_value, monkeypatch) -> None:
