@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 from pathlib import Path
@@ -166,6 +167,67 @@ def _candidate(*, arm_id: str, attempt_index: int, seed: int, failed: str | None
     }
 
 
+def _paired_task(task_value: dict) -> dict:
+    value = copy.deepcopy(task_value)
+    seeds = [17, 23, 47, 71, 101]
+    value["schema_version"] = "1.3.0"
+    value["repetitions"] = {
+        "attempts_per_arm": len(seeds),
+        "paired_seeds": seeds,
+        "model_random_seed_control": "unsupported_not_claimed",
+    }
+    value["comparison_plan"] = {
+        "control_arm": "C0_raw",
+        "treatment_arm": "C3_typed_execution",
+        "primary_endpoint": "evidence_valid_completion",
+        "pairing_key": "paired_seed",
+        "planned_pairs": len(seeds),
+        "execution_order": [
+            {
+                "attempt_index": index,
+                "paired_seed": seed,
+                "first_arm": "C0_raw" if index % 2 else "C3_typed_execution",
+                "second_arm": "C3_typed_execution" if index % 2 else "C0_raw",
+            }
+            for index, seed in enumerate(seeds, start=1)
+        ],
+        "test": "exact_paired_sign_test",
+        "alternative": "treatment_greater",
+        "alpha": 0.05,
+        "missing_policy": "incomplete_no_claim",
+        "claim_scope": "local_tlp_fixed_stack",
+    }
+    return freeze_task(value)
+
+
+def _paired_results(task: dict, *, control_passes: set[int] | None = None) -> list[dict]:
+    passing = set(control_passes or set())
+    rows = []
+    for index, seed in enumerate(task["repetitions"]["paired_seeds"], start=1):
+        rows.append(
+            evaluate_candidate(
+                task,
+                _candidate(
+                    arm_id="C0_raw",
+                    attempt_index=index,
+                    seed=seed,
+                    failed=None if index in passing else "runner_conformance",
+                ),
+            )
+        )
+        rows.append(
+            evaluate_candidate(
+                task,
+                _candidate(
+                    arm_id="C3_typed_execution",
+                    attempt_index=index,
+                    seed=seed,
+                ),
+            )
+        )
+    return rows
+
+
 def test_evaluator_computes_primary_endpoint_budget_and_first_failure(task_value) -> None:
     task = freeze_task(task_value)
     passed = evaluate_candidate(task, _candidate(arm_id="C0_raw", attempt_index=1, seed=17))
@@ -198,6 +260,44 @@ def test_evaluator_computes_primary_endpoint_budget_and_first_failure(task_value
     assert package["summary"] == summary
     assert package["results"][0]["digest"] == passed["digest"]
     assert package["digest"].startswith("sha256:")
+
+
+def test_five_clean_c3_wins_cross_preregistered_exact_threshold(task_value) -> None:
+    task = _paired_task(task_value)
+    summary = summarize(task, _paired_results(task))
+    comparison = summary["primary_comparison"]
+
+    assert summary["complete"] is True
+    assert summary["all_arms_complete"] is False
+    assert comparison["complete_pairs"] == 5
+    assert comparison["treatment_wins"] == 5
+    assert comparison["control_wins"] == 0
+    assert comparison["ties"] == 0
+    assert comparison["p_value"] == pytest.approx(0.03125)
+    assert comparison["paired_risk_difference"] == 1.0
+    assert comparison["claim_status"] == "supports_local_advantage"
+
+
+def test_four_discordant_wins_are_insufficient_and_missing_pair_forbids_claim(task_value) -> None:
+    task = _paired_task(task_value)
+    rows = _paired_results(task, control_passes={5})
+    comparison = summarize(task, rows)["primary_comparison"]
+    assert comparison["treatment_wins"] == 4
+    assert comparison["ties"] == 1
+    assert comparison["p_value"] == pytest.approx(0.0625)
+    assert comparison["claim_status"] == "does_not_support_local_advantage"
+
+    incomplete = summarize(task, rows[:-1])["primary_comparison"]
+    assert incomplete["complete"] is False
+    assert incomplete["p_value"] is None
+    assert incomplete["claim_status"] == "incomplete_no_claim"
+
+
+def test_paired_summary_rejects_duplicate_attempts(task_value) -> None:
+    task = _paired_task(task_value)
+    rows = _paired_results(task)
+    with pytest.raises(ValueError, match="duplicate arm attempts"):
+        summarize(task, [*rows, rows[0]])
 
 
 def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(task_value) -> None:

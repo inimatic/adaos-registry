@@ -213,12 +213,145 @@ def _wilson(successes: int, total: int) -> list[float] | None:
     return [max(0.0, center - margin), min(1.0, center + margin)]
 
 
+def _one_sided_sign_p(treatment_wins: int, control_wins: int) -> float:
+    discordant = int(treatment_wins) + int(control_wins)
+    if discordant <= 0:
+        return 1.0
+    return sum(
+        math.comb(discordant, value)
+        for value in range(int(treatment_wins), discordant + 1)
+    ) / (2**discordant)
+
+
+def _paired_comparison(
+    task: Mapping[str, Any],
+    results: list[Mapping[str, Any]],
+) -> dict[str, Any] | None:
+    raw = task.get("comparison_plan")
+    if not isinstance(raw, Mapping):
+        return None
+    plan = dict(raw)
+    control_arm = str(plan["control_arm"])
+    treatment_arm = str(plan["treatment_arm"])
+    endpoint = str(plan["primary_endpoint"])
+    by_pair: dict[tuple[str, int], Mapping[str, Any]] = {}
+    for item in results:
+        arm_id = str(item.get("arm_id") or "")
+        if arm_id not in {control_arm, treatment_arm}:
+            continue
+        key = (arm_id, int(item["attempt_index"]))
+        if key in by_pair:
+            raise ValueError("paired calibration contains a duplicate arm attempt")
+        by_pair[key] = item
+    pairs = []
+    treatment_wins = control_wins = ties = 0
+    for scheduled in plan["execution_order"]:
+        attempt_index = int(scheduled["attempt_index"])
+        paired_seed = int(scheduled["paired_seed"])
+        control = by_pair.get((control_arm, attempt_index))
+        treatment = by_pair.get((treatment_arm, attempt_index))
+        complete = control is not None and treatment is not None
+        control_value = (
+            bool(dict(control.get("metrics") or {}).get(endpoint)) if control else None
+        )
+        treatment_value = (
+            bool(dict(treatment.get("metrics") or {}).get(endpoint)) if treatment else None
+        )
+        if control is not None and int(control.get("paired_seed")) != paired_seed:
+            raise ValueError("control result paired_seed differs from comparison schedule")
+        if treatment is not None and int(treatment.get("paired_seed")) != paired_seed:
+            raise ValueError("treatment result paired_seed differs from comparison schedule")
+        outcome = "missing"
+        if complete:
+            if treatment_value and not control_value:
+                treatment_wins += 1
+                outcome = "treatment_win"
+            elif control_value and not treatment_value:
+                control_wins += 1
+                outcome = "control_win"
+            else:
+                ties += 1
+                outcome = "tie"
+        pairs.append(
+            {
+                "attempt_index": attempt_index,
+                "paired_seed": paired_seed,
+                "first_arm": str(scheduled["first_arm"]),
+                "second_arm": str(scheduled["second_arm"]),
+                "control_value": control_value,
+                "treatment_value": treatment_value,
+                "outcome": outcome,
+            }
+        )
+    complete_pairs = sum(1 for item in pairs if item["outcome"] != "missing")
+    planned_pairs = int(plan["planned_pairs"])
+    complete = complete_pairs == planned_pairs
+    p_value = _one_sided_sign_p(treatment_wins, control_wins) if complete else None
+    paired_risk_difference = (
+        (treatment_wins - control_wins) / planned_pairs if complete else None
+    )
+    alpha = float(plan["alpha"])
+    supports = bool(
+        complete
+        and p_value is not None
+        and p_value <= alpha
+        and treatment_wins > control_wins
+    )
+    claim_status = (
+        "supports_local_advantage"
+        if supports
+        else "does_not_support_local_advantage"
+        if complete
+        else "incomplete_no_claim"
+    )
+    return {
+        "control_arm": control_arm,
+        "treatment_arm": treatment_arm,
+        "endpoint": endpoint,
+        "pairing_key": str(plan["pairing_key"]),
+        "planned_pairs": planned_pairs,
+        "complete_pairs": complete_pairs,
+        "complete": complete,
+        "treatment_wins": treatment_wins,
+        "control_wins": control_wins,
+        "ties": ties,
+        "discordant_pairs": treatment_wins + control_wins,
+        "paired_risk_difference": paired_risk_difference,
+        "test": str(plan["test"]),
+        "alternative": str(plan["alternative"]),
+        "p_value": p_value,
+        "alpha": alpha,
+        "claim_scope": str(plan["claim_scope"]),
+        "claim_status": claim_status,
+        "model_random_seed_control": str(
+            dict(task["repetitions"])["model_random_seed_control"]
+        ),
+        "pairs": pairs,
+    }
+
+
 def summarize(task: Mapping[str, Any], results: list[Mapping[str, Any]]) -> dict[str, Any]:
     budget_views = {str(item.get("budget_view") or "") for item in results}
     if len(budget_views) > 1:
         raise ValueError("summarize requires results from exactly one budget view")
     budget_view = next(iter(budget_views), "fixed_downstream")
     expected = int(task["repetitions"]["attempts_per_arm"])
+    admitted: set[tuple[str, int]] = set()
+    expected_seeds = list(task["repetitions"]["paired_seeds"])
+    for item in results:
+        if str(item.get("task_id") or "") != str(task["task_id"]):
+            raise ValueError("calibration result belongs to another task")
+        if str(item.get("task_digest") or "") != str(task["digest"]):
+            raise ValueError("calibration result task digest does not match the frozen task")
+        attempt_index = int(item.get("attempt_index") or 0)
+        if attempt_index < 1 or attempt_index > expected:
+            raise ValueError("calibration result attempt is outside preregistration")
+        if int(item.get("paired_seed")) != int(expected_seeds[attempt_index - 1]):
+            raise ValueError("calibration result seed is outside the preregistered pair")
+        identity = (str(item.get("arm_id") or ""), attempt_index)
+        if identity in admitted:
+            raise ValueError("calibration summary cannot admit duplicate arm attempts")
+        admitted.add(identity)
     arms = []
     for arm_id in ARM_IDS:
         rows = [dict(item) for item in results if item.get("arm_id") == arm_id]
@@ -241,14 +374,19 @@ def summarize(task: Mapping[str, Any], results: list[Mapping[str, Any]]) -> dict
                 "mean_human_interventions": sum(item["budget_usage"]["human_interventions"] for item in rows) / len(rows) if rows else None,
             }
         )
+    primary_comparison = _paired_comparison(task, results)
+    all_arms_complete = all(item["complete"] for item in arms)
     identity = {
         "schema": "adaos.research.calibration_summary.v1",
+        "schema_version": "1.1.0" if primary_comparison else "1.0.0",
         "task_id": task["task_id"],
         "task_digest": task["digest"],
         "primary_endpoint": "evidence_valid_completion",
         "budget_view": budget_view,
-        "complete": all(item["complete"] for item in arms),
+        "complete": bool(primary_comparison["complete"]) if primary_comparison else all_arms_complete,
+        "all_arms_complete": all_arms_complete,
         "arms": arms,
+        **({"primary_comparison": primary_comparison} if primary_comparison else {}),
     }
     return {**identity, "digest": digest(identity)}
 
@@ -275,7 +413,7 @@ def build_recomputable_package(
     summary = summarize(task, selected_results)
     identity = {
         "schema": "adaos.research.calibration_package.v1",
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0" if task.get("comparison_plan") else "1.0.0",
         "task": dict(task),
         "budget_view": str(budget_view),
         "packets": selected_packets,
@@ -283,7 +421,11 @@ def build_recomputable_package(
         "summary": summary,
         "recompute": {
             "algorithm": "evaluation.harness:summarize",
-            "algorithm_contract": "adaos.research.calibration_summary.v1",
+            "algorithm_contract": (
+                "adaos.research.calibration_summary.v1.1"
+                if task.get("comparison_plan")
+                else "adaos.research.calibration_summary.v1"
+            ),
             "canonicalization": "utf8-json-sort-keys-compact",
         },
     }

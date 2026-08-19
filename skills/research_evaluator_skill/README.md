@@ -11,7 +11,7 @@ contexts, and scores results from evidence references rather than self-reports.
 | --- | --- |
 | `C0_raw` | nothing |
 | `C1_reviewed_prose` | one reviewed prose brief |
-| `C2_staged` | the compiled four-facet research contract |
+| `C2_staged` | the staged ResearchCompilation |
 | `C3_typed_execution` | compilation, AutomationBrief, and conformance fixture |
 | `C4_over_specified` | C3 plus a prescribed implementation scaffold |
 
@@ -20,6 +20,21 @@ Every task must contain all five arms, paired seeds, both `fixed_downstream` and
 input. The primary endpoint is `evidence_valid_completion`: all mandatory checks
 pass, the protocol has not drifted, the selected budget is respected, and no
 unresolved failure was reported.
+
+For the primary AdaOS-versus-raw claim, calibration task v1.3 preregisters
+`C0_raw` as control and `C3_typed_execution` as treatment. It requires at least
+five pairs, a counterbalanced within-pair execution order, an
+`incomplete_no_claim` missing-data policy, and a one-sided exact paired sign
+test at alpha 0.05. With five pairs, five C3-only successes and no C0-only
+successes yield `p=0.03125`; four discordant wins yield `p=0.0625` and do not
+cross the threshold. The reported effect is the paired difference in
+evidence-valid completion probability.
+
+This is deliberately a local claim for the frozen TLP workload, AdaOS/core
+commit, component versions, model profile, budgets, and environment. The
+paired seed controls the scientific workload, not model sampling (which the
+provider does not expose). Predeclared counterbalancing reduces execution-order
+confounding but does not justify a universal autonomous-science claim.
 
 ## Boundary and workflow
 
@@ -30,7 +45,8 @@ unresolved failure was reported.
 4. A separate judge records deterministic, expert, or LLM-judge check evidence
    through `record_calibration_result`.
 5. `summarize_calibration` reports completion rate, Wilson intervals, resource
-   usage, and first-failure stages for one budget view.
+   usage, first-failure stages, and—when v1.3 is used—the independently
+   recomputed paired C0/C3 result and scoped conclusion for one budget view.
 6. `export_calibration_package` binds the frozen task, exact arm packets,
    immutable results, and recomputed summary into one content-addressed JSON
    object. Its digest is the portable audit identity; the database is not the

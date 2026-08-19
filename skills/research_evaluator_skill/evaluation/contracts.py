@@ -117,8 +117,31 @@ def freeze_task(value: Mapping[str, Any]) -> dict[str, Any]:
     seeds = list(validated["repetitions"]["paired_seeds"])
     if validated["repetitions"]["attempts_per_arm"] != len(seeds):
         raise ValueError("attempts_per_arm must equal paired_seeds length")
-    if schema_version in {"1.1.0", "1.2.0"} and validated["repetitions"]["model_random_seed_control"] != "unsupported_not_claimed":
+    if schema_version in {"1.1.0", "1.2.0", "1.3.0"} and validated["repetitions"]["model_random_seed_control"] != "unsupported_not_claimed":
         raise ValueError("calibration must not claim unsupported model random-seed control")
+    if schema_version == "1.3.0":
+        comparison = dict(validated["comparison_plan"])
+        if int(comparison["planned_pairs"]) != len(seeds):
+            raise ValueError("comparison planned_pairs must equal paired_seeds length")
+        order = [dict(item) for item in comparison["execution_order"]]
+        expected_pairs = {(index, int(seed)) for index, seed in enumerate(seeds, start=1)}
+        actual_pairs = {
+            (int(item["attempt_index"]), int(item["paired_seed"])) for item in order
+        }
+        if len(order) != len(actual_pairs) or actual_pairs != expected_pairs:
+            raise ValueError("comparison execution_order must cover every preregistered pair exactly once")
+        if any(
+            {str(item["first_arm"]), str(item["second_arm"])}
+            != {str(comparison["control_arm"]), str(comparison["treatment_arm"])}
+            for item in order
+        ):
+            raise ValueError("each comparison pair must counterorder exactly the control and treatment arms")
+        first_counts = {
+            arm: sum(1 for item in order if item["first_arm"] == arm)
+            for arm in (comparison["control_arm"], comparison["treatment_arm"])
+        }
+        if abs(first_counts[comparison["control_arm"]] - first_counts[comparison["treatment_arm"]]) > 1:
+            raise ValueError("comparison execution order must be counterbalanced")
     check_ids = [str(item["check_id"]) for item in validated["rubric"]["checks"]]
     if len(check_ids) != len(set(check_ids)):
         raise ValueError("rubric check ids must be unique")

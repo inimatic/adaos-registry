@@ -16,7 +16,7 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.calibration_package.v1"},
-    "schema_version": {"const": "1.0.0"},
+    "schema_version": {"enum": ["1.0.0", "1.1.0"]},
     "task": {
       "type": "object",
       "required": ["task_id", "digest"],
@@ -52,7 +52,7 @@
       "additionalProperties": false,
       "properties": {
         "algorithm": {"type": "string", "minLength": 1},
-        "algorithm_contract": {"const": "adaos.research.calibration_summary.v1"},
+        "algorithm_contract": {"enum": ["adaos.research.calibration_summary.v1", "adaos.research.calibration_summary.v1.1"]},
         "canonicalization": {"const": "utf8-json-sort-keys-compact"}
       }
     },

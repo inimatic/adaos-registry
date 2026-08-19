@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -50,7 +51,7 @@ def freeze_calibration(task: Mapping[str, Any], **_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="Derive and freeze a compact v1.2 calibration from an immutable audit task.", side_effects="local_write")
+@tool(summary="Derive and freeze a compact paired v1.3 calibration from an immutable audit task.", side_effects="local_write")
 def derive_compact_calibration(
     baseline_task_id: str,
     task_id: str,
@@ -64,7 +65,8 @@ def derive_compact_calibration(
     runner_version: str,
     reasoning_effort: str = "high",
     standard_prompt_version: str = "adaos-skill-realization/0.1.0",
-    attempts_per_arm: int = 1,
+    attempts_per_arm: int = 5,
+    paired_seeds: list[int] | None = None,
     max_model_tokens: int = 5_000_000,
     max_wall_seconds: int = 10_800,
     **_: Any,
@@ -168,12 +170,24 @@ def derive_compact_calibration(
     for field in ("schema", "frozen_at", "digest"):
         task.pop(field, None)
     count = int(attempts_per_arm)
-    seeds = list(baseline["repetitions"]["paired_seeds"])[:count]
-    if count < 1 or len(seeds) != count:
-        raise ValueError("attempts_per_arm exceeds the baseline paired workload seeds")
+    seeds = [int(item) for item in (paired_seeds or [17, 23, 47, 71, 101])]
+    if count < 5 or len(seeds) != count or len(set(seeds)) != count:
+        raise ValueError("v1.3 paired calibration requires at least five unique preregistered seeds")
+    start_with_control = hashlib.sha256(str(task_id).encode("utf-8")).digest()[0] % 2 == 0
+    execution_order = []
+    for index, seed in enumerate(seeds, start=1):
+        control_first = start_with_control if index % 2 == 1 else not start_with_control
+        execution_order.append(
+            {
+                "attempt_index": index,
+                "paired_seed": seed,
+                "first_arm": "C0_raw" if control_first else "C3_typed_execution",
+                "second_arm": "C3_typed_execution" if control_first else "C0_raw",
+            }
+        )
     task.update(
         {
-            "schema_version": "1.2.0",
+            "schema_version": "1.3.0",
             "task_id": str(task_id),
             "title": str(baseline["title"]) + " (compact execution contracts)",
             "agent_profile": {
@@ -219,6 +233,19 @@ def derive_compact_calibration(
                 "attempts_per_arm": count,
                 "paired_seeds": seeds,
                 "model_random_seed_control": "unsupported_not_claimed",
+            },
+            "comparison_plan": {
+                "control_arm": "C0_raw",
+                "treatment_arm": "C3_typed_execution",
+                "primary_endpoint": "evidence_valid_completion",
+                "pairing_key": "paired_seed",
+                "planned_pairs": count,
+                "execution_order": execution_order,
+                "test": "exact_paired_sign_test",
+                "alternative": "treatment_greater",
+                "alpha": 0.05,
+                "missing_policy": "incomplete_no_claim",
+                "claim_scope": "local_tlp_fixed_stack",
             },
         }
     )
@@ -448,6 +475,19 @@ def summarize_calibration(
         + f"\n\n**Budget:** `{summary['budget_view']}` · **Frozen task:** `{summary['task_digest']}` "
         + f"· **complete:** `{summary['complete']}`"
     )
+    comparison = summary.get("primary_comparison")
+    if isinstance(comparison, Mapping):
+        content += (
+            "\n\n### Preregistered C0/C3 comparison\n\n"
+            f"- complete pairs: `{comparison['complete_pairs']}/{comparison['planned_pairs']}`\n"
+            f"- C3 wins / C0 wins / ties: `{comparison['treatment_wins']}` / "
+            f"`{comparison['control_wins']}` / `{comparison['ties']}`\n"
+            f"- one-sided exact p: `{comparison['p_value']}` at alpha `{comparison['alpha']}`\n"
+            f"- paired risk difference: `{comparison['paired_risk_difference']}`\n"
+            f"- conclusion: `{comparison['claim_status']}` within `{comparison['claim_scope']}`\n\n"
+            "The paired seed controls the scientific workload, not model sampling; "
+            "the execution order is preregistered and counterbalanced."
+        )
     return {"ok": True, "summary": summary, "content": content}
 
 
