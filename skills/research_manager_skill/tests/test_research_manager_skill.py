@@ -164,6 +164,14 @@ def _acceptance_envelope(profile: str) -> dict:
     }
 
 
+def _smoke_expected_outputs() -> list[str]:
+    return list(
+        runner_contract_descriptor()["workflow_smoke_evidence"][
+            "required_expected_outputs"
+        ]
+    )
+
+
 def test_development_traceability_acceptance_is_digest_bound() -> None:
     manager = ResearchManager()
     accepted = manager.validate_development_candidate(
@@ -182,6 +190,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
+    assert contract["version"] == "1.3.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -194,6 +203,14 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     for operation in contract["operations"].values():
         jsonschema.Draft202012Validator.check_schema(operation["input_schema"])
         jsonschema.Draft202012Validator.check_schema(operation["output_schema"])
+    smoke_contract = contract["workflow_smoke_evidence"]
+    assert smoke_contract["required_expected_outputs"] == [
+        "run_log.json",
+        "evaluation_audit.json",
+        "artifacts_index.json",
+    ]
+    for schema in smoke_contract["documents"].values():
+        jsonschema.Draft202012Validator.check_schema(schema)
 
     dataset_schema = contract["operations"]["dataset_status"]["output_schema"]
     split_values = {
@@ -218,6 +235,18 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
                 ],
             },
             dataset_schema,
+        )
+
+
+def test_development_consumer_rejects_symbolic_rng_seed_units() -> None:
+    plan = _acceptance_plan()
+    plan["execution"]["stage_smoke_cpu"]["seeds"] = ["S1"]
+
+    with pytest.raises(ValueError, match="integer RNG seeds"):
+        ResearchManager._acceptance_conditions(
+            plan,
+            runner_id="tlp_runner",
+            dataset_digest="sha256:" + "a" * 64,
         )
 
 
@@ -273,7 +302,7 @@ def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) 
             "environment_digest": "sha256:" + "4" * 64,
             "output_ref": "skill-data:files/acceptance/output",
             "spec_id": "acceptance-spec",
-            "expected_outputs": ["result.json"],
+            "expected_outputs": _smoke_expected_outputs(),
         }
 
     monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
@@ -328,7 +357,7 @@ def test_development_consumer_acceptance_reads_public_compilation_projection(
             "environment_digest": "sha256:" + "4" * 64,
             "output_ref": "skill-data:files/acceptance/output",
             "spec_id": "acceptance-spec",
-            "expected_outputs": ["result.json"],
+            "expected_outputs": _smoke_expected_outputs(),
         }
 
     monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
@@ -361,6 +390,43 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
     split_values = {
         role: {**item, "sealed": role == "test"} for role, item in _splits().items()
     }
+    smoke_outputs = _smoke_expected_outputs()
+    artifact_rows = [
+        {
+            "uri": f"skill-data:files/acceptance/{name}",
+            "digest": "sha256:" + str(index) * 64,
+            "size_bytes": 42,
+            "media_type": "application/json",
+            "owner_ref": "skill:tlp_runner",
+            "kind": "workflow-smoke-evidence",
+            "metadata": {"evidence_class": "workflow_smoke"},
+        }
+        for index, name in enumerate(smoke_outputs, start=5)
+    ]
+    smoke_documents = {
+        "run_log.json": {
+            "stage": "workflow_smoke",
+            "device": "cpu",
+            "epochs_completed": 3,
+            "seeds": ["seed-17"],
+            "inference_allowed": False,
+            "evidence_class": "workflow_smoke",
+        },
+        "evaluation_audit.json": {
+            "per_stage": {"workflow_smoke": {"test_evaluations_count": 0}},
+            "test_access": [],
+        },
+        "artifacts_index.json": {
+            "files": [
+                {
+                    "path": name,
+                    "digest": artifact["digest"],
+                    "content_ref": artifact,
+                }
+                for name, artifact in zip(smoke_outputs, artifact_rows, strict=True)
+            ]
+        },
+    }
 
     def invoke(project_id: str, operation_id: str, arguments: dict, **_kwargs):
         calls.append((operation_id, dict(arguments)))
@@ -387,26 +453,22 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
                 "environment_digest": "sha256:" + "4" * 64,
                 "output_ref": "skill-data:files/acceptance/output",
                 "spec_id": "acceptance-spec",
-                "expected_outputs": ["result.json"],
+                "expected_outputs": _smoke_expected_outputs(),
             }
         if operation_id == "collect_attempt":
             assert arguments == {"output_ref": "skill-data:files/acceptance/output"}
             return {
                 "provider_id": project_id,
                 "complete": True,
+                "tracker_session_calls": 0,
                 "observations": [],
-                "artifacts": [
-                    {
-                        "uri": "skill-data:files/acceptance/result.json",
-                        "digest": "sha256:" + "5" * 64,
-                    }
-                ],
+                "artifacts": artifact_rows,
             }
         assert operation_id == "verify_artifact"
-        assert arguments == {
-            "uri": "skill-data:files/acceptance/result.json",
-            "digest": "sha256:" + "5" * 64,
-        }
+        assert arguments in [
+            {"uri": item["uri"], "digest": item["digest"]}
+            for item in artifact_rows
+        ]
         return {"ok": True}
 
     monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
@@ -415,9 +477,12 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         "execute_spec",
         lambda *_args, **_kwargs: {
             "ok": True,
-            "digest": "sha256:" + "6" * 64,
-            "documents": {"result.json": {"ok": True}},
-            "outputs": [],
+            "digest": "sha256:" + "8" * 64,
+            "documents": smoke_documents,
+            "outputs": [
+                {"path": name, "digest": artifact["digest"]}
+                for name, artifact in zip(smoke_outputs, artifact_rows, strict=True)
+            ],
         },
     )
     envelope = _acceptance_envelope("research.consumer-contracts")
@@ -431,9 +496,15 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         "prepare_attempt",
         "collect_attempt",
         "verify_artifact",
+        "verify_artifact",
+        "verify_artifact",
     ]
     assert receipt["evidence"]["workflow_smoke_executed"] is True
-    assert receipt["evidence"]["verified_artifacts"] == [{"ok": True}]
+    assert receipt["evidence"]["verified_artifacts"] == [
+        {"ok": True},
+        {"ok": True},
+        {"ok": True},
+    ]
 
 
 def test_compiled_study_binds_exact_realization_and_is_idempotent() -> None:

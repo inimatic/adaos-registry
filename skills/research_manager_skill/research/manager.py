@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Mapping, Sequence
 from urllib.parse import urlsplit
 
+import jsonschema
+
 from adaos.domain.execution import ExecutionSpec
 from adaos.domain.runtime_bindings import ServiceBinding
 from adaos.sdk.data.secrets import get as get_secret
@@ -151,6 +153,20 @@ class ResearchManager:
         execution: dict[str, Any] = {}
         for stage_id, raw_profile in dict(plan["execution"]).items():
             profile = dict(raw_profile)
+            seeds = list(profile.get("seeds") or [])
+            if not seeds or any(
+                isinstance(seed, bool) or not isinstance(seed, int)
+                for seed in seeds
+            ):
+                raise ValueError(
+                    f"ExperimentPlan execution.{stage_id}.seeds must contain "
+                    "non-empty integer RNG seeds; pairing-unit labels belong in "
+                    "randomization.allocation.planned_units"
+                )
+            if len(set(seeds)) != len(seeds):
+                raise ValueError(
+                    f"ExperimentPlan execution.{stage_id}.seeds must be unique"
+                )
             evidence_class = str(profile["evidence_class"])
             manager_profile = (
                 "preflight"
@@ -164,7 +180,7 @@ class ResearchManager:
             execution[manager_profile] = {
                 "source_stage_id": str(stage_id),
                 "epochs": int(profile["epochs"]),
-                "seeds": [int(item) for item in profile["seeds"]],
+                "seeds": seeds,
                 "device": str(profile["device"]),
                 "workers": 0,
                 "wall_time_s": int(profile["max_wall_time_minutes"]) * 60,
@@ -210,6 +226,100 @@ class ResearchManager:
                 "data_owner": runner_id,
             },
         }
+
+    @staticmethod
+    def _workflow_smoke_contract() -> dict[str, Any]:
+        return dict(runner_contract_descriptor()["workflow_smoke_evidence"])
+
+    @classmethod
+    def _validate_workflow_smoke_evidence(
+        cls,
+        *,
+        trial: Mapping[str, Any],
+        collected: Mapping[str, Any],
+        verified_artifacts: Sequence[Mapping[str, Any]],
+        expected_seed_labels: Sequence[str],
+    ) -> None:
+        contract = cls._workflow_smoke_contract()
+        documents = dict(trial.get("documents") or {})
+        schemas = dict(contract["documents"])
+        for name, schema in schemas.items():
+            if name not in documents:
+                raise ValueError(f"workflow smoke omitted required document {name}")
+            try:
+                jsonschema.validate(documents[name], schema)
+            except jsonschema.ValidationError as exc:
+                location = ".".join(str(item) for item in exc.absolute_path)
+                suffix = f" at {location}" if location else ""
+                raise ValueError(
+                    f"workflow smoke document {name} violates the consumer ABI{suffix}: "
+                    f"{exc.message}"
+                ) from exc
+
+        run_log = dict(documents["run_log.json"])
+        if list(run_log.get("seeds") or []) != list(expected_seed_labels):
+            raise ValueError(
+                "workflow smoke run_log.json seeds differ from the authoritative "
+                "pairing-unit identities"
+            )
+
+        outputs = {
+            str(item.get("path") or ""): dict(item)
+            for item in trial.get("outputs") or []
+            if isinstance(item, Mapping)
+        }
+        index_files = [
+            dict(item)
+            for item in dict(documents["artifacts_index.json"]).get("files") or []
+            if isinstance(item, Mapping)
+        ]
+        artifacts = [
+            dict(item)
+            for item in collected.get("artifacts") or []
+            if isinstance(item, Mapping)
+        ]
+        if int(collected.get("tracker_session_calls") or 0) != 0:
+            raise ValueError(
+                "workflow-smoke provider crossed the tracking boundary; "
+                "tracker_session_calls must be 0"
+            )
+        if not bool(collected.get("complete")):
+            raise ValueError("workflow-smoke collection is not complete")
+        if len(index_files) != len(artifacts):
+            raise ValueError(
+                "artifacts_index.json and collect_attempt returned different artifact counts"
+            )
+        if len(verified_artifacts) != len(artifacts) or not all(
+            bool(item.get("ok") or item.get("verified"))
+            for item in verified_artifacts
+        ):
+            raise ValueError("verify_artifact rejected one or more indexed identities")
+
+        collected_by_digest = {
+            str(item.get("digest") or ""): item for item in artifacts
+        }
+        for item in index_files:
+            path = str(item.get("path") or "")
+            digest_value = str(item.get("digest") or "")
+            content_ref = dict(item.get("content_ref") or {})
+            output = outputs.get(path)
+            collected_item = collected_by_digest.get(digest_value)
+            if output is None or collected_item is None:
+                raise ValueError(
+                    f"indexed workflow-smoke artifact {path or '<empty>'} has no "
+                    "matching trial output and collection identity"
+                )
+            if any(
+                str(value or "") != digest_value
+                for value in (
+                    output.get("digest"),
+                    content_ref.get("digest"),
+                    collected_item.get("digest"),
+                )
+            ):
+                raise ValueError(
+                    f"workflow-smoke artifact {path} has inconsistent content digests"
+                )
 
     def validate_development_candidate(self, request: Mapping[str, Any]) -> dict[str, Any]:
         """Evaluate a DEV runner from the consumer side, without scientific execution.
@@ -471,6 +581,22 @@ class ResearchManager:
                 metadata=dict(package.get("metadata") or {}),
             )
             command = [str(item) for item in prepared.get("command") or []]
+            expected_outputs = [
+                str(item) for item in prepared.get("expected_outputs") or []
+            ]
+            smoke_contract = self._workflow_smoke_contract()
+            required_smoke_outputs = [
+                str(item)
+                for item in smoke_contract.get("required_expected_outputs") or []
+            ]
+            missing_smoke_outputs = [
+                item for item in required_smoke_outputs if item not in expected_outputs
+            ]
+            if missing_smoke_outputs:
+                raise ValueError(
+                    "prepare_attempt expected_outputs omits workflow-smoke consumer "
+                    "documents: " + ", ".join(missing_smoke_outputs)
+                )
             required_fields = {
                 "code_digest": str(prepared.get("code_digest") or ""),
                 "environment_digest": str(prepared.get("environment_digest") or ""),
@@ -541,9 +667,7 @@ class ResearchManager:
                         or 2 * 1024 * 1024 * 1024
                     ),
                 ),
-                expected_outputs=tuple(
-                    str(item) for item in prepared.get("expected_outputs") or ()
-                ),
+                expected_outputs=tuple(expected_outputs),
                 metadata={
                     "protocol_digest": protocol_digest,
                     "stage": "workflow_smoke",
@@ -615,6 +739,15 @@ class ResearchManager:
                 ]
                 verified_artifacts = []
                 for artifact in artifacts:
+                    ContentRef(
+                        uri=str(artifact["uri"]),
+                        digest=str(artifact["digest"]),
+                        size_bytes=int(artifact["size_bytes"]),
+                        media_type=str(artifact["media_type"]),
+                        owner_ref=str(artifact["owner_ref"]),
+                        kind=str(artifact.get("kind") or "workflow-smoke-evidence"),
+                        metadata=dict(artifact.get("metadata") or {}),
+                    )
                     verified = developer_validation.invoke_skill(
                         candidate_id,
                         "verify_artifact",
@@ -628,6 +761,12 @@ class ResearchManager:
                 collection_ok = bool(collected.get("complete")) and bool(artifacts)
                 verification_ok = len(verified_artifacts) == len(artifacts) and all(
                     bool(item.get("ok")) for item in verified_artifacts
+                )
+                self._validate_workflow_smoke_evidence(
+                    trial=trial,
+                    collected=collected,
+                    verified_artifacts=verified_artifacts,
+                    expected_seed_labels=[f"seed-{int(item)}" for item in seeds],
                 )
                 checks.extend(
                     [

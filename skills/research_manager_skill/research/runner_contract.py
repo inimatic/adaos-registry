@@ -42,11 +42,131 @@ def _split_binding_schema() -> dict[str, Any]:
     }
 
 
+def _workflow_smoke_documents() -> dict[str, Any]:
+    """Return the public, machine-checkable evidence boundary for CPU smoke.
+
+    These documents used to be known only to the independent evaluator.  That
+    made conformance depend on guessing filenames and seed-label conventions.
+    Keeping their schemas in the consumer ABI lets a generated provider target
+    the contract while the evaluator still withholds its implementation and
+    verdict logic.
+    """
+
+    seed_label = {"type": "string", "pattern": "^seed--?[0-9]+$"}
+    indexed_content_ref = _content_ref_schema()
+    indexed_content_ref = {
+        **indexed_content_ref,
+        "required": [*indexed_content_ref["required"], "metadata"],
+        "properties": {
+            **indexed_content_ref["properties"],
+            "metadata": {
+                "type": "object",
+                "required": ["evidence_class"],
+                "properties": {
+                    "evidence_class": {"const": "workflow_smoke"},
+                },
+                "additionalProperties": True,
+            },
+        },
+    }
+    return {
+        "required_expected_outputs": [
+            "run_log.json",
+            "evaluation_audit.json",
+            "artifacts_index.json",
+        ],
+        "documents": {
+            "run_log.json": {
+                "type": "object",
+                "required": [
+                    "stage",
+                    "device",
+                    "epochs_completed",
+                    "seeds",
+                    "inference_allowed",
+                    "evidence_class",
+                ],
+                "properties": {
+                    "stage": {"const": "workflow_smoke"},
+                    "device": {"const": "cpu"},
+                    "epochs_completed": {"const": 3},
+                    "seeds": {
+                        "type": "array",
+                        "minItems": 1,
+                        "uniqueItems": True,
+                        "items": seed_label,
+                    },
+                    "inference_allowed": {"const": False},
+                    "evidence_class": {"const": "workflow_smoke"},
+                },
+                "additionalProperties": True,
+            },
+            "evaluation_audit.json": {
+                "type": "object",
+                "required": ["per_stage", "test_access"],
+                "properties": {
+                    "per_stage": {
+                        "type": "object",
+                        "required": ["workflow_smoke"],
+                        "properties": {
+                            "workflow_smoke": {
+                                "type": "object",
+                                "required": ["test_evaluations_count"],
+                                "properties": {
+                                    "test_evaluations_count": {"const": 0},
+                                },
+                                "additionalProperties": True,
+                            }
+                        },
+                        "additionalProperties": True,
+                    },
+                    "test_access": {"type": "array", "maxItems": 0},
+                },
+                "additionalProperties": True,
+            },
+            "artifacts_index.json": {
+                "type": "object",
+                "required": ["files"],
+                "properties": {
+                    "files": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": {
+                            "type": "object",
+                            "required": ["path", "digest", "content_ref"],
+                            "properties": {
+                                "path": {"type": "string", "minLength": 1},
+                                "digest": _sha256_schema(),
+                                "content_ref": indexed_content_ref,
+                            },
+                            "additionalProperties": True,
+                        },
+                    }
+                },
+                "additionalProperties": True,
+            },
+        },
+        "collection": {
+            "tracker_session_calls": {"const": 0},
+            "complete": {"const": True},
+            "artifact_identity": (
+                "each artifacts_index entry must resolve to one trial output and one "
+                "collect_attempt ContentRef with the same SHA-256 digest"
+            ),
+        },
+        "canonicalization": {
+            "rng_seed_type": "integer",
+            "pairing_unit_id": "seed-{seed}",
+            "example": {"seed": 17, "pairing_unit_id": "seed-17"},
+        },
+    }
+
+
 def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.2.0",
+        "version": "1.3.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -227,6 +347,7 @@ def descriptor() -> dict[str, Any]:
                     "output_ref is an opaque portable key that collect_attempt resolves to that same attempt directory",
                     "conditions and profile_conditions are consumer authority; providers may validate them but must not replace their shape with a private one",
                     "preparation does not start scientific execution",
+                    "expected_outputs contains every workflow_smoke_evidence.required_expected_outputs entry for a workflow-smoke request",
                 ],
             },
             "collect_attempt": {
@@ -257,6 +378,7 @@ def descriptor() -> dict[str, Any]:
                     "provider_id equals the direction skill id",
                     "observations use the canonical result_record paths",
                     "artifacts contain portable content identities, never private host paths",
+                    "workflow-smoke collection reports tracker_session_calls=0 because ResearchManager owns tracking",
                 ],
             },
             "verify_artifact": {
@@ -286,6 +408,7 @@ def descriptor() -> dict[str, Any]:
             "ingestion": "research_manager_skill",
             "scientific_smoke": "governed Study action after ProjectRelease",
         },
+        "workflow_smoke_evidence": _workflow_smoke_documents(),
     }
     return {**value, "digest": digest(value)}
 
