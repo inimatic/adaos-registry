@@ -177,3 +177,8 @@ and acceptance identity plus the exact runner/provider boundary, while
 removing verification prose already carried by the scientific compilation and
 the consumer-owned conformance fixture. Its predecessor digest keeps the full
 accepted brief auditable.
+
+ResearchCompilation execution projection v1.2 likewise carries the normalized
+`experiment_plan` exactly once. The full formulation protocol and its digest
+remain in the accepted audit package, while assistant prose and the duplicated
+embedded plan are excluded from Codex's bounded attention budget.

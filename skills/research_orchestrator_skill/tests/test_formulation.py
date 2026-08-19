@@ -274,6 +274,7 @@ def test_research_compiler_emits_execution_plan_and_source_to_acceptance_traceab
     assert package["readiness"] == {"decision": "ready_for_acceptance", "blockers": []}
     assert package["digest"].startswith("sha256:")
     projection = project_execution_compilation(package)
+    assert projection["schema_version"] == "1.2.0"
     assert projection["compilation_digest"] == package["digest"]
     assert projection["traceability"]["protocol_digest"] == package["facets"]["experimental_protocol"]["digest"]
     plan = projection["experiment_plan"]
@@ -287,6 +288,8 @@ def test_research_compiler_emits_execution_plan_and_source_to_acceptance_traceab
     assert plan["execution"]["confirmatory"]["seeds"] == [17, 23]
     assert plan["runner_contract"]["dataset_binding"]["required_roles"] == ["validation", "robustness", "test"]
     assert "inventory" not in projection["source_analysis"]
+    assert "assistant_message" not in projection["experimental_protocol"]
+    assert "experimental_plan" not in projection["experimental_protocol"]
     assert all(node["kind"] != "acceptance_check" for node in projection["traceability"]["nodes"])
 
 
