@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from adaos.sdk.builder import development_sessions
+from adaos.sdk.builder import automation as builder_automation
 from adaos.sdk.core.decorators import tool
 from adaos.sdk.core.environment import runtime_identity as sdk_runtime_identity
 from adaos.sdk.developer import compositions
@@ -420,7 +421,11 @@ def _public_preparation(prepared: Mapping[str, Any]) -> dict[str, Any]:
 
 @tool(summary="Return the runner runtime identity used by calibration preflight.", side_effects="none")
 def environment_identity(**_: Any) -> dict[str, Any]:
-    return {"ok": True, "runtime_identity": sdk_runtime_identity()}
+    return {
+        "ok": True,
+        "runtime_identity": sdk_runtime_identity(),
+        "standard_prompt_version": builder_automation.standard_prompt_version(),
+    }
 
 
 @tool(summary="Prepare one isolated Builder candidate from a frozen calibration packet.", side_effects="local_write")

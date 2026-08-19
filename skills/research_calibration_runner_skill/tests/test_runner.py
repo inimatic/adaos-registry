@@ -142,6 +142,11 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
         },
     }
     monkeypatch.setattr(module, "sdk_runtime_identity", lambda: identity)
+    monkeypatch.setattr(
+        module.builder_automation,
+        "standard_prompt_version",
+        lambda: "adaos-skill-realization/0.2.0",
+    )
     def invoke(_skill, method, *_args, **_kwargs):
         if method == "get_task":
             return {

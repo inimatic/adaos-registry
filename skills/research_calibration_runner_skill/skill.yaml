@@ -1,5 +1,5 @@
 name: research_calibration_runner_skill
-version: 0.1.10
+version: 0.1.11
 description: Contamination-aware execution bridge from frozen research calibration
   packets to native Builder Automation.
 supported_locales:
@@ -33,6 +33,7 @@ tools:
     required:
     - ok
     - runtime_identity
+    - standard_prompt_version
 - name: prepare_attempt
   description: Create or reuse one disposable candidate Project and bind its exact
     C0-C4 Development Session.
@@ -193,13 +194,13 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-19T11:10:45+00:00'
+updated_at: '2026-08-19T12:13:00+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.867+5285.9b2ba2ac
-    recorded_at: '2026-08-19T11:10:45+00:00'
+    min_version: 0.1.867+5287.56dc1e7c
+    recorded_at: '2026-08-19T12:13:00+00:00'
     source: skill_push
-    min_commit: 9b2ba2ac792d2bd01efcdc0a25c874e983bfa733
-    min_short_commit: 9b2ba2ac
-    build_date: '2026-08-19T13:57:03+03:00'
+    min_commit: 56dc1e7c860a6597be5932fab78ca8324c83438a
+    min_short_commit: 56dc1e7c
+    build_date: '2026-08-19T15:12:33+03:00'
 
