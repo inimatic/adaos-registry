@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.3.0
+version: 0.4.0
 description: Distributed Media Center coordinator with bounded catalog, collection, personalization, and playback projections.
 supported_locales:
 - en
@@ -36,6 +36,7 @@ events:
 lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
+  dispose: dispose
 exports:
   tools:
   - ensure_schema
@@ -69,6 +70,7 @@ exports:
   - save_checkpoint
   - queue_background_job
   - operations
+  - dispose
   - status
   - deployment_status
   - configure_deployment
@@ -575,6 +577,12 @@ tools:
     properties:
       limit: {type: integer, minimum: 1, maximum: 100, default: 30}
     additionalProperties: true
+  output_schema: {type: object}
+- name: dispose
+  description: Stop the process-local enrichment worker.
+  entry: handlers.main:dispose
+  side_effects: local_write
+  input_schema: {type: object, additionalProperties: true}
   output_schema: {type: object}
 - name: status
   description: Return compact media-center catalog status.

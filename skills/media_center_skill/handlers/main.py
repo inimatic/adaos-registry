@@ -3,6 +3,7 @@ from __future__ import annotations
 import mimetypes
 import re
 import sys
+import threading
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Mapping
@@ -17,6 +18,7 @@ if str(_SKILL_ROOT) not in sys.path:
 
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
 from media_center.coordinator import COORDINATOR_SCHEMA, MediaCatalogCoordinator  # noqa: E402
+from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
 
 
@@ -24,6 +26,9 @@ VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".o
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".opus", ".ogg"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 LEGACY_MANAGED_COPY_RE = re.compile(r"^media-center-[0-9a-f]{24}-import\.[^.]+$", re.IGNORECASE)
+_enrichment_lock = threading.Lock()
+_enrichment_path = ""
+_enrichment_worker: MediaEnrichmentWorker | None = None
 
 
 class MediaRootOperationBusy(RuntimeError):
@@ -40,6 +45,24 @@ def _coordinator(repository: MediaCenterRepository | None = None) -> MediaCatalo
 
 def _topology() -> MediaCenterTopology:
     return MediaCenterTopology()
+
+
+def _enrichment_runtime(
+    catalog: MediaCatalogCoordinator | None = None,
+) -> MediaEnrichmentWorker:
+    global _enrichment_path, _enrichment_worker
+    coordinator = catalog or _coordinator()
+    path = str(coordinator.repository.db_path.resolve())
+    with _enrichment_lock:
+        if _enrichment_worker is None or _enrichment_path != path:
+            if _enrichment_worker is not None:
+                _enrichment_worker.dispose(timeout=0.2)
+            _enrichment_worker = MediaEnrichmentWorker(
+                coordinator,
+                publish=lambda: _publish_library_snapshot(coordinator),
+            )
+            _enrichment_path = path
+        return _enrichment_worker
 
 
 def _event_payload(event: Any) -> dict[str, Any]:
@@ -273,6 +296,8 @@ def rehydrate(**_: Any) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
     sync = _sync_agents(catalog, max_pages=4)
+    enrichment = _enrichment_runtime(catalog)
+    enrichment.ensure_started()
     _publish_library_snapshot(
         catalog,
         profile_id=str(_.get("profile_id") or "default"),
@@ -285,6 +310,7 @@ def rehydrate(**_: Any) -> dict[str, Any]:
         "facets": repo.facets(),
         "catalog_revision": catalog.catalog_revision(),
         "agent_sync": sync,
+        "enrichment": {"running": True},
     }
 
 
@@ -428,6 +454,7 @@ def _sync_agents(
 def on_sys_ready(_: Any) -> None:
     catalog = _coordinator()
     _sync_agents(catalog, max_pages=4, limit=1000)
+    _enrichment_runtime(catalog).ensure_started()
     _publish_library_snapshot(catalog)
 
 
@@ -1193,12 +1220,32 @@ def save_checkpoint(
 
 @tool(summary="Queue background media enrichment or technical analysis.", side_effects="local_write")
 def queue_background_job(kind: str = "", subject_ref: str = "", priority: int = 100, **_: Any) -> dict[str, Any]:
-    return _coordinator().queue_background_job(kind, subject_ref, priority=priority)
+    catalog = _coordinator()
+    result = catalog.queue_background_job(kind, subject_ref, priority=priority)
+    if result.get("ok"):
+        _enrichment_runtime(catalog).ensure_started()
+        _publish_library_snapshot(
+            catalog,
+            profile_id=str(_.get("profile_id") or "default"),
+            webspace_id=str(_.get("webspace_id") or ""),
+        )
+    return result
 
 
 @tool(summary="List bounded background media operations.", side_effects="none")
 def operations(limit: int = 30, **_: Any) -> dict[str, Any]:
     return _coordinator().operations(limit=limit)
+
+
+@tool(summary="Stop the process-local enrichment worker.", side_effects="local_write")
+def dispose(**_: Any) -> dict[str, Any]:
+    global _enrichment_worker
+    with _enrichment_lock:
+        worker = _enrichment_worker
+        _enrichment_worker = None
+    if worker is not None:
+        worker.dispose()
+    return {"ok": True, "schema": COORDINATOR_SCHEMA, "disposed": True}
 
 
 @tool(summary="Explain the MVP media-center workflow and admitted next steps.", side_effects="none")

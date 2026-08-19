@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.2.1
+version: 0.3.0
 description: Distributed node-local media discovery agent with durable asynchronous scans and ordered catalog deltas.
 supported_locales:
 - en

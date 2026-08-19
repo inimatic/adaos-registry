@@ -246,6 +246,21 @@ class MediaCatalogCoordinator:
                 );
                 """
             )
+            job_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(media_background_jobs)"
+                ).fetchall()
+            }
+            for name, definition in {
+                "provider_id": "TEXT NOT NULL DEFAULT ''",
+                "started_at": "TEXT NOT NULL DEFAULT ''",
+                "finished_at": "TEXT NOT NULL DEFAULT ''",
+            }.items():
+                if name not in job_columns:
+                    connection.execute(
+                        f"ALTER TABLE media_background_jobs ADD COLUMN {name} {definition}"
+                    )
             agent_columns = {
                 str(row["name"])
                 for row in connection.execute(
@@ -494,6 +509,17 @@ class MediaCatalogCoordinator:
                     membership.get("track_number"), membership.get("chapter_number"),
                 ),
             )
+        enrichment_job_id = _stable_id(
+            "mediajob", "metadata_enrichment", item_id, source_revision, size=24
+        )
+        connection.execute(
+            """
+            INSERT OR IGNORE INTO media_background_jobs(
+                id,kind,subject_ref,status,priority,created_at,updated_at
+            ) VALUES (?, 'metadata_enrichment', ?, 'queued', 200, ?, ?)
+            """,
+            (enrichment_job_id, f"item:{item_id}", now_iso(), now_iso()),
+        )
         return operation or "updated"
 
     @staticmethod
@@ -1653,6 +1679,195 @@ class MediaCatalogCoordinator:
             )
             connection.commit()
         return {"ok": True, "schema": COORDINATOR_SCHEMA, "job": {"id": job_id, "kind": kind_token, "subject_ref": _text(subject_ref), "status": "queued", "priority": priority}}
+
+    def claim_background_job(self) -> dict[str, Any] | None:
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """
+                SELECT * FROM media_background_jobs
+                WHERE status='queued' AND attempts<3
+                ORDER BY priority, created_at LIMIT 1
+                """
+            ).fetchone()
+            if row is None:
+                connection.commit()
+                return None
+            now = now_iso()
+            changed = connection.execute(
+                """
+                UPDATE media_background_jobs
+                SET status='running', attempts=attempts+1, started_at=?,
+                    progress_json=?, error_code='', updated_at=?
+                WHERE id=? AND status='queued'
+                """,
+                (
+                    now,
+                    _json_dumps({"phase": "provider", "completed": 0, "total": 1}),
+                    now,
+                    str(row["id"]),
+                ),
+            ).rowcount
+            connection.commit()
+        if not changed:
+            return None
+        with self.repository.connect() as connection:
+            claimed = connection.execute(
+                "SELECT * FROM media_background_jobs WHERE id=?",
+                (str(row["id"]),),
+            ).fetchone()
+        return dict(claimed) if claimed else None
+
+    def finish_background_job(
+        self,
+        job_id: str,
+        *,
+        provider_id: str,
+        claim_count: int,
+    ) -> dict[str, Any]:
+        now = now_iso()
+        with self.repository.connect() as connection:
+            changed = connection.execute(
+                """
+                UPDATE media_background_jobs
+                SET status='completed', provider_id=?, finished_at=?,
+                    progress_json=?, updated_at=? WHERE id=? AND status='running'
+                """,
+                (
+                    _text(provider_id),
+                    now,
+                    _json_dumps(
+                        {
+                            "phase": "completed",
+                            "completed": 1,
+                            "total": 1,
+                            "claim_count": max(0, int(claim_count)),
+                        }
+                    ),
+                    now,
+                    _text(job_id),
+                ),
+            ).rowcount
+            connection.commit()
+        return {"ok": bool(changed), "job_id": _text(job_id), "status": "completed"}
+
+    def fail_background_job(
+        self, job_id: str, *, error_code: str, retryable: bool
+    ) -> dict[str, Any]:
+        token = _text(job_id)
+        with self.repository.connect() as connection:
+            row = connection.execute(
+                "SELECT attempts FROM media_background_jobs WHERE id=?", (token,)
+            ).fetchone()
+            attempts = int(row["attempts"] or 0) if row else 3
+            status = "queued" if retryable and attempts < 3 else "failed"
+            connection.execute(
+                """
+                UPDATE media_background_jobs SET status=?, error_code=?,
+                    progress_json=?, finished_at=?, updated_at=? WHERE id=?
+                """,
+                (
+                    status,
+                    _text(error_code),
+                    _json_dumps(
+                        {
+                            "phase": "retry" if status == "queued" else "failed",
+                            "completed": 0,
+                            "total": 1,
+                        }
+                    ),
+                    "" if status == "queued" else now_iso(),
+                    now_iso(),
+                    token,
+                ),
+            )
+            connection.commit()
+        return {"ok": True, "job_id": token, "status": status, "attempts": attempts}
+
+    def record_metadata_claim(
+        self,
+        *,
+        subject_ref: str,
+        field_name: str,
+        value: Any,
+        provenance: str,
+        confidence: float,
+        preferred: bool = False,
+    ) -> dict[str, Any]:
+        subject = _text(subject_ref)
+        field = _text(field_name)
+        provider = _text(provenance)
+        if not subject or not field or not provider:
+            return {"ok": False, "error": "metadata_claim_invalid"}
+        claim_id = _stable_id(
+            "claim", subject, field, _json_dumps(value), provider, size=24
+        )
+        with self.repository.connect() as connection:
+            previous = connection.execute(
+                "SELECT revision FROM metadata_claims WHERE id=?", (claim_id,)
+            ).fetchone()
+            revision = int(previous["revision"] or 0) + 1 if previous else 1
+            connection.execute(
+                """
+                INSERT INTO metadata_claims(
+                    id,subject_ref,field_name,value_json,provenance,confidence,
+                    preferred,revision,created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET confidence=excluded.confidence,
+                    preferred=excluded.preferred, revision=excluded.revision,
+                    created_at=excluded.created_at
+                """,
+                (
+                    claim_id,
+                    subject,
+                    field,
+                    _json_dumps(value),
+                    provider,
+                    max(0.0, min(1.0, float(confidence))),
+                    int(preferred),
+                    revision,
+                    now_iso(),
+                ),
+            )
+            connection.commit()
+        return {"ok": True, "claim_id": claim_id, "revision": revision}
+
+    def enrichment_subject(self, subject_ref: str) -> dict[str, Any] | None:
+        subject = _text(subject_ref)
+        if subject.startswith("item:"):
+            item_id = subject.removeprefix("item:")
+            with self.repository.connect() as connection:
+                row = connection.execute(
+                    "SELECT * FROM catalog_items WHERE id=?", (item_id,)
+                ).fetchone()
+            if row:
+                return {
+                    "subject_ref": subject,
+                    "kind": "item",
+                    "id": item_id,
+                    "name": str(row["name"]),
+                    "title": str(row["title"]),
+                    "folder_path": str(row["folder_path"]),
+                    "media_kind": str(row["media_kind"]),
+                    "metadata": _json_loads(row["metadata_json"]) or {},
+                    "descriptor": _json_loads(row["descriptor_json"]) or {},
+                }
+        if subject.startswith("work:"):
+            work_id = subject.removeprefix("work:")
+            with self.repository.connect() as connection:
+                row = connection.execute(
+                    "SELECT * FROM media_works WHERE id=?", (work_id,)
+                ).fetchone()
+            if row:
+                return {
+                    "subject_ref": subject,
+                    "kind": "work",
+                    "id": work_id,
+                    "title": str(row["canonical_title"]),
+                    "media_kind": str(row["media_kind"]),
+                    "metadata": _json_loads(row["metadata_json"]) or {},
+                }
+        return None
 
     def operations(self, *, limit: int = 30) -> dict[str, Any]:
         bounded = max(1, min(100, int(limit or 30)))

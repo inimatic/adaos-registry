@@ -15,6 +15,7 @@ if str(SKILL_ROOT) not in sys.path:
 from handlers import main  # noqa: E402
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
+from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
 
 
@@ -768,3 +769,30 @@ def test_catalog_corrections_are_audited_reversible_and_non_destructive(
             "SELECT canonical_title FROM media_works WHERE id=?", (target,)
         ).fetchone()[0]
     assert title != "Corrected title"
+
+
+def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Author/Book/001.mp3"))
+    )
+    queued = catalog.operations(limit=10)["items"]
+    worker = MediaEnrichmentWorker(catalog, poll_seconds=0.2)
+
+    result = worker.run_once()
+    operations = catalog.operations(limit=10)["items"]
+    claims = catalog.metadata_claims(queued[0]["subject_ref"], limit=30)
+
+    assert result["status"] == "completed"
+    assert operations[0]["status"] == "completed"
+    assert operations[0]["provider_id"] == "media_center.deterministic_local.v1"
+    assert operations[0]["progress"]["phase"] == "completed"
+    assert {item["field_name"] for item in claims["items"]} >= {
+        "title",
+        "folder_keywords",
+    }
