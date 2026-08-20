@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from research.contracts import digest
+from research import orchestrator as orchestrator_module
 from research.orchestrator import ResearchOrchestrator
 from research.repository import OrchestratorRepository
 
@@ -232,3 +234,171 @@ def test_observed_builder_trial_is_adopted_only_with_complete_immutable_identity
         "governed": {"state": "trial_review"},
     }
     assert orchestrator._observed_builder_trial_identity("skill", "direction") is None
+
+
+def test_consumer_contract_refresh_supersedes_only_the_development_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    old_contract = {
+        "schema": "adaos.contract.operation_set.v1",
+        "contract": "adaos.research.runner.v1",
+        "version": "1.9.0",
+        "operations": {},
+    }
+    old_contract["digest"] = digest(old_contract)
+    current_contract = {
+        "schema": "adaos.contract.operation_set.v1",
+        "contract": "adaos.research.runner.v1",
+        "version": "1.10.0",
+        "operations": {},
+    }
+    current_contract["digest"] = digest(current_contract)
+    brief = {"schema": "brief", "digest": "sha256:" + "b" * 64}
+    compilation = {"schema": "compilation", "digest": "sha256:" + "c" * 64}
+    previous_session = {
+        "session_id": "dev_direction_old",
+        "project_ref": "project:direction_implementation",
+        "base_release": {"package_digest": "sha256:" + "d" * 64},
+        "focus": {"ref": "skill:direction"},
+        "targets": {
+            "primary": [{"ref": "skill:direction"}],
+            "secondary": [],
+        },
+        "context_members": [
+            {"ref": "skill:research_manager_skill", "access": "read-only"}
+        ],
+        "artifact_inputs": [
+            {
+                "ref": "artifact://skill/direction/part0",
+                "audience": "research.implementation",
+                "manifest_digest": "sha256:" + "e" * 64,
+            }
+        ],
+        "subject_refs": [{"kind": "research_task", "ref": "research-task:task-1"}],
+        "contract_inputs": [
+            {"kind": "research_compilation", "digest": compilation["digest"]},
+            {"kind": "automation_brief", "digest": brief["digest"]},
+            {"kind": "consumer_contract", "digest": old_contract["digest"]},
+        ],
+        "acceptance_profiles": ["research.consumer-contracts", "research.traceability"],
+        "acceptance_requirements": [
+            {
+                "id": "research.consumer-contracts",
+                "profile": "research.consumer-contracts",
+                "provider_ref": "skill:research_manager_skill",
+                "operation": "validate_development_candidate",
+                "required": True,
+            }
+        ],
+        "handoff": {
+            "automation_brief_digest": brief["digest"],
+            "research_prototype_digest": "sha256:" + "f" * 64,
+            "prohibited_actions": ["Do not run scientific inference."],
+        },
+    }
+    track = {
+        "track_id": "task-1.track-001",
+        "ref": "implementation-track:task-1.track-001",
+        "primary_target_ref": "skill:direction",
+    }
+    state = {
+        "direction": {"direction_id": "direction"},
+        "selected_task": {"ref": "research-task:task-1"},
+        "active_implementation_track": track,
+        "development_session": previous_session,
+    }
+
+    class Repository:
+        def __init__(self) -> None:
+            self.bound: dict | None = None
+            self.activity_record: tuple | None = None
+
+        def bind_track_development(self, track_id: str, **kwargs: object) -> dict:
+            self.bound = {"track_id": track_id, **kwargs}
+            return {**track, **kwargs, "status": "development_ready"}
+
+        def activity(self, *args: object, **kwargs: object) -> dict:
+            self.activity_record = (args, kwargs)
+            return {"event_id": "event-1"}
+
+    repository = Repository()
+    orchestrator = ResearchOrchestrator(repository=repository)
+    monkeypatch.setattr(orchestrator, "get", lambda *args, **kwargs: state)
+    monkeypatch.setattr(
+        orchestrator,
+        "_invoke_skill",
+        lambda *args, **kwargs: current_contract,
+    )
+    created: dict = {}
+    attached: list[tuple[str, str, dict]] = []
+
+    def get_instruction(session_id: str, kind: str) -> dict:
+        assert session_id == previous_session["session_id"]
+        return {
+            "consumer_contract": old_contract,
+            "automation_brief": brief,
+            "research_compilation": compilation,
+        }[kind]
+
+    def create(project_id: str, **kwargs: object) -> dict:
+        created.update({"project_id": project_id, **kwargs})
+        return {
+            "session": {
+                **previous_session,
+                "session_id": str(kwargs["session_id"]),
+                "contract_inputs": kwargs["contract_inputs"],
+            }
+        }
+
+    def attach_instruction(
+        session_id: str,
+        kind: str,
+        value: dict,
+        **_: object,
+    ) -> dict:
+        attached.append((session_id, kind, value))
+        return {
+            "session": {
+                **previous_session,
+                "session_id": session_id,
+                "contract_inputs": created["contract_inputs"],
+            }
+        }
+
+    monkeypatch.setattr(orchestrator_module.development_sessions, "get_instruction", get_instruction)
+    monkeypatch.setattr(orchestrator_module.development_sessions, "create", create)
+    monkeypatch.setattr(
+        orchestrator_module.development_sessions,
+        "attach_instruction",
+        attach_instruction,
+    )
+
+    result = orchestrator.refresh_development_contract("direction", actor="system:test")
+
+    assert result["reused"] is False
+    assert result["previous_consumer_contract_digest"] == old_contract["digest"]
+    assert result["consumer_contract_digest"] == current_contract["digest"]
+    assert created["project_id"] == "direction_implementation"
+    assert created["artifact_sources"] == [
+        {
+            "skill_id": "direction",
+            "group_id": "part0",
+            "audience": "research.implementation",
+        }
+    ]
+    assert next(
+        item for item in created["contract_inputs"] if item["kind"] == "consumer_contract"
+    )["digest"] == current_contract["digest"]
+    assert created["acceptance_requirements"][0]["parameters"] == {
+        "execute_workflow_smoke": True
+    }
+    assert [item[1] for item in attached] == [
+        "automation_brief",
+        "research_compilation",
+        "consumer_contract",
+    ]
+    assert attached[0][2] == brief
+    assert attached[1][2] == compilation
+    assert attached[2][2] == current_contract
+    assert repository.bound is not None
+    assert repository.activity_record is not None

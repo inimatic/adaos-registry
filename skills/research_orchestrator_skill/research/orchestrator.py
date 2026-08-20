@@ -1830,6 +1830,246 @@ class ResearchOrchestrator:
         }
 
     @staticmethod
+    def _artifact_sources_from_development_session(
+        session: Mapping[str, Any],
+    ) -> list[dict[str, str]]:
+        """Project immutable artifact inputs back to the SDK creation API."""
+
+        sources: list[dict[str, str]] = []
+        for item in session.get("artifact_inputs") or []:
+            if not isinstance(item, Mapping):
+                continue
+            ref = str(item.get("ref") or "").strip()
+            prefix = "artifact://skill/"
+            if not ref.startswith(prefix):
+                raise ValueError(f"unsupported Development Session artifact ref: {ref}")
+            owner_and_group = ref[len(prefix) :]
+            owner, separator, group_id = owner_and_group.partition("/")
+            if not separator or not owner or not group_id:
+                raise ValueError(f"invalid Development Session artifact ref: {ref}")
+            source = {"skill_id": owner, "group_id": group_id}
+            audience = str(item.get("audience") or "").strip()
+            if audience:
+                source["audience"] = audience
+            sources.append(source)
+        return sources
+
+    def refresh_development_contract(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        actor: str = "system:research_orchestrator",
+    ) -> dict[str, Any]:
+        """Supersede a Development Session after an admitted consumer ABI changes.
+
+        Accepted scientific and engineering instructions remain immutable.  The
+        refreshed session differs only in the exact consumer-owned contract and
+        records both session identities in the research activity ledger.  This
+        lets Builder re-evaluate (and, when necessary, repair) a candidate against
+        the current ABI without mutating the historical handoff that produced it.
+        """
+
+        state = self.get(
+            direction_id,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+        )
+        track = state.get("active_implementation_track")
+        previous = state.get("development_session")
+        if not isinstance(track, Mapping) or not isinstance(previous, Mapping):
+            raise ValueError("implementation track has no Development Session")
+
+        current_contract = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "get_runner_contract",
+                {},
+                timeout=60,
+            )
+        )
+        current_digest = str(current_contract.get("digest") or "").strip()
+        if (
+            current_contract.get("schema") != "adaos.contract.operation_set.v1"
+            or current_contract.get("contract") != "adaos.research.runner.v1"
+            or current_digest
+            != contract_digest(
+                {key: item for key, item in current_contract.items() if key != "digest"}
+            )
+        ):
+            raise ValueError("ResearchManager returned an invalid runner consumer contract")
+
+        previous_contract = development_sessions.get_instruction(
+            str(previous["session_id"]), "consumer_contract"
+        )
+        previous_digest = str(previous_contract.get("digest") or "").strip()
+        if previous_digest == current_digest:
+            return {
+                "ok": True,
+                "reused": True,
+                "development_session": dict(previous),
+                "implementation_track": dict(track),
+                "consumer_contract_digest": current_digest,
+            }
+
+        project_ref = str(previous.get("project_ref") or "").strip()
+        project_kind, separator, project_id = project_ref.partition(":")
+        if separator != ":" or project_kind != "project" or not project_id:
+            raise ValueError("Development Session has an invalid project_ref")
+
+        contract_inputs = []
+        for item in previous.get("contract_inputs") or []:
+            if not isinstance(item, Mapping):
+                continue
+            value = dict(item)
+            if str(value.get("kind") or "") == "consumer_contract":
+                value["digest"] = current_digest
+            contract_inputs.append(value)
+        if not any(
+            str(item.get("kind") or "") == "consumer_contract"
+            for item in contract_inputs
+        ):
+            raise ValueError("Development Session has no consumer_contract input")
+
+        requirements: list[dict[str, Any]] = []
+        for item in previous.get("acceptance_requirements") or []:
+            if not isinstance(item, Mapping):
+                continue
+            value = dict(item)
+            if str(value.get("id") or "") == "research.consumer-contracts":
+                value["parameters"] = {
+                    **dict(value.get("parameters") or {}),
+                    "execute_workflow_smoke": True,
+                }
+            requirements.append(value)
+
+        primary_targets = [
+            str(item.get("ref") or "")
+            for item in dict(previous.get("targets") or {}).get("primary") or []
+            if isinstance(item, Mapping) and str(item.get("ref") or "").strip()
+        ]
+        secondary_targets = [
+            str(item.get("ref") or "")
+            for item in dict(previous.get("targets") or {}).get("secondary") or []
+            if isinstance(item, Mapping) and str(item.get("ref") or "").strip()
+        ]
+        handoff = (
+            dict(previous.get("handoff"))
+            if isinstance(previous.get("handoff"), Mapping)
+            else {}
+        )
+        session_seed = contract_digest(
+            {
+                "predecessor": previous["session_id"],
+                "consumer_contract_digest": current_digest,
+            }
+        ).removeprefix("sha256:")[:16]
+        created = development_sessions.create(
+            project_id,
+            automation_brief_digest=str(handoff.get("automation_brief_digest") or "") or None,
+            research_prototype_digest=str(handoff.get("research_prototype_digest") or "") or None,
+            artifact_sources=self._artifact_sources_from_development_session(previous),
+            subject_refs=[
+                dict(item)
+                for item in previous.get("subject_refs") or []
+                if isinstance(item, Mapping)
+            ],
+            contract_inputs=contract_inputs,
+            acceptance_profiles=[str(item) for item in previous.get("acceptance_profiles") or []],
+            acceptance_requirements=requirements,
+            request=str(handoff.get("request") or "") or None,
+            execution_budget=(
+                dict(handoff["execution_budget"])
+                if isinstance(handoff.get("execution_budget"), Mapping)
+                else None
+            ),
+            agent_profile=(
+                dict(handoff["agent_profile"])
+                if isinstance(handoff.get("agent_profile"), Mapping)
+                else None
+            ),
+            primary_targets=primary_targets,
+            secondary_targets=secondary_targets,
+            context_members=[
+                dict(item)
+                for item in previous.get("context_members") or []
+                if isinstance(item, Mapping)
+            ],
+            prohibited_actions=[str(item) for item in handoff.get("prohibited_actions") or []],
+            base_release=(
+                dict(previous["base_release"])
+                if isinstance(previous.get("base_release"), Mapping)
+                else None
+            ),
+            focus_ref=str(dict(previous.get("focus") or {}).get("ref") or "") or None,
+            session_id=f"dev_{project_id}_{session_seed}",
+            actor=actor,
+        )
+        session = dict(created["session"])
+        for kind in ("automation_brief", "research_compilation"):
+            instruction = development_sessions.get_instruction(
+                str(previous["session_id"]), kind
+            )
+            attached = development_sessions.attach_instruction(
+                str(session["session_id"]),
+                kind,
+                instruction,
+                expected_digest=str(instruction.get("digest") or ""),
+            )
+            session = dict(attached["session"])
+        attached = development_sessions.attach_instruction(
+            str(session["session_id"]),
+            "consumer_contract",
+            current_contract,
+            expected_digest=current_digest,
+        )
+        session = dict(attached["session"])
+        updated_track = self.repository.bind_track_development(
+            str(track["track_id"]),
+            project_ref=project_ref,
+            primary_target_ref=str(track["primary_target_ref"]),
+            development_session_id=str(session["session_id"]),
+        )
+        event_identity = contract_digest(
+            {
+                "track_ref": track["ref"],
+                "previous_session_id": previous["session_id"],
+                "development_session_id": session["session_id"],
+                "previous_consumer_contract_digest": previous_digest,
+                "consumer_contract_digest": current_digest,
+            }
+        )
+        self.repository.activity(
+            str(state["direction"]["direction_id"]),
+            "implementation",
+            "consumer_contract_refreshed",
+            "Development Session superseded because the admitted consumer ABI changed; accepted scientific instructions remain unchanged.",
+            {
+                "task_ref": (state.get("selected_task") or {}).get("ref"),
+                "implementation_track_ref": track["ref"],
+                "previous_development_session_id": previous["session_id"],
+                "development_session_id": session["session_id"],
+                "previous_consumer_contract_digest": previous_digest,
+                "consumer_contract_digest": current_digest,
+                "actor": actor,
+            },
+            actor=actor,
+            origin="skill:research_manager_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"consumer-contract-refresh:{event_identity}",
+        )
+        return {
+            "ok": True,
+            "reused": False,
+            "previous_development_session_id": previous["session_id"],
+            "previous_consumer_contract_digest": previous_digest,
+            "consumer_contract_digest": current_digest,
+            "development_session": session,
+            "implementation_track": updated_track,
+        }
+
+    @staticmethod
     def _next_steps(
         state: Mapping[str, Any],
         bundle: Mapping[str, Any],

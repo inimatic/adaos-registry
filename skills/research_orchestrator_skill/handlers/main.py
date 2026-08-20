@@ -581,6 +581,22 @@ def open_builder_session(
     )
 
 
+@tool(summary="Supersede a Development Session when the admitted consumer ABI changes.", side_effects="local_write")
+def refresh_development_contract(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().refresh_development_contract(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+    )
+
+
 @tool(summary="Start one-shot Builder Automation from the exact bound Development Session.", side_effects="external_write")
 def start_implementation(
     direction_id: str,

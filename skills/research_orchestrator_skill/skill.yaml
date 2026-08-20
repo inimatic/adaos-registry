@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.49.2
+version: 0.49.3
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -52,6 +52,7 @@ exports:
   - accept_prototype
   - get_automation_brief
   - open_builder_session
+  - refresh_development_contract
   - get_activity
   - get_formulation_run
   - get_compilation
@@ -645,6 +646,31 @@ tools:
         type:
         - string
         - 'null'
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: refresh_development_contract
+  description: Supersede the exact Development Session when its admitted consumer
+    ABI has changed, preserving the accepted scientific and engineering instructions.
+  entry: handlers.main:refresh_development_contract
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
     additionalProperties: true
   output_schema:
     type: object
