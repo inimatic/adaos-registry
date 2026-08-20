@@ -1,6 +1,19 @@
 {
   "schema": "adaos.research.tlp_conformance_fixture.v1",
   "purpose": "Consumer-side contract for a TLP research direction skill; it describes observable behavior, not an implementation.",
+  "implementation_contract": {
+    "framework": "pytorch",
+    "required_source_signals": ["torch", "Conv2d", "MaxPool2d", "Parameter"],
+    "required_callable_keys": ["model_factory", "baseline_operator", "intervention_operator", "training_entrypoint"],
+    "model_input_shape": [3, 96, 96],
+    "model_output_classes": 10,
+    "production_tlp_parameter_shape": [128, 4],
+    "window": [2, 2],
+    "stride": [2, 2],
+    "initial_equivalence_tolerance": 0.000001,
+    "shared_training_path_required": true,
+    "initial_maxpool_equivalence_required": true
+  },
   "required_surfaces": [
     {
       "id": "conditions",

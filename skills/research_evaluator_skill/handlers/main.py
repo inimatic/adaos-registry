@@ -38,6 +38,10 @@ from evaluation.harness import (  # noqa: E402
 )
 from evaluation.independent import build_independent_candidate  # noqa: E402
 from evaluation.repository import EvaluationRepository  # noqa: E402
+from evaluation.public_contract import (  # noqa: E402
+    assert_hidden_profile_is_public,
+    project_tlp_consumer_contract,
+)
 from evaluation.tlp_semantics import (  # noqa: E402
     evaluate_tlp_implementation,
     hidden_probe_request,
@@ -222,6 +226,16 @@ def derive_compact_calibration(
         or not consumer_contract.get("digest")
     ):
         raise RuntimeError("research manager did not return its exact runner consumer ABI")
+    public_conformance_path = _SKILL_ROOT / "benchmarks" / "tlp" / "conformance-fixture.json"
+    public_conformance = json.loads(
+        public_conformance_path.read_text(encoding="utf-8-sig")
+    )
+    if not isinstance(public_conformance, Mapping):
+        raise RuntimeError("public TLP implementation conformance contract is invalid")
+    projected_consumer_contract = project_tlp_consumer_contract(
+        consumer_contract,
+        public_conformance,
+    )
     manager_response = invoke_skill(
         "research_manager_skill",
         "environment_identity",
@@ -300,7 +314,7 @@ def derive_compact_calibration(
     projected_inputs = {
         "research_compilation": dict(response["research_compilation"]),
         "automation_brief": dict(response["automation_brief"]),
-        "conformance_fixture": dict(consumer_contract),
+        "conformance_fixture": projected_consumer_contract,
     }
     replacements = {}
     for kind, value in projected_inputs.items():
@@ -315,6 +329,10 @@ def derive_compact_calibration(
         (_SKILL_ROOT / "benchmarks" / "tlp" / "hidden-rubric.json").read_text(
             encoding="utf-8-sig"
         )
+    )
+    assert_hidden_profile_is_public(
+        public_conformance,
+        dict(current_hidden_rubric.get("implementation_profile") or {}),
     )
     rubric_checks = [
         {
