@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.23
+version: 0.8.24
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -45,6 +45,11 @@ lifecycle:
   after_activate: ensure_schema
   rehydrate: rehydrate
   dispose: dispose
+memory_budget:
+  expected_rss_mb: 192
+  background_workers:
+    max_threads: 2
+    cleanup_hook: dispose
 exports:
   tools:
   - ensure_schema

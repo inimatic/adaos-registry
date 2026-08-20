@@ -52,6 +52,8 @@ Recommendations evaluate at most three catalog pages, use only local favorite an
 
 Topology administration remains reviewed and SDK-only. `plan_topology_change()` persists an immutable dry-run plan, `apply_topology_change()` reads that plan through the SDK and applies its exact digest with idempotency and only the approvals declared by the plan, and `handoff_authority()` performs an explicit revision- and epoch-fenced recovery handoff. The coordinator never imports the distributed runtime store or adapter implementation.
 
+Distributed catalog catch-up is cursor-based and lifecycle-managed. The coordinator adapts an oversized agent page down to the core service-invocation envelope, keeps the accepted cursor unchanged while retrying, and continues incomplete catch-up in one single-flight background worker. `dispose()` stops both the sync and enrichment workers; UI reads only bootstrap synchronously when the coordinator catalog is empty.
+
 ## Compatibility
 
 The local public-tool invocation and old Media Server discovery methods remain bounded compatibility fallbacks when no distributed agent instance is registered or the handler is exercised outside an AdaOS skill context. In a Project deployment, exact service-instance invocation is authoritative; root and scan commands return asynchronous job identifiers.

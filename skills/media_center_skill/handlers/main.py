@@ -25,6 +25,7 @@ from media_center.catalog import (  # noqa: E402
 )
 from media_center.coordinator import COORDINATOR_SCHEMA, MediaCatalogCoordinator  # noqa: E402
 from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
+from media_center.sync import MediaAgentSyncWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
 
 
@@ -35,6 +36,10 @@ LEGACY_MANAGED_COPY_RE = re.compile(r"^media-center-[0-9a-f]{24}-import\.[^.]+$"
 _enrichment_lock = threading.Lock()
 _enrichment_path = ""
 _enrichment_worker: MediaEnrichmentWorker | None = None
+_agent_sync_lock = threading.Lock()
+_agent_sync_call_lock = threading.Lock()
+_agent_sync_path = ""
+_agent_sync_worker: MediaAgentSyncWorker | None = None
 _coordinator_lock = threading.Lock()
 _coordinator_path = ""
 _coordinator_cached: MediaCatalogCoordinator | None = None
@@ -80,6 +85,51 @@ def _enrichment_runtime(
             )
             _enrichment_path = path
         return _enrichment_worker
+
+
+def _run_agent_sync(
+    catalog: MediaCatalogCoordinator,
+    *,
+    max_pages: int = 8,
+    limit: int = 500,
+    timeout_seconds: float = 30.0,
+) -> dict[str, Any]:
+    with _agent_sync_call_lock:
+        return _sync_agents(
+            catalog,
+            max_pages=max_pages,
+            limit=limit,
+            timeout_seconds=timeout_seconds,
+        )
+
+
+def _agent_sync_runtime(
+    catalog: MediaCatalogCoordinator | None = None,
+) -> MediaAgentSyncWorker:
+    global _agent_sync_path, _agent_sync_worker
+    coordinator = catalog or _coordinator()
+    path = str(coordinator.repository.db_path.resolve())
+    with _agent_sync_lock:
+        if _agent_sync_worker is None or _agent_sync_path != path:
+            if _agent_sync_worker is not None:
+                _agent_sync_worker.dispose(timeout=0.2)
+            _agent_sync_worker = MediaAgentSyncWorker(
+                lambda: _run_agent_sync(
+                    coordinator,
+                    max_pages=8,
+                    limit=500,
+                    timeout_seconds=30.0,
+                ),
+                publish=lambda: _publish_library_snapshot(coordinator),
+            )
+            _agent_sync_path = path
+        return _agent_sync_worker
+
+
+def _agent_sync_status() -> dict[str, Any]:
+    with _agent_sync_lock:
+        worker = _agent_sync_worker
+    return worker.status() if worker is not None else {"state": "stopped", "revision": 0}
 
 
 def _event_payload(event: Any) -> dict[str, Any]:
@@ -163,6 +213,7 @@ def _publish_library_snapshot(
             "participation": catalog.participation(),
             "home": home,
             "operations": catalog.operations(limit=10),
+            "agent_sync": _agent_sync_status(),
         }
         stream_variable_publish(
             "media_center.library_state",
@@ -439,7 +490,8 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
 def rehydrate(**_: Any) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
-    sync = _sync_agents(catalog, max_pages=4)
+    sync = _run_agent_sync(catalog, max_pages=4)
+    _agent_sync_runtime(catalog).ensure_started()
     enrichment = _enrichment_runtime(catalog)
     enrichment.ensure_started()
     _publish_library_snapshot(
@@ -481,18 +533,28 @@ def _sync_one_agent(
     )
     page_timeout = max(1.0, min(30.0, float(timeout_seconds or 30.0)))
     applied = ignored = removed = 0
+    page_limit_backoffs = 0
     for _index in range(pages):
         if instance_id:
-            try:
-                page = _topology().invoke_agent(
-                    instance_id,
-                    "pull_deltas",
-                    {"cursor": cursor, "limit": page_limit},
-                    timeout_seconds=page_timeout,
-                )
-                error = ""
-            except Exception as exc:
-                page, error = None, str(exc)
+            while True:
+                try:
+                    page = _topology().invoke_agent(
+                        instance_id,
+                        "pull_deltas",
+                        {"cursor": cursor, "limit": page_limit},
+                        timeout_seconds=page_timeout,
+                    )
+                    error = ""
+                    break
+                except Exception as exc:
+                    page, error = None, str(exc)
+                    if (
+                        "service_invocation_result_too_large" not in error
+                        or page_limit <= 1
+                    ):
+                        break
+                    page_limit = max(1, page_limit // 2)
+                    page_limit_backoffs += 1
         else:
             page, error = _invoke_agent(
                 "pull_deltas",
@@ -514,6 +576,8 @@ def _sync_one_agent(
                 "retryable": True,
                 "instance_id": instance_id,
                 "node_id": node_id,
+                "effective_page_limit": page_limit,
+                "page_limit_backoffs": page_limit_backoffs,
             }
         if not page.get("ok"):
             return {**page, "applied_count": applied}
@@ -538,6 +602,8 @@ def _sync_one_agent(
                 "next_cursor": cursor,
                 "instance_id": instance_id,
                 "node_id": node_id or str(agent.get("node_id") or ""),
+                "effective_page_limit": page_limit,
+                "page_limit_backoffs": page_limit_backoffs,
             }
     return {
         "ok": True,
@@ -551,6 +617,8 @@ def _sync_one_agent(
         "bounded": True,
         "instance_id": instance_id,
         "node_id": node_id,
+        "effective_page_limit": page_limit,
+        "page_limit_backoffs": page_limit_backoffs,
     }
 
 
@@ -661,7 +729,7 @@ def _sync_agents(
 @subscribe("sys.ready")
 def on_sys_ready(_: Any) -> None:
     catalog = _coordinator()
-    _sync_agents(catalog, max_pages=4, limit=1000)
+    _agent_sync_runtime(catalog).ensure_started()
     _enrichment_runtime(catalog).ensure_started()
     _publish_library_snapshot(catalog)
 
@@ -698,7 +766,7 @@ def on_library_snapshot_requested(event: Any) -> None:
 def on_agent_catalog_changed(event: Any) -> None:
     payload = _event_payload(event)
     catalog = _coordinator()
-    _sync_agents(catalog, max_pages=8, limit=1000)
+    _agent_sync_runtime(catalog).ensure_started()
     _publish_library_snapshot(
         catalog,
         profile_id=str(payload.get("profile_id") or "default"),
@@ -709,7 +777,8 @@ def on_agent_catalog_changed(event: Any) -> None:
 @tool(summary="Pull bounded idempotent deltas from ready library agents.", side_effects="local_write")
 def sync_agent(max_pages: int = 4, limit: int = 500, **_: Any) -> dict[str, Any]:
     catalog = _coordinator()
-    result = _sync_agents(catalog, max_pages=max_pages, limit=limit)
+    result = _run_agent_sync(catalog, max_pages=max_pages, limit=limit)
+    _agent_sync_runtime(catalog).ensure_started()
     _publish_library_snapshot(
         catalog,
         profile_id=str(_.get("profile_id") or "default"),
@@ -964,11 +1033,18 @@ def library(
     agent_sync: dict[str, Any] | None = None
     summary = repo.summary()
     if _bool(auto_scan, True):
-        agent_sync = _sync_agents(
-            catalog, max_pages=1, limit=500, timeout_seconds=5.0
-        )
-        if not agent_sync.get("ok") and int(summary.get("total_count") or 0) == 0:
-            scan = scan_sources(source="all", limit=5000)
+        if catalog.catalog_revision() <= 0:
+            agent_sync = _run_agent_sync(
+                catalog, max_pages=1, limit=500, timeout_seconds=5.0
+            )
+            if (
+                not agent_sync.get("ok")
+                and int(summary.get("total_count") or 0) == 0
+            ):
+                scan = scan_sources(source="all", limit=5000)
+        else:
+            agent_sync = _agent_sync_status()
+        _agent_sync_runtime(catalog).ensure_started()
     try:
         payload = catalog.list_items(
             query=query,
@@ -2565,7 +2641,12 @@ def operations(limit: int = 30, **_: Any) -> dict[str, Any]:
 
 @tool(summary="Stop the process-local enrichment worker.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
-    global _coordinator_cached, _coordinator_path, _enrichment_worker
+    global _agent_sync_worker, _coordinator_cached, _coordinator_path, _enrichment_worker
+    with _agent_sync_lock:
+        sync_worker = _agent_sync_worker
+        _agent_sync_worker = None
+    if sync_worker is not None:
+        sync_worker.dispose()
     with _enrichment_lock:
         worker = _enrichment_worker
         _enrichment_worker = None

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import sys
+import threading
 import time
 import importlib.util
 from pathlib import Path
@@ -18,6 +19,7 @@ if str(SKILL_ROOT) not in sys.path:
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
 from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
+from media_center.sync import MediaAgentSyncWorker  # noqa: E402
 from media_center.topology import MediaCenterTopology  # noqa: E402
 
 
@@ -154,6 +156,11 @@ def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
         main,
         "_sync_agents",
         lambda *_args, **_kwargs: {"ok": False, "error": "agent_unavailable"},
+    )
+    monkeypatch.setattr(
+        main,
+        "_agent_sync_runtime",
+        lambda *_args, **_kwargs: SimpleNamespace(ensure_started=lambda: True),
     )
 
     payload = main.library(auto_scan=True, limit=20)
@@ -1375,6 +1382,78 @@ def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
     assert catalog.agent_binding("instance-b")["cursor"] == "cursor-b"
     assert second["participation"]["partial"] is True
     assert second["participation"]["unavailable_agent_ids"] == ["agent-b"]
+
+
+def test_distributed_agent_sync_adapts_to_bounded_result_envelope(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    observed_limits = []
+
+    class BoundedTopology:
+        def agent_instances(self, *, limit=100):
+            return [{"instance_id": "instance-a", "node_id": "node-a"}][:limit]
+
+        def invoke_agent(
+            self, instance_id, operation, arguments, *, timeout_seconds
+        ):
+            observed_limits.append(arguments["limit"])
+            if arguments["limit"] > 125:
+                raise RuntimeError("service_invocation_result_too_large")
+            page = _agent_page(_agent_delta(1, "Music/track.mp3"))
+            page["agent"] = {"id": "agent-a", "node_id": "node-a"}
+            page["has_more"] = False
+            return page
+
+    monkeypatch.setattr(main, "_topology", lambda: BoundedTopology())
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+
+    result = main._sync_agents(catalog, max_pages=1, limit=1000)
+
+    assert result["ok"] is True
+    assert result["agents"][0]["effective_page_limit"] == 125
+    assert result["agents"][0]["page_limit_backoffs"] == 3
+    assert observed_limits == [1000, 500, 250, 125]
+    assert result["applied_count"] == 1
+
+
+def test_agent_sync_worker_continues_bounded_cursor_catchup() -> None:
+    completed = threading.Event()
+    published = []
+    calls = 0
+
+    def sync():
+        nonlocal calls
+        calls += 1
+        has_more = calls < 2
+        if not has_more:
+            completed.set()
+        return {
+            "ok": True,
+            "mode": "distributed",
+            "agent_count": 2,
+            "applied_count": 100,
+            "has_more": has_more,
+        }
+
+    worker = MediaAgentSyncWorker(
+        sync,
+        publish=lambda: published.append(True),
+        catchup_seconds=0.05,
+        poll_seconds=30,
+    )
+    try:
+        assert worker.ensure_started() is True
+        assert completed.wait(2.0) is True
+    finally:
+        worker.dispose()
+
+    assert calls == 2
+    assert len(published) == 2
+    assert worker.status()["state"] == "idle"
+    assert worker.status()["last_result"]["has_more"] is False
 
 
 def test_complete_distributed_sync_retires_local_compatibility_state(
