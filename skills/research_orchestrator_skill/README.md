@@ -67,7 +67,10 @@ The default path uses three bounded LLM stages: `problem_frame`,
 `protocol_design`, and `implementation_contract`. AdaOS then compiles five
 stable facets: `source_analysis`, `research_problem`,
 `experimental_protocol`, `engineering_contract`, and the provider-neutral
-`experiment_plan`. The protocol stage must assign
+`experiment_plan`. ExperimentPlan v1.4 retains a digest-bound `system` object
+with the scientific subject, component settings, intervention boundary, and
+locked invariants. A bounded execution profile may reduce workload, but cannot
+silently replace that system with a surrogate. The protocol stage must assign
 stable arm ids and one exact primary minuend/subtrahend. Since formulation
 stage contract v1.2, `problem_frame.experimental_signature` freezes only the
 cross-stage scientific identity: subject, dataset, baseline, intervention,

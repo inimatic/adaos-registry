@@ -217,6 +217,75 @@ def test_v18_freeze_requires_preregistered_runtime_disk_headroom(task_value) -> 
         freeze_task(invalid)
 
 
+def test_v19_freeze_requires_the_scientific_implementation_gate(task_value) -> None:
+    valid = copy.deepcopy(task_value)
+    valid["schema_version"] = "1.9.0"
+    valid["exclusion_rules"] = list(CALIBRATION_EXCLUSION_RULES)
+    valid["comparison_plan"] = _paired_task(task_value)["comparison_plan"]
+    valid["repetitions"] = {
+        "attempts_per_arm": 5,
+        "paired_seeds": [17, 23, 47, 71, 101],
+        "model_random_seed_control": "unsupported_not_claimed",
+    }
+    valid["consumer_evaluation"] = {
+        "max_wall_seconds": 1200,
+        "timeout_result_policy": "persist_terminal_failure",
+        "repeat_policy": "return_existing_result",
+    }
+    valid["expected_smoke_profile"].update(
+        {
+            "network_enforcement_required": False,
+            "max_wall_seconds": 600,
+            "workload": {"mode": "bounded", "limits": []},
+            "input_policy": {
+                "source": "deterministic_contract_fixture",
+                "readiness": "required_before_execution",
+                "sampling": "deterministic_seeded",
+            },
+        }
+    )
+    valid["environment_spec"].update(
+        {
+            "runner_contract_digest": "sha256:" + "6" * 64,
+            "minimum_free_disk_bytes": 17_179_869_184,
+        }
+    )
+    valid["environment_spec"]["component_versions"][
+        "research_manager_skill"
+    ] = "0.1.0"
+    stages = {
+        "context_isolation": "source_understanding",
+        "protocol_fidelity": "operationalization",
+        "native_skill_validation": "implementation",
+        "runner_conformance": "implementation",
+        "scientific_implementation": "implementation",
+        "cpu_workflow_smoke": "runtime_infrastructure",
+        "evidence_manifest": "scientific_evaluation",
+    }
+    valid["rubric"]["checks"] = [
+        {
+            "check_id": check_id,
+            "stage": stage,
+            "evaluation_mode": "deterministic",
+            "mandatory": True,
+            "description": f"Independently verify the mandatory {check_id} condition.",
+        }
+        for check_id, stage in stages.items()
+    ]
+
+    frozen = freeze_task(valid)
+    assert {item["check_id"] for item in frozen["rubric"]["checks"]} == set(stages)
+
+    invalid = copy.deepcopy(valid)
+    invalid["rubric"]["checks"] = [
+        item
+        for item in invalid["rubric"]["checks"]
+        if item["check_id"] != "scientific_implementation"
+    ]
+    with pytest.raises(ValueError, match="scientific implementation rubric"):
+        freeze_task(invalid)
+
+
 def test_hidden_judge_inputs_are_snapshotted_before_freeze(tmp_path: Path) -> None:
     class MemoryBlobStore:
         def __init__(self, root: Path) -> None:
@@ -802,3 +871,160 @@ def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypa
     assert response["idempotent_replay"] is True
     assert response["result"] is stored
     assert releases == [("candidate", "session")]
+
+
+def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from handlers import main as handler_module
+
+    rubric_path = tmp_path / "hidden-rubric.json"
+    rubric_path.write_text(
+        json.dumps({"implementation_profile": {"subject": "tlp"}}),
+        encoding="utf-8",
+    )
+    plan = {
+        "digest": "sha256:" + "1" * 64,
+        "system": {"digest": "sha256:" + "2" * 64},
+    }
+    task = {
+        "rubric": {"checks": [{"check_id": "scientific_implementation"}]},
+        "hidden_inputs": [
+            {
+                "kind": "hidden_rubric",
+                "path": str(rubric_path),
+                "digest": _sha(rubric_path.read_bytes()),
+            }
+        ],
+        "inputs": [],
+    }
+    packet = {"packet_id": "packet"}
+
+    class _Repository:
+        @staticmethod
+        def get_task(_task_id: str) -> dict:
+            return task
+
+        @staticmethod
+        def get_packet(*_args, **_kwargs) -> dict:
+            return packet
+
+        @staticmethod
+        def find_result(*_args, **_kwargs):
+            return None
+
+        @staticmethod
+        def put_result(value: dict) -> dict:
+            return value
+
+    instruction_values = {
+        "research_compilation": {
+            "digest": "sha256:" + "3" * 64,
+            "experiment_plan": plan,
+        },
+        "automation_brief": {
+            "digest": "sha256:" + "4" * 64,
+            "compilation_digest": "sha256:" + "3" * 64,
+        },
+    }
+    session = {
+        "session_id": "session",
+        "project_ref": "project:test",
+        "instruction_inputs": [
+            {"kind": kind, "content_digest": value["digest"]}
+            for kind, value in instruction_values.items()
+        ],
+    }
+    arm_trials = [{"arm": {"id": "maxpool", "role": "baseline"}}, {"arm": {"id": "tlp", "role": "intervention"}}]
+    source_snapshot = {
+        "source_digest": "sha256:" + "5" * 64,
+        "digest": "sha256:" + "6" * 64,
+        "files": [],
+    }
+    semantic_calls: list[dict] = []
+    candidate_calls: list[dict] = []
+
+    monkeypatch.setattr(handler_module, "EvaluationRepository", _Repository)
+    monkeypatch.setattr(handler_module.development_sessions, "get", lambda _session_id: session)
+    monkeypatch.setattr(
+        handler_module.development_sessions,
+        "get_instruction",
+        lambda _session_id, kind: {"value": instruction_values[kind]},
+    )
+    monkeypatch.setattr(
+        handler_module.automation,
+        "get_state",
+        lambda **_kwargs: {"automation": {"terminal": True, "status": "completed"}},
+    )
+
+    def invoke(_skill_id: str, operation_id: str, _arguments: dict, **_kwargs):
+        if operation_id == "get_runner_contract":
+            return {"digest": "sha256:" + "7" * 64}
+        assert operation_id == "evaluate_development_candidate"
+        return {
+            "ok": True,
+            "receipt_digest": "sha256:" + "8" * 64,
+            "checks": [
+                {
+                    "id": "candidate.native_validation",
+                    "ok": True,
+                    "digest": "sha256:" + "9" * 64,
+                    "source_digest": source_snapshot["source_digest"],
+                }
+            ],
+            "evidence": {
+                "execution_spec": {},
+                "arm_trials": arm_trials,
+            },
+            "errors": [],
+        }
+
+    monkeypatch.setattr(handler_module, "invoke_skill", invoke)
+    monkeypatch.setattr(handler_module, "inspect_skill_source", lambda _candidate: source_snapshot)
+    monkeypatch.setattr(
+        handler_module,
+        "invoke_development_skill",
+        lambda *_args, **_kwargs: {"schema": "probe-result"},
+    )
+
+    def semantic(**kwargs):
+        semantic_calls.append(kwargs)
+        return {"ok": True, "detail": "verified", "evidence_refs": ["evidence://semantic"]}
+
+    monkeypatch.setattr(handler_module, "evaluate_tlp_implementation", semantic)
+
+    def build_candidate(**kwargs):
+        candidate_calls.append(kwargs)
+        return {"candidate": True}
+
+    monkeypatch.setattr(handler_module, "build_independent_candidate", build_candidate)
+    monkeypatch.setattr(
+        handler_module,
+        "evaluate_candidate",
+        lambda _task, _candidate: {
+            "metrics": {"evidence_valid_completion": True},
+            "digest": "sha256:" + "a" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        handler_module,
+        "_release_attempt_runtime",
+        lambda *_args: {"ok": True},
+    )
+
+    response = handler_module.evaluate_builder_attempt(
+        task_id="task",
+        arm_id="C3_typed_execution",
+        attempt_index=1,
+        candidate_id="candidate",
+        development_session_id="session",
+        builder_webspace_id="builder",
+    )
+
+    assert response["evidence_valid_completion"] is True
+    assert len(semantic_calls) == 1
+    assert semantic_calls[0]["arm_trials"] == arm_trials
+    assert semantic_calls[0]["source_snapshot"] is source_snapshot
+    assert semantic_calls[0]["expected_source_digest"] == source_snapshot["source_digest"]
+    assert semantic_calls[0]["probe_request"]["experiment_plan_digest"] == plan["digest"]
+    assert candidate_calls[0]["scientific_implementation"]["ok"] is True

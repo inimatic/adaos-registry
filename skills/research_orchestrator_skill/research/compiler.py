@@ -46,6 +46,8 @@ def _build_experiment_plan(
     data_policy = dict(experimental["data_policy"])
     reproducibility = dict(experimental["reproducibility"])
     pairing = dict(reproducibility["pairing"])
+    system = copy.deepcopy(dict(experimental["system_specification"]))
+    system["digest"] = digest(system)
     evaluation = dict(compiled_evaluation)
     estimand = dict(evaluation["primary_estimand"])
     execution: dict[str, Any] = {}
@@ -71,7 +73,7 @@ def _build_experiment_plan(
     task_id = str((task or {}).get("task_id") or f"{direction_id}.task-001")
     plan: dict[str, Any] = {
         "schema": "adaos.research.experiment_plan.v1",
-        "schema_version": "1.3.0",
+        "schema_version": "1.4.0",
         "direction_ref": f"research-direction:{direction_id}",
         "task_ref": str((task or {}).get("ref") or f"research-task:{task_id}"),
         "source_bundle_digest": str(source_bundle_digest),
@@ -85,6 +87,11 @@ def _build_experiment_plan(
             "evaluation_access": copy.deepcopy(dict(data_policy["evaluation_access"])),
         },
         "operators": {"arms": copy.deepcopy(list(comparison["arms"]))},
+        # This is the executable scientific subject, not review prose.  Earlier
+        # projections retained arm labels but accidentally dropped the model,
+        # input geometry, component settings and intervention boundary, which
+        # allowed a bounded fixture to become a different scientific system.
+        "system": system,
         "execution": execution,
         "randomization": {
             "paired": True,
@@ -402,7 +409,7 @@ def project_execution_compilation(value: Mapping[str, Any]) -> dict[str, Any]:
     ]
     projected = {
         "schema": "adaos.research.compilation_projection.v1",
-        "schema_version": "1.2.0" if "experiment_plan" in source["facets"] else "1.0.0",
+        "schema_version": "1.3.0" if "experiment_plan" in source["facets"] else "1.0.0",
         "direction_id": source["direction_id"],
         "compilation_digest": source["digest"],
         "source_bundle_digest": source["source_bundle_digest"],

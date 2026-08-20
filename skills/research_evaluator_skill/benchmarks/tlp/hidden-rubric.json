@@ -29,6 +29,12 @@
       "pass": "Conditions, execution lifecycle, tracker records, and evidence surfaces pass the frozen conformance fixture."
     },
     {
+      "check_id": "scientific_implementation",
+      "stage": "implementation",
+      "mode": "deterministic",
+      "pass": "A hidden operator probe, paired implementation observations, and the bounded source snapshot agree that the production runner implements the accepted STL-10 ConvNet and centered trainable TLP intervention rather than a surrogate."
+    },
+    {
       "check_id": "cpu_workflow_smoke",
       "stage": "runtime_infrastructure",
       "mode": "deterministic",
@@ -41,6 +47,22 @@
       "pass": "An independent verifier reconstructs content identities and rejects smoke records as confirmatory evidence."
     }
   ],
+  "implementation_profile": {
+    "required_source_signals": ["torch", "Conv2d", "MaxPool2d", "Parameter"],
+    "required_callable_keys": ["model_factory", "baseline_operator", "intervention_operator", "training_entrypoint"],
+    "forbidden_source_signals": [
+      "synthetic_cifar10_smoke",
+      "ConvNetSTL10-stdlib",
+      "this runner fixes 3 channels, 8x8 images",
+      "feature_count = 4"
+    ],
+    "model_input_shape": [3, 96, 96],
+    "model_output_classes": 10,
+    "production_tlp_parameter_shape": [128, 4],
+    "window": [2, 2],
+    "stride": [2, 2],
+    "initial_equivalence_tolerance": 1e-6
+  },
   "exclusions": [
     "Only a preregistered platform outage before candidate execution may exclude an attempt.",
     "Model refusal, timeout after candidate execution begins, schema failure, protocol drift, and implementation or evidence failure remain scored failures of the primary correctness endpoint.",

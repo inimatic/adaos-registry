@@ -12,6 +12,7 @@ _CHECK_IDS = (
     "protocol_fidelity",
     "native_skill_validation",
     "runner_conformance",
+    "scientific_implementation",
     "cpu_workflow_smoke",
     "evidence_manifest",
 )
@@ -103,6 +104,7 @@ def build_independent_candidate(
     dataset: Mapping[str, Any] | None,
     verified_artifacts: Sequence[Mapping[str, Any]],
     collected: Mapping[str, Any] | None,
+    scientific_implementation: Mapping[str, Any] | None = None,
     operation_errors: Sequence[str] = (),
 ) -> dict[str, Any]:
     refs = [f"builder://automation/{candidate_id}", f"builder://development-session/{session['session_id']}"]
@@ -196,7 +198,12 @@ def build_independent_candidate(
     )
     run_network = dict(run_log.get("network") or {})
     provider = dict((trial or {}).get("provider") or {})
-    extended_execution_contract = str(task.get("schema_version") or "") == "1.6.0"
+    extended_execution_contract = str(task.get("schema_version") or "") in {
+        "1.6.0",
+        "1.7.0",
+        "1.8.0",
+        "1.9.0",
+    }
     network_ok = not extended_execution_contract or all(
         (
             str(run_network.get("mode") or "") == expected_network_mode,
@@ -265,9 +272,28 @@ def build_independent_candidate(
         ),
         _check("native_skill_validation", validation_ok, [str((validation or {}).get("digest") or "")], "strict validation, probing and packaged tests passed" if validation_ok else "native validation or packaged tests failed"),
         _check("runner_conformance", runner_ok, refs, "public runner operations passed consumer checks" if runner_ok else "runner operation checks failed"),
-        _check("cpu_workflow_smoke", smoke_ok, [str((trial or {}).get("digest") or "")], "real three-epoch CPU workflow smoke completed" if smoke_ok else "CPU smoke or no-test audit failed"),
-        _check("evidence_manifest", evidence_ok, [str((trial or {}).get("digest") or "")], "content identities reconstructed and smoke remained non-confirmatory" if evidence_ok else "evidence identities or classification failed"),
     ]
+    rubric_ids = {
+        str(item.get("check_id") or "")
+        for item in task.get("rubric", {}).get("checks") or []
+        if isinstance(item, Mapping)
+    }
+    if "scientific_implementation" in rubric_ids:
+        semantic = dict(scientific_implementation or {})
+        checks.append(
+            _check(
+                "scientific_implementation",
+                bool(semantic.get("ok")),
+                list(semantic.get("evidence_refs") or refs),
+                str(semantic.get("detail") or "scientific implementation was not independently evaluated"),
+            )
+        )
+    checks.extend(
+        [
+            _check("cpu_workflow_smoke", smoke_ok, [str((trial or {}).get("digest") or "")], "real three-epoch CPU workflow smoke completed" if smoke_ok else "CPU smoke or no-test audit failed"),
+            _check("evidence_manifest", evidence_ok, [str((trial or {}).get("digest") or "")], "content identities reconstructed and smoke remained non-confirmatory" if evidence_ok else "evidence identities or classification failed"),
+        ]
+    )
     if operation_errors:
         detail = "; ".join(str(item) for item in operation_errors)
         for check in checks:

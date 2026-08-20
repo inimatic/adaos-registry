@@ -73,6 +73,7 @@ def _workflow_smoke_documents() -> dict[str, Any]:
         "required_expected_outputs": [
             "run_log.json",
             "evaluation_audit.json",
+            "implementation_observation.json",
             "artifacts_index.json",
         ],
         "documents": {
@@ -171,6 +172,64 @@ def _workflow_smoke_documents() -> dict[str, Any]:
                 },
                 "additionalProperties": True,
             },
+            "implementation_observation.json": {
+                "type": "object",
+                "required": [
+                    "schema",
+                    "experiment_plan_digest",
+                    "system_digest",
+                    "arm",
+                    "execution_path_digest",
+                    "implementation",
+                    "observed",
+                ],
+                "properties": {
+                    "schema": {"const": "adaos.research.implementation_observation.v1"},
+                    "experiment_plan_digest": _sha256_schema(),
+                    "system_digest": _sha256_schema(),
+                    "arm": {
+                        "type": "object",
+                        "required": ["id", "role"],
+                        "properties": {
+                            "id": {"type": "string", "minLength": 1},
+                            "role": {"enum": ["baseline", "intervention"]},
+                        },
+                        "additionalProperties": True,
+                    },
+                    "execution_path_digest": _sha256_schema(),
+                    "implementation": {
+                        "type": "object",
+                        "required": ["source_files", "callables"],
+                        "properties": {
+                            "source_files": {
+                                "type": "array",
+                                "minItems": 1,
+                                "uniqueItems": True,
+                                "items": {
+                                    "type": "object",
+                                    "required": ["path", "digest"],
+                                    "properties": {
+                                        "path": {"type": "string", "minLength": 1},
+                                        "digest": _sha256_schema(),
+                                    },
+                                    "additionalProperties": False,
+                                },
+                            },
+                            "callables": {
+                                "type": "object",
+                                "minProperties": 1,
+                                "additionalProperties": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                },
+                            },
+                        },
+                        "additionalProperties": True,
+                    },
+                    "observed": {"type": "object", "minProperties": 1},
+                },
+                "additionalProperties": True,
+            },
             "artifacts_index.json": {
                 "type": "object",
                 "required": ["files"],
@@ -222,6 +281,11 @@ def _workflow_smoke_documents() -> dict[str, Any]:
             "rng_seed_type": "integer",
             "pairing_unit_id": "seed-{seed}",
             "example": {"seed": 17, "pairing_unit_id": "seed-17"},
+            "execution_path_digest": (
+                "sha256 of UTF-8 canonical JSON for implementation_observation.json.implementation; "
+                "canonical JSON uses ensure_ascii=false, lexicographically sorted object keys, "
+                "and separators ',' and ':'"
+            ),
         },
     }
 
@@ -231,7 +295,7 @@ def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.8.0",
+        "version": "1.9.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -440,6 +504,7 @@ def descriptor() -> dict[str, Any]:
                     "offline execution starts only after dataset_status reports execution_ready_without_network=true and run_log.network.accessed remains false",
                     "preparation does not start scientific execution",
                     "expected_outputs contains every workflow_smoke_evidence.required_expected_outputs entry for a workflow-smoke request",
+                    "implementation_observation.json is emitted by the same production path as the arm workload and binds the exact ExperimentPlan, system contract, arm and execution path",
                 ],
                 "profile_mapping": {
                     "preflight": {

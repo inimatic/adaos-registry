@@ -9,7 +9,7 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.calibration_task.v1"},
-    "schema_version": {"enum": ["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0"]},
+    "schema_version": {"enum": ["1.0.0", "1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0", "1.9.0"]},
     "task_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,127}$"},
     "title": {"type": "string", "minLength": 3},
     "direction_skill_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,127}$"},
@@ -204,6 +204,26 @@
     },
     {
       "if": {"properties": {"schema_version": {"const": "1.8.0"}}},
+      "then": {
+        "required": ["agent_profile", "environment_spec", "measurement_policy", "comparison_plan", "expected_smoke_profile", "consumer_evaluation", "exclusion_rules"],
+        "properties": {
+          "repetitions": {"required": ["model_random_seed_control"]},
+          "expected_smoke_profile": {
+            "required": ["profile_id", "stage_id", "device", "epochs", "seeds", "evidence_class", "inference_allowed", "gpu_count", "network_mode", "network_enforcement_required", "max_wall_seconds", "workload", "input_policy"]
+          },
+          "environment_spec": {
+            "required": ["skill_workspace_commit", "component_versions", "standard_prompt_version", "core_source_tree_clean", "core_source_tree_digest", "runner_contract_digest", "minimum_free_disk_bytes"],
+            "properties": {
+              "component_versions": {
+                "required": ["research_orchestrator_skill", "research_evaluator_skill", "research_calibration_runner_skill", "research_manager_skill"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {"properties": {"schema_version": {"const": "1.9.0"}}},
       "then": {
         "required": ["agent_profile", "environment_spec", "measurement_policy", "comparison_plan", "expected_smoke_profile", "consumer_evaluation", "exclusion_rules"],
         "properties": {

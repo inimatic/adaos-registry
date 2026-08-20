@@ -1,5 +1,5 @@
 name: research_evaluator_skill
-version: 0.1.33
+version: 0.1.34
 description: Independent, contamination-aware evaluator for AdaOS research-compilation
   calibrations.
 supported_locales:
@@ -35,8 +35,8 @@ exports:
 tools:
 - name: derive_compact_calibration
   description: Derive compact digest-linked developer inputs and freeze an environment-controlled,
-    counterbalanced v1.8 C0/C3 calibration with bounded workload, a frozen consumer
-    ABI, and pre-execution resource headroom.
+    counterbalanced v1.9 C0/C3 calibration with bounded workload, a frozen consumer
+    ABI, source-bound paired execution, and a hidden scientific implementation probe.
   entry: handlers.main:derive_compact_calibration
   side_effect_class: local_write
   input_schema:
@@ -91,7 +91,7 @@ tools:
         - 'null'
       standard_prompt_version:
         type: string
-        default: adaos-skill-realization/0.1.0
+        default: adaos-skill-realization/0.8.0
       reasoning_effort:
         enum:
         - low

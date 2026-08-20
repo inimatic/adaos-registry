@@ -14,7 +14,7 @@ if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
 import research.manager as manager_module
-from research.contracts import ResearchRecord, identity
+from research.contracts import ResearchRecord, digest, identity
 from research.manager import ResearchManager
 from research.runner_contract import descriptor as runner_contract_descriptor
 from research.tracker import MlflowTracker, TrackerConflict
@@ -184,6 +184,29 @@ def _smoke_expected_outputs() -> list[str]:
     )
 
 
+def _implementation_observation(
+    *, arm_id: str = "maxpool", role: str = "baseline"
+) -> dict:
+    implementation = {
+        "source_files": [
+            {"path": "handlers/runner.py", "digest": "sha256:" + "a" * 64}
+        ],
+        "callables": {
+            "model_factory": "build_model",
+            "training_entrypoint": "run_workflow_smoke",
+        },
+    }
+    return {
+        "schema": "adaos.research.implementation_observation.v1",
+        "experiment_plan_digest": "sha256:" + "d" * 64,
+        "system_digest": "sha256:" + "9" * 64,
+        "arm": {"id": arm_id, "role": role},
+        "execution_path_digest": digest(implementation),
+        "implementation": implementation,
+        "observed": {"path_executed": True},
+    }
+
+
 def test_development_traceability_acceptance_is_digest_bound() -> None:
     manager = ResearchManager()
     accepted = manager.validate_development_candidate(
@@ -202,7 +225,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.8.0"
+    assert contract["version"] == "1.9.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -246,6 +269,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     assert smoke_contract["required_expected_outputs"] == [
         "run_log.json",
         "evaluation_audit.json",
+        "implementation_observation.json",
         "artifacts_index.json",
     ]
     for schema in smoke_contract["documents"].values():
@@ -464,7 +488,9 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         role: {**item, "sealed": role == "test"} for role, item in _splits().items()
     }
     smoke_outputs = _smoke_expected_outputs()
-    indexed_output_names = smoke_outputs[:2]
+    indexed_output_names = [
+        name for name in smoke_outputs if name != "artifacts_index.json"
+    ]
     artifact_rows = [
         {
             "uri": f"skill-data:files/acceptance/{name}",
@@ -503,6 +529,7 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
             "per_stage": {"workflow_smoke": {"test_evaluations_count": 0}},
             "test_access": [],
         },
+        "implementation_observation.json": _implementation_observation(),
         "artifacts_index.json": {
             "files": [
                 {
@@ -586,11 +613,101 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         "collect_attempt",
         "verify_artifact",
         "verify_artifact",
+        "verify_artifact",
     ]
     assert receipt["evidence"]["workflow_smoke_executed"] is True
     assert receipt["evidence"]["verified_artifacts"] == [
         {"ok": True},
         {"ok": True},
+        {"ok": True},
+    ]
+
+
+def test_v14_system_executes_paired_baseline_and_intervention_smoke(
+    monkeypatch,
+) -> None:
+    from adaos.sdk.developer import validation as developer_validation
+
+    monkeypatch.setattr(
+        developer_validation,
+        "validate_skill",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "digest": "sha256:" + "1" * 64,
+            "source_digest": "sha256:" + "2" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        developer_validation,
+        "activate_skill",
+        lambda project_id: {"ok": True, "project_id": project_id, "version": "0.1.0"},
+    )
+    monkeypatch.setattr(
+        developer_validation,
+        "invoke_skill",
+        lambda _project_id, operation_id, _arguments, **_kwargs: {
+            "dataset_id": "stl10_torchvision",
+            "ready": True,
+            "execution_ready_without_network": True,
+            "split_bindings": {
+                role: {**item, "sealed": role == "test"}
+                for role, item in _splits().items()
+            },
+        }
+        if operation_id == "dataset_status"
+        else None,
+    )
+    prepared_roles: list[str] = []
+    executed_roles: list[str] = []
+
+    def prepare_arm(**kwargs):
+        arm = dict(kwargs["arm"])
+        prepared_roles.append(str(arm["role"]))
+        return {
+            "arm": arm,
+            "prepared_attempt": {"arm": arm},
+            "execution_spec": {"metadata": {"arm_id": arm["id"]}},
+            "execution_spec_digest": "sha256:" + "3" * 64,
+            "output_ref": f"skill-data:files/{arm['id']}",
+            "protocol_digest": "sha256:" + "c" * 64,
+        }
+
+    def execute_arm(**kwargs):
+        prepared = dict(kwargs["prepared_arm"])
+        arm = dict(prepared["arm"])
+        executed_roles.append(str(arm["role"]))
+        return {
+            **prepared,
+            "trial": {
+                "ok": True,
+                "digest": "sha256:" + ("4" if arm["role"] == "baseline" else "5") * 64,
+            },
+            "collected": {"complete": True, "artifacts": [{"arm": arm["id"]}]},
+            "verified_artifacts": [{"ok": True}],
+            "collection_ok": True,
+            "verification_ok": True,
+        }
+
+    monkeypatch.setattr(ResearchManager, "_prepare_acceptance_arm", staticmethod(prepare_arm))
+    monkeypatch.setattr(ResearchManager, "_execute_acceptance_arm", staticmethod(execute_arm))
+    envelope = _acceptance_envelope("research.consumer-contracts")
+    envelope["execute_workflow_smoke"] = True
+    plan = envelope["instructions"]["research_compilation"]["facets"][
+        "experiment_plan"
+    ]["payload"]
+    plan["schema_version"] = "1.4.0"
+    plan["system"] = {"digest": "sha256:" + "9" * 64, "subject": "TLP"}
+
+    receipt = ResearchManager().validate_development_candidate(envelope)
+
+    assert receipt["ok"] is True, receipt["errors"]
+    assert prepared_roles == ["baseline", "intervention"]
+    assert executed_roles == ["baseline", "intervention"]
+    assert receipt["evidence"]["paired_smoke_required"] is True
+    assert receipt["evidence"]["paired_workflow_smoke_executed"] is True
+    assert [item["arm"]["role"] for item in receipt["evidence"]["arm_trials"]] == [
+        "baseline",
+        "intervention",
     ]
 
 
@@ -634,6 +751,7 @@ def test_workflow_smoke_index_rejects_self_referential_digest() -> None:
                         },
                         "test_access": [],
                     },
+                    "implementation_observation.json": _implementation_observation(),
                     "artifacts_index.json": {
                         "files": [
                             {

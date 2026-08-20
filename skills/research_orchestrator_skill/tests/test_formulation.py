@@ -274,11 +274,19 @@ def test_research_compiler_emits_execution_plan_and_source_to_acceptance_traceab
     assert package["readiness"] == {"decision": "ready_for_acceptance", "blockers": []}
     assert package["digest"].startswith("sha256:")
     projection = project_execution_compilation(package)
-    assert projection["schema_version"] == "1.2.0"
+    assert projection["schema_version"] == "1.3.0"
     assert projection["compilation_digest"] == package["digest"]
     assert projection["traceability"]["protocol_digest"] == package["facets"]["experimental_protocol"]["digest"]
     plan = projection["experiment_plan"]
-    assert plan["schema_version"] == "1.3.0"
+    assert plan["schema_version"] == "1.4.0"
+    assert plan["system"]["subject"] == "Paired STL-10 pooling classifier"
+    assert plan["system"]["components"][0]["settings"][0]["value"] == (
+        "conv32,pool1,conv64,pool2,conv128,pool3,fc256,fc10"
+    )
+    assert plan["system"]["intervention_boundary"] == (
+        "Only the pool2 operator and its trainability may differ between arms."
+    )
+    assert plan["system"]["digest"].startswith("sha256:")
     assert plan["execution"]["smoke"]["network_mode"] == "offline"
     assert plan["execution"]["smoke"]["workload"]["mode"] == "bounded"
     assert plan["execution"]["smoke"]["input_policy"]["readiness"] == "required_before_execution"

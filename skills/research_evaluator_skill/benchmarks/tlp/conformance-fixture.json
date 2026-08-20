@@ -17,13 +17,41 @@
     {
       "id": "evidence",
       "contract": "Paired results and the primary estimand are independently reconstructable from immutable run records."
+    },
+    {
+      "id": "implementation_observation",
+      "contract": "Each smoke arm emits implementation_observation.json from the production path, bound to the accepted ExperimentPlan and system digests. implementation.source_files lists the relative paths and byte SHA-256 digests of the production implementation; implementation.callables names model_factory, baseline_operator, intervention_operator, and training_entrypoint; execution_path_digest is the AdaOS canonical-JSON digest of implementation and is identical across arms and implementation_probe. observed.model contains input_shape=[batch,3,96,96] and output_shape=[batch,10]; observed.operator contains window=[2,2], stride=[2,2], production_parameter_shape=[128,4], centered=true, zero_initialized=true, and initial_max_abs_error<=1e-6; observed.execution.same_training_path=true."
     }
   ],
+  "required_operations": {
+    "implementation_probe": {
+      "purpose": "Exercise the production centered-TLP operator with evaluator-supplied values without running a scientific workload.",
+      "input": {
+        "request": {
+          "schema": "adaos.research.tlp_operator_probe.v1",
+          "experiment_plan_digest": "sha256 digest",
+          "input_nchw": "finite nested number array with shape [1,C,4,4]",
+          "theta_c4": "finite nested number array with shape [C,4]"
+        }
+      },
+      "output": {
+        "schema": "adaos.research.tlp_operator_probe_result.v1",
+        "experiment_plan_digest": "exact request digest",
+        "execution_path_digest": "same digest recorded by both smoke-arm implementation observations",
+        "baseline_nchw": "ordinary non-overlapping 2x2 MaxPool result",
+        "intervention_nchw": "centered per-channel theta bias followed by max over the same windows",
+        "parameter_shape": "[C,4]",
+        "centered_theta_c4": "theta with each channel mean subtracted"
+      }
+    }
+  },
   "mandatory_checks": [
     "adaos skill validate <candidate> --strict --probe-tools --json",
     "adaos skill test <candidate>",
     "research runner conformance for conditions, run lifecycle, tracker records, and evidence manifest",
     "three-epoch CPU workflow smoke for seed 17 with zero final-test evidence claims",
+    "both accepted arms execute through the same bounded training path and emit digest-bound implementation observations",
+    "a hidden implementation_probe input reproduces ordinary MaxPool and centered-TLP outputs independently",
     "protocol digest in produced records equals the accepted ResearchPrototype digest"
   ],
   "forbidden_shortcuts": [

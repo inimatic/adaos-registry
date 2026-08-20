@@ -13,6 +13,10 @@ from adaos.sdk.core.environment import runtime_identity as sdk_runtime_identity
 from adaos.domain.runtime_bindings import ContentRef
 from adaos.sdk.builder import automation, development_sessions
 from adaos.sdk.data.blob import store as blob_store
+from adaos.sdk.developer.validation import (
+    inspect_skill_source,
+    invoke_skill as invoke_development_skill,
+)
 from adaos.sdk.skills import invoke as invoke_skill
 
 
@@ -34,6 +38,10 @@ from evaluation.harness import (  # noqa: E402
 )
 from evaluation.independent import build_independent_candidate  # noqa: E402
 from evaluation.repository import EvaluationRepository  # noqa: E402
+from evaluation.tlp_semantics import (  # noqa: E402
+    evaluate_tlp_implementation,
+    hidden_probe_request,
+)
 
 
 def _snapshot_hidden_inputs(
@@ -124,7 +132,7 @@ def derive_compact_calibration(
     source_direction_id: str | None = None,
     source_task_id: str | None = None,
     reasoning_effort: str = "high",
-    standard_prompt_version: str = "adaos-skill-realization/0.1.0",
+    standard_prompt_version: str = "adaos-skill-realization/0.8.0",
     attempts_per_arm: int = 5,
     paired_seeds: list[int] | None = None,
     max_model_tokens: int = 5_000_000,
@@ -303,6 +311,26 @@ def derive_compact_calibration(
             "digest": str(value["digest"]),
             "blob_ref": str(blob["ref"]),
         }
+    current_hidden_rubric = json.loads(
+        (_SKILL_ROOT / "benchmarks" / "tlp" / "hidden-rubric.json").read_text(
+            encoding="utf-8-sig"
+        )
+    )
+    rubric_checks = [
+        {
+            "check_id": str(item["check_id"]),
+            "stage": str(item["stage"]),
+            "evaluation_mode": str(item["mode"]),
+            "mandatory": True,
+            "description": str(item["pass"]),
+        }
+        for item in current_hidden_rubric.get("checks") or []
+        if isinstance(item, Mapping)
+    ]
+    if not rubric_checks or not any(
+        item["check_id"] == "scientific_implementation" for item in rubric_checks
+    ):
+        raise ValueError("current hidden rubric has no scientific implementation gate")
     task = copy.deepcopy(baseline)
     for field in ("schema", "frozen_at", "digest"):
         task.pop(field, None)
@@ -353,7 +381,7 @@ def derive_compact_calibration(
     }
     task.update(
         {
-            "schema_version": "1.8.0",
+            "schema_version": "1.9.0",
             "task_id": str(task_id),
             "title": re.sub(
                 r"(?: \(compact execution contracts\))+$",
@@ -429,6 +457,11 @@ def derive_compact_calibration(
                 "claim_scope": "local_tlp_fixed_stack",
             },
             "exclusion_rules": list(CALIBRATION_EXCLUSION_RULES),
+            "rubric": {
+                "primary_endpoint": str(current_hidden_rubric["primary_endpoint"]),
+                "checks": rubric_checks,
+                "failure_stages": list(baseline["rubric"]["failure_stages"]),
+            },
         }
     )
     task["hidden_inputs"], hidden_blob_refs = _snapshot_hidden_inputs(
@@ -609,6 +642,8 @@ def evaluate_builder_attempt(
     dataset = None
     verified = []
     collected = None
+    arm_trials = []
+    scientific_implementation = None
     errors = []
     if projection.get("status") == "completed":
         try:
@@ -678,6 +713,7 @@ def evaluate_builder_attempt(
             validation = {
                 "ok": bool(native.get("ok")),
                 "digest": native.get("digest"),
+                "source_digest": native.get("source_digest"),
             }
             prepare = {
                 "ok": bool(consumer.get("ok")),
@@ -692,6 +728,11 @@ def evaluate_builder_attempt(
                 if isinstance(item, Mapping)
             ]
             collected = dict(evidence.get("collected") or {}) or None
+            arm_trials = [
+                dict(item)
+                for item in evidence.get("arm_trials") or []
+                if isinstance(item, Mapping)
+            ]
             errors.extend(str(item) for item in consumer.get("errors") or [])
         except Exception as exc:
             errors.append(f"{type(exc).__name__}: {exc}")
@@ -701,6 +742,77 @@ def evaluate_builder_attempt(
             f"Builder Automation ended with status {projection.get('status')}"
             + (f": {terminal_error}" if terminal_error else "")
         )
+    rubric_ids = {
+        str(item.get("check_id") or "")
+        for item in task.get("rubric", {}).get("checks") or []
+        if isinstance(item, Mapping)
+    }
+    if "scientific_implementation" in rubric_ids:
+        probe_request: dict[str, Any] = {}
+        probe_result = None
+        probe_error = None
+        source_snapshot = None
+        try:
+            plan = dict(
+                dict(instruction_values.get("research_compilation") or {}).get(
+                    "experiment_plan"
+                )
+                or {}
+            )
+            if not plan.get("digest") or not isinstance(plan.get("system"), Mapping):
+                raise ValueError(
+                    "scientific implementation evaluation requires ExperimentPlan v1.4 system"
+                )
+            hidden_rubric_item = next(
+                (
+                    dict(item)
+                    for item in task.get("hidden_inputs") or []
+                    if isinstance(item, Mapping)
+                    and str(item.get("kind") or "") == "hidden_rubric"
+                ),
+                None,
+            )
+            if hidden_rubric_item is None:
+                raise ValueError("frozen hidden rubric is unavailable")
+            hidden_rubric_path = Path(str(hidden_rubric_item["path"])).resolve()
+            hidden_rubric = json.loads(
+                hidden_rubric_path.read_text(encoding="utf-8-sig")
+            )
+            if file_digest(hidden_rubric_path) != str(hidden_rubric_item["digest"]):
+                raise ValueError("frozen hidden rubric digest changed")
+            source_snapshot = inspect_skill_source(candidate_id)
+            probe_request = hidden_probe_request(str(plan["digest"]))
+            try:
+                value = invoke_development_skill(
+                    candidate_id,
+                    "implementation_probe",
+                    {"request": probe_request},
+                    timeout=60,
+                )
+                if isinstance(value, Mapping):
+                    probe_result = dict(value)
+                else:
+                    probe_error = "implementation_probe returned no mapping"
+            except Exception as exc:
+                probe_error = f"{type(exc).__name__}: {exc}"
+            scientific_implementation = evaluate_tlp_implementation(
+                profile=dict(hidden_rubric.get("implementation_profile") or {}),
+                plan=plan,
+                source_snapshot=source_snapshot,
+                expected_source_digest=str((validation or {}).get("source_digest") or "")
+                or None,
+                arm_trials=arm_trials,
+                probe_request=probe_request,
+                probe_result=probe_result,
+                probe_error=probe_error,
+            )
+        except Exception as exc:
+            scientific_implementation = {
+                "ok": False,
+                "detail": f"scientific implementation evaluation failed: {type(exc).__name__}: {exc}",
+                "evidence_refs": [],
+                "diagnostics": [f"{type(exc).__name__}: {exc}"],
+            }
     candidate = build_independent_candidate(
         task=task,
         packet=packet,
@@ -713,6 +825,7 @@ def evaluate_builder_attempt(
         dataset=dataset,
         verified_artifacts=verified,
         collected=collected,
+        scientific_implementation=scientific_implementation,
         operation_errors=errors,
     )
     stored = repository.put_result(evaluate_candidate(task, candidate))
