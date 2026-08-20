@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-20T03:26:04+00:00",
+  "updated_at": "2026-08-20T14:57:03+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -802,8 +802,8 @@
       "kind": "skill",
       "id": "research_orchestrator_skill",
       "name": "research_orchestrator_skill",
-      "version": "0.46.0",
-      "updated_at": "2026-08-19T23:46:36+00:00",
+      "version": "0.47.0",
+      "updated_at": "2026-08-20T14:57:03+00:00",
       "path": "skills/research_orchestrator_skill",
       "manifest": "skills/research_orchestrator_skill/skill.yaml",
       "source": {
