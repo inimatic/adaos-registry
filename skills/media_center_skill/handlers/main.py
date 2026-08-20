@@ -88,6 +88,52 @@ def _event_payload(event: Any) -> dict[str, Any]:
     return dict(nested) if isinstance(nested, Mapping) else {}
 
 
+def _compact_home_item(item: Mapping[str, Any]) -> dict[str, Any]:
+    fields = (
+        "id",
+        "title",
+        "name",
+        "subtitle",
+        "media_kind",
+        "kind",
+        "icon",
+        "mime_type",
+        "favorite",
+        "play_count",
+        "folder_path",
+        "work_id",
+        "variant_id",
+        "collection_id",
+        "quality",
+        "artwork",
+        "personal",
+        "recommendation",
+        "path",
+        "queue_ref",
+        "item_count",
+        "shelf_id",
+        "shelf_title",
+        "queue_source_type",
+        "queue_source_id",
+    )
+    return {field: item[field] for field in fields if field in item}
+
+
+def _compact_home_snapshot(home: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "ok": bool(home.get("ok")),
+        "schema": str(home.get("schema") or COORDINATOR_SCHEMA),
+        "profile_id": str(home.get("profile_id") or "default"),
+        "profile": dict(home.get("profile") or {}),
+        "shared_surface": bool(home.get("shared_surface")),
+        "items": [
+            _compact_home_item(item)
+            for item in home.get("items") or []
+            if isinstance(item, Mapping)
+        ],
+    }
+
+
 def _publish_library_snapshot(
     catalog: MediaCatalogCoordinator,
     *,
@@ -98,13 +144,14 @@ def _publish_library_snapshot(
         from adaos.sdk.io import stream_variable_publish
 
         profile = str(profile_id or "default").strip() or "default"
+        home = _compact_home_snapshot(catalog.home(profile_id=profile, limit=6))
         snapshot = {
             "schema": "adaos.media_center.library_state.v1",
             "profile_id": profile,
             "catalog_revision": catalog.catalog_revision(),
             "personal_revision": catalog.profile_revision(profile),
             "participation": catalog.participation(),
-            "home": catalog.home(profile_id=profile, limit=8),
+            "home": home,
             "operations": catalog.operations(limit=10),
         }
         stream_variable_publish(

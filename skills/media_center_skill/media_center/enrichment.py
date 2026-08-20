@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping, Protocol
 
@@ -155,11 +156,20 @@ class MediaEnrichmentWorker:
         providers: tuple[MetadataProvider, ...] | None = None,
         publish: Callable[[], None] | None = None,
         poll_seconds: float = 2.0,
+        work_interval_seconds: float = 0.1,
+        publish_interval_seconds: float = 10.0,
     ):
         self.coordinator = coordinator
         self.providers = providers or (DeterministicLocalProvider(),)
         self.publish = publish
         self.poll_seconds = max(0.2, min(float(poll_seconds), 30.0))
+        self.work_interval_seconds = max(
+            0.02, min(float(work_interval_seconds), 5.0)
+        )
+        self.publish_interval_seconds = max(
+            1.0, min(float(publish_interval_seconds), 300.0)
+        )
+        self._last_publish_monotonic = 0.0
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
@@ -229,9 +239,15 @@ class MediaEnrichmentWorker:
             result = self.coordinator.fail_background_job(
                 job_id, error_code="enrichment_provider_failed", retryable=True
             )
-        if self.publish:
+        publish_at = time.monotonic()
+        if self.publish and (
+            self._last_publish_monotonic == 0.0
+            or publish_at - self._last_publish_monotonic
+            >= self.publish_interval_seconds
+        ):
             try:
                 self.publish()
+                self._last_publish_monotonic = publish_at
             except Exception:
                 pass
         return result
@@ -242,6 +258,8 @@ class MediaEnrichmentWorker:
             if result is None:
                 self._wake.wait(self.poll_seconds)
                 self._wake.clear()
+            else:
+                self._stop.wait(self.work_interval_seconds)
 
 
 __all__ = [

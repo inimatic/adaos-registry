@@ -12,6 +12,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 
 SCHEMA_VERSION = "adaos.media_center.catalog.v1"
+CATALOG_SCHEMA_REVISION = "2026-08-20.1"
 SKILL_NAME = "media_center_skill"
 MAX_LIST_LIMIT = 500
 DEFAULT_LIST_LIMIT = 100
@@ -55,7 +56,27 @@ class MediaCenterRepository:
         connection.execute("PRAGMA synchronous=NORMAL")
         return connection
 
-    def ensure_schema(self) -> dict[str, Any]:
+    def _schema_is_current(self) -> bool:
+        if not self.db_path.exists():
+            return False
+        try:
+            with sqlite3.connect(str(self.db_path), timeout=1) as connection:
+                row = connection.execute(
+                    "SELECT value FROM meta WHERE key='catalog_schema_revision'"
+                ).fetchone()
+        except sqlite3.Error:
+            return False
+        return bool(row and str(row[0]) == CATALOG_SCHEMA_REVISION)
+
+    def ensure_schema(self, *, force: bool = False) -> dict[str, Any]:
+        if not force and self._schema_is_current():
+            return {
+                "ok": True,
+                "schema": SCHEMA_VERSION,
+                "db_path": str(self.db_path),
+                "retired_legacy_count": 0,
+                "migration": "current",
+            }
         retired_legacy_count = 0
         with sqlite3.connect(str(self.db_path), timeout=30) as connection:
             connection.execute("PRAGMA journal_mode=WAL")
@@ -148,6 +169,10 @@ class MediaCenterRepository:
                 """,
                 (now_iso(),),
             ).rowcount
+            connection.execute(
+                "INSERT OR REPLACE INTO meta(key, value) VALUES ('catalog_schema_revision', ?)",
+                (CATALOG_SCHEMA_REVISION,),
+            )
             connection.commit()
         return {
             "ok": True,

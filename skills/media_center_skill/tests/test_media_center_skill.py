@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sqlite3
 import sys
 import time
 import importlib.util
@@ -251,13 +253,34 @@ def test_schema_retires_pre_reference_media_center_catalog_rows(monkeypatch, tmp
     repo = MediaCenterRepository()
     repo.scan_resources([legacy], source="media_server", mark_missing=False)
 
-    migration = repo.ensure_schema()
+    migration = repo.ensure_schema(force=True)
     available = repo.list_items()["items"]
     all_items = repo.list_items(include_missing=True)["items"]
 
     assert migration["retired_legacy_count"] == 1
     assert available == []
     assert all_items[0]["missing"] is True
+
+
+def test_current_schema_reopens_without_waiting_for_a_writer(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/track.mp3")))
+    writer = sqlite3.connect(str(catalog.repository.db_path), timeout=1)
+    writer.execute("PRAGMA journal_mode=WAL")
+    writer.execute("BEGIN IMMEDIATE")
+    try:
+        started = time.monotonic()
+        reopened = MediaCatalogCoordinator(MediaCenterRepository())
+        elapsed = time.monotonic() - started
+        assert reopened.list_items(media_kind="audio", limit=1)["count"] == 1
+    finally:
+        writer.rollback()
+        writer.close()
+
+    assert elapsed < 1.0
 
 
 def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path):
@@ -1484,6 +1507,67 @@ def test_enrichment_worker_persists_provider_claims_and_terminal_progress(
         "title",
         "folder_keywords",
     }
+
+
+def test_enrichment_worker_coalesces_publication_and_exposes_pacing(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Music/one.mp3"),
+            _agent_delta(2, "Music/two.mp3"),
+        )
+    )
+    published = []
+    worker = MediaEnrichmentWorker(
+        catalog,
+        publish=lambda: published.append(time.monotonic()),
+        work_interval_seconds=0.25,
+        publish_interval_seconds=30,
+    )
+
+    assert worker.run_once() is not None
+    assert worker.run_once() is not None
+
+    assert len(published) == 1
+    assert worker.work_interval_seconds == 0.25
+    assert worker.publish_interval_seconds == 30
+
+
+def test_library_stream_snapshot_is_compact(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            *(
+                _agent_delta(index, f"Music/Album/{index:03d}.mp3")
+                for index in range(1, 21)
+            )
+        )
+    )
+    published = []
+
+    import adaos.sdk.io as sdk_io
+
+    monkeypatch.setattr(
+        sdk_io,
+        "stream_variable_publish",
+        lambda receiver, value, **kwargs: published.append(value),
+    )
+
+    main._publish_library_snapshot(catalog)
+
+    snapshot = published[-1]
+    assert len(json.dumps(snapshot, ensure_ascii=False).encode("utf-8")) < 65536
+    assert snapshot["home"]["items"]
+    assert all("resource" not in item for item in snapshot["home"]["items"])
+    assert all("descriptor" not in item for item in snapshot["home"]["items"])
 
 
 def test_local_discovery_is_phonetic_semantic_and_resource_bounded(

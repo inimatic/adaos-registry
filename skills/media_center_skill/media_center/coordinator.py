@@ -26,6 +26,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
+COORDINATOR_SCHEMA_REVISION = "2026-08-20.4"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
 WORK_SCHEMA = "adaos.media_center.media_work.v1"
 COLLECTION_SCHEMA = "adaos.media_center.media_collection.v1"
@@ -116,7 +117,30 @@ class MediaCatalogCoordinator:
         self.repository = repository
         self.ensure_schema()
 
-    def ensure_schema(self) -> dict[str, Any]:
+    def _schema_is_current(self) -> bool:
+        if not self.repository.db_path.exists():
+            return False
+        try:
+            with sqlite3.connect(
+                str(self.repository.db_path), timeout=1
+            ) as connection:
+                row = connection.execute(
+                    "SELECT value FROM coordinator_meta "
+                    "WHERE key='coordinator_schema_revision'"
+                ).fetchone()
+        except sqlite3.Error:
+            return False
+        return bool(row and str(row[0]) == COORDINATOR_SCHEMA_REVISION)
+
+    def ensure_schema(self, *, force: bool = False) -> dict[str, Any]:
+        if not force and self._schema_is_current():
+            return {
+                "ok": True,
+                "schema": COORDINATOR_SCHEMA,
+                "db_path": str(self.repository.db_path),
+                "retired_legacy_count": 0,
+                "migration": "current",
+            }
         with self.repository.connect() as connection:
             columns = {str(row["name"]) for row in connection.execute("PRAGMA table_info(catalog_items)").fetchall()}
             additions = {
@@ -435,6 +459,11 @@ class MediaCatalogCoordinator:
                 (now,),
             ).rowcount
             self._backfill_search(connection)
+            connection.execute(
+                "INSERT OR REPLACE INTO coordinator_meta(key, value) "
+                "VALUES ('coordinator_schema_revision', ?)",
+                (COORDINATOR_SCHEMA_REVISION,),
+            )
             connection.commit()
         return {
             "ok": True,
