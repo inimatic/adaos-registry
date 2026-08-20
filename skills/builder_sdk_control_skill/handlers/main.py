@@ -3234,7 +3234,8 @@ def _ensure_trial_waiting_before_result(
         return
     if str(delivery.get("status") or "") == "activating" and governed_state == "trial_waiting":
         return
-    if str(delivery.get("status") or "") != "checkpoint" or governed_state != "trial_ready":
+    delivery_status = str(delivery.get("status") or "")
+    if delivery_status not in {"checkpoint", "activating"} or governed_state != "trial_ready":
         raise ValueError("Trial result cannot be reconciled from the current Builder state")
     workflow.transition(
         kind,

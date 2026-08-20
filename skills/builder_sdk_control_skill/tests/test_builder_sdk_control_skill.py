@@ -1503,6 +1503,38 @@ def test_trial_result_reconciles_lost_local_waiting_state_without_external_activ
     assert calls[0][1]["metadata"]["reconciliation"] == "external_trial_result_observed"
 
 
+def test_trial_result_repairs_legacy_half_applied_waiting_state(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module.workflow,
+        "get_state",
+        lambda *args: {
+            "delivery": {"status": "activating"},
+            "governed": {"state": "trial_ready"},
+        },
+    )
+    calls: list[tuple[tuple, dict]] = []
+    monkeypatch.setattr(
+        module.workflow,
+        "transition",
+        lambda *args, **kwargs: calls.append((args, kwargs)) or {"ok": True},
+    )
+
+    module._ensure_trial_waiting_before_result(
+        "scenario",
+        "builder",
+        admitted_workflow={"governed": {"state": "trial_ready"}},
+        run_id="candidate:builder:activate",
+        canonical_change_id="change-1",
+        context_packet_digest="sha256:" + "3" * 64,
+        package_digest="sha256:" + "2" * 64,
+    )
+
+    assert [args[2] for args, _kwargs in calls] == ["candidate_preparation_started"]
+    assert calls[0][1]["metadata"]["idempotency_key"].endswith(":waiting-reconcile")
+    assert calls[0][1]["metadata"]["reconciliation"] == "external_trial_result_observed"
+
+
 def test_publication_result_reconciles_lost_local_waiting_state_without_repromotion(monkeypatch) -> None:
     module = _module()
     monkeypatch.setattr(
