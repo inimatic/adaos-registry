@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import jsonschema
@@ -59,3 +60,39 @@ def test_scenario_requires_every_project_runtime_component() -> None:
         "mediaserver",
     }
     assert "media_indexer_skill" not in scenario["depends"]
+
+
+def test_registry_index_matches_media_center_distribution_manifests() -> None:
+    registry = json.loads(
+        (REGISTRY_ROOT / "registry.json").read_text(encoding="utf-8")
+    )
+    skills = {item["id"]: item for item in registry["skills"]}
+    scenarios = {item["id"]: item for item in registry["scenarios"]}
+
+    for skill_id in (
+        "media_center_skill",
+        "media_library_agent",
+        "media_control_skill",
+    ):
+        manifest = yaml.safe_load(
+            (REGISTRY_ROOT / "skills" / skill_id / "skill.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        entry = skills[skill_id]
+        assert entry["version"] == manifest["version"]
+        assert entry["description"] == manifest["description"]
+        assert entry["tools_count"] == len(manifest["tools"])
+
+    scenario = yaml.safe_load(
+        (REGISTRY_ROOT / "scenarios" / "media_center" / "scenario.yaml").read_text(
+            encoding="utf-8"
+        )
+    )
+    entry = scenarios["media_center"]
+    assert entry["version"] == scenario["version"]
+    assert entry["description"] == scenario["description"]
+    assert set(entry["skills"]["required"]) == set(
+        scenario["runtime"]["skills"]["required"]
+    )
+    assert "optional" not in entry["skills"]

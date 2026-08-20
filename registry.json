@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-19T23:46:36+00:00",
+  "updated_at": "2026-08-20T00:15:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -380,8 +380,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.1.9",
-      "updated_at": "2026-08-14T12:00:00+00:00",
+      "version": "0.8.1",
+      "updated_at": "2026-08-20T00:15:00+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -393,10 +393,32 @@
         "name": "media_center_skill",
         "id": "media_center_skill"
       },
-      "description": "Durable MVP media-center catalog built on AdaOS media resource descriptors.",
+      "description": "Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 17
+      "tools_count": 53
+    },
+    {
+      "kind": "skill",
+      "id": "media_control_skill",
+      "name": "media_control_skill",
+      "version": "0.2.0",
+      "updated_at": "2026-08-20T00:15:00+00:00",
+      "path": "skills/media_control_skill",
+      "manifest": "skills/media_control_skill/skill.yaml",
+      "source": {
+        "path": "skills/media_control_skill",
+        "manifest": "skills/media_control_skill/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "media_control_skill",
+        "id": "media_control_skill"
+      },
+      "description": "Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 19
     },
     {
       "kind": "skill",
@@ -418,6 +440,27 @@
       "description": "Semantic indexing and multimodal search for local media files (video, audio, images) using NER, FAISS and CLIP.",
       "runtime_python": "3.11",
       "tools_count": 6
+    },
+    {
+      "kind": "skill",
+      "id": "media_library_agent",
+      "name": "media_library_agent",
+      "version": "0.6.1",
+      "updated_at": "2026-08-20T00:15:00+00:00",
+      "path": "skills/media_library_agent",
+      "manifest": "skills/media_library_agent/skill.yaml",
+      "source": {
+        "path": "skills/media_library_agent",
+        "manifest": "skills/media_library_agent/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "media_library_agent",
+        "id": "media_library_agent"
+      },
+      "description": "Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.",
+      "runtime_python": "3.11",
+      "tools_count": 27
     },
     {
       "kind": "skill",
@@ -1172,8 +1215,8 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.1.6",
-      "updated_at": "2026-08-14T12:00:00+00:00",
+      "version": "0.6.1",
+      "updated_at": "2026-08-20T00:15:00+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {
@@ -1186,15 +1229,14 @@
         "id": "media_center"
       },
       "title": "Media Center",
-      "description": "Compact media-center catalog with in-place folder registration, server-backed pages, and modal playback over AdaOS media resource descriptors.",
+      "description": "Distributed Media Center application with in-place library agents, a bounded coordinator catalog, persistent playback, and remote-control surfaces.",
       "trigger": "manual",
       "skills": {
         "required": [
           "media_center_skill",
+          "media_library_agent",
+          "media_control_skill",
           "mediaserver"
-        ],
-        "optional": [
-          "media_indexer_skill"
         ]
       }
     },
