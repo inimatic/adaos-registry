@@ -10,7 +10,7 @@ BENCHMARK_ROOT = Path(__file__).resolve().parents[1] / "benchmarks"
 if str(BENCHMARK_ROOT) not in sys.path:
     sys.path.insert(0, str(BENCHMARK_ROOT))
 
-from run_media_center_soak import run  # noqa: E402
+from run_media_center_soak import _warmup_duration, run  # noqa: E402
 
 
 def test_short_soak_exercises_reads_during_agent_deltas() -> None:
@@ -31,3 +31,8 @@ def test_acceptance_mode_rejects_short_or_small_runs() -> None:
         run(count=20_000, duration_seconds=10, acceptance=True)
     with pytest.raises(ValueError, match="fixture"):
         run(count=1_000, duration_seconds=3_600, acceptance=True)
+
+
+def test_acceptance_warmup_allows_allocator_and_sqlite_caches_to_stabilize() -> None:
+    assert _warmup_duration(3_600, acceptance=True) == 300
+    assert _warmup_duration(90, acceptance=False) == 18

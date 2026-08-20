@@ -29,6 +29,11 @@ ACCEPTANCE_FIXTURE_COUNT = 20_000
 MAX_ERRORS = 100
 
 
+def _warmup_duration(requested_duration: float, *, acceptance: bool) -> float:
+    ceiling = 300.0 if acceptance else 60.0
+    return min(ceiling, requested_duration * 0.20)
+
+
 def _percentile(values: list[float], percentile: float) -> float:
     ordered = sorted(values)
     if not ordered:
@@ -264,7 +269,10 @@ def run(
         rss_samples: list[float] = []
         steady_rss_samples: list[float] = []
         cpu_samples: list[float] = []
-        warmup_seconds = min(60.0, requested_duration * 0.20)
+        warmup_seconds = _warmup_duration(
+            requested_duration,
+            acceptance=acceptance,
+        )
         try:
             import psutil  # type: ignore[import-not-found]
 
