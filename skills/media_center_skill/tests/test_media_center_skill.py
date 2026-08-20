@@ -535,7 +535,15 @@ def test_coordinator_applies_agent_deltas_and_searches_folder_segments(monkeypat
     assert applied["applied_count"] == 2
     assert [item["name"] for item in by_folder["items"]] == ["001.mp3"]
     assert [item["name"] for item in by_filename["items"]] == ["001.mp3"]
-    assert by_folder["ranking"] == {"version": "deterministic-fts-v1", "query_mode": "explicit_submit"}
+    assert by_folder["ranking"] == {
+        "version": "deterministic-fts-v2",
+        "query_mode": "explicit_submit",
+        "candidate_window_bounded": True,
+        "candidate_limit": 192,
+        "candidate_count": 1,
+        "candidate_window_full": False,
+    }
+    assert by_folder["total_count_exact"] is False
     assert by_folder["partial"] is False
     assert replay["applied_count"] == 0
     assert replay["ignored_count"] == 2
@@ -1731,6 +1739,154 @@ def test_queue_builder_preserves_large_playlist_order_and_bounds_sources(
     assert folder_queue["count"] == 5
     assert folder_queue["limit"] == 5
     _validate_schema("queue-source.v1.schema.json", playlist_queue)
+
+
+def test_catalog_keyset_cursor_matches_legacy_offset_without_gaps(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            *[
+                _agent_delta(
+                    index,
+                    f"Shows/Keyset/Example Episode {index:03d}.mp4",
+                    kind="video",
+                )
+                for index in range(1, 96)
+            ]
+        )
+    )
+
+    first = catalog.list_items(media_kind="video", sort="title", limit=30)
+    second = catalog.list_items(
+        media_kind="video",
+        sort="title",
+        limit=30,
+        cursor=first["pagination"]["next_cursor"],
+    )
+    legacy_second = catalog.list_items(
+        media_kind="video",
+        sort="title",
+        limit=30,
+        offset=30,
+    )
+    assert [item["id"] for item in second["items"]] == [
+        item["id"] for item in legacy_second["items"]
+    ]
+
+    item_ids = [item["id"] for item in first["items"]]
+    cursor = first["pagination"]["next_cursor"]
+    while cursor:
+        page = catalog.list_items(
+            media_kind="video", sort="title", limit=30, cursor=cursor
+        )
+        item_ids.extend(item["id"] for item in page["items"])
+        cursor = page["pagination"]["next_cursor"]
+    assert len(item_ids) == 95
+    assert len(set(item_ids)) == 95
+
+    search_ids: list[str] = []
+    cursor = ""
+    while True:
+        page = catalog.list_items(
+            query="Example",
+            media_kind="video",
+            sort="title",
+            limit=30,
+            cursor=cursor,
+        )
+        search_ids.extend(item["id"] for item in page["items"])
+        cursor = str(page["pagination"]["next_cursor"] or "")
+        if not cursor:
+            break
+    assert len(search_ids) == 95
+    assert len(set(search_ids)) == 95
+
+
+def test_catalog_search_bounds_broad_window_but_finds_rare_late_match(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    monkeypatch.delenv("MEDIA_CENTER_SEARCH_CANDIDATE_LIMIT", raising=False)
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            *[
+                _agent_delta(
+                    index,
+                    f"Shows/Window/Window Episode {index:03d}.mp4",
+                    kind="video",
+                )
+                for index in range(1, 301)
+            ]
+        )
+    )
+
+    broad_ids: list[str] = []
+    cursor = ""
+    first = None
+    while True:
+        page = catalog.list_items(
+            query="Window", media_kind="video", limit=30, cursor=cursor
+        )
+        first = first or page
+        broad_ids.extend(item["id"] for item in page["items"])
+        cursor = str(page["pagination"]["next_cursor"] or "")
+        if not cursor:
+            break
+
+    assert len(broad_ids) == 192
+    assert len(set(broad_ids)) == 192
+    assert first["ranking"]["candidate_window_full"] is True
+    assert first["total_count_exact"] is False
+
+    late = catalog.list_items(
+        query="Window Episode 300", media_kind="video", limit=30
+    )
+    assert [item["name"] for item in late["items"]] == [
+        "Window Episode 300.mp4"
+    ]
+    assert late["ranking"]["candidate_count"] == 1
+
+
+def test_source_revision_coalesces_queued_enrichment_and_bounds_history(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+
+    for revision in range(1, 31):
+        result = catalog.apply_agent_page(
+            _agent_page(
+                _agent_delta(
+                    1,
+                    "Music/Changing Track.mp3",
+                    revision=revision,
+                )
+            )
+        )
+        assert result["ok"] is True
+
+    with repository.connect() as connection:
+        rows = connection.execute(
+            """
+            SELECT kind,status,COUNT(*) AS count FROM media_background_jobs
+            GROUP BY kind,status ORDER BY kind,status
+            """
+        ).fetchall()
+    counts = {(row["kind"], row["status"]): int(row["count"]) for row in rows}
+
+    for kind in ("metadata_enrichment", "embedding", "fingerprint"):
+        assert counts[(kind, "queued")] == 1
+        assert counts[(kind, "canceled")] == 8
+    assert sum(counts.values()) == 27
 
 
 def test_catalog_corrections_are_audited_reversible_and_non_destructive(

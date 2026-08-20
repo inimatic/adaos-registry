@@ -26,7 +26,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-20.8"
+COORDINATOR_SCHEMA_REVISION = "2026-08-20.9"
 SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
@@ -95,23 +95,65 @@ def _cursor_signature(payload: Mapping[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest()[:16]
 
 
-def _encode_cursor(offset: int, signature: str) -> str:
-    raw = json.dumps({"v": 1, "offset": max(0, int(offset)), "sig": signature}, separators=(",", ":")).encode("utf-8")
+def _encode_cursor(
+    offset: int,
+    signature: str,
+    anchor: list[Any] | tuple[Any, ...] | None = None,
+) -> str:
+    payload: dict[str, Any] = {
+        "v": 2 if anchor is not None else 1,
+        "offset": max(0, int(offset)),
+        "sig": signature,
+    }
+    if anchor is not None:
+        payload["anchor"] = list(anchor)[:4]
+    raw = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 
 
-def _decode_cursor(value: Any, signature: str) -> int:
+def _decode_keyset_cursor(value: Any, signature: str) -> tuple[int, list[Any] | None]:
     token = _text(value)
     if not token:
         return 0
     try:
         raw = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4))
         payload = json.loads(raw.decode("utf-8"))
-        if payload.get("v") != 1 or payload.get("sig") != signature:
+        if payload.get("v") not in {1, 2} or payload.get("sig") != signature:
             raise ValueError("cursor does not match query")
-        return max(0, int(payload["offset"]))
+        anchor = payload.get("anchor") if payload.get("v") == 2 else None
+        if anchor is not None and (
+            not isinstance(anchor, list)
+            or not 1 <= len(anchor) <= 4
+            or any(not isinstance(item, (str, int, float)) for item in anchor)
+        ):
+            raise ValueError("cursor anchor is invalid")
+        return max(0, int(payload["offset"])), anchor
     except Exception as exc:
         raise ValueError("invalid_media_catalog_cursor") from exc
+
+
+def _decode_cursor(value: Any, signature: str) -> int:
+    offset, _anchor = _decode_keyset_cursor(value, signature)
+    return offset
+
+
+def _keyset_predicate(
+    keys: tuple[tuple[str, str], ...],
+    anchor: list[Any],
+) -> tuple[str, list[Any]]:
+    if len(keys) != len(anchor):
+        raise ValueError("invalid_media_catalog_cursor")
+    branches: list[str] = []
+    params: list[Any] = []
+    for index, (expression, direction) in enumerate(keys):
+        equality = [f"{keys[prior][0]}=?" for prior in range(index)]
+        comparator = "<" if direction == "desc" else ">"
+        branches.append(
+            "(" + " AND ".join([*equality, f"{expression}{comparator}?"]) + ")"
+        )
+        params.extend(anchor[:index])
+        params.append(anchor[index])
+    return "(" + " OR ".join(branches) + ")", params
 
 
 class MediaCatalogCoordinator:
@@ -373,6 +415,10 @@ class MediaCatalogCoordinator:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_media_center_variant_work "
                 "ON media_variants(work_id,derived,id)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_media_center_background_subject "
+                "ON media_background_jobs(subject_ref,kind,status,updated_at DESC,id)"
             )
             alias_columns = {
                 str(row["name"])
@@ -1183,20 +1229,24 @@ class MediaCatalogCoordinator:
                     membership.get("track_number"), membership.get("chapter_number"),
                 ),
             )
-        enrichment_job_id = _stable_id(
-            "mediajob", "metadata_enrichment", item_id, source_revision, size=24
-        )
-        connection.execute(
-            """
-            INSERT OR IGNORE INTO media_background_jobs(
-                id,kind,subject_ref,status,priority,created_at,updated_at
-            ) VALUES (?, 'metadata_enrichment', ?, 'queued', 200, ?, ?)
-            """,
-            (enrichment_job_id, f"item:{item_id}", now_iso(), now_iso()),
-        )
-        for job_kind, priority in (("embedding", 600), ("fingerprint", 500)):
+        subject_ref = f"item:{item_id}"
+        for job_kind, priority in (
+            ("metadata_enrichment", 200),
+            ("embedding", 600),
+            ("fingerprint", 500),
+        ):
             job_id = _stable_id(
                 "mediajob", job_kind, item_id, source_revision, size=24
+            )
+            queued_at = now_iso()
+            connection.execute(
+                """
+                UPDATE media_background_jobs
+                SET status='canceled', error_code='superseded_source_revision',
+                    finished_at=?, updated_at=?
+                WHERE subject_ref=? AND kind=? AND status='queued' AND id<>?
+                """,
+                (queued_at, queued_at, subject_ref, job_kind, job_id),
             )
             connection.execute(
                 """
@@ -1207,11 +1257,22 @@ class MediaCatalogCoordinator:
                 (
                     job_id,
                     job_kind,
-                    f"item:{item_id}",
+                    subject_ref,
                     priority,
-                    now_iso(),
-                    now_iso(),
+                    queued_at,
+                    queued_at,
                 ),
+            )
+            connection.execute(
+                """
+                DELETE FROM media_background_jobs WHERE id IN (
+                    SELECT id FROM media_background_jobs
+                    WHERE subject_ref=? AND kind=?
+                        AND status IN ('completed','failed','canceled')
+                    ORDER BY updated_at DESC,id DESC LIMIT -1 OFFSET 8
+                )
+                """,
+                (subject_ref, job_kind),
             )
         return operation or "updated"
 
@@ -1868,7 +1929,11 @@ class MediaCatalogCoordinator:
                 "profile_revision": int(profile_record["revision"]), "collection": collection_id,
             }
         )
-        resolved_offset = _decode_cursor(cursor, signature) if _text(cursor) else max(0, int(offset or 0))
+        if _text(cursor):
+            resolved_offset, cursor_anchor = _decode_keyset_cursor(cursor, signature)
+        else:
+            resolved_offset = max(0, int(offset or 0))
+            cursor_anchor = None
         filters: list[str] = []
         params: list[Any] = [profile]
         if not include_missing:
@@ -1908,47 +1973,153 @@ class MediaCatalogCoordinator:
         if _text(collection_id):
             filters.append("c.collection_id=?")
             params.append(_text(collection_id))
-        join_search = ""
+        fts_query = ""
         if query_token:
             terms = [term for term in re.findall(r"[\w]+", query_token, flags=re.UNICODE) if term][:12]
             if not terms:
                 terms = [query_token]
             fts_query = " AND ".join(f'"{term.replace(chr(34), chr(34) * 2)}"*' for term in terms)
-            join_search = "JOIN catalog_search ON catalog_search.item_id=c.id"
-            filters.append("catalog_search.text MATCH ?")
-            params.append(fts_query)
         where = f"WHERE {' AND '.join(filters)}" if filters else ""
-        from_sql = f"catalog_items c {join_search} LEFT JOIN personal_media_state ps ON ps.item_id=c.id AND ps.profile_id=?"
+        from_sql = "catalog_items c LEFT JOIN personal_media_state ps ON ps.item_id=c.id AND ps.profile_id=?"
         if query_token:
-            order = "catalog_search.rank"
+            order = "catalog_rank,c.rowid"
         else:
-            order = {
-                "title": "c.title COLLATE NOCASE, c.id",
-                "size": "c.size_bytes DESC, c.id",
-                "source": "c.source, lower(c.title), c.id",
-                "favorite": "COALESCE(ps.favorite,c.favorite) DESC, c.title COLLATE NOCASE, c.id",
-                "recent": "COALESCE(ps.last_played_at,c.modified_at) DESC, c.id",
-            }.get(sort_token, "COALESCE(ps.last_played_at,c.modified_at) DESC, c.id")
+            sort_contracts = {
+                "title": (
+                    "c.title COLLATE NOCASE, c.id",
+                    (("c.title COLLATE NOCASE", "asc"), ("c.id", "asc")),
+                ),
+                "size": (
+                    "c.size_bytes DESC, c.id",
+                    (("c.size_bytes", "desc"), ("c.id", "asc")),
+                ),
+                "source": (
+                    "c.source, lower(c.title), c.id",
+                    (("c.source", "asc"), ("lower(c.title)", "asc"), ("c.id", "asc")),
+                ),
+                "favorite": (
+                    "COALESCE(ps.favorite,c.favorite) DESC, c.title COLLATE NOCASE, c.id",
+                    (
+                        ("COALESCE(ps.favorite,c.favorite)", "desc"),
+                        ("c.title COLLATE NOCASE", "asc"),
+                        ("c.id", "asc"),
+                    ),
+                ),
+                "recent": (
+                    "COALESCE(ps.last_played_at,c.modified_at) DESC, c.id",
+                    (("COALESCE(ps.last_played_at,c.modified_at)", "desc"), ("c.id", "asc")),
+                ),
+            }
+            order, sort_keys = sort_contracts.get(sort_token, sort_contracts["recent"])
+        if cursor_anchor is not None and not query_token:
+            keyset_filter, keyset_params = _keyset_predicate(sort_keys, cursor_anchor)
+            filters.append(keyset_filter)
+            params.extend(keyset_params)
+            where = f"WHERE {' AND '.join(filters)}"
+        use_offset = not query_token and cursor_anchor is None and resolved_offset > 0
+        query_suffix = "LIMIT ? OFFSET ?" if use_offset else "LIMIT ?"
+        query_params = (*params, page_size + 1, resolved_offset) if use_offset else (*params, page_size + 1)
+        try:
+            search_candidate_limit = int(
+                os.environ.get("MEDIA_CENTER_SEARCH_CANDIDATE_LIMIT") or 192
+            )
+        except ValueError:
+            search_candidate_limit = 192
+        search_candidate_limit = max(64, min(10_000, search_candidate_limit))
+        search_candidate_count = 0
         with self.repository.connect() as connection:
-            rows = connection.execute(
-                f"""
-                SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
-                    COALESCE(ps.resume_ms,0) AS profile_resume_ms,
-                    COALESCE(ps.duration_ms,0) AS profile_duration_ms,
-                    COALESCE(ps.completed,0) AS profile_completed,
-                    COALESCE(ps.rating,0) AS profile_rating,
-                    COALESCE(ps.hidden,0) AS profile_hidden,
-                    COALESCE(ps.last_played_at,'') AS profile_last_played_at,
-                    COALESCE(ps.revision,0) AS profile_revision
-                FROM {from_sql} {where} ORDER BY {order} LIMIT ? OFFSET ?
-                """,
-                (*params, page_size + 1, resolved_offset),
-            ).fetchall()
+            if query_token:
+                candidate_rows = connection.execute(
+                    """
+                    SELECT item_id FROM catalog_search
+                    WHERE catalog_search.text MATCH ? LIMIT ?
+                    """,
+                    (fts_query, search_candidate_limit),
+                ).fetchall()
+                candidate_ids = [str(row["item_id"]) for row in candidate_rows]
+                search_candidate_count = len(candidate_ids)
+                if candidate_ids:
+                    candidate_placeholders = ",".join("?" for _ in candidate_ids)
+                    search_filters = [f"c.id IN ({candidate_placeholders})", *filters]
+                    search_where = "WHERE " + " AND ".join(search_filters)
+                    rows = connection.execute(
+                        f"""
+                        WITH search_input(query_label) AS (VALUES (?)),
+                        search_page AS MATERIALIZED (
+                            SELECT c.id,
+                                CASE
+                                    WHEN lower(c.title)=lower(search_input.query_label) THEN 0
+                                    WHEN instr(lower(c.title),lower(search_input.query_label))>0 THEN 1
+                                    WHEN instr(lower(c.name),lower(search_input.query_label))>0 THEN 2
+                                    ELSE 3
+                                END AS catalog_rank,
+                                c.rowid AS catalog_rowid
+                            FROM catalog_items c CROSS JOIN search_input
+                            LEFT JOIN personal_media_state ps
+                                ON ps.item_id=c.id AND ps.profile_id=?
+                            {search_where} ORDER BY {order} LIMIT ? OFFSET ?
+                        )
+                        SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                            COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                            COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                            COALESCE(ps.completed,0) AS profile_completed,
+                            COALESCE(ps.rating,0) AS profile_rating,
+                            COALESCE(ps.hidden,0) AS profile_hidden,
+                            COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                            COALESCE(ps.revision,0) AS profile_revision,
+                            search_page.catalog_rank,search_page.catalog_rowid
+                        FROM search_page JOIN catalog_items c ON c.id=search_page.id
+                        LEFT JOIN personal_media_state ps
+                            ON ps.item_id=c.id AND ps.profile_id=?
+                        ORDER BY search_page.catalog_rank,search_page.catalog_rowid
+                        """,
+                        (
+                            query_token,
+                            profile,
+                            *candidate_ids,
+                            *params[1:],
+                            page_size + 1,
+                            resolved_offset,
+                            profile,
+                        ),
+                    ).fetchall()
+                else:
+                    rows = []
+            else:
+                rows = connection.execute(
+                    f"""
+                    SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                        COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                        COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                        COALESCE(ps.completed,0) AS profile_completed,
+                        COALESCE(ps.rating,0) AS profile_rating,
+                        COALESCE(ps.hidden,0) AS profile_hidden,
+                        COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                        COALESCE(ps.revision,0) AS profile_revision
+                    FROM {from_sql} {where} ORDER BY {order} {query_suffix}
+                    """,
+                    query_params,
+                ).fetchall()
         has_more = len(rows) > page_size
         visible_rows = rows[:page_size]
         items = [self._public_coordinator_item(row, profile) for row in visible_rows]
         next_offset = resolved_offset + len(items)
         total_count = next_offset + (1 if has_more else 0)
+        next_anchor: list[Any] | None = None
+        if has_more and visible_rows:
+            last = visible_rows[-1]
+            if query_token:
+                next_anchor = [last["catalog_rank"], last["catalog_rowid"]]
+            elif sort_token == "title":
+                next_anchor = [last["title"], last["id"]]
+            elif sort_token == "size":
+                next_anchor = [last["size_bytes"], last["id"]]
+            elif sort_token == "source":
+                next_anchor = [last["source"], str(last["title"]).lower(), last["id"]]
+            elif sort_token == "favorite":
+                next_anchor = [last["profile_favorite"], last["title"], last["id"]]
+            else:
+                next_anchor = [last["profile_last_played_at"] or last["modified_at"], last["id"]]
         participation = self.participation()
         return {
             "ok": True,
@@ -1956,18 +2127,27 @@ class MediaCatalogCoordinator:
             "items": items,
             "count": len(items),
             "total_count": total_count,
-            "total_count_exact": not has_more,
+            "total_count_exact": not has_more and not query_token,
             "total_count_lower_bound": total_count,
             "catalog_revision": self.catalog_revision(),
-            "ranking": {"version": "deterministic-fts-v1", "query_mode": "explicit_submit"},
+            "ranking": {
+                "version": "deterministic-fts-v2",
+                "query_mode": "explicit_submit",
+                "candidate_window_bounded": bool(query_token),
+                "candidate_limit": search_candidate_limit if query_token else None,
+                "candidate_count": search_candidate_count if query_token else None,
+                "candidate_window_full": bool(
+                    query_token and search_candidate_count >= search_candidate_limit
+                ),
+            },
             "participation": participation,
             "partial": participation["partial"],
             "pagination": {
                 "limit": page_size,
                 "offset": resolved_offset,
-                "cursor": _encode_cursor(resolved_offset, signature),
+                "cursor": cursor or _encode_cursor(resolved_offset, signature),
                 "next_offset": next_offset if has_more else None,
-                "next_cursor": _encode_cursor(next_offset, signature) if has_more else None,
+                "next_cursor": _encode_cursor(next_offset, signature, next_anchor) if next_anchor is not None else None,
                 "has_more": has_more,
             },
             "profile_policy": policy,
