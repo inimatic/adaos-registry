@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import base64
 import hashlib
+import zlib
 from dataclasses import replace
 from typing import Any, Mapping
 
 from adaos.sdk import distributed as distributed_sdk
 
-from .contracts import json_dumps, now_iso, stable_id, text
+from .contracts import json_dumps, json_loads, now_iso, stable_id, text
 from .repository import MediaLibraryAgentRepository
+
+
+MAX_INLINE_SNAPSHOT_BYTES = 64 * 1024
+MAX_INLINE_SNAPSHOT_EXPANDED_BYTES = 512 * 1024
 
 
 class LibraryAgentTopology:
@@ -99,6 +105,7 @@ class LibraryAgentTopology:
         if selected is None or text(selected.get("node_id")) != repository.node_id:
             return {"ok": False, "error_code": "topology_phase_node_mismatch"}
         root_id = text((partition.get("selector") or {}).get("root_id"))
+        partition_id = text(partition.get("partition_id"))
         witness = repository.topology_root_witness(root_id) if root_id else None
         if dataset.get("consistency_profile") == "external_authority" and witness is None:
             return {
@@ -112,7 +119,20 @@ class LibraryAgentTopology:
                 "error_code": "media_agent_resource_pressure",
             }
         previous = None if witness is not None else self._selected_replica(payload)
-        evidence = dict(witness or previous or {})
+        if phase == "catch_up":
+            imported = self._import_inline_snapshot(
+                repository,
+                payload,
+                partition_id=partition_id,
+            )
+            if imported is not None:
+                return imported
+        local_snapshot = (
+            repository.topology_replica_snapshot(partition_id)
+            if witness is None and previous is None
+            else None
+        )
+        evidence = dict(witness or previous or local_snapshot or {})
         if phase in {"catch_up", "verify", "activate_read", "promote"}:
             mismatch = self._target_witness_error(payload, evidence=evidence)
             if mismatch is not None:
@@ -129,12 +149,25 @@ class LibraryAgentTopology:
             "byte_count": int(evidence.get("bytes") or evidence.get("byte_count") or 0),
             "external_media_copied": False,
         }
+        if phase in {"snapshot", "stream_deltas"}:
+            source = payload.get("source_instance")
+            if isinstance(source, Mapping) and text(source.get("instance_id")) == text(
+                selected.get("instance_id")
+            ):
+                snapshot = self._export_inline_snapshot(
+                    repository,
+                    root_id=root_id,
+                    evidence=evidence,
+                )
+                if snapshot.get("ok") is not True:
+                    return snapshot
+                receipt["inline_snapshot"] = snapshot["inline_snapshot"]
         if phase in {"activate_read", "promote", "demote", "drain", "remove"}:
             observed = self._observe_phase_replica(
                 repository,
                 payload,
                 selected=selected,
-                witness=witness,
+                witness=evidence,
             )
             if not observed.get("ok"):
                 return observed
@@ -142,6 +175,124 @@ class LibraryAgentTopology:
         if phase == "release":
             receipt["released"] = True
         return {"ok": True, "receipt": receipt}
+
+    @staticmethod
+    def _export_inline_snapshot(
+        repository: MediaLibraryAgentRepository,
+        *,
+        root_id: str,
+        evidence: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        snapshot = repository.topology_catalog_snapshot(
+            root_id=root_id,
+            max_items=1000,
+        )
+        if snapshot.get("has_more") is True:
+            return {
+                "ok": False,
+                "error_code": "media_agent_topology_snapshot_data_plane_required",
+            }
+        raw = json_dumps(snapshot).encode("utf-8")
+        compressed = zlib.compress(raw, level=6)
+        if (
+            len(raw) > MAX_INLINE_SNAPSHOT_EXPANDED_BYTES
+            or len(compressed) > MAX_INLINE_SNAPSHOT_BYTES
+        ):
+            return {
+                "ok": False,
+                "error_code": "media_agent_topology_snapshot_data_plane_required",
+            }
+        digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+        checkpoint = text(evidence.get("checkpoint") or snapshot.get("checkpoint"))
+        return {
+            "ok": True,
+            "inline_snapshot": {
+                "schema": "adaos.distributed.inline_snapshot.v1",
+                "encoding": "zlib+base64",
+                "payload": base64.b64encode(compressed).decode("ascii"),
+                "payload_digest": digest,
+                "checkpoint": checkpoint,
+                "content_witness": text(
+                    evidence.get("content_witness")
+                    or snapshot.get("content_witness")
+                    or checkpoint
+                ),
+                "item_count": int(
+                    evidence.get("available")
+                    or evidence.get("item_count")
+                    or snapshot.get("item_count")
+                    or 0
+                ),
+                "byte_count": int(
+                    evidence.get("bytes")
+                    or evidence.get("byte_count")
+                    or snapshot.get("byte_count")
+                    or 0
+                ),
+            },
+        }
+
+    @staticmethod
+    def _import_inline_snapshot(
+        repository: MediaLibraryAgentRepository,
+        payload: Mapping[str, Any],
+        *,
+        partition_id: str,
+    ) -> dict[str, Any] | None:
+        phase_inputs = payload.get("phase_inputs")
+        snapshot = (
+            phase_inputs.get("source_snapshot")
+            if isinstance(phase_inputs, Mapping)
+            else None
+        )
+        if not isinstance(snapshot, Mapping):
+            return {
+                "ok": False,
+                "error_code": "topology_snapshot_input_missing",
+            }
+        if (
+            snapshot.get("schema") != "adaos.distributed.inline_snapshot.v1"
+            or snapshot.get("encoding") != "zlib+base64"
+        ):
+            return {
+                "ok": False,
+                "error_code": "topology_snapshot_input_invalid",
+            }
+        try:
+            compressed = base64.b64decode(text(snapshot.get("payload")), validate=True)
+            if len(compressed) > MAX_INLINE_SNAPSHOT_BYTES:
+                raise ValueError("compressed snapshot exceeds inline limit")
+            decompressor = zlib.decompressobj()
+            raw = decompressor.decompress(
+                compressed,
+                MAX_INLINE_SNAPSHOT_EXPANDED_BYTES + 1,
+            )
+            raw += decompressor.flush()
+            if len(raw) > MAX_INLINE_SNAPSHOT_EXPANDED_BYTES or not decompressor.eof:
+                raise ValueError("expanded snapshot exceeds inline limit")
+            digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+            if digest != text(snapshot.get("payload_digest")):
+                raise ValueError("snapshot digest mismatch")
+            value = json_loads(raw.decode("utf-8"), None)
+            if not isinstance(value, Mapping):
+                raise ValueError("snapshot payload must be an object")
+            if value.get("schema") != "adaos.media_library.catalog_snapshot.v1":
+                raise ValueError("snapshot payload schema mismatch")
+        except (ValueError, zlib.error, UnicodeDecodeError):
+            return {
+                "ok": False,
+                "error_code": "topology_snapshot_input_invalid",
+            }
+        repository.save_topology_replica_snapshot(
+            partition_id,
+            checkpoint=text(snapshot.get("checkpoint")),
+            content_witness=text(snapshot.get("content_witness")),
+            payload_digest=digest,
+            item_count=int(snapshot.get("item_count") or 0),
+            byte_count=int(snapshot.get("byte_count") or 0),
+            payload=value,
+        )
+        return None
 
     @staticmethod
     def _selected_instance(payload: Mapping[str, Any]) -> dict[str, Any] | None:
@@ -236,7 +387,7 @@ class LibraryAgentTopology:
 
         expected_checkpoint = text(source.get("checkpoint"))
         observed_checkpoint = text(
-            evidence.get("content_witness") or evidence.get("checkpoint")
+            evidence.get("checkpoint") or evidence.get("content_witness")
         )
         expected_items = int(source.get("item_count") or 0)
         observed_items = int(evidence.get("available") or evidence.get("item_count") or 0)

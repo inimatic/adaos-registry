@@ -46,6 +46,13 @@ item count, byte count, and source witness when no external root is involved;
 promotion and demotion therefore cannot erase the data evidence used for
 fencing and recovery decisions.
 
+Read activation and promotion fail closed until the target publishes the
+source checkpoint and item witness. Small catalog-state snapshots may use the
+authenticated, digest-verified 64 KiB inline conformance path. Larger
+snapshots return `media_agent_topology_snapshot_data_plane_required` instead
+of crossing command or synchronized-state envelopes, and original media bytes
+are never part of a replica snapshot.
+
 Repository identity comes from `adaos.sdk.core.runtime_identity()`. Existing
 repositories that only contain the former `local` placeholder are migrated once
 in place, including ordered delta payloads; media paths, root IDs, source IDs,

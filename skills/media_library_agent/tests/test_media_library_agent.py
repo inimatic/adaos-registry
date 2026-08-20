@@ -798,6 +798,99 @@ def test_replicated_topology_phase_rejects_empty_target_witness(tmp_path):
     }
 
 
+def test_small_catalog_snapshot_catches_up_target_without_media_copy(tmp_path):
+    library = tmp_path / "source-library"
+    library.mkdir()
+    (library / "track.mp3").write_bytes(b"audio")
+    source_repository = MediaLibraryAgentRepository(
+        tmp_path / "snapshot-source.sqlite3",
+        node_id="node-a",
+    )
+    root = source_repository.add_root(str(library))["root"]
+    source_repository.create_job(root["id"], mode="full")
+    source_worker = MediaLibraryAgentWorker(
+        source_repository,
+        register=lambda path, _root, metadata: {
+            "resource_id": f"resource-{path.name}",
+            "source_path": str(path),
+            "mime_type": "audio/mpeg",
+            "metadata": dict(metadata),
+        },
+    )
+    source_worker.run_once()
+    witness = source_repository.topology_root_witness(root["id"])
+    assert witness is not None
+
+    source_payload = _topology_payload(
+        root,
+        phase="snapshot",
+        idempotency_key="small-snapshot-source",
+    )
+    source_payload["partition"] = {
+        "partition_id": "catalog-small",
+        "selector": {"root_id": root["id"]},
+    }
+    source_payload["dataset"] = {"consistency_profile": "single_authority"}
+    source_result = LibraryAgentTopology().execute_phase(
+        source_repository,
+        source_payload,
+        resource_pressure="normal",
+    )
+    inline_snapshot = source_result["receipt"]["inline_snapshot"]
+
+    target_repository = MediaLibraryAgentRepository(
+        tmp_path / "snapshot-target.sqlite3",
+        node_id="node-b",
+    )
+    source_instance = dict(source_payload["source_instance"])
+    target_instance = {
+        **source_instance,
+        "instance_id": "media-agent-node-b",
+        "node_id": "node-b",
+        "activation_id": "activation-node-b",
+        "lease_id": "lease-node-b",
+    }
+    source_replica = {
+        "instance_id": "media-agent-node-a",
+        "checkpoint": witness["checkpoint"],
+        "content_state": "non_empty",
+        "item_count": witness["available"],
+        "byte_count": witness["bytes"],
+    }
+    target_payload = {
+        **source_payload,
+        "target_node_id": "node-b",
+        "selected_instance_id": "media-agent-node-b",
+        "target_instance": target_instance,
+        "source_replica": source_replica,
+        "phase": "catch_up",
+        "idempotency_key": "small-snapshot-target-catch-up",
+        "phase_inputs": {"source_snapshot": inline_snapshot},
+    }
+    caught_up = LibraryAgentTopology().execute_phase(
+        target_repository,
+        target_payload,
+        resource_pressure="normal",
+    )
+    verified = LibraryAgentTopology().execute_phase(
+        target_repository,
+        {
+            **target_payload,
+            "phase": "verify",
+            "idempotency_key": "small-snapshot-target-verify",
+            "phase_inputs": {},
+        },
+        resource_pressure="normal",
+    )
+
+    assert caught_up["ok"] is True
+    assert verified["ok"] is True
+    assert verified["receipt"]["checkpoint"] == witness["checkpoint"]
+    assert verified["receipt"]["item_count"] == 1
+    assert target_repository.summary()["source_count"] == 0
+    assert target_repository.topology_replica_snapshot("catalog-small") is not None
+
+
 def _rendition_source(repository, worker, library: Path) -> dict:
     root = repository.add_root(str(library))["root"]
     scan = repository.create_job(root["id"], mode="full")

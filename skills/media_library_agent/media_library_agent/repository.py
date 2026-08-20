@@ -203,6 +203,16 @@ class MediaLibraryAgentRepository:
                 );
                 CREATE INDEX IF NOT EXISTS idx_media_agent_topology_operation
                     ON topology_phase_receipts(operation_id, phase);
+                CREATE TABLE IF NOT EXISTS topology_replica_snapshots (
+                    partition_id TEXT PRIMARY KEY,
+                    checkpoint TEXT NOT NULL,
+                    content_witness TEXT NOT NULL,
+                    payload_digest TEXT NOT NULL,
+                    item_count INTEGER NOT NULL,
+                    byte_count INTEGER NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                );
                 CREATE TABLE IF NOT EXISTS rendition_jobs (
                     id TEXT PRIMARY KEY,
                     source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
@@ -1607,6 +1617,135 @@ class MediaLibraryAgentRepository:
             "checkpoint": f"root:{root['revision']}:source:{source_revision}:delta:{sequence}",
             "content_witness": "sha256:"
             + hashlib.sha256(json_dumps(manifest).encode("utf-8")).hexdigest(),
+        }
+
+    def topology_catalog_snapshot(
+        self, *, root_id: str = "", max_items: int = 1000
+    ) -> dict[str, Any]:
+        limit = max(1, min(int(max_items), 1000))
+        token = text(root_id)
+        with self.connect() as connection:
+            if token:
+                rows = connection.execute(
+                    "SELECT payload_json FROM source_deltas WHERE root_id=? "
+                    "ORDER BY sequence LIMIT ?",
+                    (token, limit + 1),
+                ).fetchall()
+                witness = self.topology_root_witness(token)
+            else:
+                rows = connection.execute(
+                    "SELECT payload_json FROM source_deltas ORDER BY sequence LIMIT ?",
+                    (limit + 1,),
+                ).fetchall()
+                summary = connection.execute(
+                    "SELECT COUNT(*) AS item_count, "
+                    "SUM(CASE WHEN present=1 THEN size_bytes ELSE 0 END) AS byte_count "
+                    "FROM sources WHERE present=1"
+                ).fetchone()
+                sequence = connection.execute(
+                    "SELECT MAX(sequence) AS sequence FROM source_deltas"
+                ).fetchone()
+                manifest = {
+                    "node_id": self.node_id,
+                    "item_count": int(summary["item_count"] or 0),
+                    "byte_count": int(summary["byte_count"] or 0),
+                    "delta_sequence": int(sequence["sequence"] or 0),
+                }
+                import hashlib
+
+                witness = {
+                    **manifest,
+                    "checkpoint": f"catalog:{manifest['delta_sequence']}",
+                    "content_witness": "sha256:"
+                    + hashlib.sha256(json_dumps(manifest).encode("utf-8")).hexdigest(),
+                }
+        items = [json_loads(str(row["payload_json"]), {}) for row in rows[:limit]]
+        return {
+            "schema": "adaos.media_library.catalog_snapshot.v1",
+            "node_id": self.node_id,
+            "root_id": token or None,
+            "checkpoint": text((witness or {}).get("checkpoint")) or None,
+            "content_witness": text((witness or {}).get("content_witness")) or None,
+            "item_count": int((witness or {}).get("available") or (witness or {}).get("item_count") or 0),
+            "byte_count": int((witness or {}).get("bytes") or (witness or {}).get("byte_count") or 0),
+            "items": items,
+            "has_more": len(rows) > limit,
+        }
+
+    def save_topology_replica_snapshot(
+        self,
+        partition_id: str,
+        *,
+        checkpoint: str,
+        content_witness: str,
+        payload_digest: str,
+        item_count: int,
+        byte_count: int,
+        payload: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        value = {
+            "partition_id": text(partition_id),
+            "checkpoint": text(checkpoint),
+            "content_witness": text(content_witness),
+            "payload_digest": text(payload_digest),
+            "item_count": max(0, int(item_count)),
+            "byte_count": max(0, int(byte_count)),
+            "payload": dict(payload),
+            "updated_at": now_iso(),
+        }
+        with self.connect() as connection:
+            previous = connection.execute(
+                "SELECT payload_digest FROM topology_replica_snapshots WHERE partition_id=?",
+                (value["partition_id"],),
+            ).fetchone()
+            if previous is not None and str(previous["payload_digest"]) == value["payload_digest"]:
+                return self.topology_replica_snapshot(value["partition_id"]) or value
+            connection.execute(
+                """
+                INSERT INTO topology_replica_snapshots(
+                    partition_id,checkpoint,content_witness,payload_digest,
+                    item_count,byte_count,payload_json,updated_at
+                ) VALUES (?,?,?,?,?,?,?,?)
+                ON CONFLICT(partition_id) DO UPDATE SET
+                    checkpoint=excluded.checkpoint,
+                    content_witness=excluded.content_witness,
+                    payload_digest=excluded.payload_digest,
+                    item_count=excluded.item_count,
+                    byte_count=excluded.byte_count,
+                    payload_json=excluded.payload_json,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    value["partition_id"],
+                    value["checkpoint"],
+                    value["content_witness"],
+                    value["payload_digest"],
+                    value["item_count"],
+                    value["byte_count"],
+                    json_dumps(value["payload"]),
+                    value["updated_at"],
+                ),
+            )
+            connection.commit()
+        return value
+
+    def topology_replica_snapshot(self, partition_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM topology_replica_snapshots WHERE partition_id=?",
+                (text(partition_id),),
+            ).fetchone()
+        if row is None:
+            return None
+        return {
+            "partition_id": str(row["partition_id"]),
+            "checkpoint": str(row["checkpoint"]),
+            "content_witness": str(row["content_witness"]),
+            "payload_digest": str(row["payload_digest"]),
+            "item_count": int(row["item_count"]),
+            "byte_count": int(row["byte_count"]),
+            "payload": json_loads(str(row["payload_json"]), {}),
+            "updated_at": str(row["updated_at"]),
         }
 
     def topology_phase_receipt(self, idempotency_key: str) -> dict[str, Any] | None:
