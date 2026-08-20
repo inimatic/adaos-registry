@@ -73,9 +73,9 @@ class LibraryAgentTopology:
         resource_pressure: str,
     ) -> dict[str, Any]:
         request = dict(payload)
-        request_digest = "sha256:" + hashlib.sha256(
-            json_dumps(request).encode("utf-8")
-        ).hexdigest()
+        request_digest = (
+            "sha256:" + hashlib.sha256(json_dumps(request).encode("utf-8")).hexdigest()
+        )
         idempotency_key = text(request.get("idempotency_key"))
         previous = repository.topology_phase_receipt(idempotency_key)
         if previous is not None:
@@ -116,7 +116,10 @@ class LibraryAgentTopology:
         root_id = text((partition.get("selector") or {}).get("root_id"))
         partition_id = text(partition.get("partition_id"))
         witness = repository.topology_root_witness(root_id) if root_id else None
-        if dataset.get("consistency_profile") == "external_authority" and witness is None:
+        if (
+            dataset.get("consistency_profile") == "external_authority"
+            and witness is None
+        ):
             return {
                 "ok": False,
                 "error_code": "external_root_not_present_on_target",
@@ -129,10 +132,20 @@ class LibraryAgentTopology:
             }
         previous = None if witness is not None else self._selected_replica(payload)
         if phase == "catch_up":
-            imported = self._import_inline_snapshot(
-                repository,
-                payload,
-                partition_id=partition_id,
+            phase_inputs = payload.get("phase_inputs")
+            imported = (
+                self._validate_transferred_snapshot(
+                    repository,
+                    phase_inputs,
+                    partition_id=partition_id,
+                )
+                if isinstance(phase_inputs, Mapping)
+                and isinstance(phase_inputs.get("source_transfer"), Mapping)
+                else self._import_inline_snapshot(
+                    repository,
+                    payload,
+                    partition_id=partition_id,
+                )
             )
             if imported is not None:
                 return imported
@@ -154,7 +167,9 @@ class LibraryAgentTopology:
             "node_id": repository.node_id,
             "checkpoint": checkpoint,
             "content_witness": evidence.get("content_witness") or checkpoint,
-            "item_count": int(evidence.get("available") or evidence.get("item_count") or 0),
+            "item_count": int(
+                evidence.get("available") or evidence.get("item_count") or 0
+            ),
             "byte_count": int(evidence.get("bytes") or evidence.get("byte_count") or 0),
             "external_media_copied": False,
         }
@@ -167,10 +182,17 @@ class LibraryAgentTopology:
                     repository,
                     root_id=root_id,
                     evidence=evidence,
+                    artifact_id="snapshot-"
+                    + hashlib.sha256(
+                        text(payload.get("idempotency_key")).encode("utf-8")
+                    ).hexdigest()[:28],
                 )
                 if snapshot.get("ok") is not True:
                     return snapshot
-                receipt["inline_snapshot"] = snapshot["inline_snapshot"]
+                if isinstance(snapshot.get("inline_snapshot"), Mapping):
+                    receipt["inline_snapshot"] = snapshot["inline_snapshot"]
+                else:
+                    receipt["transfer_manifest"] = snapshot["transfer_manifest"]
         if phase in {"activate_read", "promote", "demote", "drain", "remove"}:
             observed = self._observe_phase_replica(
                 repository,
@@ -191,6 +213,7 @@ class LibraryAgentTopology:
         *,
         root_id: str,
         evidence: Mapping[str, Any],
+        artifact_id: str,
     ) -> dict[str, Any]:
         snapshot = repository.topology_catalog_snapshot(
             root_id=root_id,
@@ -198,8 +221,11 @@ class LibraryAgentTopology:
         )
         if snapshot.get("has_more") is True:
             return {
-                "ok": False,
-                "error_code": "media_agent_topology_snapshot_data_plane_required",
+                "ok": True,
+                "transfer_manifest": repository.prepare_topology_catalog_transfer(
+                    artifact_id=artifact_id,
+                    root_id=root_id,
+                ),
             }
         raw = json_dumps(snapshot).encode("utf-8")
         compressed = zlib.compress(raw, level=6)
@@ -208,8 +234,11 @@ class LibraryAgentTopology:
             or len(compressed) > MAX_INLINE_SNAPSHOT_BYTES
         ):
             return {
-                "ok": False,
-                "error_code": "media_agent_topology_snapshot_data_plane_required",
+                "ok": True,
+                "transfer_manifest": repository.prepare_topology_catalog_transfer(
+                    artifact_id=artifact_id,
+                    root_id=root_id,
+                ),
             }
         digest = "sha256:" + hashlib.sha256(raw).hexdigest()
         checkpoint = text(evidence.get("checkpoint") or snapshot.get("checkpoint"))
@@ -240,6 +269,111 @@ class LibraryAgentTopology:
                 ),
             },
         }
+
+    @staticmethod
+    def _validate_transferred_snapshot(
+        repository: MediaLibraryAgentRepository,
+        phase_inputs: Mapping[str, Any],
+        *,
+        partition_id: str,
+    ) -> dict[str, Any] | None:
+        manifest = phase_inputs.get("source_transfer")
+        receipt = phase_inputs.get("transfer_receipt")
+        if not isinstance(manifest, Mapping) or not isinstance(receipt, Mapping):
+            return {
+                "ok": False,
+                "error_code": "topology_transfer_receipt_missing",
+            }
+        snapshot = repository.topology_replica_snapshot(partition_id)
+        if snapshot is None:
+            return {
+                "ok": False,
+                "error_code": "topology_transfer_snapshot_missing",
+            }
+        if (
+            text(snapshot.get("payload_digest")) != text(manifest.get("payload_digest"))
+            or text(snapshot.get("checkpoint")) != text(manifest.get("checkpoint"))
+            or int(snapshot.get("item_count") or 0)
+            != int(manifest.get("item_count") or 0)
+            or text(receipt.get("state")) != "complete"
+        ):
+            return {
+                "ok": False,
+                "error_code": "topology_transfer_snapshot_mismatch",
+            }
+        return None
+
+    def execute_transfer(
+        self,
+        repository: MediaLibraryAgentRepository,
+        payload: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        if payload.get("schema") != "adaos.distributed.topology_transfer_request.v1":
+            return {"ok": False, "error_code": "topology_transfer_schema_invalid"}
+        selected = self._selected_instance(payload)
+        if selected is None or text(selected.get("node_id")) != repository.node_id:
+            return {"ok": False, "error_code": "topology_transfer_node_mismatch"}
+        manifest = payload.get("manifest")
+        if (
+            not isinstance(manifest, Mapping)
+            or manifest.get("schema") != "adaos.distributed.transfer_manifest.v1"
+            or manifest.get("encoding") != "zlib+ndjson"
+        ):
+            return {"ok": False, "error_code": "topology_transfer_manifest_invalid"}
+        direction = text(payload.get("direction")).lower()
+        source = payload.get("source_instance")
+        target = payload.get("target_instance")
+        if direction == "read":
+            if not isinstance(source, Mapping) or text(
+                source.get("instance_id")
+            ) != text(selected.get("instance_id")):
+                return {"ok": False, "error_code": "topology_transfer_source_mismatch"}
+            chunk = repository.read_topology_catalog_transfer(
+                manifest,
+                checkpoint=text(payload.get("checkpoint")) or None,
+                max_bytes=int(payload.get("max_bytes") or 0),
+            )
+            return {
+                "ok": True,
+                "receipt": {
+                    "payload_base64": base64.b64encode(chunk["payload"]).decode(
+                        "ascii"
+                    ),
+                    "checkpoint": chunk["checkpoint"],
+                    "eof": chunk["eof"],
+                    "content_witness": chunk["content_witness"],
+                },
+            }
+        if direction != "write":
+            return {"ok": False, "error_code": "topology_transfer_direction_invalid"}
+        if not isinstance(target, Mapping) or text(target.get("instance_id")) != text(
+            selected.get("instance_id")
+        ):
+            return {"ok": False, "error_code": "topology_transfer_target_mismatch"}
+        chunk = payload.get("chunk")
+        if not isinstance(chunk, Mapping):
+            return {"ok": False, "error_code": "topology_transfer_chunk_missing"}
+        try:
+            raw = base64.b64decode(text(chunk.get("payload_base64")), validate=True)
+        except ValueError:
+            return {"ok": False, "error_code": "topology_transfer_chunk_invalid"}
+        if len(raw) > 96 * 1024:
+            return {"ok": False, "error_code": "topology_transfer_chunk_too_large"}
+        eof = bool(chunk.get("eof"))
+        if eof and text(chunk.get("content_witness")) != text(
+            manifest.get("payload_digest")
+        ):
+            return {"ok": False, "error_code": "topology_transfer_witness_mismatch"}
+        receipt = repository.write_topology_catalog_transfer(
+            transfer_id=text(payload.get("transfer_id")),
+            partition_id=text((payload.get("partition") or {}).get("partition_id")),
+            manifest=manifest,
+            previous_checkpoint=text(payload.get("checkpoint")) or None,
+            checkpoint=text(chunk.get("checkpoint")),
+            payload=raw,
+            eof=eof,
+        )
+        return {"ok": True, "receipt": receipt}
 
     @staticmethod
     def _import_inline_snapshot(
@@ -307,7 +441,10 @@ class LibraryAgentTopology:
     def _selected_instance(payload: Mapping[str, Any]) -> dict[str, Any] | None:
         selected_id = text(payload.get("selected_instance_id"))
         for value in (payload.get("source_instance"), payload.get("target_instance")):
-            if isinstance(value, Mapping) and text(value.get("instance_id")) == selected_id:
+            if (
+                isinstance(value, Mapping)
+                and text(value.get("instance_id")) == selected_id
+            ):
                 return dict(value)
         return None
 
@@ -367,7 +504,9 @@ class LibraryAgentTopology:
                 else text(evidence.get("source_ref")) or None
             ),
             freshness_seconds=0,
-            item_count=int(evidence.get("available") or evidence.get("item_count") or 0),
+            item_count=int(
+                evidence.get("available") or evidence.get("item_count") or 0
+            ),
             byte_count=int(evidence.get("bytes") or evidence.get("byte_count") or 0),
             observed_at=now_iso(),
             revision=int((previous or {}).get("revision") or 0) + 1,
@@ -378,7 +517,10 @@ class LibraryAgentTopology:
     def _selected_replica(payload: Mapping[str, Any]) -> dict[str, Any] | None:
         selected_id = text(payload.get("selected_instance_id"))
         for value in (payload.get("source_replica"), payload.get("target_replica")):
-            if isinstance(value, Mapping) and text(value.get("instance_id")) == selected_id:
+            if (
+                isinstance(value, Mapping)
+                and text(value.get("instance_id")) == selected_id
+            ):
                 return dict(value)
         return None
 
@@ -399,11 +541,16 @@ class LibraryAgentTopology:
             evidence.get("checkpoint") or evidence.get("content_witness")
         )
         expected_items = int(source.get("item_count") or 0)
-        observed_items = int(evidence.get("available") or evidence.get("item_count") or 0)
+        observed_items = int(
+            evidence.get("available") or evidence.get("item_count") or 0
+        )
         if expected_checkpoint and observed_checkpoint != expected_checkpoint:
             return "topology_target_content_witness_mismatch"
         if expected_items > observed_items:
             return "topology_target_content_incomplete"
-        if text(source.get("content_state")).lower() == "non_empty" and observed_items <= 0:
+        if (
+            text(source.get("content_state")).lower() == "non_empty"
+            and observed_items <= 0
+        ):
             return "topology_target_content_incomplete"
         return None

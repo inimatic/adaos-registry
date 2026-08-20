@@ -186,9 +186,7 @@ def test_repository_migrates_legacy_local_identity_once(tmp_path):
             "fingerprint": "legacy-fingerprint",
             "resource_id": "media-ref",
             "descriptor": {"node_id": "local"},
-            "metadata": {
-                "agent": {"node_id": "local", "agent_id": legacy.agent_id}
-            },
+            "metadata": {"agent": {"node_id": "local", "agent_id": legacy.agent_id}},
         },
         job_id="legacy-job",
     )
@@ -908,6 +906,150 @@ def test_small_catalog_snapshot_catches_up_target_without_media_copy(tmp_path):
     assert verified["receipt"]["item_count"] == 1
     assert target_repository.summary()["source_count"] == 0
     assert target_repository.topology_replica_snapshot("catalog-small") is not None
+
+
+def test_large_catalog_uses_chunked_data_plane_without_media_copy(tmp_path):
+    source_repository = MediaLibraryAgentRepository(
+        tmp_path / "large-source.sqlite3",
+        node_id="node-a",
+    )
+    library = tmp_path / "large-library"
+    library.mkdir()
+    root = source_repository.add_root(str(library))["root"]
+    for index in range(1001):
+        source_repository.upsert_source(
+            {
+                "root_id": root["id"],
+                "relative_path": f"Album/{index:04d}.mp3",
+                "folder_path": "Album",
+                "name": f"{index:04d}.mp3",
+                "media_kind": "audio",
+                "mime_type": "audio/mpeg",
+                "size_bytes": 100 + index,
+                "modified_ns": index + 1,
+                "inode": index + 1,
+                "fingerprint": f"fingerprint-{index}",
+                "resource_id": f"resource-{index}",
+                "descriptor": {"title": f"Track {index}"},
+                "metadata": {"root_label": "Music"},
+            },
+            job_id="large-fixture",
+        )
+    witness = source_repository.topology_root_witness(root["id"])
+    assert witness is not None
+    source_payload = _topology_payload(
+        root,
+        phase="snapshot",
+        idempotency_key="large-snapshot-source",
+    )
+    source_payload["partition"] = {
+        "partition_id": "catalog-large",
+        "selector": {"root_id": root["id"]},
+    }
+    source_payload["dataset"] = {"consistency_profile": "single_authority"}
+    topology = LibraryAgentTopology()
+    source_result = topology.execute_phase(
+        source_repository,
+        source_payload,
+        resource_pressure="normal",
+    )
+    manifest = source_result["receipt"]["transfer_manifest"]
+    assert manifest["payload_bytes"] > 0
+    assert manifest["item_count"] == 1001
+    assert manifest["external_media_copied"] is False
+
+    target_repository = MediaLibraryAgentRepository(
+        tmp_path / "large-target.sqlite3",
+        node_id="node-b",
+    )
+    source_instance = dict(source_payload["source_instance"])
+    target_instance = {
+        **source_instance,
+        "instance_id": "media-agent-node-b",
+        "node_id": "node-b",
+        "activation_id": "activation-node-b",
+        "lease_id": "lease-node-b",
+    }
+    checkpoint = None
+    transfer_id = "large-catalog-transfer"
+    while True:
+        read_result = topology.execute_transfer(
+            source_repository,
+            {
+                **source_payload,
+                "schema": "adaos.distributed.topology_transfer_request.v1",
+                "direction": "read",
+                "selected_instance_id": source_instance["instance_id"],
+                "source_instance": source_instance,
+                "target_instance": target_instance,
+                "transfer_id": transfer_id,
+                "manifest": manifest,
+                "checkpoint": checkpoint,
+                "max_bytes": 8 * 1024,
+                "chunk": None,
+            },
+        )
+        chunk = read_result["receipt"]
+        write_result = topology.execute_transfer(
+            target_repository,
+            {
+                **source_payload,
+                "schema": "adaos.distributed.topology_transfer_request.v1",
+                "target_node_id": "node-b",
+                "direction": "write",
+                "selected_instance_id": target_instance["instance_id"],
+                "source_instance": source_instance,
+                "target_instance": target_instance,
+                "transfer_id": transfer_id,
+                "manifest": manifest,
+                "checkpoint": checkpoint,
+                "max_bytes": 8 * 1024,
+                "chunk": chunk,
+            },
+        )
+        assert write_result["ok"] is True
+        checkpoint = chunk["checkpoint"]
+        if chunk["eof"]:
+            assert (
+                write_result["receipt"]["content_witness"] == manifest["payload_digest"]
+            )
+            break
+
+    source_replica = {
+        "instance_id": source_instance["instance_id"],
+        "checkpoint": witness["checkpoint"],
+        "content_state": "non_empty",
+        "item_count": witness["available"],
+        "byte_count": witness["bytes"],
+    }
+    caught_up = topology.execute_phase(
+        target_repository,
+        {
+            **source_payload,
+            "target_node_id": "node-b",
+            "selected_instance_id": target_instance["instance_id"],
+            "target_instance": target_instance,
+            "source_replica": source_replica,
+            "phase": "catch_up",
+            "idempotency_key": "large-snapshot-target-catch-up",
+            "phase_inputs": {
+                "source_transfer": manifest,
+                "transfer_receipt": {"state": "complete"},
+            },
+        },
+        resource_pressure="normal",
+    )
+    snapshot = target_repository.topology_replica_snapshot("catalog-large")
+    with target_repository.connect() as connection:
+        replicated = connection.execute(
+            "SELECT COUNT(*) FROM topology_replica_items WHERE partition_id=?",
+            ("catalog-large",),
+        ).fetchone()[0]
+
+    assert caught_up["ok"] is True
+    assert snapshot is not None and snapshot["item_count"] == 1001
+    assert replicated == 1001
+    assert target_repository.summary()["source_count"] == 0
 
 
 def _rendition_source(repository, worker, library: Path) -> dict:

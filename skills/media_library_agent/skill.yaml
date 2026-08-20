@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.10
+version: 0.6.11
 description: Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.
 supported_locales:
 - en
@@ -73,6 +73,7 @@ exports:
   - status
   - observe_topology
   - distributed_topology_phase
+  - distributed_topology_transfer
   - dispose
 tools:
 - name: ensure_schema
@@ -355,6 +356,31 @@ tools:
       phase: {type: string}
       authority_epoch: {type: integer, minimum: 0}
       idempotency_key: {type: string, minLength: 1}
+      step: {type: object}
+      dataset: {type: object}
+      partition: {type: object}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: distributed_topology_transfer
+  entry: handlers.main:distributed_topology_transfer
+  description: Read or write one bounded reviewed derived-catalog transfer chunk.
+  side_effects: local_write
+  timeout_seconds: 600
+  input_schema:
+    type: object
+    required: [schema, target_node_id, selected_instance_id, operation_id, plan_digest, plan, direction, authority_epoch, idempotency_key, transfer_id, manifest, step, dataset, partition]
+    properties:
+      schema: {const: adaos.distributed.topology_transfer_request.v1}
+      target_node_id: {type: string}
+      selected_instance_id: {type: string}
+      operation_id: {type: string}
+      plan_digest: {type: string}
+      plan: {type: object}
+      direction: {enum: [read, write]}
+      authority_epoch: {type: integer, minimum: 0}
+      idempotency_key: {type: string, minLength: 1}
+      transfer_id: {type: string, minLength: 1}
+      manifest: {type: object}
       step: {type: object}
       dataset: {type: object}
       partition: {type: object}

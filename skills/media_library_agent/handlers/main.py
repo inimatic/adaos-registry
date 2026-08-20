@@ -832,6 +832,22 @@ def distributed_topology_phase(**payload: Any) -> dict[str, Any]:
         }
 
 
+@tool(
+    summary="Transfer one bounded reviewed topology snapshot chunk.",
+    side_effects="local_write",
+)
+def distributed_topology_transfer(**payload: Any) -> dict[str, Any]:
+    repository, _worker = _runtime()
+    try:
+        return _topology().execute_transfer(repository, payload)
+    except Exception as exc:
+        return {
+            "ok": False,
+            "error_code": "media_agent_topology_transfer_failed",
+            "detail": str(exc)[:300],
+        }
+
+
 @tool(summary="Stop process-local media-library workers.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
     _repository, worker = _runtime()

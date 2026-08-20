@@ -55,10 +55,14 @@ fencing and recovery decisions.
 
 Read activation and promotion fail closed until the target publishes the
 source checkpoint and item witness. Small catalog-state snapshots may use the
-authenticated, digest-verified 64 KiB inline conformance path. Larger
-snapshots return `media_agent_topology_snapshot_data_plane_required` instead
-of crossing command or synchronized-state envelopes, and original media bytes
-are never part of a replica snapshot.
+authenticated, digest-verified 64 KiB inline path. Larger snapshots are
+serialized as a compressed derived-catalog artifact and transferred through
+the core `distributed.topology.transfer` data plane in at most 96 KiB chunks.
+The receiver persists resumable offsets, validates the compressed SHA-256
+digest and logical catalog witness, and atomically replaces partition replica
+metadata only after the complete item count is present. Transfer staging and
+replica tables contain metadata only; original media bytes are never part of a
+replica snapshot.
 
 Repository identity comes from `adaos.sdk.core.runtime_identity()`. Existing
 repositories that only contain the former `local` placeholder are migrated once

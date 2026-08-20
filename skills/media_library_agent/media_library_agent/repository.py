@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 import sqlite3
+import zlib
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -213,6 +215,15 @@ class MediaLibraryAgentRepository:
                     payload_json TEXT NOT NULL,
                     updated_at TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS topology_replica_items (
+                    partition_id TEXT NOT NULL,
+                    source_id TEXT NOT NULL,
+                    source_revision INTEGER NOT NULL,
+                    payload_json TEXT NOT NULL,
+                    PRIMARY KEY(partition_id, source_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_media_agent_topology_replica_items
+                    ON topology_replica_items(partition_id, source_id);
                 CREATE TABLE IF NOT EXISTS rendition_jobs (
                     id TEXT PRIMARY KEY,
                     source_id TEXT NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
@@ -1666,11 +1677,308 @@ class MediaLibraryAgentRepository:
             "root_id": token or None,
             "checkpoint": text((witness or {}).get("checkpoint")) or None,
             "content_witness": text((witness or {}).get("content_witness")) or None,
-            "item_count": int((witness or {}).get("available") or (witness or {}).get("item_count") or 0),
-            "byte_count": int((witness or {}).get("bytes") or (witness or {}).get("byte_count") or 0),
+            "item_count": int(
+                (witness or {}).get("available")
+                or (witness or {}).get("item_count")
+                or 0
+            ),
+            "byte_count": int(
+                (witness or {}).get("bytes") or (witness or {}).get("byte_count") or 0
+            ),
             "items": items,
             "has_more": len(rows) > limit,
         }
+
+    def _topology_transfer_dir(self) -> Path:
+        path = self.db_path.parent / "topology_transfers"
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @staticmethod
+    def _topology_transfer_token(value: str) -> str:
+        token = text(value)
+        if not re.fullmatch(r"[A-Za-z0-9._-]{1,160}", token):
+            raise ValueError("topology_transfer_id_invalid")
+        return token
+
+    @staticmethod
+    def _topology_transfer_offset(checkpoint: str | None) -> int:
+        token = text(checkpoint)
+        if not token:
+            return 0
+        if not token.startswith("offset:") or not token[7:].isdigit():
+            raise ValueError("topology_transfer_checkpoint_invalid")
+        return int(token[7:])
+
+    def prepare_topology_catalog_transfer(
+        self, *, artifact_id: str, root_id: str = ""
+    ) -> dict[str, Any]:
+        artifact = self._topology_transfer_token(artifact_id)
+        summary = self.topology_catalog_snapshot(root_id=root_id, max_items=1)
+        header = {
+            "schema": "adaos.media_library.catalog_transfer.v1",
+            "node_id": self.node_id,
+            "root_id": text(root_id) or None,
+            "checkpoint": summary.get("checkpoint"),
+            "content_witness": summary.get("content_witness"),
+            "item_count": int(summary.get("item_count") or 0),
+            "byte_count": int(summary.get("byte_count") or 0),
+        }
+        directory = self._topology_transfer_dir()
+        target = directory / f"{artifact}.zlib"
+        temporary = directory / f"{artifact}.part"
+        compressor = zlib.compressobj(level=6)
+        payload_hash = hashlib.sha256()
+        payload_bytes = 0
+        emitted_items = 0
+
+        def emit(handle: Any, value: Mapping[str, Any]) -> None:
+            nonlocal payload_bytes
+            compressed = compressor.compress(
+                (json_dumps(dict(value)) + "\n").encode("utf-8")
+            )
+            if compressed:
+                handle.write(compressed)
+                payload_hash.update(compressed)
+                payload_bytes += len(compressed)
+
+        try:
+            with temporary.open("wb") as handle, self.connect() as connection:
+                emit(handle, header)
+                if text(root_id):
+                    cursor = connection.execute(
+                        "SELECT * FROM sources WHERE present=1 AND root_id=? "
+                        "ORDER BY relative_path,id",
+                        (text(root_id),),
+                    )
+                else:
+                    cursor = connection.execute(
+                        "SELECT * FROM sources WHERE present=1 ORDER BY root_id,relative_path,id"
+                    )
+                while rows := cursor.fetchmany(200):
+                    for row in rows:
+                        emit(handle, self._public_source(row))
+                        emitted_items += 1
+                tail = compressor.flush()
+                if tail:
+                    handle.write(tail)
+                    payload_hash.update(tail)
+                    payload_bytes += len(tail)
+                handle.flush()
+                os.fsync(handle.fileno())
+            if emitted_items != int(header["item_count"]):
+                raise RuntimeError("topology_transfer_snapshot_changed")
+            os.replace(temporary, target)
+        finally:
+            temporary.unlink(missing_ok=True)
+        return {
+            "schema": "adaos.distributed.transfer_manifest.v1",
+            "artifact_id": artifact,
+            "encoding": "zlib+ndjson",
+            "payload_digest": "sha256:" + payload_hash.hexdigest(),
+            "payload_bytes": payload_bytes,
+            "item_count": emitted_items,
+            "byte_count": int(header["byte_count"]),
+            "checkpoint": header["checkpoint"],
+            "content_witness": header["content_witness"],
+            "external_media_copied": False,
+        }
+
+    def read_topology_catalog_transfer(
+        self,
+        manifest: Mapping[str, Any],
+        *,
+        checkpoint: str | None,
+        max_bytes: int,
+    ) -> dict[str, Any]:
+        artifact = self._topology_transfer_token(text(manifest.get("artifact_id")))
+        path = self._topology_transfer_dir() / f"{artifact}.zlib"
+        expected_size = max(0, int(manifest.get("payload_bytes") or 0))
+        if not path.is_file() or path.stat().st_size != expected_size:
+            raise FileNotFoundError("topology_transfer_artifact_unavailable")
+        offset = self._topology_transfer_offset(checkpoint)
+        if offset > expected_size:
+            raise ValueError("topology_transfer_checkpoint_out_of_range")
+        bounded = max(1, min(int(max_bytes), 96 * 1024))
+        with path.open("rb") as handle:
+            handle.seek(offset)
+            payload = handle.read(bounded)
+        next_offset = offset + len(payload)
+        eof = next_offset == expected_size
+        return {
+            "payload": payload,
+            "checkpoint": f"offset:{next_offset}",
+            "eof": eof,
+            "content_witness": text(manifest.get("payload_digest")) if eof else None,
+        }
+
+    def write_topology_catalog_transfer(
+        self,
+        *,
+        transfer_id: str,
+        partition_id: str,
+        manifest: Mapping[str, Any],
+        previous_checkpoint: str | None,
+        checkpoint: str,
+        payload: bytes,
+        eof: bool,
+    ) -> dict[str, Any]:
+        transfer = self._topology_transfer_token(transfer_id)
+        partition = text(partition_id)
+        if not partition:
+            raise ValueError("topology_transfer_partition_required")
+        previous_offset = self._topology_transfer_offset(previous_checkpoint)
+        next_offset = self._topology_transfer_offset(checkpoint)
+        if next_offset != previous_offset + len(payload):
+            raise ValueError("topology_transfer_chunk_range_invalid")
+        expected_size = max(0, int(manifest.get("payload_bytes") or 0))
+        expected_digest = text(manifest.get("payload_digest"))
+        existing = self.topology_replica_snapshot(partition)
+        if (
+            eof
+            and next_offset == expected_size
+            and existing is not None
+            and existing.get("payload_digest") == expected_digest
+        ):
+            return {
+                "checkpoint": checkpoint,
+                "content_witness": expected_digest,
+                "idempotent": True,
+            }
+        directory = self._topology_transfer_dir() / "incoming"
+        directory.mkdir(parents=True, exist_ok=True)
+        path = directory / f"{transfer}.part"
+        current_size = path.stat().st_size if path.is_file() else 0
+        if current_size == next_offset:
+            with path.open("rb") as handle:
+                handle.seek(previous_offset)
+                if handle.read(len(payload)) != payload:
+                    raise ValueError("topology_transfer_chunk_conflict")
+        elif current_size == previous_offset:
+            with path.open("ab") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+        else:
+            raise ValueError("topology_transfer_sink_checkpoint_mismatch")
+        witness = None
+        if eof:
+            if next_offset != expected_size:
+                raise ValueError("topology_transfer_payload_size_mismatch")
+            payload_hash = hashlib.sha256()
+            with path.open("rb") as handle:
+                while block := handle.read(64 * 1024):
+                    payload_hash.update(block)
+            digest = "sha256:" + payload_hash.hexdigest()
+            if digest != expected_digest:
+                raise ValueError("topology_transfer_payload_digest_mismatch")
+            self._import_topology_catalog_transfer(
+                path,
+                partition_id=partition,
+                manifest=manifest,
+            )
+            path.unlink(missing_ok=True)
+            witness = digest
+        return {
+            "checkpoint": checkpoint,
+            "content_witness": witness,
+            "idempotent": current_size == next_offset,
+        }
+
+    def _import_topology_catalog_transfer(
+        self,
+        path: Path,
+        *,
+        partition_id: str,
+        manifest: Mapping[str, Any],
+    ) -> None:
+        decompressor = zlib.decompressobj()
+        buffered = b""
+        header: dict[str, Any] | None = None
+        item_count = 0
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                "DELETE FROM topology_replica_items WHERE partition_id=?",
+                (partition_id,),
+            )
+
+            def consume(line: bytes) -> None:
+                nonlocal header, item_count
+                value = json_loads(line.decode("utf-8"), None)
+                if not isinstance(value, Mapping):
+                    raise ValueError("topology_transfer_payload_invalid")
+                if header is None:
+                    if value.get("schema") != "adaos.media_library.catalog_transfer.v1":
+                        raise ValueError("topology_transfer_payload_schema_invalid")
+                    header = dict(value)
+                    return
+                source_id = text(value.get("id"))
+                source_revision = int(value.get("revision") or 0)
+                if not source_id or source_revision < 1:
+                    raise ValueError("topology_transfer_source_invalid")
+                connection.execute(
+                    "INSERT INTO topology_replica_items(partition_id,source_id,"
+                    "source_revision,payload_json) VALUES (?,?,?,?)",
+                    (
+                        partition_id,
+                        source_id,
+                        source_revision,
+                        json_dumps(dict(value)),
+                    ),
+                )
+                item_count += 1
+
+            with path.open("rb") as handle:
+                while block := handle.read(64 * 1024):
+                    buffered += decompressor.decompress(block)
+                    while b"\n" in buffered:
+                        line, buffered = buffered.split(b"\n", 1)
+                        if line:
+                            consume(line)
+                buffered += decompressor.flush()
+            if buffered.strip():
+                consume(buffered)
+            if not decompressor.eof or header is None:
+                raise ValueError("topology_transfer_payload_truncated")
+            if item_count != int(manifest.get("item_count") or 0):
+                raise ValueError("topology_transfer_item_count_mismatch")
+            if text(header.get("checkpoint")) != text(
+                manifest.get("checkpoint")
+            ) or text(header.get("content_witness")) != text(
+                manifest.get("content_witness")
+            ):
+                raise ValueError("topology_transfer_logical_witness_mismatch")
+            now = now_iso()
+            connection.execute(
+                """
+                INSERT INTO topology_replica_snapshots(
+                    partition_id,checkpoint,content_witness,payload_digest,
+                    item_count,byte_count,payload_json,updated_at
+                ) VALUES (?,?,?,?,?,?,?,?)
+                ON CONFLICT(partition_id) DO UPDATE SET
+                    checkpoint=excluded.checkpoint,
+                    content_witness=excluded.content_witness,
+                    payload_digest=excluded.payload_digest,
+                    item_count=excluded.item_count,
+                    byte_count=excluded.byte_count,
+                    payload_json=excluded.payload_json,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    partition_id,
+                    text(manifest.get("checkpoint")),
+                    text(manifest.get("content_witness")),
+                    text(manifest.get("payload_digest")),
+                    item_count,
+                    max(0, int(manifest.get("byte_count") or 0)),
+                    json_dumps(
+                        {"schema": header["schema"], "root_id": header.get("root_id")}
+                    ),
+                    now,
+                ),
+            )
+            connection.commit()
 
     def save_topology_replica_snapshot(
         self,
@@ -1698,7 +2006,10 @@ class MediaLibraryAgentRepository:
                 "SELECT payload_digest FROM topology_replica_snapshots WHERE partition_id=?",
                 (value["partition_id"],),
             ).fetchone()
-            if previous is not None and str(previous["payload_digest"]) == value["payload_digest"]:
+            if (
+                previous is not None
+                and str(previous["payload_digest"]) == value["payload_digest"]
+            ):
                 return self.topology_replica_snapshot(value["partition_id"]) or value
             connection.execute(
                 """
