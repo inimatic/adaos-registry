@@ -27,6 +27,26 @@ TERMINAL_JOB_STATUSES = ("completed", "failed", "canceled")
 _CLOCK = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
 
 
+def _replace_legacy_identity(value: Any, *, node_id: str, agent_id: str) -> Any:
+    if isinstance(value, dict):
+        return {
+            key: (
+                node_id
+                if key == "node_id" and item == "local"
+                else agent_id
+                if key == "agent_id" and isinstance(item, str)
+                else _replace_legacy_identity(item, node_id=node_id, agent_id=agent_id)
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [
+            _replace_legacy_identity(item, node_id=node_id, agent_id=agent_id)
+            for item in value
+        ]
+    return value
+
+
 def default_db_path() -> Path:
     override = text(os.environ.get("MEDIA_LIBRARY_AGENT_DB_PATH"))
     if override:
@@ -37,7 +57,9 @@ def default_db_path() -> Path:
         from adaos.sdk.data.skill_env import skill_env_path
 
         env_path = Path(skill_env_path())
-        data_root = env_path.parents[1] if env_path.parent.name == "db" else env_path.parent
+        data_root = (
+            env_path.parents[1] if env_path.parent.name == "db" else env_path.parent
+        )
         db_dir = data_root / "db"
     except Exception:
         db_dir = Path(__file__).resolve().parents[1] / ".skill_state" / "db"
@@ -49,7 +71,14 @@ class MediaLibraryAgentRepository:
     def __init__(self, db_path: str | Path | None = None, *, node_id: str = ""):
         self.db_path = Path(db_path) if db_path is not None else default_db_path()
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        self.node_id = text(node_id or os.environ.get("ADAOS_NODE_ID") or os.environ.get("ADAOS_HUB_ID")) or "local"
+        self.node_id = (
+            text(
+                node_id
+                or os.environ.get("ADAOS_NODE_ID")
+                or os.environ.get("ADAOS_HUB_ID")
+            )
+            or "local"
+        )
         self.ensure_schema()
 
     def connect(self) -> sqlite3.Connection:
@@ -204,9 +233,7 @@ class MediaLibraryAgentRepository:
             )
             schedule_columns = {
                 str(row["name"])
-                for row in connection.execute(
-                    "PRAGMA table_info(schedules)"
-                ).fetchall()
+                for row in connection.execute("PRAGMA table_info(schedules)").fetchall()
             }
             for name, definition in {
                 "watch_enabled": "INTEGER NOT NULL DEFAULT 0",
@@ -216,7 +243,11 @@ class MediaLibraryAgentRepository:
                     connection.execute(
                         f"ALTER TABLE schedules ADD COLUMN {name} {definition}"
                     )
-            connection.execute("INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('schema_version', ?)", (SCHEMA_VERSION,))
+            self._bind_node_identity(connection)
+            connection.execute(
+                "INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('schema_version', ?)",
+                (SCHEMA_VERSION,),
+            )
             search_count = int(
                 connection.execute("SELECT COUNT(*) FROM source_search").fetchone()[0]
             )
@@ -245,7 +276,62 @@ class MediaLibraryAgentRepository:
                         ),
                     )
             connection.commit()
-        return {"ok": True, "schema": SCHEMA_VERSION, "db_path": str(self.db_path), "node_id": self.node_id}
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "db_path": str(self.db_path),
+            "node_id": self.node_id,
+        }
+
+    def _bind_node_identity(self, connection: sqlite3.Connection) -> None:
+        row = connection.execute(
+            "SELECT value FROM agent_meta WHERE key='node_id'"
+        ).fetchone()
+        stored = text(row["value"] if row else "")
+        observed = {
+            text(item[0])
+            for table in ("roots", "sources", "source_deltas")
+            for item in connection.execute(
+                f"SELECT DISTINCT node_id FROM {table}"
+            ).fetchall()
+            if text(item[0])
+        }
+        concrete = observed - {"local"}
+        if stored and stored not in {"local", self.node_id}:
+            raise ValueError("repository_node_identity_mismatch")
+        if concrete and concrete != {self.node_id}:
+            raise ValueError("repository_node_identity_mismatch")
+        if self.node_id != "local" and (stored == "local" or "local" in observed):
+            agent_id = stable_id("agent", self.node_id, size=20)
+            connection.execute(
+                "UPDATE roots SET node_id=? WHERE node_id='local'", (self.node_id,)
+            )
+            connection.execute(
+                "UPDATE sources SET node_id=? WHERE node_id='local'", (self.node_id,)
+            )
+            rows = connection.execute(
+                "SELECT sequence,payload_json FROM source_deltas WHERE node_id='local'"
+            ).fetchall()
+            for delta in rows:
+                payload = _replace_legacy_identity(
+                    json_loads(str(delta["payload_json"])),
+                    node_id=self.node_id,
+                    agent_id=agent_id,
+                )
+                connection.execute(
+                    "UPDATE source_deltas SET node_id=?,agent_id=?,payload_json=? "
+                    "WHERE sequence=?",
+                    (
+                        self.node_id,
+                        agent_id,
+                        json_dumps(payload),
+                        int(delta["sequence"]),
+                    ),
+                )
+        connection.execute(
+            "INSERT OR REPLACE INTO agent_meta(key,value) VALUES ('node_id',?)",
+            (self.node_id,),
+        )
 
     @property
     def agent_id(self) -> str:
@@ -283,19 +369,35 @@ class MediaLibraryAgentRepository:
     ) -> dict[str, Any]:
         token = text(path)
         if not token:
-            return {"ok": False, "error": "root_path_required", "schema": SCHEMA_VERSION}
+            return {
+                "ok": False,
+                "error": "root_path_required",
+                "schema": SCHEMA_VERSION,
+            }
         try:
             resolved = Path(token).expanduser().resolve(strict=True)
         except Exception:
-            return {"ok": False, "error": "root_path_not_found", "path": token, "schema": SCHEMA_VERSION}
+            return {
+                "ok": False,
+                "error": "root_path_not_found",
+                "path": token,
+                "schema": SCHEMA_VERSION,
+            }
         if not resolved.is_dir():
-            return {"ok": False, "error": "root_path_not_directory", "path": str(resolved), "schema": SCHEMA_VERSION}
+            return {
+                "ok": False,
+                "error": "root_path_not_directory",
+                "path": str(resolved),
+                "schema": SCHEMA_VERSION,
+            }
         for existing in self.list_roots(include_disabled=False)["items"]:
             existing_path = Path(str(existing["path"]))
             if existing_path == resolved:
                 continue
             try:
-                overlaps = resolved.is_relative_to(existing_path) or existing_path.is_relative_to(resolved)
+                overlaps = resolved.is_relative_to(
+                    existing_path
+                ) or existing_path.is_relative_to(resolved)
             except (OSError, ValueError):
                 overlaps = False
             if overlaps:
@@ -311,7 +413,11 @@ class MediaLibraryAgentRepository:
                 }
         patterns = [text(item) for item in exclusions if text(item)][:64]
         if any(len(item) > 300 for item in patterns):
-            return {"ok": False, "error": "root_exclusion_invalid", "schema": SCHEMA_VERSION}
+            return {
+                "ok": False,
+                "error": "root_exclusion_invalid",
+                "schema": SCHEMA_VERSION,
+            }
         window = dict(scan_window or {})
         if window:
             unknown = set(window).difference({"start", "end", "days"})
@@ -336,7 +442,9 @@ class MediaLibraryAgentRepository:
         root_id = stable_id("root", self.node_id, str(resolved), size=20)
         root_label = text(label) or resolved.name or str(resolved)
         with self.connect() as connection:
-            existing = connection.execute("SELECT * FROM roots WHERE path = ?", (str(resolved),)).fetchone()
+            existing = connection.execute(
+                "SELECT * FROM roots WHERE path = ?", (str(resolved),)
+            ).fetchone()
             revision = int(existing["revision"] or 0) + 1 if existing else 1
             created_at = str(existing["created_at"]) if existing else now
             connection.execute(
@@ -366,19 +474,34 @@ class MediaLibraryAgentRepository:
                 ),
             )
             connection.commit()
-        return {"ok": True, "schema": SCHEMA_VERSION, "root": self.get_root(root_id), "roots": self.list_roots()["items"]}
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "root": self.get_root(root_id),
+            "roots": self.list_roots()["items"],
+        }
 
     def get_root(self, root_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM roots WHERE id = ?", (text(root_id),)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM roots WHERE id = ?", (text(root_id),)
+            ).fetchone()
         return self._public_root(row) if row else None
 
     def list_roots(self, *, include_disabled: bool = False) -> dict[str, Any]:
         where = "" if include_disabled else "WHERE enabled = 1"
         with self.connect() as connection:
-            rows = connection.execute(f"SELECT * FROM roots {where} ORDER BY lower(label), path").fetchall()
+            rows = connection.execute(
+                f"SELECT * FROM roots {where} ORDER BY lower(label), path"
+            ).fetchall()
         items = [self._public_root(row) for row in rows]
-        return {"ok": True, "schema": SCHEMA_VERSION, "items": items, "count": len(items), "node_id": self.node_id}
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "items": items,
+            "count": len(items),
+            "node_id": self.node_id,
+        }
 
     def disable_root(self, root_id: str) -> dict[str, Any]:
         token = text(root_id)
@@ -389,8 +512,18 @@ class MediaLibraryAgentRepository:
             ).rowcount
             connection.commit()
         if not changed:
-            return {"ok": False, "error": "root_not_found", "root_id": token, "schema": SCHEMA_VERSION}
-        return {"ok": True, "schema": SCHEMA_VERSION, "root": self.get_root(token), "roots": self.list_roots()["items"]}
+            return {
+                "ok": False,
+                "error": "root_not_found",
+                "root_id": token,
+                "schema": SCHEMA_VERSION,
+            }
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "root": self.get_root(token),
+            "roots": self.list_roots()["items"],
+        }
 
     def active_job_for_root(self, root_id: str) -> dict[str, Any] | None:
         placeholders = ",".join("?" for _ in ACTIVE_JOB_STATUSES)
@@ -401,15 +534,33 @@ class MediaLibraryAgentRepository:
             ).fetchone()
         return self._public_job(row) if row else None
 
-    def create_job(self, root_id: str, *, mode: str = "incremental", webspace_id: str = "") -> dict[str, Any]:
+    def create_job(
+        self, root_id: str, *, mode: str = "incremental", webspace_id: str = ""
+    ) -> dict[str, Any]:
         root = self.get_root(root_id)
         if root is None:
-            return {"ok": False, "error": "root_not_found", "root_id": text(root_id), "schema": SCHEMA_VERSION}
+            return {
+                "ok": False,
+                "error": "root_not_found",
+                "root_id": text(root_id),
+                "schema": SCHEMA_VERSION,
+            }
         if not root["enabled"]:
-            return {"ok": False, "error": "root_disabled", "root_id": root["id"], "schema": SCHEMA_VERSION}
+            return {
+                "ok": False,
+                "error": "root_disabled",
+                "root_id": root["id"],
+                "schema": SCHEMA_VERSION,
+            }
         active = self.active_job_for_root(root["id"])
         if active:
-            return {"ok": True, "schema": SCHEMA_VERSION, "job": active, "accepted": False, "deduplicated": True}
+            return {
+                "ok": True,
+                "schema": SCHEMA_VERSION,
+                "job": active,
+                "accepted": False,
+                "deduplicated": True,
+            }
         requested_at = now_iso()
         job_id = stable_id("scan", root["id"], requested_at, size=24)
         mode_token = text(mode).lower()
@@ -421,16 +572,26 @@ class MediaLibraryAgentRepository:
                 (job_id, root["id"], mode_token, requested_at, text(webspace_id)),
             )
             connection.commit()
-        return {"ok": True, "schema": SCHEMA_VERSION, "job": self.get_job(job_id), "accepted": True, "deduplicated": False}
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "job": self.get_job(job_id),
+            "accepted": True,
+            "deduplicated": False,
+        }
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM scan_jobs WHERE id=?", (text(job_id),)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM scan_jobs WHERE id=?", (text(job_id),)
+            ).fetchone()
         return self._public_job(row) if row else None
 
     def next_queued_job(self) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM scan_jobs WHERE status='queued' ORDER BY requested_at LIMIT 1").fetchone()
+            row = connection.execute(
+                "SELECT * FROM scan_jobs WHERE status='queued' ORDER BY requested_at LIMIT 1"
+            ).fetchone()
         return self._public_job(row) if row else None
 
     def claim_job(self, job_id: str) -> dict[str, Any] | None:
@@ -469,11 +630,24 @@ class MediaLibraryAgentRepository:
             connection.commit()
         return max(0, int(count or 0))
 
-    def update_job(self, job_id: str, *, status: str | None = None, **fields: Any) -> dict[str, Any] | None:
+    def update_job(
+        self, job_id: str, *, status: str | None = None, **fields: Any
+    ) -> dict[str, Any] | None:
         allowed = {
-            "started_at", "finished_at", "discovered_count", "processed_count", "added_count",
-            "updated_count", "removed_count", "skipped_count", "error_count", "processed_bytes",
-            "current_path", "error_code", "error_detail", "cancel_requested",
+            "started_at",
+            "finished_at",
+            "discovered_count",
+            "processed_count",
+            "added_count",
+            "updated_count",
+            "removed_count",
+            "skipped_count",
+            "error_count",
+            "processed_bytes",
+            "current_path",
+            "error_code",
+            "error_detail",
+            "cancel_requested",
         }
         updates: list[str] = []
         values: list[Any] = []
@@ -490,7 +664,9 @@ class MediaLibraryAgentRepository:
         updates.append("revision=revision+1")
         values.append(text(job_id))
         with self.connect() as connection:
-            connection.execute(f"UPDATE scan_jobs SET {', '.join(updates)} WHERE id=?", tuple(values))
+            connection.execute(
+                f"UPDATE scan_jobs SET {', '.join(updates)} WHERE id=?", tuple(values)
+            )
             connection.commit()
         return self.get_job(job_id)
 
@@ -498,7 +674,12 @@ class MediaLibraryAgentRepository:
         token = text(job_id)
         job = self.get_job(token)
         if job is None:
-            return {"ok": False, "error": "scan_job_not_found", "job_id": token, "schema": SCHEMA_VERSION}
+            return {
+                "ok": False,
+                "error": "scan_job_not_found",
+                "job_id": token,
+                "schema": SCHEMA_VERSION,
+            }
         if job["status"] in TERMINAL_JOB_STATUSES:
             return {"ok": True, "schema": SCHEMA_VERSION, "job": job, "changed": False}
         updated = self.update_job(
@@ -522,7 +703,12 @@ class MediaLibraryAgentRepository:
                 f"SELECT * FROM scan_jobs {where} ORDER BY requested_at DESC LIMIT ?",
                 tuple(params),
             ).fetchall()
-        return {"ok": True, "schema": SCHEMA_VERSION, "items": [self._public_job(row) for row in rows], "count": len(rows)}
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "items": [self._public_job(row) for row in rows],
+            "count": len(rows),
+        }
 
     def create_rendition_job(
         self,
@@ -782,10 +968,14 @@ class MediaLibraryAgentRepository:
                 "exact_source_id": str(source["id"]),
                 "exact_source_revision": int(source["revision"]),
                 "exact_source_fingerprint": str(source["fingerprint"]),
-                "mime_type": text(descriptor.get("mime_type") or descriptor.get("mime")),
+                "mime_type": text(
+                    descriptor.get("mime_type") or descriptor.get("mime")
+                ),
                 "descriptor": dict(descriptor),
                 "quality": {
-                    "codec": text(target.get("video_codec") or target.get("audio_codec")),
+                    "codec": text(
+                        target.get("video_codec") or target.get("audio_codec")
+                    ),
                     "container": text(target.get("container")),
                     "width": int(target.get("max_width") or 0),
                     "height": int(target.get("max_height") or 0),
@@ -855,10 +1045,14 @@ class MediaLibraryAgentRepository:
 
     def get_source(self, source_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM sources WHERE id=?", (text(source_id),)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (text(source_id),)
+            ).fetchone()
         return self._public_source(row) if row else None
 
-    def upsert_source(self, source: Mapping[str, Any], *, job_id: str) -> tuple[str, dict[str, Any]]:
+    def upsert_source(
+        self, source: Mapping[str, Any], *, job_id: str
+    ) -> tuple[str, dict[str, Any]]:
         root_id = text(source.get("root_id"))
         relative_path = text(source.get("relative_path")).replace("\\", "/")
         now = now_iso()
@@ -870,7 +1064,9 @@ class MediaLibraryAgentRepository:
             operation = "added"
             if previous is not None:
                 operation = "restored" if not bool(previous["present"]) else "updated"
-                if str(previous["fingerprint"]) == text(source.get("fingerprint")) and bool(previous["present"]):
+                if str(previous["fingerprint"]) == text(
+                    source.get("fingerprint")
+                ) and bool(previous["present"]):
                     operation = "unchanged"
                 elif str(previous["fingerprint"]) != text(source.get("fingerprint")):
                     connection.execute(
@@ -881,8 +1077,16 @@ class MediaLibraryAgentRepository:
                         """,
                         (now, str(previous["id"])),
                     )
-            revision = int(previous["revision"] or 0) + (0 if operation == "unchanged" else 1) if previous else 1
-            source_id = str(previous["id"]) if previous else stable_id("source", self.node_id, root_id, relative_path, size=28)
+            revision = (
+                int(previous["revision"] or 0) + (0 if operation == "unchanged" else 1)
+                if previous
+                else 1
+            )
+            source_id = (
+                str(previous["id"])
+                if previous
+                else stable_id("source", self.node_id, root_id, relative_path, size=28)
+            )
             first_seen_at = str(previous["first_seen_at"]) if previous else now
             descriptor = dict(source.get("descriptor") or {})
             metadata = dict(source.get("metadata") or {})
@@ -902,14 +1106,29 @@ class MediaLibraryAgentRepository:
                     present=1, last_seen_at=excluded.last_seen_at, revision=excluded.revision
                 """,
                 (
-                    source_id, root_id, self.node_id, relative_path, text(source.get("folder_path")),
-                    text(source.get("name")), text(source.get("media_kind")), text(source.get("mime_type")),
-                    int(source.get("size_bytes") or 0), int(source.get("modified_ns") or 0),
-                    int(source.get("inode") or 0), text(source.get("fingerprint")), text(source.get("resource_id")),
-                    json_dumps(descriptor), json_dumps(metadata), first_seen_at, now, revision,
+                    source_id,
+                    root_id,
+                    self.node_id,
+                    relative_path,
+                    text(source.get("folder_path")),
+                    text(source.get("name")),
+                    text(source.get("media_kind")),
+                    text(source.get("mime_type")),
+                    int(source.get("size_bytes") or 0),
+                    int(source.get("modified_ns") or 0),
+                    int(source.get("inode") or 0),
+                    text(source.get("fingerprint")),
+                    text(source.get("resource_id")),
+                    json_dumps(descriptor),
+                    json_dumps(metadata),
+                    first_seen_at,
+                    now,
+                    revision,
                 ),
             )
-            row = connection.execute("SELECT * FROM sources WHERE id=?", (source_id,)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM sources WHERE id=?", (source_id,)
+            ).fetchone()
             public = self._public_source(row)
             if operation != "unchanged":
                 connection.execute(
@@ -934,10 +1153,14 @@ class MediaLibraryAgentRepository:
             connection.commit()
         return operation, public
 
-    def mark_missing(self, root_id: str, *, seen_relative_paths: set[str], job_id: str) -> list[dict[str, Any]]:
+    def mark_missing(
+        self, root_id: str, *, seen_relative_paths: set[str], job_id: str
+    ) -> list[dict[str, Any]]:
         removed: list[dict[str, Any]] = []
         with self.connect() as connection:
-            rows = connection.execute("SELECT * FROM sources WHERE root_id=? AND present=1", (text(root_id),)).fetchall()
+            rows = connection.execute(
+                "SELECT * FROM sources WHERE root_id=? AND present=1", (text(root_id),)
+            ).fetchall()
             for row in rows:
                 if str(row["relative_path"]) in seen_relative_paths:
                     continue
@@ -946,16 +1169,32 @@ class MediaLibraryAgentRepository:
                     "UPDATE sources SET present=0, last_seen_at=?, revision=? WHERE id=?",
                     (now_iso(), revision, str(row["id"])),
                 )
-                changed = connection.execute("SELECT * FROM sources WHERE id=?", (str(row["id"]),)).fetchone()
+                changed = connection.execute(
+                    "SELECT * FROM sources WHERE id=?", (str(row["id"]),)
+                ).fetchone()
                 public = self._public_source(changed)
                 self._insert_delta(connection, "removed", public, job_id=job_id)
                 removed.append(public)
             connection.commit()
         return removed
 
-    def _insert_delta(self, connection: sqlite3.Connection, operation: str, source: Mapping[str, Any], *, job_id: str) -> None:
+    def _insert_delta(
+        self,
+        connection: sqlite3.Connection,
+        operation: str,
+        source: Mapping[str, Any],
+        *,
+        job_id: str,
+    ) -> None:
         created_at = now_iso()
-        delta_id = stable_id("delta", source.get("id"), source.get("revision"), operation, job_id, size=28)
+        delta_id = stable_id(
+            "delta",
+            source.get("id"),
+            source.get("revision"),
+            operation,
+            job_id,
+            size=28,
+        )
         connection.execute(
             """
             INSERT OR IGNORE INTO source_deltas(
@@ -964,13 +1203,23 @@ class MediaLibraryAgentRepository:
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                delta_id, DELTA_SCHEMA, self.agent_id, self.node_id, text(source.get("root_id")),
-                text(source.get("id")), operation, int(source.get("revision") or 0), text(job_id),
-                json_dumps(dict(source)), created_at,
+                delta_id,
+                DELTA_SCHEMA,
+                self.agent_id,
+                self.node_id,
+                text(source.get("root_id")),
+                text(source.get("id")),
+                operation,
+                int(source.get("revision") or 0),
+                text(job_id),
+                json_dumps(dict(source)),
+                created_at,
             ),
         )
 
-    def pull_deltas(self, *, cursor: str = "", limit: int = 250, root_id: str = "") -> dict[str, Any]:
+    def pull_deltas(
+        self, *, cursor: str = "", limit: int = 250, root_id: str = ""
+    ) -> dict[str, Any]:
         after = decode_cursor(cursor)
         bounded = max(1, min(1000, int(limit or 250)))
         params: list[Any] = [after]
@@ -1015,7 +1264,9 @@ class MediaLibraryAgentRepository:
                 "has_more": False,
                 "agent": {"id": self.agent_id, "node_id": self.node_id},
             }
-        terms = [term for term in re.findall(r"[\w]+", token, flags=re.UNICODE) if term][:12]
+        terms = [
+            term for term in re.findall(r"[\w]+", token, flags=re.UNICODE) if term
+        ][:12]
         if not terms:
             terms = [token]
         expression = " AND ".join(
@@ -1038,7 +1289,12 @@ class MediaLibraryAgentRepository:
             "schema": SCHEMA_VERSION,
             "items": [
                 self._public_source(row)
-                | {"match": {"stage": "agent_technical_fts", "rank": float(row["rank"])}}
+                | {
+                    "match": {
+                        "stage": "agent_technical_fts",
+                        "rank": float(row["rank"]),
+                    }
+                }
                 for row in visible
             ],
             "count": len(visible),
@@ -1067,7 +1323,9 @@ class MediaLibraryAgentRepository:
         if parent_token:
             clauses.append("folder_path LIKE ? ESCAPE '\\'")
             params.append(
-                parent_token.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+                parent_token.replace("\\", "\\\\")
+                .replace("%", "\\%")
+                .replace("_", "\\_")
                 + "/%"
             )
             relative_start = len(parent_token) + 2
@@ -1106,14 +1364,16 @@ class MediaLibraryAgentRepository:
         items = []
         for row in rows:
             child = str(row["child_name"])
-            child_path = "/".join(
-                item for item in (parent_token, child) if item
-            )
+            child_path = "/".join(item for item in (parent_token, child) if item)
             items.append(
                 {
                     "schema": "adaos.media_library.folder_node.v1",
                     "id": stable_id(
-                        "folder", self.agent_id, str(row["root_id"]), child_path, size=20
+                        "folder",
+                        self.agent_id,
+                        str(row["root_id"]),
+                        child_path,
+                        size=20,
                     ),
                     "agent_id": self.agent_id,
                     "node_id": self.node_id,
@@ -1162,7 +1422,12 @@ class MediaLibraryAgentRepository:
         watch_poll_seconds: int = 30,
     ) -> dict[str, Any]:
         if self.get_root(root_id) is None:
-            return {"ok": False, "error": "root_not_found", "root_id": text(root_id), "schema": SCHEMA_VERSION}
+            return {
+                "ok": False,
+                "error": "root_not_found",
+                "root_id": text(root_id),
+                "schema": SCHEMA_VERSION,
+            }
         interval = max(300, min(604800, int(interval_seconds or 21600)))
         debounce = max(1, min(3600, int(debounce_seconds or 30)))
         watch_poll = max(5, min(3600, int(watch_poll_seconds or 30)))
@@ -1180,16 +1445,27 @@ class MediaLibraryAgentRepository:
                     updated_at=excluded.updated_at
                 """,
                 (
-                    text(root_id), int(enabled), interval, debounce,
-                    int(watch_enabled), watch_poll, now_iso(),
+                    text(root_id),
+                    int(enabled),
+                    interval,
+                    debounce,
+                    int(watch_enabled),
+                    watch_poll,
+                    now_iso(),
                 ),
             )
             connection.commit()
-        return {"ok": True, "schema": SCHEMA_VERSION, "schedule": self.get_schedule(root_id)}
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "schedule": self.get_schedule(root_id),
+        }
 
     def get_schedule(self, root_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM schedules WHERE root_id=?", (text(root_id),)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM schedules WHERE root_id=?", (text(root_id),)
+            ).fetchone()
         return (
             dict(row)
             | {
@@ -1232,7 +1508,10 @@ class MediaLibraryAgentRepository:
 
     def advance_schedule(self, root_id: str, next_run_at: str) -> None:
         with self.connect() as connection:
-            connection.execute("UPDATE schedules SET next_run_at=?, updated_at=? WHERE root_id=?", (text(next_run_at), now_iso(), text(root_id)))
+            connection.execute(
+                "UPDATE schedules SET next_run_at=?, updated_at=? WHERE root_id=?",
+                (text(next_run_at), now_iso(), text(root_id)),
+            )
             connection.commit()
 
     def mark_root_scan(self, root_id: str, status: str) -> None:
@@ -1245,13 +1524,21 @@ class MediaLibraryAgentRepository:
 
     def summary(self) -> dict[str, Any]:
         with self.connect() as connection:
-            roots = connection.execute("SELECT COUNT(*) AS count FROM roots WHERE enabled=1").fetchone()
+            roots = connection.execute(
+                "SELECT COUNT(*) AS count FROM roots WHERE enabled=1"
+            ).fetchone()
             sources = connection.execute(
                 "SELECT COUNT(*) AS total, SUM(CASE WHEN present=1 THEN 1 ELSE 0 END) AS available, SUM(CASE WHEN present=1 THEN size_bytes ELSE 0 END) AS bytes FROM sources"
             ).fetchone()
-            active = connection.execute("SELECT COUNT(*) AS count FROM scan_jobs WHERE status IN ('queued','running','waiting_resources','canceling')").fetchone()
-            errors = connection.execute("SELECT COUNT(*) AS count FROM scan_jobs WHERE status='failed'").fetchone()
-            delta = connection.execute("SELECT MAX(sequence) AS sequence FROM source_deltas").fetchone()
+            active = connection.execute(
+                "SELECT COUNT(*) AS count FROM scan_jobs WHERE status IN ('queued','running','waiting_resources','canceling')"
+            ).fetchone()
+            errors = connection.execute(
+                "SELECT COUNT(*) AS count FROM scan_jobs WHERE status='failed'"
+            ).fetchone()
+            delta = connection.execute(
+                "SELECT MAX(sequence) AS sequence FROM source_deltas"
+            ).fetchone()
             rendition = connection.execute(
                 """
                 SELECT COUNT(*) AS total,
@@ -1412,7 +1699,12 @@ class MediaLibraryAgentRepository:
                 "processed_bytes": int(row["processed_bytes"]),
                 "current_path": str(row["current_path"]),
             },
-            "error": {"code": str(row["error_code"]), "detail": str(row["error_detail"])} if row["error_code"] else None,
+            "error": {
+                "code": str(row["error_code"]),
+                "detail": str(row["error_detail"]),
+            }
+            if row["error_code"]
+            else None,
             "cancel_requested": bool(row["cancel_requested"]),
             "webspace_id": str(row["webspace_id"]),
             "revision": int(row["revision"]),

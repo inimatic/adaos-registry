@@ -33,7 +33,9 @@ _HANDLER_SPEC.loader.exec_module(main)
 @pytest.fixture(autouse=True)
 def isolated_runtime(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_DB_PATH", str(tmp_path / "agent.sqlite3"))
-    monkeypatch.setenv("ADAOS_MEDIA_REFERENCE_DB_PATH", str(tmp_path / "references.sqlite3"))
+    monkeypatch.setenv(
+        "ADAOS_MEDIA_REFERENCE_DB_PATH", str(tmp_path / "references.sqlite3")
+    )
     monkeypatch.setenv("ADAOS_NODE_ID", "node-test")
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_EMBEDDED_WORKER", "1")
     monkeypatch.delenv("ADAOS_RUNTIME_PORT", raising=False)
@@ -73,9 +75,7 @@ def test_progress_publication_is_nonblocking_bounded_and_coalesced(monkeypatch):
 
     started_at = time.monotonic()
     for sequence in range(2, 102):
-        main._publish_progress(
-            {"job_id": "scan-a", "sequence": sequence}, "desktop"
-        )
+        main._publish_progress({"job_id": "scan-a", "sequence": sequence}, "desktop")
     enqueue_duration = time.monotonic() - started_at
     status = main._progress_publisher_status()
 
@@ -97,12 +97,16 @@ def test_progress_publication_is_nonblocking_bounded_and_coalesced(monkeypatch):
 
 
 def test_agent_reports_local_topology_without_writing_control_plane(tmp_path):
-    source = (SKILL_ROOT / "media_library_agent" / "topology.py").read_text(encoding="utf-8")
+    source = (SKILL_ROOT / "media_library_agent" / "topology.py").read_text(
+        encoding="utf-8"
+    )
     assert "from adaos.sdk import distributed" in source
     assert "adaos.services" not in source
     library = tmp_path / "library"
     library.mkdir()
-    repository = MediaLibraryAgentRepository(tmp_path / "agent.sqlite3", node_id="node-a")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "agent.sqlite3", node_id="node-a"
+    )
     root = repository.add_root(str(library))["root"]
     partition = {
         "schema": "adaos.distributed.partition.v1",
@@ -143,6 +147,34 @@ def test_agent_reports_local_topology_without_writing_control_plane(tmp_path):
     assert result["external_media_copied"] is False
 
 
+def test_repository_migrates_legacy_local_identity_once(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    database = tmp_path / "identity.sqlite3"
+    legacy = MediaLibraryAgentRepository(database, node_id="local")
+    root_id = legacy.add_root(str(library))["root"]["id"]
+
+    migrated = MediaLibraryAgentRepository(database, node_id="node-a")
+
+    assert migrated.list_roots()["items"][0]["node_id"] == "node-a"
+    assert migrated.list_roots()["items"][0]["id"] == root_id
+    with pytest.raises(ValueError, match="repository_node_identity_mismatch"):
+        MediaLibraryAgentRepository(database, node_id="node-b")
+
+
+def test_runtime_prefers_sdk_node_identity(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_DB_PATH", str(tmp_path / "sdk.sqlite3"))
+    monkeypatch.setattr(
+        main,
+        "runtime_identity",
+        lambda: {"node": {"node_id": "node-from-sdk"}},
+    )
+
+    repository, _worker = main._runtime()
+
+    assert repository.node_id == "node-from-sdk"
+
+
 def test_import_is_async_reference_only_and_excludes_images(tmp_path):
     library = tmp_path / "library"
     album = library / "Artist" / "Album"
@@ -156,15 +188,24 @@ def test_import_is_async_reference_only_and_excludes_images(tmp_path):
 
     assert result["ok"] is True
     assert result["asynchronous"] is True
-    assert result["storage"] == {"mode": "external_reference", "media_bytes_copied": False}
+    assert result["storage"] == {
+        "mode": "external_reference",
+        "media_bytes_copied": False,
+    }
     job = _wait(result["job"]["id"])
     assert job["status"] == "completed"
     assert job["progress"]["processed_count"] == 1
     deltas = main.pull_deltas(limit=10)
     assert [item["source"]["name"] for item in deltas["items"]] == ["01.mp3"]
-    assert deltas["items"][0]["source"]["metadata"]["folder_segments"] == ["Artist", "Album"]
+    assert deltas["items"][0]["source"]["metadata"]["folder_segments"] == [
+        "Artist",
+        "Album",
+    ]
     assert deltas["items"][0]["source"]["metadata"]["technical"]["probe"] == "basic"
-    assert deltas["items"][0]["source"]["descriptor"]["metadata"]["storage_mode"] == "reference"
+    assert (
+        deltas["items"][0]["source"]["descriptor"]["metadata"]["storage_mode"]
+        == "reference"
+    )
     assert song.read_bytes() == b"audio-data"
     assert poster.read_bytes() == b"image-data"
     assert list(tmp_path.rglob("*.mp3")) == [song]
@@ -204,7 +245,9 @@ def test_incremental_scan_emits_only_changes_and_tombstones(tmp_path):
 def test_duplicate_scan_request_returns_active_job(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
-    repository = MediaLibraryAgentRepository(tmp_path / "direct.sqlite3", node_id="node-a")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "direct.sqlite3", node_id="node-a"
+    )
     root = repository.add_root(str(library))["root"]
 
     first = repository.create_job(root["id"])
@@ -220,7 +263,9 @@ def test_playback_pressure_pauses_worker_until_released(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
     (library / "track.mp3").write_bytes(b"audio")
-    repository = MediaLibraryAgentRepository(tmp_path / "pressure.sqlite3", node_id="node-a")
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "pressure.sqlite3", node_id="node-a"
+    )
     root = repository.add_root(str(library))["root"]
     job = repository.create_job(root["id"])["job"]
 
@@ -238,12 +283,18 @@ def test_playback_pressure_pauses_worker_until_released(tmp_path):
     worker.set_resource_pressure("playback")
     worker.ensure_started()
     deadline = time.monotonic() + 2
-    while time.monotonic() < deadline and repository.get_job(job["id"])["status"] != "waiting_resources":
+    while (
+        time.monotonic() < deadline
+        and repository.get_job(job["id"])["status"] != "waiting_resources"
+    ):
         time.sleep(0.01)
     assert repository.get_job(job["id"])["status"] == "waiting_resources"
     worker.set_resource_pressure("normal")
     deadline = time.monotonic() + 2
-    while time.monotonic() < deadline and repository.get_job(job["id"])["status"] != "completed":
+    while (
+        time.monotonic() < deadline
+        and repository.get_job(job["id"])["status"] != "completed"
+    ):
         time.sleep(0.01)
     assert repository.get_job(job["id"])["status"] == "completed"
     worker.dispose()
@@ -265,8 +316,7 @@ def test_resource_pressure_is_shared_across_agent_processes(tmp_path):
     deadline = time.monotonic() + 2
     while (
         time.monotonic() < deadline
-        and worker_repository.get_job(job["id"])["status"]
-        != "waiting_resources"
+        and worker_repository.get_job(job["id"])["status"] != "waiting_resources"
     ):
         time.sleep(0.01)
     assert worker_repository.get_job(job["id"])["status"] == "waiting_resources"
@@ -491,7 +541,9 @@ def test_contract_examples_validate_against_strict_schemas(tmp_path):
         }
 
     worker = MediaLibraryAgentWorker(
-        repository, register=register, publish=lambda value, _webspace: published.append(value)
+        repository,
+        register=register,
+        publish=lambda value, _webspace: published.append(value),
     )
     worker.run_once()
 
@@ -503,7 +555,9 @@ def test_contract_examples_validate_against_strict_schemas(tmp_path):
         "media-library-scan-progress.v1.schema.json": published[-1],
     }
     for filename, payload in fixtures.items():
-        schema = json.loads((SKILL_ROOT / "schemas" / filename).read_text(encoding="utf-8"))
+        schema = json.loads(
+            (SKILL_ROOT / "schemas" / filename).read_text(encoding="utf-8")
+        )
         jsonschema.Draft202012Validator(schema).validate(payload)
 
 
@@ -855,9 +909,7 @@ def test_queued_rendition_cancellation_is_terminal_without_worker(tmp_path):
         },
     )
     source = _rendition_source(repository, worker, library)
-    plan = rendition_plan(
-        source, endpoint_capabilities={"mime_types": ["video/mp4"]}
-    )
+    plan = rendition_plan(source, endpoint_capabilities={"mime_types": ["video/mp4"]})
     queued = repository.create_rendition_job(
         source["id"], profile="browser-mp4-v1", target=plan["target"]
     )
@@ -904,9 +956,7 @@ def test_perceptual_sampling_is_opt_in_bounded_and_never_publishes_bytes(
     source = tmp_path / "sample.mp4"
     source.write_bytes(b"original-media")
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_MODE", "ffmpeg")
-    monkeypatch.setenv(
-        "MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_TIMEOUT_SECONDS", "7"
-    )
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_PERCEPTUAL_HASH_TIMEOUT_SECONDS", "7")
     monkeypatch.setattr(worker_module.shutil, "which", lambda name: f"/{name}")
     captured = {}
 
@@ -916,16 +966,15 @@ def test_perceptual_sampling_is_opt_in_bounded_and_never_publishes_bytes(
 
     monkeypatch.setattr(worker_module.subprocess, "run", fake_run)
 
-    result = MediaLibraryAgentWorker._technical_metadata(
-        source, stat=source.stat()
-    )
+    result = MediaLibraryAgentWorker._technical_metadata(source, stat=source.stat())
 
     assert result["perceptual_hash_algorithm"] == "ffmpeg_sample_sha256_v1"
     assert result["perceptual_hash"]
     assert captured["kwargs"]["timeout"] == 7
     assert captured["command"][captured["command"].index("-threads") + 1] == "1"
-    assert captured["command"][
-        captured["command"].index("-protocol_whitelist") + 1
-    ] == "file,pipe"
+    assert (
+        captured["command"][captured["command"].index("-protocol_whitelist") + 1]
+        == "file,pipe"
+    )
     assert captured["command"][-1] == "pipe:1"
     assert source.read_bytes() == b"original-media"

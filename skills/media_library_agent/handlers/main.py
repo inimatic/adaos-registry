@@ -7,6 +7,7 @@ import time
 from pathlib import Path
 from typing import Any, Mapping
 
+from adaos.sdk.core import runtime_identity
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data.i18n import _
 
@@ -31,6 +32,7 @@ from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
 
 _runtime_lock = threading.Lock()
 _runtime_path = ""
+_runtime_node_id = ""
 _repository_instance: MediaLibraryAgentRepository | None = None
 _worker_instance: MediaLibraryAgentWorker | None = None
 _progress_condition = threading.Condition()
@@ -189,16 +191,40 @@ def _event_payload(event: Any) -> dict[str, Any]:
 
 
 def _runtime() -> tuple[MediaLibraryAgentRepository, MediaLibraryAgentWorker]:
-    global _repository_instance, _runtime_path, _worker_instance
+    global _repository_instance, _runtime_node_id, _runtime_path, _worker_instance
     path = str(default_db_path().resolve())
+    node_id = _node_identity()
     with _runtime_lock:
-        if _repository_instance is None or _worker_instance is None or _runtime_path != path:
+        if (
+            _repository_instance is None
+            or _worker_instance is None
+            or _runtime_path != path
+            or _runtime_node_id != node_id
+        ):
             if _worker_instance is not None:
                 _worker_instance.dispose(timeout=0.2)
-            _repository_instance = MediaLibraryAgentRepository(path)
-            _worker_instance = MediaLibraryAgentWorker(_repository_instance, publish=_publish_progress)
+            _repository_instance = MediaLibraryAgentRepository(path, node_id=node_id)
+            _worker_instance = MediaLibraryAgentWorker(
+                _repository_instance, publish=_publish_progress
+            )
             _runtime_path = path
+            _runtime_node_id = node_id
         return _repository_instance, _worker_instance
+
+
+def _node_identity() -> str:
+    try:
+        identity = runtime_identity()
+        node = identity.get("node") if isinstance(identity, Mapping) else None
+        node_id = text(node.get("node_id")) if isinstance(node, Mapping) else ""
+        if node_id:
+            return node_id
+    except Exception:
+        pass
+    return (
+        text(os.environ.get("ADAOS_NODE_ID") or os.environ.get("ADAOS_HUB_ID"))
+        or "local"
+    )
 
 
 def _owns_background_worker() -> bool:
@@ -219,13 +245,18 @@ def _topology() -> LibraryAgentTopology:
     return LibraryAgentTopology()
 
 
-@tool(summary="Ensure the durable media-library agent schema.", side_effects="local_write")
+@tool(
+    summary="Ensure the durable media-library agent schema.", side_effects="local_write"
+)
 def ensure_schema(**_: Any) -> dict[str, Any]:
     repository, _worker = _runtime()
     return repository.ensure_schema()
 
 
-@tool(summary="Resume queued media-library work after activation.", side_effects="local_write")
+@tool(
+    summary="Resume queued media-library work after activation.",
+    side_effects="local_write",
+)
 def rehydrate(**_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
     _ensure_worker_if_owned(worker)
@@ -283,12 +314,16 @@ def on_progress_snapshot_requested(event: Any) -> None:
     repository, worker = _runtime()
     if receiver == "media_library_agent.rendition_progress":
         jobs = repository.list_rendition_jobs(limit=1).get("items") or []
-        job = dict(jobs[0]) if jobs else {
-            "schema": RENDITION_JOB_SCHEMA,
-            "id": "",
-            "status": "idle",
-            "revision": 0,
-        }
+        job = (
+            dict(jobs[0])
+            if jobs
+            else {
+                "schema": RENDITION_JOB_SCHEMA,
+                "id": "",
+                "status": "idle",
+                "revision": 0,
+            }
+        )
         _publish_progress(
             {
                 **job,
@@ -328,7 +363,10 @@ def on_progress_snapshot_requested(event: Any) -> None:
     _publish_progress(snapshot, text(payload.get("webspace_id")))
 
 
-@tool(summary="Add a local media root without copying its files.", side_effects="local_write")
+@tool(
+    summary="Add a local media root without copying its files.",
+    side_effects="local_write",
+)
 def add_root(
     path: str = "",
     label: str = "",
@@ -358,16 +396,27 @@ def add_root(
         "root_path_overlap": "This folder overlaps another active media folder on this node.",
         "root_scan_window_invalid": "The scan window must contain valid local start/end times and weekdays.",
     }
-    return {**result, **_human_error(code, fallbacks.get(code, "The media folder could not be added."))}
+    return {
+        **result,
+        **_human_error(
+            code, fallbacks.get(code, "The media folder could not be added.")
+        ),
+    }
 
 
-@tool(summary="Disable a media root while retaining external files and indexed evidence.", side_effects="local_write")
+@tool(
+    summary="Disable a media root while retaining external files and indexed evidence.",
+    side_effects="local_write",
+)
 def remove_root(root_id: str = "", **_: Any) -> dict[str, Any]:
     repository, _worker = _runtime()
     result = repository.disable_root(root_id)
     if result.get("ok"):
         return result
-    return {**result, **_human_error("root_not_found", "The media folder is no longer configured.")}
+    return {
+        **result,
+        **_human_error("root_not_found", "The media folder is no longer configured."),
+    }
 
 
 @tool(summary="List media roots owned by this node agent.", side_effects="none")
@@ -376,7 +425,10 @@ def list_roots(include_disabled: bool = False, **_: Any) -> dict[str, Any]:
     return repository.list_roots(include_disabled=bool(include_disabled))
 
 
-@tool(summary="Queue bounded incremental scans and return immediately.", side_effects="local_write")
+@tool(
+    summary="Queue bounded incremental scans and return immediately.",
+    side_effects="local_write",
+)
 def start_scan(
     root_id: str = "",
     mode: str = "incremental",
@@ -384,15 +436,26 @@ def start_scan(
     **_: Any,
 ) -> dict[str, Any]:
     repository, worker = _runtime()
-    root_ids = [text(root_id)] if text(root_id) else [item["id"] for item in repository.list_roots()["items"]]
+    root_ids = (
+        [text(root_id)]
+        if text(root_id)
+        else [item["id"] for item in repository.list_roots()["items"]]
+    )
     if not root_ids:
-        return _human_error("no_active_media_roots", "No active media folders are configured.", roots=[])
+        return _human_error(
+            "no_active_media_roots", "No active media folders are configured.", roots=[]
+        )
     jobs: list[dict[str, Any]] = []
     accepted = 0
     for candidate in root_ids:
         result = repository.create_job(candidate, mode=mode, webspace_id=webspace_id)
         if not result.get("ok"):
-            return {**result, **_human_error(text(result.get("error")), "The media scan could not be queued.")}
+            return {
+                **result,
+                **_human_error(
+                    text(result.get("error")), "The media scan could not be queued."
+                ),
+            }
         jobs.append(dict(result["job"]))
         accepted += int(bool(result.get("accepted")))
     _ensure_worker_if_owned(worker)
@@ -407,7 +470,10 @@ def start_scan(
     }
 
 
-@tool(summary="Add a media root and queue its first asynchronous scan.", side_effects="local_write")
+@tool(
+    summary="Add a media root and queue its first asynchronous scan.",
+    side_effects="local_write",
+)
 def import_folder(
     path: str = "",
     label: str = "",
@@ -428,8 +494,15 @@ def import_folder(
     )
     if not added.get("ok"):
         return added
-    queued = start_scan(root_id=added["root"]["id"], mode="full", webspace_id=webspace_id)
-    return {**queued, "root": added["root"], "roots": added["roots"], "storage": {"mode": "external_reference", "media_bytes_copied": False}}
+    queued = start_scan(
+        root_id=added["root"]["id"], mode="full", webspace_id=webspace_id
+    )
+    return {
+        **queued,
+        "root": added["root"],
+        "roots": added["roots"],
+        "storage": {"mode": "external_reference", "media_bytes_copied": False},
+    }
 
 
 @tool(summary="Read one durable scan job and compact progress.", side_effects="none")
@@ -437,8 +510,17 @@ def scan_status(job_id: str = "", **_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
     job = repository.get_job(job_id)
     if job is None:
-        return _human_error("scan_job_not_found", "The media scan is no longer available.", job_id=text(job_id))
-    return {"ok": True, "schema": SCHEMA_VERSION, "job": job, "resource_pressure": worker.resource_pressure}
+        return _human_error(
+            "scan_job_not_found",
+            "The media scan is no longer available.",
+            job_id=text(job_id),
+        )
+    return {
+        "ok": True,
+        "schema": SCHEMA_VERSION,
+        "job": job,
+        "resource_pressure": worker.resource_pressure,
+    }
 
 
 @tool(summary="List recent bounded scan jobs.", side_effects="none")
@@ -447,26 +529,41 @@ def list_jobs(root_id: str = "", limit: int = 20, **_: Any) -> dict[str, Any]:
     return repository.list_jobs(root_id=root_id, limit=limit)
 
 
-@tool(summary="Request cooperative cancellation of one scan.", side_effects="local_write")
+@tool(
+    summary="Request cooperative cancellation of one scan.", side_effects="local_write"
+)
 def cancel_scan(job_id: str = "", **_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
     result = repository.request_cancel(job_id)
     _ensure_worker_if_owned(worker)
     if result.get("ok"):
         return result
-    return {**result, **_human_error("scan_job_not_found", "The media scan is no longer available.")}
+    return {
+        **result,
+        **_human_error("scan_job_not_found", "The media scan is no longer available."),
+    }
 
 
-@tool(summary="Pull ordered idempotent source deltas through an opaque cursor.", side_effects="none")
-def pull_deltas(cursor: str = "", limit: int = 250, root_id: str = "", **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Pull ordered idempotent source deltas through an opaque cursor.",
+    side_effects="none",
+)
+def pull_deltas(
+    cursor: str = "", limit: int = 250, root_id: str = "", **_: Any
+) -> dict[str, Any]:
     repository, _worker = _runtime()
     try:
         return repository.pull_deltas(cursor=cursor, limit=limit, root_id=root_id)
     except ValueError:
-        return _human_error("invalid_cursor", "The catalog cursor has expired or is invalid.")
+        return _human_error(
+            "invalid_cursor", "The catalog cursor has expired or is invalid."
+        )
 
 
-@tool(summary="Browse indexed folders as an alternative library navigation.", side_effects="none")
+@tool(
+    summary="Browse indexed folders as an alternative library navigation.",
+    side_effects="none",
+)
 def browse_folders(
     root_id: str = "",
     parent: str = "",
@@ -485,7 +582,10 @@ def browse_folders(
         )
 
 
-@tool(summary="Configure periodic reconciliation for one media root.", side_effects="local_write")
+@tool(
+    summary="Configure periodic reconciliation for one media root.",
+    side_effects="local_write",
+)
 def configure_schedule(
     root_id: str = "",
     enabled: bool = True,
@@ -508,7 +608,10 @@ def configure_schedule(
     return result
 
 
-@tool(summary="Pause or resume background scans according to playback pressure.", side_effects="local_write")
+@tool(
+    summary="Pause or resume background scans according to playback pressure.",
+    side_effects="local_write",
+)
 def set_resource_pressure(level: str = "normal", **_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
     try:
@@ -516,16 +619,25 @@ def set_resource_pressure(level: str = "normal", **_: Any) -> dict[str, Any]:
         if _owns_background_worker():
             worker.set_resource_pressure(current)
     except ValueError:
-        return _human_error("invalid_resource_pressure", "The resource pressure level is invalid.")
+        return _human_error(
+            "invalid_resource_pressure", "The resource pressure level is invalid."
+        )
     return {"ok": True, "schema": SCHEMA_VERSION, "resource_pressure": current}
 
 
-@tool(summary="Inspect one indexed source without reading media bytes.", side_effects="none")
+@tool(
+    summary="Inspect one indexed source without reading media bytes.",
+    side_effects="none",
+)
 def inspect_source(source_id: str = "", **_: Any) -> dict[str, Any]:
     repository, _worker = _runtime()
     source = repository.get_source(source_id)
     if source is None:
-        return _human_error("source_not_found", "The media source is no longer available.", source_id=text(source_id))
+        return _human_error(
+            "source_not_found",
+            "The media source is no longer available.",
+            source_id=text(source_id),
+        )
     return {"ok": True, "schema": SCHEMA_VERSION, "source": source}
 
 
@@ -644,9 +756,7 @@ def status(**_: Any) -> dict[str, Any]:
         **repository.summary(),
         "worker": {
             "owner": (
-                "current_process"
-                if _owns_background_worker()
-                else "service_process"
+                "current_process" if _owns_background_worker() else "service_process"
             ),
             "resource_pressure": worker.resource_pressure,
             "max_concurrent_scans": 1,
@@ -654,7 +764,9 @@ def status(**_: Any) -> dict[str, Any]:
             "progress_publisher": _progress_publisher_status(),
         },
         "limits": {
-            "max_files_per_scan": int(os.environ.get("MEDIA_LIBRARY_AGENT_MAX_FILES") or 1_000_000),
+            "max_files_per_scan": int(
+                os.environ.get("MEDIA_LIBRARY_AGENT_MAX_FILES") or 1_000_000
+            ),
             "max_delta_page": 1000,
             "progress_publish_hz": 2,
             "watch_max_entries": int(
@@ -665,7 +777,9 @@ def status(**_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="Validate and report one node-local partition replica.", side_effects="none")
+@tool(
+    summary="Validate and report one node-local partition replica.", side_effects="none"
+)
 def observe_topology(
     partition: Mapping[str, Any] | None = None,
     replica: Mapping[str, Any] | None = None,
