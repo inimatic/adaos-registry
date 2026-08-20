@@ -752,13 +752,29 @@ def cancel_rendition(job_id: str = "", **_: Any) -> dict[str, Any]:
 @tool(summary="Return compact agent health and capacity state.", side_effects="none")
 def status(**_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
+    summary = repository.summary()
+    pressure = worker.resource_pressure
+    active_jobs = int(summary.get("active_job_count") or 0)
+    failed_jobs = int(summary.get("failed_job_count") or 0)
     return {
-        **repository.summary(),
+        **summary,
+        "distributed": {
+            "health": {
+                "status": "passing",
+                "ready": True,
+                "active_jobs": active_jobs,
+                "failed_jobs": failed_jobs,
+            },
+            "pressure": {
+                "state": pressure,
+                "active_jobs": active_jobs,
+            },
+        },
         "worker": {
             "owner": (
                 "current_process" if _owns_background_worker() else "service_process"
             ),
-            "resource_pressure": worker.resource_pressure,
+            "resource_pressure": pressure,
             "max_concurrent_scans": 1,
             "watch": worker.watch_status(),
             "progress_publisher": _progress_publisher_status(),

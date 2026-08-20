@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import signal
@@ -47,7 +48,8 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(raw)))
         self.end_headers()
-        self.wfile.write(raw)
+        with contextlib.suppress(BrokenPipeError, ConnectionResetError):
+            self.wfile.write(raw)
 
     def log_message(self, _format: str, *_args: Any) -> None:
         return

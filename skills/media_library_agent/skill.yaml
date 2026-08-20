@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.9
+version: 0.6.10
 description: Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.
 supported_locales:
 - en
@@ -17,7 +17,21 @@ service:
   - handlers.service
   healthcheck:
     path: /health
-    timeout_ms: 1000
+    timeout_ms: 5000
+  membership:
+    enabled: true
+    group_id: media-library-home
+    lease_seconds: 600
+    protocol_version: '1'
+    capabilities:
+    - media.catalog
+    endpoints:
+    - endpoint_id: catalog
+      protocol: adaos.skill.v1
+      address_ref: skill://{node_id}/{skill}/catalog
+      scopes:
+      - media.read
+      metadata: {}
 capabilities:
 - media.catalog
 - media.rendition

@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +29,18 @@ _HANDLER_SPEC = importlib.util.spec_from_file_location(
 assert _HANDLER_SPEC and _HANDLER_SPEC.loader
 main = importlib.util.module_from_spec(_HANDLER_SPEC)
 _HANDLER_SPEC.loader.exec_module(main)
+
+
+def test_agent_declares_core_managed_membership_and_health_projection():
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    membership = manifest["service"]["membership"]
+    health = main.status()
+
+    assert membership["enabled"] is True
+    assert membership["group_id"] == "media-library-home"
+    assert membership["lease_seconds"] == 600
+    assert health["distributed"]["health"]["ready"] is True
+    assert health["distributed"]["pressure"]["state"] == "normal"
 
 
 @pytest.fixture(autouse=True)
