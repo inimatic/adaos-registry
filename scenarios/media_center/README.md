@@ -35,4 +35,4 @@ $env:PYTHONPATH='..\adaos\src'
 python scenarios/media_center/benchmarks/run_library_benchmark.py --enforce
 ```
 
-The harness reports one-time FTS/trigram backfill separately from p50/p95/max catalog FTS, cursor-page and local-discovery latency, encoded page bytes, process RSS, sample counts and the exact enforced budgets. It uses generated descriptors and never needs private media bytes.
+The harness reports one-time FTS/trigram backfill separately from p50/p95/max catalog FTS, cursor-page and local-discovery latency, encoded page bytes, process RSS, sample counts and the exact enforced budgets. Correctness assertions reject empty FTS/fuzzy results, incomplete search indexes and invalid page sizes. The same run migrates and removes 20,000 legacy works and collections, verifies 20,000 contextual works/memberships, and enforces a bounded migration budget. It uses generated descriptors and never needs private media bytes.

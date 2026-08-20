@@ -10,6 +10,13 @@
 
 The coordinator derives explicit `MediaSource`, `MediaVariant`, `MediaWork`, `MediaCollection`, and membership rows. Deterministic grouping preserves series/season/episode, album/disc/track, audiobook/part/chapter, and source-folder levels. Folder navigation is a separate lazy, cursor-backed read model with breadcrumbs. Duplicate results are review candidates only and never authorize source deletion. Metadata, merge, split, and regroup corrections are audited and reversible; alias activation/revocation remains explicit evidence.
 
+Provisional audio work identity includes normalized folder/collection context,
+so files named only `0.mp3` or `01.mp3` in different books cannot become
+playback alternatives by filename alone. Matching contextual tracks from
+different agents may still become variants. A variant id belongs to its exact
+physical source and remains stable when migration, enrichment, or a reviewed
+correction reclassifies that source under another work.
+
 Profile-owned playlists have revision-safe ordered membership and explicit `private`, `household`, or `shared` visibility. Playlist reads remain cursor-backed and catalog/player limits remain independent; deleting a playlist never deletes source media.
 
 ## Playback Planning
