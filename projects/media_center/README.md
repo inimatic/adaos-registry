@@ -6,15 +6,18 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.5.0` adds federated technical search, exact-source derived
-renditions, profile-owned presentation defaults, and sanitized operations
-diagnostics. Derived renditions are disposable managed outputs; they do not
-change ownership of the original source.
+Release `0.6.2` locks the distributed coordinator, node-local agent, persistent
+control plane, adaptive desktop/TV/controller presentation, federated search,
+exact-source renditions, and bounded operations diagnostics as one immutable
+Project closure. The ordinary Project release builder resolves and stores all
+five selected packages, including the shared Media Server dependency, before a
+reviewed deployment can target nodes.
 
-The same release supports colocated one-node operation and selected-node
-deployment. Entry-point bindings select presentation semantics (`desktop`,
-`tv`, `mobile_control`, or `embedded`); they do not infer component placement
-from viewport width.
+The same release supports colocated one-node operation and selected-node or
+capability-based deployment. Entry-point bindings select presentation
+semantics (`desktop`, `tv`, `mobile_control`, or `embedded`); they do not infer
+component placement from viewport width. Workspace-scoped playback and
+settings modals remain independent from node-scoped diagnostics.
 
 Uninstall removes unreferenced Project-owned code while retaining runtime
 evidence and source artifacts. External media roots are never Project-owned,
