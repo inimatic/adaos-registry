@@ -1854,6 +1854,35 @@ class ResearchOrchestrator:
             sources.append(source)
         return sources
 
+    @staticmethod
+    def _development_instruction_value(
+        session_id: str,
+        kind: str,
+    ) -> tuple[dict[str, Any], bool]:
+        """Return producer content, never the SDK verification envelope.
+
+        ``development_sessions.get_instruction`` deliberately returns a receipt
+        containing ``value``.  Older callers could accidentally attach that
+        receipt as a new instruction.  Bounded recursive unwrapping repairs such
+        a session without weakening the descriptor/content verification already
+        performed by the SDK.
+        """
+
+        result: Mapping[str, Any] = development_sessions.get_instruction(
+            session_id, kind
+        )
+        unwrapped_receipt = False
+        for depth in range(3):
+            value = result.get("value")
+            if not isinstance(value, Mapping):
+                break
+            if depth:
+                unwrapped_receipt = True
+            result = value
+        if "digest" not in result:
+            raise ValueError(f"Development Session {kind} instruction has no producer digest")
+        return dict(result), unwrapped_receipt
+
     def refresh_development_contract(
         self,
         direction_id: str,
@@ -1900,11 +1929,24 @@ class ResearchOrchestrator:
         ):
             raise ValueError("ResearchManager returned an invalid runner consumer contract")
 
-        previous_contract = development_sessions.get_instruction(
+        previous_contract, contract_envelope_nested = self._development_instruction_value(
             str(previous["session_id"]), "consumer_contract"
         )
+        brief, brief_envelope_nested = self._development_instruction_value(
+            str(previous["session_id"]), "automation_brief"
+        )
+        compilation, compilation_envelope_nested = self._development_instruction_value(
+            str(previous["session_id"]), "research_compilation"
+        )
         previous_digest = str(previous_contract.get("digest") or "").strip()
-        if previous_digest == current_digest:
+        instruction_envelope_nested = any(
+            (
+                contract_envelope_nested,
+                brief_envelope_nested,
+                compilation_envelope_nested,
+            )
+        )
+        if previous_digest == current_digest and not instruction_envelope_nested:
             return {
                 "ok": True,
                 "reused": True,
@@ -2007,10 +2049,10 @@ class ResearchOrchestrator:
             actor=actor,
         )
         session = dict(created["session"])
-        for kind in ("automation_brief", "research_compilation"):
-            instruction = development_sessions.get_instruction(
-                str(previous["session_id"]), kind
-            )
+        for kind, instruction in (
+            ("automation_brief", brief),
+            ("research_compilation", compilation),
+        ):
             attached = development_sessions.attach_instruction(
                 str(session["session_id"]),
                 kind,
@@ -2044,7 +2086,11 @@ class ResearchOrchestrator:
             str(state["direction"]["direction_id"]),
             "implementation",
             "consumer_contract_refreshed",
-            "Development Session superseded because the admitted consumer ABI changed; accepted scientific instructions remain unchanged.",
+            (
+                "Development Session superseded to normalize verified instruction envelopes; accepted producer content remains unchanged."
+                if instruction_envelope_nested and previous_digest == current_digest
+                else "Development Session superseded because the admitted consumer ABI changed; accepted scientific instructions remain unchanged."
+            ),
             {
                 "task_ref": (state.get("selected_task") or {}).get("ref"),
                 "implementation_track_ref": track["ref"],
@@ -2052,6 +2098,7 @@ class ResearchOrchestrator:
                 "development_session_id": session["session_id"],
                 "previous_consumer_contract_digest": previous_digest,
                 "consumer_contract_digest": current_digest,
+                "instruction_envelope_normalized": instruction_envelope_nested,
                 "actor": actor,
             },
             actor=actor,
@@ -2065,6 +2112,7 @@ class ResearchOrchestrator:
             "previous_development_session_id": previous["session_id"],
             "previous_consumer_contract_digest": previous_digest,
             "consumer_contract_digest": current_digest,
+            "instruction_envelope_normalized": instruction_envelope_nested,
             "development_session": session,
             "implementation_track": updated_track,
         }

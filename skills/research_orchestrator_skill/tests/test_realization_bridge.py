@@ -334,11 +334,18 @@ def test_consumer_contract_refresh_supersedes_only_the_development_session(
 
     def get_instruction(session_id: str, kind: str) -> dict:
         assert session_id == previous_session["session_id"]
-        return {
+        value = {
             "consumer_contract": old_contract,
             "automation_brief": brief,
             "research_compilation": compilation,
         }[kind]
+        if kind == "automation_brief":
+            value = {"ok": True, "instruction": {"kind": kind}, "value": value}
+        return {
+            "ok": True,
+            "instruction": {"kind": kind},
+            "value": value,
+        }
 
     def create(project_id: str, **kwargs: object) -> dict:
         created.update({"project_id": project_id, **kwargs})
@@ -378,6 +385,7 @@ def test_consumer_contract_refresh_supersedes_only_the_development_session(
     assert result["reused"] is False
     assert result["previous_consumer_contract_digest"] == old_contract["digest"]
     assert result["consumer_contract_digest"] == current_contract["digest"]
+    assert result["instruction_envelope_normalized"] is True
     assert created["project_id"] == "direction_implementation"
     assert created["artifact_sources"] == [
         {
