@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import json
 import sqlite3
 import sys
@@ -1423,9 +1424,12 @@ def test_agent_sync_worker_continues_bounded_cursor_catchup() -> None:
     completed = threading.Event()
     published = []
     calls = 0
+    skill_identity = contextvars.ContextVar("test_media_center_skill_identity")
+    skill_identity.set("media_center_skill")
 
     def sync():
         nonlocal calls
+        assert skill_identity.get() == "media_center_skill"
         calls += 1
         has_more = calls < 2
         if not has_more:
@@ -1440,7 +1444,7 @@ def test_agent_sync_worker_continues_bounded_cursor_catchup() -> None:
 
     worker = MediaAgentSyncWorker(
         sync,
-        publish=lambda: published.append(True),
+        publish=lambda: published.append(skill_identity.get()),
         catchup_seconds=0.05,
         poll_seconds=30,
     )
@@ -1451,7 +1455,7 @@ def test_agent_sync_worker_continues_bounded_cursor_catchup() -> None:
         worker.dispose()
 
     assert calls == 2
-    assert len(published) == 2
+    assert published == ["media_center_skill", "media_center_skill"]
     assert worker.status()["state"] == "idle"
     assert worker.status()["last_result"]["has_more"] is False
 

@@ -1475,6 +1475,7 @@ def status(**_: Any) -> dict[str, Any]:
         "summary": repo.summary(),
         "facets": repo.facets(),
         "coordinator": catalog.diagnostics(),
+        "agent_sync": _agent_sync_status(),
     }
 
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextvars
 import threading
 from datetime import datetime, timezone
 from typing import Any, Callable, Mapping
@@ -30,6 +31,7 @@ class MediaAgentSyncWorker:
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
+        self._context = contextvars.copy_context()
         self._revision = 0
         self._state = "idle"
         self._last_result: dict[str, Any] = {}
@@ -72,7 +74,7 @@ class MediaAgentSyncWorker:
             self._revision += 1
             self._updated_at = _now()
         try:
-            raw = self.sync()
+            raw = self._context.run(self.sync)
             result = dict(raw) if isinstance(raw, Mapping) else {
                 "ok": False,
                 "error": "media_agent_sync_invalid_result",
@@ -104,7 +106,7 @@ class MediaAgentSyncWorker:
             self._updated_at = _now()
         if self.publish is not None:
             try:
-                self.publish()
+                self._context.run(self.publish)
             except Exception:
                 pass
         return result
