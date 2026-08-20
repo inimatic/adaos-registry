@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import mimetypes
 import re
 import sys
@@ -37,6 +38,7 @@ _enrichment_worker: MediaEnrichmentWorker | None = None
 _coordinator_lock = threading.Lock()
 _coordinator_path = ""
 _coordinator_cached: MediaCatalogCoordinator | None = None
+_log = logging.getLogger("adaos.skill.media_center")
 
 
 class MediaRootOperationBusy(RuntimeError):
@@ -140,7 +142,7 @@ def _publish_library_snapshot(
     profile_id: str = "default",
     shared_surface: bool = False,
     webspace_id: str = "",
-) -> None:
+) -> bool:
     try:
         from adaos.sdk.io import stream_variable_publish
 
@@ -182,8 +184,15 @@ def _publish_library_snapshot(
                 },
             },
         )
+        return True
     except Exception:
-        return
+        _log.exception(
+            "library snapshot publish failed profile=%s shared_surface=%s webspace=%s",
+            str(profile_id or "default"),
+            bool(shared_surface),
+            str(webspace_id or "default"),
+        )
+        return False
 
 
 def _invoke_agent(operation: str, arguments: Mapping[str, Any] | None = None, *, timeout: float = 15.0) -> tuple[dict[str, Any] | None, str]:

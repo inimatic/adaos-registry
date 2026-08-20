@@ -1494,6 +1494,34 @@ def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
     ]
 
 
+def test_library_snapshot_publish_failure_is_observable(monkeypatch, tmp_path, caplog):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+
+    import adaos.sdk.io as sdk_io
+
+    monkeypatch.setattr(
+        sdk_io,
+        "stream_variable_publish",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("bridge down")),
+    )
+
+    with caplog.at_level("ERROR", logger="adaos.skill.media_center"):
+        published = main._publish_library_snapshot(
+            catalog,
+            profile_id="household",
+            shared_surface=True,
+            webspace_id="television",
+        )
+
+    assert published is False
+    assert "library snapshot publish failed" in caplog.text
+    assert "profile=household" in caplog.text
+    assert "webspace=television" in caplog.text
+
+
 def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
