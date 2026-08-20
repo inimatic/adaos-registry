@@ -26,7 +26,19 @@ def _plan() -> dict:
                 "epochs": 3,
                 "seeds": [17],
                 "device": "cpu",
+                "network_mode": "offline",
                 "max_wall_time_minutes": 30,
+                "workload": {
+                    "mode": "bounded",
+                    "limits": [
+                        {"name": "examples", "maximum": 8, "unit": "items"}
+                    ],
+                },
+                "input_policy": {
+                    "source": "deterministic_contract_fixture",
+                    "readiness": "required_before_execution",
+                    "sampling": "deterministic_prefix",
+                },
                 "inference_allowed": False,
             },
             "paired-series": {
@@ -34,7 +46,14 @@ def _plan() -> dict:
                 "epochs": 30,
                 "seeds": [17, 23],
                 "device": "cpu",
+                "network_mode": "offline",
                 "max_wall_time_minutes": 360,
+                "workload": {"mode": "full", "limits": []},
+                "input_policy": {
+                    "source": "accepted_dataset",
+                    "readiness": "required_before_execution",
+                    "sampling": "full",
+                },
                 "inference_allowed": True,
             },
         },
@@ -84,6 +103,16 @@ def test_experiment_plan_projects_without_scientific_inference_or_provider_heuri
     assert set(conditions["execution"]) == {"preflight", "confirmatory"}
     assert conditions["execution"]["preflight"]["source_stage_id"] == "cpu-smoke"
     assert conditions["execution"]["preflight"]["epochs"] == 3
+    assert conditions["execution"]["preflight"]["network_mode"] == "offline"
+    assert conditions["execution"]["preflight"]["workload"] == {
+        "mode": "bounded",
+        "limits": [{"name": "examples", "maximum": 8, "unit": "items"}],
+    }
+    assert conditions["execution"]["preflight"]["input_policy"] == {
+        "source": "deterministic_contract_fixture",
+        "readiness": "required_before_execution",
+        "sampling": "deterministic_prefix",
+    }
     assert conditions["analysis"]["primary_contrast"] == {"minuend": "candidate", "subtrahend": "baseline"}
     assert conditions["analysis"]["primary_metric"] == "validation accuracy"
     assert conditions["analysis"]["result_metric_path"] == "primary_metric"

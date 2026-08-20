@@ -225,7 +225,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.9.0"
+    assert contract["version"] == "1.10.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",

@@ -1950,7 +1950,9 @@ class ResearchManager:
                 wall_time_s=int(profile_conditions.get("wall_time_s") or 7200),
                 max_log_bytes=int(profile_conditions.get("max_log_bytes") or 2 * 1024 * 1024),
             ),
-            network=ExecutionNetworkPolicy(mode="unrestricted"),
+            network=ExecutionNetworkPolicy(
+                mode=str(profile_conditions.get("network_mode") or "unrestricted")
+            ),
             determinism=ExecutionDeterminism(
                 mode="confirmatory" if profile == "confirmatory" else "exploratory",
                 rng_streams=streams,

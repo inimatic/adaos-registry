@@ -3497,6 +3497,7 @@ class ResearchOrchestrator:
                         "operation": "validate_development_candidate",
                         "required": True,
                         "timeout_seconds": 300,
+                        "parameters": {"execute_workflow_smoke": True},
                     },
                     {
                         "id": "research.traceability",
@@ -4112,8 +4113,17 @@ class ResearchOrchestrator:
                 "epochs": int(profile_value["epochs"]),
                 "seeds": seeds,
                 "device": str(profile_value["device"]),
+                "network_mode": str(
+                    profile_value.get("network_mode") or "unrestricted"
+                ),
                 "workers": 0,
                 "wall_time_s": int(profile_value["max_wall_time_minutes"]) * 60,
+                "workload": copy.deepcopy(
+                    dict(profile_value.get("workload") or {})
+                ),
+                "input_policy": copy.deepcopy(
+                    dict(profile_value.get("input_policy") or {})
+                ),
                 "evidence_class": evidence_class,
                 "inference_allowed": bool(profile_value["inference_allowed"]),
             }

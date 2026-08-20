@@ -295,7 +295,7 @@ def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.9.0",
+        "version": "1.10.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -494,6 +494,7 @@ def descriptor() -> dict[str, Any]:
                     "package_ref is a portable ContentRef owned by the direction skill",
                     "request.profile is exactly preflight when profile_conditions.evidence_class is workflow_smoke and exactly confirmatory when it is confirmatory; workflow_smoke is not a valid request.profile value",
                     "profile_conditions.source_stage_id carries the accepted scientific stage identity independently of the ResearchManager lifecycle profile",
+                    "profile_conditions.input_policy is the sole input-source selector: deterministic_contract_fixture must execute the bounded production conformance path without opening the accepted dataset, while accepted_dataset selects the admitted scientific data path; providers must not require a private duplicate flag in conditions",
                     "arm is the exact accepted arm object; providers read arm.id instead of coercing the object to text",
                     "command[0] is the active Python interpreter and command[1] is an absolute runner path under the skill source",
                     "working_directory is a pre-created skill-owned execution-output directory",
