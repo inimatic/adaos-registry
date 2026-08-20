@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.15
+version: 0.8.16
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -1013,6 +1013,10 @@ tools:
   input_schema:
     type: object
     properties:
+      dataset_id:
+        type: string
+        enum: [media-catalog, media-catalog-authority, media-files]
+        default: media-catalog-authority
       partition_ids:
         type: array
         maxItems: 100

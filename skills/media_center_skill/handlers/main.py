@@ -1701,9 +1701,19 @@ def topology_status(limit: int = 50, **_: Any) -> dict[str, Any]:
 
 
 @tool(summary="Explain route eligibility and partial participation for Media Center shards.", side_effects="none")
-def explain_route(partition_ids: list[str] | None = None, **_: Any) -> dict[str, Any]:
+def explain_route(
+    partition_ids: list[str] | None = None,
+    dataset_id: str = "media-catalog-authority",
+    **_: Any,
+) -> dict[str, Any]:
     try:
-        return {"ok": True, **_topology().explain_route(partition_ids or [])}
+        return {
+            "ok": True,
+            **_topology().explain_route(
+                partition_ids or [],
+                dataset_id=dataset_id,
+            ),
+        }
     except Exception as exc:
         key = "runtime.media_center.error.route_explain_failed"
         return _skill_error(

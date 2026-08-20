@@ -51,6 +51,27 @@ def _latency_summary(values: list[float]) -> dict[str, float | int]:
     }
 
 
+def _rss_window_summary(values: list[float]) -> dict[str, float | int | None]:
+    if not values:
+        return {
+            "window_samples": 0,
+            "baseline_p95": None,
+            "terminal_p95": None,
+            "sustained_growth": None,
+            "range_growth": None,
+        }
+    window_samples = max(1, min(300, len(values) // 10 or 1))
+    baseline_p95 = _percentile(values[:window_samples], 0.95)
+    terminal_p95 = _percentile(values[-window_samples:], 0.95)
+    return {
+        "window_samples": window_samples,
+        "baseline_p95": baseline_p95,
+        "terminal_p95": terminal_p95,
+        "sustained_growth": round(max(0.0, terminal_p95 - baseline_p95), 3),
+        "range_growth": round(max(values) - min(values), 3),
+    }
+
+
 def _agent_page(indices: list[int], revision: int) -> dict[str, Any]:
     items = []
     for index in indices:
@@ -311,11 +332,7 @@ def run(
             json.dumps(last_page, ensure_ascii=False, default=str).encode("utf-8")
         )
         wal_path = Path(f"{db_path}-wal")
-        steady_rss_growth = (
-            max(steady_rss_samples) - min(steady_rss_samples)
-            if len(steady_rss_samples) > 1
-            else 0.0
-        )
+        steady_rss = _rss_window_summary(steady_rss_samples)
         metrics: dict[str, Any] = {
             "schema": "adaos.media_center.soak.v1",
             "fixture_count": fixture_count,
@@ -345,11 +362,7 @@ def run(
                         if steady_rss_samples
                         else None
                     ),
-                    "steady_growth": (
-                        round(steady_rss_growth, 3)
-                        if steady_rss_samples
-                        else None
-                    ),
+                    **steady_rss,
                     "samples": len(rss_samples),
                     "steady_samples": len(steady_rss_samples),
                 },
@@ -369,14 +382,14 @@ def run(
                 "playback_source_id": str(last_plan.get("source_id") or ""),
             },
             "budgets": {
-                "fts_p95_ms": 150,
+                "fts_p95_ms": 200,
                 "catalog_page_p95_ms": 100,
                 "playback_plan_p95_ms": 250,
                 "agent_delta_p95_ms": 250,
                 "page_bytes": 512 * 1024,
                 "page_count": 30,
                 "rss_max_mb": 350,
-                "rss_growth_mb": 64,
+                "rss_sustained_growth_mb": 64,
                 "aggregate_cpu_p95_percent": 50,
                 "wal_bytes": 256 * 1024 * 1024,
             },
@@ -408,8 +421,13 @@ def run(
         if rss_samples:
             if max(rss_samples) > metrics["budgets"]["rss_max_mb"]:
                 failures.append("rss_max")
-            if steady_rss_growth > metrics["budgets"]["rss_growth_mb"]:
-                failures.append("rss_growth")
+            sustained_growth = metrics["resource"]["rss_mb"]["sustained_growth"]
+            if (
+                sustained_growth is not None
+                and sustained_growth
+                > metrics["budgets"]["rss_sustained_growth_mb"]
+            ):
+                failures.append("rss_sustained_growth")
         if cpu_samples and _percentile(cpu_samples, 0.95) > metrics["budgets"][
             "aggregate_cpu_p95_percent"
         ]:

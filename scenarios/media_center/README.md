@@ -49,4 +49,11 @@ python scenarios/media_center/benchmarks/run_media_center_soak.py \
 Use `--duration-seconds 60 --count 2000 --enforce` only as a development
 smoke test; it is intentionally not accepted as long-duration evidence.
 
+The static large-library gate keeps a 150 ms FTS p95 budget. The concurrent
+one-hour gate allows 200 ms while continuous agent deltas hold the write path.
+Memory evidence records absolute RSS, the complete steady-state range, and p95
+for bounded initial/final windows. Only continued window-to-window growth is a
+leak failure; a one-time allocator or SQLite cache high-water mark remains
+visible but is governed by the separate 350 MiB absolute limit.
+
 The harness reports one-time FTS/trigram backfill separately from p50/p95/max catalog FTS, cursor-page and local-discovery latency, encoded page bytes, process RSS, sample counts and the exact enforced budgets. Correctness assertions reject empty FTS/fuzzy results, incomplete search indexes and invalid page sizes. The same run migrates and removes 20,000 legacy works and collections, verifies 20,000 contextual works/memberships, and enforces a bounded migration budget. It uses generated descriptors and never needs private media bytes.

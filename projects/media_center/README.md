@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.9` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.10` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -27,6 +27,15 @@ already bound to another concrete node fails closed.
 Topology apply reads the immutable reviewed plan through the public SDK and
 grants only the approvals named by that plan. Ordinary replica creation carries
 no authority or removal approval; handoff and removal remain separately fenced.
+Route diagnostics now select one of the declared Media Center datasets and use
+`media-catalog-authority` by default; the former undeclared placeholder dataset
+is rejected before it reaches the generic distributed runtime.
+
+The one-hour concurrent acceptance gate keeps the static 150 ms catalog-search
+target separate from its 200 ms FTS target under continuous agent deltas. RSS
+leak detection compares bounded post-warmup baseline and terminal windows while
+still reporting the full high-water range and enforcing the 350 MiB absolute
+limit.
 
 The same release supports colocated one-node operation and selected-node or
 capability-based deployment. Entry-point bindings select presentation

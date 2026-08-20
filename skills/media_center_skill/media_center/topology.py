@@ -8,6 +8,9 @@ from adaos.sdk import distributed as distributed_sdk
 
 
 DEPLOYMENT_ID = "media-center-home"
+MEDIA_DATASET_IDS = frozenset(
+    {"media-catalog", "media-catalog-authority", "media-files"}
+)
 
 
 def _dict(value: Any) -> dict[str, Any]:
@@ -407,5 +410,13 @@ class MediaCenterTopology:
                 "reason": str(exc)[:300],
             }
 
-    def explain_route(self, partition_ids: list[str]) -> dict[str, Any]:
-        return distributed_sdk.explain_route("media-center-sources", partition_ids[:100])
+    def explain_route(
+        self,
+        partition_ids: list[str],
+        *,
+        dataset_id: str = "media-catalog-authority",
+    ) -> dict[str, Any]:
+        selected_dataset = str(dataset_id or "media-catalog-authority").strip()
+        if selected_dataset not in MEDIA_DATASET_IDS:
+            raise ValueError("media_center_dataset_not_supported")
+        return distributed_sdk.explain_route(selected_dataset, partition_ids[:100])

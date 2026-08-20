@@ -1134,6 +1134,33 @@ def test_media_topology_owns_agent_membership_and_commits_remote_observation(
     assert observed["external_media_copied"] is False
 
 
+def test_media_topology_explains_only_declared_media_datasets(monkeypatch):
+    from media_center import topology as topology_module
+
+    captured = {}
+
+    def fake_explain_route(dataset_id, partition_ids):
+        captured["route"] = (dataset_id, partition_ids)
+        return {"dataset_id": dataset_id, "eligible": []}
+
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "explain_route",
+        fake_explain_route,
+    )
+    topology = MediaCenterTopology()
+
+    explained = topology.explain_route(["catalog-home"] * 101)
+
+    assert explained["dataset_id"] == "media-catalog-authority"
+    assert captured["route"] == (
+        "media-catalog-authority",
+        ["catalog-home"] * 100,
+    )
+    with pytest.raises(ValueError, match="media_center_dataset_not_supported"):
+        topology.explain_route([], dataset_id="media-center-sources")
+
+
 def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
     monkeypatch, tmp_path
 ):
