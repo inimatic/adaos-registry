@@ -1777,6 +1777,9 @@ class ResearchOrchestrator:
             task_id=task_id,
             implementation_track_id=implementation_track_id,
         )
+        selected_task = state.get("selected_task")
+        if isinstance(selected_task, Mapping):
+            self._ensure_implementation_project(state["direction"], selected_task)
         session = state.get("development_session")
         if not isinstance(session, Mapping):
             raise ValueError("accept the ResearchPrototype before opening a Builder Development Session")
@@ -3633,6 +3636,9 @@ class ResearchOrchestrator:
             task_id=task_id,
             implementation_track_id=implementation_track_id,
         )
+        selected_task = state.get("selected_task")
+        if isinstance(selected_task, Mapping):
+            self._ensure_implementation_project(state["direction"], selected_task)
         track = state.get("active_implementation_track")
         session = state.get("development_session")
         if not isinstance(track, Mapping) or not isinstance(session, Mapping):
