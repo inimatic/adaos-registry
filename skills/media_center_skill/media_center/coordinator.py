@@ -2066,62 +2066,75 @@ class MediaCatalogCoordinator:
         search_candidate_count = 0
         with self.repository.connect() as connection:
             if query_token:
-                candidate_rows = connection.execute(
-                    """
-                    SELECT item_id FROM catalog_search
-                    WHERE catalog_search.text MATCH ? LIMIT ?
-                    """,
-                    (fts_query, search_candidate_limit),
-                ).fetchall()
-                candidate_ids = [str(row["item_id"]) for row in candidate_rows]
-                search_candidate_count = len(candidate_ids)
-                if candidate_ids:
-                    candidate_placeholders = ",".join("?" for _ in candidate_ids)
-                    search_filters = [f"c.id IN ({candidate_placeholders})", *filters]
-                    search_where = "WHERE " + " AND ".join(search_filters)
-                    rows = connection.execute(
-                        f"""
-                        WITH search_input(query_label) AS (VALUES (?)),
-                        search_page AS MATERIALIZED (
-                            SELECT c.id,
-                                CASE
-                                    WHEN lower(c.title)=lower(search_input.query_label) THEN 0
-                                    WHEN instr(lower(c.title),lower(search_input.query_label))>0 THEN 1
-                                    WHEN instr(lower(c.name),lower(search_input.query_label))>0 THEN 2
-                                    ELSE 3
-                                END AS catalog_rank,
-                                c.rowid AS catalog_rowid
-                            FROM catalog_items c CROSS JOIN search_input
-                            LEFT JOIN personal_media_state ps
-                                ON ps.item_id=c.id AND ps.profile_id=?
-                            {search_where} ORDER BY {order} LIMIT ? OFFSET ?
-                        )
-                        SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
-                            COALESCE(ps.resume_ms,0) AS profile_resume_ms,
-                            COALESCE(ps.duration_ms,0) AS profile_duration_ms,
-                            COALESCE(ps.completed,0) AS profile_completed,
-                            COALESCE(ps.rating,0) AS profile_rating,
-                            COALESCE(ps.hidden,0) AS profile_hidden,
-                            COALESCE(ps.last_played_at,'') AS profile_last_played_at,
-                            COALESCE(ps.revision,0) AS profile_revision,
-                            search_page.catalog_rank,search_page.catalog_rowid
-                        FROM search_page JOIN catalog_items c ON c.id=search_page.id
+                search_where = "WHERE " + " AND ".join(filters)
+                rows = connection.execute(
+                    f"""
+                    WITH search_input(query_label) AS (VALUES (?)),
+                    search_candidates AS MATERIALIZED (
+                        SELECT rowid,item_id FROM catalog_search
+                        WHERE catalog_search.text MATCH ? LIMIT ?
+                    ),
+                    search_page AS MATERIALIZED (
+                        SELECT c.id,
+                            CASE
+                                WHEN lower(c.title)=lower(search_input.query_label) THEN 0
+                                WHEN instr(lower(c.title),lower(search_input.query_label))>0 THEN 1
+                                WHEN instr(lower(c.name),lower(search_input.query_label))>0 THEN 2
+                                ELSE 3
+                            END AS catalog_rank,
+                            c.rowid AS catalog_rowid,
+                            (SELECT COUNT(*) FROM search_candidates)
+                                AS search_candidate_count
+                        FROM search_candidates candidate
+                        CROSS JOIN catalog_items c
+                            ON c.rowid=candidate.rowid AND c.id=candidate.item_id
+                        CROSS JOIN search_input
                         LEFT JOIN personal_media_state ps
                             ON ps.item_id=c.id AND ps.profile_id=?
-                        ORDER BY search_page.catalog_rank,search_page.catalog_rowid
-                        """,
-                        (
-                            query_token,
-                            profile,
-                            *candidate_ids,
-                            *params[1:],
-                            page_size + 1,
-                            resolved_offset,
-                            profile,
-                        ),
-                    ).fetchall()
+                        {search_where} ORDER BY {order} LIMIT ? OFFSET ?
+                    )
+                    SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                        COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                        COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                        COALESCE(ps.completed,0) AS profile_completed,
+                        COALESCE(ps.rating,0) AS profile_rating,
+                        COALESCE(ps.hidden,0) AS profile_hidden,
+                        COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                        COALESCE(ps.revision,0) AS profile_revision,
+                        search_page.catalog_rank,search_page.catalog_rowid,
+                        search_page.search_candidate_count
+                    FROM search_page JOIN catalog_items c ON c.id=search_page.id
+                    LEFT JOIN personal_media_state ps
+                        ON ps.item_id=c.id AND ps.profile_id=?
+                    ORDER BY search_page.catalog_rank,search_page.catalog_rowid
+                    """,
+                    (
+                        query_token,
+                        fts_query,
+                        search_candidate_limit,
+                        profile,
+                        *params[1:],
+                        page_size + 1,
+                        resolved_offset,
+                        profile,
+                    ),
+                ).fetchall()
+                if rows:
+                    search_candidate_count = int(
+                        rows[0]["search_candidate_count"] or 0
+                    )
                 else:
-                    rows = []
+                    search_candidate_count = int(
+                        connection.execute(
+                            """
+                            SELECT COUNT(*) FROM (
+                                SELECT 1 FROM catalog_search
+                                WHERE catalog_search.text MATCH ? LIMIT ?
+                            )
+                            """,
+                            (fts_query, search_candidate_limit),
+                        ).fetchone()[0]
+                    )
             else:
                 rows = connection.execute(
                     f"""
