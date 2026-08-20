@@ -148,6 +148,11 @@ def test_catalog_scans_lists_and_plans_playback(monkeypatch, tmp_path):
 def test_library_auto_scan_uses_sdk_discovery_boundary(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     monkeypatch.setattr(main, "_discover_resources", lambda source="all", limit=5000: ([_resource("song.mp3")], {"ok": True}))
+    monkeypatch.setattr(
+        main,
+        "_sync_agents",
+        lambda *_args, **_kwargs: {"ok": False, "error": "agent_unavailable"},
+    )
 
     payload = main.library(auto_scan=True, limit=20)
 

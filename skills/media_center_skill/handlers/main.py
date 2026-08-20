@@ -393,6 +393,7 @@ def _sync_one_agent(
     limit: int,
     agent_id_hint: str = "",
     node_id_hint: str = "",
+    timeout_seconds: float = 30.0,
 ) -> dict[str, Any]:
     pages = max(1, min(16, int(max_pages or 4)))
     page_limit = max(1, min(1000, int(limit or 500)))
@@ -405,6 +406,7 @@ def _sync_one_agent(
         if instance_id
         else catalog.agent_cursor(actual_agent_id)
     )
+    page_timeout = max(1.0, min(30.0, float(timeout_seconds or 30.0)))
     applied = ignored = removed = 0
     for _index in range(pages):
         if instance_id:
@@ -413,7 +415,7 @@ def _sync_one_agent(
                     instance_id,
                     "pull_deltas",
                     {"cursor": cursor, "limit": page_limit},
-                    timeout_seconds=30.0,
+                    timeout_seconds=page_timeout,
                 )
                 error = ""
             except Exception as exc:
@@ -422,7 +424,7 @@ def _sync_one_agent(
             page, error = _invoke_agent(
                 "pull_deltas",
                 {"cursor": cursor, "limit": page_limit},
-                timeout=30.0,
+                timeout=page_timeout,
             )
         if page is None:
             if actual_agent_id:
@@ -480,7 +482,11 @@ def _sync_one_agent(
 
 
 def _sync_agents(
-    catalog: MediaCatalogCoordinator, *, max_pages: int = 4, limit: int = 500
+    catalog: MediaCatalogCoordinator,
+    *,
+    max_pages: int = 4,
+    limit: int = 500,
+    timeout_seconds: float = 30.0,
 ) -> dict[str, Any]:
     topology_error = ""
     try:
@@ -498,6 +504,7 @@ def _sync_agents(
                 instance=instance,
                 max_pages=max_pages,
                 limit=limit,
+                timeout_seconds=timeout_seconds,
             )
             for instance in instances
         ]
@@ -511,7 +518,9 @@ def _sync_agents(
             "has_more": any(bool(item.get("has_more")) for item in results),
             "participation": catalog.participation(),
         }
-    agent_status, status_error = _invoke_agent("status", {}, timeout=10.0)
+    agent_status, status_error = _invoke_agent(
+        "status", {}, timeout=min(5.0, max(1.0, float(timeout_seconds)))
+    )
     agent_info = (
         agent_status.get("agent")
         if isinstance(agent_status, Mapping)
@@ -546,6 +555,7 @@ def _sync_agents(
         limit=limit,
         agent_id_hint=agent_id,
         node_id_hint=node_id,
+        timeout_seconds=timeout_seconds,
     )
     return {
         **local,
@@ -850,7 +860,9 @@ def library(
     agent_sync: dict[str, Any] | None = None
     summary = repo.summary()
     if _bool(auto_scan, True):
-        agent_sync = _sync_agents(catalog, max_pages=1, limit=500)
+        agent_sync = _sync_agents(
+            catalog, max_pages=1, limit=500, timeout_seconds=5.0
+        )
         if not agent_sync.get("ok") and int(summary.get("total_count") or 0) == 0:
             scan = scan_sources(source="all", limit=5000)
     try:
