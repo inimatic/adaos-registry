@@ -41,6 +41,7 @@ from evaluation.repository import EvaluationRepository  # noqa: E402
 from evaluation.public_contract import (  # noqa: E402
     assert_hidden_profile_is_public,
     project_tlp_consumer_contract,
+    project_tlp_probe_contract,
 )
 from evaluation.tlp_semantics import (  # noqa: E402
     evaluate_tlp_implementation,
@@ -236,6 +237,7 @@ def derive_compact_calibration(
         consumer_contract,
         public_conformance,
     )
+    projected_probe_contract = project_tlp_probe_contract(public_conformance)
     manager_response = invoke_skill(
         "research_manager_skill",
         "environment_identity",
@@ -314,7 +316,8 @@ def derive_compact_calibration(
     projected_inputs = {
         "research_compilation": dict(response["research_compilation"]),
         "automation_brief": dict(response["automation_brief"]),
-        "conformance_fixture": projected_consumer_contract,
+        "runner_contract": projected_consumer_contract,
+        "conformance_fixture": projected_probe_contract,
     }
     replacements = {}
     for kind, value in projected_inputs.items():
@@ -399,7 +402,7 @@ def derive_compact_calibration(
     }
     task.update(
         {
-            "schema_version": "1.9.0",
+            "schema_version": "1.10.0",
             "task_id": str(task_id),
             "title": re.sub(
                 r"(?: \(compact execution contracts\))+$",
@@ -492,6 +495,31 @@ def derive_compact_calibration(
         if replacement:
             item.update({key: replacement[key] for key in ("path", "digest")})
             item["ref"] = f"calibration-input://{task_id}/{item['kind']}/{replacement['digest']}"
+    runner_input_id = "runner-contract"
+    if not any(
+        str(item.get("kind") or "") == "runner_contract"
+        for item in task["inputs"]
+    ):
+        runner_replacement = replacements["runner_contract"]
+        task["inputs"].append(
+            {
+                "input_id": runner_input_id,
+                "kind": "runner_contract",
+                "ref": (
+                    f"calibration-input://{task_id}/runner_contract/"
+                    f"{runner_replacement['digest']}"
+                ),
+                "digest": runner_replacement["digest"],
+                "path": runner_replacement["path"],
+                "visible_arms": ["C3_typed_execution", "C4_over_specified"],
+            }
+        )
+        for arm in task["arms"]:
+            if str(arm.get("arm_id") or "") in {
+                "C3_typed_execution",
+                "C4_over_specified",
+            }:
+                arm["instruction_input_ids"].append(runner_input_id)
     stored = repository.put_task(freeze_task(task))
     return {
         "ok": True,

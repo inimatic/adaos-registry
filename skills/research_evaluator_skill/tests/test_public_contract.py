@@ -10,6 +10,7 @@ from evaluation.contracts import digest
 from evaluation.public_contract import (
     assert_hidden_profile_is_public,
     project_tlp_consumer_contract,
+    project_tlp_probe_contract,
 )
 
 
@@ -44,7 +45,8 @@ def _hidden_profile() -> dict:
 
 
 def test_public_projection_exposes_every_required_semantic_interface() -> None:
-    projected = project_tlp_consumer_contract(_generic_contract(), _public_contract())
+    runner = project_tlp_consumer_contract(_generic_contract(), _public_contract())
+    projected = project_tlp_probe_contract(_public_contract())
 
     domain = projected["domain_conformance"]
     profile = domain["implementation_contract"]
@@ -74,6 +76,12 @@ def test_public_projection_exposes_every_required_semantic_interface() -> None:
     assert projected["digest"] == digest(
         {key: value for key, value in projected.items() if key != "digest"}
     )
+    assert runner["contract"] == "adaos.research.runner.v1"
+    assert runner["candidate_role"] == "provider"
+    assert list(runner["operations"]) == ["prepare_attempt"]
+    assert projected["contract"] == "adaos.research.tlp_probe.v1"
+    assert projected["capability"] == "research.tlp.implementation_probe"
+    assert projected["candidate_role"] == "provider"
     assert_hidden_profile_is_public(domain, _hidden_profile())
 
 

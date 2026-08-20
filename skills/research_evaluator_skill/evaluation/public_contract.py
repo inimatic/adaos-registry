@@ -23,7 +23,7 @@ def project_tlp_consumer_contract(
     consumer_contract: Mapping[str, Any],
     public_conformance: Mapping[str, Any],
 ) -> dict[str, Any]:
-    """Attach the public domain surface without exposing hidden probe values."""
+    """Project the generic runner ABI as an explicit candidate provider rail."""
 
     if (
         consumer_contract.get("schema") != "adaos.contract.operation_set.v1"
@@ -45,6 +45,22 @@ def project_tlp_consumer_contract(
 
     projected = copy.deepcopy(dict(consumer_contract))
     projected.pop("digest", None)
+    projected["candidate_role"] = "provider"
+    return {**projected, "digest": digest(projected)}
+
+
+def project_tlp_probe_contract(
+    public_conformance: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build an independent public TLP probe ABI without hidden values."""
+
+    if (
+        public_conformance.get("schema")
+        != "adaos.research.tlp_conformance_fixture.v1"
+        or "implementation_probe"
+        not in dict(public_conformance.get("required_operations") or {})
+    ):
+        raise ValueError("public TLP implementation conformance contract is incomplete")
     probe = dict(
         dict(public_conformance.get("required_operations") or {}).get(
             "implementation_probe"
@@ -55,14 +71,24 @@ def project_tlp_consumer_contract(
     output_schema = probe.get("output_schema")
     if not isinstance(input_schema, Mapping) or not isinstance(output_schema, Mapping):
         raise ValueError("public TLP implementation probe has no machine schemas")
-    operations = dict(projected.get("operations") or {})
-    operations["implementation_probe"] = {
-        "description": str(probe.get("purpose") or "TLP implementation probe"),
-        "input_schema": copy.deepcopy(dict(input_schema)),
-        "output_schema": copy.deepcopy(dict(output_schema)),
+    projected = {
+        "schema": "adaos.contract.operation_set.v1",
+        "contract": "adaos.research.tlp_probe.v1",
+        "version": "1.0.0",
+        "consumer_ref": "skill:research_evaluator_skill",
+        "capability": "research.tlp.implementation_probe",
+        "candidate_role": "provider",
+        "operations": {
+            "implementation_probe": {
+                "description": str(
+                    probe.get("purpose") or "TLP implementation probe"
+                ),
+                "input_schema": copy.deepcopy(dict(input_schema)),
+                "output_schema": copy.deepcopy(dict(output_schema)),
+            }
+        },
+        "domain_conformance": copy.deepcopy(dict(public_conformance)),
     }
-    projected["operations"] = operations
-    projected["domain_conformance"] = copy.deepcopy(dict(public_conformance))
     return {**projected, "digest": digest(projected)}
 
 
@@ -89,4 +115,5 @@ __all__ = [
     "PUBLIC_IMPLEMENTATION_PROFILE_KEYS",
     "assert_hidden_profile_is_public",
     "project_tlp_consumer_contract",
+    "project_tlp_probe_contract",
 ]
