@@ -1665,6 +1665,32 @@ def plan_change_set(
     }
 
 
+@tool(
+    "rebase_change",
+    summary="Rebase one stale Builder Change after deterministic affected-ref verification.",
+    side_effects="local_write",
+)
+def rebase_change(
+    change_id: str,
+    expected_project_generation: int,
+    verified_unchanged_refs: list[str],
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> dict[str, Any]:
+    """Expose the Project aggregate's explicit optimistic-concurrency repair."""
+
+    kind, project_id = _identity(object_type, object_id)
+    return workflow.rebase_change(
+        kind,
+        project_id,
+        str(change_id or "").strip(),
+        expected_project_generation=expected_project_generation,
+        verified_unchanged_refs=[
+            str(item).strip() for item in verified_unchanged_refs if str(item).strip()
+        ],
+    )
+
+
 @tool("add_change_issues", summary="Add follow-up issues to the active Builder change set.", side_effects="local_write")
 def add_change_issues(
     request: str,

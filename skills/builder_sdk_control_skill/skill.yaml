@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.70
+version: 0.1.71
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -538,6 +538,41 @@ tools:
       expected_generation:
         type: integer
         minimum: 0
+  output_schema:
+    type: object
+- name: rebase_change
+  description: Rebase one stale Builder Change after deterministic verification of
+    its affected refs.
+  entry: handlers.main:rebase_change
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - change_id
+    - expected_project_generation
+    - verified_unchanged_refs
+    properties:
+      change_id:
+        type: string
+        minLength: 1
+      expected_project_generation:
+        type: integer
+        minimum: 0
+      verified_unchanged_refs:
+        type: array
+        minItems: 1
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
   output_schema:
     type: object
 - name: add_change_issues

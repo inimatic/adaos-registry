@@ -66,6 +66,12 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["get_process"]["side_effects"] == "none"
     assert tools["get_change_context"]["side_effects"] == "none"
     assert tools["plan_change_set"]["side_effects"] == "local_write"
+    assert tools["rebase_change"]["side_effects"] == "local_write"
+    assert set(tools["rebase_change"]["input_schema"]["required"]) == {
+        "change_id",
+        "expected_project_generation",
+        "verified_unchanged_refs",
+    }
     assert tools["add_change_issues"]["side_effects"] == "local_write"
     assert tools["update_change_issue"]["side_effects"] == "local_write"
     assert tools["link_dependency_checkpoint"]["side_effects"] == "local_write"
@@ -682,6 +688,36 @@ def test_plan_change_set_persists_workflow_and_durable_change_evidence(monkeypat
     assert evidence_calls[0]["status"] == "planned"
     assert evidence_calls[0]["meta"]["change_set"]["route"] == "prototype_first"
     assert result["evidence_synced"] is True
+
+
+def test_rebase_change_uses_project_generation_and_verified_refs(monkeypatch) -> None:
+    module = _module()
+    calls: list[tuple[tuple, dict]] = []
+    monkeypatch.setattr(
+        module.workflow,
+        "rebase_change",
+        lambda *args, **kwargs: calls.append((args, kwargs))
+        or {"ok": True, "project": {"artifact_generation": 3}},
+    )
+
+    result = module.rebase_change(
+        "CH-reviewed-repair",
+        12,
+        ["skill:research_runner", "", "  "],
+        object_type="skill",
+        object_id="research_runner",
+    )
+
+    assert result["ok"] is True
+    assert calls == [
+        (
+            ("skill", "research_runner", "CH-reviewed-repair"),
+            {
+                "expected_project_generation": 12,
+                "verified_unchanged_refs": ["skill:research_runner"],
+            },
+        )
+    ]
 
 
 def test_get_automation_exposes_missing_session_as_idle(monkeypatch) -> None:
