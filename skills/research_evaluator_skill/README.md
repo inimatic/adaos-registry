@@ -27,6 +27,9 @@ Calibration-task schema v1.7 makes that separation part of the frozen contract:
 only a platform outage before candidate execution is excludable; post-start model,
 schema, protocol, implementation, and evidence failures count against correctness,
 while resource-budget excess affects only the budgeted secondary endpoint.
+Visible execution contracts and hidden judge inputs are snapshotted into separate
+owner-scoped content-addressed stores before freezing. A later source-tree edit can
+therefore neither invalidate nor silently mutate an already frozen task.
 
 For the primary AdaOS-versus-raw claim, calibration task v1.4 preregisters
 `C0_raw` as control and `C3_typed_execution` as treatment. It requires at least

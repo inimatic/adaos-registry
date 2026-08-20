@@ -10,6 +10,7 @@ import pytest
 from evaluation.contracts import ARM_IDS, CALIBRATION_EXCLUSION_RULES, freeze_task
 from evaluation.harness import build_recomputable_package, evaluate_candidate, prepare_arm, summarize
 from evaluation.independent import build_independent_candidate
+from handlers.main import _snapshot_hidden_inputs
 
 
 def _sha(value: bytes) -> str:
@@ -143,6 +144,25 @@ def test_v17_freeze_enforces_separate_correctness_and_resource_endpoints(task_va
         "paired_seeds": [17, 23, 47, 71, 101],
         "model_random_seed_control": "unsupported_not_claimed",
     }
+    valid["consumer_evaluation"] = {
+        "max_wall_seconds": 1200,
+        "timeout_result_policy": "persist_terminal_failure",
+        "repeat_policy": "return_existing_result",
+    }
+    valid["expected_smoke_profile"].update(
+        {
+            "network_enforcement_required": False,
+            "max_wall_seconds": 600,
+            "workload": {"mode": "bounded", "limits": []},
+            "input_policy": {
+                "source": "deterministic_contract_fixture",
+                "readiness": "required_before_execution",
+                "sampling": "deterministic_seeded",
+            },
+        }
+    )
+    valid["environment_spec"]["runner_contract_digest"] = "sha256:" + "6" * 64
+    valid["environment_spec"]["component_versions"]["research_manager_skill"] = "0.1.0"
 
     frozen = freeze_task(valid)
     assert frozen["exclusion_rules"] == list(CALIBRATION_EXCLUSION_RULES)
@@ -151,6 +171,61 @@ def test_v17_freeze_enforces_separate_correctness_and_resource_endpoints(task_va
     invalid["exclusion_rules"][-1] = "Budget exhaustion is a correctness failure."
     with pytest.raises(ValueError, match="correctness and resource endpoints separate"):
         freeze_task(invalid)
+
+
+def test_hidden_judge_inputs_are_snapshotted_before_freeze(tmp_path: Path) -> None:
+    class MemoryBlobStore:
+        def __init__(self, root: Path) -> None:
+            self.root = root
+            self.root.mkdir(parents=True, exist_ok=True)
+
+        def put_bytes(self, name: str, data: bytes, *, media_type: str) -> dict:
+            path = self.root / name
+            path.write_bytes(data)
+            return {"ref": f"blob://{name}", "path": str(path), "media_type": media_type}
+
+        def materialize_path(self, blob: dict) -> Path:
+            return Path(blob["path"])
+
+    rubric_path = tmp_path / "hidden-rubric.json"
+    rubric_path.write_text(
+        json.dumps({"exclusions": list(CALIBRATION_EXCLUSION_RULES)}),
+        encoding="utf-8",
+    )
+    oracle_path = tmp_path / "oracle.json"
+    oracle_path.write_text('{"legacy":true}', encoding="utf-8")
+    oracle_digest = _sha(oracle_path.read_bytes())
+    values = [
+        {
+            "input_id": "hidden-rubric",
+            "kind": "hidden_rubric",
+            "ref": "source://rubric",
+            "digest": "sha256:" + "0" * 64,
+            "path": "obsolete-rubric.json",
+        },
+        {
+            "input_id": "legacy-oracle",
+            "kind": "legacy_implementation",
+            "ref": "source://oracle",
+            "digest": oracle_digest,
+            "path": str(oracle_path),
+        },
+    ]
+
+    snapshots, refs = _snapshot_hidden_inputs(
+        "task-v1",
+        values,
+        MemoryBlobStore(tmp_path / "blobs"),
+        rubric_path=rubric_path,
+    )
+    snapshot_paths = [Path(item["path"]) for item in snapshots]
+    before = [path.read_bytes() for path in snapshot_paths]
+    rubric_path.write_text("{}", encoding="utf-8")
+    oracle_path.write_text("{}", encoding="utf-8")
+
+    assert [path.read_bytes() for path in snapshot_paths] == before
+    assert set(refs) == {"hidden-rubric", "legacy-oracle"}
+    assert all(item["ref"].startswith("calibration-hidden://task-v1/") for item in snapshots)
 
 
 def test_prepare_arm_never_projects_hidden_evaluator_material(task_value, monkeypatch) -> None:

@@ -181,6 +181,26 @@
           }
         }
       }
+    },
+    {
+      "if": {"properties": {"schema_version": {"const": "1.7.0"}}},
+      "then": {
+        "required": ["agent_profile", "environment_spec", "measurement_policy", "comparison_plan", "expected_smoke_profile", "consumer_evaluation", "exclusion_rules"],
+        "properties": {
+          "repetitions": {"required": ["model_random_seed_control"]},
+          "expected_smoke_profile": {
+            "required": ["profile_id", "stage_id", "device", "epochs", "seeds", "evidence_class", "inference_allowed", "gpu_count", "network_mode", "network_enforcement_required", "max_wall_seconds", "workload", "input_policy"]
+          },
+          "environment_spec": {
+            "required": ["skill_workspace_commit", "component_versions", "standard_prompt_version", "core_source_tree_clean", "core_source_tree_digest", "runner_contract_digest"],
+            "properties": {
+              "component_versions": {
+                "required": ["research_orchestrator_skill", "research_evaluator_skill", "research_calibration_runner_skill", "research_manager_skill"]
+              }
+            }
+          }
+        }
+      }
     }
   ],
   "$defs": {

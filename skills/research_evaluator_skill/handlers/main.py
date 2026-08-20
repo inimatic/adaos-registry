@@ -23,6 +23,7 @@ if str(_SKILL_ROOT) not in sys.path:
 from evaluation.contracts import (  # noqa: E402
     ARM_IDS,
     CALIBRATION_EXCLUSION_RULES,
+    file_digest,
     freeze_task,
 )
 from evaluation.harness import (  # noqa: E402
@@ -33,6 +34,58 @@ from evaluation.harness import (  # noqa: E402
 )
 from evaluation.independent import build_independent_candidate  # noqa: E402
 from evaluation.repository import EvaluationRepository  # noqa: E402
+
+
+def _snapshot_hidden_inputs(
+    task_id: str,
+    hidden_inputs: list[Mapping[str, Any]],
+    hidden_store: Any,
+    *,
+    rubric_path: Path | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Copy hidden judge inputs into immutable owner-scoped blob storage.
+
+    A newly derived task deliberately adopts the evaluator's current hidden rubric.
+    Every other hidden input must still match the baseline digest before it is
+    snapshotted, preventing an unrelated mutable source file from silently changing
+    the benchmark.
+    """
+
+    current_rubric = (rubric_path or (_SKILL_ROOT / "benchmarks" / "tlp" / "hidden-rubric.json")).resolve()
+    snapshots: list[dict[str, Any]] = []
+    blob_refs: dict[str, str] = {}
+    for raw_item in hidden_inputs:
+        item = copy.deepcopy(dict(raw_item))
+        kind = str(item.get("kind") or "")
+        source = current_rubric if kind == "hidden_rubric" else Path(str(item["path"])).resolve()
+        if not source.is_file():
+            raise ValueError(f"hidden calibration input is unavailable: {item.get('input_id')}")
+        if kind == "hidden_rubric":
+            rubric = json.loads(source.read_text(encoding="utf-8-sig"))
+            if tuple(rubric.get("exclusions") or ()) != CALIBRATION_EXCLUSION_RULES:
+                raise ValueError("current hidden rubric does not match calibration endpoint semantics")
+        elif file_digest(source) != str(item.get("digest") or ""):
+            raise ValueError(
+                f"baseline hidden calibration input changed unexpectedly: {item.get('input_id')}"
+            )
+        payload = source.read_bytes()
+        content_digest = "sha256:" + hashlib.sha256(payload).hexdigest()
+        blob = hidden_store.put_bytes(
+            f"{task_id}-{item['input_id']}{source.suffix}",
+            payload,
+            media_type="application/json" if source.suffix.lower() == ".json" else "application/octet-stream",
+        )
+        materialized = hidden_store.materialize_path(blob)
+        item.update(
+            {
+                "path": str(materialized),
+                "digest": content_digest,
+                "ref": f"calibration-hidden://{task_id}/{item['input_id']}/{content_digest}",
+            }
+        )
+        snapshots.append(item)
+        blob_refs[str(item["input_id"])] = str(blob["ref"])
+    return snapshots, blob_refs
 
 
 @tool(summary="Ensure the independent research-evaluation ledger.", side_effects="local_write")
@@ -234,6 +287,7 @@ def derive_compact_calibration(
             + ", ".join(sorted(set(mismatches)))
         )
     input_store = blob_store("calibration_inputs")
+    hidden_store = blob_store("calibration_hidden_inputs")
     projected_inputs = {
         "research_compilation": dict(response["research_compilation"]),
         "automation_brief": dict(response["automation_brief"]),
@@ -375,6 +429,11 @@ def derive_compact_calibration(
             "exclusion_rules": list(CALIBRATION_EXCLUSION_RULES),
         }
     )
+    task["hidden_inputs"], hidden_blob_refs = _snapshot_hidden_inputs(
+        str(task_id),
+        [dict(item) for item in baseline["hidden_inputs"]],
+        hidden_store,
+    )
     for item in task["inputs"]:
         replacement = replacements.get(str(item["kind"]))
         if replacement:
@@ -394,6 +453,7 @@ def derive_compact_calibration(
             "execution_compilation_digest": projected_inputs["research_compilation"]["digest"],
             "execution_automation_brief_digest": projected_inputs["automation_brief"]["digest"],
             "blob_refs": {kind: item["blob_ref"] for kind, item in replacements.items()},
+            "hidden_blob_refs": hidden_blob_refs,
         },
     }
 
