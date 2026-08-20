@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import os
 import re
 import sqlite3
+import time
 import zlib
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -27,6 +30,51 @@ from .contracts import (
 ACTIVE_JOB_STATUSES = ("queued", "running", "waiting_resources", "canceling")
 TERMINAL_JOB_STATUSES = ("completed", "failed", "canceled")
 _CLOCK = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
+_DATABASE_SCHEMA_REVISION = "2"
+_SCHEMA_LOCK_TIMEOUT_SECONDS = 300.0
+
+
+@contextlib.contextmanager
+def _exclusive_schema_lock(path: Path) -> Iterator[None]:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    handle = path.open("a+b")
+    deadline = time.monotonic() + _SCHEMA_LOCK_TIMEOUT_SECONDS
+    acquired = False
+    try:
+        handle.seek(0)
+        if path.stat().st_size == 0:
+            handle.write(b"0")
+            handle.flush()
+        while not acquired:
+            try:
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                acquired = True
+            except (BlockingIOError, OSError):
+                if time.monotonic() >= deadline:
+                    raise TimeoutError("media_library_agent_schema_lock_timeout")
+                time.sleep(0.05)
+        yield
+    finally:
+        if acquired:
+            with contextlib.suppress(OSError):
+                handle.seek(0)
+                if os.name == "nt":
+                    import msvcrt
+
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        handle.close()
 
 
 def _replace_legacy_identity(value: Any, *, node_id: str, agent_id: str) -> Any:
@@ -87,13 +135,54 @@ class MediaLibraryAgentRepository:
         connection = sqlite3.connect(str(self.db_path), timeout=30)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
-        connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA synchronous=NORMAL")
         connection.execute("PRAGMA busy_timeout=30000")
         return connection
 
     def ensure_schema(self) -> dict[str, Any]:
+        if self._schema_is_current():
+            return self._schema_result()
+        with _exclusive_schema_lock(self.db_path.with_suffix(".schema.lock")):
+            if self._schema_is_current():
+                return self._schema_result()
+            self._migrate_schema()
+        return self._schema_result()
+
+    def _schema_result(self) -> dict[str, Any]:
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "schema_revision": _DATABASE_SCHEMA_REVISION,
+            "db_path": str(self.db_path),
+            "node_id": self.node_id,
+        }
+
+    def _schema_is_current(self) -> bool:
+        if not self.db_path.exists():
+            return False
         with self.connect() as connection:
+            table = connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name='agent_meta'"
+            ).fetchone()
+            if table is None:
+                return False
+            rows = {
+                text(row["key"]): text(row["value"])
+                for row in connection.execute(
+                    "SELECT key,value FROM agent_meta WHERE key IN ('node_id','database_schema_revision')"
+                ).fetchall()
+            }
+        stored_node = rows.get("node_id", "")
+        if stored_node and stored_node not in {"local", self.node_id}:
+            raise ValueError("repository_node_identity_mismatch")
+        return (
+            stored_node == self.node_id
+            and rows.get("database_schema_revision") == _DATABASE_SCHEMA_REVISION
+        )
+
+    def _migrate_schema(self) -> None:
+        with self.connect() as connection:
+            connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS agent_meta (
@@ -269,6 +358,10 @@ class MediaLibraryAgentRepository:
                 "INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('schema_version', ?)",
                 (SCHEMA_VERSION,),
             )
+            connection.execute(
+                "INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('database_schema_revision', ?)",
+                (_DATABASE_SCHEMA_REVISION,),
+            )
             search_count = int(
                 connection.execute("SELECT COUNT(*) FROM source_search").fetchone()[0]
             )
@@ -297,12 +390,6 @@ class MediaLibraryAgentRepository:
                         ),
                     )
             connection.commit()
-        return {
-            "ok": True,
-            "schema": SCHEMA_VERSION,
-            "db_path": str(self.db_path),
-            "node_id": self.node_id,
-        }
 
     def _bind_node_identity(self, connection: sqlite3.Connection) -> None:
         row = connection.execute(
@@ -349,10 +436,11 @@ class MediaLibraryAgentRepository:
                         int(delta["sequence"]),
                     ),
                 )
-        connection.execute(
-            "INSERT OR REPLACE INTO agent_meta(key,value) VALUES ('node_id',?)",
-            (self.node_id,),
-        )
+        if stored != self.node_id:
+            connection.execute(
+                "INSERT OR REPLACE INTO agent_meta(key,value) VALUES ('node_id',?)",
+                (self.node_id,),
+            )
 
     @property
     def agent_id(self) -> str:

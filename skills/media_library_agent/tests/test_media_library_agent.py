@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import concurrent.futures
 import json
+import sqlite3
 import sys
 import time
 import importlib.util
@@ -29,6 +31,7 @@ _HANDLER_SPEC = importlib.util.spec_from_file_location(
 assert _HANDLER_SPEC and _HANDLER_SPEC.loader
 main = importlib.util.module_from_spec(_HANDLER_SPEC)
 _HANDLER_SPEC.loader.exec_module(main)
+_WORKER_STATE_TIMEOUT_SECONDS = 20.0
 
 
 def test_agent_declares_core_managed_membership_and_health_projection():
@@ -212,6 +215,40 @@ def test_repository_migrates_legacy_local_identity_once(tmp_path):
         MediaLibraryAgentRepository(database, node_id="node-b")
 
 
+def test_repository_schema_initialization_is_concurrency_safe(tmp_path):
+    database = tmp_path / "concurrent-schema.sqlite3"
+
+    def initialize(_: int) -> dict:
+        return MediaLibraryAgentRepository(database, node_id="node-a").ensure_schema()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        results = list(executor.map(initialize, range(16)))
+
+    assert all(result["ok"] is True for result in results)
+    assert {result["schema_revision"] for result in results} == {"2"}
+    with sqlite3.connect(database) as connection:
+        rows = dict(connection.execute("SELECT key,value FROM agent_meta").fetchall())
+    assert rows["node_id"] == "node-a"
+    assert rows["database_schema_revision"] == "2"
+
+
+def test_current_schema_check_does_not_require_sqlite_writer_lock(tmp_path):
+    database = tmp_path / "current-schema.sqlite3"
+    repository = MediaLibraryAgentRepository(database, node_id="node-a")
+    blocker = sqlite3.connect(database, timeout=1)
+    blocker.execute("BEGIN IMMEDIATE")
+    try:
+        started = time.monotonic()
+        result = repository.ensure_schema()
+    finally:
+        blocker.rollback()
+        blocker.close()
+
+    assert result["ok"] is True
+    assert result["schema_revision"] == "2"
+    assert time.monotonic() - started < 1.0
+
+
 def test_runtime_prefers_sdk_node_identity(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_DB_PATH", str(tmp_path / "sdk.sqlite3"))
     monkeypatch.setattr(
@@ -332,7 +369,7 @@ def test_playback_pressure_pauses_worker_until_released(tmp_path):
     worker = MediaLibraryAgentWorker(repository, register=register, poll_seconds=0.01)
     worker.set_resource_pressure("playback")
     worker.ensure_started()
-    deadline = time.monotonic() + 2
+    deadline = time.monotonic() + _WORKER_STATE_TIMEOUT_SECONDS
     while (
         time.monotonic() < deadline
         and repository.get_job(job["id"])["status"] != "waiting_resources"
@@ -340,7 +377,7 @@ def test_playback_pressure_pauses_worker_until_released(tmp_path):
         time.sleep(0.01)
     assert repository.get_job(job["id"])["status"] == "waiting_resources"
     worker.set_resource_pressure("normal")
-    deadline = time.monotonic() + 2
+    deadline = time.monotonic() + _WORKER_STATE_TIMEOUT_SECONDS
     while (
         time.monotonic() < deadline
         and repository.get_job(job["id"])["status"] != "completed"
@@ -363,7 +400,7 @@ def test_resource_pressure_is_shared_across_agent_processes(tmp_path):
 
     controller_repository.set_resource_pressure("playback")
     worker.ensure_started()
-    deadline = time.monotonic() + 2
+    deadline = time.monotonic() + _WORKER_STATE_TIMEOUT_SECONDS
     while (
         time.monotonic() < deadline
         and worker_repository.get_job(job["id"])["status"] != "waiting_resources"
@@ -372,7 +409,7 @@ def test_resource_pressure_is_shared_across_agent_processes(tmp_path):
     assert worker_repository.get_job(job["id"])["status"] == "waiting_resources"
 
     controller_repository.set_resource_pressure("normal")
-    deadline = time.monotonic() + 2
+    deadline = time.monotonic() + _WORKER_STATE_TIMEOUT_SECONDS
     while (
         time.monotonic() < deadline
         and worker_repository.get_job(job["id"])["status"] != "completed"

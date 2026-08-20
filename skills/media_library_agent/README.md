@@ -13,6 +13,15 @@ health projection, and expires stale memberships. The health endpoint exposes
 only compact `distributed.health` and `distributed.pressure` fields to that
 generic core supervisor.
 
+Repository schema migration is serialized by a node-local process lock. Once
+the recorded database revision and node binding are current, runtime handlers,
+the migration worker, and the persistent service use a read-only fast path and
+do not renegotiate SQLite WAL mode or acquire a writer lock during startup.
+This keeps service health admission independent from concurrent core migration
+and UI rehydration on slow storage. Worker transition tests use bounded
+slow-storage deadlines rather than assuming a local SSD completes a scan in
+two seconds.
+
 ## Scan model
 
 - `import_folder` and `start_scan` return in seconds with durable job identifiers.
