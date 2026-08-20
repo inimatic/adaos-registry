@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -165,7 +166,27 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
             "calibration environment mismatch: "
             + ", ".join(f"{key} expected={required[key]!r} actual={actual[key]!r}" for key in mismatches)
         )
-    return {"task_digest": str(task["digest"]), "expected": required, "actual": actual}
+    minimum_free_disk_bytes = int(expected.get("minimum_free_disk_bytes") or 0)
+    if minimum_free_disk_bytes <= 0:
+        raise RuntimeError("calibration task does not freeze minimum_free_disk_bytes")
+    disk = shutil.disk_usage(Path(__file__).resolve())
+    resource_preflight = {
+        "probe": "current_skill_runtime_volume",
+        "minimum_free_disk_bytes": minimum_free_disk_bytes,
+        "observed_free_disk_bytes": int(disk.free),
+        "ok": int(disk.free) >= minimum_free_disk_bytes,
+    }
+    if not resource_preflight["ok"]:
+        raise RuntimeError(
+            "calibration host free-disk preflight failed before candidate execution: "
+            f"required={minimum_free_disk_bytes} observed={int(disk.free)}"
+        )
+    return {
+        "task_digest": str(task["digest"]),
+        "expected": required,
+        "actual": actual,
+        "resource_preflight": resource_preflight,
+    }
 
 
 def _candidate_id(packet: Mapping[str, Any], explicit: str | None = None) -> str:
@@ -485,4 +506,40 @@ def get_attempt(candidate_id: str, builder_webspace_id: str, **_: Any) -> dict[s
     return {"ok": True, "candidate_id": candidate_id, "automation": result}
 
 
-__all__ = ["environment_identity", "get_attempt", "prepare_attempt", "start_attempt"]
+@tool(
+    summary="Release one terminal calibration candidate runtime after evidence capture.",
+    side_effects="local_write",
+)
+def release_attempt(
+    candidate_id: str,
+    development_session_id: str,
+    **_: Any,
+) -> dict[str, Any]:
+    candidate = str(candidate_id or "").strip().lower()
+    if not _ID_RE.fullmatch(candidate):
+        raise ValueError("candidate_id is invalid")
+    session_id = str(development_session_id or "").strip()
+    if not session_id:
+        raise ValueError("development_session_id is required")
+    result = invoke_skill(
+        "builder_sdk_control_skill",
+        "release_candidate_runtime",
+        {
+            "object_type": "skill",
+            "object_id": candidate,
+            "development_session_id": session_id,
+        },
+        timeout=600,
+    )
+    if not isinstance(result, Mapping) or not result.get("ok"):
+        raise RuntimeError("Builder did not confirm candidate runtime release")
+    return {"ok": True, "candidate_id": candidate, **dict(result)}
+
+
+__all__ = [
+    "environment_identity",
+    "get_attempt",
+    "prepare_attempt",
+    "release_attempt",
+    "start_attempt",
+]

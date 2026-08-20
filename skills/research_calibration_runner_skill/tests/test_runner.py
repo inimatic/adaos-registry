@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -139,9 +140,15 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
                 "research_manager_skill": "0.13.0",
             },
             "runner_contract_digest": runner_contract_digest,
+            "minimum_free_disk_bytes": 1024,
         },
     }
     monkeypatch.setattr(module, "sdk_runtime_identity", lambda: identity)
+    monkeypatch.setattr(
+        module.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(total=4096, used=1024, free=3072),
+    )
     monkeypatch.setattr(
         module.builder_automation,
         "standard_prompt_version",
@@ -172,3 +179,79 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
     task["environment_spec"]["core_commit"] = "b" * 40
     with pytest.raises(RuntimeError, match="core_commit"):
         module._environment_preflight("tlp-calibration-v1")
+
+
+def test_environment_preflight_rejects_disk_pressure_before_candidate_creation(monkeypatch) -> None:
+    module = _module()
+    task = {
+        "digest": "sha256:" + "1" * 64,
+        "environment_spec": {
+            "core_commit": "a" * 40,
+            "python_version": "3.11.9",
+            "platform": "windows-test",
+            "core_source_tree_clean": True,
+            "core_source_tree_digest": "sha256:" + "2" * 64,
+            "component_versions": {
+                "research_evaluator_skill": "0.1.32",
+                "research_calibration_runner_skill": "0.1.12",
+                "research_manager_skill": "0.24.0",
+            },
+            "runner_contract_digest": "sha256:" + "3" * 64,
+            "minimum_free_disk_bytes": 4096,
+        },
+    }
+    local = {
+        "core": {
+            "git_commit": "a" * 40,
+            "source_tree": {"clean": True, "tracked_diff_digest": "sha256:" + "2" * 64},
+        },
+        "python_version": "3.11.9",
+        "platform": "windows-test",
+        "current_skill": {"version": "0.1.12"},
+    }
+
+    def invoke(_skill, method, *_args, **_kwargs):
+        if method == "get_task":
+            return {"ok": True, "task": task, "runtime_identity": {**local, "current_skill": {"version": "0.1.32"}}}
+        if method == "environment_identity":
+            return {"runtime_identity": {**local, "current_skill": {"version": "0.24.0"}}}
+        if method == "get_runner_contract":
+            return {"digest": "sha256:" + "3" * 64}
+        raise AssertionError(method)
+
+    monkeypatch.setattr(module, "invoke_skill", invoke)
+    monkeypatch.setattr(module, "sdk_runtime_identity", lambda: local)
+    monkeypatch.setattr(
+        module.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(total=4096, used=2048, free=2048),
+    )
+
+    with pytest.raises(RuntimeError, match="before candidate execution"):
+        module._environment_preflight("tlp-calibration-v1")
+
+
+def test_release_attempt_delegates_exact_terminal_candidate(monkeypatch) -> None:
+    module = _module()
+    calls: list[tuple[str, str, dict]] = []
+    monkeypatch.setattr(
+        module,
+        "invoke_skill",
+        lambda skill, method, arguments, **_kwargs: calls.append((skill, method, arguments))
+        or {"ok": True, "runtime_release": {"runtime_removed": True}},
+    )
+
+    result = module.release_attempt("tlp_cal_c3_a1_fd_deadbeef", "devcal2_deadbeef")
+
+    assert result["ok"] is True
+    assert calls == [
+        (
+            "builder_sdk_control_skill",
+            "release_candidate_runtime",
+            {
+                "object_type": "skill",
+                "object_id": "tlp_cal_c3_a1_fd_deadbeef",
+                "development_session_id": "devcal2_deadbeef",
+            },
+        )
+    ]
