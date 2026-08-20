@@ -255,6 +255,32 @@ def test_schema_retires_pre_reference_media_center_catalog_rows(monkeypatch, tmp
     assert all_items[0]["missing"] is True
 
 
+def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    repo = MediaCenterRepository()
+    legacy = _resource("legacy-track.mp3")
+    legacy["source_path"] = "/mnt/library/Music/track-1.mp3"
+    legacy["path"] = legacy["source_path"]
+    repo.scan_resources([legacy], source="media_server", mark_missing=False)
+    catalog = MediaCatalogCoordinator(repo)
+
+    applied = catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Music/track-1.mp3"))
+    )
+    available = catalog.list_items(media_kind="audio", limit=30)["items"]
+    all_items = catalog.list_items(
+        media_kind="audio", include_missing=True, limit=30
+    )["items"]
+
+    assert applied["applied_count"] == 1
+    assert len(available) == 1
+    assert available[0]["agent_id"] == "agent-node-a"
+    assert len(all_items) == 2
+    assert next(item for item in all_items if not item["agent_id"])["missing"] is True
+
+
 def test_import_folder_registers_playable_files_without_copying(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     media_dir = tmp_path / "media"

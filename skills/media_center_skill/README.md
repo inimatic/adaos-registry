@@ -24,6 +24,8 @@ Agent availability is independent from known catalog identity. The coordinator d
 
 The colocated compatibility path first reads the agent's stable identity and then resumes that agent's durable cursor. It never restarts delta ingestion at sequence zero merely because distributed topology is not configured, and it never borrows a cursor from a different prior local agent.
 
+When an agent delta names the same contained source path as a legacy `media_server` compatibility row, the coordinator retires the legacy row from normal reads. This removes duplicate UI entries during migration without deleting the original file or its core media reference.
+
 ## Personal State
 
 Favorites, recent playback, resume positions, completion, ratings, hidden items, playlists, and recommendations are keyed by `profile_id`. Catalog queries and playback plans enforce media-kind, maturity, explicit-content, hidden-item, and shared-screen history policy. Mutations publish the bounded replace-mode `media_center.library_state` stream with catalog and personal revisions, participation, home shelves, and recent operations. Multiple browsers can therefore converge without putting a full catalog into synchronized state. The stream supports snapshot replay after reconnect.

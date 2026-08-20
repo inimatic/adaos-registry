@@ -147,6 +147,8 @@ class MediaCatalogCoordinator:
                     ON catalog_items(missing,media_kind,title COLLATE NOCASE,id);
                 CREATE INDEX IF NOT EXISTS idx_media_center_browse_size
                     ON catalog_items(missing,media_kind,size_bytes DESC,id);
+                CREATE INDEX IF NOT EXISTS idx_media_center_source_path
+                    ON catalog_items(source_path,missing,agent_id);
                 CREATE TABLE IF NOT EXISTS coordinator_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
@@ -415,9 +417,31 @@ class MediaCatalogCoordinator:
                         ),
                     )
             connection.execute("INSERT OR REPLACE INTO coordinator_meta(key, value) VALUES ('schema_version', ?)", (COORDINATOR_SCHEMA,))
+            retired_legacy_count = connection.execute(
+                """
+                UPDATE catalog_items AS legacy
+                SET missing=1,last_seen_at=?
+                WHERE legacy.source='media_server'
+                    AND legacy.agent_id=''
+                    AND legacy.missing=0
+                    AND legacy.source_path<>''
+                    AND EXISTS (
+                        SELECT 1 FROM catalog_items AS agent
+                        WHERE agent.agent_id<>''
+                            AND agent.missing=0
+                            AND agent.source_path=legacy.source_path
+                    )
+                """,
+                (now,),
+            ).rowcount
             self._backfill_search(connection)
             connection.commit()
-        return {"ok": True, "schema": COORDINATOR_SCHEMA, "db_path": str(self.repository.db_path)}
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "db_path": str(self.repository.db_path),
+            "retired_legacy_count": max(0, int(retired_legacy_count or 0)),
+        }
 
     def _backfill_search(self, connection: sqlite3.Connection) -> None:
         rows = connection.execute(
@@ -644,6 +668,16 @@ class MediaCatalogCoordinator:
         content_path = _text(descriptor.get("content_path"))
         routed_path = _text(descriptor.get("routed_content_path") or descriptor.get("browser_path"))
         source_path = _text(descriptor.get("source_path") or descriptor.get("path"))
+        if source_path:
+            connection.execute(
+                """
+                UPDATE catalog_items
+                SET missing=1,last_seen_at=?
+                WHERE source='media_server' AND agent_id='' AND missing=0
+                    AND source_path=?
+                """,
+                (now_iso(), source_path),
+            )
         modified_ns = int(source.get("modified_ns") or 0)
         modified_at = _text(descriptor.get("modified_at")) or (str(modified_ns) if modified_ns else "")
         search_text = self._search_text(
