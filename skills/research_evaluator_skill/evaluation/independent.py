@@ -118,32 +118,106 @@ def build_independent_candidate(
     resources = dict(execution_spec.get("resources") or {})
     network = dict(execution_spec.get("network") or {})
     expected_protocol = str(task.get("expected_protocol_digest") or "")
-    protocol_ok = bool(execution_spec) and all(
-        (
-            str(metadata.get("protocol_digest") or "") == expected_protocol,
-            str(metadata.get("stage") or "") == "workflow_smoke",
-            str(metadata.get("evidence_class") or "") == "workflow_smoke",
-            int(metadata.get("epochs") or 0) == 3,
-            list(metadata.get("seeds") or []) == ["seed-17"],
-            metadata.get("inference_allowed") is False,
-            int(resources.get("gpu_count") or 0) == 0,
-            str(network.get("mode") or "") == "offline",
-        )
+    expected_smoke = dict(task.get("expected_smoke_profile") or {})
+    expected_stage = str(expected_smoke.get("stage_id") or "workflow_smoke")
+    expected_evidence_class = str(
+        expected_smoke.get("evidence_class") or "workflow_smoke"
     )
+    expected_epochs = int(expected_smoke.get("epochs") or 3)
+    expected_seeds = list(expected_smoke.get("seeds") or [17])
+    expected_inference = bool(expected_smoke.get("inference_allowed", False))
+    expected_gpu_count = int(expected_smoke.get("gpu_count") or 0)
+    expected_network_mode = str(expected_smoke.get("network_mode") or "offline")
+    expected_workload = dict(expected_smoke.get("workload") or {})
+    expected_input_policy = dict(expected_smoke.get("input_policy") or {})
+    expected_wall_seconds = int(expected_smoke.get("max_wall_seconds") or 0)
+    protocol_fields: dict[str, tuple[Any, Any]] = {
+        "protocol_digest": (
+            str(metadata.get("protocol_digest") or ""),
+            expected_protocol,
+        ),
+        "stage": (str(metadata.get("stage") or ""), expected_stage),
+        "evidence_class": (
+            str(metadata.get("evidence_class") or ""),
+            expected_evidence_class,
+        ),
+        "epochs": (int(metadata.get("epochs") or 0), expected_epochs),
+        "seeds": (list(metadata.get("seeds") or []), expected_seeds),
+        "inference_allowed": (
+            metadata.get("inference_allowed"),
+            expected_inference,
+        ),
+        "gpu_count": (int(resources.get("gpu_count") or 0), expected_gpu_count),
+        "network_mode": (str(network.get("mode") or ""), expected_network_mode),
+    }
+    if "max_wall_seconds" in expected_smoke:
+        protocol_fields["wall_time_seconds"] = (
+            int(resources.get("wall_time_s") or 0),
+            expected_wall_seconds,
+        )
+    if "workload" in expected_smoke:
+        protocol_fields["workload"] = (
+            dict(metadata.get("workload") or {}),
+            expected_workload,
+        )
+    if "input_policy" in expected_smoke:
+        protocol_fields["input_policy"] = (
+            dict(metadata.get("input_policy") or {}),
+            expected_input_policy,
+        )
+    protocol_mismatches = [
+        name for name, (actual, expected) in protocol_fields.items() if actual != expected
+    ]
+    protocol_ok = bool(execution_spec) and not protocol_mismatches
     validation_ok = bool(validation and validation.get("ok"))
     documents = dict((trial or {}).get("documents") or {})
     run_log = dict(documents.get("run_log.json") or {})
     audit = dict(documents.get("evaluation_audit.json") or {})
     evidence_index = dict(documents.get("artifacts_index.json") or {})
+    run_workload = dict(run_log.get("workload") or {})
+    workload_limits = [
+        dict(item)
+        for item in expected_workload.get("limits") or []
+        if isinstance(item, Mapping)
+    ]
+    observed_workload = dict(run_workload.get("observed") or {})
+    workload_ok = "workload" not in expected_smoke or (
+        str(run_workload.get("mode") or "") == str(expected_workload.get("mode") or "")
+        and [dict(item) for item in run_workload.get("limits") or []]
+        == workload_limits
+        and all(
+            isinstance(observed_workload.get(str(item.get("name") or "")), int)
+            and not isinstance(observed_workload.get(str(item.get("name") or "")), bool)
+            and int(observed_workload[str(item.get("name") or "")])
+            <= int(item["maximum"])
+            for item in workload_limits
+        )
+    )
+    run_network = dict(run_log.get("network") or {})
+    provider = dict((trial or {}).get("provider") or {})
+    extended_execution_contract = str(task.get("schema_version") or "") == "1.6.0"
+    network_ok = not extended_execution_contract or all(
+        (
+            str(run_network.get("mode") or "") == expected_network_mode,
+            expected_network_mode != "offline" or run_network.get("accessed") is False,
+            str(provider.get("network_intent") or "") == expected_network_mode,
+            not bool(expected_smoke.get("network_enforcement_required"))
+            or provider.get("network_enforced") is True,
+        )
+    )
     trial_outputs = {str(item["path"]): dict(item) for item in (trial or {}).get("outputs") or []}
     smoke_ok = bool(trial and trial.get("ok")) and all(
         (
-            run_log.get("stage") == "workflow_smoke",
-            run_log.get("device") == "cpu",
-            int(run_log.get("epochs_completed") or 0) == 3,
-            list(run_log.get("seeds") or []) == ["seed-17"],
-            run_log.get("inference_allowed") is False,
-            str(run_log.get("evidence_class") or "") == "workflow_smoke",
+            run_log.get("stage") == expected_stage,
+            run_log.get("device") == str(expected_smoke.get("device") or "cpu"),
+            int(run_log.get("epochs_completed") or 0) == expected_epochs,
+            list(run_log.get("seeds") or []) == expected_seeds,
+            run_log.get("inference_allowed") is expected_inference,
+            str(run_log.get("evidence_class") or "") == expected_evidence_class,
+            "input_policy" not in expected_smoke
+            or dict(run_log.get("input_policy") or {}) == expected_input_policy,
+            workload_ok,
+            network_ok,
             int(dict(audit.get("per_stage") or {}).get("workflow_smoke", {}).get("test_evaluations_count") or 0) == 0,
             not list(audit.get("test_access") or []),
         )
@@ -179,7 +253,15 @@ def build_independent_candidate(
     evidence_ok = smoke_ok and identity_ok and verifier_ok and collection_ok
     checks = [
         _check("context_isolation", context_ok, refs, context_detail),
-        _check("protocol_fidelity", protocol_ok, refs, "frozen smoke protocol preserved" if protocol_ok else "execution spec drifted from frozen protocol"),
+        _check(
+            "protocol_fidelity",
+            protocol_ok,
+            refs,
+            "frozen smoke protocol preserved"
+            if protocol_ok
+            else "execution spec drifted in fields: "
+            + ", ".join(protocol_mismatches or ["execution_spec"]),
+        ),
         _check("native_skill_validation", validation_ok, [str((validation or {}).get("digest") or "")], "strict validation, probing and packaged tests passed" if validation_ok else "native validation or packaged tests failed"),
         _check("runner_conformance", runner_ok, refs, "public runner operations passed consumer checks" if runner_ok else "runner operation checks failed"),
         _check("cpu_workflow_smoke", smoke_ok, [str((trial or {}).get("digest") or "")], "real three-epoch CPU workflow smoke completed" if smoke_ok else "CPU smoke or no-test audit failed"),

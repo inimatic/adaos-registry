@@ -11,12 +11,15 @@ from jsonschema import Draft202012Validator
 from research.contracts import prototype_candidate_schema
 
 
-STAGE_SCHEMA_VERSION = "1.2.0"
+STAGE_SCHEMA_VERSION = "1.3.0"
 DEFAULT_WORKFLOW_SMOKE_POLICY = {
     "device": "cpu",
     "epochs": 3,
     "seed_values": [17],
     "inference_allowed": False,
+    "network_mode": "offline",
+    "input_readiness": "required_before_execution",
+    "workload_mode": "bounded",
 }
 REQUIREMENT_CATEGORIES = ("execution", "data", "reproducibility", "observability", "evidence", "recovery", "analysis", "security")
 CHECK_CATEGORIES = ("workflow", "data_integrity", "reproducibility", "evidence", "analysis", "failure_recovery", "security")
@@ -157,8 +160,17 @@ def protocol_design_schema() -> dict[str, Any]:
         {
             "node": {"type": "string", "minLength": 2},
             "device": {"enum": ["cpu", "cuda", "mps"]},
+            "network_mode": {"enum": ["offline", "unrestricted"]},
         },
-        ["node", "device"],
+        ["node", "device", "network_mode"],
+    )
+    workload_limit = _object(
+        {
+            "name": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+            "maximum": {"type": "integer", "minimum": 1},
+            "unit": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]*$"},
+        },
+        ["name", "maximum", "unit"],
     )
     budget = _object(
         {
@@ -170,8 +182,31 @@ def protocol_design_schema() -> dict[str, Any]:
                 "items": {"anyOf": [{"type": "string", "minLength": 1}, {"type": "integer"}]},
             },
             "max_wall_time_minutes": {"type": "integer", "minimum": 1},
+            "workload": _object(
+                {
+                    "mode": {"enum": ["bounded", "full"]},
+                    "limits": {
+                        "type": "array",
+                        "uniqueItems": True,
+                        "items": workload_limit,
+                    },
+                },
+                ["mode", "limits"],
+            ),
         },
-        ["epochs", "seed_values", "max_wall_time_minutes"],
+        ["epochs", "seed_values", "max_wall_time_minutes", "workload"],
+    )
+    input_policy = _object(
+        {
+            "source": {"enum": ["accepted_dataset", "deterministic_contract_fixture"]},
+            "readiness": {
+                "enum": ["required_before_execution", "may_prepare_during_execution"],
+            },
+            "sampling": {
+                "enum": ["deterministic_prefix", "deterministic_seeded", "full"],
+            },
+        },
+        ["source", "readiness", "sampling"],
     )
     data_policy_properties = copy.deepcopy(
         properties["experimental_plan"]["properties"]["data_policy"]["properties"]
@@ -237,10 +272,11 @@ def protocol_design_schema() -> dict[str, Any]:
                         "evidence_class": {"enum": ["workflow_smoke", "exploratory", "confirmatory"]},
                         "execution_profile": execution_profile,
                         "budget": budget,
+                        "input_policy": input_policy,
                         "inference_allowed": {"type": "boolean"},
                         "stop_conditions": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 5}},
                     },
-                    ["id", "purpose", "evidence_class", "execution_profile", "budget", "inference_allowed", "stop_conditions"],
+                    ["id", "purpose", "evidence_class", "execution_profile", "budget", "input_policy", "inference_allowed", "stop_conditions"],
                 ),
             },
             "data_policy": _object(
@@ -486,6 +522,17 @@ def stage_quality_issues(
                 issues.append(
                     f"stage {item.get('id')} budget.seed_values must be unique"
                 )
+            workload = dict(dict(item.get("budget") or {}).get("workload") or {})
+            limits = [
+                dict(limit)
+                for limit in workload.get("limits") or []
+                if isinstance(limit, Mapping)
+            ]
+            names = [str(limit.get("name") or "") for limit in limits]
+            if workload.get("mode") == "bounded" and not limits:
+                issues.append(f"stage {item.get('id')} bounded workload requires explicit limits")
+            if len(names) != len(set(names)):
+                issues.append(f"stage {item.get('id')} workload limit names must be unique")
         smoke = [item for item in stages if item.get("evidence_class") == "workflow_smoke"]
         confirmation = [item for item in stages if item.get("evidence_class") == "confirmatory"]
         if not smoke or not all(item.get("inference_allowed") is False for item in smoke):
@@ -587,26 +634,60 @@ def stage_quality_issues(
                 or int(smoke[0]["budget"]["epochs"]) != int(smoke_policy.get("epochs") or 0)
                 or list(smoke[0]["budget"]["seed_values"]) != list(smoke_policy.get("seed_values") or [])
                 or bool(smoke[0]["inference_allowed"]) is not bool(smoke_policy.get("inference_allowed"))
+                or (
+                    "network_mode" in smoke_policy
+                    and str(smoke[0]["execution_profile"]["network_mode"])
+                    != str(smoke_policy["network_mode"])
+                )
+                or (
+                    "input_readiness" in smoke_policy
+                    and str(smoke[0]["input_policy"]["readiness"])
+                    != str(smoke_policy["input_readiness"])
+                )
+                or (
+                    "workload_mode" in smoke_policy
+                    and str(smoke[0]["budget"]["workload"]["mode"])
+                    != str(smoke_policy["workload_mode"])
+                )
             ):
                 issues.append("workflow_smoke must exactly preserve the AdaOS execution policy")
     elif stage == "implementation_contract":
         obligations = [
-            str(value)
-            for grouped in (
-                payload.get("requirements_by_category") or {},
-                payload.get("checks_by_category") or {},
-            )
-            for items in grouped.values()
-            for item in items or []
+            (f"{group_name}.{category}.{index}.{field}", str(value))
+            for group_name in ("requirements_by_category", "checks_by_category")
+            for category, items in (payload.get(group_name) or {}).items()
+            for index, item in enumerate(items or [])
             if isinstance(item, Mapping)
-            for value in item.values()
+            for field, value in item.items()
         ]
         per_epoch_test = re.compile(
             r"(?i)(?:test.{0,40}(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445)|"
             r"(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445).{0,40}test)"
         )
-        if any(per_epoch_test.search(item) for item in obligations):
-            issues.append("implementation contract must not observe final-test metrics per epoch")
+        prohibition = re.compile(
+            r"(?i)(?:must\s+not|never|do\s+not|\bnot\b|\bno\b|prohibit\w*|forbid\w*|prevent\w*|"
+            r"reject\w*|fail\w*|without|only\s+once|"
+            r"absen\w*|disabled|zero\s+occurrences|"
+            r"\u043d\u0435\s+\w{0,20}|\u0437\u0430\u043f\u0440\u0435\u0449\w*|\u043d\u0435\u043b\u044c\u0437\u044f|\u0438\u0441\u043a\u043b\u044e\u0447\w*|\u043f\u0440\u0435\u0434\u043e\u0442\u0432\u0440\u0430\u0449\w*|"
+            r"\u043e\u0442\u043a\u043b\u043e\u043d\w*|\u043e\u0448\u0438\u0431\w*|\u043e\u0442\u0441\u0443\u0442\u0441\u0442\u0432\w*|\u043d\u043e\u043b\u044c\w*)"
+        )
+
+        def requires_per_epoch_final_test(text: str) -> bool:
+            """Reject affirmative test-per-epoch obligations, not prohibitions quoting them."""
+
+            match = per_epoch_test.search(text)
+            if match is None:
+                return False
+            context = text[max(0, match.start() - 80) : min(len(text), match.end() + 80)]
+            return prohibition.search(context) is None
+
+        for path, text in obligations:
+            if requires_per_epoch_final_test(text):
+                excerpt = re.sub(r"\s+", " ", text).strip()[:240]
+                issues.append(
+                    f"{path} must not require final-test metrics per epoch; replace it with one sealed "
+                    f"final-test evaluation after selection. Rejected text: {excerpt}"
+                )
         signature = dict(expected_experimental_signature or {})
         bindings = dict(payload.get("scientific_bindings") or {})
         if expected_protocol_digest and bindings.get("protocol_digest") != expected_protocol_digest:

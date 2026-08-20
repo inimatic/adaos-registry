@@ -61,14 +61,17 @@ def _build_experiment_plan(
             "seeds": copy.deepcopy(list(budget["seed_values"])),
             "device": str(profile["device"]),
             "node": str(profile["node"]),
+            "network_mode": str(profile["network_mode"]),
             "max_wall_time_minutes": int(budget["max_wall_time_minutes"]),
+            "workload": copy.deepcopy(dict(budget["workload"])),
+            "input_policy": copy.deepcopy(dict(stage_value["input_policy"])),
             "inference_allowed": bool(stage_value["inference_allowed"]),
             "stop_conditions": copy.deepcopy(list(stage_value["stop_conditions"])),
         }
     task_id = str((task or {}).get("task_id") or f"{direction_id}.task-001")
     plan: dict[str, Any] = {
         "schema": "adaos.research.experiment_plan.v1",
-        "schema_version": "1.2.0",
+        "schema_version": "1.3.0",
         "direction_ref": f"research-direction:{direction_id}",
         "task_ref": str((task or {}).get("ref") or f"research-task:{task_id}"),
         "source_bundle_digest": str(source_bundle_digest),
@@ -376,6 +379,14 @@ def project_execution_compilation(value: Mapping[str, Any]) -> dict[str, Any]:
     problem = copy.deepcopy(dict(source["facets"]["research_problem"]["payload"]))
     problem.pop("assistant_message", None)
     protocol_facet = dict(source["facets"]["experimental_protocol"])
+    protocol = copy.deepcopy(dict(protocol_facet["payload"]))
+    protocol.pop("assistant_message", None)
+    # The normalized experiment_plan facet is the executable authority. The
+    # formulation facet keeps the same large plan only for audit/review, so
+    # sending both to Codex adds attention cost without an additional
+    # obligation or identity.
+    if "experiment_plan" in source["facets"]:
+        protocol.pop("experimental_plan", None)
     graph = dict(source["traceability_graph"])
     allowed_kinds = {"source_fragment", "hypothesis", "experimental_protocol"}
     nodes = [
@@ -391,7 +402,7 @@ def project_execution_compilation(value: Mapping[str, Any]) -> dict[str, Any]:
     ]
     projected = {
         "schema": "adaos.research.compilation_projection.v1",
-        "schema_version": "1.1.0" if "experiment_plan" in source["facets"] else "1.0.0",
+        "schema_version": "1.2.0" if "experiment_plan" in source["facets"] else "1.0.0",
         "direction_id": source["direction_id"],
         "compilation_digest": source["digest"],
         "source_bundle_digest": source["source_bundle_digest"],
@@ -406,7 +417,7 @@ def project_execution_compilation(value: Mapping[str, Any]) -> dict[str, Any]:
             )
         },
         "research_problem": problem,
-        "experimental_protocol": copy.deepcopy(protocol_facet["payload"]),
+        "experimental_protocol": protocol,
         **(
             {"experiment_plan": copy.deepcopy(source["facets"]["experiment_plan"]["payload"])}
             if "experiment_plan" in source["facets"]

@@ -262,13 +262,48 @@ def derive_compact_calibration(
                 "second_arm": "C3_typed_execution" if control_first else "C0_raw",
             }
         )
+    experiment_plan = dict(dict(response["research_compilation"]).get("experiment_plan") or {})
+    execution_profiles = dict(experiment_plan.get("execution") or {})
+    smoke_profiles = [
+        (str(profile_id), dict(profile))
+        for profile_id, profile in execution_profiles.items()
+        if isinstance(profile, Mapping)
+        and str(profile.get("evidence_class") or "") == "workflow_smoke"
+    ]
+    if len(smoke_profiles) != 1:
+        raise ValueError("accepted execution projection must expose exactly one workflow_smoke profile")
+    smoke_profile_id, smoke_profile = smoke_profiles[0]
+    smoke_seeds = list(smoke_profile.get("seeds") or [])
+    if not smoke_seeds or any(isinstance(item, bool) or not isinstance(item, int) for item in smoke_seeds):
+        raise ValueError("workflow_smoke profile must expose integer RNG seeds")
+    expected_smoke_profile = {
+        "profile_id": smoke_profile_id,
+        "stage_id": str(smoke_profile.get("stage_id") or smoke_profile_id),
+        "device": str(smoke_profile.get("device") or ""),
+        "epochs": int(smoke_profile.get("epochs") or 0),
+        "seeds": [int(item) for item in smoke_seeds],
+        "evidence_class": str(smoke_profile.get("evidence_class") or ""),
+        "inference_allowed": bool(smoke_profile.get("inference_allowed")),
+        "gpu_count": 0 if str(smoke_profile.get("device") or "").lower() == "cpu" else 1,
+        "network_mode": str(smoke_profile.get("network_mode") or "unrestricted"),
+        "network_enforcement_required": False,
+        "max_wall_seconds": int(smoke_profile.get("max_wall_time_minutes") or 30) * 60,
+        "workload": copy.deepcopy(dict(smoke_profile.get("workload") or {})),
+        "input_policy": copy.deepcopy(dict(smoke_profile.get("input_policy") or {})),
+    }
     task.update(
         {
-            "schema_version": "1.4.0",
+            "schema_version": "1.6.0",
             "task_id": str(task_id),
             "title": str(baseline["title"]) + " (compact execution contracts)",
             "direction_skill_id": source_direction or str(baseline["direction_skill_id"]),
             "expected_protocol_digest": str(brief["prototype_digest"]),
+            "expected_smoke_profile": expected_smoke_profile,
+            "consumer_evaluation": {
+                "max_wall_seconds": int(expected_smoke_profile["max_wall_seconds"]) + 600,
+                "timeout_result_policy": "persist_terminal_failure",
+                "repeat_policy": "return_existing_result",
+            },
             "agent_profile": {
                 "provider": "openai-codex-cli",
                 "model": str(model),
@@ -439,6 +474,16 @@ def evaluate_builder_attempt(
     repository = EvaluationRepository()
     task = repository.get_task(str(task_id))
     packet = repository.get_packet(task_id, arm_id, attempt_index, budget_view)
+    existing = repository.find_result(task_id, arm_id, attempt_index, budget_view)
+    if existing is not None:
+        return {
+            "ok": True,
+            "ready": True,
+            "idempotent_replay": True,
+            "result": existing,
+            "evidence_valid_completion": existing["metrics"]["evidence_valid_completion"],
+            "operation_errors": [],
+        }
     session = development_sessions.get(development_session_id)
     enriched_instructions = []
     instruction_values: dict[str, Any] = {}
@@ -498,6 +543,7 @@ def evaluate_builder_attempt(
                     "consumer_contract",
                 )
             ]
+            evaluation_policy = dict(task.get("consumer_evaluation") or {})
             consumer = invoke_skill(
                 "research_manager_skill",
                 "evaluate_development_candidate",
@@ -521,7 +567,7 @@ def evaluate_builder_attempt(
                         },
                     }
                 },
-                timeout=3600,
+                timeout=float(evaluation_policy.get("max_wall_seconds") or 3600),
             )
             if not isinstance(consumer, Mapping):
                 raise RuntimeError("ResearchManager consumer evaluation returned no receipt")

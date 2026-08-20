@@ -97,8 +97,8 @@ def _protocol(*, unresolved: bool = False) -> dict:
                 "unresolved_choices": [],
             },
             "stages": [
-                {"id": "smoke", "purpose": "Проверить исполнимость и сбор evidence.", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current", "device": "cpu"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30}, "inference_allowed": False, "stop_conditions": ["Остановить при нечисловом loss."]},
-                {"id": "confirmatory", "purpose": "Оценить заранее объявленный парный контраст.", "evidence_class": "confirmatory", "execution_profile": {"node": "member", "device": "cpu"}, "budget": {"epochs": 30, "seed_values": seed_values, "max_wall_time_minutes": 360}, "inference_allowed": True, "stop_conditions": ["Завершить фиксированный бюджет."]},
+                {"id": "smoke", "purpose": "Проверить исполнимость и сбор evidence.", "evidence_class": "workflow_smoke", "execution_profile": {"node": "current", "device": "cpu", "network_mode": "offline"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30, "workload": {"mode": "bounded", "limits": [{"name": "train_samples", "maximum": 128, "unit": "samples"}]}}, "input_policy": {"source": "deterministic_contract_fixture", "readiness": "required_before_execution", "sampling": "deterministic_seeded"}, "inference_allowed": False, "stop_conditions": ["Остановить при нечисловом loss."]},
+                {"id": "confirmatory", "purpose": "Оценить заранее объявленный парный контраст.", "evidence_class": "confirmatory", "execution_profile": {"node": "member", "device": "cpu", "network_mode": "offline"}, "budget": {"epochs": 30, "seed_values": seed_values, "max_wall_time_minutes": 360, "workload": {"mode": "full", "limits": []}}, "input_policy": {"source": "accepted_dataset", "readiness": "required_before_execution", "sampling": "full"}, "inference_allowed": True, "stop_conditions": ["Завершить фиксированный бюджет."]},
             ],
             "data_policy": {
                 "dataset": "STL-10 version torchvision",
@@ -274,16 +274,22 @@ def test_research_compiler_emits_execution_plan_and_source_to_acceptance_traceab
     assert package["readiness"] == {"decision": "ready_for_acceptance", "blockers": []}
     assert package["digest"].startswith("sha256:")
     projection = project_execution_compilation(package)
+    assert projection["schema_version"] == "1.2.0"
     assert projection["compilation_digest"] == package["digest"]
     assert projection["traceability"]["protocol_digest"] == package["facets"]["experimental_protocol"]["digest"]
     plan = projection["experiment_plan"]
-    assert plan["schema_version"] == "1.2.0"
+    assert plan["schema_version"] == "1.3.0"
+    assert plan["execution"]["smoke"]["network_mode"] == "offline"
+    assert plan["execution"]["smoke"]["workload"]["mode"] == "bounded"
+    assert plan["execution"]["smoke"]["input_policy"]["readiness"] == "required_before_execution"
     assert [item["id"] for item in plan["operators"]["arms"]] == ["maxpool", "tlp"]
     assert plan["analysis"]["primary_contrast"] == {"minuend": "tlp", "subtrahend": "maxpool"}
     assert plan["execution"]["smoke"]["epochs"] == 3
     assert plan["execution"]["confirmatory"]["seeds"] == [17, 23]
     assert plan["runner_contract"]["dataset_binding"]["required_roles"] == ["validation", "robustness", "test"]
     assert "inventory" not in projection["source_analysis"]
+    assert "assistant_message" not in projection["experimental_protocol"]
+    assert "experimental_plan" not in projection["experimental_protocol"]
     assert all(node["kind"] != "acceptance_check" for node in projection["traceability"]["nodes"])
 
 
@@ -414,8 +420,25 @@ def test_implementation_contract_rejects_per_epoch_final_test_observation() -> N
     )
 
     assert stage_quality_issues("implementation_contract", implementation) == [
-        "implementation contract must not observe final-test metrics per epoch"
+        "requirements_by_category.evidence.0.requirement must not require final-test metrics per epoch; "
+        "replace it with one sealed final-test evaluation after selection. Rejected text: "
+        "Store train, validation, and test metrics after every epoch."
     ]
+
+
+def test_implementation_contract_allows_explicit_per_epoch_final_test_prohibition() -> None:
+    implementation = _implementation()
+    implementation["requirements_by_category"]["evidence"][0]["requirement"] = (
+        "Never store final-test metrics per epoch; expose them only once after the evaluation seal."
+    )
+    implementation["checks_by_category"]["workflow"][0]["check"] = (
+        "Отклонить запуск, если test metrics вычислялись на каждой эпохе."
+    )
+    implementation["checks_by_category"]["workflow"][0]["evidence"] = (
+        "Audit shows test metrics per epoch are absent."
+    )
+
+    assert stage_quality_issues("implementation_contract", implementation) == []
 
 
 def test_hypothesis_and_decision_direction_must_match() -> None:

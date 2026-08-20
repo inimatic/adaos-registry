@@ -70,8 +70,8 @@ def _candidate() -> dict:
                 "unresolved_choices": [],
             },
             "stages": [
-                {"id": "smoke", "purpose": "validate the complete local workflow", "evidence_class": "workflow_smoke", "execution_profile": {"device": "cpu", "node": "current"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30}, "inference_allowed": False, "stop_conditions": ["both paired arms finish or one fails"]},
-                {"id": "series", "purpose": "estimate the locked paired scientific contrasts", "evidence_class": "confirmatory", "execution_profile": {"device": "cuda", "node": "declared_member"}, "budget": {"epochs": 120, "seed_values": [17, 23, 29, 31, 37, 41, 43, 47, 53, 59], "max_wall_time_minutes": 10080}, "inference_allowed": True, "stop_conditions": ["enumerated trials complete or budget exhausts"]},
+                {"id": "smoke", "purpose": "validate the complete local workflow", "evidence_class": "workflow_smoke", "execution_profile": {"device": "cpu", "node": "current", "network_mode": "offline"}, "budget": {"epochs": 3, "seed_values": [17], "max_wall_time_minutes": 30, "workload": {"mode": "bounded", "limits": [{"name": "train_samples", "maximum": 128, "unit": "samples"}]}}, "input_policy": {"source": "deterministic_contract_fixture", "readiness": "required_before_execution", "sampling": "deterministic_seeded"}, "inference_allowed": False, "stop_conditions": ["both paired arms finish or one fails"]},
+                {"id": "series", "purpose": "estimate the locked paired scientific contrasts", "evidence_class": "confirmatory", "execution_profile": {"device": "cuda", "node": "declared_member", "network_mode": "offline"}, "budget": {"epochs": 120, "seed_values": [17, 23, 29, 31, 37, 41, 43, 47, 53, 59], "max_wall_time_minutes": 10080, "workload": {"mode": "full", "limits": []}}, "input_policy": {"source": "accepted_dataset", "readiness": "required_before_execution", "sampling": "full"}, "inference_allowed": True, "stop_conditions": ["enumerated trials complete or budget exhausts"]},
             ],
             "data_policy": {
                 "dataset": "STL-10 pinned release",
@@ -274,8 +274,8 @@ def test_legacy_compiled_automation_brief_has_host_neutral_projection() -> None:
         "artifact_groups": [{"ref": "artifact://skill/tlp_direction_skill/part0", "group_id": "part0", "manifest_digest": "sha256:" + "6" * 64, "root_path": "C:/host/view/files", "manifest_path": "C:/host/view/manifest.json"}],
         "development_scope": {"targets": [{"ref": "skill:tlp_direction_skill", "access": "read-write", "context": "full", "source_path": "C:/host/skill"}], "context_members": [], "artifact_inputs": [{"ref": "artifact://skill/tlp_direction_skill/part0", "access": "read-only", "manifest_digest": "sha256:" + "6" * 64, "root_path": "C:/host/view/files"}]},
         "contract_requirements": [{"id": "runner", "contract": "adaos.research.runner.v1", "role": "provider", "operations": [], "boundary": "observable"}],
-        "implementation_requirements": [{}],
-        "acceptance_checks": [{}],
+        "implementation_requirements": [{"id": "REQ-1", "category": "execution", "requirement": "Run the exact path.", "verification": "Inspect run_log.json."}],
+        "acceptance_checks": [{"id": "AC-1", "check": "The path executes.", "evidence": "run_log.json"}],
         "prohibited_actions": ["no hidden access"],
         "handoff_state": "ready_for_codex",
         "created_at": "2026-08-18T00:00:00Z",
@@ -294,12 +294,18 @@ def test_legacy_compiled_automation_brief_has_host_neutral_projection() -> None:
         compilation_projection_digest="sha256:" + "7" * 64,
         protocol_digest="sha256:" + "8" * 64,
     )
-    assert execution["schema_version"] == "1.4.0"
+    assert execution["schema_version"] == "1.6.0"
     assert execution["predecessor_digest"] == projected["digest"]
     assert execution["scientific_contract_ref"]["execution_projection_digest"] == "sha256:" + "7" * 64
     assert "research_prototype" not in execution
     assert "source_inventory" not in execution
     assert "builder_checkpoint" not in execution
+    assert execution["implementation_requirements"] == [
+        {"id": "REQ-1", "category": "execution", "requirement": "Run the exact path."}
+    ]
+    assert execution["acceptance_checks"] == [
+        {"id": "AC-1", "check": "The path executes."}
+    ]
 
 
 def test_llm_candidate_schema_matches_the_typed_contract_and_reports_all_violations() -> None:

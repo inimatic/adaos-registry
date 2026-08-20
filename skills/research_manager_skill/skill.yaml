@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.19.0
+version: 0.20.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -931,4 +931,3 @@ compatibility:
     min_commit: 4cd3cf21ae04b33113f794737756920a21459671
     min_short_commit: 4cd3cf21
     build_date: '2026-08-19T19:11:21+03:00'
-

@@ -130,6 +130,24 @@ class EvaluationRepository:
         )
         return dict(result)
 
+    def find_result(
+        self,
+        task_id: str,
+        arm_id: str,
+        attempt_index: int,
+        budget_view: str,
+    ) -> dict[str, Any] | None:
+        row = self._db.fetch_one(
+            "SELECT payload_json FROM calibration_results WHERE task_id=:task_id AND arm_id=:arm_id AND attempt_index=:attempt_index AND budget_view=:budget_view",
+            {
+                "task_id": str(task_id),
+                "arm_id": str(arm_id),
+                "attempt_index": int(attempt_index),
+                "budget_view": str(budget_view),
+            },
+        )
+        return json.loads(str(row["payload_json"])) if row else None
+
     def results(self, task_id: str, *, budget_view: str | None = None) -> list[dict[str, Any]]:
         sql = "SELECT payload_json FROM calibration_results WHERE task_id=:task_id"
         params: dict[str, Any] = {"task_id": task_id}

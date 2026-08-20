@@ -108,6 +108,18 @@ def _acceptance_plan() -> dict:
                 "inference_allowed": False,
                 "max_wall_time_minutes": 60,
                 "seeds": [17],
+                "network_mode": "offline",
+                "workload": {
+                    "mode": "bounded",
+                    "limits": [
+                        {"name": "train_samples", "maximum": 128, "unit": "samples"}
+                    ],
+                },
+                "input_policy": {
+                    "source": "deterministic_contract_fixture",
+                    "readiness": "required_before_execution",
+                    "sampling": "deterministic_seeded",
+                },
             }
         },
         "randomization": {
@@ -190,7 +202,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.3.0"
+    assert contract["version"] == "1.4.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -222,6 +234,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
         {
             "dataset_id": "stl10_torchvision",
             "ready": True,
+            "execution_ready_without_network": True,
             "split_bindings": split_values,
         },
         dataset_schema,
@@ -230,6 +243,8 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
         jsonschema.validate(
             {
                 "dataset_id": "stl10_torchvision",
+                "ready": True,
+                "execution_ready_without_network": True,
                 "split_bindings": [
                     {"role": role, **item, "sealed": role == "test"}
                     for role, item in split_values.items()
@@ -280,6 +295,7 @@ def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) 
             return {
                 "dataset_id": "stl10_torchvision",
                 "ready": True,
+                "execution_ready_without_network": True,
                 "split_bindings": split_values,
             }
         assert operation_id == "prepare_attempt"
@@ -337,6 +353,7 @@ def test_development_consumer_acceptance_reads_public_compilation_projection(
             return {
                 "dataset_id": "stl10_torchvision",
                 "ready": True,
+                "execution_ready_without_network": True,
                 "split_bindings": {
                     role: {**item, "sealed": role == "test"}
                     for role, item in _splits().items()
@@ -413,6 +430,19 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
             "seeds": ["seed-17"],
             "inference_allowed": False,
             "evidence_class": "workflow_smoke",
+            "workload": {
+                "mode": "bounded",
+                "limits": [
+                    {"name": "train_samples", "maximum": 128, "unit": "samples"}
+                ],
+                "observed": {"train_samples": 128},
+            },
+            "input_policy": {
+                "source": "deterministic_contract_fixture",
+                "readiness": "required_before_execution",
+                "sampling": "deterministic_seeded",
+            },
+            "network": {"mode": "offline", "accessed": False},
         },
         "evaluation_audit.json": {
             "per_stage": {"workflow_smoke": {"test_evaluations_count": 0}},
@@ -436,6 +466,7 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
             return {
                 "dataset_id": "stl10_torchvision",
                 "ready": True,
+                "execution_ready_without_network": True,
                 "split_bindings": split_values,
             }
         if operation_id == "prepare_attempt":
@@ -528,6 +559,19 @@ def test_workflow_smoke_index_rejects_self_referential_digest() -> None:
                         "seeds": ["seed-17"],
                         "inference_allowed": False,
                         "evidence_class": "workflow_smoke",
+                        "workload": {
+                            "mode": "bounded",
+                            "limits": [
+                                {"name": "train_samples", "maximum": 128, "unit": "samples"}
+                            ],
+                            "observed": {"train_samples": 128},
+                        },
+                        "input_policy": {
+                            "source": "deterministic_contract_fixture",
+                            "readiness": "required_before_execution",
+                            "sampling": "deterministic_seeded",
+                        },
+                        "network": {"mode": "offline", "accessed": False},
                     },
                     "evaluation_audit.json": {
                         "per_stage": {
@@ -552,6 +596,7 @@ def test_workflow_smoke_index_rejects_self_referential_digest() -> None:
             collected={"complete": True, "artifacts": [self_ref]},
             verified_artifacts=[{"ok": True}],
             expected_seed_labels=["seed-17"],
+            expected_profile=_acceptance_plan()["execution"]["stage_smoke_cpu"],
         )
 
 
