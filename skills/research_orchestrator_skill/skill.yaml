@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.51.0
+version: 0.51.1
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -53,6 +53,7 @@ exports:
   - get_automation_brief
   - open_builder_session
   - refresh_development_contract
+  - branch_implementation_track
   - get_activity
   - get_formulation_run
   - get_compilation
@@ -669,6 +670,33 @@ tools:
         type:
         - string
         - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: branch_implementation_track
+  description: Create an idempotent successor ImplementationTrack for a repaired
+    realization while preserving predecessor release, Study, and Experiment identity.
+  entry: handlers.main:branch_implementation_track
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      reason:
+        type: string
       actor:
         type: string
     additionalProperties: true
@@ -1358,4 +1386,3 @@ compatibility:
     min_commit: 42e33bd1664fe0157f1d548b25c5aca42f3d2e9f
     min_short_commit: 42e33bd1
     build_date: '2026-08-21T02:22:05+03:00'
-

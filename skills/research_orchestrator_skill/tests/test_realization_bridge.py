@@ -410,3 +410,65 @@ def test_consumer_contract_refresh_supersedes_only_the_development_session(
     assert attached[2][2] == current_contract
     assert repository.bound is not None
     assert repository.activity_record is not None
+
+
+def test_successor_track_preserves_released_predecessor_and_is_idempotent() -> None:
+    repository = OrchestratorRepository()
+    direction = repository.initialize("branching", "Branching")
+    task = repository.get_task(direction["active_task_id"])
+    assert task is not None
+    parent = repository.create_track(
+        "branching",
+        task["task_id"],
+        track_id=f"{task['task_id']}.track-001",
+        title="Primary implementation",
+        project_ref="project:branching_implementation",
+        primary_target_ref="skill:branching",
+    )
+    parent = repository.bind_track_development(
+        parent["track_id"],
+        project_ref="project:branching_implementation",
+        primary_target_ref="skill:branching",
+        development_session_id="dev-branching-old",
+    )
+    release_digest = "sha256:" + "a" * 64
+    parent = repository.bind_track_release(
+        parent["track_id"],
+        candidate_release_digest=release_digest,
+        project_release_ref=f"project-release:branching:{release_digest}",
+        project_release_digest=release_digest,
+    )
+    session = {
+        "session_id": "dev-branching-repair",
+        "project_ref": "project:branching_implementation",
+    }
+    state = {
+        "direction": {"direction_id": "branching"},
+        "selected_task": task,
+    }
+    orchestrator = ResearchOrchestrator(repository=repository)
+
+    successor = orchestrator._successor_implementation_track(
+        state,
+        parent,
+        session,
+        reason="consumer_contract_refresh",
+        actor="system:test",
+    )
+    replay = orchestrator._successor_implementation_track(
+        state,
+        parent,
+        session,
+        reason="consumer_contract_refresh",
+        actor="system:test",
+    )
+
+    assert replay == successor
+    assert successor["parent_track_id"] == parent["track_id"]
+    assert successor["development_session_id"] == session["session_id"]
+    assert successor["status"] == "development_ready"
+    assert successor["candidate_release_digest"] is None
+    unchanged_parent = repository.get_track(parent["track_id"])
+    assert unchanged_parent is not None
+    assert unchanged_parent["project_release_digest"] == release_digest
+    assert unchanged_parent["development_session_id"] == "dev-branching-old"

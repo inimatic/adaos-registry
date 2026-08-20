@@ -2067,12 +2067,30 @@ class ResearchOrchestrator:
             expected_digest=current_digest,
         )
         session = dict(attached["session"])
-        updated_track = self.repository.bind_track_development(
-            str(track["track_id"]),
-            project_ref=project_ref,
-            primary_target_ref=str(track["primary_target_ref"]),
-            development_session_id=str(session["session_id"]),
+        has_immutable_realization = any(
+            track.get(key)
+            for key in (
+                "candidate_release_digest",
+                "project_release_digest",
+                "study_id",
+                "experiment_id",
+            )
         )
+        if has_immutable_realization:
+            updated_track = self._successor_implementation_track(
+                state,
+                track,
+                session,
+                reason="consumer_contract_refresh",
+                actor=actor,
+            )
+        else:
+            updated_track = self.repository.bind_track_development(
+                str(track["track_id"]),
+                project_ref=project_ref,
+                primary_target_ref=str(track["primary_target_ref"]),
+                development_session_id=str(session["session_id"]),
+            )
         event_identity = contract_digest(
             {
                 "track_ref": track["ref"],
@@ -2115,6 +2133,117 @@ class ResearchOrchestrator:
             "instruction_envelope_normalized": instruction_envelope_nested,
             "development_session": session,
             "implementation_track": updated_track,
+        }
+
+    def _successor_implementation_track(
+        self,
+        state: Mapping[str, Any],
+        parent: Mapping[str, Any],
+        session: Mapping[str, Any],
+        *,
+        reason: str,
+        actor: str,
+    ) -> dict[str, Any]:
+        """Create an idempotent branch before changing an immutable realization."""
+
+        task = state.get("selected_task")
+        if not isinstance(task, Mapping):
+            raise ValueError("ImplementationTrack successor requires one ResearchTask")
+        identity = contract_digest(
+            {
+                "parent_track_ref": parent["ref"],
+                "development_session_id": session["session_id"],
+                "reason": reason,
+            }
+        ).removeprefix("sha256:")[:12]
+        track_id = f"{task['task_id']}.track-{identity}"
+        successor = self.repository.create_track(
+            str(state["direction"]["direction_id"]),
+            str(task["task_id"]),
+            track_id=track_id,
+            title=f"{str(parent.get('title') or 'Implementation')} · successor",
+            project_ref=str(parent.get("project_ref") or session.get("project_ref") or "") or None,
+            primary_target_ref=str(parent.get("primary_target_ref") or "") or None,
+            condition_id=(str(parent.get("condition_id") or "") or None),
+            parent_track_id=str(parent["track_id"]),
+            metadata={
+                "lineage": {
+                    "reason": reason,
+                    "parent_track_ref": parent["ref"],
+                    "parent_candidate_release_digest": parent.get("candidate_release_digest"),
+                    "parent_project_release_ref": parent.get("project_release_ref"),
+                    "parent_study_id": parent.get("study_id"),
+                    "parent_experiment_id": parent.get("experiment_id"),
+                    "development_session_id": session["session_id"],
+                }
+            },
+        )
+        successor = self.repository.bind_track_development(
+            str(successor["track_id"]),
+            project_ref=str(parent.get("project_ref") or session.get("project_ref") or ""),
+            primary_target_ref=str(parent.get("primary_target_ref") or ""),
+            development_session_id=str(session["session_id"]),
+        )
+        event_identity = contract_digest(
+            {
+                "parent_track_ref": parent["ref"],
+                "successor_track_ref": successor["ref"],
+                "development_session_id": session["session_id"],
+                "reason": reason,
+            }
+        )
+        self.repository.activity(
+            str(state["direction"]["direction_id"]),
+            "implementation",
+            "successor_track_created",
+            "A successor ImplementationTrack was created; the predecessor release, Study, and Experiment remain immutable.",
+            {
+                "task_ref": task.get("ref"),
+                "parent_implementation_track_ref": parent["ref"],
+                "implementation_track_ref": successor["ref"],
+                "development_session_id": session["session_id"],
+                "reason": reason,
+                "actor": actor,
+            },
+            actor=actor,
+            origin="skill:research_orchestrator_skill",
+            subject_ref=str(successor["ref"]),
+            source_event_id=f"implementation-track-successor:{event_identity}",
+        )
+        return successor
+
+    def branch_implementation_track(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        reason: str = "realization_repair",
+        actor: str = "system:research_orchestrator",
+    ) -> dict[str, Any]:
+        """Branch a released/evaluated realization onto its current exact session."""
+
+        state = self.get(
+            direction_id,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+        )
+        parent = state.get("active_implementation_track")
+        session = state.get("development_session")
+        if not isinstance(parent, Mapping) or not isinstance(session, Mapping):
+            raise ValueError("ImplementationTrack branch requires a bound Development Session")
+        successor = self._successor_implementation_track(
+            state,
+            parent,
+            session,
+            reason=str(reason or "realization_repair").strip() or "realization_repair",
+            actor=actor,
+        )
+        return {
+            "ok": True,
+            "parent_implementation_track": dict(parent),
+            "implementation_track": successor,
+            "development_session": dict(session),
         }
 
     @staticmethod
