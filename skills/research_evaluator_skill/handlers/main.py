@@ -20,7 +20,11 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from evaluation.contracts import ARM_IDS, freeze_task  # noqa: E402
+from evaluation.contracts import (  # noqa: E402
+    ARM_IDS,
+    CALIBRATION_EXCLUSION_RULES,
+    freeze_task,
+)
 from evaluation.harness import (  # noqa: E402
     build_recomputable_package,
     evaluate_candidate,
@@ -294,7 +298,7 @@ def derive_compact_calibration(
     }
     task.update(
         {
-            "schema_version": "1.6.0",
+            "schema_version": "1.7.0",
             "task_id": str(task_id),
             "title": re.sub(
                 r"(?: \(compact execution contracts\))+$",
@@ -368,6 +372,7 @@ def derive_compact_calibration(
                 "missing_policy": "incomplete_no_claim",
                 "claim_scope": "local_tlp_fixed_stack",
             },
+            "exclusion_rules": list(CALIBRATION_EXCLUSION_RULES),
         }
     )
     for item in task["inputs"]:

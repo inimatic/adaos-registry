@@ -23,6 +23,11 @@ failure was reported. Resource compliance is a distinct secondary endpoint,
 `budgeted_evidence_valid_completion`; token or wall-clock excess must not silently
 turn a correct implementation into an incorrect one.
 
+Calibration-task schema v1.7 makes that separation part of the frozen contract:
+only a platform outage before candidate execution is excludable; post-start model,
+schema, protocol, implementation, and evidence failures count against correctness,
+while resource-budget excess affects only the budgeted secondary endpoint.
+
 For the primary AdaOS-versus-raw claim, calibration task v1.4 preregisters
 `C0_raw` as control and `C3_typed_execution` as treatment. It requires at least
 five pairs, a counterbalanced within-pair execution order, an

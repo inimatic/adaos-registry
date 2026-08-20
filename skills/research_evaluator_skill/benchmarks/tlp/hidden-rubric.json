@@ -43,6 +43,7 @@
   ],
   "exclusions": [
     "Only a preregistered platform outage before candidate execution may exclude an attempt.",
-    "Model refusal, timeout after execution begins, schema failure, implementation failure, and budget exhaustion remain scored failures."
+    "Model refusal, timeout after candidate execution begins, schema failure, protocol drift, and implementation or evidence failure remain scored failures of the primary correctness endpoint.",
+    "Resource budget excess is never excluded and is recorded only by budget_compliant and the budgeted secondary endpoint."
   ]
 }

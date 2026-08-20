@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from evaluation.contracts import ARM_IDS, freeze_task
+from evaluation.contracts import ARM_IDS, CALIBRATION_EXCLUSION_RULES, freeze_task
 from evaluation.harness import build_recomputable_package, evaluate_candidate, prepare_arm, summarize
 from evaluation.independent import build_independent_candidate
 
@@ -130,6 +130,26 @@ def test_freeze_task_requires_exact_c0_c4_delivery_contract(task_value) -> None:
     invalid["arms"] = [dict(item) for item in task_value["arms"]]
     invalid["arms"][0]["instruction_input_ids"] = ["review"]
     with pytest.raises(ValueError, match="visibility declarations"):
+        freeze_task(invalid)
+
+
+def test_v17_freeze_enforces_separate_correctness_and_resource_endpoints(task_value) -> None:
+    valid = copy.deepcopy(task_value)
+    valid["schema_version"] = "1.7.0"
+    valid["exclusion_rules"] = list(CALIBRATION_EXCLUSION_RULES)
+    valid["comparison_plan"] = _paired_task(task_value)["comparison_plan"]
+    valid["repetitions"] = {
+        "attempts_per_arm": 5,
+        "paired_seeds": [17, 23, 47, 71, 101],
+        "model_random_seed_control": "unsupported_not_claimed",
+    }
+
+    frozen = freeze_task(valid)
+    assert frozen["exclusion_rules"] == list(CALIBRATION_EXCLUSION_RULES)
+
+    invalid = copy.deepcopy(valid)
+    invalid["exclusion_rules"][-1] = "Budget exhaustion is a correctness failure."
+    with pytest.raises(ValueError, match="correctness and resource endpoints separate"):
         freeze_task(invalid)
 
 

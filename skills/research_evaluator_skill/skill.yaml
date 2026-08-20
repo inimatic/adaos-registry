@@ -1,5 +1,5 @@
 name: research_evaluator_skill
-version: 0.1.29
+version: 0.1.30
 description: Independent, contamination-aware evaluator for AdaOS research-compilation
   calibrations.
 supported_locales:
@@ -421,4 +421,3 @@ compatibility:
     min_commit: a6a3b3269e7fe366cc42d866500a439d23e576e9
     min_short_commit: a6a3b326
     build_date: '2026-08-20T06:21:38+03:00'
-
