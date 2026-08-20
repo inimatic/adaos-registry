@@ -18,6 +18,7 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
+from media_center.background import background_runtime  # noqa: E402
 from media_center.catalog import (  # noqa: E402
     MediaCenterRepository,
     SCHEMA_VERSION,
@@ -33,13 +34,6 @@ VIDEO_EXTENSIONS = {".mp4", ".webm", ".mov", ".m4v", ".mkv", ".avi", ".wmv", ".o
 AUDIO_EXTENSIONS = {".mp3", ".wav", ".flac", ".m4a", ".aac", ".opus", ".ogg"}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp", ".tif", ".tiff"}
 LEGACY_MANAGED_COPY_RE = re.compile(r"^media-center-[0-9a-f]{24}-import\.[^.]+$", re.IGNORECASE)
-_enrichment_lock = threading.Lock()
-_enrichment_path = ""
-_enrichment_worker: MediaEnrichmentWorker | None = None
-_agent_sync_lock = threading.Lock()
-_agent_sync_call_lock = threading.Lock()
-_agent_sync_path = ""
-_agent_sync_worker: MediaAgentSyncWorker | None = None
 _coordinator_lock = threading.Lock()
 _coordinator_path = ""
 _coordinator_cached: MediaCatalogCoordinator | None = None
@@ -72,19 +66,15 @@ def _topology() -> MediaCenterTopology:
 def _enrichment_runtime(
     catalog: MediaCatalogCoordinator | None = None,
 ) -> MediaEnrichmentWorker:
-    global _enrichment_path, _enrichment_worker
     coordinator = catalog or _coordinator()
     path = str(coordinator.repository.db_path.resolve())
-    with _enrichment_lock:
-        if _enrichment_worker is None or _enrichment_path != path:
-            if _enrichment_worker is not None:
-                _enrichment_worker.dispose(timeout=0.2)
-            _enrichment_worker = MediaEnrichmentWorker(
-                coordinator,
-                publish=lambda: _publish_library_snapshot(coordinator),
-            )
-            _enrichment_path = path
-        return _enrichment_worker
+    return background_runtime().enrichment_worker(
+        path,
+        lambda: MediaEnrichmentWorker(
+            coordinator,
+            publish=lambda: _publish_library_snapshot(coordinator),
+        ),
+    )
 
 
 def _run_agent_sync(
@@ -94,42 +84,37 @@ def _run_agent_sync(
     limit: int = 500,
     timeout_seconds: float = 30.0,
 ) -> dict[str, Any]:
-    with _agent_sync_call_lock:
-        return _sync_agents(
+    return background_runtime().run_agent_sync(
+        lambda: _sync_agents(
             catalog,
             max_pages=max_pages,
             limit=limit,
             timeout_seconds=timeout_seconds,
         )
+    )
 
 
 def _agent_sync_runtime(
     catalog: MediaCatalogCoordinator | None = None,
 ) -> MediaAgentSyncWorker:
-    global _agent_sync_path, _agent_sync_worker
     coordinator = catalog or _coordinator()
     path = str(coordinator.repository.db_path.resolve())
-    with _agent_sync_lock:
-        if _agent_sync_worker is None or _agent_sync_path != path:
-            if _agent_sync_worker is not None:
-                _agent_sync_worker.dispose(timeout=0.2)
-            _agent_sync_worker = MediaAgentSyncWorker(
-                lambda: _run_agent_sync(
-                    coordinator,
-                    max_pages=8,
-                    limit=500,
-                    timeout_seconds=30.0,
-                ),
-                publish=lambda: _publish_library_snapshot(coordinator),
-            )
-            _agent_sync_path = path
-        return _agent_sync_worker
+    return background_runtime().agent_sync_worker(
+        path,
+        lambda: MediaAgentSyncWorker(
+            lambda: _run_agent_sync(
+                coordinator,
+                max_pages=8,
+                limit=500,
+                timeout_seconds=30.0,
+            ),
+            publish=lambda: _publish_library_snapshot(coordinator),
+        ),
+    )
 
 
 def _agent_sync_status() -> dict[str, Any]:
-    with _agent_sync_lock:
-        worker = _agent_sync_worker
-    return worker.status() if worker is not None else {"state": "stopped", "revision": 0}
+    return background_runtime().agent_sync_status()
 
 
 def _event_payload(event: Any) -> dict[str, Any]:
@@ -2642,17 +2627,8 @@ def operations(limit: int = 30, **_: Any) -> dict[str, Any]:
 
 @tool(summary="Stop the process-local enrichment worker.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
-    global _agent_sync_worker, _coordinator_cached, _coordinator_path, _enrichment_worker
-    with _agent_sync_lock:
-        sync_worker = _agent_sync_worker
-        _agent_sync_worker = None
-    if sync_worker is not None:
-        sync_worker.dispose()
-    with _enrichment_lock:
-        worker = _enrichment_worker
-        _enrichment_worker = None
-    if worker is not None:
-        worker.dispose()
+    global _coordinator_cached, _coordinator_path
+    background_runtime().dispose()
     with _coordinator_lock:
         _coordinator_cached = None
         _coordinator_path = ""

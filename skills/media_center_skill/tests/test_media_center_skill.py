@@ -18,6 +18,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from media_center.catalog import MediaCenterRepository, SCHEMA_VERSION  # noqa: E402
+from media_center.background import MediaCenterBackgroundRuntime  # noqa: E402
 from media_center.coordinator import MediaCatalogCoordinator  # noqa: E402
 from media_center.enrichment import MediaEnrichmentWorker  # noqa: E402
 from media_center.sync import MediaAgentSyncWorker  # noqa: E402
@@ -30,6 +31,40 @@ _HANDLER_SPEC = importlib.util.spec_from_file_location(
 assert _HANDLER_SPEC and _HANDLER_SPEC.loader
 main = importlib.util.module_from_spec(_HANDLER_SPEC)
 _HANDLER_SPEC.loader.exec_module(main)
+
+
+def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
+    runtime = MediaCenterBackgroundRuntime()
+    disposed: list[tuple[str, float]] = []
+
+    class Worker:
+        def __init__(self, name: str):
+            self.name = name
+
+        def dispose(self, *, timeout: float = 5.0) -> None:
+            disposed.append((self.name, timeout))
+
+        def status(self) -> dict[str, object]:
+            return {"state": "idle", "revision": 2, "worker": self.name}
+
+    first = runtime.agent_sync_worker("catalog-a", lambda: Worker("sync-a"))
+    same = runtime.agent_sync_worker("catalog-a", lambda: Worker("unused"))
+    second = runtime.agent_sync_worker("catalog-b", lambda: Worker("sync-b"))
+    runtime.enrichment_worker("catalog-b", lambda: Worker("enrichment-b"))
+
+    assert first is same
+    assert second is not first
+    assert disposed == [("sync-a", 0.2)]
+    assert runtime.agent_sync_status()["worker"] == "sync-b"
+
+    runtime.dispose(timeout=1.5)
+
+    assert disposed == [
+        ("sync-a", 0.2),
+        ("sync-b", 1.5),
+        ("enrichment-b", 1.5),
+    ]
+    assert runtime.agent_sync_status() == {"state": "stopped", "revision": 0}
 
 
 def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") -> dict:
