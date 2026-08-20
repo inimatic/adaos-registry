@@ -80,8 +80,30 @@ class MediaCenterTopology:
             }
         value = inspection.to_dict()
         activations = list(value.get("activations") or [])
-        nodes: dict[str, dict[str, Any]] = {}
+        latest: dict[tuple[str, str], dict[str, Any]] = {}
         for activation in activations:
+            node_id = str(activation.get("node_id") or "")
+            component_ref = str(activation.get("component_ref") or "")
+            if not node_id or not component_ref:
+                continue
+            key = (node_id, component_ref)
+            current = latest.get(key)
+            candidate_rank = (
+                int(activation.get("generation") or 0),
+                str(activation.get("updated_at") or ""),
+                str(activation.get("activation_id") or ""),
+            )
+            current_rank = (
+                int(current.get("generation") or 0),
+                str(current.get("updated_at") or ""),
+                str(current.get("activation_id") or ""),
+            ) if current is not None else (-1, "", "")
+            if candidate_rank > current_rank:
+                latest[key] = activation
+        nodes: dict[str, dict[str, Any]] = {}
+        for activation in latest.values():
+            if activation.get("status") == "removed":
+                continue
             node_id = str(activation.get("node_id") or "")
             row = nodes.setdefault(
                 node_id,
@@ -93,11 +115,13 @@ class MediaCenterTopology:
                     "agent": False,
                 },
             )
-            row["components"].append(activation.get("component_ref"))
+            row["components"].append(str(activation.get("component_ref") or ""))
             row["generation"] = max(int(row["generation"]), int(activation.get("generation") or 0))
             row["agent"] = row["agent"] or activation.get("component_ref") == "skill:media_library_agent"
-            if activation.get("status") not in {"active", "removed"}:
+            if activation.get("status") != "active":
                 row["state"] = activation.get("status")
+        for row in nodes.values():
+            row["components"].sort()
         desired = dict(value.get("desired") or {})
         return {
             "ok": True,

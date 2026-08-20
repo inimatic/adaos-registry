@@ -983,6 +983,73 @@ def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkey
     assert captured["expected_revision"] == 0
 
 
+def test_deployment_status_projects_only_latest_component_activations(monkeypatch):
+    from media_center import topology as topology_module
+
+    monkeypatch.setattr(
+        topology_module.deployment_sdk,
+        "inspect",
+        lambda deployment_id, limit: SimpleNamespace(
+            to_dict=lambda: {
+                "desired": {
+                    "deployment_id": deployment_id,
+                    "status": "planned",
+                    "revision": 19,
+                    "release_digest": f"sha256:{'a' * 64}",
+                },
+                "activations": [
+                    {
+                        "activation_id": "old-agent",
+                        "node_id": "node-a",
+                        "component_ref": "skill:media_library_agent",
+                        "generation": 18,
+                        "status": "inactive",
+                    },
+                    {
+                        "activation_id": "current-agent",
+                        "node_id": "node-a",
+                        "component_ref": "skill:media_library_agent",
+                        "generation": 19,
+                        "status": "active",
+                    },
+                    {
+                        "activation_id": "current-coordinator",
+                        "node_id": "node-a",
+                        "component_ref": "skill:media_center_skill",
+                        "generation": 19,
+                        "status": "active",
+                    },
+                    {
+                        "activation_id": "removed-agent",
+                        "node_id": "node-b",
+                        "component_ref": "skill:media_library_agent",
+                        "generation": 19,
+                        "status": "removed",
+                    },
+                ],
+                "operations": [],
+                "activation_cursor": None,
+                "operation_cursor": None,
+            }
+        ),
+    )
+
+    result = MediaCenterTopology().deployment_status(limit=50)
+
+    assert result["nodes"] == [
+        {
+            "node_id": "node-a",
+            "state": "active",
+            "generation": 19,
+            "components": [
+                "skill:media_center_skill",
+                "skill:media_library_agent",
+            ],
+            "agent": True,
+        }
+    ]
+
+
 def test_media_topology_definition_is_idempotent_for_existing_datasets(monkeypatch):
     from media_center import topology as topology_module
 
