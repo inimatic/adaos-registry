@@ -35,4 +35,16 @@ $env:PYTHONPATH='..\adaos\src'
 python scenarios/media_center/benchmarks/run_library_benchmark.py --enforce
 ```
 
+The sustained catalog/playback acceptance gate uses a real agent-delta writer
+beside bounded FTS, cursor-page and playback-plan readers. Acceptance mode
+cannot be shortened below one hour or reduced below 20,000 catalog items:
+
+```bash
+python scenarios/media_center/benchmarks/run_media_center_soak.py \
+  --acceptance --enforce
+```
+
+Use `--duration-seconds 60 --count 2000 --enforce` only as a development
+smoke test; it is intentionally not accepted as long-duration evidence.
+
 The harness reports one-time FTS/trigram backfill separately from p50/p95/max catalog FTS, cursor-page and local-discovery latency, encoded page bytes, process RSS, sample counts and the exact enforced budgets. Correctness assertions reject empty FTS/fuzzy results, incomplete search indexes and invalid page sizes. The same run migrates and removes 20,000 legacy works and collections, verifies 20,000 contextual works/memberships, and enforces a bounded migration budget. It uses generated descriptors and never needs private media bytes.

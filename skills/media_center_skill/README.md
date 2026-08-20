@@ -25,6 +25,11 @@ Profile-owned playlists have revision-safe ordered membership and explicit `priv
 
 Every plan carries an `adaos.media_center.playback_route.v1` contract. A source-agent direct URL is preferred when available; the plan always describes a root-routed HTTP fallback tied to the source node. `ensure_rendition()` routes a browser-compatibility request to the exact source-owning agent. Completed derived resources are hidden variants of the same work and remain tied to the exact source revision/fingerprint. `build_playback_queue()` creates ordered snapshots from an item, work, collection, folder, or profile-visible playlist. Queue construction is bounded to 500 and never copies original media bytes.
 
+Coordinator FTS rows share the owning `catalog_items.rowid`. Incremental agent
+updates therefore replace search and fuzzy-search records by indexed row id
+instead of scanning the full virtual table; schema migration rebuilds legacy
+FTS rows once before publishing the new schema revision.
+
 Delta ingestion queues durable enrichment jobs. One low-priority worker selects a versioned provider, records bounded `MetadataClaim` rows with provenance/confidence, and publishes terminal operation progress. The built-in deterministic provider uses only indexed filename, folder, tag, and technical evidence. Technical probes, exact/perceptual fingerprints, thumbnails, and embeddings use the same provider/job boundary; unavailable providers fail explicitly rather than blocking catalog reads or touching source bytes. Perceptual duplicate groups are review-only evidence: no candidate is automatically merged or deleted.
 
 Agent availability is independent from known catalog identity. The coordinator discovers ready `skill:media_library_agent` service instances through `adaos.sdk.distributed`, invokes each exact instance through the public service boundary, and stores one cursor per instance/agent binding. Reads retain known rows but report `partial=true` when an expected instance is stale, missing, or unavailable. Every applied source revision advances a catalog revision, and replayed agent deltas are ignored idempotently.

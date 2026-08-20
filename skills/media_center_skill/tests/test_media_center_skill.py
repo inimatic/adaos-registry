@@ -833,6 +833,106 @@ def test_twenty_thousand_item_catalog_remains_server_paged(monkeypatch, tmp_path
     assert time.monotonic() - started < 30
 
 
+def test_search_indexes_use_catalog_rowids_for_addressed_updates(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    first = catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Example/movie.mp4", kind="video"))
+    )
+    assert first["applied_count"] == 1
+
+    with repository.connect() as connection:
+        row = connection.execute(
+            "SELECT rowid AS catalog_rowid,id FROM catalog_items WHERE source_id='source-1'"
+        ).fetchone()
+        catalog_rowid = int(row["catalog_rowid"])
+        assert int(
+            connection.execute(
+                "SELECT rowid FROM catalog_search WHERE item_id=?", (str(row["id"]),)
+            ).fetchone()[0]
+        ) == catalog_rowid
+        assert int(
+            connection.execute(
+                "SELECT rowid FROM catalog_fuzzy_search WHERE item_id=?",
+                (str(row["id"]),),
+            ).fetchone()[0]
+        ) == catalog_rowid
+
+    updated = catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(
+                1, "Movies/Example/movie.mp4", kind="video", revision=2
+            )
+        )
+    )
+    assert updated["applied_count"] == 1
+    with repository.connect() as connection:
+        indexed = connection.execute(
+            "SELECT text FROM catalog_search WHERE item_id=?", (str(row["id"]),)
+        ).fetchone()
+        assert indexed is not None
+        assert "Example" in str(indexed["text"])
+        assert connection.execute(
+            "SELECT COUNT(*) FROM catalog_search "
+            "WHERE catalog_search MATCH 'example*'"
+        ).fetchone()[0] == 1
+    assert catalog.list_items(query="Example", media_kind="video")["count"] == 1
+    with repository.connect() as connection:
+        assert connection.execute("SELECT COUNT(*) FROM catalog_search").fetchone()[
+            0
+        ] == 1
+        assert connection.execute(
+            "SELECT COUNT(*) FROM catalog_fuzzy_search"
+        ).fetchone()[0] == 1
+
+
+def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Example/movie.mp4", kind="video"))
+    )
+    with repository.connect() as connection:
+        item = connection.execute(
+            "SELECT id,search_text FROM catalog_items WHERE source_id='source-1'"
+        ).fetchone()
+        connection.execute("DELETE FROM catalog_search")
+        connection.execute("DELETE FROM catalog_fuzzy_search")
+        connection.execute(
+            "INSERT INTO catalog_search(rowid,item_id,text) VALUES (999999,?,?)",
+            (str(item["id"]), str(item["search_text"])),
+        )
+        connection.execute(
+            "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) "
+            "VALUES (999999,?,?)",
+            (str(item["id"]), "legacy"),
+        )
+        connection.execute(
+            "DELETE FROM coordinator_meta WHERE key='search_rowid_revision'"
+        )
+        connection.execute(
+            "UPDATE coordinator_meta SET value='legacy' "
+            "WHERE key='coordinator_schema_revision'"
+        )
+        connection.commit()
+
+    MediaCatalogCoordinator(repository)
+    with repository.connect() as connection:
+        catalog_rowid = int(
+            connection.execute(
+                "SELECT rowid FROM catalog_items WHERE source_id='source-1'"
+            ).fetchone()[0]
+        )
+        assert int(connection.execute("SELECT rowid FROM catalog_search").fetchone()[0]) == catalog_rowid
+        assert int(
+            connection.execute("SELECT rowid FROM catalog_fuzzy_search").fetchone()[0]
+        ) == catalog_rowid
+
+
 def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkeypatch):
     from media_center import topology as topology_module
 

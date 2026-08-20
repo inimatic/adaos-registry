@@ -26,7 +26,8 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-20.7"
+COORDINATOR_SCHEMA_REVISION = "2026-08-20.8"
+SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
 WORK_SCHEMA = "adaos.media_center.media_work.v1"
@@ -475,6 +476,7 @@ class MediaCatalogCoordinator:
                 (now,),
             ).rowcount
             self._backfill_search(connection)
+            self._ensure_search_rowids(connection)
             connection.execute(
                 "INSERT OR REPLACE INTO coordinator_meta(key, value) "
                 "VALUES ('coordinator_schema_revision', ?)",
@@ -725,13 +727,14 @@ class MediaCatalogCoordinator:
     def _backfill_search(self, connection: sqlite3.Connection) -> None:
         rows = connection.execute(
             """
-            SELECT id, title, name, source_path, folder_path, metadata_json
+            SELECT rowid AS search_rowid,id,title,name,source_path,folder_path,
+                metadata_json
             FROM catalog_items
             WHERE search_text=''
             """
         ).fetchall()
         updates: list[tuple[str, str]] = []
-        search_rows: list[tuple[str, str]] = []
+        search_rows: list[tuple[int, str, str]] = []
         for row in rows:
             metadata = _json_loads(row["metadata_json"])
             search_text = self._search_text(
@@ -743,26 +746,29 @@ class MediaCatalogCoordinator:
             )
             item_id = str(row["id"])
             updates.append((search_text, item_id))
-            search_rows.append((item_id, search_text))
+            search_rows.append((int(row["search_rowid"]), item_id, search_text))
         if updates:
             connection.executemany("UPDATE catalog_items SET search_text=? WHERE id=?", updates)
             for start in range(0, len(search_rows), 400):
                 batch = search_rows[start : start + 400]
                 placeholders = ",".join("?" for _ in batch)
                 connection.execute(
-                    f"DELETE FROM catalog_search WHERE item_id IN ({placeholders})",
-                    tuple(item_id for item_id, _value in batch),
+                    f"DELETE FROM catalog_search WHERE rowid IN ({placeholders})",
+                    tuple(rowid for rowid, _item_id, _value in batch),
                 )
                 connection.execute(
-                    f"DELETE FROM catalog_fuzzy_search WHERE item_id IN ({placeholders})",
-                    tuple(item_id for item_id, _value in batch),
+                    f"DELETE FROM catalog_fuzzy_search WHERE rowid IN ({placeholders})",
+                    tuple(rowid for rowid, _item_id, _value in batch),
                 )
-            connection.executemany("INSERT INTO catalog_search(item_id, text) VALUES (?, ?)", search_rows)
             connection.executemany(
-                "INSERT INTO catalog_fuzzy_search(item_id,tokens) VALUES (?,?)",
+                "INSERT INTO catalog_search(rowid,item_id,text) VALUES (?,?,?)",
+                search_rows,
+            )
+            connection.executemany(
+                "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) VALUES (?,?,?)",
                 [
-                    (item_id, self._fuzzy_tokens(search_text))
-                    for item_id, search_text in search_rows
+                    (rowid, item_id, self._fuzzy_tokens(search_text))
+                    for rowid, item_id, search_text in search_rows
                 ],
             )
         catalog_count = int(
@@ -774,15 +780,55 @@ class MediaCatalogCoordinator:
         if catalog_count != fuzzy_count:
             connection.execute("DELETE FROM catalog_fuzzy_search")
             rows = connection.execute(
-                "SELECT id,search_text FROM catalog_items ORDER BY id"
+                "SELECT rowid AS search_rowid,id,search_text "
+                "FROM catalog_items ORDER BY rowid"
             ).fetchall()
             connection.executemany(
-                "INSERT INTO catalog_fuzzy_search(item_id,tokens) VALUES (?,?)",
+                "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) VALUES (?,?,?)",
                 [
-                    (str(row["id"]), self._fuzzy_tokens(row["search_text"]))
+                    (
+                        int(row["search_rowid"]),
+                        str(row["id"]),
+                        self._fuzzy_tokens(row["search_text"]),
+                    )
                     for row in rows
                 ],
             )
+
+    def _ensure_search_rowids(self, connection: sqlite3.Connection) -> None:
+        marker = connection.execute(
+            "SELECT value FROM coordinator_meta WHERE key='search_rowid_revision'"
+        ).fetchone()
+        if marker and str(marker["value"]) == SEARCH_ROWID_REVISION:
+            return
+        rows = connection.execute(
+            "SELECT rowid AS search_rowid,id,search_text "
+            "FROM catalog_items ORDER BY rowid"
+        ).fetchall()
+        connection.execute("DELETE FROM catalog_search")
+        connection.execute("DELETE FROM catalog_fuzzy_search")
+        connection.executemany(
+            "INSERT INTO catalog_search(rowid,item_id,text) VALUES (?,?,?)",
+            [
+                (int(row["search_rowid"]), str(row["id"]), str(row["search_text"]))
+                for row in rows
+            ],
+        )
+        connection.executemany(
+            "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) VALUES (?,?,?)",
+            [
+                (
+                    int(row["search_rowid"]),
+                    str(row["id"]),
+                    self._fuzzy_tokens(row["search_text"]),
+                )
+                for row in rows
+            ],
+        )
+        connection.execute(
+            "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+            ("search_rowid_revision", SEARCH_ROWID_REVISION),
+        )
 
     def refresh_search_index(self, *, force_legacy: bool = False) -> dict[str, Any]:
         with self.repository.connect() as connection:
@@ -804,12 +850,27 @@ class MediaCatalogCoordinator:
 
     @staticmethod
     def _replace_search(connection: sqlite3.Connection, item_id: str, search_text: str) -> None:
-        connection.execute("DELETE FROM catalog_search WHERE item_id=?", (item_id,))
-        connection.execute("INSERT INTO catalog_search(item_id, text) VALUES (?, ?)", (item_id, search_text))
-        connection.execute("DELETE FROM catalog_fuzzy_search WHERE item_id=?", (item_id,))
+        row = connection.execute(
+            "SELECT rowid AS search_rowid FROM catalog_items WHERE id=?", (item_id,)
+        ).fetchone()
+        if row is None:
+            return
+        search_rowid = int(row["search_rowid"])
+        connection.execute("DELETE FROM catalog_search WHERE rowid=?", (search_rowid,))
         connection.execute(
-            "INSERT INTO catalog_fuzzy_search(item_id,tokens) VALUES (?,?)",
-            (item_id, MediaCatalogCoordinator._fuzzy_tokens(search_text)),
+            "INSERT INTO catalog_search(rowid,item_id,text) VALUES (?,?,?)",
+            (search_rowid, item_id, search_text),
+        )
+        connection.execute(
+            "DELETE FROM catalog_fuzzy_search WHERE rowid=?", (search_rowid,)
+        )
+        connection.execute(
+            "INSERT INTO catalog_fuzzy_search(rowid,item_id,tokens) VALUES (?,?,?)",
+            (
+                search_rowid,
+                item_id,
+                MediaCatalogCoordinator._fuzzy_tokens(search_text),
+            ),
         )
 
     @staticmethod
