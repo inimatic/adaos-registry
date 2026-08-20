@@ -447,6 +447,10 @@ def test_successor_track_preserves_released_predecessor_and_is_idempotent() -> N
         "selected_task": task,
     }
     orchestrator = ResearchOrchestrator(repository=repository)
+    orchestrator._clone_development_session_for_track = lambda source, **_: {
+        **source,
+        "session_id": "dev-branching-successor",
+    }
 
     successor = orchestrator._successor_implementation_track(
         state,
@@ -465,7 +469,7 @@ def test_successor_track_preserves_released_predecessor_and_is_idempotent() -> N
 
     assert replay == successor
     assert successor["parent_track_id"] == parent["track_id"]
-    assert successor["development_session_id"] == session["session_id"]
+    assert successor["development_session_id"] == "dev-branching-successor"
     assert successor["status"] == "development_ready"
     assert successor["candidate_release_digest"] is None
     unchanged_parent = repository.get_track(parent["track_id"])

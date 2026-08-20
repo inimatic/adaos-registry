@@ -2174,21 +2174,38 @@ class ResearchOrchestrator:
                     "parent_project_release_ref": parent.get("project_release_ref"),
                     "parent_study_id": parent.get("study_id"),
                     "parent_experiment_id": parent.get("experiment_id"),
-                    "development_session_id": session["session_id"],
+                    "source_development_session_id": session["session_id"],
                 }
             },
+        )
+        scoped_session = self._clone_development_session_for_track(
+            session,
+            track_ref=str(successor["ref"]),
+            track_revision=int(successor.get("revision") or 1),
+            actor=actor,
         )
         successor = self.repository.bind_track_development(
             str(successor["track_id"]),
             project_ref=str(parent.get("project_ref") or session.get("project_ref") or ""),
             primary_target_ref=str(parent.get("primary_target_ref") or ""),
-            development_session_id=str(session["session_id"]),
+            development_session_id=str(scoped_session["session_id"]),
+        )
+        successor = self.repository.record_track_evaluation(
+            str(successor["track_id"]),
+            status="development_ready",
+            metadata={
+                **dict(successor.get("metadata") or {}),
+                "lineage": {
+                    **dict(dict(successor.get("metadata") or {}).get("lineage") or {}),
+                    "development_session_id": scoped_session["session_id"],
+                },
+            },
         )
         event_identity = contract_digest(
             {
                 "parent_track_ref": parent["ref"],
                 "successor_track_ref": successor["ref"],
-                "development_session_id": session["session_id"],
+                "development_session_id": scoped_session["session_id"],
                 "reason": reason,
             }
         )
@@ -2201,7 +2218,7 @@ class ResearchOrchestrator:
                 "task_ref": task.get("ref"),
                 "parent_implementation_track_ref": parent["ref"],
                 "implementation_track_ref": successor["ref"],
-                "development_session_id": session["session_id"],
+                "development_session_id": scoped_session["session_id"],
                 "reason": reason,
                 "actor": actor,
             },
@@ -2211,6 +2228,121 @@ class ResearchOrchestrator:
             source_event_id=f"implementation-track-successor:{event_identity}",
         )
         return successor
+
+    def _clone_development_session_for_track(
+        self,
+        source: Mapping[str, Any],
+        *,
+        track_ref: str,
+        track_revision: int,
+        actor: str,
+    ) -> dict[str, Any]:
+        """Clone immutable inputs while rebinding the track subject explicitly."""
+
+        project_ref = str(source.get("project_ref") or "").strip()
+        project_kind, separator, project_id = project_ref.partition(":")
+        if separator != ":" or project_kind != "project" or not project_id:
+            raise ValueError("Development Session has an invalid project_ref")
+        subjects: list[dict[str, Any]] = []
+        replaced = False
+        for item in source.get("subject_refs") or []:
+            if not isinstance(item, Mapping):
+                continue
+            value = dict(item)
+            if str(value.get("kind") or "") == "implementation_track":
+                value = {
+                    "kind": "implementation_track",
+                    "ref": track_ref,
+                    "revision": max(1, int(track_revision)),
+                }
+                replaced = True
+            subjects.append(value)
+        if not replaced:
+            subjects.append(
+                {
+                    "kind": "implementation_track",
+                    "ref": track_ref,
+                    "revision": max(1, int(track_revision)),
+                }
+            )
+        handoff = (
+            dict(source.get("handoff"))
+            if isinstance(source.get("handoff"), Mapping)
+            else {}
+        )
+        requirements = [
+            dict(item)
+            for item in source.get("acceptance_requirements") or []
+            if isinstance(item, Mapping)
+        ]
+        identity = contract_digest(
+            {
+                "source_development_session_id": source["session_id"],
+                "implementation_track_ref": track_ref,
+            }
+        ).removeprefix("sha256:")[:16]
+        created = development_sessions.create(
+            project_id,
+            automation_brief_digest=str(handoff.get("automation_brief_digest") or "") or None,
+            research_prototype_digest=str(handoff.get("research_prototype_digest") or "") or None,
+            artifact_sources=self._artifact_sources_from_development_session(source),
+            subject_refs=subjects,
+            contract_inputs=[
+                dict(item)
+                for item in source.get("contract_inputs") or []
+                if isinstance(item, Mapping)
+            ],
+            acceptance_profiles=[str(item) for item in source.get("acceptance_profiles") or []],
+            acceptance_requirements=requirements,
+            request=str(handoff.get("request") or "") or None,
+            execution_budget=(
+                dict(handoff["execution_budget"])
+                if isinstance(handoff.get("execution_budget"), Mapping)
+                else None
+            ),
+            agent_profile=(
+                dict(handoff["agent_profile"])
+                if isinstance(handoff.get("agent_profile"), Mapping)
+                else None
+            ),
+            primary_targets=[
+                str(item.get("ref") or "")
+                for item in dict(source.get("targets") or {}).get("primary") or []
+                if isinstance(item, Mapping) and str(item.get("ref") or "").strip()
+            ],
+            secondary_targets=[
+                str(item.get("ref") or "")
+                for item in dict(source.get("targets") or {}).get("secondary") or []
+                if isinstance(item, Mapping) and str(item.get("ref") or "").strip()
+            ],
+            context_members=[
+                dict(item)
+                for item in source.get("context_members") or []
+                if isinstance(item, Mapping)
+            ],
+            prohibited_actions=[str(item) for item in handoff.get("prohibited_actions") or []],
+            base_release=(
+                dict(source["base_release"])
+                if isinstance(source.get("base_release"), Mapping)
+                else None
+            ),
+            focus_ref=str(dict(source.get("focus") or {}).get("ref") or "") or None,
+            session_id=f"dev_{project_id}_{identity}",
+            actor=actor,
+        )
+        session = dict(created["session"])
+        for kind in ("automation_brief", "research_compilation", "consumer_contract"):
+            instruction, _ = self._development_instruction_value(
+                str(source["session_id"]), kind
+            )
+            attached = development_sessions.attach_instruction(
+                str(session["session_id"]),
+                kind,
+                instruction,
+                expected_digest=str(instruction.get("digest") or ""),
+            )
+            session = dict(attached["session"])
+        return session
 
     def branch_implementation_track(
         self,
