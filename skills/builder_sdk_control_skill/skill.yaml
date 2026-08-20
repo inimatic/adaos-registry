@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.66
+version: 0.1.67
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -1318,12 +1318,13 @@ tools:
 - name: push_project
   description: Checkpoint a DEV project as an exact Forge revision and immutable package.
   entry: handlers.main:push_project
-  side_effects: local_write
+  side_effects: external_write
   timeout_seconds: 120
   input_schema:
     type: object
     required:
     - checkpoint_id
+    - confirmed
     properties:
       object_type:
         type: string
@@ -1339,6 +1340,9 @@ tools:
         type: string
         minLength: 1
         description: Caller-assigned immutable identity for this checkpoint operation.
+      confirmed:
+        type: boolean
+        description: Explicit confirmation before the Forge checkpoint and verification acceptance.
       webspace_id:
         type: string
   output_schema:

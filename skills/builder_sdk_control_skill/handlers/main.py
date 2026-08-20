@@ -3017,10 +3017,13 @@ def push_project(
     object_id: str = DEFAULT_PROJECT_ID,
     message: str | None = None,
     checkpoint_id: str | None = None,
+    confirmed: bool = False,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if not confirmed:
+        raise ValueError("Forge checkpoint requires explicit user confirmation")
     checkpoint_change_id = str(checkpoint_id or "").strip()
     if not checkpoint_change_id:
         raise ValueError("checkpoint_id is required")
@@ -3111,6 +3114,7 @@ def push_project(
             "context_packet_digest": context_packet_digest or None,
             "package_digest": package_digest,
             "source_revision": source_revision,
+            "confirmed": True,
         },
     )
     workflow_projection = (

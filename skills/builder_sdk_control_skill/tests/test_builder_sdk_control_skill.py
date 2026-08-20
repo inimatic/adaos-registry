@@ -83,13 +83,13 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["list_development_feedback"]["side_effects"] == "none"
     assert tools["reconcile_automation_checkpoint"]["side_effects"] == "external_write"
     assert tools["apply_subscription_update"]["side_effects"] == "external_write"
-    assert tools["push_project"]["side_effects"] == "local_write"
+    assert tools["push_project"]["side_effects"] == "external_write"
     assert tools["publish_project"]["side_effects"] == "external_write"
     assert tools["delete_project"]["side_effects"] == "external_write"
     declared_effects = {"none", "local_write", "ui_navigation", "external_write"}
     assert all(tool.get("side_effects") in declared_effects for tool in tools.values())
     push_schema = tools["push_project"]["input_schema"]
-    assert "checkpoint_id" in push_schema["required"]
+    assert set(push_schema["required"]) == {"checkpoint_id", "confirmed"}
     assert push_schema["properties"]["checkpoint_id"]["minLength"] == 1
 
 
@@ -233,11 +233,26 @@ def test_push_requires_explicit_checkpoint_identity() -> None:
     module = _module()
 
     try:
-        module.push_project(checkpoint_id="   ")
+        module.push_project(checkpoint_id="   ", confirmed=True)
     except ValueError as exc:
         assert str(exc) == "checkpoint_id is required"
     else:
         raise AssertionError("blank checkpoint identity must be rejected")
+
+
+def test_push_requires_confirmation_before_forge_write(monkeypatch) -> None:
+    module = _module()
+    calls: list[tuple[object, ...]] = []
+    monkeypatch.setattr(
+        module.projects,
+        "push",
+        lambda *args, **kwargs: calls.append((*args, kwargs)) or {},
+    )
+
+    with pytest.raises(ValueError, match="explicit user confirmation"):
+        module.push_project(checkpoint_id="checkpoint-not-confirmed")
+
+    assert calls == []
 
 
 def _dependency_link_setup(monkeypatch, module, *, declared: bool = True, delivery: dict | None = None):
@@ -2088,6 +2103,7 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
         "builder",
         message="checkpoint",
         checkpoint_id="checkpoint-change",
+        confirmed=True,
         webspace_id="desktop",
     )
     result = module.publish_project("scenario", "builder", dry_run=True, confirmed=True)
