@@ -123,9 +123,9 @@ def freeze_task(value: Mapping[str, Any]) -> dict[str, Any]:
     seeds = list(validated["repetitions"]["paired_seeds"])
     if validated["repetitions"]["attempts_per_arm"] != len(seeds):
         raise ValueError("attempts_per_arm must equal paired_seeds length")
-    if schema_version in {"1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0"} and validated["repetitions"]["model_random_seed_control"] != "unsupported_not_claimed":
+    if schema_version in {"1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0"} and validated["repetitions"]["model_random_seed_control"] != "unsupported_not_claimed":
         raise ValueError("calibration must not claim unsupported model random-seed control")
-    if schema_version in {"1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0"}:
+    if schema_version in {"1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0"}:
         comparison = dict(validated["comparison_plan"])
         if int(comparison["planned_pairs"]) != len(seeds):
             raise ValueError("comparison planned_pairs must equal paired_seeds length")
@@ -148,9 +148,9 @@ def freeze_task(value: Mapping[str, Any]) -> dict[str, Any]:
         }
         if abs(first_counts[comparison["control_arm"]] - first_counts[comparison["treatment_arm"]]) > 1:
             raise ValueError("comparison execution order must be counterbalanced")
-    if schema_version == "1.7.0" and tuple(validated["exclusion_rules"]) != CALIBRATION_EXCLUSION_RULES:
+    if schema_version in {"1.7.0", "1.8.0"} and tuple(validated["exclusion_rules"]) != CALIBRATION_EXCLUSION_RULES:
         raise ValueError(
-            "v1.7 calibration exclusion rules must keep correctness and resource endpoints separate"
+            "v1.7+ calibration exclusion rules must keep correctness and resource endpoints separate"
         )
     check_ids = [str(item["check_id"]) for item in validated["rubric"]["checks"]]
     if len(check_ids) != len(set(check_ids)):

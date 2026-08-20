@@ -173,6 +173,50 @@ def test_v17_freeze_enforces_separate_correctness_and_resource_endpoints(task_va
         freeze_task(invalid)
 
 
+def test_v18_freeze_requires_preregistered_runtime_disk_headroom(task_value) -> None:
+    valid = copy.deepcopy(task_value)
+    valid["schema_version"] = "1.8.0"
+    valid["exclusion_rules"] = list(CALIBRATION_EXCLUSION_RULES)
+    valid["comparison_plan"] = _paired_task(task_value)["comparison_plan"]
+    valid["repetitions"] = {
+        "attempts_per_arm": 5,
+        "paired_seeds": [17, 23, 47, 71, 101],
+        "model_random_seed_control": "unsupported_not_claimed",
+    }
+    valid["consumer_evaluation"] = {
+        "max_wall_seconds": 1200,
+        "timeout_result_policy": "persist_terminal_failure",
+        "repeat_policy": "return_existing_result",
+    }
+    valid["expected_smoke_profile"].update(
+        {
+            "network_enforcement_required": False,
+            "max_wall_seconds": 600,
+            "workload": {"mode": "bounded", "limits": []},
+            "input_policy": {
+                "source": "deterministic_contract_fixture",
+                "readiness": "required_before_execution",
+                "sampling": "deterministic_seeded",
+            },
+        }
+    )
+    valid["environment_spec"].update(
+        {
+            "runner_contract_digest": "sha256:" + "6" * 64,
+            "minimum_free_disk_bytes": 17_179_869_184,
+        }
+    )
+    valid["environment_spec"]["component_versions"]["research_manager_skill"] = "0.1.0"
+
+    frozen = freeze_task(valid)
+    assert frozen["environment_spec"]["minimum_free_disk_bytes"] == 17_179_869_184
+
+    invalid = copy.deepcopy(valid)
+    del invalid["environment_spec"]["minimum_free_disk_bytes"]
+    with pytest.raises(ValueError, match="minimum_free_disk_bytes"):
+        freeze_task(invalid)
+
+
 def test_hidden_judge_inputs_are_snapshotted_before_freeze(tmp_path: Path) -> None:
     class MemoryBlobStore:
         def __init__(self, root: Path) -> None:
@@ -708,6 +752,13 @@ def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypa
         "get_state",
         lambda **_kwargs: (_ for _ in ()).throw(AssertionError("must not read Builder state")),
     )
+    releases: list[tuple[str, str]] = []
+    monkeypatch.setattr(
+        handler_module,
+        "_release_attempt_runtime",
+        lambda candidate_id, session_id: releases.append((candidate_id, session_id))
+        or {"ok": True},
+    )
 
     response = handler_module.evaluate_builder_attempt(
         task_id="task",
@@ -720,3 +771,4 @@ def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypa
 
     assert response["idempotent_replay"] is True
     assert response["result"] is stored
+    assert releases == [("candidate", "session")]

@@ -129,6 +129,7 @@ def derive_compact_calibration(
     paired_seeds: list[int] | None = None,
     max_model_tokens: int = 5_000_000,
     max_wall_seconds: int = 10_800,
+    minimum_free_disk_bytes: int = 17_179_869_184,
     **_: Any,
 ) -> dict[str, Any]:
     repository = EvaluationRepository()
@@ -352,7 +353,7 @@ def derive_compact_calibration(
     }
     task.update(
         {
-            "schema_version": "1.7.0",
+            "schema_version": "1.8.0",
             "task_id": str(task_id),
             "title": re.sub(
                 r"(?: \(compact execution contracts\))+$",
@@ -387,6 +388,7 @@ def derive_compact_calibration(
                 "core_source_tree_clean": True,
                 "core_source_tree_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "runner_contract_digest": str(consumer_contract["digest"]),
+                "minimum_free_disk_bytes": int(minimum_free_disk_bytes),
             },
             "measurement_policy": {
                 "model_token_charge": "input_plus_output_including_cached",
@@ -531,6 +533,21 @@ def record_calibration_result(
     }
 
 
+def _release_attempt_runtime(candidate_id: str, development_session_id: str) -> dict[str, Any]:
+    response = invoke_skill(
+        "research_calibration_runner_skill",
+        "release_attempt",
+        {
+            "candidate_id": str(candidate_id),
+            "development_session_id": str(development_session_id),
+        },
+        timeout=600,
+    )
+    if not isinstance(response, Mapping) or not response.get("ok"):
+        raise RuntimeError("calibration runner did not confirm runtime release")
+    return dict(response)
+
+
 @tool(summary="Execute the hidden deterministic judge over one terminal Builder candidate.", side_effects="local_write")
 def evaluate_builder_attempt(
     task_id: str,
@@ -547,6 +564,12 @@ def evaluate_builder_attempt(
     packet = repository.get_packet(task_id, arm_id, attempt_index, budget_view)
     existing = repository.find_result(task_id, arm_id, attempt_index, budget_view)
     if existing is not None:
+        lifecycle_errors = []
+        runtime_release = None
+        try:
+            runtime_release = _release_attempt_runtime(candidate_id, development_session_id)
+        except Exception as exc:
+            lifecycle_errors.append(f"{type(exc).__name__}: {exc}")
         return {
             "ok": True,
             "ready": True,
@@ -554,6 +577,8 @@ def evaluate_builder_attempt(
             "result": existing,
             "evidence_valid_completion": existing["metrics"]["evidence_valid_completion"],
             "operation_errors": [],
+            "runtime_release": runtime_release,
+            "lifecycle_errors": lifecycle_errors,
         }
     session = development_sessions.get(development_session_id)
     enriched_instructions = []
@@ -691,12 +716,20 @@ def evaluate_builder_attempt(
         operation_errors=errors,
     )
     stored = repository.put_result(evaluate_candidate(task, candidate))
+    lifecycle_errors = []
+    runtime_release = None
+    try:
+        runtime_release = _release_attempt_runtime(candidate_id, development_session_id)
+    except Exception as exc:
+        lifecycle_errors.append(f"{type(exc).__name__}: {exc}")
     return {
         "ok": True,
         "ready": True,
         "result": stored,
         "evidence_valid_completion": stored["metrics"]["evidence_valid_completion"],
         "operation_errors": errors,
+        "runtime_release": runtime_release,
+        "lifecycle_errors": lifecycle_errors,
     }
 
 
