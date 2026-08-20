@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.14
+version: 0.8.15
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -30,6 +30,7 @@ capabilities:
 - distributed.topology.plan
 - distributed.topology.apply
 - distributed.authority.handoff
+- distributed.replica.remove
 - distributed.service.invoke
 - distributed.replica.observe
 dependencies: []

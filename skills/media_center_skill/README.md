@@ -50,7 +50,7 @@ Recommendations evaluate at most three catalog pages, use only local favorite an
 
 `diagnostic_export()` combines bounded deployment, topology, scan, catalog/search, provider, playback, route, QoE, and optional browser observations. Paths, credentials, direct URLs, media bytes, and unbounded logs are excluded or redacted. Repair recommendations contain review-required tool plans; they never mutate deployment or data automatically.
 
-Topology administration remains reviewed and SDK-only. `plan_topology_change()` persists an immutable dry-run plan, `apply_topology_change()` applies its exact digest with idempotency, and `handoff_authority()` performs an explicit revision- and epoch-fenced recovery handoff. The coordinator never imports the distributed runtime store or adapter implementation.
+Topology administration remains reviewed and SDK-only. `plan_topology_change()` persists an immutable dry-run plan, `apply_topology_change()` reads that plan through the SDK and applies its exact digest with idempotency and only the approvals declared by the plan, and `handoff_authority()` performs an explicit revision- and epoch-fenced recovery handoff. The coordinator never imports the distributed runtime store or adapter implementation.
 
 ## Compatibility
 

@@ -1007,6 +1007,14 @@ def test_media_topology_exposes_reviewed_plan_apply_and_fenced_handoff(monkeypat
             to_dict=lambda: {"status": "succeeded"},
         )
 
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "get_plan",
+        lambda plan_digest: SimpleNamespace(
+            plan_digest=plan_digest,
+            required_approvals=("authority_handoff",),
+        ),
+    )
     monkeypatch.setattr(topology_module.distributed_sdk, "apply_plan", fake_apply)
 
     def fake_handoff(partition_id, target_instance_id, **kwargs):
@@ -1045,7 +1053,7 @@ def test_media_topology_exposes_reviewed_plan_apply_and_fenced_handoff(monkeypat
     assert captured["apply"] == (
         "sha256:plan",
         "apply-1",
-        ("authority_handoff", "replica_remove"),
+        ("authority_handoff",),
     )
     assert handed_off == {"ok": True, "lease": {"epoch": 4}}
     assert captured["handoff"][2]["expected_partition_revision"] == 3

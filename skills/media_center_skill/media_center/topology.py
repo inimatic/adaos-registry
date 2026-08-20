@@ -367,10 +367,11 @@ class MediaCenterTopology:
         *,
         idempotency_key: str = "",
     ) -> dict[str, Any]:
+        plan = distributed_sdk.get_plan(plan_digest)
         operation = distributed_sdk.apply_plan(
             plan_digest,
             idempotency_key=idempotency_key or f"media-center-topology-{uuid4().hex}",
-            approvals=("authority_handoff", "replica_remove"),
+            approvals=tuple(plan.required_approvals),
         )
         return {"ok": operation.state == "succeeded", "operation": operation.to_dict()}
 
