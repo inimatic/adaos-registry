@@ -125,6 +125,7 @@ def build_independent_candidate(
     )
     expected_epochs = int(expected_smoke.get("epochs") or 3)
     expected_seeds = list(expected_smoke.get("seeds") or [17])
+    expected_seed_labels = [f"seed-{int(item)}" for item in expected_seeds]
     expected_inference = bool(expected_smoke.get("inference_allowed", False))
     expected_gpu_count = int(expected_smoke.get("gpu_count") or 0)
     expected_network_mode = str(expected_smoke.get("network_mode") or "offline")
@@ -211,7 +212,7 @@ def build_independent_candidate(
             run_log.get("stage") == expected_stage,
             run_log.get("device") == str(expected_smoke.get("device") or "cpu"),
             int(run_log.get("epochs_completed") or 0) == expected_epochs,
-            list(run_log.get("seeds") or []) == expected_seeds,
+            list(run_log.get("seeds") or []) == expected_seed_labels,
             run_log.get("inference_allowed") is expected_inference,
             str(run_log.get("evidence_class") or "") == expected_evidence_class,
             "input_policy" not in expected_smoke

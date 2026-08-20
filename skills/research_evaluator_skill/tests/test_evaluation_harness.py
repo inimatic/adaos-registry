@@ -397,6 +397,51 @@ def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(
     assert evaluated["metrics"]["evidence_valid_completion"] is False
     assert evaluated["failure"]["stage"] == "implementation"
 
+    canonical_run_log = {
+        "stage": "workflow_smoke",
+        "device": "cpu",
+        "epochs_completed": 3,
+        "seeds": ["seed-17"],
+        "inference_allowed": False,
+        "evidence_class": "workflow_smoke",
+    }
+    canonical_audit = {
+        "per_stage": {"workflow_smoke": {"test_evaluations_count": 0}},
+        "test_access": [],
+    }
+    accepted = build_independent_candidate(
+        task=task,
+        packet=packet,
+        candidate_id="candidate",
+        session=session,
+        automation={
+            "budget_usage": {
+                "observed": {"model_tokens": 100, "wall_seconds": 10, "attempts": 1}
+            }
+        },
+        validation={"ok": True, "digest": "sha256:" + "3" * 64},
+        prepare={"ok": True, "execution_spec": spec},
+        trial={
+            "ok": True,
+            "digest": "sha256:" + "5" * 64,
+            "documents": {
+                "run_log.json": canonical_run_log,
+                "evaluation_audit.json": canonical_audit,
+                "artifacts_index.json": {"files": []},
+            },
+            "outputs": [],
+        },
+        dataset={"ok": True},
+        verified_artifacts=[],
+        collected=None,
+    )
+
+    accepted_statuses = {
+        item["check_id"]: item["status"] for item in accepted["checks"]
+    }
+    assert accepted_statuses["protocol_fidelity"] == "pass"
+    assert accepted_statuses["cpu_workflow_smoke"] == "pass"
+
 
 def test_independent_judge_rejects_string_pair_ids_as_rng_seeds(task_value, monkeypatch) -> None:
     task = freeze_task(task_value)
