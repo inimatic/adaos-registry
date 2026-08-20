@@ -108,3 +108,69 @@ def test_staged_discussion_rejects_accepted_task_before_source_or_llm_work(monke
             "Revise this accepted formulation.",
             dialog_payload={"task_id": "accepted-direction.task-001"},
         )
+
+
+def test_implementation_project_keeps_direction_identity_outside_task_lifecycle(monkeypatch) -> None:
+    stale = {
+        "schema": "adaos.project.v1",
+        "kind": "project",
+        "id": "direction_implementation",
+        "version": "0.1.0",
+        "profiles": ["adaos.research.implementation.v1"],
+        "components": {
+            "owned": [{"ref": "skill:direction", "role": "primary"}],
+            "dependencies": [],
+        },
+        "entrypoints": [
+            {
+                "id": "research",
+                "presentation": "scenario:research_workbench",
+                "default": True,
+                "bindings": {
+                    "direction_ref": "research-direction:direction",
+                    "task_ref": "research-task:direction.task-001",
+                },
+            }
+        ],
+        "catalog": {
+            "title": "Direction implementation",
+            "description": "Project-scoped implementation for research-task:direction.task-001.",
+            "categories": ["research"],
+            "tags": [],
+        },
+        "compatibility": {},
+        "lifecycle": {"uninstall": {}},
+        "ref": "project:direction_implementation",
+        "manifest_digest": "sha256:" + "a" * 64,
+        "source_path": "dev/projects/direction_implementation",
+    }
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(orchestrator_module.compositions, "get", lambda _project_id: stale)
+
+    def replace(project_id, value, *, expected_manifest_digest):
+        captured.update(
+            project_id=project_id,
+            value=value,
+            expected_manifest_digest=expected_manifest_digest,
+        )
+        return {**value, "ref": f"project:{project_id}", "manifest_digest": "sha256:" + "b" * 64}
+
+    monkeypatch.setattr(orchestrator_module.compositions, "replace", replace)
+    orchestrator = ResearchOrchestrator(repository=object())
+
+    project = orchestrator._ensure_implementation_project(
+        {
+            "direction_id": "direction",
+            "title": "Direction",
+            "artifact_owner_skill_id": "direction",
+            "legacy_project_ref": None,
+        },
+        {"task_id": "direction.task-004"},
+    )
+
+    bindings = project["entrypoints"][0]["bindings"]
+    assert bindings == {"direction_ref": "research-direction:direction"}
+    assert project["catalog"]["description"] == (
+        "Project-scoped implementation workspace for research-direction:direction."
+    )
+    assert captured["expected_manifest_digest"] == stale["manifest_digest"]

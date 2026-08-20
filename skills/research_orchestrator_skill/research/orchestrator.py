@@ -563,6 +563,43 @@ class ResearchOrchestrator:
         direction: Mapping[str, Any],
         task: Mapping[str, Any],
     ) -> dict[str, Any]:
+        del task  # Task identity belongs to the immutable Development Session, not the distributable Project.
+
+        def reconcile(project: Mapping[str, Any]) -> dict[str, Any]:
+            payload = {
+                key: copy.deepcopy(value)
+                for key, value in project.items()
+                if key not in {"ref", "manifest_digest", "source_path"}
+            }
+            changed = False
+            direction_ref = f"research-direction:{direction['direction_id']}"
+            for entrypoint in payload.get("entrypoints") or []:
+                if str(entrypoint.get("id") or "") != "research":
+                    continue
+                bindings = entrypoint.setdefault("bindings", {})
+                if bindings.get("direction_ref") != direction_ref:
+                    bindings["direction_ref"] = direction_ref
+                    changed = True
+                # A Project is the distributable implementation envelope. A selected
+                # ResearchTask is mutable workflow state and is frozen separately in
+                # DevelopmentSession.subject_refs/contract_inputs. Keeping it here made
+                # a reused Project advertise the first task forever.
+                if "task_ref" in bindings:
+                    bindings.pop("task_ref", None)
+                    changed = True
+            catalog = payload.get("catalog") or {}
+            desired_description = f"Project-scoped implementation workspace for {direction_ref}."
+            if str(catalog.get("description") or "") != desired_description:
+                catalog["description"] = desired_description
+                changed = True
+            if not changed:
+                return dict(project)
+            return compositions.replace(
+                str(payload["id"]),
+                payload,
+                expected_manifest_digest=str(project["manifest_digest"]),
+            )
+
         owner_skill_id = str(direction.get("artifact_owner_skill_id") or direction["direction_id"])
         legacy_ref = str(direction.get("legacy_project_ref") or "")
         if legacy_ref.startswith("project:"):
@@ -570,7 +607,7 @@ class ResearchOrchestrator:
             if f"skill:{owner_skill_id}" in {
                 str(item.get("ref") or "") for item in legacy["components"]["owned"]
             }:
-                return legacy
+                return reconcile(legacy)
         project_id = _direction_id(f"{direction['direction_id']}_implementation")
         try:
             project = compositions.get(project_id)
@@ -608,15 +645,14 @@ class ResearchOrchestrator:
                             "default": True,
                             "bindings": {
                                 "direction_ref": f"research-direction:{direction['direction_id']}",
-                                "task_ref": f"research-task:{task['task_id']}",
                             },
                         }
                     ],
                     "catalog": {
                         "title": f"{direction['title']} — implementation",
                         "description": (
-                            "Project-scoped implementation for "
-                            f"research-task:{task['task_id']}."
+                            "Project-scoped implementation workspace for "
+                            f"research-direction:{direction['direction_id']}."
                         ),
                         "categories": ["research", "development"],
                         "tags": list(direction.get("tags") or []),
@@ -641,7 +677,7 @@ class ResearchOrchestrator:
                     },
                 }
             )
-        return project
+        return reconcile(project)
 
     def create_direction(
         self,
