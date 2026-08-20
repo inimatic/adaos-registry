@@ -6,6 +6,7 @@
   "runtime.media_center.error.invalid_media_catalog_cursor": "The catalog page changed. Refresh the list.",
   "runtime.media_center.error.deployment_plan_failed": "Could not create the Media Center deployment plan.",
   "runtime.media_center.error.deployment_apply_failed": "Could not apply the Media Center deployment plan.",
+  "runtime.media_center.error.deployment_status_failed": "Could not read the Media Center deployment operation.",
   "runtime.media_center.error.deployment_drain_failed": "Could not drain the Media Center agent.",
   "runtime.media_center.error.deployment_remove_failed": "Could not remove the Media Center agent.",
   "runtime.media_center.error.topology_define_failed": "Could not define Media Center service topology.",

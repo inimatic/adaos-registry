@@ -1584,6 +1584,20 @@ def apply_deployment(plan_digest: str = "", idempotency_key: str = "", **_: Any)
         )
 
 
+@tool(summary="Return one durable Media Center deployment operation.", side_effects="none")
+def deployment_operation_status(operation_id: str = "", **_: Any) -> dict[str, Any]:
+    try:
+        return _topology().deployment_operation_status(operation_id)
+    except Exception as exc:
+        key = "runtime.media_center.error.deployment_status_failed"
+        return _skill_error(
+            "deployment_status_failed",
+            human_message=_skill_text(key, "Could not read the Media Center deployment operation."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
 @tool(summary="Cordon and drain one Media Center component activation.", side_effects="remote_write")
 def drain_activation(activation_id: str = "", idempotency_key: str = "", **_: Any) -> dict[str, Any]:
     try:

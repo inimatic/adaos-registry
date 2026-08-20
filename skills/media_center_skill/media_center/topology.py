@@ -244,12 +244,25 @@ class MediaCenterTopology:
         }
 
     def apply_deployment(self, plan_digest: str, *, idempotency_key: str = "") -> dict[str, Any]:
-        operation = deployment_sdk.apply(
+        operation = deployment_sdk.submit(
             plan_digest,
             idempotency_key=idempotency_key or f"media-center-apply-{uuid4().hex}",
             approvals=("remote_install",),
         )
-        return {"ok": operation.state in {"succeeded", "partial"}, "operation": operation.to_dict()}
+        return {
+            "ok": operation.state in {"accepted", "running", "succeeded", "partial"},
+            "accepted": operation.state in {"accepted", "running"},
+            "operation": operation.to_dict(),
+        }
+
+    @staticmethod
+    def deployment_operation_status(operation_id: str) -> dict[str, Any]:
+        operation = deployment_sdk.get_operation(str(operation_id or "").strip())
+        return {
+            "ok": True,
+            "schema": "adaos.media_center.deployment_operation.v1",
+            "operation": operation.to_dict(),
+        }
 
     def drain_activation(self, activation_id: str, *, idempotency_key: str = "") -> dict[str, Any]:
         operation = deployment_sdk.drain(

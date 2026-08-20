@@ -1183,6 +1183,54 @@ def test_media_topology_definition_is_idempotent_for_existing_datasets(monkeypat
     ]
 
 
+def test_deployment_apply_submits_durable_operation_and_reads_status(monkeypatch):
+    from media_center import topology as topology_module
+
+    captured = {}
+    operation = SimpleNamespace(
+        state="running",
+        operation_id="deploymentop.media-center",
+        to_dict=lambda: {
+            "operation_id": "deploymentop.media-center",
+            "state": "running",
+        },
+    )
+
+    def fake_submit(plan_digest, *, idempotency_key, approvals):
+        captured.update(
+            {
+                "plan_digest": plan_digest,
+                "idempotency_key": idempotency_key,
+                "approvals": approvals,
+            }
+        )
+        return operation
+
+    monkeypatch.setattr(topology_module.deployment_sdk, "submit", fake_submit)
+    monkeypatch.setattr(
+        topology_module.deployment_sdk,
+        "get_operation",
+        lambda operation_id: operation,
+    )
+
+    submitted = MediaCenterTopology().apply_deployment(
+        "sha256:" + "a" * 64,
+        idempotency_key="media-center-rollout-1",
+    )
+    observed = MediaCenterTopology().deployment_operation_status(
+        "deploymentop.media-center"
+    )
+
+    assert submitted["ok"] is True
+    assert submitted["accepted"] is True
+    assert captured == {
+        "plan_digest": "sha256:" + "a" * 64,
+        "idempotency_key": "media-center-rollout-1",
+        "approvals": ("remote_install",),
+    }
+    assert observed["operation"]["state"] == "running"
+
+
 def test_repository_connection_context_commits_rolls_back_and_closes(tmp_path: Path) -> None:
     repository = MediaCenterRepository(tmp_path / "connection-lifecycle.sqlite3")
 
