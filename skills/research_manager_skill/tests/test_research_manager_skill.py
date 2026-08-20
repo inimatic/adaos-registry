@@ -202,7 +202,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.5.0"
+    assert contract["version"] == "1.6.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -238,6 +238,23 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     for schema in smoke_contract["documents"].values():
         jsonschema.Draft202012Validator.check_schema(schema)
     assert "MUST NOT index itself" in smoke_contract["collection"]["index_boundary"]
+    exact_set = smoke_contract["collection"]["exact_artifact_set"]
+    assert exact_set == {
+        "authority": "artifacts_index.json.files",
+        "collection": "collect_attempt.artifacts",
+        "identity_key": "digest",
+        "relation": "set_equal",
+        "unique": True,
+        "excluded_paths": ["artifacts_index.json"],
+        "canonical_example": {
+            "index_paths": ["run_log.json", "evaluation_audit.json"],
+            "collected_paths": ["run_log.json", "evaluation_audit.json"],
+        },
+    }
+    assert any(
+        "exact set equals artifacts_index.json.files" in invariant
+        for invariant in contract["operations"]["collect_attempt"]["invariants"]
+    )
 
     dataset_schema = contract["operations"]["dataset_status"]["output_schema"]
     split_values = {

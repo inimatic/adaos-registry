@@ -330,9 +330,20 @@ class ResearchManager:
             )
         if not bool(collected.get("complete")):
             raise ValueError("workflow-smoke collection is not complete")
-        if len(index_files) != len(artifacts):
+        index_digests = [str(item.get("digest") or "") for item in index_files]
+        artifact_digests = [str(item.get("digest") or "") for item in artifacts]
+        if len(set(index_digests)) != len(index_digests):
             raise ValueError(
-                "artifacts_index.json and collect_attempt returned different artifact counts"
+                "artifacts_index.json contains duplicate artifact identities"
+            )
+        if len(set(artifact_digests)) != len(artifact_digests):
+            raise ValueError("collect_attempt returned duplicate artifact identities")
+        if set(index_digests) != set(artifact_digests):
+            missing = sorted(set(index_digests) - set(artifact_digests))
+            extra = sorted(set(artifact_digests) - set(index_digests))
+            raise ValueError(
+                "workflow-smoke collection must exactly equal artifacts_index.json.files "
+                f"by digest and exclude the index itself; missing={missing}, extra={extra}"
             )
         if len(verified_artifacts) != len(artifacts) or not all(
             bool(item.get("ok") or item.get("verified"))
@@ -340,9 +351,7 @@ class ResearchManager:
         ):
             raise ValueError("verify_artifact rejected one or more indexed identities")
 
-        collected_by_digest = {
-            str(item.get("digest") or ""): item for item in artifacts
-        }
+        collected_by_digest = dict(zip(artifact_digests, artifacts, strict=True))
         for item in index_files:
             path = str(item.get("path") or "")
             digest_value = str(item.get("digest") or "")

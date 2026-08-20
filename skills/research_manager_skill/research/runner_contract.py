@@ -196,6 +196,18 @@ def _workflow_smoke_documents() -> dict[str, Any]:
         "collection": {
             "tracker_session_calls": {"const": 0},
             "complete": {"const": True},
+            "exact_artifact_set": {
+                "authority": "artifacts_index.json.files",
+                "collection": "collect_attempt.artifacts",
+                "identity_key": "digest",
+                "relation": "set_equal",
+                "unique": True,
+                "excluded_paths": ["artifacts_index.json"],
+                "canonical_example": {
+                    "index_paths": ["run_log.json", "evaluation_audit.json"],
+                    "collected_paths": ["run_log.json", "evaluation_audit.json"],
+                },
+            },
             "artifact_identity": (
                 "each artifacts_index entry must resolve to one trial output and one "
                 "collect_attempt ContentRef with the same SHA-256 digest"
@@ -218,7 +230,7 @@ def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.5.0",
+        "version": "1.6.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -463,6 +475,7 @@ def descriptor() -> dict[str, Any]:
                     "observations use the canonical result_record paths",
                     "artifacts contain portable content identities, never private host paths",
                     "workflow-smoke collection reports tracker_session_calls=0 because ResearchManager owns tracking",
+                    "for workflow-smoke, artifact digests are unique and their exact set equals artifacts_index.json.files digests; artifacts_index.json itself is excluded from both sets",
                 ],
             },
             "verify_artifact": {
