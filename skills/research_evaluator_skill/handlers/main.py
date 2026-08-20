@@ -584,19 +584,22 @@ def record_calibration_result(
     }
 
 
-def _release_attempt_runtime(candidate_id: str, development_session_id: str) -> dict[str, Any]:
-    response = invoke_skill(
-        "research_calibration_runner_skill",
-        "release_attempt",
-        {
-            "candidate_id": str(candidate_id),
-            "development_session_id": str(development_session_id),
-        },
-        timeout=600,
-    )
-    if not isinstance(response, Mapping) or not response.get("ok"):
-        raise RuntimeError("calibration runner did not confirm runtime release")
-    return dict(response)
+def _deferred_runtime_release() -> dict[str, Any]:
+    """Keep runtime lifecycle outside the process that loaded candidate code.
+
+    On Windows, importing a candidate with native dependencies maps its DLLs
+    into this evaluator process.  Deleting the DEV runtime before this process
+    exits therefore fails even though a subsequent runner-owned release is
+    safe.  The calibration runner already owns the attempt lifecycle and
+    releases the exact terminal candidate after this result is durable.
+    """
+
+    return {
+        "schema": "adaos.research.runtime_release_delegation.v1",
+        "status": "deferred",
+        "owner_ref": "skill:research_calibration_runner_skill",
+        "reason": "evaluator_process_may_hold_candidate_native_modules",
+    }
 
 
 @tool(summary="Execute the hidden deterministic judge over one terminal Builder candidate.", side_effects="local_write")
@@ -615,12 +618,6 @@ def evaluate_builder_attempt(
     packet = repository.get_packet(task_id, arm_id, attempt_index, budget_view)
     existing = repository.find_result(task_id, arm_id, attempt_index, budget_view)
     if existing is not None:
-        lifecycle_errors = []
-        runtime_release = None
-        try:
-            runtime_release = _release_attempt_runtime(candidate_id, development_session_id)
-        except Exception as exc:
-            lifecycle_errors.append(f"{type(exc).__name__}: {exc}")
         return {
             "ok": True,
             "ready": True,
@@ -628,8 +625,8 @@ def evaluate_builder_attempt(
             "result": existing,
             "evidence_valid_completion": existing["metrics"]["evidence_valid_completion"],
             "operation_errors": [],
-            "runtime_release": runtime_release,
-            "lifecycle_errors": lifecycle_errors,
+            "runtime_release": _deferred_runtime_release(),
+            "lifecycle_errors": [],
         }
     session = development_sessions.get(development_session_id)
     enriched_instructions = []
@@ -847,20 +844,14 @@ def evaluate_builder_attempt(
         operation_errors=errors,
     )
     stored = repository.put_result(evaluate_candidate(task, candidate))
-    lifecycle_errors = []
-    runtime_release = None
-    try:
-        runtime_release = _release_attempt_runtime(candidate_id, development_session_id)
-    except Exception as exc:
-        lifecycle_errors.append(f"{type(exc).__name__}: {exc}")
     return {
         "ok": True,
         "ready": True,
         "result": stored,
         "evidence_valid_completion": stored["metrics"]["evidence_valid_completion"],
         "operation_errors": errors,
-        "runtime_release": runtime_release,
-        "lifecycle_errors": lifecycle_errors,
+        "runtime_release": _deferred_runtime_release(),
+        "lifecycle_errors": [],
     }
 
 

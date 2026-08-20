@@ -39,6 +39,51 @@
   "required_operations": {
     "implementation_probe": {
       "purpose": "Exercise the production centered-TLP operator with evaluator-supplied values without running a scientific workload.",
+      "input_schema": {
+        "type": "object",
+        "required": ["request"],
+        "properties": {
+          "request": {
+            "type": "object",
+            "required": ["schema", "experiment_plan_digest", "input_nchw", "theta_c4"],
+            "properties": {
+              "schema": {"const": "adaos.research.tlp_operator_probe.v1"},
+              "experiment_plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+              "input_nchw": {"type": "array", "minItems": 1},
+              "theta_c4": {"type": "array", "minItems": 1}
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "output_schema": {
+        "type": "object",
+        "required": [
+          "schema",
+          "experiment_plan_digest",
+          "execution_path_digest",
+          "baseline_nchw",
+          "intervention_nchw",
+          "parameter_shape",
+          "centered_theta_c4"
+        ],
+        "properties": {
+          "schema": {"const": "adaos.research.tlp_operator_probe_result.v1"},
+          "experiment_plan_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "execution_path_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+          "baseline_nchw": {"type": "array"},
+          "intervention_nchw": {"type": "array"},
+          "parameter_shape": {
+            "type": "array",
+            "prefixItems": [{"type": "integer", "minimum": 1}, {"const": 4}],
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "centered_theta_c4": {"type": "array"}
+        },
+        "additionalProperties": false
+      },
       "input": {
         "request": {
           "schema": "adaos.research.tlp_operator_probe.v1",

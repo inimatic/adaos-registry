@@ -317,6 +317,7 @@ def test_release_attempt_delegates_exact_terminal_candidate(monkeypatch) -> None
     result = module.release_attempt("tlp_cal_c3_a1_fd_deadbeef", "devcal2_deadbeef")
 
     assert result["ok"] is True
+    assert result["runtime_removed"] is True
     assert calls == [
         (
             "builder_sdk_control_skill",

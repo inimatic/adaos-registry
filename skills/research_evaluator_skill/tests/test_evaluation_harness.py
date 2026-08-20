@@ -824,7 +824,7 @@ def test_independent_judge_preserves_terminal_builder_failure_stage(task_value, 
     }
 
 
-def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypatch) -> None:
+def test_builder_evaluation_returns_existing_result_without_reexecuting_or_releasing(monkeypatch) -> None:
     from handlers import main as handler_module
 
     stored = {
@@ -851,12 +851,12 @@ def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypa
         "get_state",
         lambda **_kwargs: (_ for _ in ()).throw(AssertionError("must not read Builder state")),
     )
-    releases: list[tuple[str, str]] = []
     monkeypatch.setattr(
         handler_module,
-        "_release_attempt_runtime",
-        lambda candidate_id, session_id: releases.append((candidate_id, session_id))
-        or {"ok": True},
+        "invoke_skill",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("must not invoke another skill")
+        ),
     )
 
     response = handler_module.evaluate_builder_attempt(
@@ -870,7 +870,13 @@ def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypa
 
     assert response["idempotent_replay"] is True
     assert response["result"] is stored
-    assert releases == [("candidate", "session")]
+    assert response["runtime_release"] == {
+        "schema": "adaos.research.runtime_release_delegation.v1",
+        "status": "deferred",
+        "owner_ref": "skill:research_calibration_runner_skill",
+        "reason": "evaluator_process_may_hold_candidate_native_modules",
+    }
+    assert response["lifecycle_errors"] == []
 
 
 def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
@@ -1006,12 +1012,6 @@ def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
             "digest": "sha256:" + "a" * 64,
         },
     )
-    monkeypatch.setattr(
-        handler_module,
-        "_release_attempt_runtime",
-        lambda *_args: {"ok": True},
-    )
-
     response = handler_module.evaluate_builder_attempt(
         task_id="task",
         arm_id="C3_typed_execution",
@@ -1028,3 +1028,5 @@ def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
     assert semantic_calls[0]["expected_source_digest"] == source_snapshot["source_digest"]
     assert semantic_calls[0]["probe_request"]["experiment_plan_digest"] == plan["digest"]
     assert candidate_calls[0]["scientific_implementation"]["ok"] is True
+    assert response["runtime_release"]["status"] == "deferred"
+    assert response["lifecycle_errors"] == []

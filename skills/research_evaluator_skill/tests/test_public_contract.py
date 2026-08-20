@@ -49,6 +49,7 @@ def test_public_projection_exposes_every_required_semantic_interface() -> None:
     domain = projected["domain_conformance"]
     profile = domain["implementation_contract"]
     probe = domain["required_operations"]["implementation_probe"]
+    operation = projected["operations"]["implementation_probe"]
     assert profile["required_callable_keys"] == [
         "model_factory",
         "baseline_operator",
@@ -59,6 +60,17 @@ def test_public_projection_exposes_every_required_semantic_interface() -> None:
     assert profile["production_tlp_parameter_shape"] == [128, 4]
     assert probe["input"]["request"]["input_nchw"].startswith("finite nested")
     assert probe["input"]["request"]["theta_c4"].startswith("finite nested")
+    assert operation["input_schema"]["required"] == ["request"]
+    assert operation["input_schema"]["properties"]["request"]["required"] == [
+        "schema",
+        "experiment_plan_digest",
+        "input_nchw",
+        "theta_c4",
+    ]
+    assert operation["input_schema"]["additionalProperties"] is False
+    assert operation["output_schema"]["properties"]["schema"]["const"] == (
+        "adaos.research.tlp_operator_probe_result.v1"
+    )
     assert projected["digest"] == digest(
         {key: value for key, value in projected.items() if key != "digest"}
     )
