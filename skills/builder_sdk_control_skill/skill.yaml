@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.68
+version: 0.1.69
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:

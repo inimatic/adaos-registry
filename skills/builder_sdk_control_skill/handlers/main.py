@@ -3345,7 +3345,16 @@ def publish_project(
             project_id,
             source_webspace_id,
         )
-        if not bool(capabilities.get("can_prepare_candidate")):
+        governed_workflow = (
+            workflow_before.get("governed")
+            if isinstance(workflow_before.get("governed"), Mapping)
+            else {}
+        )
+        reconciles_half_applied_waiting = (
+            str(delivery.get("status") or "") == "activating"
+            and str(governed_workflow.get("state") or "") == "trial_ready"
+        )
+        if not bool(capabilities.get("can_prepare_candidate")) and not reconciles_half_applied_waiting:
             raise ValueError(
                 "Candidate preparation requires the current completed Automation result "
                 "and no active trial"

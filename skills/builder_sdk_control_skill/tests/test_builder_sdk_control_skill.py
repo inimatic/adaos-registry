@@ -1409,17 +1409,21 @@ def test_publish_records_only_successful_non_dry_run_releases(monkeypatch) -> No
     assert by_action["publish"]["metadata"]["candidate_digest"] == "sha256:" + "2" * 64
 
 
-def test_publish_recovers_exact_running_trial_without_repeating_activation(monkeypatch) -> None:
+@pytest.mark.parametrize("compatibility_mismatch", [False, True])
+def test_publish_recovers_exact_running_trial_without_repeating_activation(
+    monkeypatch,
+    compatibility_mismatch: bool,
+) -> None:
     module = _module()
     package_digest = "sha256:" + "2" * 64
     source_revision = "a" * 40
     candidate_id = "builder-0-2-1-" + package_digest[-12:]
     checkpoint = {
-        "capabilities": {"can_prepare_candidate": True},
+        "capabilities": {"can_prepare_candidate": not compatibility_mismatch},
         "change_set": {"change_set_id": "change-1", "member_change_ids": ["change-1"]},
         "automation": {"head_task_id": "task.21"},
         "delivery": {
-            "status": "checkpoint",
+            "status": "activating" if compatibility_mismatch else "checkpoint",
             "checkpoint_change_id": "checkpoint-change",
             "package_digest": package_digest,
             "source_revision": source_revision,
@@ -1432,13 +1436,14 @@ def test_publish_recovers_exact_running_trial_without_repeating_activation(monke
         "delivery": {**checkpoint["delivery"], "status": "activating"},
         "governed": {"state": "trial_waiting"},
     }
-    states = iter([checkpoint, waiting])
+    states = iter([checkpoint, checkpoint if compatibility_mismatch else waiting])
     monkeypatch.setattr(module.workflow, "get_state", lambda *args: next(states))
     transitions: list[str] = []
     monkeypatch.setattr(
         module.workflow,
         "transition",
-        lambda *args, **kwargs: transitions.append(args[2]) or {"ok": True, "workflow": {}},
+        lambda *args, **kwargs: transitions.append(args[2])
+        or {"ok": True, "workflow": checkpoint},
     )
     monkeypatch.setattr(
         module.projects,
@@ -1469,7 +1474,11 @@ def test_publish_recovers_exact_running_trial_without_repeating_activation(monke
     assert result["trial_ready"] is True
     assert result["recovered"] is True
     assert result["candidate"]["candidate_id"] == candidate_id
-    assert transitions == ["candidate_preparation_started", "candidate_prepared"]
+    assert transitions == [
+        "candidate_preparation_started",
+        *(["candidate_preparation_started"] if compatibility_mismatch else []),
+        "candidate_prepared",
+    ]
 
 
 def test_trial_result_reconciles_lost_local_waiting_state_without_external_activation(monkeypatch) -> None:
