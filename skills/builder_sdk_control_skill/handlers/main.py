@@ -3097,9 +3097,10 @@ def push_project(
     change_id = str(evidence.get("change_id") or "").strip()
     package_digest = str(result.get("package_digest") or "").strip()
     source_revision = str(result.get("source_revision") or commit or "").strip()
-    if not package_digest or not source_revision:
+    version = str(result.get("version") or "").strip()
+    if not package_digest or not source_revision or not version:
         raise ValueError(
-            "Forge checkpoint did not return immutable package/source identities; "
+            "Forge checkpoint did not return immutable version/package/source identities; "
             "the updated artifact pipeline must be available"
         )
     workflow_result = workflow.transition(
@@ -3114,6 +3115,7 @@ def push_project(
             "context_packet_digest": context_packet_digest or None,
             "package_digest": package_digest,
             "source_revision": source_revision,
+            "version": version,
             "confirmed": True,
         },
     )
@@ -3143,23 +3145,40 @@ def push_project(
     }
 
 
-def _checkpoint_candidate_id(project_id: str, delivery: Mapping[str, Any]) -> str | None:
+def _checkpoint_candidate_id(
+    kind: str,
+    project_id: str,
+    delivery: Mapping[str, Any],
+) -> tuple[str, str] | None:
     version = str(delivery.get("version") or "").strip()
     package_digest = str(delivery.get("package_digest") or "").strip()
+    if not version:
+        # Compatibility recovery for checkpoints created before the control
+        # skill forwarded the already available Forge semantic version.  The
+        # candidate is accepted only after package and source identities are
+        # compared below, so a later DEV manifest cannot authorize different
+        # bytes accidentally.
+        try:
+            project = projects.describe(kind, project_id)
+        except Exception:
+            project = {}
+        version = str(project.get("version") or "").strip()
     if not version or not package_digest.startswith("sha256:"):
         return None
-    return f"{project_id}-{version.replace('.', '-')}-{package_digest[-12:]}"
+    return f"{project_id}-{version.replace('.', '-')}-{package_digest[-12:]}", version
 
 
 def _recover_running_checkpoint_candidate(
+    kind: str,
     project_id: str,
     delivery: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     """Recover an exact Trial after its external result outlived a local rollback."""
 
-    candidate_id = _checkpoint_candidate_id(project_id, delivery)
-    if not candidate_id:
+    identity = _checkpoint_candidate_id(kind, project_id, delivery)
+    if not identity:
         return None
+    candidate_id, checkpoint_version = identity
     try:
         result = projects.get_candidate(candidate_id)
     except Exception:
@@ -3170,7 +3189,7 @@ def _recover_running_checkpoint_candidate(
     expected = {
         "candidate_id": candidate_id,
         "project_id": project_id,
-        "version": str(delivery.get("version") or "").strip(),
+        "version": checkpoint_version,
         "package_digest": str(delivery.get("package_digest") or "").strip(),
         "source_revision": str(delivery.get("source_revision") or "").strip(),
     }
@@ -3406,7 +3425,11 @@ def publish_project(
             },
         )
         try:
-            recovered_result = None if stale_candidate_id else _recover_running_checkpoint_candidate(project_id, delivery)
+            recovered_result = (
+                None
+                if stale_candidate_id
+                else _recover_running_checkpoint_candidate(kind, project_id, delivery)
+            )
             if recovered_result is not None:
                 result = recovered_result
             elif stale_candidate_id:

@@ -1410,9 +1410,11 @@ def test_publish_records_only_successful_non_dry_run_releases(monkeypatch) -> No
 
 
 @pytest.mark.parametrize("compatibility_mismatch", [False, True])
+@pytest.mark.parametrize("legacy_missing_version", [False, True])
 def test_publish_recovers_exact_running_trial_without_repeating_activation(
     monkeypatch,
     compatibility_mismatch: bool,
+    legacy_missing_version: bool,
 ) -> None:
     module = _module()
     package_digest = "sha256:" + "2" * 64
@@ -1427,7 +1429,7 @@ def test_publish_recovers_exact_running_trial_without_repeating_activation(
             "checkpoint_change_id": "checkpoint-change",
             "package_digest": package_digest,
             "source_revision": source_revision,
-            "version": "0.2.1",
+            **({} if legacy_missing_version else {"version": "0.2.1"}),
         },
         "governed": {"state": "trial_ready"},
     }
@@ -1438,6 +1440,11 @@ def test_publish_recovers_exact_running_trial_without_repeating_activation(
     }
     states = iter([checkpoint, checkpoint if compatibility_mismatch else waiting])
     monkeypatch.setattr(module.workflow, "get_state", lambda *args: next(states))
+    monkeypatch.setattr(
+        module.projects,
+        "describe",
+        lambda *args: {"version": "0.2.1"},
+    )
     transitions: list[str] = []
     monkeypatch.setattr(
         module.workflow,
@@ -2056,6 +2063,7 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
             "commit": "a" * 40,
             "source_revision": "a" * 40,
             "package_digest": "sha256:" + "2" * 64,
+            "version": "0.2.1",
         },
     )
     monkeypatch.setattr(
@@ -2167,6 +2175,7 @@ def test_project_lifecycle_tools_stay_behind_sdk(monkeypatch) -> None:
     assert run_calls[0]["change_id"] == "CH-builder"
     assert transitions[0]["run_id"] == "checkpoint-change"
     assert transitions[0]["context_packet_digest"] == packet_digest
+    assert transitions[0]["version"] == "0.2.1"
     assert transitions[1]["run_id"] == "candidate:builder:activate"
     assert transitions[2]["run_id"] == "candidate:candidate-1:prepare"
     assert len(pushed["checkpoint_artifacts"]) == 2
