@@ -218,7 +218,7 @@ def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.4.0",
+        "version": "1.5.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -279,7 +279,15 @@ def descriptor() -> dict[str, Any]:
                                 "trial_id": {"type": "string", "minLength": 1},
                                 "run_id": {"type": "string", "minLength": 1},
                                 "attempt_number": {"type": "integer", "minimum": 1},
-                                "profile": {"type": "string", "minLength": 1},
+                                "profile": {
+                                    "enum": ["preflight", "confirmatory"],
+                                    "description": (
+                                        "ResearchManager lifecycle profile. Use preflight "
+                                        "for workflow_smoke evidence and confirmatory for "
+                                        "confirmatory evidence; scientific stage identity is "
+                                        "carried separately by profile_conditions.source_stage_id."
+                                    ),
+                                },
                                 "seed": {"type": "integer"},
                                 "arm": {
                                     "type": "object",
@@ -401,7 +409,8 @@ def descriptor() -> dict[str, Any]:
                     "contract equals adaos.research.runner.v1",
                     "provider_id equals the direction skill id",
                     "package_ref is a portable ContentRef owned by the direction skill",
-                    "profile is a ResearchManager lifecycle label; source_stage_id and evidence_class carry the accepted scientific stage semantics",
+                    "request.profile is exactly preflight when profile_conditions.evidence_class is workflow_smoke and exactly confirmatory when it is confirmatory; workflow_smoke is not a valid request.profile value",
+                    "profile_conditions.source_stage_id carries the accepted scientific stage identity independently of the ResearchManager lifecycle profile",
                     "arm is the exact accepted arm object; providers read arm.id instead of coercing the object to text",
                     "command[0] is the active Python interpreter and command[1] is an absolute runner path under the skill source",
                     "working_directory is a pre-created skill-owned attempt directory and every expected output is written beneath it",
@@ -412,6 +421,18 @@ def descriptor() -> dict[str, Any]:
                     "preparation does not start scientific execution",
                     "expected_outputs contains every workflow_smoke_evidence.required_expected_outputs entry for a workflow-smoke request",
                 ],
+                "profile_mapping": {
+                    "preflight": {
+                        "required_evidence_class": "workflow_smoke",
+                        "scientific_stage_field": "profile_conditions.source_stage_id",
+                        "inference_allowed": False,
+                    },
+                    "confirmatory": {
+                        "required_evidence_class": "confirmatory",
+                        "scientific_stage_field": "profile_conditions.source_stage_id",
+                        "inference_allowed": True,
+                    },
+                },
             },
             "collect_attempt": {
                 "input_schema": {

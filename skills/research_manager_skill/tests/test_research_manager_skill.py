@@ -202,7 +202,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.4.0"
+    assert contract["version"] == "1.5.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -212,6 +212,20 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     assert contract["operations"]["prepare_attempt"]["input_schema"]["required"] == [
         "request"
     ]
+    prepare_contract = contract["operations"]["prepare_attempt"]
+    profile_schema = prepare_contract["input_schema"]["properties"]["request"][
+        "properties"
+    ]["profile"]
+    assert profile_schema["enum"] == ["preflight", "confirmatory"]
+    assert prepare_contract["profile_mapping"]["preflight"] == {
+        "required_evidence_class": "workflow_smoke",
+        "scientific_stage_field": "profile_conditions.source_stage_id",
+        "inference_allowed": False,
+    }
+    assert any(
+        "workflow_smoke is not a valid request.profile" in invariant
+        for invariant in prepare_contract["invariants"]
+    )
     for operation in contract["operations"].values():
         jsonschema.Draft202012Validator.check_schema(operation["input_schema"])
         jsonschema.Draft202012Validator.check_schema(operation["output_schema"])
