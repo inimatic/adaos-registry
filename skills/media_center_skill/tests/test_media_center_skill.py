@@ -1165,6 +1165,117 @@ def test_playback_plan_selects_endpoint_compatible_variant_and_route(
     _validate_schema("playback-route.v1.schema.json", plan["route"])
 
 
+def test_audio_identity_uses_folder_context_and_migrates_existing_collisions(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Audiobooks/Author A/Book A/01/0.mp3"),
+            _agent_delta(2, "Audiobooks/Author B/Book B/01/0.mp3"),
+        )
+    )
+    items = catalog.list_items(media_kind="audio", sort="title", limit=30)[
+        "items"
+    ]
+    by_source = {item["source_id"]: item for item in items}
+    source_two_variant_id = by_source["source-2"]["variant_id"]
+
+    assert by_source["source-1"]["work_id"] != by_source["source-2"]["work_id"]
+    assert by_source["source-1"]["collection_id"] != by_source["source-2"][
+        "collection_id"
+    ]
+    for source_id in ("source-1", "source-2"):
+        plan = catalog.playback_plan(by_source[source_id]["id"])
+        assert plan["source_id"] == source_id
+        assert plan["decision"]["candidate_count"] == 1
+
+    with repository.connect() as connection:
+        connection.execute(
+            "UPDATE catalog_items SET work_id=?,collection_id=? WHERE source_id='source-2'",
+            (
+                by_source["source-1"]["work_id"],
+                by_source["source-1"]["collection_id"],
+            ),
+        )
+        connection.execute(
+            "UPDATE media_variants SET work_id=? WHERE source_id='source-2'",
+            (by_source["source-1"]["work_id"],),
+        )
+        connection.execute(
+            "UPDATE coordinator_meta SET value='legacy' "
+            "WHERE key='coordinator_schema_revision'"
+        )
+        connection.execute(
+            "DELETE FROM coordinator_meta "
+            "WHERE key='audio_context_identity_revision'"
+        )
+        connection.commit()
+
+    migrated = MediaCatalogCoordinator(repository)
+    repaired = migrated.list_items(media_kind="audio", sort="title", limit=30)[
+        "items"
+    ]
+    repaired_by_source = {item["source_id"]: item for item in repaired}
+
+    assert repaired_by_source["source-1"]["work_id"] != repaired_by_source[
+        "source-2"
+    ]["work_id"]
+    assert repaired_by_source["source-1"]["collection_id"] != repaired_by_source[
+        "source-2"
+    ]["collection_id"]
+    assert migrated.playback_plan(repaired_by_source["source-2"]["id"])[
+        "source_id"
+    ] == "source-2"
+    update = migrated.apply_agent_page(
+        _agent_page(
+            _agent_delta(
+                2,
+                "Audiobooks/Author B/Book B/01/0.mp3",
+                revision=2,
+            )
+        )
+    )
+    updated_source_two = next(
+        item
+        for item in migrated.list_items(
+            media_kind="audio", sort="title", limit=30
+        )["items"]
+        if item["source_id"] == "source-2"
+    )
+    assert update["applied_count"] == 1
+    assert updated_source_two["variant_id"] == source_two_variant_id
+
+
+def test_replicated_audio_path_remains_one_work_with_multiple_variants(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Music/Artist/Album/01 Track.mp3")),
+        instance_id="instance-a",
+    )
+    replica = _agent_delta(2, "Music/Artist/Album/01 Track.mp3")
+    replica["agent_id"] = "agent-node-b"
+    replica["node_id"] = replica["source"]["node_id"] = "node-b"
+    page = _agent_page(replica)
+    page["agent"] = {"id": "agent-node-b", "node_id": "node-b"}
+    catalog.apply_agent_page(page, instance_id="instance-b")
+
+    items = catalog.list_items(media_kind="audio", sort="title", limit=30)[
+        "items"
+    ]
+    assert len({item["work_id"] for item in items}) == 1
+    assert catalog.playback_plan(items[0]["id"])["decision"]["candidate_count"] == 2
+
+
 def test_derived_rendition_is_a_hidden_exact_source_variant(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")

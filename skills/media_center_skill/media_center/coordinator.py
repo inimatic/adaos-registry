@@ -26,7 +26,8 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-20.5"
+COORDINATOR_SCHEMA_REVISION = "2026-08-20.6"
+AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
 WORK_SCHEMA = "adaos.media_center.media_work.v1"
 COLLECTION_SCHEMA = "adaos.media_center.media_collection.v1"
@@ -70,6 +71,8 @@ _SEASON_EPISODE = re.compile(r"(?i)(?:^|[ ._\-])s(?P<season>\d{1,3})e(?P<episode
 _SEASON_FOLDER = re.compile(r"(?i)^(?:season|сезон)[ ._\-]*(?P<season>\d{1,3})$")
 _DISC_FOLDER = re.compile(r"(?i)^(?:disc|disk|cd|диск)[ ._\-]*(?P<disc>\d{1,3})$")
 _PART_FOLDER = re.compile(r"(?i)^(?:part|book|том|часть)[ ._\-]*(?P<part>\d{1,3})$")
+_NUMERIC_FOLDER = re.compile(r"^(?P<number>\d{1,3})$")
+_AUDIOBOOK_HINT = re.compile(r"(?i)(?:audio[ ._\-]*books?|аудиокниг)")
 _LEADING_NUMBER = re.compile(r"^(?P<number>\d{1,4})(?:[ ._\-]+|$)")
 
 
@@ -446,6 +449,7 @@ class MediaCatalogCoordinator:
                             str(profile_row["id"]),
                         ),
                     )
+            identity_repair = self._repair_contextual_audio_identity(connection)
             connection.execute("INSERT OR REPLACE INTO coordinator_meta(key, value) VALUES ('schema_version', ?)", (COORDINATOR_SCHEMA,))
             retired_legacy_count = connection.execute(
                 """
@@ -476,6 +480,240 @@ class MediaCatalogCoordinator:
             "schema": COORDINATOR_SCHEMA,
             "db_path": str(self.repository.db_path),
             "retired_legacy_count": max(0, int(retired_legacy_count or 0)),
+            "identity_repair": identity_repair,
+        }
+
+    def _repair_contextual_audio_identity(
+        self, connection: sqlite3.Connection
+    ) -> dict[str, int]:
+        marker = connection.execute(
+            "SELECT value FROM coordinator_meta "
+            "WHERE key='audio_context_identity_revision'"
+        ).fetchone()
+        if marker and str(marker["value"]) == AUDIO_CONTEXT_IDENTITY_REVISION:
+            return {
+                "migration_applied": 0,
+                "audio_items": 0,
+                "repaired_items": 0,
+                "rebuilt_memberships": 0,
+                "removed_collections": 0,
+                "removed_works": 0,
+            }
+        rows = connection.execute(
+            """
+            SELECT id,name,folder_path,metadata_json,node_id,source_id,
+                work_id,variant_id,collection_id
+            FROM catalog_items
+            WHERE agent_id<>'' AND media_kind='audio'
+            ORDER BY id
+            """
+        ).fetchall()
+        now = now_iso()
+        work_records: dict[str, tuple[Any, ...]] = {}
+        collection_records: dict[str, tuple[Any, ...]] = {}
+        variant_updates: list[tuple[Any, ...]] = []
+        catalog_updates: list[tuple[Any, ...]] = []
+        membership_deletes: list[tuple[str]] = []
+        membership_records: list[tuple[Any, ...]] = []
+        for row in rows:
+            metadata = _json_loads(row["metadata_json"])
+            work, collections, membership = self._classify_source(
+                str(row["name"]),
+                "audio",
+                str(row["folder_path"]),
+                metadata if isinstance(metadata, Mapping) else {},
+            )
+            title = _text(work.get("canonical_title"))
+            kind = _text(work.get("media_kind")) or "other"
+            work_identity = _text(work.get("identity_key")) or title
+            work_id = _stable_id(
+                "work", kind, work_identity.casefold(), size=24
+            )
+            work_records[work_id] = (
+                work_id,
+                WORK_SCHEMA,
+                kind,
+                title,
+                title.casefold(),
+                _json_dumps(work.get("metadata") or {}),
+                now,
+                now,
+            )
+            collection_ids: list[str] = []
+            for collection in collections:
+                value = dict(collection)
+                parent_index = value.pop("parent_index", None)
+                if parent_index is not None:
+                    value["parent_id"] = collection_ids[int(parent_index)]
+                collection_kind = _text(value.get("kind"))
+                collection_title = _text(value.get("title"))
+                parent_id = _text(value.get("parent_id"))
+                collection_identity = (
+                    _text(value.get("identity_key")) or collection_title
+                )
+                collection_id = _stable_id(
+                    "collection",
+                    collection_kind,
+                    collection_identity.casefold(),
+                    parent_id,
+                    size=24,
+                )
+                collection_ids.append(collection_id)
+                collection_records[collection_id] = (
+                    collection_id,
+                    COLLECTION_SCHEMA,
+                    collection_kind,
+                    collection_title,
+                    parent_id,
+                    _text(value.get("ownership")) or "derived",
+                    _json_dumps(value.get("metadata") or {}),
+                    now,
+                    now,
+                )
+            collection_id = collection_ids[-1] if collection_ids else ""
+            variant_id = str(row["variant_id"])
+            changed = (
+                str(row["work_id"]) != work_id
+                or str(row["collection_id"]) != collection_id
+            )
+            if not changed:
+                continue
+            source_id = str(row["source_id"])
+            variant_updates.append(
+                (work_id, str(row["node_id"]), source_id, source_id, work_id)
+            )
+            catalog_updates.append((work_id, collection_id, str(row["id"])))
+            if not variant_id:
+                continue
+            membership_deletes.append((variant_id,))
+            for membership_collection_id in collection_ids:
+                membership_records.append(
+                    (
+                        membership_collection_id,
+                        work_id,
+                        variant_id,
+                        int(membership.get("ordinal") or 0),
+                        membership.get("season_number"),
+                        membership.get("episode_number"),
+                        membership.get("disc_number"),
+                        membership.get("track_number"),
+                        membership.get("chapter_number"),
+                    )
+                )
+
+        connection.executemany(
+            """
+            INSERT INTO media_works(
+                id,schema_name,media_kind,canonical_title,sort_title,
+                metadata_json,created_at,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET
+                metadata_json=excluded.metadata_json,
+                updated_at=excluded.updated_at,
+                revision=media_works.revision+1
+            """,
+            work_records.values(),
+        )
+        connection.executemany(
+            """
+            INSERT INTO media_collections(
+                id,schema_name,kind,title,parent_id,ownership,metadata_json,
+                created_at,updated_at
+            ) VALUES (?,?,?,?,?,?,?,?,?)
+            ON CONFLICT(id) DO UPDATE SET
+                title=excluded.title,metadata_json=excluded.metadata_json,
+                updated_at=excluded.updated_at,
+                revision=media_collections.revision+1
+            """,
+            collection_records.values(),
+        )
+        connection.executemany(
+            """
+            UPDATE media_variants SET work_id=?,revision=revision+1
+            WHERE node_id=? AND (source_id=? OR exact_source_id=?)
+                AND work_id<>?
+            """,
+            variant_updates,
+        )
+        connection.executemany(
+            "UPDATE catalog_items SET work_id=?,collection_id=? WHERE id=?",
+            catalog_updates,
+        )
+        connection.executemany(
+            "DELETE FROM collection_memberships WHERE variant_id=?",
+            membership_deletes,
+        )
+        connection.executemany(
+            """
+            INSERT INTO collection_memberships(
+                collection_id,work_id,variant_id,ordinal,season_number,
+                episode_number,disc_number,track_number,chapter_number,revision
+            ) VALUES (?,?,?,?,?,?,?,?,?,1)
+            """,
+            membership_records,
+        )
+
+        removed_collections = 0
+        while True:
+            removed = connection.execute(
+                """
+                DELETE FROM media_collections
+                WHERE NOT EXISTS (
+                        SELECT 1 FROM catalog_items c
+                        WHERE c.collection_id=media_collections.id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM collection_memberships m
+                        WHERE m.collection_id=media_collections.id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM media_collections child
+                        WHERE child.parent_id=media_collections.id
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM metadata_claims claim
+                        WHERE claim.subject_ref='collection:' || media_collections.id
+                    )
+                """
+            ).rowcount
+            removed_collections += max(0, int(removed or 0))
+            if not removed:
+                break
+        removed_works = connection.execute(
+            """
+            DELETE FROM media_works
+            WHERE NOT EXISTS (
+                    SELECT 1 FROM catalog_items c WHERE c.work_id=media_works.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM media_variants v WHERE v.work_id=media_works.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM collection_memberships m
+                    WHERE m.work_id=media_works.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM metadata_claims claim
+                    WHERE claim.subject_ref='work:' || media_works.id
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM catalog_aliases alias
+                    WHERE alias.alias_id=media_works.id
+                        OR alias.canonical_id=media_works.id
+                )
+            """
+        ).rowcount
+        connection.execute(
+            "INSERT OR REPLACE INTO coordinator_meta(key,value) VALUES (?,?)",
+            ("audio_context_identity_revision", AUDIO_CONTEXT_IDENTITY_REVISION),
+        )
+        return {
+            "migration_applied": 1,
+            "audio_items": len(rows),
+            "repaired_items": len(catalog_updates),
+            "rebuilt_memberships": len(membership_records),
+            "removed_collections": removed_collections,
+            "removed_works": max(0, int(removed_works or 0)),
         }
 
     def _backfill_search(self, connection: sqlite3.Connection) -> None:
@@ -654,7 +892,8 @@ class MediaCatalogCoordinator:
         if not source_id or source_revision < 1:
             return "ignored"
         previous = connection.execute(
-            "SELECT id, source_revision FROM catalog_items WHERE agent_id=? AND source_id=?",
+            "SELECT id,source_revision,variant_id FROM catalog_items "
+            "WHERE agent_id=? AND source_id=?",
             (agent_id, source_id),
         ).fetchone()
         if previous and int(previous["source_revision"] or 0) >= source_revision:
@@ -689,16 +928,15 @@ class MediaCatalogCoordinator:
         work, collections, membership = self._classify_source(
             name, kind, folder_path, metadata
         )
-        work_id = self._upsert_work(connection, work)
-        collection_ids: list[str] = []
-        for collection in collections:
-            value = dict(collection)
-            parent_index = value.pop("parent_index", None)
-            if parent_index is not None:
-                value["parent_id"] = collection_ids[int(parent_index)]
-            collection_ids.append(self._upsert_collection(connection, value))
+        work_id, collection_ids = self._upsert_classification(
+            connection, work, collections
+        )
         collection_id = collection_ids[-1] if collection_ids else ""
-        variant_id = _stable_id("variant", work_id, node_id, source_id, size=24)
+        variant_id = (
+            str(previous["variant_id"])
+            if previous and _text(previous["variant_id"])
+            else _stable_id("variant", node_id, source_id, size=24)
+        )
         item_id = str(previous["id"]) if previous else _stable_id("mc", agent_id, source_id, size=24)
         content_path = _text(descriptor.get("content_path"))
         routed_path = _text(descriptor.get("routed_content_path") or descriptor.get("browser_path"))
@@ -823,7 +1061,7 @@ class MediaCatalogCoordinator:
             )
             derived_quality = dict(derived.get("quality") or {})
             derived_variant_id = _stable_id(
-                "variant", work_id, node_id, derived_id, size=24
+                "variant", node_id, derived_id, size=24
             )
             connection.execute(
                 """
@@ -933,6 +1171,8 @@ class MediaCatalogCoordinator:
             season = int(match.group("season"))
             episode = int(match.group("episode"))
             series_title = parts[-2] if len(parts) >= 2 and _SEASON_FOLDER.match(parts[-1]) else (parts[-1] if parts else canonical_title)
+            series_parts = parts[:-1] if parts and _SEASON_FOLDER.match(parts[-1]) else parts
+            series_identity = "/".join(series_parts) or series_title
             canonical_title = f"{series_title} S{season:02d}E{episode:02d}"
             collections = [
                 {
@@ -940,12 +1180,14 @@ class MediaCatalogCoordinator:
                     "title": series_title,
                     "parent_id": "",
                     "ownership": "derived",
+                    "identity_key": series_identity,
                 },
                 {
                     "kind": "season",
                     "title": f"Season {season}",
                     "parent_index": 0,
                     "ownership": "derived",
+                    "identity_key": f"{series_identity}/season:{season}",
                     "metadata": {"season_number": season},
                 },
             ]
@@ -953,24 +1195,28 @@ class MediaCatalogCoordinator:
         elif media_kind == "audio" and parts:
             disc_match = _DISC_FOLDER.match(parts[-1]) if parts else None
             part_match = _PART_FOLDER.match(parts[-1]) if parts else None
-            container_title = parts[-2] if len(parts) >= 2 and (disc_match or part_match) else parts[-1]
+            numeric_part = _NUMERIC_FOLDER.match(parts[-1]) if parts else None
+            audiobook_hint = any(_AUDIOBOOK_HINT.search(part) for part in parts)
+            nested_part = bool(disc_match or part_match or (numeric_part and audiobook_hint))
+            container_title = parts[-2] if len(parts) >= 2 and nested_part else parts[-1]
             album_title = _text(metadata.get("album")) or container_title
             number_match = _LEADING_NUMBER.match(Path(name).stem)
             ordinal = int(number_match.group("number")) if number_match else 0
             kind = (
                 "audiobook"
-                if len(parts) >= 2
-                and number_match
-                and not metadata.get("album")
-                and not disc_match
+                if not metadata.get("album")
+                and (audiobook_hint or bool(part_match))
                 else "album"
             )
+            container_parts = parts[:-1] if nested_part else parts
+            container_identity = "/".join(container_parts) or album_title
             collections = [
                 {
                     "kind": kind,
                     "title": album_title,
                     "parent_id": "",
                     "ownership": "derived",
+                    "identity_key": container_identity,
                 }
             ]
             if disc_match:
@@ -981,18 +1227,20 @@ class MediaCatalogCoordinator:
                         "title": f"Disc {disc}",
                         "parent_index": 0,
                         "ownership": "derived",
+                        "identity_key": f"{container_identity}/disc:{disc}",
                         "metadata": {"disc_number": disc},
                     }
                 )
                 membership["disc_number"] = disc
-            elif part_match:
-                part = int(part_match.group("part"))
+            elif part_match or (numeric_part and audiobook_hint):
+                part = int((part_match or numeric_part).group("part" if part_match else "number"))
                 collections.append(
                     {
                         "kind": "book_part",
                         "title": f"Part {part}",
                         "parent_index": 0,
                         "ownership": "derived",
+                        "identity_key": f"{container_identity}/part:{part}",
                         "metadata": {"part_number": part},
                     }
                 )
@@ -1005,15 +1253,41 @@ class MediaCatalogCoordinator:
                     "title": parts[-1],
                     "parent_id": "",
                     "ownership": "source",
+                    "identity_key": "/".join(parts),
                 }
             ]
-        work = {"media_kind": media_kind, "canonical_title": canonical_title, "metadata": {"source_title": _title_from_name(name)}}
+        identity_key = canonical_title
+        if media_kind == "audio" and parts:
+            identity_key = f"{'/'.join(parts)}\0{canonical_title}"
+        work = {
+            "media_kind": media_kind,
+            "canonical_title": canonical_title,
+            "identity_key": identity_key,
+            "metadata": {"source_title": _title_from_name(name)},
+        }
         return work, collections, membership
+
+    def _upsert_classification(
+        self,
+        connection: sqlite3.Connection,
+        work: Mapping[str, Any],
+        collections: Iterable[Mapping[str, Any]],
+    ) -> tuple[str, list[str]]:
+        work_id = self._upsert_work(connection, work)
+        collection_ids: list[str] = []
+        for collection in collections:
+            value = dict(collection)
+            parent_index = value.pop("parent_index", None)
+            if parent_index is not None:
+                value["parent_id"] = collection_ids[int(parent_index)]
+            collection_ids.append(self._upsert_collection(connection, value))
+        return work_id, collection_ids
 
     def _upsert_work(self, connection: sqlite3.Connection, work: Mapping[str, Any]) -> str:
         title = _text(work.get("canonical_title"))
         kind = _text(work.get("media_kind")) or "other"
-        work_id = _stable_id("work", kind, title.casefold(), size=24)
+        identity_key = _text(work.get("identity_key")) or title
+        work_id = _stable_id("work", kind, identity_key.casefold(), size=24)
         now = now_iso()
         connection.execute(
             """
@@ -1030,16 +1304,30 @@ class MediaCatalogCoordinator:
         kind = _text(collection.get("kind"))
         title = _text(collection.get("title"))
         parent_id = _text(collection.get("parent_id"))
-        collection_id = _stable_id("collection", kind, title.casefold(), parent_id, size=24)
+        identity_key = _text(collection.get("identity_key")) or title
+        collection_id = _stable_id(
+            "collection", kind, identity_key.casefold(), parent_id, size=24
+        )
         now = now_iso()
         connection.execute(
             """
             INSERT INTO media_collections(id, schema_name, kind, title, parent_id, ownership, metadata_json, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, '{}', ?, ?)
-            ON CONFLICT(id) DO UPDATE SET title=excluded.title, updated_at=excluded.updated_at,
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET title=excluded.title,
+                metadata_json=excluded.metadata_json,updated_at=excluded.updated_at,
                 revision=media_collections.revision+1
             """,
-            (collection_id, COLLECTION_SCHEMA, kind, title, parent_id, _text(collection.get("ownership")) or "derived", now, now),
+            (
+                collection_id,
+                COLLECTION_SCHEMA,
+                kind,
+                title,
+                parent_id,
+                _text(collection.get("ownership")) or "derived",
+                _json_dumps(collection.get("metadata") or {}),
+                now,
+                now,
+            ),
         )
         return collection_id
 
@@ -2377,6 +2665,7 @@ class MediaCatalogCoordinator:
         quality_preference = _text(preferred_quality).lower() or "auto"
         language_preference = _text(preferred_language).lower()
         override = _text(variant_id)
+        selected_item_variant = str(selected_item["variant_id"])
         ranked: list[tuple[float, sqlite3.Row, dict[str, Any], list[str]]] = []
         for row in rows:
             quality = _json_loads(row["variant_quality_json"]) or {}
@@ -2385,6 +2674,9 @@ class MediaCatalogCoordinator:
                 row["missing"] if row["missing"] is not None else False
             )
             score = 1000.0 if available else -10000.0
+            if str(row["selected_variant_id"]) == selected_item_variant:
+                score += 1.0
+                reasons.append("selected_item_source")
             if override:
                 score += (
                     100000.0

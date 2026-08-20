@@ -181,6 +181,52 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
         encoded_page_bytes = len(
             json.dumps(page_result, ensure_ascii=False, default=str).encode("utf-8")
         )
+        with repository.connect() as connection:
+            connection.execute(
+                "UPDATE catalog_items SET media_kind='audio',"
+                "work_id='work-legacy',collection_id='collection-legacy'"
+            )
+            connection.execute(
+                """
+                INSERT INTO media_works(
+                    id,schema_name,media_kind,canonical_title,sort_title,
+                    created_at,updated_at
+                ) VALUES (
+                    'work-legacy','adaos.media_center.media_work.v1','audio',
+                    'Legacy','legacy','2026-08-20','2026-08-20'
+                )
+                """
+            )
+            connection.execute(
+                """
+                INSERT INTO media_collections(
+                    id,schema_name,kind,title,ownership,created_at,updated_at
+                ) VALUES (
+                    'collection-legacy','adaos.media_center.media_collection.v1',
+                    'album','Legacy','derived','2026-08-20','2026-08-20'
+                )
+                """
+            )
+            connection.execute(
+                "DELETE FROM coordinator_meta "
+                "WHERE key='audio_context_identity_revision'"
+            )
+            connection.commit()
+        started = time.perf_counter()
+        identity_migration = catalog.ensure_schema(force=True)["identity_repair"]
+        identity_migration_ms = (time.perf_counter() - started) * 1000
+        with repository.connect() as connection:
+            migrated_work_count = int(
+                connection.execute(
+                    "SELECT COUNT(DISTINCT work_id) FROM catalog_items "
+                    "WHERE media_kind='audio'"
+                ).fetchone()[0]
+            )
+            migrated_membership_count = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM collection_memberships"
+                ).fetchone()[0]
+            )
         metrics = {
             "schema": "adaos.media_center.benchmark.v1",
             "fixture_count": count,
@@ -208,6 +254,12 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             },
             "encoded_page_bytes": encoded_page_bytes,
             "process_rss_mb": _rss_mb(),
+            "identity_migration": {
+                **identity_migration,
+                "duration_ms": round(identity_migration_ms, 3),
+                "distinct_work_count": migrated_work_count,
+                "membership_count": migrated_membership_count,
+            },
             "result_counts": {
                 "fts": search_result["count"],
                 "fts_by_query": search_result_counts,
@@ -219,6 +271,7 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
                 "catalog_page_p95_ms": 100,
                 "local_discovery_p95_ms": 500,
                 "encoded_page_bytes": 512 * 1024,
+                "identity_migration_ms": 60_000,
             },
         }
         failures = []
@@ -242,6 +295,14 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             or int(discovery_result["candidate_count"]) < 1
         ):
             failures.append("local_discovery_result_count")
+        if identity_migration_ms > metrics["budgets"]["identity_migration_ms"]:
+            failures.append("identity_migration.duration_ms")
+        if (
+            int(identity_migration["repaired_items"]) != count
+            or migrated_work_count != count
+            or migrated_membership_count != count
+        ):
+            failures.append("identity_migration.correctness")
         metrics["passed"] = not failures
         metrics["failures"] = failures
         if enforce and failures:
