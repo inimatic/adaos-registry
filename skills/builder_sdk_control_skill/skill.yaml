@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.64
+version: 0.1.65
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -1045,6 +1045,31 @@ tools:
         - scenario
         - skill
       object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
+- name: release_candidate_runtime
+  description: Release a terminal skill candidate DEV runtime while retaining its
+    governed source, Builder session, and evidence.
+  entry: handlers.main:release_candidate_runtime
+  side_effects: local_write
+  timeout_seconds: 600
+  input_schema:
+    type: object
+    additionalProperties: false
+    required:
+    - object_id
+    - development_session_id
+    properties:
+      object_type:
+        type: string
+        const: skill
+        default: skill
+      object_id:
+        type: string
+        minLength: 1
+      development_session_id:
         type: string
         minLength: 1
   output_schema:
@@ -2109,7 +2134,7 @@ data_routes:
 updated_at: '2026-08-19T09:55:00+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.854+5188.9a4e31d5
+    min_version: 0.1.868+5320.5d9e1770
     recorded_at: '2026-08-17T23:04:05+00:00'
     source: skill_push
     min_commit: 9a4e31d564680c3ef901ccfc4ecbba58a22d5678

@@ -41,6 +41,7 @@ def test_manifest_declares_trusted_local_effects_for_interactive_tools() -> None
     assert tools["save_project_file"]["side_effects"] == "local_write"
     assert tools["create_project"]["side_effects"] == "local_write"
     assert tools["start_automation"]["side_effects"] == "local_write"
+    assert tools["release_candidate_runtime"]["side_effects"] == "local_write"
     assert tools["submit_automation"]["side_effects"] == "local_write"
     assert tools["save_prompt_context"]["side_effects"] == "local_write"
     assert tools["append_prompt_addendum"]["side_effects"] == "local_write"
@@ -526,6 +527,30 @@ def test_start_automation_uses_exact_bound_instruction_without_manual_paste(monk
     assert launched[0]["brief_path"].endswith("automation_brief.json")
     assert launched[0]["change_set_id"] == "change-tlp"
     assert launched[0]["development_session_id"] == "dev-tlp"
+
+
+def test_release_candidate_runtime_uses_exact_sdk_binding(monkeypatch) -> None:
+    module = _module()
+    calls: list[dict] = []
+    monkeypatch.setattr(
+        module.automation,
+        "release_candidate_runtime",
+        lambda **kwargs: calls.append(kwargs) or {"ok": True},
+    )
+
+    result = module.release_candidate_runtime(
+        object_id="candidate_skill",
+        development_session_id="dev_candidate_01",
+    )
+
+    assert result["ok"] is True
+    assert calls == [
+        {
+            "object_type": "skill",
+            "object_id": "candidate_skill",
+            "development_session_id": "dev_candidate_01",
+        }
+    ]
 
 
 def test_start_automation_rejects_free_form_replacement_of_bound_instruction(monkeypatch) -> None:

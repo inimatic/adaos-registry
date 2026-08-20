@@ -2249,6 +2249,26 @@ def get_automation(
     }
 
 
+@tool(
+    "release_candidate_runtime",
+    summary="Release a terminal skill candidate's DEV runtime while retaining evidence.",
+    side_effects="local_write",
+)
+def release_candidate_runtime(
+    object_id: str,
+    development_session_id: str,
+    object_type: str = "skill",
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    if kind != "skill":
+        raise ValueError("candidate runtime release requires object_type=skill")
+    return automation.release_candidate_runtime(
+        object_type=kind,
+        object_id=project_id,
+        development_session_id=str(development_session_id or "").strip(),
+    )
+
+
 @tool("get_process", summary="Project dependent Change, Prototype, Implementation, Trial, and Release provenance.", side_effects="none")
 def get_process(
     object_type: str = DEFAULT_PROJECT_KIND,
@@ -3790,6 +3810,7 @@ __all__ = [
     "push_project",
     "read_project_file",
     "record_development_feedback",
+    "release_candidate_runtime",
     "save_prompt_context",
     "save_project_file",
     "select_preview",
