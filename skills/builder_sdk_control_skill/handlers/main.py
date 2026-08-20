@@ -2819,12 +2819,18 @@ def submit_automation(
     kind, project_id = _identity(object_type, object_id)
     source = _webspace_id(webspace_id, _meta)
     topic = _project_topic(kind, project_id, webspace_id=source)
+    admitted_session = _bound_development_session(kind, project_id, source)
     return automation.submit(
         text,
         object_type=kind,
         object_id=project_id,
         webspace_id=source,
         conversation_id=str(conversation_id or topic.get("conversation_id") or "").strip() or None,
+        development_session_id=(
+            str(admitted_session["session"]["session_id"])
+            if admitted_session
+            else None
+        ),
     )
 
 

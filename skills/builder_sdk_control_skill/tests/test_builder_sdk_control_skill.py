@@ -529,6 +529,36 @@ def test_start_automation_uses_exact_bound_instruction_without_manual_paste(monk
     assert launched[0]["development_session_id"] == "dev-tlp"
 
 
+def test_submit_automation_rebinds_terminal_session_to_current_builder_host(monkeypatch) -> None:
+    module = _module()
+    submitted: list[tuple[str, dict]] = []
+    monkeypatch.setattr(
+        module,
+        "_bound_development_session",
+        lambda *_args: {"session": {"session_id": "dev-current"}, "binding": {}},
+    )
+    monkeypatch.setattr(
+        module,
+        "_project_topic",
+        lambda *_args, **_kwargs: {"conversation_id": "conv", "topic_id": "topic"},
+    )
+    monkeypatch.setattr(
+        module.automation,
+        "submit",
+        lambda text, **kwargs: submitted.append((text, kwargs)) or {"ok": True},
+    )
+
+    result = module.submit_automation(
+        "Rebase the exact current Development Session.",
+        object_type="skill",
+        object_id="tlp_direction",
+        webspace_id="research-dev",
+    )
+
+    assert result["ok"] is True
+    assert submitted[0][1]["development_session_id"] == "dev-current"
+
+
 def test_release_candidate_runtime_uses_exact_sdk_binding(monkeypatch) -> None:
     module = _module()
     calls: list[dict] = []

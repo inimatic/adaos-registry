@@ -3655,6 +3655,19 @@ class ResearchOrchestrator:
             timeout=120,
         )
         current_status = str((current or {}).get("status") or "").lower()
+        builder_session = (
+            current.get("session")
+            if isinstance(current.get("session"), Mapping)
+            else {}
+        )
+        current_development_session_id = str(
+            builder_session.get("development_session_id") or ""
+        ).strip()
+        incoming_development_session_id = str(session["session_id"])
+        development_session_rebase = bool(
+            current_development_session_id
+            and current_development_session_id != incoming_development_session_id
+        )
         if current_status in {"queued", "starting", "working", "running", "completed"}:
             response = dict(current)
             reused = True
@@ -3669,6 +3682,12 @@ class ResearchOrchestrator:
                         "object_id": target_id,
                         "webspace_id": webspace,
                         "text": (
+                            "Rebase the terminal Automation result onto the newly compiled, "
+                            "digest-bound Development Session selected by the research "
+                            "orchestrator. Treat its instruction envelope as the only current "
+                            "scientific, engineering, and consumer-contract authority."
+                            if development_session_rebase
+                            else
                             "Retry the unchanged digest-bound Development Session after a "
                             "recorded infrastructure failure. Do not add, remove, reinterpret, "
                             "or broaden any scientific or engineering requirement."
@@ -3678,7 +3697,7 @@ class ResearchOrchestrator:
                 )
             )
             reused = False
-            recovery_iteration = True
+            recovery_iteration = not development_session_rebase
         else:
             response = dict(
                 self._invoke_skill(
@@ -3709,6 +3728,7 @@ class ResearchOrchestrator:
                     "task_id": task_ref or None,
                     "phase": projection.get("phase") or response.get("phase"),
                     "updated_at": projection.get("updated_at") or response.get("updated_at"),
+                    "development_session_rebase": development_session_rebase,
                 },
             },
         )
@@ -3723,6 +3743,8 @@ class ResearchOrchestrator:
                 "Builder Automation recovery iteration started for the unchanged exact "
                 "Development Session."
                 if recovery_iteration
+                else "Builder Automation was rebased onto the current exact Development Session."
+                if development_session_rebase
                 else f"Builder Automation {'reused' if reused else 'started'} for the exact Development Session."
             ),
             {
@@ -3732,6 +3754,7 @@ class ResearchOrchestrator:
                 "builder_webspace_id": webspace,
                 "automation_task_id": task_ref or None,
                 "recovery_iteration": recovery_iteration,
+                "development_session_rebase": development_session_rebase,
                 "actor": actor,
             },
             actor=actor,
@@ -3743,6 +3766,7 @@ class ResearchOrchestrator:
             "ok": bool(response.get("ok", True)),
             "reused": reused,
             "recovery_iteration": recovery_iteration,
+            "development_session_rebase": development_session_rebase,
             "direction_ref": state["direction"]["ref"],
             "task_ref": (state.get("selected_task") or {}).get("ref"),
             "implementation_track_ref": track["ref"],
