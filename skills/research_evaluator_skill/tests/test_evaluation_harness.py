@@ -300,8 +300,16 @@ def test_prepare_arm_never_projects_hidden_evaluator_material(task_value, monkey
     assert packet["agent_profile"]["model"] == "gpt-5.4"
 
 
-def _candidate(*, arm_id: str, attempt_index: int, seed: int, failed: str | None = None, tokens: int = 9000) -> dict:
-    return {
+def _candidate(
+    *,
+    arm_id: str,
+    attempt_index: int,
+    seed: int,
+    failed: str | None = None,
+    tokens: int = 9000,
+    execution_started_at: str | None = None,
+) -> dict:
+    value = {
         "arm_id": arm_id,
         "attempt_index": attempt_index,
         "paired_seed": seed,
@@ -315,6 +323,9 @@ def _candidate(*, arm_id: str, attempt_index: int, seed: int, failed: str | None
             for check_id in ("protocol_fidelity", "runner_conformance", "evidence_manifest")
         ],
     }
+    if execution_started_at:
+        value["execution_started_at"] = execution_started_at
+    return value
 
 
 def _paired_task(task_value: dict) -> dict:
@@ -353,28 +364,28 @@ def _paired_task(task_value: dict) -> dict:
 def _paired_results(task: dict, *, control_passes: set[int] | None = None) -> list[dict]:
     passing = set(control_passes or set())
     rows = []
-    for index, seed in enumerate(task["repetitions"]["paired_seeds"], start=1):
-        rows.append(
-            evaluate_candidate(
-                task,
-                _candidate(
-                    arm_id="C0_raw",
-                    attempt_index=index,
-                    seed=seed,
-                    failed=None if index in passing else "runner_conformance",
-                ),
+    sequence = 0
+    for scheduled in task["comparison_plan"]["execution_order"]:
+        index = int(scheduled["attempt_index"])
+        seed = int(scheduled["paired_seed"])
+        for arm_id in (scheduled["first_arm"], scheduled["second_arm"]):
+            rows.append(
+                evaluate_candidate(
+                    task,
+                    _candidate(
+                        arm_id=arm_id,
+                        attempt_index=index,
+                        seed=seed,
+                        failed=(
+                            None
+                            if arm_id == "C3_typed_execution" or index in passing
+                            else "runner_conformance"
+                        ),
+                        execution_started_at=f"2026-08-18T00:{sequence:02d}:00Z",
+                    ),
+                )
             )
-        )
-        rows.append(
-            evaluate_candidate(
-                task,
-                _candidate(
-                    arm_id="C3_typed_execution",
-                    attempt_index=index,
-                    seed=seed,
-                ),
-            )
-        )
+            sequence += 1
     return rows
 
 
@@ -428,6 +439,8 @@ def test_five_clean_c3_wins_cross_preregistered_exact_threshold(task_value) -> N
     assert comparison["ties"] == 0
     assert comparison["p_value"] == pytest.approx(0.03125)
     assert comparison["paired_risk_difference"] == 1.0
+    assert comparison["execution_order_verifiable"] is True
+    assert comparison["execution_order_valid"] is True
     assert comparison["claim_status"] == "supports_local_advantage"
 
 
@@ -451,6 +464,23 @@ def test_paired_summary_rejects_duplicate_attempts(task_value) -> None:
     rows = _paired_results(task)
     with pytest.raises(ValueError, match="duplicate arm attempts"):
         summarize(task, [*rows, rows[0]])
+
+
+def test_paired_summary_refuses_claim_when_execution_order_drifted(task_value) -> None:
+    task = _paired_task(task_value)
+    rows = _paired_results(task)
+    rows[0]["execution_started_at"], rows[1]["execution_started_at"] = (
+        rows[1]["execution_started_at"],
+        rows[0]["execution_started_at"],
+    )
+
+    comparison = summarize(task, rows)["primary_comparison"]
+
+    assert comparison["complete"] is True
+    assert comparison["execution_order_verifiable"] is True
+    assert comparison["execution_order_valid"] is False
+    assert comparison["execution_order_violations"][0]["position"] == 1
+    assert comparison["claim_status"] == "execution_order_violation_no_claim"
 
 
 def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(task_value) -> None:

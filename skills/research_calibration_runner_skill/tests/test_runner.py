@@ -231,6 +231,79 @@ def test_environment_preflight_rejects_disk_pressure_before_candidate_creation(m
         module._environment_preflight("tlp-calibration-v1")
 
 
+def _lineage(*results: dict) -> dict:
+    return {
+        "ok": True,
+        "task": {
+            "comparison_plan": {
+                "execution_order": [
+                    {
+                        "attempt_index": 1,
+                        "first_arm": "C0_raw",
+                        "second_arm": "C3_typed_execution",
+                    },
+                    {
+                        "attempt_index": 2,
+                        "first_arm": "C3_typed_execution",
+                        "second_arm": "C0_raw",
+                    },
+                ]
+            }
+        },
+        "results": list(results),
+    }
+
+
+def test_execution_order_gate_admits_only_next_preregistered_attempt(monkeypatch) -> None:
+    module = _module()
+    lineage = _lineage(
+        {
+            "arm_id": "C0_raw",
+            "attempt_index": 1,
+            "budget_view": "fixed_downstream",
+            "execution_started_at": "2026-08-18T00:00:00Z",
+        }
+    )
+    monkeypatch.setattr(module, "invoke_skill", lambda *_args, **_kwargs: lineage)
+
+    receipt = module._execution_order_gate(
+        "task", "C3_typed_execution", 1, "fixed_downstream"
+    )
+
+    assert receipt["status"] == "next_preregistered_attempt"
+    assert receipt["completed"] == 1
+    with pytest.raises(RuntimeError, match="expected C3_typed_execution:1"):
+        module._execution_order_gate("task", "C0_raw", 2, "fixed_downstream")
+
+
+def test_execution_order_gate_rejects_unverifiable_or_drifted_lineage(monkeypatch) -> None:
+    module = _module()
+    unverifiable = _lineage(
+        {
+            "arm_id": "C0_raw",
+            "attempt_index": 1,
+            "budget_view": "fixed_downstream",
+        }
+    )
+    monkeypatch.setattr(module, "invoke_skill", lambda *_args, **_kwargs: unverifiable)
+    with pytest.raises(RuntimeError, match="not verifiable"):
+        module._execution_order_gate(
+            "task", "C3_typed_execution", 1, "fixed_downstream"
+        )
+
+    drifted = _lineage(
+        {
+            "arm_id": "C3_typed_execution",
+            "attempt_index": 1,
+            "budget_view": "fixed_downstream",
+            "execution_started_at": "2026-08-18T00:00:00Z",
+        }
+    )
+    monkeypatch.setattr(module, "invoke_skill", lambda *_args, **_kwargs: drifted)
+    with pytest.raises(RuntimeError, match="already drifted"):
+        module._execution_order_gate("task", "C0_raw", 1, "fixed_downstream")
+
+
 def test_release_attempt_delegates_exact_terminal_candidate(monkeypatch) -> None:
     module = _module()
     calls: list[tuple[str, str, dict]] = []

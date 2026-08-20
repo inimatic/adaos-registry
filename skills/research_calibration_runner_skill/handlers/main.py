@@ -189,6 +189,113 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
     }
 
 
+def _execution_order_gate(
+    task_id: str,
+    arm_id: str,
+    attempt_index: int,
+    budget_view: str,
+) -> dict[str, Any]:
+    """Admit only the next preregistered C0/C3 execution.
+
+    Packet preparation remains order-independent so an evaluator may freeze all
+    inputs before execution.  Starting a candidate is different: the runner
+    must derive the next legal identity from durable evaluator results rather
+    than trust a caller-maintained loop.
+    """
+
+    response = invoke_skill(
+        "research_evaluator_skill",
+        "get_calibration_lineage",
+        {"task_id": str(task_id), "budget_view": str(budget_view)},
+        timeout=120,
+    )
+    if not isinstance(response, Mapping) or not response.get("ok"):
+        raise RuntimeError("independent evaluator did not return calibration lineage")
+    task = response.get("task")
+    if not isinstance(task, Mapping):
+        raise RuntimeError("calibration lineage has no frozen task")
+    plan = task.get("comparison_plan")
+    if not isinstance(plan, Mapping):
+        return {"enforced": False, "reason": "task_has_no_comparison_plan"}
+
+    schedule: list[tuple[str, int]] = []
+    for pair in plan.get("execution_order") or []:
+        if not isinstance(pair, Mapping):
+            raise ValueError("calibration comparison schedule is invalid")
+        index = int(pair.get("attempt_index") or 0)
+        schedule.extend(
+            (
+                (str(pair.get("first_arm") or ""), index),
+                (str(pair.get("second_arm") or ""), index),
+            )
+        )
+    if not schedule:
+        raise ValueError("calibration comparison schedule is empty")
+    requested = (str(arm_id), int(attempt_index))
+    if requested not in schedule:
+        return {
+            "enforced": False,
+            "reason": "arm_is_outside_primary_comparison",
+        }
+
+    results = [
+        dict(item)
+        for item in response.get("results") or []
+        if isinstance(item, Mapping)
+        and str(item.get("budget_view") or "") == str(budget_view)
+        and (str(item.get("arm_id") or ""), int(item.get("attempt_index") or 0))
+        in schedule
+    ]
+    completed = {
+        (str(item["arm_id"]), int(item["attempt_index"]))
+        for item in results
+    }
+    if len(completed) != len(results):
+        raise RuntimeError("calibration lineage contains duplicate scheduled results")
+
+    if results:
+        if any(not str(item.get("execution_started_at") or "").strip() for item in results):
+            raise RuntimeError(
+                "calibration execution order is not verifiable from Builder start timestamps"
+            )
+        timestamps = [str(item["execution_started_at"]) for item in results]
+        if len(timestamps) != len(set(timestamps)):
+            raise RuntimeError("calibration Builder start timestamps are not strictly ordered")
+        observed = [
+            (str(item["arm_id"]), int(item["attempt_index"]))
+            for item in sorted(results, key=lambda item: str(item["execution_started_at"]))
+        ]
+        if observed != schedule[: len(observed)]:
+            raise RuntimeError(
+                "calibration execution order already drifted from the frozen schedule"
+            )
+
+    if requested in completed:
+        return {
+            "enforced": True,
+            "status": "completed_idempotent_replay",
+            "requested": {"arm_id": requested[0], "attempt_index": requested[1]},
+            "completed": len(completed),
+            "planned": len(schedule),
+        }
+    next_expected = next((item for item in schedule if item not in completed), None)
+    if next_expected != requested:
+        expected_label = (
+            f"{next_expected[0]}:{next_expected[1]}" if next_expected else "series_complete"
+        )
+        raise RuntimeError(
+            "calibration execution order mismatch: "
+            f"expected {expected_label}, requested {requested[0]}:{requested[1]}"
+        )
+    return {
+        "enforced": True,
+        "status": "next_preregistered_attempt",
+        "requested": {"arm_id": requested[0], "attempt_index": requested[1]},
+        "completed": len(completed),
+        "planned": len(schedule),
+    }
+
+
 def _candidate_id(packet: Mapping[str, Any], explicit: str | None = None) -> str:
     requested = str(explicit or "").strip().lower()
     if requested:
@@ -470,6 +577,12 @@ def start_attempt(
     candidate_id: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
+    execution_gate = _execution_order_gate(
+        task_id,
+        arm_id,
+        attempt_index,
+        budget_view,
+    )
     prepared = _prepare(task_id, arm_id, attempt_index, budget_view, candidate_id)
     public = _public_preparation(prepared)
     arguments = {
@@ -486,7 +599,7 @@ def start_attempt(
         arguments,
         timeout=120,
     )
-    return {**public, "automation": result}
+    return {**public, "execution_order_gate": execution_gate, "automation": result}
 
 
 @tool(summary="Read native Builder Automation state for one prepared candidate.", side_effects="none")

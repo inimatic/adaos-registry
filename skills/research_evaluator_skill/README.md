@@ -45,6 +45,10 @@ commit, component versions, model profile, budgets, and environment. The
 paired seed controls the scientific workload, not model sampling (which the
 provider does not expose). Predeclared counterbalancing reduces execution-order
 confounding but does not justify a universal autonomous-science claim.
+Calibration summary v1.2 additionally requires durable Builder
+`execution_started_at` timestamps to reproduce that exact order. Missing,
+duplicate, or reordered timestamps yield an explicit no-claim status even when
+all outcome rows exist and the sign test would otherwise cross alpha.
 
 ## Boundary and workflow
 

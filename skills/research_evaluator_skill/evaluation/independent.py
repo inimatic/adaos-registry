@@ -314,6 +314,14 @@ def build_independent_candidate(
         },
         "checks": checks,
     }
+    execution_started_at = str(
+        automation.get("created_at") or session.get("created_at") or ""
+    ).strip()
+    if execution_started_at:
+        # Builder owns this timestamp.  Keeping it in the evaluator input lets
+        # the recomputable package prove the preregistered arm order without
+        # granting the evaluator access to Builder's private state directory.
+        candidate["execution_started_at"] = execution_started_at
     if terminal_failure is not None:
         candidate["failure"] = terminal_failure
     return candidate

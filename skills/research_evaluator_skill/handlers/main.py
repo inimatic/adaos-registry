@@ -762,9 +762,13 @@ def summarize_calibration(
             f"`{comparison['control_wins']}` / `{comparison['ties']}`\n"
             f"- one-sided exact p: `{comparison['p_value']}` at alpha `{comparison['alpha']}`\n"
             f"- paired risk difference: `{comparison['paired_risk_difference']}`\n"
+            f"- execution order verifiable / valid: "
+            f"`{comparison['execution_order_verifiable']}` / "
+            f"`{comparison['execution_order_valid']}`\n"
             f"- conclusion: `{comparison['claim_status']}` within `{comparison['claim_scope']}`\n\n"
             "The paired seed controls the scientific workload, not model sampling; "
-            "the execution order is preregistered and counterbalanced."
+            "the execution order is preregistered and a claim is admitted only when "
+            "Builder start timestamps prove that exact counterbalanced sequence."
         )
     return {"ok": True, "summary": summary, "content": content}
 
