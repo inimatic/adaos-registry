@@ -329,6 +329,7 @@
       "modals": {
         "media_center_player": {
           "title": "Now Playing",
+          "scope": "workspace",
           "presentation": {"kind": "modal", "restoreFocus": true},
           "schema": {
             "id": "media_center_player",
@@ -344,6 +345,7 @@
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_center_skill.build_playback_queue",
+                  "scope": "workspace",
                   "params": {"source_type": "$state.playbackSourceType", "source_id": "$state.playbackSourceId", "profile_id": "$state.profileId", "limit": 10},
                   "cacheTtlMs": 0,
                   "invalidationTags": ["media_center.catalog"],
@@ -386,6 +388,7 @@
         },
         "media_center_remote": {
           "title": "Media Remote",
+          "scope": "workspace",
           "presentation": {"kind": "modal", "restoreFocus": true},
           "schema": {
             "id": "media_center_remote",
@@ -430,6 +433,7 @@
         },
         "media_center_settings": {
           "title": "Media Center Settings",
+          "scope": "workspace",
           "presentation": {"kind": "modal", "restoreFocus": true},
           "schema": {
             "id": "media_center_settings",
@@ -628,6 +632,7 @@
         },
         "media_center_delete_root": {
           "title": "Remove media folder",
+          "scope": "workspace",
           "presentation": {"kind": "modal", "restoreFocus": true},
           "schema": {
             "id": "media_center_delete_root",

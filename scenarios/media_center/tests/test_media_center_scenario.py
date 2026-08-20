@@ -153,10 +153,21 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
     webui = json.loads((SCENARIO_ROOT / "webui.json").read_text(encoding="utf-8"))
     modals = webui["ui"]["application"]["modals"]
 
+    assert {
+        modal_id: modal["scope"]
+        for modal_id, modal in modals.items()
+    } == {
+        "media_center_player": "workspace",
+        "media_center_remote": "workspace",
+        "media_center_settings": "workspace",
+        "media_center_delete_root": "workspace",
+    }
+
     player_widgets = {widget["id"]: widget for widget in modals["media_center_player"]["schema"]["widgets"]}
     player = player_widgets["media-center-player"]
     assert player["type"] == "media.videoBrowser"
     assert player["dataSource"]["name"] == "media_center_skill.build_playback_queue"
+    assert player["dataSource"]["scope"] == "workspace"
     assert player["dataSource"]["params"]["source_type"] == "$state.playbackSourceType"
     assert player["dataSource"]["params"]["source_id"] == "$state.playbackSourceId"
     assert player["dataSource"]["params"]["limit"] == 10
