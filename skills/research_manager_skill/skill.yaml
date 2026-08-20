@@ -926,8 +926,8 @@ updated_at: '2026-08-20T09:20:00+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.868+5321.f83853b5
-    recorded_at: '2026-08-20T03:23:22+00:00'
+    recorded_at: '2026-08-20T09:33:53+00:00'
     source: skill_push
-    min_commit: a6a3b3269e7fe366cc42d866500a439d23e576e9
-    min_short_commit: a6a3b326
-    build_date: '2026-08-20T06:21:38+03:00'
+    min_commit: f83853b562afacc32cd22943a2232c814bb2d055
+    min_short_commit: f83853b5
+    build_date: '2026-08-20T12:29:27+03:00'
