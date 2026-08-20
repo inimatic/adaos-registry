@@ -18,8 +18,10 @@ contexts, and scores results from evidence references rather than self-reports.
 Every task must contain all five arms, paired seeds, both `fixed_downstream` and
 `fixed_total_system` budgets, a frozen rubric, and at least one hidden evaluator
 input. The primary endpoint is `evidence_valid_completion`: all mandatory checks
-pass, the protocol has not drifted, the selected budget is respected, and no
-unresolved failure was reported.
+pass, the protocol has not drifted, and no unresolved implementation or evidence
+failure was reported. Resource compliance is a distinct secondary endpoint,
+`budgeted_evidence_valid_completion`; token or wall-clock excess must not silently
+turn a correct implementation into an incorrect one.
 
 For the primary AdaOS-versus-raw claim, calibration task v1.4 preregisters
 `C0_raw` as control and `C3_typed_execution` as treatment. It requires at least

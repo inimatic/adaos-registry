@@ -156,10 +156,10 @@ def evaluate_candidate(task_value: Mapping[str, Any], candidate: Mapping[str, An
     failure = copy.deepcopy(candidate.get("failure")) if isinstance(candidate.get("failure"), Mapping) else None
     evidence_valid = (
         mandatory_passed == len(mandatory)
-        and budget_compliant
         and not protocol_drift
         and failure is None
     )
+    budgeted_evidence_valid = evidence_valid and budget_compliant
     if not evidence_valid and failure is None:
         failed = [item for item in mandatory if item["status"] != "pass"]
         if failed:
@@ -171,11 +171,9 @@ def evaluate_candidate(task_value: Mapping[str, Any], candidate: Mapping[str, An
             }
         elif protocol_drift:
             failure = {"stage": "implementation", "code": "protocol_drift", "detail": "Produced protocol digest differs from the frozen task."}
-        else:
-            failure = {"stage": "runtime_infrastructure", "code": "budget_exceeded", "detail": "Candidate exceeded the selected preregistered budget."}
     result: dict[str, Any] = {
         "schema": "adaos.research.calibration_result.v1",
-        "schema_version": "1.0.0",
+        "schema_version": "1.1.0",
         "result_id": f"result-{task['task_id']}-{arm_id}-{attempt_index}-{budget_view}",
         "task_id": task["task_id"],
         "task_digest": task["digest"],
@@ -190,6 +188,7 @@ def evaluate_candidate(task_value: Mapping[str, Any], candidate: Mapping[str, An
         "checks": checks,
         "metrics": {
             "evidence_valid_completion": evidence_valid,
+            "budgeted_evidence_valid_completion": budgeted_evidence_valid,
             "mandatory_passed": mandatory_passed,
             "mandatory_total": len(mandatory),
             "protocol_drift": protocol_drift,
@@ -356,6 +355,15 @@ def summarize(task: Mapping[str, Any], results: list[Mapping[str, Any]]) -> dict
     for arm_id in ARM_IDS:
         rows = [dict(item) for item in results if item.get("arm_id") == arm_id]
         successes = sum(1 for item in rows if item.get("metrics", {}).get("evidence_valid_completion"))
+        budgeted_successes = sum(
+            1
+            for item in rows
+            if item.get("metrics", {}).get(
+                "budgeted_evidence_valid_completion",
+                item.get("metrics", {}).get("evidence_valid_completion")
+                and item.get("metrics", {}).get("budget_compliant"),
+            )
+        )
         failures: dict[str, int] = {}
         for item in rows:
             stage = str((item.get("failure") or {}).get("stage") or "none")
@@ -367,7 +375,9 @@ def summarize(task: Mapping[str, Any], results: list[Mapping[str, Any]]) -> dict
                 "expected": expected,
                 "complete": len(rows) == expected,
                 "evidence_valid_completions": successes,
+                "budgeted_evidence_valid_completions": budgeted_successes,
                 "rate": successes / len(rows) if rows else None,
+                "budgeted_rate": budgeted_successes / len(rows) if rows else None,
                 "wilson_95": _wilson(successes, len(rows)),
                 "failure_stages": failures,
                 "mean_model_tokens": sum(item["budget_usage"]["model_tokens"] for item in rows) / len(rows) if rows else None,

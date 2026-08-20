@@ -247,7 +247,10 @@ def test_evaluator_computes_primary_endpoint_budget_and_first_failure(task_value
 
     assert passed["metrics"]["evidence_valid_completion"] is True
     assert failed["failure"]["stage"] == "implementation"
-    assert over_budget["failure"]["code"] == "budget_exceeded"
+    assert over_budget["metrics"]["evidence_valid_completion"] is True
+    assert over_budget["metrics"]["budget_compliant"] is False
+    assert over_budget["metrics"]["budgeted_evidence_valid_completion"] is False
+    assert over_budget["failure"] is None
 
     summary = summarize(task, [passed, failed, over_budget])
     assert summary["complete"] is False

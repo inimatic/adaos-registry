@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Mapping
@@ -295,7 +296,12 @@ def derive_compact_calibration(
         {
             "schema_version": "1.6.0",
             "task_id": str(task_id),
-            "title": str(baseline["title"]) + " (compact execution contracts)",
+            "title": re.sub(
+                r"(?: \(compact execution contracts\))+$",
+                "",
+                str(baseline["title"]),
+            )
+            + " (compact execution contracts)",
             "direction_skill_id": source_direction or str(baseline["direction_skill_id"]),
             "expected_protocol_digest": str(brief["prototype_digest"]),
             "expected_smoke_profile": expected_smoke_profile,
