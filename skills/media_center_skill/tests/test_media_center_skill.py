@@ -1183,6 +1183,107 @@ def test_media_topology_definition_is_idempotent_for_existing_datasets(monkeypat
     ]
 
 
+def test_deployment_status_consumes_bounded_history_and_orders_newest_operation(
+    monkeypatch,
+):
+    from media_center import topology as topology_module
+
+    calls = []
+
+    def fake_inspect(
+        deployment_id,
+        *,
+        limit,
+        activation_cursor=None,
+        operation_cursor=None,
+    ):
+        calls.append((activation_cursor, operation_cursor, limit))
+        if activation_cursor:
+            activations = [
+                {
+                    "activation_id": "current-agent",
+                    "node_id": "node-a",
+                    "component_ref": "skill:media_library_agent",
+                    "generation": 26,
+                    "status": "active",
+                    "updated_at": "2026-08-21T00:02:00+00:00",
+                }
+            ]
+            operations = []
+            next_activation = None
+            next_operation = "operation-page-2"
+        elif operation_cursor:
+            activations = []
+            operations = [
+                {
+                    "operation_id": "new-operation",
+                    "state": "succeeded",
+                    "updated_at": "2026-08-21T00:03:00+00:00",
+                }
+            ]
+            next_activation = "activation-page-2"
+            next_operation = None
+        else:
+            activations = [
+                {
+                    "activation_id": "old-agent",
+                    "node_id": "node-a",
+                    "component_ref": "skill:media_library_agent",
+                    "generation": 20,
+                    "status": "inactive",
+                    "updated_at": "2026-08-20T00:01:00+00:00",
+                }
+            ]
+            operations = [
+                {
+                    "operation_id": "old-operation",
+                    "state": "succeeded",
+                    "updated_at": "2026-08-20T00:03:00+00:00",
+                }
+            ]
+            next_activation = "activation-page-2"
+            next_operation = "operation-page-2"
+        return SimpleNamespace(
+            to_dict=lambda: {
+                "desired": {
+                    "deployment_id": deployment_id,
+                    "status": "planned",
+                    "revision": 26,
+                    "release_digest": f"sha256:{'a' * 64}",
+                    "placements": [],
+                },
+                "activations": activations,
+                "operations": operations,
+                "activation_cursor": next_activation,
+                "operation_cursor": next_operation,
+            }
+        )
+
+    monkeypatch.setattr(topology_module.deployment_sdk, "inspect", fake_inspect)
+
+    result = MediaCenterTopology().deployment_status(limit=50)
+
+    assert result["nodes"] == [
+        {
+            "node_id": "node-a",
+            "state": "active",
+            "generation": 26,
+            "components": ["skill:media_library_agent"],
+            "agent": True,
+        }
+    ]
+    assert [item["operation_id"] for item in result["operations"]] == [
+        "new-operation",
+        "old-operation",
+    ]
+    assert result["history_truncated"] is False
+    assert calls == [
+        (None, None, 50),
+        ("activation-page-2", None, 50),
+        (None, "operation-page-2", 50),
+    ]
+
+
 def test_deployment_apply_submits_durable_operation_and_reads_status(monkeypatch):
     from media_center import topology as topology_module
 

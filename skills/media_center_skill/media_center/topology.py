@@ -66,8 +66,9 @@ class MediaCenterTopology:
         return dict(result)
 
     def deployment_status(self, deployment_id: str = DEPLOYMENT_ID, *, limit: int = 50) -> dict[str, Any]:
+        page_limit = max(1, min(int(limit), 100))
         try:
-            inspection = deployment_sdk.inspect(deployment_id, limit=max(1, min(int(limit), 100)))
+            inspection = deployment_sdk.inspect(deployment_id, limit=page_limit)
         except Exception as exc:
             return {
                 "ok": False,
@@ -80,6 +81,37 @@ class MediaCenterTopology:
             }
         value = inspection.to_dict()
         activations = list(value.get("activations") or [])
+        operations = list(value.get("operations") or [])
+        activation_cursor = value.get("activation_cursor")
+        operation_cursor = value.get("operation_cursor")
+        page_budget = 20
+        activation_pages = 1
+        history_error = ""
+        try:
+            while activation_cursor and activation_pages < page_budget:
+                page = deployment_sdk.inspect(
+                    deployment_id,
+                    activation_cursor=str(activation_cursor),
+                    limit=page_limit,
+                ).to_dict()
+                activations.extend(page.get("activations") or [])
+                activation_cursor = page.get("activation_cursor")
+                activation_pages += 1
+        except Exception as exc:
+            history_error = str(exc)[:300]
+        operation_pages = 1
+        try:
+            while operation_cursor and operation_pages < page_budget:
+                page = deployment_sdk.inspect(
+                    deployment_id,
+                    operation_cursor=str(operation_cursor),
+                    limit=page_limit,
+                ).to_dict()
+                operations.extend(page.get("operations") or [])
+                operation_cursor = page.get("operation_cursor")
+                operation_pages += 1
+        except Exception as exc:
+            history_error = history_error or str(exc)[:300]
         latest: dict[tuple[str, str], dict[str, Any]] = {}
         for activation in activations:
             node_id = str(activation.get("node_id") or "")
@@ -122,6 +154,14 @@ class MediaCenterTopology:
                 row["state"] = activation.get("status")
         for row in nodes.values():
             row["components"].sort()
+        operations.sort(
+            key=lambda item: (
+                str(item.get("updated_at") or ""),
+                str(item.get("created_at") or ""),
+                str(item.get("operation_id") or ""),
+            ),
+            reverse=True,
+        )
         desired = dict(value.get("desired") or {})
         return {
             "ok": True,
@@ -132,9 +172,11 @@ class MediaCenterTopology:
             "release_digest": desired.get("release_digest"),
             "placements": desired.get("placements") or [],
             "nodes": list(nodes.values())[:100],
-            "operations": list(value.get("operations") or [])[:50],
-            "next_activation_cursor": value.get("activation_cursor"),
-            "next_operation_cursor": value.get("operation_cursor"),
+            "operations": operations[:page_limit],
+            "next_activation_cursor": activation_cursor,
+            "next_operation_cursor": operation_cursor,
+            "history_truncated": bool(activation_cursor or operation_cursor),
+            "history_error": history_error or None,
         }
 
     def configure_deployment(
