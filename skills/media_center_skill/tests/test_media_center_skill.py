@@ -709,7 +709,14 @@ def test_voice_request_uses_catalog_policy_and_existing_control_tools(monkeypatc
     assert len(calls[-1][2]["queue"]) == 1
 
 
-def test_compound_voice_request_is_bounded_and_requires_governed_approval():
+def test_compound_voice_request_is_bounded_and_requires_governed_approval(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        main,
+        "_coordinator",
+        lambda: (_ for _ in ()).throw(AssertionError("catalog must stay lazy")),
+    )
     result = main.voice_request(
         text=(
             "play the next episode in the living room and "

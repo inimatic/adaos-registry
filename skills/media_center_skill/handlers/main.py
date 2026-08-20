@@ -1798,7 +1798,6 @@ def voice_request(
     limit: int = 5,
     **_: Any,
 ) -> dict[str, Any]:
-    catalog = _coordinator()
     profile = str(profile_id or "default").strip() or "default"
     bounded = max(1, min(10, int(limit or 5)))
     raw = str(text or "").strip()
@@ -1813,6 +1812,7 @@ def voice_request(
         )
         if compound is not None:
             return compound
+    catalog = _coordinator()
     transport_actions = {
         "play", "pause", "seek", "volume", "mute", "next", "previous",
         "stop", "handoff", "tracks", "rate", "sleep_timer",
