@@ -283,6 +283,24 @@ def test_current_schema_reopens_without_waiting_for_a_writer(monkeypatch, tmp_pa
     assert elapsed < 1.0
 
 
+def test_playback_variant_lookup_has_durable_indexes(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+
+    with catalog.repository.connect() as connection:
+        catalog_indexes = {
+            row[1] for row in connection.execute("PRAGMA index_list(catalog_items)")
+        }
+        variant_indexes = {
+            row[1] for row in connection.execute("PRAGMA index_list(media_variants)")
+        }
+
+    assert "idx_media_center_catalog_variant" in catalog_indexes
+    assert "idx_media_center_variant_work" in variant_indexes
+
+
 def test_agent_delta_retires_same_path_legacy_catalog_row(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")

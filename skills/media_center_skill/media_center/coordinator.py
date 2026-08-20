@@ -26,7 +26,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-20.4"
+COORDINATOR_SCHEMA_REVISION = "2026-08-20.5"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
 WORK_SCHEMA = "adaos.media_center.media_work.v1"
 COLLECTION_SCHEMA = "adaos.media_center.media_collection.v1"
@@ -173,6 +173,8 @@ class MediaCatalogCoordinator:
                     ON catalog_items(missing,media_kind,size_bytes DESC,id);
                 CREATE INDEX IF NOT EXISTS idx_media_center_source_path
                     ON catalog_items(source_path,missing,agent_id);
+                CREATE INDEX IF NOT EXISTS idx_media_center_catalog_variant
+                    ON catalog_items(variant_id);
                 CREATE TABLE IF NOT EXISTS coordinator_meta (
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
@@ -358,6 +360,10 @@ class MediaCatalogCoordinator:
                     connection.execute(
                         f"ALTER TABLE media_variants ADD COLUMN {name} {definition}"
                     )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_media_center_variant_work "
+                "ON media_variants(work_id,derived,id)"
+            )
             alias_columns = {
                 str(row["name"])
                 for row in connection.execute(
