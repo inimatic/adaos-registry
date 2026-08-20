@@ -4265,7 +4265,33 @@ class ResearchOrchestrator:
             current_development_session_id
             and current_development_session_id != incoming_development_session_id
         )
-        if current_status in {"queued", "starting", "working", "running", "completed"}:
+        if development_session_rebase and current_status in {
+            "completed",
+            "succeeded",
+            "failed",
+            "cancelled",
+        }:
+            response = dict(
+                self._invoke_skill(
+                    "builder_sdk_control_skill",
+                    "submit_automation",
+                    {
+                        "object_type": kind,
+                        "object_id": target_id,
+                        "webspace_id": webspace,
+                        "text": (
+                            "Rebase the terminal Automation result onto the newly compiled, "
+                            "digest-bound Development Session selected by the research "
+                            "orchestrator. Treat its instruction envelope as the only current "
+                            "scientific, engineering, and consumer-contract authority."
+                        ),
+                    },
+                    timeout=180,
+                )
+            )
+            reused = False
+            recovery_iteration = False
+        elif current_status in {"queued", "starting", "working", "running", "completed"}:
             response = dict(current)
             reused = True
             recovery_iteration = False

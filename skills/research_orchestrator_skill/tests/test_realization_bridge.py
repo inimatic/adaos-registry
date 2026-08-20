@@ -476,3 +476,65 @@ def test_successor_track_preserves_released_predecessor_and_is_idempotent() -> N
     assert unchanged_parent is not None
     assert unchanged_parent["project_release_digest"] == release_digest
     assert unchanged_parent["development_session_id"] == "dev-branching-old"
+
+
+def test_completed_automation_rebases_when_successor_session_differs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    track = {
+        "track_id": "task-1.track-successor",
+        "ref": "implementation-track:task-1.track-successor",
+        "primary_target_ref": "skill:direction",
+        "status": "development_ready",
+        "metadata": {},
+    }
+    session = {"session_id": "dev-direction-successor"}
+    state = {
+        "direction": {"direction_id": "direction", "ref": "research-direction:direction"},
+        "selected_task": None,
+        "active_implementation_track": track,
+        "development_session": session,
+    }
+
+    class Repository:
+        def record_track_evaluation(self, track_id: str, **kwargs: object) -> dict:
+            return {**track, "track_id": track_id, **kwargs}
+
+        def activity(self, *args: object, **kwargs: object) -> dict:
+            return {"event_id": "event-1"}
+
+    calls: list[tuple[str, dict]] = []
+
+    def invoke(_skill: str, operation: str, payload: dict, **_: object) -> dict:
+        calls.append((operation, payload))
+        if operation == "get_automation":
+            return {
+                "status": "completed",
+                "session": {"development_session_id": "dev-direction-old"},
+                "task_id": "task-old",
+            }
+        assert operation == "submit_automation"
+        return {
+            "ok": True,
+            "status": "automation_queued",
+            "automation": {
+                "status": "queued",
+                "task_id": "task-successor",
+                "updated_at": "2026-08-21T00:00:00Z",
+            },
+        }
+
+    orchestrator = ResearchOrchestrator(repository=Repository(), skill_invoker=invoke)
+    monkeypatch.setattr(orchestrator, "get", lambda *args, **kwargs: state)
+    monkeypatch.setattr(
+        orchestrator_module.development_sessions,
+        "bind",
+        lambda *args, **kwargs: {"ok": True},
+    )
+
+    result = orchestrator.start_implementation("direction")
+
+    assert result["development_session_rebase"] is True
+    assert result["reused"] is False
+    assert [item[0] for item in calls] == ["get_automation", "submit_automation"]
+    assert calls[-1][1]["text"].startswith("Rebase the terminal Automation result")
