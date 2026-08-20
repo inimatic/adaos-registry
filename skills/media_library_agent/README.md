@@ -9,11 +9,11 @@ Original media bytes remain at their original paths. The agent calls `adaos.sdk.
 ## Scan model
 
 - `import_folder` and `start_scan` return in seconds with durable job identifiers.
-- One background scan runs per agent process. Duplicate requests for a root resolve to the active job.
-- Jobs survive process restart. The service requeues interrupted work and incremental fingerprints avoid re-registering unchanged files.
-- Progress is persisted and published as the bounded replace-mode stream variable `media_library_agent.current_scan` at no more than 2 Hz.
+- The persistent service process is the single owner of background work in production. Root-runtime tools only mutate the shared durable queue, while standalone development retains an in-process worker.
+- Jobs survive process restart. Only the service owner requeues interrupted work, preventing root/service fencing races; incremental fingerprints avoid re-registering unchanged files.
+- Progress is persisted and published as the bounded replace-mode stream variable `media_library_agent.progress` at no more than 2 Hz.
 - Terminal job transitions publish `media_library_agent.catalog.changed`, allowing the coordinator to pull bounded deltas without polling from the browser.
-- `set_resource_pressure(playback)` pauses scanning so playback retains priority.
+- `set_resource_pressure(playback)` persists pressure in the shared agent database. The service observes it within its one-second poll interval and pauses scanning or rendition work so playback retains priority.
 - Images are excluded unless enabled for a root. Symlinks are not followed by default; exclusions and periodic reconciliation are root policy.
 - A schedule can enable a bounded polling watcher. It fingerprints at most `MEDIA_LIBRARY_AGENT_WATCH_MAX_ENTRIES` filesystem entries, debounces bursts, queues an incremental scan after a change, and falls back to a full reconcile when the watch budget overflows. Periodic reconciliation remains authoritative after watcher or process interruption.
 - Active roots may not overlap. Scan windows use node-local `HH:MM` times and weekday numbers (`0` is Monday); invalid windows fail closed.

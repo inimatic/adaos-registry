@@ -251,6 +251,26 @@ class MediaLibraryAgentRepository:
     def agent_id(self) -> str:
         return stable_id("agent", self.node_id, size=20)
 
+    def set_resource_pressure(self, level: str) -> str:
+        token = text(level).lower()
+        if token not in {"normal", "playback", "critical"}:
+            raise ValueError("invalid_resource_pressure")
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO agent_meta(key, value) VALUES ('resource_pressure', ?)",
+                (token,),
+            )
+            connection.commit()
+        return token
+
+    def resource_pressure(self) -> str:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM agent_meta WHERE key='resource_pressure'"
+            ).fetchone()
+        token = text(row["value"] if row else "normal").lower()
+        return token if token in {"normal", "playback", "critical"} else "normal"
+
     def add_root(
         self,
         path: str,

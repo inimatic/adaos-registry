@@ -201,6 +201,17 @@ def _runtime() -> tuple[MediaLibraryAgentRepository, MediaLibraryAgentWorker]:
         return _repository_instance, _worker_instance
 
 
+def _owns_background_worker() -> bool:
+    service_skill = text(os.environ.get("ADAOS_SERVICE_SKILL"))
+    if service_skill:
+        return service_skill == "media_library_agent"
+    return not bool(text(os.environ.get("ADAOS_RUNTIME_PORT")))
+
+
+def _ensure_worker_if_owned(worker: MediaLibraryAgentWorker) -> bool:
+    return worker.ensure_started() if _owns_background_worker() else False
+
+
 def _topology() -> LibraryAgentTopology:
     return LibraryAgentTopology()
 
@@ -214,15 +225,36 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
 @tool(summary="Resume queued media-library work after activation.", side_effects="local_write")
 def rehydrate(**_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
-    worker.ensure_started()
-    return {**repository.summary(), "worker": {"running": True, "resource_pressure": worker.resource_pressure}}
+    _ensure_worker_if_owned(worker)
+    return {
+        **repository.summary(),
+        "worker": {
+            "running": worker.running if _owns_background_worker() else False,
+            "owner": (
+                "service_process"
+                if not _owns_background_worker()
+                else "current_process"
+            ),
+            "resource_pressure": worker.resource_pressure,
+        },
+    }
 
 
 def recover_interrupted_runtime() -> dict[str, Any]:
     repository, worker = _runtime()
+    if not _owns_background_worker():
+        return {
+            **repository.summary(),
+            "requeued_job_count": 0,
+            "worker": {"running": False, "owner": "service_process"},
+        }
     requeued = repository.requeue_interrupted_jobs()
     worker.ensure_started()
-    return {**repository.summary(), "requeued_job_count": requeued}
+    return {
+        **repository.summary(),
+        "requeued_job_count": requeued,
+        "worker": {"running": True, "owner": "current_process"},
+    }
 
 
 @subscribe("sys.ready")
@@ -360,7 +392,7 @@ def start_scan(
             return {**result, **_human_error(text(result.get("error")), "The media scan could not be queued.")}
         jobs.append(dict(result["job"]))
         accepted += int(bool(result.get("accepted")))
-    worker.ensure_started()
+    _ensure_worker_if_owned(worker)
     return {
         "ok": True,
         "schema": SCHEMA_VERSION,
@@ -416,7 +448,7 @@ def list_jobs(root_id: str = "", limit: int = 20, **_: Any) -> dict[str, Any]:
 def cancel_scan(job_id: str = "", **_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
     result = repository.request_cancel(job_id)
-    worker.ensure_started()
+    _ensure_worker_if_owned(worker)
     if result.get("ok"):
         return result
     return {**result, **_human_error("scan_job_not_found", "The media scan is no longer available.")}
@@ -469,15 +501,17 @@ def configure_schedule(
         watch_enabled=bool(watch_enabled),
         watch_poll_seconds=watch_poll_seconds,
     )
-    worker.ensure_started()
+    _ensure_worker_if_owned(worker)
     return result
 
 
 @tool(summary="Pause or resume background scans according to playback pressure.", side_effects="local_write")
 def set_resource_pressure(level: str = "normal", **_: Any) -> dict[str, Any]:
-    _repository, worker = _runtime()
+    repository, worker = _runtime()
     try:
-        current = worker.set_resource_pressure(level)
+        current = repository.set_resource_pressure(level)
+        if _owns_background_worker():
+            worker.set_resource_pressure(current)
     except ValueError:
         return _human_error("invalid_resource_pressure", "The resource pressure level is invalid.")
     return {"ok": True, "schema": SCHEMA_VERSION, "resource_pressure": current}
@@ -554,7 +588,7 @@ def plan_rendition(
             "The compatible media rendition could not be queued.",
             source_id=text(source_id),
         )
-    worker.ensure_started()
+    _ensure_worker_if_owned(worker)
     return {
         "ok": True,
         "schema": SCHEMA_VERSION,
@@ -590,7 +624,7 @@ def list_rendition_jobs(
 def cancel_rendition(job_id: str = "", **_: Any) -> dict[str, Any]:
     repository, worker = _runtime()
     result = repository.request_rendition_cancel(job_id)
-    worker.ensure_started()
+    _ensure_worker_if_owned(worker)
     if result.get("ok"):
         return result
     return _human_error(
@@ -606,6 +640,11 @@ def status(**_: Any) -> dict[str, Any]:
     return {
         **repository.summary(),
         "worker": {
+            "owner": (
+                "current_process"
+                if _owns_background_worker()
+                else "service_process"
+            ),
             "resource_pressure": worker.resource_pressure,
             "max_concurrent_scans": 1,
             "watch": worker.watch_status(),

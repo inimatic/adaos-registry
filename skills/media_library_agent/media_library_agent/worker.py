@@ -65,6 +65,7 @@ class MediaLibraryAgentWorker:
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._resource_pressure = "normal"
+        self._resource_pressure_checked_at = 0.0
         self._last_publish_monotonic = 0.0
         self._job_started: dict[str, float] = {}
         self._wait_reason = ""
@@ -91,18 +92,31 @@ class MediaLibraryAgentWorker:
             thread.join(timeout=max(0.0, timeout))
 
     def set_resource_pressure(self, level: str) -> str:
-        token = text(level).lower()
-        if token not in {"normal", "playback", "critical"}:
-            raise ValueError("invalid_resource_pressure")
+        token = self.repository.set_resource_pressure(level)
         self._resource_pressure = token
+        self._resource_pressure_checked_at = time.monotonic()
         self._wake.set()
         return token
 
     @property
     def resource_pressure(self) -> str:
+        return self._refresh_resource_pressure(force=True)
+
+    @property
+    def running(self) -> bool:
+        with self._lock:
+            return bool(self._thread and self._thread.is_alive())
+
+    def _refresh_resource_pressure(self, *, force: bool = False) -> str:
+        now = time.monotonic()
+        if not force and now - self._resource_pressure_checked_at < 0.25:
+            return self._resource_pressure
+        self._resource_pressure = self.repository.resource_pressure()
+        self._resource_pressure_checked_at = now
         return self._resource_pressure
 
     def run_once(self) -> dict[str, Any] | None:
+        self._refresh_resource_pressure(force=True)
         self._enqueue_due_schedules()
         self._poll_watch_schedules()
         self._cleanup_invalidated_renditions()
@@ -215,7 +229,9 @@ class MediaLibraryAgentWorker:
 
     def _wait_for_rendition_resources(self, job_id: str) -> None:
         waiting = False
-        while self._resource_pressure in {"playback", "critical"} and not self._stop.is_set():
+        while not self._stop.is_set():
+            if self._refresh_resource_pressure() not in {"playback", "critical"}:
+                break
             if self._rendition_cancelled(job_id):
                 return
             if not waiting:
@@ -606,10 +622,10 @@ class MediaLibraryAgentWorker:
         current_path: str,
     ) -> None:
         waiting = False
-        while (
-            self._resource_pressure in {"playback", "critical"}
-            or not self._scan_window_open(root)
-        ) and not self._stop.is_set():
+        while not self._stop.is_set():
+            pressure = self._refresh_resource_pressure()
+            if pressure not in {"playback", "critical"} and self._scan_window_open(root):
+                break
             current = self.repository.get_job(job_id)
             if current and current["cancel_requested"]:
                 return

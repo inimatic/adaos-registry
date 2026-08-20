@@ -34,6 +34,8 @@ def isolated_runtime(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_DB_PATH", str(tmp_path / "agent.sqlite3"))
     monkeypatch.setenv("ADAOS_MEDIA_REFERENCE_DB_PATH", str(tmp_path / "references.sqlite3"))
     monkeypatch.setenv("ADAOS_NODE_ID", "node-test")
+    monkeypatch.delenv("ADAOS_RUNTIME_PORT", raising=False)
+    monkeypatch.delenv("ADAOS_SERVICE_SKILL", raising=False)
     yield
     try:
         main.dispose()
@@ -228,6 +230,69 @@ def test_playback_pressure_pauses_worker_until_released(tmp_path):
         time.sleep(0.01)
     assert repository.get_job(job["id"])["status"] == "completed"
     worker.dispose()
+
+
+def test_resource_pressure_is_shared_across_agent_processes(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "track.mp3").write_bytes(b"audio")
+    db_path = tmp_path / "shared-pressure.sqlite3"
+    worker_repository = MediaLibraryAgentRepository(db_path, node_id="node-a")
+    controller_repository = MediaLibraryAgentRepository(db_path, node_id="node-a")
+    root = worker_repository.add_root(str(library))["root"]
+    job = worker_repository.create_job(root["id"])["job"]
+    worker = MediaLibraryAgentWorker(worker_repository, poll_seconds=0.01)
+
+    controller_repository.set_resource_pressure("playback")
+    worker.ensure_started()
+    deadline = time.monotonic() + 2
+    while (
+        time.monotonic() < deadline
+        and worker_repository.get_job(job["id"])["status"]
+        != "waiting_resources"
+    ):
+        time.sleep(0.01)
+    assert worker_repository.get_job(job["id"])["status"] == "waiting_resources"
+
+    controller_repository.set_resource_pressure("normal")
+    deadline = time.monotonic() + 2
+    while (
+        time.monotonic() < deadline
+        and worker_repository.get_job(job["id"])["status"] != "completed"
+    ):
+        time.sleep(0.01)
+    assert worker_repository.get_job(job["id"])["status"] == "completed"
+    worker.dispose()
+
+
+def test_root_runtime_only_queues_service_owned_work(monkeypatch, tmp_path):
+    monkeypatch.setenv("ADAOS_RUNTIME_PORT", "8777")
+    library = tmp_path / "library"
+    library.mkdir()
+    (library / "track.mp3").write_bytes(b"audio")
+    repository, worker = main._runtime()
+    root = repository.add_root(str(library))["root"]
+    queued = repository.create_job(root["id"])["job"]
+    repository.claim_job(queued["id"])
+
+    monkeypatch.setattr(
+        worker,
+        "ensure_started",
+        lambda: (_ for _ in ()).throw(AssertionError("root runtime started worker")),
+    )
+    recovered = main.recover_interrupted_runtime()
+
+    assert main._owns_background_worker() is False
+    assert recovered["requeued_job_count"] == 0
+    assert recovered["worker"] == {"running": False, "owner": "service_process"}
+    assert repository.get_job(queued["id"])["status"] == "running"
+
+
+def test_service_process_owns_background_worker(monkeypatch):
+    monkeypatch.setenv("ADAOS_RUNTIME_PORT", "8777")
+    monkeypatch.setenv("ADAOS_SERVICE_SKILL", "media_library_agent")
+
+    assert main._owns_background_worker() is True
 
 
 def test_bounded_watcher_debounces_changes_into_incremental_scan(tmp_path):
