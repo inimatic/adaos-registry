@@ -1,5 +1,5 @@
 name: research_calibration_runner_skill
-version: 0.1.13
+version: 0.1.14
 description: Contamination-aware execution bridge from frozen research calibration
   packets to native Builder Automation.
 supported_locales:

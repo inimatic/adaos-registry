@@ -646,7 +646,15 @@ def release_attempt(
     )
     if not isinstance(result, Mapping) or not result.get("ok"):
         raise RuntimeError("Builder did not confirm candidate runtime release")
-    return {"ok": True, "candidate_id": candidate, **dict(result)}
+    receipt = result.get("runtime_release")
+    if not isinstance(receipt, Mapping):
+        raise RuntimeError("Builder returned no candidate runtime release receipt")
+    return {
+        "ok": True,
+        "candidate_id": candidate,
+        "idempotent": bool(result.get("idempotent")),
+        **dict(receipt),
+    }
 
 
 __all__ = [
