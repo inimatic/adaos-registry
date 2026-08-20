@@ -1130,14 +1130,25 @@ class ResearchOrchestrator:
                 else None
             )
         )
-        brief = (
-            self.repository.get_brief_for_task(
-                str(selected_task["task_id"]),
-                implementation_track_id=(selected_track or {}).get("track_id"),
-            )
-            if selected_task
-            else None
-        )
+        brief = None
+        if selected_task:
+            cursor = selected_track
+            visited: set[str] = set()
+            while isinstance(cursor, Mapping):
+                cursor_id = str(cursor.get("track_id") or "")
+                if not cursor_id or cursor_id in visited:
+                    break
+                visited.add(cursor_id)
+                brief = self.repository.get_brief_for_task(
+                    str(selected_task["task_id"]),
+                    implementation_track_id=cursor_id,
+                )
+                if brief:
+                    break
+                parent_id = str(cursor.get("parent_track_id") or "")
+                cursor = self.repository.get_track(parent_id) if parent_id else None
+            if brief is None:
+                brief = self.repository.get_brief_for_task(str(selected_task["task_id"]))
         if selected_track and str(selected_track.get("project_ref") or "").startswith("project:"):
             try:
                 project = compositions.get(str(selected_track["project_ref"]).partition(":")[2])
@@ -2375,7 +2386,9 @@ class ResearchOrchestrator:
             "ok": True,
             "parent_implementation_track": dict(parent),
             "implementation_track": successor,
-            "development_session": dict(session),
+            "development_session": development_sessions.get(
+                str(successor["development_session_id"])
+            ),
         }
 
     @staticmethod
