@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import importlib.util
-import sys
 import uuid
 from pathlib import Path
 
@@ -9,21 +8,6 @@ import yaml
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-
-
-def _find_repo_root() -> Path:
-    marker = Path("src") / "adaos" / "services"
-    candidates = [Path.cwd(), *SKILL_ROOT.parents]
-    for root in candidates:
-        if (root / marker).exists():
-            return root
-    raise FileNotFoundError(f"Cannot find AdaOS repo root containing {marker}")
-
-
-REPO_ROOT = _find_repo_root()
-SRC_ROOT = REPO_ROOT / "src"
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
 
 
 def _load_module():
@@ -148,3 +132,19 @@ def test_capture_feedback_stores_trial_observation() -> None:
 
     assert result["ok"] is True
     assert result["feedback_count"] == 1
+
+
+def test_diagnostics_cache_is_bounded_and_disposable(monkeypatch) -> None:
+    skill = _load_module()
+    monkeypatch.setattr(skill, "_build_diagnostics", lambda webspace_id: {"ok": True, "webspace_id": webspace_id})
+
+    for index in range(skill._DIAGNOSTICS_CACHE_MAX_ITEMS + 5):
+        skill._diagnostics_snapshot(f"ws-{index}")
+
+    assert len(skill._DIAGNOSTICS_CACHE) == skill._DIAGNOSTICS_CACHE_MAX_ITEMS
+    assert "ws-0" not in skill._DIAGNOSTICS_CACHE
+    result = skill.dispose()
+    assert result["ok"] is True
+    assert result["cleared"] == skill._DIAGNOSTICS_CACHE_MAX_ITEMS
+    assert not skill._DIAGNOSTICS_CACHE
+    assert not skill._DIAGNOSTICS_STREAM_FINGERPRINTS

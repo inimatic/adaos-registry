@@ -5,8 +5,7 @@ import sys
 from pathlib import Path
 
 
-ROOT = Path(__file__).resolve().parents[5]
-SKILL_ROOT = ROOT / ".adaos" / "workspace" / "skills" / "cv_descriptor"
+SKILL_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _load_module(tmp_path: Path, monkeypatch):

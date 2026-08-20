@@ -3,9 +3,9 @@ from __future__ import annotations
 import copy
 import json
 import logging
-import re
 import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -50,9 +50,10 @@ VOICE_PROFILES = {
 _FALLBACK_MEMORY: dict[str, Any] = {}
 _LOG = logging.getLogger("adaos.skill.conversation_companions")
 _DIAGNOSTICS_CACHE_TTL_S = 2.0
+_DIAGNOSTICS_CACHE_MAX_ITEMS = 64
 _DIAGNOSTICS_CACHE_LOCK = threading.RLock()
-_DIAGNOSTICS_CACHE: dict[str, tuple[float, dict[str, Any]]] = {}
-_DIAGNOSTICS_STREAM_FINGERPRINTS: dict[str, str] = {}
+_DIAGNOSTICS_CACHE: OrderedDict[str, tuple[float, dict[str, Any]]] = OrderedDict()
+_DIAGNOSTICS_STREAM_FINGERPRINTS: OrderedDict[str, str] = OrderedDict()
 
 
 def _load_default_profiles() -> dict[str, dict[str, Any]]:
@@ -92,8 +93,17 @@ def _clear_diagnostics_cache(webspace_id: str | None = None) -> int:
         if webspace_id is None:
             total = len(_DIAGNOSTICS_CACHE)
             _DIAGNOSTICS_CACHE.clear()
+            _DIAGNOSTICS_STREAM_FINGERPRINTS.clear()
             return total
-        return 1 if _DIAGNOSTICS_CACHE.pop(_diagnostics_cache_key(webspace_id), None) is not None else 0
+        key = _diagnostics_cache_key(webspace_id)
+        removed = _DIAGNOSTICS_CACHE.pop(key, None) is not None
+        _DIAGNOSTICS_STREAM_FINGERPRINTS.pop(key, None)
+        return 1 if removed else 0
+
+
+def _trim_diagnostics_mapping(mapping: OrderedDict[str, Any]) -> None:
+    while len(mapping) > _DIAGNOSTICS_CACHE_MAX_ITEMS:
+        mapping.popitem(last=False)
 
 
 def _diagnostics_fingerprint(payload: Mapping[str, Any]) -> str:
@@ -451,10 +461,10 @@ def _draft_reply(profile: Mapping[str, Any], text: str) -> str:
             "уточнить формулировку или помочь проверить его через профильный источник."
         )
     if profile.get("id") == "nika":
-        return f"Ника: главный вопрос - где эта идея может сломаться. Я бы сначала проверила допущения, сроки и критерий успеха."
+        return "Ника: главный вопрос - где эта идея может сломаться. Я бы сначала проверила допущения, сроки и критерий успеха."
     if profile.get("id") == "mira":
-        return f"Мира: можно сделать это легче. Сначала поймать настроение разговора, потом уже усложнять форму."
-    return f"Арсений: начни с цели и одного ближайшего шага. Если цель не ясна, любое решение будет выглядеть шумом."
+        return "Мира: можно сделать это легче. Сначала поймать настроение разговора, потом уже усложнять форму."
+    return "Арсений: начни с цели и одного ближайшего шага. Если цель не ясна, любое решение будет выглядеть шумом."
 
 
 def _profile_patch_from_instruction(instruction: str) -> dict[str, Any]:
@@ -722,10 +732,13 @@ def _diagnostics_snapshot(webspace_id: str, *, force: bool = False) -> dict[str,
         with _DIAGNOSTICS_CACHE_LOCK:
             cached = _DIAGNOSTICS_CACHE.get(key)
             if cached is not None and cached[0] > now:
+                _DIAGNOSTICS_CACHE.move_to_end(key)
                 return copy.deepcopy(cached[1])
     payload = _build_diagnostics(key)
     with _DIAGNOSTICS_CACHE_LOCK:
         _DIAGNOSTICS_CACHE[key] = (time.monotonic() + _DIAGNOSTICS_CACHE_TTL_S, copy.deepcopy(payload))
+        _DIAGNOSTICS_CACHE.move_to_end(key)
+        _trim_diagnostics_mapping(_DIAGNOSTICS_CACHE)
     return payload
 
 
@@ -751,7 +764,15 @@ def _publish_diagnostics_snapshot(
         return payload
     with _DIAGNOSTICS_CACHE_LOCK:
         _DIAGNOSTICS_STREAM_FINGERPRINTS[key] = fingerprint
+        _DIAGNOSTICS_STREAM_FINGERPRINTS.move_to_end(key)
+        _trim_diagnostics_mapping(_DIAGNOSTICS_STREAM_FINGERPRINTS)
     return payload
+
+
+@tool(summary="Release bounded process-local diagnostic state.", side_effects="none")
+def dispose(**_: Any) -> dict[str, Any]:
+    cleared = _clear_diagnostics_cache()
+    return {"ok": True, "cleared": cleared}
 
 
 def _event_payload(evt: Any) -> Mapping[str, Any]:
