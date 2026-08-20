@@ -9,7 +9,7 @@ Original media bytes remain at their original paths. The agent calls `adaos.sdk.
 ## Scan model
 
 - `import_folder` and `start_scan` return in seconds with durable job identifiers.
-- The persistent service process is the single owner of background work in production. Root-runtime tools only mutate the shared durable queue, while standalone development retains an in-process worker.
+- The persistent service process is the single owner of background work in production. Root-runtime tools only mutate the shared durable queue. Standalone development may opt into an in-process worker with `MEDIA_LIBRARY_AGENT_EMBEDDED_WORKER=1`.
 - Jobs survive process restart. Only the service owner requeues interrupted work, preventing root/service fencing races; incremental fingerprints avoid re-registering unchanged files.
 - Progress is persisted and published as the bounded replace-mode stream variable `media_library_agent.progress` at no more than 2 Hz.
 - Terminal job transitions publish `media_library_agent.catalog.changed`, allowing the coordinator to pull bounded deltas without polling from the browser.

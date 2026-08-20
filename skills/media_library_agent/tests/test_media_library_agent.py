@@ -34,6 +34,7 @@ def isolated_runtime(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_DB_PATH", str(tmp_path / "agent.sqlite3"))
     monkeypatch.setenv("ADAOS_MEDIA_REFERENCE_DB_PATH", str(tmp_path / "references.sqlite3"))
     monkeypatch.setenv("ADAOS_NODE_ID", "node-test")
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_EMBEDDED_WORKER", "1")
     monkeypatch.delenv("ADAOS_RUNTIME_PORT", raising=False)
     monkeypatch.delenv("ADAOS_SERVICE_SKILL", raising=False)
     yield
@@ -267,6 +268,7 @@ def test_resource_pressure_is_shared_across_agent_processes(tmp_path):
 
 def test_root_runtime_only_queues_service_owned_work(monkeypatch, tmp_path):
     monkeypatch.setenv("ADAOS_RUNTIME_PORT", "8777")
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_EMBEDDED_WORKER", "0")
     library = tmp_path / "library"
     library.mkdir()
     (library / "track.mp3").write_bytes(b"audio")

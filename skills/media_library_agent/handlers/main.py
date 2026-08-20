@@ -205,6 +205,9 @@ def _owns_background_worker() -> bool:
     service_skill = text(os.environ.get("ADAOS_SERVICE_SKILL"))
     if service_skill:
         return service_skill == "media_library_agent"
+    embedded = text(os.environ.get("MEDIA_LIBRARY_AGENT_EMBEDDED_WORKER")).lower()
+    if embedded in {"1", "true", "yes", "on"}:
+        return True
     return not bool(text(os.environ.get("ADAOS_RUNTIME_PORT")))
 
 
