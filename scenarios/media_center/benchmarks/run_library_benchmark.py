@@ -183,29 +183,32 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
         )
         with repository.connect() as connection:
             connection.execute(
-                "UPDATE catalog_items SET media_kind='audio',"
-                "work_id='work-legacy',collection_id='collection-legacy'"
-            )
-            connection.execute(
                 """
                 INSERT INTO media_works(
                     id,schema_name,media_kind,canonical_title,sort_title,
                     created_at,updated_at
-                ) VALUES (
-                    'work-legacy','adaos.media_center.media_work.v1','audio',
-                    'Legacy','legacy','2026-08-20','2026-08-20'
                 )
+                SELECT 'legacy-work-' || id,
+                    'adaos.media_center.media_work.v1','audio',title,lower(title),
+                    '2026-08-20','2026-08-20'
+                FROM catalog_items
                 """
             )
             connection.execute(
                 """
                 INSERT INTO media_collections(
                     id,schema_name,kind,title,ownership,created_at,updated_at
-                ) VALUES (
-                    'collection-legacy','adaos.media_center.media_collection.v1',
-                    'album','Legacy','derived','2026-08-20','2026-08-20'
                 )
+                SELECT 'legacy-collection-' || id,
+                    'adaos.media_center.media_collection.v1','album',title,
+                    'derived','2026-08-20','2026-08-20'
+                FROM catalog_items
                 """
+            )
+            connection.execute(
+                "UPDATE catalog_items SET media_kind='audio',"
+                "work_id='legacy-work-' || id,"
+                "collection_id='legacy-collection-' || id"
             )
             connection.execute(
                 "DELETE FROM coordinator_meta "
@@ -299,6 +302,8 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             failures.append("identity_migration.duration_ms")
         if (
             int(identity_migration["repaired_items"]) != count
+            or int(identity_migration["removed_works"]) != count
+            or int(identity_migration["removed_collections"]) != count
             or migrated_work_count != count
             or migrated_membership_count != count
         ):

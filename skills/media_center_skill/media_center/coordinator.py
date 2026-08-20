@@ -26,7 +26,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-20.6"
+COORDINATOR_SCHEMA_REVISION = "2026-08-20.7"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
 WORK_SCHEMA = "adaos.media_center.media_work.v1"
@@ -231,6 +231,10 @@ class MediaCatalogCoordinator:
                     revision INTEGER NOT NULL DEFAULT 1,
                     PRIMARY KEY(collection_id, work_id, variant_id)
                 );
+                CREATE INDEX IF NOT EXISTS idx_media_center_collection_parent
+                    ON media_collections(parent_id);
+                CREATE INDEX IF NOT EXISTS idx_media_center_membership_work
+                    ON collection_memberships(work_id);
                 CREATE TABLE IF NOT EXISTS metadata_claims (
                     id TEXT PRIMARY KEY,
                     subject_ref TEXT NOT NULL,
@@ -253,6 +257,8 @@ class MediaCatalogCoordinator:
                     created_at TEXT NOT NULL,
                     active INTEGER NOT NULL DEFAULT 1
                 );
+                CREATE INDEX IF NOT EXISTS idx_media_center_alias_canonical
+                    ON catalog_aliases(canonical_id,active);
                 CREATE TABLE IF NOT EXISTS agent_catalog_state (
                     agent_id TEXT PRIMARY KEY,
                     instance_id TEXT NOT NULL DEFAULT '',
