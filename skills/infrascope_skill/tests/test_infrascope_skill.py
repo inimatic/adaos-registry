@@ -9,6 +9,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
+import yaml
+
 
 if "y_py" not in sys.modules:
     sys.modules["y_py"] = types.SimpleNamespace(
@@ -76,6 +78,18 @@ def _load_infrascope_module():
             sys.modules.pop(service_key, None)
         else:
             sys.modules[service_key] = previous_service_module
+
+
+def test_infrascope_runtime_diagnostics_is_declared_read_only():
+    manifest_path = Path(__file__).resolve().parents[1] / "skill.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    tools = {
+        entry["name"]: entry
+        for entry in manifest.get("tools", [])
+        if isinstance(entry, dict) and entry.get("name")
+    }
+
+    assert tools["infrascope_runtime_diagnostics"]["side_effects"] == "read_only"
 
 
 def _wait_until(predicate, *, timeout_s: float = 2.0) -> None:
