@@ -1458,7 +1458,40 @@ def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path
     assert published[-1][0] == "media_center.library_state"
     assert published[-1][1]["profile_id"] == "alice"
     assert published[-1][1]["personal_revision"] == 1
-    assert published[-1][2]["_meta"] == {"webspace_id": "desktop"}
+    assert published[-1][2]["_meta"] == {
+        "webspace_id": "desktop",
+        "params": {"profile_id": "alice", "shared_surface": False},
+    }
+
+
+def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
+    published = []
+    coordinator = object()
+    monkeypatch.setattr(main, "_coordinator", lambda repository=None: coordinator)
+    monkeypatch.setattr(
+        main,
+        "_publish_library_snapshot",
+        lambda catalog, **kwargs: published.append((catalog, kwargs)),
+    )
+
+    main.on_library_snapshot_requested(
+        {
+            "receiver": "media_center.library_state",
+            "webspace_id": "television",
+            "params": {"profile_id": "household", "shared_surface": True},
+        }
+    )
+
+    assert published == [
+        (
+            coordinator,
+            {
+                "profile_id": "household",
+                "shared_surface": True,
+                "webspace_id": "television",
+            },
+        )
+    ]
 
 
 def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp_path):

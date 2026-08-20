@@ -138,13 +138,21 @@ def _publish_library_snapshot(
     catalog: MediaCatalogCoordinator,
     *,
     profile_id: str = "default",
+    shared_surface: bool = False,
     webspace_id: str = "",
 ) -> None:
     try:
         from adaos.sdk.io import stream_variable_publish
 
         profile = str(profile_id or "default").strip() or "default"
-        home = _compact_home_snapshot(catalog.home(profile_id=profile, limit=6))
+        surface_is_shared = _bool(shared_surface, False)
+        home = _compact_home_snapshot(
+            catalog.home(
+                profile_id=profile,
+                limit=6,
+                shared_surface=surface_is_shared,
+            )
+        )
         snapshot = {
             "schema": "adaos.media_center.library_state.v1",
             "profile_id": profile,
@@ -157,13 +165,22 @@ def _publish_library_snapshot(
         stream_variable_publish(
             "media_center.library_state",
             snapshot,
-            var_id=f"media_center.library.{profile}",
+            var_id=(
+                f"media_center.library.{profile}."
+                f"{'shared' if surface_is_shared else 'personal'}"
+            ),
             seq=max(
                 int(snapshot["catalog_revision"]),
                 int(snapshot["personal_revision"]),
             ),
             ttl_ms=120000,
-            _meta={"webspace_id": webspace_id} if webspace_id else None,
+            _meta={
+                **({"webspace_id": webspace_id} if webspace_id else {}),
+                "params": {
+                    "profile_id": profile,
+                    "shared_surface": surface_is_shared,
+                },
+            },
         )
     except Exception:
         return
@@ -648,9 +665,22 @@ def on_library_snapshot_requested(event: Any) -> None:
     payload = _event_payload(event)
     if str(payload.get("receiver") or "") != "media_center.library_state":
         return
+    params = payload.get("params")
+    receiver_params = dict(params) if isinstance(params, Mapping) else {}
     _publish_library_snapshot(
         _coordinator(),
-        profile_id=str(payload.get("profile_id") or "default"),
+        profile_id=str(
+            receiver_params.get("profile_id")
+            or payload.get("profile_id")
+            or "default"
+        ),
+        shared_surface=_bool(
+            receiver_params.get(
+                "shared_surface",
+                payload.get("shared_surface", False),
+            ),
+            False,
+        ),
         webspace_id=str(payload.get("webspace_id") or ""),
     )
 
