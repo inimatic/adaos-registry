@@ -227,10 +227,11 @@ def _workflow_smoke_documents() -> dict[str, Any]:
 
 
 def descriptor() -> dict[str, Any]:
+    workflow_smoke_evidence = _workflow_smoke_documents()
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.6.0",
+        "version": "1.7.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -505,7 +506,20 @@ def descriptor() -> dict[str, Any]:
             "ingestion": "research_manager_skill",
             "scientific_smoke": "governed Study action after ProjectRelease",
         },
-        "workflow_smoke_evidence": _workflow_smoke_documents(),
+        "workflow_smoke_evidence": workflow_smoke_evidence,
+        "conformance_fixtures": [
+            {
+                "id": "workflow_smoke.evidence_documents",
+                "kind": "document_set",
+                "required": True,
+                "runtime_scope": "task_runtime",
+                "selection": "newest_complete",
+                "required_documents": list(
+                    workflow_smoke_evidence["required_expected_outputs"]
+                ),
+                "documents": dict(workflow_smoke_evidence["documents"]),
+            }
+        ],
     }
     return {**value, "digest": digest(value)}
 

@@ -202,7 +202,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.6.0"
+    assert contract["version"] == "1.7.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -237,6 +237,17 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     ]
     for schema in smoke_contract["documents"].values():
         jsonschema.Draft202012Validator.check_schema(schema)
+    assert contract["conformance_fixtures"] == [
+        {
+            "id": "workflow_smoke.evidence_documents",
+            "kind": "document_set",
+            "required": True,
+            "runtime_scope": "task_runtime",
+            "selection": "newest_complete",
+            "required_documents": smoke_contract["required_expected_outputs"],
+            "documents": smoke_contract["documents"],
+        }
+    ]
     assert "MUST NOT index itself" in smoke_contract["collection"]["index_boundary"]
     exact_set = smoke_contract["collection"]["exact_artifact_set"]
     assert exact_set == {
