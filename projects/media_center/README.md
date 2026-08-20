@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.11` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.18` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -23,6 +23,14 @@ durable repository to the canonical SDK node identity. A one-time migration
 rewrites legacy `local` root, source, and delta identities in place while
 preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
+
+Active node agents declare their distributed membership contract in the skill
+manifest. The core runtime owns registration, lease renewal, stale-member
+expiration, and reconciliation against the exact active Project release. Health
+responses expose only bounded pressure and availability evidence; they do not
+mutate topology. Newly activated skill handlers replace the previous deployment
+in the running process, so a successful Project apply does not require a hub
+restart before its tools and streams become authoritative.
 
 Topology apply reads the immutable reviewed plan through the public SDK and
 grants only the approvals named by that plan. Ordinary replica creation carries
