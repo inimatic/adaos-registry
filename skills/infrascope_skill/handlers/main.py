@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from concurrent.futures import Future, ThreadPoolExecutor
 from copy import deepcopy
 import json
 import logging
@@ -15,6 +16,7 @@ import yaml
 from adaos.sdk.core.decorators import subscribe, tool
 from adaos.sdk.data import ctx_subnet
 from adaos.sdk.io import stream_publish
+from adaos.services.agent_context import get_ctx
 from adaos.services.core_update import read_last_result as read_core_update_last_result
 from adaos.services.core_update import read_status as read_core_update_status
 from adaos.services.operations.manager import get_operation_manager
@@ -93,13 +95,33 @@ _last_stream_fingerprints: dict[str, str] = {}
 _stream_request_seen_at: dict[str, float] = {}
 _stream_snapshot_guard = threading.Lock()
 _stream_snapshot_locks: dict[str, threading.Lock] = {}
+_stream_snapshot_tasks: dict[str, Future[None]] = {}
+_stream_snapshot_task_guard = threading.Lock()
+_stream_snapshot_executor_guard = threading.Lock()
+_stream_snapshot_executor_instance: ThreadPoolExecutor | None = None
+_stream_snapshot_generation = 0
 _last_refresh_at_mono = 0.0
 _MIN_YJS_PROJECTION_INTERVAL_S = 1.0
 _MAX_LAST_GOOD_SNAPSHOTS = 16
+_MAX_STREAM_SNAPSHOT_TASKS = 32
+_MAX_STREAM_SNAPSHOT_WORKERS = 2
 _stream_request_diag = {
     "requested_total": 0,
     "forced_total": 0,
     "coalesced_total": 0,
+    "scheduled_total": 0,
+    "inflight_coalesced_total": 0,
+    "capacity_dropped_total": 0,
+    "completed_total": 0,
+    "failed_total": 0,
+    "cancelled_total": 0,
+    "stale_publish_suppressed_total": 0,
+    "active_peak": 0,
+    "last_duration_ms": 0.0,
+    "max_duration_ms": 0.0,
+    "last_receiver": "",
+    "last_webspace_id": "",
+    "last_error": "",
 }
 
 
@@ -153,6 +175,8 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle") -> dict[str, Any]:
     global _background_refresh_pending_all
     global _background_refresh_reason
     global _last_refresh_at_mono
+    global _stream_snapshot_executor_instance
+    global _stream_snapshot_generation
     task_cancelled = False
     task = _background_refresh_task
     if task is not None and not task.done():
@@ -166,6 +190,20 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle") -> dict[str, Any]:
     snapshot_total = len(_last_good_snapshots)
     receiver_total = sum(len(receivers) for receivers in _active_stream_receivers_by_webspace.values())
     lock_total = len(_stream_snapshot_locks)
+    with _stream_snapshot_task_guard:
+        _stream_snapshot_generation += 1
+        stream_tasks = list(_stream_snapshot_tasks.values())
+        stream_task_total = len(stream_tasks)
+        _stream_snapshot_tasks.clear()
+    stream_task_cancelled = 0
+    for stream_task in stream_tasks:
+        if not stream_task.done():
+            stream_task_cancelled += 1 if stream_task.cancel() else 0
+    with _stream_snapshot_executor_guard:
+        stream_executor = _stream_snapshot_executor_instance
+        _stream_snapshot_executor_instance = None
+    if stream_executor is not None:
+        stream_executor.shutdown(wait=False, cancel_futures=True)
     _last_projected_fingerprints.clear()
     _last_projected_at_mono.clear()
     _last_good_snapshots.clear()
@@ -175,12 +213,14 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle") -> dict[str, Any]:
     with _stream_snapshot_guard:
         _stream_snapshot_locks.clear()
     _log.info(
-        "infrascope lifecycle cleanup reason=%s task_cancelled=%s snapshots=%s active_receivers=%s locks=%s",
+        "infrascope lifecycle cleanup reason=%s task_cancelled=%s snapshots=%s active_receivers=%s locks=%s stream_tasks=%s/%s",
         reason,
         task_cancelled,
         snapshot_total,
         receiver_total,
         lock_total,
+        stream_task_cancelled,
+        stream_task_total,
     )
     return {
         "ok": True,
@@ -189,6 +229,9 @@ def _cleanup_runtime_state(*, reason: str = "lifecycle") -> dict[str, Any]:
         "snapshot_total": snapshot_total,
         "active_receiver_total": receiver_total,
         "stream_lock_total": lock_total,
+        "stream_task_total": stream_task_total,
+        "stream_task_cancelled": stream_task_cancelled,
+        "stream_request_diagnostics": dict(_stream_request_diag),
     }
 
 
@@ -200,6 +243,22 @@ def infrascope_runtime_drain(reason: str = "drain", **_: Any) -> dict[str, Any]:
 @tool("infrascope_runtime_dispose")
 def infrascope_runtime_dispose(reason: str = "dispose", **_: Any) -> dict[str, Any]:
     return _cleanup_runtime_state(reason=reason or "dispose")
+
+
+@tool("infrascope_runtime_diagnostics")
+def infrascope_runtime_diagnostics(**_: Any) -> dict[str, Any]:
+    with _stream_snapshot_task_guard:
+        active = sum(1 for task in _stream_snapshot_tasks.values() if not task.done())
+        diagnostics = dict(_stream_request_diag)
+    return {
+        "ok": True,
+        "stream_snapshot": {
+            "active": active,
+            "capacity": _MAX_STREAM_SNAPSHOT_TASKS,
+            "workers": _MAX_STREAM_SNAPSHOT_WORKERS,
+            **diagnostics,
+        },
+    }
 
 
 def _eager_stream_publish_enabled() -> bool:
@@ -957,6 +1016,134 @@ def _stream_payload_for_receiver_direct(receiver: str, *, webspace_id: str) -> t
     return False, None
 
 
+def _build_stream_snapshot_payload(receiver: str, *, webspace_id: str) -> Any:
+    handled, stream_payload = _stream_payload_for_receiver_direct(receiver, webspace_id=webspace_id)
+    if handled:
+        return stream_payload
+    snapshot = _stream_snapshot_for_subscribe(webspace_id)
+    return _stream_payload_for_receiver(snapshot, receiver)
+
+
+def _stream_snapshot_executor() -> ThreadPoolExecutor:
+    global _stream_snapshot_executor_instance
+    with _stream_snapshot_executor_guard:
+        if _stream_snapshot_executor_instance is None:
+            _stream_snapshot_executor_instance = ThreadPoolExecutor(
+                max_workers=_MAX_STREAM_SNAPSHOT_WORKERS,
+                thread_name_prefix="infrascope-stream-snapshot",
+            )
+        return _stream_snapshot_executor_instance
+
+
+def _serve_stream_snapshot_request(receiver: str, *, webspace_id: str, generation: int) -> None:
+    stream_payload = _build_stream_snapshot_payload(receiver, webspace_id=webspace_id)
+    with _stream_snapshot_task_guard:
+        if generation != _stream_snapshot_generation:
+            _stream_request_diag["stale_publish_suppressed_total"] = int(
+                _stream_request_diag.get("stale_publish_suppressed_total") or 0
+            ) + 1
+            return
+        if stream_payload is not None:
+            _publish_stream_payload(receiver, stream_payload, webspace_id=webspace_id, force=True)
+
+
+def _stream_snapshot_finished(
+    task_key: str,
+    receiver: str,
+    webspace_id: str,
+    started_at: float,
+    task: Future[None],
+) -> None:
+    duration_ms = max(0.0, (time.monotonic() - started_at) * 1000.0)
+    error: BaseException | None = None
+    if task.cancelled():
+        outcome = "cancelled_total"
+    else:
+        try:
+            error = task.exception()
+        except BaseException as exc:
+            error = exc
+        outcome = "failed_total" if error is not None else "completed_total"
+    with _stream_snapshot_task_guard:
+        if _stream_snapshot_tasks.get(task_key) is task:
+            _stream_snapshot_tasks.pop(task_key, None)
+        _stream_request_diag[outcome] = int(_stream_request_diag.get(outcome) or 0) + 1
+        _stream_request_diag["last_duration_ms"] = round(duration_ms, 3)
+        _stream_request_diag["max_duration_ms"] = round(
+            max(float(_stream_request_diag.get("max_duration_ms") or 0.0), duration_ms),
+            3,
+        )
+        _stream_request_diag["last_receiver"] = receiver
+        _stream_request_diag["last_webspace_id"] = webspace_id
+        _stream_request_diag["last_error"] = (
+            f"{type(error).__name__}: {error}" if error is not None else ""
+        )
+    if error is not None:
+        _log.warning(
+            "infrascope stream snapshot worker failed receiver=%s webspace=%s duration_ms=%.1f error=%s",
+            receiver,
+            webspace_id,
+            duration_ms,
+            error,
+            exc_info=(type(error), error, error.__traceback__),
+        )
+    elif duration_ms >= 250.0:
+        _log.warning(
+            "infrascope stream snapshot worker slow receiver=%s webspace=%s duration_ms=%.1f",
+            receiver,
+            webspace_id,
+            duration_ms,
+        )
+
+
+def _schedule_stream_snapshot_response(receiver: str, *, webspace_id: str) -> None:
+    task_key = _stream_cache_key(webspace_id, receiver)
+    with _stream_snapshot_task_guard:
+        existing = _stream_snapshot_tasks.get(task_key)
+        if existing is not None and not existing.done():
+            _stream_request_diag["inflight_coalesced_total"] = int(
+                _stream_request_diag.get("inflight_coalesced_total") or 0
+            ) + 1
+            return
+        for completed_key in [key for key, task in _stream_snapshot_tasks.items() if task.done()]:
+            _stream_snapshot_tasks.pop(completed_key, None)
+        if len(_stream_snapshot_tasks) >= _MAX_STREAM_SNAPSHOT_TASKS:
+            total = int(_stream_request_diag.get("capacity_dropped_total") or 0) + 1
+            _stream_request_diag["capacity_dropped_total"] = total
+            active = len(_stream_snapshot_tasks)
+            if total == 1 or total % 25 == 0:
+                _log.warning(
+                    "infrascope stream snapshot capacity reached active=%s limit=%s dropped_total=%s",
+                    active,
+                    _MAX_STREAM_SNAPSHOT_TASKS,
+                    total,
+                )
+            return
+        generation = _stream_snapshot_generation
+        started_at = time.monotonic()
+        task = _stream_snapshot_executor().submit(
+            _serve_stream_snapshot_request,
+            receiver,
+            webspace_id=webspace_id,
+            generation=generation,
+        )
+        _stream_snapshot_tasks[task_key] = task
+        _stream_request_diag["scheduled_total"] = int(_stream_request_diag.get("scheduled_total") or 0) + 1
+        _stream_request_diag["active_peak"] = max(
+            int(_stream_request_diag.get("active_peak") or 0),
+            len(_stream_snapshot_tasks),
+        )
+    task.add_done_callback(
+        lambda completed: _stream_snapshot_finished(
+            task_key,
+            receiver,
+            webspace_id,
+            started_at,
+            completed,
+        )
+    )
+
+
 def _compact_row_for_stream(raw: Any) -> dict[str, Any]:
     row = coerce_mapping(raw)
     object_id = str(row.get("object_id") or row.get("id") or "").strip()
@@ -1552,13 +1739,7 @@ def on_webio_stream_snapshot_requested(evt: Any) -> None:
     _remember_stream_receiver(webspace_id, receiver)
     if not _consume_stream_snapshot_request(webspace_id=webspace_id, receiver=receiver):
         return
-    handled, stream_payload = _stream_payload_for_receiver_direct(receiver, webspace_id=webspace_id)
-    if not handled:
-        snapshot = _stream_snapshot_for_subscribe(webspace_id)
-        stream_payload = _stream_payload_for_receiver(snapshot, receiver)
-    if stream_payload is None:
-        return
-    _publish_stream_payload(receiver, stream_payload, webspace_id=webspace_id, force=True)
+    _schedule_stream_snapshot_response(receiver, webspace_id=webspace_id)
 
 
 def _is_infrascope_yjs_projection_payload(payload: dict[str, Any]) -> bool:

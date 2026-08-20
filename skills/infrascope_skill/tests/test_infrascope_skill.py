@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import threading
+import time
 import types
 from pathlib import Path
 from types import SimpleNamespace
@@ -74,6 +76,15 @@ def _load_infrascope_module():
             sys.modules.pop(service_key, None)
         else:
             sys.modules[service_key] = previous_service_module
+
+
+def _wait_until(predicate, *, timeout_s: float = 2.0) -> None:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        time.sleep(0.01)
+    raise AssertionError("condition was not met before timeout")
 
 
 def test_infrascope_skill_projects_overview_summary_and_incident_rows(monkeypatch):
@@ -383,6 +394,7 @@ def test_infrascope_stream_snapshot_request_publishes_requested_receiver(monkeyp
             "receiver": "infrascope.inventory.members",
         }
     )
+    _wait_until(lambda: len(published) == 1)
 
     assert published == [
         (
@@ -479,6 +491,7 @@ def test_infrascope_stream_snapshot_request_uses_direct_receiver_builders(monkey
     mod.on_webio_stream_snapshot_requested(
         {"webspace_id": "ws-1", "receiver": "infrascope.operations.active"},
     )
+    _wait_until(lambda: len(published) == 2)
 
     assert calls["snapshot"] == 0
     assert [item[0] for item in published] == [
@@ -533,10 +546,99 @@ def test_infrascope_overview_stream_snapshot_uses_compact_direct_builder(monkeyp
     mod.on_webio_stream_snapshot_requested(
         {"webspace_id": "ws-1", "receiver": "infrascope.overview.health_strip"},
     )
+    _wait_until(lambda: len(published) == 1)
 
     assert published[0][0] == "infrascope.overview.health_strip"
     assert "details" not in published[0][1][0]
     assert published[0][1][0]["details_receiver"] == "infrascope.inspector.member-1"
+
+
+def test_infrascope_stream_snapshot_handler_uses_bounded_worker_and_coalesces(monkeypatch):
+    mod = _load_infrascope_module()
+    started = threading.Event()
+    release = threading.Event()
+    worker_threads: list[int] = []
+    published: list[tuple[str, object]] = []
+
+    def _blocking_builder(receiver, *, webspace_id):
+        worker_threads.append(threading.get_ident())
+        started.set()
+        assert release.wait(timeout=2.0)
+        return [{"id": "member-1"}]
+
+    monkeypatch.setattr(mod, "_build_stream_snapshot_payload", _blocking_builder)
+    monkeypatch.setattr(
+        mod,
+        "_publish_stream_payload",
+        lambda receiver, data, **kwargs: published.append((receiver, data)),
+    )
+
+    caller_thread = threading.get_ident()
+    before = time.monotonic()
+    mod.on_webio_stream_snapshot_requested(
+        {"webspace_id": "ws-1", "receiver": "infrascope.inventory.members"},
+    )
+    handler_elapsed = time.monotonic() - before
+
+    assert handler_elapsed < 0.1
+    assert started.wait(timeout=1.0)
+    mod._schedule_stream_snapshot_response(
+        "infrascope.inventory.members",
+        webspace_id="ws-1",
+    )
+    diagnostics = mod.infrascope_runtime_diagnostics()["stream_snapshot"]
+    assert diagnostics["active"] == 1
+    assert diagnostics["inflight_coalesced_total"] == 1
+    assert diagnostics["active_peak"] == 1
+
+    release.set()
+    _wait_until(lambda: len(published) == 1)
+    _wait_until(lambda: mod.infrascope_runtime_diagnostics()["stream_snapshot"]["active"] == 0)
+
+    assert len(worker_threads) == 1
+    assert worker_threads[0] != caller_thread
+    assert published == [("infrascope.inventory.members", [{"id": "member-1"}])]
+    diagnostics = mod.infrascope_runtime_diagnostics()["stream_snapshot"]
+    assert diagnostics["scheduled_total"] == 1
+    assert diagnostics["completed_total"] == 1
+    assert diagnostics["failed_total"] == 0
+    assert diagnostics["last_receiver"] == "infrascope.inventory.members"
+
+
+def test_infrascope_runtime_drain_suppresses_obsolete_snapshot_publish(monkeypatch):
+    mod = _load_infrascope_module()
+    started = threading.Event()
+    release = threading.Event()
+    published: list[tuple[str, object]] = []
+
+    def _blocking_builder(receiver, *, webspace_id):
+        started.set()
+        assert release.wait(timeout=2.0)
+        return [{"id": "stale-member"}]
+
+    monkeypatch.setattr(mod, "_build_stream_snapshot_payload", _blocking_builder)
+    monkeypatch.setattr(
+        mod,
+        "_publish_stream_payload",
+        lambda receiver, data, **kwargs: published.append((receiver, data)),
+    )
+
+    mod.on_webio_stream_snapshot_requested(
+        {"webspace_id": "ws-1", "receiver": "infrascope.inventory.members"},
+    )
+    assert started.wait(timeout=1.0)
+
+    cleanup = mod.infrascope_runtime_drain(reason="scenario_deactivated")
+    assert cleanup["stream_task_total"] == 1
+    release.set()
+    _wait_until(
+        lambda: mod.infrascope_runtime_diagnostics()["stream_snapshot"][
+            "stale_publish_suppressed_total"
+        ]
+        == 1
+    )
+
+    assert published == []
 
 
 def test_infrascope_adds_skill_migration_operation_row(monkeypatch):
