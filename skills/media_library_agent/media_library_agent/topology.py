@@ -113,6 +113,10 @@ class LibraryAgentTopology:
             }
         previous = None if witness is not None else self._selected_replica(payload)
         evidence = dict(witness or previous or {})
+        if phase in {"catch_up", "verify", "activate_read", "promote"}:
+            mismatch = self._target_witness_error(payload, evidence=evidence)
+            if mismatch is not None:
+                return {"ok": False, "error_code": mismatch}
         checkpoint = text(evidence.get("checkpoint")) or None
         receipt = {
             "phase": phase,
@@ -216,4 +220,30 @@ class LibraryAgentTopology:
         for value in (payload.get("source_replica"), payload.get("target_replica")):
             if isinstance(value, Mapping) and text(value.get("instance_id")) == selected_id:
                 return dict(value)
+        return None
+
+    @staticmethod
+    def _target_witness_error(
+        payload: Mapping[str, Any], *, evidence: Mapping[str, Any]
+    ) -> str | None:
+        source = payload.get("source_replica")
+        target = payload.get("target_instance")
+        selected_id = text(payload.get("selected_instance_id"))
+        if not isinstance(source, Mapping) or not isinstance(target, Mapping):
+            return None
+        if selected_id != text(target.get("instance_id")):
+            return None
+
+        expected_checkpoint = text(source.get("checkpoint"))
+        observed_checkpoint = text(
+            evidence.get("content_witness") or evidence.get("checkpoint")
+        )
+        expected_items = int(source.get("item_count") or 0)
+        observed_items = int(evidence.get("available") or evidence.get("item_count") or 0)
+        if expected_checkpoint and observed_checkpoint != expected_checkpoint:
+            return "topology_target_content_witness_mismatch"
+        if expected_items > observed_items:
+            return "topology_target_content_incomplete"
+        if text(source.get("content_state")).lower() == "non_empty" and observed_items <= 0:
+            return "topology_target_content_incomplete"
         return None

@@ -743,6 +743,61 @@ def test_replicated_topology_phase_preserves_observed_data_witness(tmp_path):
     assert result["receipt"]["replica"]["source_ref"] == "catalog-generation:7"
 
 
+def test_replicated_topology_phase_rejects_empty_target_witness(tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "empty-replica.sqlite3",
+        node_id="node-b",
+    )
+    payload = _topology_payload(
+        {"id": "replicated"},
+        phase="verify",
+        idempotency_key="phase-empty-target-verify",
+    )
+    source = dict(payload["source_instance"])
+    target = {
+        **source,
+        "instance_id": "media-agent-node-b",
+        "node_id": "node-b",
+        "activation_id": "activation-node-b",
+        "lease_id": "lease-node-b",
+    }
+    payload.update(
+        target_node_id="node-b",
+        selected_instance_id="media-agent-node-b",
+        partition={"partition_id": "catalog-home", "selector": {}},
+        dataset={"consistency_profile": "single_authority"},
+        target_instance=target,
+        source_replica={
+            "replica_id": "replica-source",
+            "partition_id": "catalog-home",
+            "instance_id": "media-agent-node-a",
+            "node_id": "node-a",
+            "role": "follower",
+            "lifecycle": "ready",
+            "content_state": "non_empty",
+            "authority_epoch": 0,
+            "checkpoint": "catalog:10",
+            "source_ref": "catalog-generation:10",
+            "freshness_seconds": 0,
+            "item_count": 42,
+            "byte_count": 2048,
+            "observed_at": "2026-08-19T00:00:00+00:00",
+            "revision": 1,
+        },
+    )
+
+    result = LibraryAgentTopology().execute_phase(
+        repository,
+        payload,
+        resource_pressure="normal",
+    )
+
+    assert result == {
+        "ok": False,
+        "error_code": "topology_target_content_witness_mismatch",
+    }
+
+
 def _rendition_source(repository, worker, library: Path) -> dict:
     root = repository.add_root(str(library))["root"]
     scan = repository.create_job(root["id"], mode="full")
