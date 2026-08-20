@@ -314,7 +314,7 @@ class MediaLibraryAgentRepository:
             ).fetchall()
             for delta in rows:
                 payload = _replace_legacy_identity(
-                    json_loads(str(delta["payload_json"])),
+                    json_loads(str(delta["payload_json"]), {}),
                     node_id=self.node_id,
                     agent_id=agent_id,
                 )

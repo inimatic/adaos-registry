@@ -45,3 +45,9 @@ external files. Replicated catalog phases preserve the last verified checkpoint,
 item count, byte count, and source witness when no external root is involved;
 promotion and demotion therefore cannot erase the data evidence used for
 fencing and recovery decisions.
+
+Repository identity comes from `adaos.sdk.core.runtime_identity()`. Existing
+repositories that only contain the former `local` placeholder are migrated once
+in place, including ordered delta payloads; media paths, root IDs, source IDs,
+and registered external references are unchanged. Opening the same repository
+under a different concrete node identity is rejected.

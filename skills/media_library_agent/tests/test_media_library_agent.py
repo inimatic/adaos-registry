@@ -153,11 +153,44 @@ def test_repository_migrates_legacy_local_identity_once(tmp_path):
     database = tmp_path / "identity.sqlite3"
     legacy = MediaLibraryAgentRepository(database, node_id="local")
     root_id = legacy.add_root(str(library))["root"]["id"]
+    operation, legacy_source = legacy.upsert_source(
+        {
+            "root_id": root_id,
+            "relative_path": "Album/01.mp3",
+            "folder_path": "Album",
+            "name": "01.mp3",
+            "media_kind": "audio",
+            "mime_type": "audio/mpeg",
+            "size_bytes": 5,
+            "modified_ns": 1,
+            "inode": 1,
+            "fingerprint": "legacy-fingerprint",
+            "resource_id": "media-ref",
+            "descriptor": {"node_id": "local"},
+            "metadata": {
+                "agent": {"node_id": "local", "agent_id": legacy.agent_id}
+            },
+        },
+        job_id="legacy-job",
+    )
+    assert operation == "added"
 
     migrated = MediaLibraryAgentRepository(database, node_id="node-a")
 
     assert migrated.list_roots()["items"][0]["node_id"] == "node-a"
     assert migrated.list_roots()["items"][0]["id"] == root_id
+    source = migrated.get_source(legacy_source["id"])
+    assert source is not None
+    assert source["node_id"] == "node-a"
+    delta = migrated.pull_deltas(limit=10)["items"][0]
+    assert delta["node_id"] == "node-a"
+    assert delta["agent_id"] == migrated.agent_id
+    assert delta["source"]["node_id"] == "node-a"
+    assert delta["source"]["descriptor"]["node_id"] == "node-a"
+    assert delta["source"]["metadata"]["agent"] == {
+        "node_id": "node-a",
+        "agent_id": migrated.agent_id,
+    }
     with pytest.raises(ValueError, match="repository_node_identity_mismatch"):
         MediaLibraryAgentRepository(database, node_id="node-b")
 
