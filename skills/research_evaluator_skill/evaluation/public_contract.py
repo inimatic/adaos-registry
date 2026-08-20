@@ -45,6 +45,23 @@ def project_tlp_consumer_contract(
 
     projected = copy.deepcopy(dict(consumer_contract))
     projected.pop("digest", None)
+    probe = dict(
+        dict(public_conformance.get("required_operations") or {}).get(
+            "implementation_probe"
+        )
+        or {}
+    )
+    input_schema = probe.get("input_schema")
+    output_schema = probe.get("output_schema")
+    if not isinstance(input_schema, Mapping) or not isinstance(output_schema, Mapping):
+        raise ValueError("public TLP implementation probe has no machine schemas")
+    operations = dict(projected.get("operations") or {})
+    operations["implementation_probe"] = {
+        "description": str(probe.get("purpose") or "TLP implementation probe"),
+        "input_schema": copy.deepcopy(dict(input_schema)),
+        "output_schema": copy.deepcopy(dict(output_schema)),
+    }
+    projected["operations"] = operations
     projected["domain_conformance"] = copy.deepcopy(dict(public_conformance))
     return {**projected, "digest": digest(projected)}
 

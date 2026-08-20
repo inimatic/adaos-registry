@@ -7,6 +7,32 @@ from typing import Any
 from evaluation.contracts import digest
 
 
+def _probe_error_observation(error: str) -> str:
+    """Persist an actionable class and identity without leaking hidden values."""
+
+    text = str(error or "").strip()
+    lowered = text.lower()
+    if "missing" in lowered and (
+        "required positional argument" in lowered or "required keyword" in lowered
+    ):
+        category = "handler_signature_mismatch"
+    elif "validat" in lowered or "schema" in lowered:
+        category = "public_input_schema_rejection"
+    elif "timeout" in lowered or "timed out" in lowered:
+        category = "probe_timeout"
+    elif "not found" in lowered or "unknown tool" in lowered:
+        category = "operation_unavailable"
+    else:
+        category = "probe_invocation_error"
+    error_type = text.split(":", 1)[0].strip() if ":" in text else "InvocationError"
+    safe_type = "".join(character for character in error_type if character.isalnum() or character in "._")
+    identity = digest({"probe_error": text})
+    return (
+        f"category={category}; error_type={safe_type or 'InvocationError'}; "
+        f"diagnostic_digest={identity}"
+    )
+
+
 def hidden_probe_request(experiment_plan_digest: str) -> dict[str, Any]:
     """Create a deterministic, evaluator-owned operator input.
 
@@ -228,7 +254,10 @@ def evaluate_tlp_implementation(
 
     result = dict(probe_result or {})
     if probe_error:
-        problems.append("hidden operator probe failed to execute")
+        problems.append(
+            "hidden operator probe failed to execute: "
+            + _probe_error_observation(probe_error)
+        )
     if str(result.get("schema") or "") != "adaos.research.tlp_operator_probe_result.v1":
         problems.append("hidden operator probe returned another schema")
     if str(result.get("experiment_plan_digest") or "") != plan_digest:

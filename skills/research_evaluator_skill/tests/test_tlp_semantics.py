@@ -191,3 +191,33 @@ def test_scientific_gate_rejects_a_probe_detached_from_the_validated_source() ->
     assert result["ok"] is False
     assert any("outside the validated snapshot" in item for item in result["diagnostics"])
     assert any("not bound to its implementation" in item for item in result["diagnostics"])
+
+
+def test_scientific_gate_persists_safe_probe_failure_class_and_digest() -> None:
+    snapshot = _source_snapshot()
+    trials = _arm_trials(snapshot)
+    request = hidden_probe_request(_PLAN_DIGEST)
+
+    result = evaluate_tlp_implementation(
+        profile=_profile(),
+        plan={"digest": _PLAN_DIGEST, "system": {"digest": _SYSTEM_DIGEST}},
+        source_snapshot=snapshot,
+        expected_source_digest=snapshot["source_digest"],
+        arm_trials=trials,
+        probe_request=request,
+        probe_result=None,
+        probe_error=(
+            "TypeError: implementation_probe() missing 4 required positional arguments"
+        ),
+    )
+
+    assert result["ok"] is False
+    observation = next(
+        item
+        for item in result["diagnostics"]
+        if item.startswith("hidden operator probe failed to execute")
+    )
+    assert "category=handler_signature_mismatch" in observation
+    assert "error_type=TypeError" in observation
+    assert "diagnostic_digest=sha256:" in observation
+    assert "required positional arguments" not in observation
