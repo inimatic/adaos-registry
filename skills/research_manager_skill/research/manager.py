@@ -681,8 +681,13 @@ class ResearchManager:
         """
 
         value = dict(request or {})
-        execute_workflow_smoke = bool(value.get("execute_workflow_smoke"))
         profile = str(value.get("profile") or "").strip()
+        execute_workflow_smoke = bool(
+            value.get(
+                "execute_workflow_smoke",
+                profile == "research.consumer-contracts",
+            )
+        )
         checks: list[dict[str, Any]] = []
         errors: list[str] = []
         candidate_ref = str(value.get("candidate_ref") or "").strip()

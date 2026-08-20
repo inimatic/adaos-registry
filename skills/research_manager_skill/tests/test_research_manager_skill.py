@@ -402,9 +402,11 @@ def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) 
         }
 
     monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
-    receipt = ResearchManager().validate_development_candidate(
-        _acceptance_envelope("research.consumer-contracts")
-    )
+    envelope = _acceptance_envelope("research.consumer-contracts")
+    # This test isolates preparation ABI. Production consumer-contract
+    # acceptance defaults to executing the complete bounded conformance path.
+    envelope["execute_workflow_smoke"] = False
+    receipt = ResearchManager().validate_development_candidate(envelope)
     assert not receipt["errors"], receipt["errors"]
     assert receipt["ok"] is True
     assert [item[0] for item in invocations] == ["dataset_status", "prepare_attempt"]
@@ -459,6 +461,7 @@ def test_development_consumer_acceptance_reads_public_compilation_projection(
 
     monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
     envelope = _acceptance_envelope("research.consumer-contracts")
+    envelope["execute_workflow_smoke"] = False
     compilation = envelope["instructions"]["research_compilation"]
     compilation["schema"] = "adaos.research.compilation_projection.v1"
     compilation["experiment_plan"] = compilation.pop("facets")["experiment_plan"]["payload"]
