@@ -837,6 +837,52 @@ def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
     assert second["participation"]["unavailable_agent_ids"] == ["agent-b"]
 
 
+def test_local_agent_sync_resumes_from_its_durable_cursor(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+
+    class LocalTopology:
+        def agent_instances(self, *, limit=100):
+            return []
+
+    observed_cursors = []
+
+    def invoke_agent(operation, arguments, *, timeout):
+        if operation == "status":
+            return (
+                {
+                    "ok": True,
+                    "agent": {"id": "agent-local", "node_id": "node-local"},
+                },
+                "",
+            )
+        assert operation == "pull_deltas"
+        cursor = str(arguments.get("cursor") or "")
+        observed_cursors.append(cursor)
+        sequence = 2 if cursor else 1
+        page = _agent_page(
+            _agent_delta(sequence, f"Music/track-{sequence}.mp3")
+        )
+        page["agent"] = {"id": "agent-local", "node_id": "node-local"}
+        page["next_cursor"] = f"cursor-{sequence}"
+        page["has_more"] = sequence == 1
+        return page, ""
+
+    monkeypatch.setattr(main, "_topology", lambda: LocalTopology())
+    monkeypatch.setattr(main, "_invoke_agent", invoke_agent)
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+
+    first = main._sync_agents(catalog, max_pages=1, limit=1)
+    second = main._sync_agents(catalog, max_pages=1, limit=1)
+
+    assert first["has_more"] is True
+    assert second["has_more"] is False
+    assert observed_cursors == ["", "cursor-1"]
+    assert catalog.agent_cursor("agent-local") == "cursor-2"
+    assert catalog.diagnostics()["counts"]["sources"] == 2
+
+
 def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")

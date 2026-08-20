@@ -22,6 +22,8 @@ Delta ingestion queues durable enrichment jobs. One low-priority worker selects 
 
 Agent availability is independent from known catalog identity. The coordinator discovers ready `skill:media_library_agent` service instances through `adaos.sdk.distributed`, invokes each exact instance through the public service boundary, and stores one cursor per instance/agent binding. Reads retain known rows but report `partial=true` when an expected instance is stale, missing, or unavailable. Every applied source revision advances a catalog revision, and replayed agent deltas are ignored idempotently.
 
+The colocated compatibility path first reads the agent's stable identity and then resumes that agent's durable cursor. It never restarts delta ingestion at sequence zero merely because distributed topology is not configured, and it never borrows a cursor from a different prior local agent.
+
 ## Personal State
 
 Favorites, recent playback, resume positions, completion, ratings, hidden items, playlists, and recommendations are keyed by `profile_id`. Catalog queries and playback plans enforce media-kind, maturity, explicit-content, hidden-item, and shared-screen history policy. Mutations publish the bounded replace-mode `media_center.library_state` stream with catalog and personal revisions, participation, home shelves, and recent operations. Multiple browsers can therefore converge without putting a full catalog into synchronized state. The stream supports snapshot replay after reconnect.

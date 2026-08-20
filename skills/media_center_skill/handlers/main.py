@@ -391,14 +391,20 @@ def _sync_one_agent(
     instance: Mapping[str, Any] | None,
     max_pages: int,
     limit: int,
+    agent_id_hint: str = "",
+    node_id_hint: str = "",
 ) -> dict[str, Any]:
     pages = max(1, min(16, int(max_pages or 4)))
     page_limit = max(1, min(1000, int(limit or 500)))
     instance_id = str((instance or {}).get("instance_id") or "")
-    node_id = str((instance or {}).get("node_id") or "")
+    node_id = str((instance or {}).get("node_id") or node_id_hint or "")
     binding = catalog.agent_binding(instance_id) if instance_id else None
-    actual_agent_id = str((binding or {}).get("agent_id") or "")
-    cursor = str((binding or {}).get("cursor") or "")
+    actual_agent_id = str((binding or {}).get("agent_id") or agent_id_hint or "")
+    cursor = (
+        str((binding or {}).get("cursor") or "")
+        if instance_id
+        else catalog.agent_cursor(actual_agent_id)
+    )
     applied = ignored = removed = 0
     for _index in range(pages):
         if instance_id:
@@ -505,11 +511,41 @@ def _sync_agents(
             "has_more": any(bool(item.get("has_more")) for item in results),
             "participation": catalog.participation(),
         }
+    agent_status, status_error = _invoke_agent("status", {}, timeout=10.0)
+    agent_info = (
+        agent_status.get("agent")
+        if isinstance(agent_status, Mapping)
+        and isinstance(agent_status.get("agent"), Mapping)
+        else {}
+    )
+    agent_id = str(agent_info.get("id") or "")
+    node_id = str(agent_info.get("node_id") or "")
+    if not agent_id:
+        for state in catalog.participation().get("agents") or []:
+            if not str(state.get("instance_id") or ""):
+                catalog.mark_agent_unavailable(
+                    str(state.get("agent_id") or ""),
+                    node_id=str(state.get("node_id") or ""),
+                    reason=str(status_error or "agent_identity_unavailable"),
+                )
+        return {
+            "ok": False,
+            "schema": COORDINATOR_SCHEMA,
+            "error": "media_library_agent_unavailable",
+            "detail": str(status_error or "agent_identity_unavailable")[:1000],
+            "mode": "local_compatibility",
+            "topology_error": topology_error[:300],
+            "agents": [],
+            "agent_count": 0,
+            "participation": catalog.participation(),
+        }
     local = _sync_one_agent(
         catalog,
         instance=None,
         max_pages=max_pages,
         limit=limit,
+        agent_id_hint=agent_id,
+        node_id_hint=node_id,
     )
     return {
         **local,

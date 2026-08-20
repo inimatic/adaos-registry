@@ -558,7 +558,10 @@ class MediaCatalogCoordinator:
                 """
                 INSERT INTO agent_catalog_state(agent_id, instance_id, node_id, cursor, last_sequence, availability, freshness, last_error, updated_at)
                 VALUES (?, ?, ?, ?, ?, 'available', 'fresh', '', ?)
-                ON CONFLICT(agent_id) DO UPDATE SET instance_id=excluded.instance_id,
+                ON CONFLICT(agent_id) DO UPDATE SET
+                    instance_id=CASE WHEN excluded.instance_id<>''
+                        THEN excluded.instance_id
+                        ELSE agent_catalog_state.instance_id END,
                     node_id=excluded.node_id, cursor=excluded.cursor,
                     last_sequence=MAX(agent_catalog_state.last_sequence, excluded.last_sequence),
                     availability='available', freshness='fresh', last_error='', updated_at=excluded.updated_at
