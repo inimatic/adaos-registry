@@ -1220,6 +1220,77 @@ def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
     assert second["participation"]["unavailable_agent_ids"] == ["agent-b"]
 
 
+def test_complete_distributed_sync_retires_local_compatibility_state(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+
+    class DistributedTopology:
+        def agent_instances(self, *, limit=100):
+            return [{"instance_id": "instance-a", "node_id": "node-a"}][:limit]
+
+        def invoke_agent(
+            self, instance_id, operation, arguments, *, timeout_seconds
+        ):
+            assert instance_id == "instance-a"
+            assert operation == "pull_deltas"
+            page = _agent_page(_agent_delta(1, "Music/track.mp3"))
+            page["agent"] = {"id": "agent-a", "node_id": "node-a"}
+            page["has_more"] = False
+            return page
+
+    monkeypatch.setattr(main, "_topology", lambda: DistributedTopology())
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    local_page = _agent_page(_agent_delta(1, "Music/track.mp3"))
+    local_page["agent"] = {"id": "agent-local", "node_id": "local"}
+    catalog.apply_agent_page(local_page)
+
+    result = main._sync_agents(catalog, max_pages=1, limit=100)
+
+    assert result["ok"] is True
+    assert result["retired_compatibility"]["retired_agent_ids"] == ["agent-local"]
+    assert result["retired_compatibility"]["retired_source_count"] == 1
+    assert [item["agent_id"] for item in result["participation"]["agents"]] == [
+        "agent-a"
+    ]
+    assert [item["agent_id"] for item in catalog.list_items()["items"]] == ["agent-a"]
+
+
+def test_incomplete_distributed_sync_preserves_local_compatibility_state(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+
+    class DistributedTopology:
+        def agent_instances(self, *, limit=100):
+            return [{"instance_id": "instance-a", "node_id": "node-a"}][:limit]
+
+        def invoke_agent(
+            self, instance_id, operation, arguments, *, timeout_seconds
+        ):
+            page = _agent_page(_agent_delta(1, "Music/track.mp3"))
+            page["agent"] = {"id": "agent-a", "node_id": "node-a"}
+            page["has_more"] = True
+            return page
+
+    monkeypatch.setattr(main, "_topology", lambda: DistributedTopology())
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    local_page = _agent_page(_agent_delta(1, "Music/track.mp3"))
+    local_page["agent"] = {"id": "agent-local", "node_id": "local"}
+    catalog.apply_agent_page(local_page)
+
+    result = main._sync_agents(catalog, max_pages=1, limit=100)
+
+    assert result["retired_compatibility"]["deferred"] is True
+    assert {item["agent_id"] for item in result["participation"]["agents"]} == {
+        "agent-a", "agent-local"
+    }
+
+
 def test_local_agent_sync_resumes_from_its_durable_cursor(monkeypatch, tmp_path):
     monkeypatch.setenv(
         "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")

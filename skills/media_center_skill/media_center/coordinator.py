@@ -26,7 +26,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-20.9"
+COORDINATOR_SCHEMA_REVISION = "2026-08-20.10"
 SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
@@ -1639,6 +1639,43 @@ class MediaCatalogCoordinator:
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "missing_agent_ids": missing,
+            "participation": self.participation(),
+        }
+
+    def retire_unbound_agent_states(
+        self, active_agent_ids: Iterable[str]
+    ) -> dict[str, Any]:
+        """Retire local-compatibility rows after a complete distributed sync."""
+        active = {_text(item) for item in active_agent_ids if _text(item)}
+        with self.repository.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            rows = connection.execute(
+                "SELECT agent_id FROM agent_catalog_state WHERE instance_id='' ORDER BY agent_id"
+            ).fetchall()
+            retired = [
+                str(row["agent_id"])
+                for row in rows
+                if str(row["agent_id"]) not in active
+            ]
+            retired_source_count = 0
+            for agent_id in retired:
+                retired_source_count += max(
+                    0,
+                    int(connection.execute(
+                        "UPDATE catalog_items SET missing=1 WHERE agent_id=? AND missing=0",
+                        (agent_id,),
+                    ).rowcount or 0),
+                )
+                connection.execute(
+                    "DELETE FROM agent_catalog_state WHERE agent_id=?", (agent_id,)
+                )
+            connection.commit()
+        return {
+            "ok": True,
+            "schema": COORDINATOR_SCHEMA,
+            "retired_agent_ids": retired,
+            "retired_agent_count": len(retired),
+            "retired_source_count": retired_source_count,
             "participation": self.participation(),
         }
 

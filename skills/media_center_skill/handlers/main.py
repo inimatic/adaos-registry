@@ -555,6 +555,23 @@ def _sync_agents(
             )
             for instance in instances
         ]
+        complete = all(bool(item.get("ok")) for item in results) and not any(
+            bool(item.get("has_more")) for item in results
+        )
+        retired_compatibility = (
+            catalog.retire_unbound_agent_states(
+                str(item.get("agent_id") or "") for item in results
+            )
+            if complete
+            else {
+                "ok": True,
+                "retired_agent_ids": [],
+                "retired_agent_count": 0,
+                "retired_source_count": 0,
+                "deferred": True,
+                "reason": "distributed_sync_incomplete",
+            }
+        )
         return {
             "ok": all(bool(item.get("ok")) for item in results),
             "schema": COORDINATOR_SCHEMA,
@@ -563,6 +580,7 @@ def _sync_agents(
             "agent_count": len(results),
             "applied_count": sum(int(item.get("applied_count") or 0) for item in results),
             "has_more": any(bool(item.get("has_more")) for item in results),
+            "retired_compatibility": retired_compatibility,
             "participation": catalog.participation(),
         }
     agent_status, status_error = _invoke_agent(

@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.10` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.11` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -36,6 +36,12 @@ target separate from its 200 ms FTS target under continuous agent deltas. RSS
 leak detection compares bounded post-warmup baseline and terminal windows while
 still reporting the full high-water range and enforcing the 350 MiB absolute
 limit.
+
+When a complete topology-backed agent sync supersedes colocated compatibility
+mode, the coordinator retires unbound compatibility participation and marks its
+old source projections inactive. Cleanup is deferred while any distributed
+agent still has pages to deliver, so the active catalog never exposes a partial
+migration as complete and source media remains untouched.
 
 The same release supports colocated one-node operation and selected-node or
 capability-based deployment. Entry-point bindings select presentation
