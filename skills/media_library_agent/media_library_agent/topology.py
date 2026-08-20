@@ -32,6 +32,15 @@ class LibraryAgentTopology:
             or replica_value.node_id != repository.node_id
         ):
             raise ValueError("topology_observation_identity_mismatch")
+        replica_value = replace(
+            replica_value,
+            replica_id=stable_id(
+                "replica",
+                partition_value.partition_id,
+                replica_value.instance_id,
+                size=28,
+            ),
+        )
         root_id = text(partition_value.selector.get("root_id"))
         if root_id:
             witness = repository.topology_root_witness(root_id)

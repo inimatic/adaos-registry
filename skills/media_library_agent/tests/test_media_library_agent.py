@@ -141,6 +141,12 @@ def test_agent_reports_local_topology_without_writing_control_plane(tmp_path):
     }
     result = LibraryAgentTopology().observe(repository, partition, replica)
     assert result["ok"] is True
+    assert result["replica"]["replica_id"] == topology_module.stable_id(
+        "replica",
+        partition["partition_id"],
+        replica["instance_id"],
+        size=28,
+    )
     assert result["replica"]["node_id"] == "node-a"
     assert result["replica"]["source_ref"] == f"media-root:{root['id']}"
     assert result["replica"]["checkpoint"].startswith("root:1:source:")

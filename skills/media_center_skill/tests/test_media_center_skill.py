@@ -983,6 +983,86 @@ def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkey
     assert captured["expected_revision"] == 0
 
 
+def test_media_topology_definition_is_idempotent_for_existing_datasets(monkeypatch):
+    from media_center import topology as topology_module
+
+    class DatasetValue:
+        def __init__(self, dataset_id, desired_revision, contract):
+            self.dataset_id = dataset_id
+            self.desired_revision = desired_revision
+            self.contract = contract
+
+        def to_dict(self):
+            return {
+                "dataset_id": self.dataset_id,
+                "desired_revision": self.desired_revision,
+                "contract": self.contract,
+            }
+
+    existing = DatasetValue("media-files", 6, "media.files.v1")
+    requested = {
+        "media-files": DatasetValue("media-files", 6, "media.files.v1"),
+        "media-catalog": DatasetValue("media-catalog", 1, "media.catalog.v1"),
+    }
+    defined = []
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "ServiceDefinition",
+        SimpleNamespace(from_mapping=lambda value: value),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "ServiceGroup",
+        SimpleNamespace(from_mapping=lambda value: value),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "Dataset",
+        SimpleNamespace(from_mapping=lambda value: requested[value["dataset_id"]]),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "define_service",
+        lambda value: SimpleNamespace(to_dict=lambda: {"definition_id": "agent"}),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "define_group",
+        lambda value, *, expected_revision: SimpleNamespace(
+            to_dict=lambda: {"group_id": "home"}
+        ),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "inspect",
+        lambda **kwargs: SimpleNamespace(
+            datasets=(existing,), cursors={"datasets": None}
+        ),
+    )
+
+    def define_dataset(value, *, expected_revision):
+        defined.append((value.dataset_id, expected_revision))
+        return value
+
+    monkeypatch.setattr(
+        topology_module.distributed_sdk, "define_dataset", define_dataset
+    )
+
+    result = MediaCenterTopology().define_topology(
+        service_definition={"definition_id": "agent"},
+        service_group={"group_id": "home"},
+        datasets=[{"dataset_id": "media-files"}, {"dataset_id": "media-catalog"}],
+        expected_group_revision=6,
+    )
+
+    assert result["ok"] is True
+    assert defined == [("media-catalog", 0)]
+    assert [item["dataset_id"] for item in result["datasets"]] == [
+        "media-files",
+        "media-catalog",
+    ]
+
+
 def test_media_topology_exposes_reviewed_plan_apply_and_fenced_handoff(monkeypatch):
     from media_center import topology as topology_module
 

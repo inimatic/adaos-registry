@@ -256,11 +256,41 @@ class MediaCenterTopology:
             distributed_sdk.ServiceGroup.from_mapping(service_group),
             expected_revision=max(0, int(expected_group_revision)),
         )
+        requested = [
+            distributed_sdk.Dataset.from_mapping(raw) for raw in datasets[:20]
+        ]
+        wanted = {dataset.dataset_id for dataset in requested}
+        existing: dict[str, Any] = {}
+        cursor: str | None = None
+        while wanted - existing.keys():
+            inspection = distributed_sdk.inspect(
+                cursors={"datasets": cursor} if cursor else None,
+                limit=100,
+            )
+            for dataset in inspection.datasets:
+                if dataset.dataset_id in wanted:
+                    existing[dataset.dataset_id] = dataset
+            cursor = inspection.cursors.get("datasets")
+            if not cursor:
+                break
         admitted = []
-        for raw in datasets[:20]:
-            dataset = distributed_sdk.Dataset.from_mapping(raw)
+        for dataset in requested:
+            current = existing.get(dataset.dataset_id)
+            if current is not None and current.to_dict() == dataset.to_dict():
+                admitted.append(current.to_dict())
+                continue
+            expected_revision = 0 if current is None else current.desired_revision
+            if dataset.desired_revision != expected_revision + 1:
+                raise RuntimeError(
+                    "media_center_dataset_revision_conflict:"
+                    f"{dataset.dataset_id}:expected={expected_revision + 1}:"
+                    f"requested={dataset.desired_revision}"
+                )
             admitted.append(
-                distributed_sdk.define_dataset(dataset, expected_revision=max(0, dataset.desired_revision - 1)).to_dict()
+                distributed_sdk.define_dataset(
+                    dataset,
+                    expected_revision=expected_revision,
+                ).to_dict()
             )
         return {"ok": True, "definition": definition.to_dict(), "group": group.to_dict(), "datasets": admitted}
 
