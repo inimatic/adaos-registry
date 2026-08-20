@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-20T20:30:00+00:00",
+  "updated_at": "2026-08-20T22:21:13+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1000,6 +1000,51 @@
         "background_refresh": false
       },
       "tools_count": 5
+    },
+    {
+      "kind": "skill",
+      "id": "tlp_structured_proof_02",
+      "name": "tlp_structured_proof_02",
+      "version": "0.1.1",
+      "updated_at": "2026-08-20T20:49:40+00:00",
+      "path": "skills/tlp_structured_proof_02",
+      "manifest": "skills/tlp_structured_proof_02/skill.yaml",
+      "source": {
+        "path": "skills/tlp_structured_proof_02",
+        "manifest": "skills/tlp_structured_proof_02/skill.yaml",
+        "forge": "adaos-root",
+        "repository": "inimatic/adaos-registry",
+        "revision": "8d061338205b761e7ed4909733bc3ddfbd1be875",
+        "path_scope": [
+          "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/skills/tlp_structured_proof_02/"
+        ]
+      },
+      "install": {
+        "kind": "skill",
+        "name": "tlp_structured_proof_02",
+        "id": "tlp_structured_proof_02"
+      },
+      "title": "TLP structured realization proof 02 — research assets",
+      "description": "Governed STL-10 MaxPool2d versus centered per-channel TLP pool2 research runner.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 7,
+      "activation": {
+        "mode": "package_lock",
+        "project_id": "tlp_structured_proof_02",
+        "release": "tlp_structured_proof_02@0.1.1",
+        "release_digest": "sha256:088798902f26d55111d1cab2f69010be7a4327ab6adbc6b8fc1bbed0264be92f",
+        "package_digest": "sha256:94935907518127ce1de79e1f4d90f999ac06a31e0daca17b1850fde4ae200beb"
+      },
+      "channels": {
+        "stable": {
+          "release": "tlp_structured_proof_02@0.1.1",
+          "release_digest": "sha256:088798902f26d55111d1cab2f69010be7a4327ab6adbc6b8fc1bbed0264be92f",
+          "source_revision": "8d061338205b761e7ed4909733bc3ddfbd1be875",
+          "package_digest": "sha256:94935907518127ce1de79e1f4d90f999ac06a31e0daca17b1850fde4ae200beb",
+          "version": "0.1.1"
+        }
+      }
     },
     {
       "kind": "skill",
