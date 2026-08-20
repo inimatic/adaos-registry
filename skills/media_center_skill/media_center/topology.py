@@ -252,10 +252,51 @@ class MediaCenterTopology:
         definition = distributed_sdk.define_service(
             distributed_sdk.ServiceDefinition.from_mapping(service_definition)
         )
-        group = distributed_sdk.define_group(
-            distributed_sdk.ServiceGroup.from_mapping(service_group),
-            expected_revision=max(0, int(expected_group_revision)),
+        requested_group = distributed_sdk.ServiceGroup.from_mapping(service_group)
+        expected_group = max(0, int(expected_group_revision))
+        current_group = None
+        group_cursor: str | None = None
+        while current_group is None:
+            inspection = distributed_sdk.inspect(
+                cursors={"groups": group_cursor} if group_cursor else None,
+                limit=100,
+            )
+            current_group = next(
+                (
+                    item
+                    for item in inspection.groups
+                    if item.group_id == requested_group.group_id
+                ),
+                None,
+            )
+            group_cursor = inspection.cursors.get("groups")
+            if current_group is not None or not group_cursor:
+                break
+        observed_group_revision = (
+            0 if current_group is None else current_group.desired_revision
         )
+        if expected_group != observed_group_revision:
+            raise RuntimeError(
+                "media_center_group_revision_conflict:"
+                f"{requested_group.group_id}:expected={expected_group}:"
+                f"observed={observed_group_revision}"
+            )
+        if (
+            current_group is not None
+            and current_group.to_dict() == requested_group.to_dict()
+        ):
+            group = current_group
+        else:
+            if requested_group.desired_revision != observed_group_revision + 1:
+                raise RuntimeError(
+                    "media_center_group_revision_conflict:"
+                    f"{requested_group.group_id}:next={observed_group_revision + 1}:"
+                    f"requested={requested_group.desired_revision}"
+                )
+            group = distributed_sdk.define_group(
+                requested_group,
+                expected_revision=expected_group,
+            )
         requested = [
             distributed_sdk.Dataset.from_mapping(raw) for raw in datasets[:20]
         ]

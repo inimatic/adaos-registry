@@ -1000,6 +1000,16 @@ def test_media_topology_definition_is_idempotent_for_existing_datasets(monkeypat
             }
 
     existing = DatasetValue("media-files", 6, "media.files.v1")
+    requested_group = SimpleNamespace(
+        group_id="home",
+        desired_revision=6,
+        to_dict=lambda: {"group_id": "home", "desired_revision": 6},
+    )
+    existing_group = SimpleNamespace(
+        group_id="home",
+        desired_revision=6,
+        to_dict=lambda: {"group_id": "home", "desired_revision": 6},
+    )
     requested = {
         "media-files": DatasetValue("media-files", 6, "media.files.v1"),
         "media-catalog": DatasetValue("media-catalog", 1, "media.catalog.v1"),
@@ -1013,7 +1023,7 @@ def test_media_topology_definition_is_idempotent_for_existing_datasets(monkeypat
     monkeypatch.setattr(
         topology_module.distributed_sdk,
         "ServiceGroup",
-        SimpleNamespace(from_mapping=lambda value: value),
+        SimpleNamespace(from_mapping=lambda value: requested_group),
     )
     monkeypatch.setattr(
         topology_module.distributed_sdk,
@@ -1028,15 +1038,15 @@ def test_media_topology_definition_is_idempotent_for_existing_datasets(monkeypat
     monkeypatch.setattr(
         topology_module.distributed_sdk,
         "define_group",
-        lambda value, *, expected_revision: SimpleNamespace(
-            to_dict=lambda: {"group_id": "home"}
-        ),
+        lambda *args, **kwargs: pytest.fail("exact group must not be redefined"),
     )
     monkeypatch.setattr(
         topology_module.distributed_sdk,
         "inspect",
         lambda **kwargs: SimpleNamespace(
-            datasets=(existing,), cursors={"datasets": None}
+            groups=(existing_group,),
+            datasets=(existing,),
+            cursors={"groups": None, "datasets": None},
         ),
     )
 
