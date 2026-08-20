@@ -1518,6 +1518,106 @@ def define_topology(
         )
 
 
+@tool(summary="Admit one exact deployed library-agent activation.", side_effects="local_write")
+def register_agent(
+    instance: Mapping[str, Any] | None = None,
+    expected_revision: int = 0,
+    lease_seconds: int = 300,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().register_agent(
+            instance or {},
+            expected_revision=expected_revision,
+            lease_seconds=lease_seconds,
+        )
+    except Exception as exc:
+        key = "runtime.media_center.error.agent_registration_failed"
+        return _skill_error(
+            "agent_registration_failed",
+            human_message=_skill_text(key, "Could not admit this Media Center agent."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Renew one admitted library-agent membership.", side_effects="local_write")
+def renew_agent(
+    instance_id: str = "",
+    expected_revision: int = 1,
+    readiness: bool = True,
+    status: str = "ready",
+    health: Mapping[str, Any] | None = None,
+    pressure: Mapping[str, Any] | None = None,
+    lease_seconds: int = 300,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().renew_agent(
+            instance_id,
+            expected_revision=expected_revision,
+            readiness=readiness,
+            status=status,
+            health=health or {"status": "ready"},
+            pressure=pressure or {"level": "normal"},
+            lease_seconds=lease_seconds,
+        )
+    except Exception as exc:
+        key = "runtime.media_center.error.agent_renewal_failed"
+        return _skill_error(
+            "agent_renewal_failed",
+            human_message=_skill_text(key, "Could not renew this Media Center agent."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Drain one admitted library agent from distributed routes.", side_effects="local_write")
+def drain_agent(
+    instance_id: str = "",
+    expected_revision: int = 1,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().drain_agent(
+            instance_id,
+            expected_revision=expected_revision,
+        )
+    except Exception as exc:
+        key = "runtime.media_center.error.agent_drain_failed"
+        return _skill_error(
+            "agent_drain_failed",
+            human_message=_skill_text(key, "Could not drain this Media Center agent."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Verify a node-local replica and commit it in the authority plane.", side_effects="remote_write")
+def observe_agent_topology(
+    instance_id: str = "",
+    partition: Mapping[str, Any] | None = None,
+    replica: Mapping[str, Any] | None = None,
+    timeout_seconds: float = 60.0,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().observe_agent_topology(
+            instance_id,
+            partition=partition or {},
+            replica=replica or {},
+            timeout_seconds=timeout_seconds,
+        )
+    except Exception as exc:
+        key = "runtime.media_center.error.agent_observation_failed"
+        return _skill_error(
+            "agent_observation_failed",
+            human_message=_skill_text(key, "Could not verify this Media Center replica."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
 @tool(summary="Create a reviewed Media Center topology-change plan.", side_effects="local_write")
 def plan_topology_change(
     partition_id: str = "",

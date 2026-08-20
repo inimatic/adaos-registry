@@ -665,81 +665,19 @@ def status(**_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="Join the logical Media Center agent group through an exact activation.", side_effects="local_write")
-def join_topology(
-    instance: Mapping[str, Any] | None = None,
-    expected_revision: int = 0,
-    lease_seconds: int = 90,
-    **_: Any,
-) -> dict[str, Any]:
-    try:
-        return _topology().join(
-            instance or {},
-            expected_revision=expected_revision,
-            lease_seconds=lease_seconds,
-        )
-    except Exception as exc:
-        return _human_error(
-            "topology_join_failed",
-            "This library agent could not join the Media Center topology.",
-            detail=str(exc)[:300],
-        )
-
-
-@tool(summary="Renew this agent membership with current health and resource pressure.", side_effects="local_write")
-def renew_topology(
-    instance_id: str = "",
-    expected_revision: int = 1,
-    readiness: bool = True,
-    status: str = "ready",
-    health: Mapping[str, Any] | None = None,
-    pressure: Mapping[str, Any] | None = None,
-    lease_seconds: int = 90,
-    **_: Any,
-) -> dict[str, Any]:
-    try:
-        repository, _worker = _runtime()
-        return _topology().renew(
-            instance_id,
-            expected_revision=expected_revision,
-            readiness=readiness,
-            status=status,
-            health=health or repository.summary(),
-            pressure=pressure or {"level": "normal"},
-            lease_seconds=lease_seconds,
-        )
-    except Exception as exc:
-        return _human_error(
-            "topology_renew_failed",
-            "This library agent could not renew its Media Center membership.",
-            detail=str(exc)[:300],
-        )
-
-
-@tool(summary="Publish one root partition and replica observation.", side_effects="local_write")
+@tool(summary="Validate and report one node-local partition replica.", side_effects="none")
 def observe_topology(
     partition: Mapping[str, Any] | None = None,
     replica: Mapping[str, Any] | None = None,
     **_: Any,
 ) -> dict[str, Any]:
     try:
-        return _topology().observe(partition or {}, replica or {})
+        repository, _worker = _runtime()
+        return _topology().observe(repository, partition or {}, replica or {})
     except Exception as exc:
         return _human_error(
             "topology_observe_failed",
-            "This library agent could not publish its shard state.",
-            detail=str(exc)[:300],
-        )
-
-
-@tool(summary="Drain this agent from distributed reads before deactivation.", side_effects="local_write")
-def drain_topology(instance_id: str = "", expected_revision: int = 1, **_: Any) -> dict[str, Any]:
-    try:
-        return _topology().drain(instance_id, expected_revision=expected_revision)
-    except Exception as exc:
-        return _human_error(
-            "topology_drain_failed",
-            "This library agent could not leave the Media Center topology.",
+            "This library agent could not report its shard state.",
             detail=str(exc)[:300],
         )
 

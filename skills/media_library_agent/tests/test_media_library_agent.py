@@ -96,36 +96,51 @@ def test_progress_publication_is_nonblocking_bounded_and_coalesced(monkeypatch):
     assert [item[0]["sequence"] for item in delivered] == [1, 101]
 
 
-def test_agent_topology_uses_public_sdk_and_bounds_membership_lease(monkeypatch):
-    from media_library_agent import topology as topology_module
-
+def test_agent_reports_local_topology_without_writing_control_plane(tmp_path):
     source = (SKILL_ROOT / "media_library_agent" / "topology.py").read_text(encoding="utf-8")
     assert "from adaos.sdk import distributed" in source
     assert "adaos.services" not in source
-
-    parsed = object()
-    captured = {}
-    monkeypatch.setattr(
-        topology_module.distributed_sdk,
-        "ServiceInstance",
-        SimpleNamespace(from_mapping=lambda value: parsed),
-    )
-
-    def fake_register(instance, *, expected_revision, lease_seconds):
-        captured.update(
-            instance=instance,
-            expected_revision=expected_revision,
-            lease_seconds=lease_seconds,
-        )
-        return SimpleNamespace(to_dict=lambda: {"instance_id": "agent-a", "revision": 1})
-
-    monkeypatch.setattr(topology_module.distributed_sdk, "register", fake_register)
-
-    result = LibraryAgentTopology().join({"instance_id": "agent-a"}, lease_seconds=999)
-
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(tmp_path / "agent.sqlite3", node_id="node-a")
+    root = repository.add_root(str(library))["root"]
+    partition = {
+        "schema": "adaos.distributed.partition.v1",
+        "partition_id": f"media-files:{root['id']}",
+        "dataset_id": "media-files",
+        "selector": {"root_id": root["id"]},
+        "desired_replicas": 1,
+        "topology_generation": 1,
+        "authority_lease_id": "lease-root-a",
+        "authority_epoch": 1,
+        "checkpoint": "untrusted",
+        "status": "ready",
+        "revision": 1,
+    }
+    replica = {
+        "schema": "adaos.distributed.replica.v1",
+        "replica_id": "replica-root-a",
+        "partition_id": partition["partition_id"],
+        "instance_id": "media-agent-node-a",
+        "node_id": "node-a",
+        "role": "authority",
+        "lifecycle": "ready",
+        "content_state": "non_empty",
+        "authority_epoch": 1,
+        "checkpoint": "untrusted",
+        "source_ref": "untrusted",
+        "freshness_seconds": 99,
+        "item_count": 99,
+        "byte_count": 99,
+        "observed_at": "2026-08-19T00:00:00+00:00",
+        "revision": 1,
+    }
+    result = LibraryAgentTopology().observe(repository, partition, replica)
     assert result["ok"] is True
-    assert result["instance"]["instance_id"] == "agent-a"
-    assert captured == {"instance": parsed, "expected_revision": 0, "lease_seconds": 300}
+    assert result["replica"]["node_id"] == "node-a"
+    assert result["replica"]["source_ref"] == f"media-root:{root['id']}"
+    assert result["replica"]["checkpoint"].startswith("root:1:source:")
+    assert result["external_media_copied"] is False
 
 
 def test_import_is_async_reference_only_and_excludes_images(tmp_path):
@@ -530,6 +545,8 @@ def _topology_payload(root, *, phase="inspect", idempotency_key="phase-1"):
         "step": {"replica_role": "follower"},
         "source_instance": instance,
         "target_instance": None,
+        "source_replica": None,
+        "target_replica": None,
     }
 
 
@@ -587,14 +604,16 @@ def test_topology_phase_rejects_external_root_on_wrong_node(tmp_path):
     assert result["error_code"] == "external_root_not_present_on_target"
 
 
-def test_replicated_topology_phase_preserves_observed_data_witness(monkeypatch, tmp_path):
+def test_replicated_topology_phase_preserves_observed_data_witness(tmp_path):
     repository = MediaLibraryAgentRepository(
         tmp_path / "replicated.sqlite3",
         node_id="node-a",
     )
     checkpoint = "sha256:" + "b" * 64
     previous = {
-        "replica_id": "replica-existing",
+        "replica_id": topology_module.stable_id(
+            "replica", "catalog-home", "media-agent-node-a", size=28
+        ),
         "partition_id": "catalog-home",
         "instance_id": "media-agent-node-a",
         "node_id": "node-a",
@@ -610,16 +629,6 @@ def test_replicated_topology_phase_preserves_observed_data_witness(monkeypatch, 
         "observed_at": "2026-08-19T00:00:00+00:00",
         "revision": 3,
     }
-    monkeypatch.setattr(
-        LibraryAgentTopology,
-        "_find_replica",
-        staticmethod(lambda _replica_id: dict(previous)),
-    )
-    monkeypatch.setattr(
-        topology_module.distributed_sdk,
-        "observe_replica",
-        lambda replica, *, expected_revision: replica,
-    )
     payload = _topology_payload(
         {"id": "replicated"},
         phase="promote",
@@ -628,6 +637,7 @@ def test_replicated_topology_phase_preserves_observed_data_witness(monkeypatch, 
     payload["partition"] = {"partition_id": "catalog-home", "selector": {}}
     payload["dataset"] = {"consistency_profile": "single_authority"}
     payload["authority_epoch"] = 2
+    payload["source_replica"] = previous
 
     result = LibraryAgentTopology().execute_phase(
         repository,

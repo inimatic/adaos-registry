@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.4
+version: 0.6.5
 description: Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.
 supported_locales:
 - en
@@ -21,12 +21,6 @@ service:
 capabilities:
 - media.catalog
 - media.rendition
-- distributed.service.register
-- distributed.service.renew
-- distributed.service.drain
-- distributed.topology.manage
-- distributed.topology.inspect
-- distributed.replica.observe
 dependencies: []
 events:
   subscribe:
@@ -63,10 +57,7 @@ exports:
   - list_rendition_jobs
   - cancel_rendition
   - status
-  - join_topology
-  - renew_topology
   - observe_topology
-  - drain_topology
   - distributed_topology_phase
   - dispose
 tools:
@@ -320,58 +311,16 @@ tools:
   side_effects: none
   input_schema: {type: object, additionalProperties: true}
   output_schema: {type: object}
-- name: join_topology
-  entry: handlers.main:join_topology
-  description: Join a distributed service group through this exact Project activation.
-  side_effects: local_write
-  input_schema:
-    type: object
-    required: [instance]
-    properties:
-      instance: {type: object}
-      expected_revision: {type: integer, minimum: 0, default: 0}
-      lease_seconds: {type: integer, minimum: 30, maximum: 300, default: 90}
-    additionalProperties: true
-  output_schema: {type: object}
-- name: renew_topology
-  entry: handlers.main:renew_topology
-  description: Renew service membership with current readiness, health, and pressure.
-  side_effects: local_write
-  input_schema:
-    type: object
-    required: [instance_id, expected_revision]
-    properties:
-      instance_id: {type: string, minLength: 1}
-      expected_revision: {type: integer, minimum: 1}
-      readiness: {type: boolean, default: true}
-      status: {type: string, default: ready}
-      health: {type: object}
-      pressure: {type: object}
-      lease_seconds: {type: integer, minimum: 30, maximum: 300, default: 90}
-    additionalProperties: true
-  output_schema: {type: object}
 - name: observe_topology
   entry: handlers.main:observe_topology
-  description: Publish one root partition and replica observation.
-  side_effects: local_write
+  description: Validate and report one node-local partition replica to the authority plane.
+  side_effects: none
   input_schema:
     type: object
     required: [partition, replica]
     properties:
       partition: {type: object}
       replica: {type: object}
-    additionalProperties: true
-  output_schema: {type: object}
-- name: drain_topology
-  entry: handlers.main:drain_topology
-  description: Drain this instance from distributed reads before deactivation.
-  side_effects: local_write
-  input_schema:
-    type: object
-    required: [instance_id, expected_revision]
-    properties:
-      instance_id: {type: string, minLength: 1}
-      expected_revision: {type: integer, minimum: 1}
     additionalProperties: true
   output_schema: {type: object}
 - name: distributed_topology_phase

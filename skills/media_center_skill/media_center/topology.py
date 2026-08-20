@@ -261,6 +261,88 @@ class MediaCenterTopology:
             )
         return {"ok": True, "definition": definition.to_dict(), "group": group.to_dict(), "datasets": admitted}
 
+    def register_agent(
+        self,
+        instance: Mapping[str, Any],
+        *,
+        expected_revision: int = 0,
+        lease_seconds: int = 300,
+    ) -> dict[str, Any]:
+        registered = distributed_sdk.register(
+            distributed_sdk.ServiceInstance.from_mapping(instance),
+            expected_revision=max(0, int(expected_revision)),
+            lease_seconds=max(30, min(int(lease_seconds), 600)),
+        )
+        return {"ok": True, "instance": registered.to_dict()}
+
+    def renew_agent(
+        self,
+        instance_id: str,
+        *,
+        expected_revision: int,
+        readiness: bool,
+        status: str,
+        health: Mapping[str, Any],
+        pressure: Mapping[str, Any],
+        lease_seconds: int = 300,
+    ) -> dict[str, Any]:
+        observed = distributed_sdk.renew(
+            instance_id,
+            expected_revision=max(1, int(expected_revision)),
+            readiness=bool(readiness),
+            status=status,
+            health=health,
+            pressure=pressure,
+            lease_seconds=max(30, min(int(lease_seconds), 600)),
+        )
+        return {"ok": True, "instance": observed.to_dict()}
+
+    def drain_agent(self, instance_id: str, *, expected_revision: int) -> dict[str, Any]:
+        observed = distributed_sdk.drain(
+            instance_id,
+            expected_revision=max(1, int(expected_revision)),
+        )
+        return {"ok": True, "instance": observed.to_dict()}
+
+    def observe_agent_topology(
+        self,
+        instance_id: str,
+        *,
+        partition: Mapping[str, Any],
+        replica: Mapping[str, Any],
+        timeout_seconds: float = 60.0,
+    ) -> dict[str, Any]:
+        reported = self.invoke_agent(
+            instance_id,
+            "observe_topology",
+            {"partition": dict(partition), "replica": dict(replica)},
+            timeout_seconds=timeout_seconds,
+        )
+        if reported.get("ok") is not True:
+            raise RuntimeError(
+                str(reported.get("error") or "media_agent_topology_observation_failed")
+            )
+        partition_value = distributed_sdk.Partition.from_mapping(
+            reported.get("partition") or {}
+        )
+        replica_value = distributed_sdk.Replica.from_mapping(
+            reported.get("replica") or {}
+        )
+        saved_partition = distributed_sdk.put_partition(
+            partition_value,
+            expected_revision=max(0, partition_value.revision - 1),
+        )
+        saved_replica = distributed_sdk.observe_replica(
+            replica_value,
+            expected_revision=max(0, replica_value.revision - 1),
+        )
+        return {
+            "ok": True,
+            "partition": saved_partition.to_dict(),
+            "replica": saved_replica.to_dict(),
+            "external_media_copied": bool(reported.get("external_media_copied")),
+        }
+
     def plan_topology_change(
         self,
         partition_id: str,

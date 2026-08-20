@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 from typing import Any, Mapping
 
 from adaos.sdk import distributed as distributed_sdk
@@ -10,54 +11,44 @@ from .repository import MediaLibraryAgentRepository
 
 
 class LibraryAgentTopology:
-    """Node-agent membership and shard observations through the public SDK."""
+    """Validate node-local shard evidence for the authority-plane SDK."""
 
-    def join(self, instance: Mapping[str, Any], *, expected_revision: int = 0, lease_seconds: int = 90) -> dict[str, Any]:
-        registered = distributed_sdk.register(
-            distributed_sdk.ServiceInstance.from_mapping(instance),
-            expected_revision=max(0, int(expected_revision)),
-            lease_seconds=max(30, min(int(lease_seconds), 300)),
-        )
-        return {"ok": True, "instance": registered.to_dict()}
-
-    def renew(
+    def observe(
         self,
-        instance_id: str,
-        *,
-        expected_revision: int,
-        readiness: bool,
-        status: str,
-        health: Mapping[str, Any],
-        pressure: Mapping[str, Any],
-        lease_seconds: int = 90,
+        repository: MediaLibraryAgentRepository,
+        partition: Mapping[str, Any],
+        replica: Mapping[str, Any],
     ) -> dict[str, Any]:
-        observed = distributed_sdk.renew(
-            instance_id,
-            expected_revision=max(1, int(expected_revision)),
-            readiness=bool(readiness),
-            status=status,
-            health=health,
-            pressure=pressure,
-            lease_seconds=max(30, min(int(lease_seconds), 300)),
-        )
-        return {"ok": True, "instance": observed.to_dict()}
-
-    def observe(self, partition: Mapping[str, Any], replica: Mapping[str, Any]) -> dict[str, Any]:
         partition_value = distributed_sdk.Partition.from_mapping(partition)
         replica_value = distributed_sdk.Replica.from_mapping(replica)
-        saved_partition = distributed_sdk.put_partition(
-            partition_value,
-            expected_revision=max(0, partition_value.revision - 1),
-        )
-        saved_replica = distributed_sdk.observe_replica(
-            replica_value,
-            expected_revision=max(0, replica_value.revision - 1),
-        )
-        return {"ok": True, "partition": saved_partition.to_dict(), "replica": saved_replica.to_dict()}
-
-    def drain(self, instance_id: str, *, expected_revision: int) -> dict[str, Any]:
-        instance = distributed_sdk.drain(instance_id, expected_revision=max(1, int(expected_revision)))
-        return {"ok": True, "instance": instance.to_dict()}
+        if (
+            replica_value.partition_id != partition_value.partition_id
+            or replica_value.node_id != repository.node_id
+        ):
+            raise ValueError("topology_observation_identity_mismatch")
+        root_id = text(partition_value.selector.get("root_id"))
+        if root_id:
+            witness = repository.topology_root_witness(root_id)
+            if witness is None:
+                raise ValueError("external_root_not_present_on_agent")
+            replica_value = replace(
+                replica_value,
+                checkpoint=text(witness.get("checkpoint")) or None,
+                source_ref=f"media-root:{root_id}",
+                content_state=(
+                    "non_empty" if int(witness.get("available") or 0) else "empty"
+                ),
+                item_count=int(witness.get("available") or 0),
+                byte_count=int(witness.get("bytes") or 0),
+                freshness_seconds=0,
+                observed_at=now_iso(),
+            )
+        return {
+            "ok": True,
+            "partition": partition_value.to_dict(),
+            "replica": replica_value.to_dict(),
+            "external_media_copied": False,
+        }
 
     def execute_phase(
         self,
@@ -120,14 +111,7 @@ class LibraryAgentTopology:
                 "retryable": True,
                 "error_code": "media_agent_resource_pressure",
             }
-        previous = (
-            None
-            if witness is not None
-            else self._replica_for_partition_instance(
-                text(partition.get("partition_id")),
-                text(selected.get("instance_id")),
-            )
-        )
+        previous = None if witness is not None else self._selected_replica(payload)
         evidence = dict(witness or previous or {})
         checkpoint = text(evidence.get("checkpoint")) or None
         receipt = {
@@ -177,7 +161,9 @@ class LibraryAgentTopology:
         partition_id = text(partition.get("partition_id"))
         instance_id = text(selected.get("instance_id"))
         replica_id = stable_id("replica", partition_id, instance_id, size=28)
-        previous = self._find_replica(replica_id)
+        previous = self._selected_replica(payload)
+        if previous is not None and text(previous.get("replica_id")) != replica_id:
+            return {"ok": False, "error_code": "topology_replica_identity_mismatch"}
         evidence = dict(witness or previous or {})
         role = text(step.get("replica_role")) or "derived"
         lifecycle = "ready"
@@ -222,33 +208,12 @@ class LibraryAgentTopology:
             observed_at=now_iso(),
             revision=int((previous or {}).get("revision") or 0) + 1,
         )
-        saved = distributed_sdk.observe_replica(
-            replica,
-            expected_revision=int((previous or {}).get("revision") or 0),
-        )
-        return {"ok": True, "replica": saved.to_dict()}
+        return {"ok": True, "replica": replica.to_dict()}
 
     @staticmethod
-    def _replica_for_partition_instance(
-        partition_id: str,
-        instance_id: str,
-    ) -> dict[str, Any] | None:
-        if not partition_id or not instance_id:
-            return None
-        return LibraryAgentTopology._find_replica(
-            stable_id("replica", partition_id, instance_id, size=28)
-        )
-
-    @staticmethod
-    def _find_replica(replica_id: str) -> dict[str, Any] | None:
-        cursors: dict[str, str | None] = {}
-        for _ in range(20):
-            inspection = distributed_sdk.inspect(cursors=cursors, limit=100)
-            for replica in inspection.replicas:
-                if replica.replica_id == replica_id:
-                    return replica.to_dict()
-            cursor = inspection.cursors.get("replicas")
-            if not cursor:
-                return None
-            cursors = {"replicas": cursor}
-        raise RuntimeError("replica_inventory_limit_exceeded")
+    def _selected_replica(payload: Mapping[str, Any]) -> dict[str, Any] | None:
+        selected_id = text(payload.get("selected_instance_id"))
+        for value in (payload.get("source_replica"), payload.get("target_replica")):
+            if isinstance(value, Mapping) and text(value.get("instance_id")) == selected_id:
+                return dict(value)
+        return None

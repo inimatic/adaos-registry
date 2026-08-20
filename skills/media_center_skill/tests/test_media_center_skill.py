@@ -1052,6 +1052,80 @@ def test_media_topology_exposes_reviewed_plan_apply_and_fenced_handoff(monkeypat
     assert captured["handoff"][2]["expected_epoch"] == 3
 
 
+def test_media_topology_owns_agent_membership_and_commits_remote_observation(
+    monkeypatch,
+):
+    from media_center import topology as topology_module
+
+    captured = {}
+    parsed_instance = object()
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "ServiceInstance",
+        SimpleNamespace(from_mapping=lambda value: parsed_instance),
+    )
+
+    def fake_register(instance, *, expected_revision, lease_seconds):
+        captured["register"] = (instance, expected_revision, lease_seconds)
+        return SimpleNamespace(to_dict=lambda: {"instance_id": "agent-b", "revision": 1})
+
+    monkeypatch.setattr(topology_module.distributed_sdk, "register", fake_register)
+    partition_value = SimpleNamespace(
+        revision=1,
+        to_dict=lambda: {"partition_id": "catalog-home", "revision": 1},
+    )
+    replica_value = SimpleNamespace(
+        revision=1,
+        to_dict=lambda: {"replica_id": "catalog-home-agent-b", "revision": 1},
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "Partition",
+        SimpleNamespace(from_mapping=lambda value: partition_value),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "Replica",
+        SimpleNamespace(from_mapping=lambda value: replica_value),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "put_partition",
+        lambda value, *, expected_revision: (
+            captured.update(partition_expected=expected_revision) or value
+        ),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "observe_replica",
+        lambda value, *, expected_revision: (
+            captured.update(replica_expected=expected_revision) or value
+        ),
+    )
+    topology = MediaCenterTopology()
+    topology.invoke_agent = lambda *args, **kwargs: {
+        "ok": True,
+        "partition": {"partition_id": "catalog-home"},
+        "replica": {"replica_id": "catalog-home-agent-b"},
+        "external_media_copied": False,
+    }
+
+    registered = topology.register_agent(
+        {"instance_id": "agent-b"}, lease_seconds=999
+    )
+    observed = topology.observe_agent_topology(
+        "agent-b",
+        partition={"partition_id": "catalog-home"},
+        replica={"replica_id": "catalog-home-agent-b"},
+    )
+
+    assert registered["instance"]["instance_id"] == "agent-b"
+    assert captured["register"] == (parsed_instance, 0, 600)
+    assert captured["partition_expected"] == 0
+    assert captured["replica_expected"] == 0
+    assert observed["external_media_copied"] is False
+
+
 def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
     monkeypatch, tmp_path
 ):

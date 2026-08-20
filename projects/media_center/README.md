@@ -6,11 +6,14 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.4` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.5` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
-Project closure. It adds reviewed topology plan/apply/handoff tools and preserves
-replicated catalog witnesses across adapter promotion and demotion. The ordinary
+Project closure. Membership, leases, desired topology, and observed replicas are
+owned by the coordinator's authority plane; node agents validate local evidence
+and return bounded receipts without creating divergent local topology stores. It
+adds reviewed topology plan/apply/handoff tools and preserves replicated catalog
+witnesses across adapter promotion and demotion. The ordinary
 Project release builder resolves and stores all five selected packages,
 including the shared Media Server dependency, before a reviewed deployment can
 target nodes. This release also adds keyset catalog continuation, bounded
