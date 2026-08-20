@@ -3622,6 +3622,40 @@ class ResearchOrchestrator:
             ).strip() or None,
         }
 
+    def _observed_builder_trial_identity(
+        self,
+        kind: str,
+        target_id: str,
+    ) -> dict[str, str | None] | None:
+        """Adopt an exact Builder Trial that completed before local binding.
+
+        Builder and the research repository are independent durable owners.  A
+        process interruption may therefore leave the Builder result committed
+        while the implementation track has not yet recorded its release
+        digest.  Read-only reconciliation avoids repeating activation and only
+        accepts Builder's complete immutable identity.
+        """
+
+        response = dict(
+            self._invoke_skill(
+                "builder_sdk_control_skill",
+                "get_workflow",
+                {"object_type": kind, "object_id": target_id},
+                timeout=60,
+            )
+        )
+        delivery = response.get("delivery") if isinstance(response.get("delivery"), Mapping) else {}
+        governed = response.get("governed") if isinstance(response.get("governed"), Mapping) else {}
+        if (
+            str(delivery.get("status") or "").strip() != "trial"
+            or str(governed.get("state") or "").strip() != "trial_review"
+        ):
+            return None
+        identity = self._release_identity({"workflow": response})
+        if not identity["candidate_id"] or not identity["release_digest"] or not identity["package_digest"]:
+            return None
+        return identity
+
     def start_implementation(
         self,
         direction_id: str,
@@ -3893,6 +3927,33 @@ class ResearchOrchestrator:
         if track.get("status") != "implementation_complete":
             raise ValueError("ProjectRelease candidate requires a completed Builder Automation")
         kind, target_id = self._component_identity(str(track["primary_target_ref"]))
+        observed_identity = self._observed_builder_trial_identity(kind, target_id)
+        if observed_identity is not None:
+            track = self.repository.bind_track_release(
+                str(track["track_id"]),
+                candidate_release_digest=str(observed_identity["release_digest"]),
+            )
+            self.repository.activity(
+                str(track["direction_id"]),
+                "release",
+                "trial_ready",
+                "Observed and adopted the exact Builder ProjectRelease trial after local reconciliation.",
+                {"implementation_track_ref": track["ref"], **observed_identity, "reconciled": True},
+                actor=actor,
+                origin="skill:builder_sdk_control_skill",
+                subject_ref=str(track["ref"]),
+                source_event_id=(
+                    f"release-candidate:{observed_identity['candidate_id']}:"
+                    f"{observed_identity['release_digest']}"
+                ),
+            )
+            return {
+                "ok": True,
+                "reused": True,
+                "reconciled": True,
+                "track": track,
+                "identity": observed_identity,
+            }
         webspace = str(builder_webspace_id or "").strip() or (
             "research-dev-" + hashlib.sha256(str(track["ref"]).encode("utf-8")).hexdigest()[:20]
         )

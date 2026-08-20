@@ -174,3 +174,32 @@ def test_release_and_external_activity_bindings_are_idempotent_and_exact() -> No
     )
     assert replay["event_id"] == first["event_id"]
     assert len(repository.activities("direction")) == 1
+
+
+def test_observed_builder_trial_is_adopted_only_with_complete_immutable_identity() -> None:
+    orchestrator = ResearchOrchestrator(repository=object())
+    candidate_id = "direction-0-1-0-" + "a" * 12
+    release_digest = "sha256:" + "b" * 64
+    package_digest = "sha256:" + "c" * 64
+    orchestrator._invoke_skill = lambda *args, **kwargs: {
+        "delivery": {
+            "status": "trial",
+            "candidate_id": candidate_id,
+            "release_digest": release_digest,
+            "package_digest": package_digest,
+        },
+        "governed": {"state": "trial_review"},
+    }
+
+    assert orchestrator._observed_builder_trial_identity("skill", "direction") == {
+        "candidate_id": candidate_id,
+        "release_digest": release_digest,
+        "package_digest": package_digest,
+        "version": None,
+    }
+
+    orchestrator._invoke_skill = lambda *args, **kwargs: {
+        "delivery": {"status": "trial", "candidate_id": candidate_id},
+        "governed": {"state": "trial_review"},
+    }
+    assert orchestrator._observed_builder_trial_identity("skill", "direction") is None
