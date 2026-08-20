@@ -1183,6 +1183,32 @@ def test_media_topology_definition_is_idempotent_for_existing_datasets(monkeypat
     ]
 
 
+def test_repository_connection_context_commits_rolls_back_and_closes(tmp_path: Path) -> None:
+    repository = MediaCenterRepository(tmp_path / "connection-lifecycle.sqlite3")
+
+    with repository.connect() as committed:
+        committed.execute(
+            "INSERT OR REPLACE INTO meta(key, value) VALUES ('connection_test', 'committed')"
+        )
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        committed.execute("SELECT 1")
+
+    with pytest.raises(RuntimeError, match="rollback"):
+        with repository.connect() as rolled_back:
+            rolled_back.execute(
+                "UPDATE meta SET value='rolled-back' WHERE key='connection_test'"
+            )
+            raise RuntimeError("rollback")
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        rolled_back.execute("SELECT 1")
+
+    with repository.connect() as verifier:
+        value = verifier.execute(
+            "SELECT value FROM meta WHERE key='connection_test'"
+        ).fetchone()[0]
+    assert value == "committed"
+
+
 def test_media_topology_exposes_reviewed_plan_apply_and_fenced_handoff(monkeypatch):
     from media_center import topology as topology_module
 

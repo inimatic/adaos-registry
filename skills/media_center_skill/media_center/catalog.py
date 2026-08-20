@@ -5,8 +5,10 @@ import json
 import os
 import sqlite3
 import time
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
+from types import TracebackType
 from typing import Any, Iterable, Mapping
 from urllib.parse import urlsplit, urlunsplit
 
@@ -17,6 +19,19 @@ SKILL_NAME = "media_center_skill"
 MAX_LIST_LIMIT = 500
 DEFAULT_LIST_LIMIT = 100
 PLAYABLE_KINDS = {"video", "audio"}
+
+
+class _ClosingConnection(sqlite3.Connection):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
 
 
 def now_iso() -> str:
@@ -49,7 +64,11 @@ class MediaCenterRepository:
         self.ensure_schema()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(str(self.db_path), timeout=30)
+        connection = sqlite3.connect(
+            str(self.db_path),
+            timeout=30,
+            factory=_ClosingConnection,
+        )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=30000")
@@ -60,7 +79,7 @@ class MediaCenterRepository:
         if not self.db_path.exists():
             return False
         try:
-            with sqlite3.connect(str(self.db_path), timeout=1) as connection:
+            with closing(sqlite3.connect(str(self.db_path), timeout=1)) as connection:
                 row = connection.execute(
                     "SELECT value FROM meta WHERE key='catalog_schema_revision'"
                 ).fetchone()
@@ -78,7 +97,7 @@ class MediaCenterRepository:
                 "migration": "current",
             }
         retired_legacy_count = 0
-        with sqlite3.connect(str(self.db_path), timeout=30) as connection:
+        with closing(sqlite3.connect(str(self.db_path), timeout=30)) as connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.execute("PRAGMA synchronous=NORMAL")
             connection.execute(
