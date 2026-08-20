@@ -279,8 +279,52 @@ def test_import_folder_registers_playable_files_without_copying(monkeypatch, tmp
     assert result["registered_count"] == 1
     assert result["roots"][0]["path"] == str(media_dir.resolve())
     assert [item["resource_id"] for item in listing["items"]] == ["movie.mp4"]
-    assert listing["items"][0]["source_path"] == str(movie.resolve())
+    assert "source_path" not in listing["items"][0]
     assert listing["items"][0]["resource"]["metadata"]["storage_mode"] == "reference"
+
+
+def test_catalog_projection_redacts_local_paths_and_embedded_credentials(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    delta = _agent_delta(1, "Author/Book/001.mp3")
+    descriptor = delta["source"]["descriptor"]
+    descriptor["path"] = "/mnt/library/Author/Book/001.mp3"
+    descriptor["content_ref"] = "root-a:/mnt/library/Author/Book/001.mp3"
+    descriptor["direct_urls"] = [
+        "http://node-a.local/media/ref-1?token=private-token"
+    ]
+    descriptor["content_url_candidates"] = [
+        "http://user:password@node-a.local/media/ref-1"
+    ]
+    descriptor["content_path"] += "?token=private-token"
+    descriptor["routed_content_path"] += "?token=private-token"
+    descriptor["metadata"].update(
+        {
+            "media_center_root_path": "/mnt/library",
+            "content_ref": "root-a:/mnt/library/Author/Book/001.mp3",
+            "access_token": "private-token",
+        }
+    )
+    catalog.apply_agent_page(_agent_page(delta), instance_id="instance-a")
+
+    item = catalog.list_items(query="Author Book", media_kind="audio")["items"][0]
+    serialized = __import__("json").dumps(item, sort_keys=True)
+    plan = catalog.playback_plan(item["id"])
+    serialized_plan = __import__("json").dumps(plan, sort_keys=True)
+
+    assert item["folder_path"] == "Author/Book"
+    assert item["content_path"] == "/api/node/media/resources/content/ref-1"
+    assert item["routed_content_path"] == "/media/resources/content/ref-1"
+    assert "source_path" not in item
+    assert "/mnt/" not in serialized
+    assert "private-token" not in serialized
+    assert "content_ref" not in serialized
+    assert "direct_urls" not in serialized
+    assert plan["route"]["direct_candidates"] == ["http://node-a.local/media/ref-1"]
+    assert plan["route"]["node_path"] == "/api/node/media/resources/content/ref-1"
+    assert plan["route"]["routed_path"] == "/media/resources/content/ref-1"
+    assert "/mnt/" not in serialized_plan
+    assert "private-token" not in serialized_plan
 
 
 def test_reference_registration_keeps_original_media_bytes(monkeypatch, tmp_path):

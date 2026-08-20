@@ -8,6 +8,7 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
+from urllib.parse import urlsplit, urlunsplit
 
 
 SCHEMA_VERSION = "adaos.media_center.catalog.v1"
@@ -674,19 +675,145 @@ def _public_item(row: sqlite3.Row) -> dict[str, Any]:
         "mime_type": str(row["mime_type"]),
         "size_bytes": int(row["size_bytes"] or 0),
         "modified_at": str(row["modified_at"] or ""),
-        "content_path": str(row["content_path"] or ""),
-        "routed_content_path": str(row["routed_content_path"] or ""),
+        "content_path": _public_content_path(row["content_path"]),
+        "routed_content_path": _public_content_path(row["routed_content_path"]),
         "playback_id": str(row["playback_id"] or ""),
-        "source_path": str(row["source_path"] or ""),
         "missing": bool(row["missing"]),
         "favorite": bool(row["favorite"]),
         "play_count": int(row["play_count"] or 0),
         "tags": tags_list,
-        "resource": descriptor if isinstance(descriptor, dict) else {},
+        "resource": _public_resource_descriptor(
+            descriptor if isinstance(descriptor, Mapping) else {},
+            resource_id=str(row["resource_id"]),
+            name=str(row["name"]),
+            mime_type=str(row["mime_type"]),
+            size_bytes=int(row["size_bytes"] or 0),
+            modified_at=str(row["modified_at"] or ""),
+            content_path=row["content_path"],
+            routed_content_path=row["routed_content_path"],
+            playback_id=str(row["playback_id"] or ""),
+        ),
         "playable": bool(str(row["content_path"] or "") or str(row["routed_content_path"] or "")),
     }
     item["preview"] = item["subtitle"]
     return item
+
+
+def _public_resource_descriptor(
+    descriptor: Mapping[str, Any],
+    *,
+    resource_id: str = "",
+    name: str = "",
+    mime_type: str = "",
+    size_bytes: int = 0,
+    modified_at: str = "",
+    content_path: Any = "",
+    routed_content_path: Any = "",
+    playback_id: str = "",
+) -> dict[str, Any]:
+    """Project an internal source descriptor into the browser-safe contract."""
+    resolved_resource_id = _text(resource_id or descriptor.get("resource_id") or descriptor.get("id"))
+    result: dict[str, Any] = {
+        "schema": _text(descriptor.get("schema")) or "adaos.media.resource.v1",
+        "id": resolved_resource_id,
+        "resource_id": resolved_resource_id,
+        "name": _text(name or descriptor.get("name")),
+        "mime_type": _text(mime_type or descriptor.get("mime_type") or descriptor.get("mime")),
+        "size_bytes": _int(size_bytes or descriptor.get("size_bytes")),
+        "modified_at": _text(modified_at or descriptor.get("modified_at")),
+        "content_path": _public_content_path(content_path or descriptor.get("content_path")),
+        "routed_content_path": _public_content_path(
+            routed_content_path
+            or descriptor.get("routed_content_path")
+            or descriptor.get("browser_path")
+        ),
+        "playback_id": _text(playback_id or descriptor.get("playback_id")),
+        "metadata": _public_metadata(descriptor.get("metadata")),
+    }
+    delivery = descriptor.get("delivery")
+    if isinstance(delivery, Mapping):
+        public_delivery = {
+            key: delivery.get(key)
+            for key in ("storage_mode", "preferred_route", "fallback_route", "range_supported")
+            if key in delivery
+        }
+        if public_delivery:
+            result["delivery"] = _public_metadata(public_delivery)
+    return result
+
+
+def _public_content_path(value: Any) -> str:
+    token = _text(value)
+    if not token.startswith(("/api/node/media/", "/media/")):
+        return ""
+    return token.split("?", 1)[0].split("#", 1)[0]
+
+
+def _public_direct_url(value: Any) -> str:
+    token = _text(value)
+    if not token.startswith(("http://", "https://")):
+        return ""
+    try:
+        parsed = urlsplit(token)
+    except ValueError:
+        return ""
+    if not parsed.hostname or parsed.username or parsed.password:
+        return ""
+    host = parsed.hostname
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
+    try:
+        port = parsed.port
+    except ValueError:
+        return ""
+    netloc = f"{host}:{port}" if port else host
+    return urlunsplit((parsed.scheme, netloc, parsed.path, "", ""))
+
+
+def _public_metadata(value: Any, *, depth: int = 0) -> Any:
+    if depth >= 5:
+        return None
+    if isinstance(value, Mapping):
+        result: dict[str, Any] = {}
+        for raw_key, item in list(value.items())[:100]:
+            key = str(raw_key)
+            lowered = key.lower()
+            if any(
+                sensitive in lowered
+                for sensitive in (
+                    "password",
+                    "secret",
+                    "token",
+                    "credential",
+                    "source_path",
+                    "root_path",
+                    "content_ref",
+                    "direct_url",
+                    "content_url",
+                )
+            ):
+                continue
+            projected = _public_metadata(item, depth=depth + 1)
+            if projected is not None:
+                result[key] = projected
+        return result
+    if isinstance(value, (list, tuple)):
+        result = []
+        for item in list(value)[:100]:
+            projected = _public_metadata(item, depth=depth + 1)
+            if projected is not None:
+                result.append(projected)
+        return result
+    if isinstance(value, str):
+        token = value.strip()
+        if token.startswith(("http://", "https://")):
+            return _public_direct_url(token) or None
+        if token.startswith(("/", "\\", "file://")) or (len(token) > 2 and token[1:3] in {":\\", ":/"}):
+            return None
+        return token[:500]
+    if isinstance(value, (bool, int, float)) or value is None:
+        return value
+    return str(value)[:500]
 
 
 def _metadata_matches_root(metadata: Any, root: Mapping[str, Any]) -> bool:

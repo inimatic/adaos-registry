@@ -14,7 +14,10 @@ from .catalog import (
     _json_dumps,
     _json_loads,
     _media_kind,
+    _public_content_path,
+    _public_direct_url,
     _public_item,
+    _public_resource_descriptor,
     _text,
     _title_from_name,
     now_iso,
@@ -2369,20 +2372,22 @@ class MediaCatalogCoordinator:
         if not descriptor:
             descriptor = _json_loads(selected["catalog_descriptor_json"]) or {}
         direct_candidates = [
-            _text(item)
+            _public_direct_url(item)
             for item in (
                 descriptor.get("direct_urls")
                 or descriptor.get("content_url_candidates")
                 or []
             )
-            if _text(item).startswith(("http://", "https://"))
+            if _public_direct_url(item)
         ][:8]
-        routed_path = _text(
+        routed_path = _public_content_path(
             descriptor.get("routed_content_path")
             or descriptor.get("browser_path")
             or selected["routed_content_path"]
         )
-        node_path = _text(descriptor.get("content_path") or selected["content_path"])
+        node_path = _public_content_path(
+            descriptor.get("content_path") or selected["content_path"]
+        )
         route = {
             "schema": "adaos.media_center.playback_route.v1",
             "mode": (
@@ -2420,7 +2425,13 @@ class MediaCatalogCoordinator:
             "title": str(selected_item["title"]),
             "profile_id": profile,
             "quality": quality,
-            "descriptor": descriptor,
+            "descriptor": _public_resource_descriptor(
+                descriptor,
+                resource_id=str(selected["variant_resource_id"]),
+                mime_type=str(selected["selected_mime_type"]),
+                content_path=node_path,
+                routed_content_path=routed_path,
+            ),
             "route": route,
             "decision": {
                 "policy": "deterministic_variant_route_v1",
