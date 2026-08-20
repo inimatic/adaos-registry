@@ -231,7 +231,7 @@ def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.7.0",
+        "version": "1.8.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -418,6 +418,12 @@ def descriptor() -> dict[str, Any]:
                     },
                     "additionalProperties": True,
                 },
+                "execution_output_layout": {
+                    "path_base": "working_directory",
+                    "resolution": "Path(working_directory) / expected_outputs[i]",
+                    "success_condition": "every resolved expected output is a regular file after command exit",
+                    "subdirectory_policy": "encode every subdirectory explicitly in expected_outputs; an undeclared implicit outputs/ prefix is invalid",
+                },
                 "invariants": [
                     "contract equals adaos.research.runner.v1",
                     "provider_id equals the direction skill id",
@@ -426,7 +432,8 @@ def descriptor() -> dict[str, Any]:
                     "profile_conditions.source_stage_id carries the accepted scientific stage identity independently of the ResearchManager lifecycle profile",
                     "arm is the exact accepted arm object; providers read arm.id instead of coercing the object to text",
                     "command[0] is the active Python interpreter and command[1] is an absolute runner path under the skill source",
-                    "working_directory is a pre-created skill-owned attempt directory and every expected output is written beneath it",
+                    "working_directory is a pre-created skill-owned execution-output directory",
+                    "each expected_outputs[i] is a relative path resolved exactly as Path(working_directory) / expected_outputs[i]; writing it under an undeclared implicit outputs/ subdirectory is missing output even when command exit_code is zero",
                     "output_ref is an opaque portable key that collect_attempt resolves to that same attempt directory",
                     "conditions and profile_conditions are consumer authority; providers may validate them but must not replace their shape with a private one",
                     "a bounded workload applies every named maximum and reports observed units in run_log.json",

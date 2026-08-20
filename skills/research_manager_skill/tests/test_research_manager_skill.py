@@ -202,7 +202,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.7.0"
+    assert contract["version"] == "1.8.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -213,6 +213,15 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
         "request"
     ]
     prepare_contract = contract["operations"]["prepare_attempt"]
+    assert prepare_contract["execution_output_layout"] == {
+        "path_base": "working_directory",
+        "resolution": "Path(working_directory) / expected_outputs[i]",
+        "success_condition": "every resolved expected output is a regular file after command exit",
+        "subdirectory_policy": (
+            "encode every subdirectory explicitly in expected_outputs; an undeclared implicit "
+            "outputs/ prefix is invalid"
+        ),
+    }
     profile_schema = prepare_contract["input_schema"]["properties"]["request"][
         "properties"
     ]["profile"]
@@ -224,6 +233,10 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     }
     assert any(
         "workflow_smoke is not a valid request.profile" in invariant
+        for invariant in prepare_contract["invariants"]
+    )
+    assert any(
+        "undeclared implicit outputs/ subdirectory" in invariant
         for invariant in prepare_contract["invariants"]
     )
     for operation in contract["operations"].values():
