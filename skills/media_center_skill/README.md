@@ -52,4 +52,4 @@ The local public-tool invocation and old Media Server discovery methods remain b
 
 ## User-Facing Errors
 
-Tools return stable machine codes and may include `human_message_i18n`. Media Center translations live in this skill's `i18n/*.json` resources, not in core, the scenario, or the client. `human_message` remains a fallback for clients that have not loaded the runtime dictionary.
+Tools return stable machine codes and may include `human_message_i18n`. Media Center translations live in this skill's `assets/i18n/*.json` resources, not in core, the scenario, or the client. Core browser-asset publication turns them into immutable content-addressed URLs during materialization. `human_message` remains a fallback for clients that have not loaded the runtime dictionary.

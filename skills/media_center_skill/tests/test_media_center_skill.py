@@ -512,9 +512,11 @@ def test_skill_declares_media_center_i18n_resources() -> None:
     assert "webui:" in manifest
     assert "file: webui.json" in manifest
     assert '"media_center.i18n.en"' in webui
-    assert '"path": "i18n/en.json"' in webui
+    assert '"path": "assets/i18n/en.json"' in webui
     assert '"media_center.i18n.ru"' in webui
-    assert '"path": "i18n/ru.json"' in webui
+    assert '"path": "assets/i18n/ru.json"' in webui
+    assert (SKILL_ROOT / "assets" / "i18n" / "en.json").is_file()
+    assert (SKILL_ROOT / "assets" / "i18n" / "ru.json").is_file()
 
 
 def test_coordinator_applies_agent_deltas_and_searches_folder_segments(monkeypatch, tmp_path):
