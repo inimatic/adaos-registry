@@ -445,8 +445,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.10",
-      "updated_at": "2026-08-20T17:20:00+00:00",
+      "version": "0.6.11",
+      "updated_at": "2026-08-21T01:15:00+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {
@@ -460,7 +460,7 @@
       },
       "description": "Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.",
       "runtime_python": "3.11",
-      "tools_count": 24
+      "tools_count": 25
     },
     {
       "kind": "skill",
