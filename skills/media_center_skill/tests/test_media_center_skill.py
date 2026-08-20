@@ -799,6 +799,14 @@ def test_twenty_thousand_item_catalog_remains_server_paged(monkeypatch, tmp_path
 
     first = catalog.list_items(media_kind="video", sort="title", limit=500)
     found = catalog.list_items(query="movie 19999", media_kind="video", limit=30)
+    broad_first = catalog.list_items(query="movie", media_kind="video", limit=30)
+    broad_repeat = catalog.list_items(query="movie", media_kind="video", limit=30)
+    broad_second = catalog.list_items(
+        query="movie",
+        media_kind="video",
+        limit=30,
+        cursor=broad_first["pagination"]["next_cursor"],
+    )
 
     assert first["count"] == 30
     assert first["total_count"] == 31
@@ -807,6 +815,14 @@ def test_twenty_thousand_item_catalog_remains_server_paged(monkeypatch, tmp_path
     assert first["pagination"]["has_more"] is True
     assert found["count"] == 1
     assert found["items"][0]["name"] == "movie-19999.mp4"
+    assert [item["id"] for item in broad_first["items"]] == [
+        item["id"] for item in broad_repeat["items"]
+    ]
+    assert not (
+        {item["id"] for item in broad_first["items"]}
+        & {item["id"] for item in broad_second["items"]}
+    )
+    assert broad_second["pagination"]["has_more"] is True
     assert time.monotonic() - started < 30
 
 

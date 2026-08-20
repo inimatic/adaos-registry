@@ -73,6 +73,7 @@ def _seed(repository: MediaCenterRepository, count: int) -> None:
                             "Movies",
                             f"Year {2000 + index % 25}",
                         ],
+                        "tags": ["h264"],
                         "technical": {"codec": "h264", "height": 1080},
                     },
                     separators=(",", ":"),
@@ -129,7 +130,7 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
         catalog = MediaCatalogCoordinator(repository)
         _seed(repository, count)
         started = time.perf_counter()
-        catalog.ensure_schema()
+        backfill = catalog.refresh_search_index()
         backfill_ms = (time.perf_counter() - started) * 1000
 
         search_queries = [
@@ -139,15 +140,25 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             "Movie 09999",
             "h264",
         ]
-        search_timings, search_result = _measure(
-            lambda: catalog.list_items(
-                query=search_queries[int(time.perf_counter_ns()) % len(search_queries)],
-                media_kind="video",
-                sort="title",
-                limit=30,
-            ),
-            samples=40,
-        )
+        search_index = 0
+
+        def search() -> dict[str, Any]:
+            nonlocal search_index
+            query = search_queries[search_index % len(search_queries)]
+            search_index += 1
+            return catalog.list_items(
+                query=query, media_kind="video", sort="title", limit=30
+            )
+
+        search_timings, search_result = _measure(search, samples=40)
+        search_result_counts = {
+            query: int(
+                catalog.list_items(
+                    query=query, media_kind="video", sort="title", limit=30
+                )["count"]
+            )
+            for query in search_queries
+        }
         cursor = ""
 
         def page() -> dict[str, Any]:
@@ -174,6 +185,7 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             "schema": "adaos.media_center.benchmark.v1",
             "fixture_count": count,
             "catalog_backfill_ms": round(backfill_ms, 3),
+            "search_index_count": int(backfill["indexed_count"]),
             "fts_ms": {
                 "p50": _percentile(search_timings, 0.5),
                 "p95": _percentile(search_timings, 0.95),
@@ -198,6 +210,7 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             "process_rss_mb": _rss_mb(),
             "result_counts": {
                 "fts": search_result["count"],
+                "fts_by_query": search_result_counts,
                 "page": page_result["count"],
                 "discovery": discovery_result["count"],
             },
@@ -218,6 +231,17 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
                 failures.append(f"{metric}.p95")
         if encoded_page_bytes > metrics["budgets"]["encoded_page_bytes"]:
             failures.append("encoded_page_bytes")
+        if metrics["search_index_count"] != count:
+            failures.append("search_index_count")
+        if any(result_count < 1 for result_count in search_result_counts.values()):
+            failures.append("fts_result_counts")
+        if int(page_result["count"]) != min(30, count):
+            failures.append("catalog_page_result_count")
+        if (
+            int(discovery_result["count"]) < 1
+            or int(discovery_result["candidate_count"]) < 1
+        ):
+            failures.append("local_discovery_result_count")
         metrics["passed"] = not failures
         metrics["failures"] = failures
         if enforce and failures:

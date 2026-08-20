@@ -1565,7 +1565,7 @@ class MediaCatalogCoordinator:
         where = f"WHERE {' AND '.join(filters)}" if filters else ""
         from_sql = f"catalog_items c {join_search} LEFT JOIN personal_media_state ps ON ps.item_id=c.id AND ps.profile_id=?"
         if query_token:
-            order = "catalog_search.rank, c.title COLLATE NOCASE, c.id"
+            order = "catalog_search.rank"
         else:
             order = {
                 "title": "c.title COLLATE NOCASE, c.id",
