@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -32,6 +33,15 @@ _runtime_lock = threading.Lock()
 _runtime_path = ""
 _repository_instance: MediaLibraryAgentRepository | None = None
 _worker_instance: MediaLibraryAgentWorker | None = None
+_progress_condition = threading.Condition()
+_progress_pending: dict[str, tuple[dict[str, Any], str]] = {}
+_progress_thread: threading.Thread | None = None
+_progress_stopping = False
+_progress_inflight_since = 0.0
+_progress_delivered_count = 0
+_progress_failure_count = 0
+_progress_last_error = ""
+_MAX_PENDING_PROGRESS = 64
 
 
 def _human_error(code: str, fallback: str, **extra: Any) -> dict[str, Any]:
@@ -51,48 +61,123 @@ def _human_error(code: str, fallback: str, **extra: Any) -> dict[str, Any]:
 
 
 def _publish_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
-    try:
-        from adaos.sdk.io import stream_variable_publish
-
-        meta = {"webspace_id": webspace_id} if webspace_id else None
-        is_rendition = text(payload.get("job_type")) == "rendition"
-        stream_variable_publish(
-            (
-                "media_library_agent.rendition_progress"
-                if is_rendition
-                else "media_library_agent.progress"
-            ),
-            dict(payload),
-            var_id=(
-                "media_library_agent.current_rendition"
-                if is_rendition
-                else "media_library_agent.current_scan"
-            ),
-            seq=(
-                int(payload.get("revision") or 0)
-                if is_rendition
-                else int((payload.get("progress") or {}).get("processed_count") or 0)
-            ),
-            ttl_ms=120000,
-            _meta=meta,
-        )
-        if text(payload.get("status")) in {"completed", "canceled", "failed"}:
-            from adaos.sdk.data.events import publish as publish_event
-
-            publish_event(
-                "media_library_agent.catalog.changed",
-                {
-                    "schema": "adaos.media_library.catalog_changed.v1",
-                    "agent_id": text(payload.get("agent_id")),
-                    "node_id": text(payload.get("node_id")),
-                    "root_id": text(payload.get("root_id")),
-                    "job_id": text(payload.get("job_id")),
-                    "status": text(payload.get("status")),
-                },
-                source="media_library_agent",
+    global _progress_stopping, _progress_thread
+    snapshot = dict(payload)
+    job_type = "rendition" if text(snapshot.get("job_type")) == "rendition" else "scan"
+    key = f"{job_type}:{text(snapshot.get('job_id')) or 'snapshot'}"
+    with _progress_condition:
+        _progress_stopping = False
+        _progress_pending.pop(key, None)
+        _progress_pending[key] = (snapshot, text(webspace_id))
+        while len(_progress_pending) > _MAX_PENDING_PROGRESS:
+            _progress_pending.pop(next(iter(_progress_pending)))
+        if _progress_thread is None or not _progress_thread.is_alive():
+            _progress_thread = threading.Thread(
+                target=_progress_publisher_loop,
+                name="media-library-progress-publisher",
+                daemon=True,
             )
-    except Exception:
-        return
+            _progress_thread.start()
+        _progress_condition.notify()
+
+
+def _progress_publisher_loop() -> None:
+    global _progress_delivered_count, _progress_failure_count
+    global _progress_inflight_since, _progress_last_error
+    while True:
+        with _progress_condition:
+            while not _progress_pending and not _progress_stopping:
+                _progress_condition.wait(1.0)
+            if _progress_stopping and not _progress_pending:
+                return
+            key = next(iter(_progress_pending))
+            payload, webspace_id = _progress_pending.pop(key)
+            _progress_inflight_since = time.monotonic()
+        try:
+            _deliver_progress(payload, webspace_id)
+        except Exception as exc:
+            with _progress_condition:
+                _progress_failure_count += 1
+                _progress_last_error = f"{type(exc).__name__}: {exc}"[:300]
+        else:
+            with _progress_condition:
+                _progress_delivered_count += 1
+                _progress_last_error = ""
+        finally:
+            with _progress_condition:
+                _progress_inflight_since = 0.0
+
+
+def _deliver_progress(payload: Mapping[str, Any], webspace_id: str) -> None:
+    from adaos.sdk.io import stream_variable_publish
+
+    meta = {"webspace_id": webspace_id} if webspace_id else None
+    is_rendition = text(payload.get("job_type")) == "rendition"
+    stream_variable_publish(
+        (
+            "media_library_agent.rendition_progress"
+            if is_rendition
+            else "media_library_agent.progress"
+        ),
+        dict(payload),
+        var_id=(
+            "media_library_agent.current_rendition"
+            if is_rendition
+            else "media_library_agent.current_scan"
+        ),
+        seq=(
+            int(payload.get("revision") or 0)
+            if is_rendition
+            else int((payload.get("progress") or {}).get("processed_count") or 0)
+        ),
+        ttl_ms=120000,
+        _meta=meta,
+    )
+    if text(payload.get("status")) in {"completed", "canceled", "failed"}:
+        from adaos.sdk.data.events import publish as publish_event
+
+        publish_event(
+            "media_library_agent.catalog.changed",
+            {
+                "schema": "adaos.media_library.catalog_changed.v1",
+                "agent_id": text(payload.get("agent_id")),
+                "node_id": text(payload.get("node_id")),
+                "root_id": text(payload.get("root_id")),
+                "job_id": text(payload.get("job_id")),
+                "status": text(payload.get("status")),
+            },
+            source="media_library_agent",
+        )
+
+
+def _progress_publisher_status() -> dict[str, Any]:
+    with _progress_condition:
+        inflight_seconds = (
+            max(0.0, time.monotonic() - _progress_inflight_since)
+            if _progress_inflight_since
+            else 0.0
+        )
+        return {
+            "mode": "bounded_coalescing",
+            "max_pending": _MAX_PENDING_PROGRESS,
+            "pending_count": len(_progress_pending),
+            "inflight": bool(_progress_inflight_since),
+            "inflight_seconds": round(inflight_seconds, 3),
+            "delivered_count": _progress_delivered_count,
+            "failure_count": _progress_failure_count,
+            "last_error": _progress_last_error,
+        }
+
+
+def _stop_progress_publisher(*, timeout: float = 0.2) -> None:
+    global _progress_stopping
+    with _progress_condition:
+        _progress_stopping = True
+        _progress_pending.clear()
+        thread = _progress_thread
+        _progress_condition.notify_all()
+    if thread and thread.is_alive() and thread is not threading.current_thread():
+        thread.join(timeout=max(0.0, timeout))
 
 
 def _event_payload(event: Any) -> dict[str, Any]:
@@ -524,6 +609,7 @@ def status(**_: Any) -> dict[str, Any]:
             "resource_pressure": worker.resource_pressure,
             "max_concurrent_scans": 1,
             "watch": worker.watch_status(),
+            "progress_publisher": _progress_publisher_status(),
         },
         "limits": {
             "max_files_per_scan": int(os.environ.get("MEDIA_LIBRARY_AGENT_MAX_FILES") or 1_000_000),
@@ -640,4 +726,5 @@ def distributed_topology_phase(**payload: Any) -> dict[str, Any]:
 def dispose(**_: Any) -> dict[str, Any]:
     _repository, worker = _runtime()
     worker.dispose()
+    _stop_progress_publisher()
     return {"ok": True, "schema": SCHEMA_VERSION, "disposed": True}

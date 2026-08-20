@@ -4,6 +4,7 @@ import json
 import sys
 import time
 import importlib.util
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -49,6 +50,46 @@ def _wait(job_id: str, timeout: float = 5.0) -> dict:
             return job
         time.sleep(0.02)
     raise AssertionError(f"scan job {job_id} did not finish")
+
+
+def test_progress_publication_is_nonblocking_bounded_and_coalesced(monkeypatch):
+    main._stop_progress_publisher(timeout=1.0)
+    started = threading.Event()
+    release = threading.Event()
+    delivered = []
+
+    def blocking_delivery(payload, webspace_id):
+        started.set()
+        release.wait(2.0)
+        delivered.append((dict(payload), webspace_id))
+
+    monkeypatch.setattr(main, "_deliver_progress", blocking_delivery)
+    main._publish_progress({"job_id": "scan-a", "sequence": 1}, "desktop")
+    assert started.wait(1.0)
+
+    started_at = time.monotonic()
+    for sequence in range(2, 102):
+        main._publish_progress(
+            {"job_id": "scan-a", "sequence": sequence}, "desktop"
+        )
+    enqueue_duration = time.monotonic() - started_at
+    status = main._progress_publisher_status()
+
+    assert enqueue_duration < 0.25
+    assert status["mode"] == "bounded_coalescing"
+    assert status["pending_count"] == 1
+    assert status["max_pending"] == 64
+    assert status["inflight"] is True
+
+    release.set()
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline:
+        if len(delivered) == 2:
+            break
+        time.sleep(0.01)
+    main._stop_progress_publisher(timeout=1.0)
+
+    assert [item[0]["sequence"] for item in delivered] == [1, 101]
 
 
 def test_agent_topology_uses_public_sdk_and_bounds_membership_lease(monkeypatch):
