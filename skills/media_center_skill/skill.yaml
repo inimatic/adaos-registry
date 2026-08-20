@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.11
+version: 0.8.12
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -24,6 +24,9 @@ capabilities:
 - distributed.service.manage
 - distributed.topology.manage
 - distributed.topology.inspect
+- distributed.topology.plan
+- distributed.topology.apply
+- distributed.authority.handoff
 - distributed.service.invoke
 dependencies: []
 events:
@@ -88,6 +91,9 @@ exports:
   - drain_activation
   - remove_activation
   - define_topology
+  - plan_topology_change
+  - apply_topology_change
+  - handoff_authority
   - topology_status
   - explain_route
   - next_steps
@@ -880,6 +886,49 @@ tools:
         maxItems: 20
         items: {type: object}
       expected_group_revision: {type: integer, minimum: 0, default: 0}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: plan_topology_change
+  description: Create and persist a reviewed immutable topology-change plan.
+  entry: handlers.main:plan_topology_change
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [partition_id, action]
+    properties:
+      partition_id: {type: string, minLength: 1}
+      action: {type: string, enum: [create, move, rebuild, handoff, drain, remove, repair]}
+      source_instance_id: {type: string}
+      target_instance_id: {type: string}
+      replica_role: {type: string, enum: [authority, follower, derived, cache], default: follower}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: apply_topology_change
+  description: Apply one explicitly reviewed immutable topology-change plan.
+  entry: handlers.main:apply_topology_change
+  side_effects: remote_write
+  input_schema:
+    type: object
+    required: [plan_digest]
+    properties:
+      plan_digest: {type: string, minLength: 1}
+      idempotency_key: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: handoff_authority
+  description: Perform one explicit fenced authority handoff with expected revision and epoch.
+  entry: handlers.main:handoff_authority
+  side_effects: remote_write
+  input_schema:
+    type: object
+    required: [partition_id, target_instance_id, expected_partition_revision, expected_epoch]
+    properties:
+      partition_id: {type: string, minLength: 1}
+      target_instance_id: {type: string, minLength: 1}
+      expected_partition_revision: {type: integer, minimum: 1}
+      expected_epoch: {type: integer, minimum: 0}
+      operation_id: {type: string}
+      lease_seconds: {type: integer, minimum: 30, maximum: 300, default: 120}
     additionalProperties: true
   output_schema: {type: object}
 - name: topology_status

@@ -46,6 +46,8 @@ Recommendations evaluate at most three catalog pages, use only local favorite an
 
 `diagnostic_export()` combines bounded deployment, topology, scan, catalog/search, provider, playback, route, QoE, and optional browser observations. Paths, credentials, direct URLs, media bytes, and unbounded logs are excluded or redacted. Repair recommendations contain review-required tool plans; they never mutate deployment or data automatically.
 
+Topology administration remains reviewed and SDK-only. `plan_topology_change()` persists an immutable dry-run plan, `apply_topology_change()` applies its exact digest with idempotency, and `handoff_authority()` performs an explicit revision- and epoch-fenced recovery handoff. The coordinator never imports the distributed runtime store or adapter implementation.
+
 ## Compatibility
 
 The local public-tool invocation and old Media Server discovery methods remain bounded compatibility fallbacks when no distributed agent instance is registered or the handler is exercised outside an AdaOS skill context. In a Project deployment, exact service-instance invocation is authoritative; root and scan commands return asynchronous job identifiers.

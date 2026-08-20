@@ -17,6 +17,7 @@ if str(SKILL_ROOT) not in sys.path:
 
 from media_library_agent.repository import MediaLibraryAgentRepository  # noqa: E402
 from media_library_agent.rendition import rendition_plan  # noqa: E402
+import media_library_agent.topology as topology_module  # noqa: E402
 from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
 
@@ -584,6 +585,65 @@ def test_topology_phase_rejects_external_root_on_wrong_node(tmp_path):
 
     assert result["ok"] is False
     assert result["error_code"] == "external_root_not_present_on_target"
+
+
+def test_replicated_topology_phase_preserves_observed_data_witness(monkeypatch, tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "replicated.sqlite3",
+        node_id="node-a",
+    )
+    checkpoint = "sha256:" + "b" * 64
+    previous = {
+        "replica_id": "replica-existing",
+        "partition_id": "catalog-home",
+        "instance_id": "media-agent-node-a",
+        "node_id": "node-a",
+        "role": "follower",
+        "lifecycle": "ready",
+        "content_state": "non_empty",
+        "authority_epoch": 1,
+        "checkpoint": checkpoint,
+        "source_ref": "catalog-generation:7",
+        "freshness_seconds": 3,
+        "item_count": 42,
+        "byte_count": 2048,
+        "observed_at": "2026-08-19T00:00:00+00:00",
+        "revision": 3,
+    }
+    monkeypatch.setattr(
+        LibraryAgentTopology,
+        "_find_replica",
+        staticmethod(lambda _replica_id: dict(previous)),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "observe_replica",
+        lambda replica, *, expected_revision: replica,
+    )
+    payload = _topology_payload(
+        {"id": "replicated"},
+        phase="promote",
+        idempotency_key="phase-replicated-promote",
+    )
+    payload["partition"] = {"partition_id": "catalog-home", "selector": {}}
+    payload["dataset"] = {"consistency_profile": "single_authority"}
+    payload["authority_epoch"] = 2
+
+    result = LibraryAgentTopology().execute_phase(
+        repository,
+        payload,
+        resource_pressure="normal",
+    )
+
+    assert result["ok"] is True
+    assert result["receipt"]["checkpoint"] == checkpoint
+    assert result["receipt"]["content_witness"] == checkpoint
+    assert result["receipt"]["item_count"] == 42
+    assert result["receipt"]["byte_count"] == 2048
+    assert result["receipt"]["replica"]["role"] == "authority"
+    assert result["receipt"]["replica"]["authority_epoch"] == 2
+    assert result["receipt"]["replica"]["checkpoint"] == checkpoint
+    assert result["receipt"]["replica"]["source_ref"] == "catalog-generation:7"
 
 
 def _rendition_source(repository, worker, library: Path) -> dict:

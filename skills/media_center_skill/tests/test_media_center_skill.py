@@ -975,6 +975,75 @@ def test_media_topology_uses_public_sdk_and_builds_safe_default_placement(monkey
     assert captured["expected_revision"] == 0
 
 
+def test_media_topology_exposes_reviewed_plan_apply_and_fenced_handoff(monkeypatch):
+    from media_center import topology as topology_module
+
+    captured = {}
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "plan_replica_change",
+        lambda partition_id, **kwargs: SimpleNamespace(
+            status="ready",
+            to_dict=lambda: {
+                "partition_id": partition_id,
+                "plan_digest": "sha256:plan",
+                **kwargs,
+            },
+        ),
+    )
+
+    def fake_apply(plan_digest, *, idempotency_key, approvals):
+        captured["apply"] = (plan_digest, idempotency_key, approvals)
+        return SimpleNamespace(
+            state="succeeded",
+            to_dict=lambda: {"status": "succeeded"},
+        )
+
+    monkeypatch.setattr(topology_module.distributed_sdk, "apply_plan", fake_apply)
+
+    def fake_handoff(partition_id, target_instance_id, **kwargs):
+        captured["handoff"] = (partition_id, target_instance_id, kwargs)
+        return SimpleNamespace(to_dict=lambda: {"epoch": 4})
+
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "handoff_authority",
+        fake_handoff,
+    )
+    topology = MediaCenterTopology()
+
+    planned = topology.plan_topology_change(
+        "catalog-home",
+        action="handoff",
+        source_instance_id="agent-a",
+        target_instance_id="agent-b",
+        replica_role="authority",
+    )
+    applied = topology.apply_topology_change(
+        "sha256:plan",
+        idempotency_key="apply-1",
+    )
+    handed_off = topology.handoff_authority(
+        "catalog-home",
+        "agent-b",
+        expected_partition_revision=3,
+        expected_epoch=3,
+        operation_id="handoff-1",
+    )
+
+    assert planned["ok"] is True
+    assert planned["plan"]["target_instance_id"] == "agent-b"
+    assert applied["ok"] is True
+    assert captured["apply"] == (
+        "sha256:plan",
+        "apply-1",
+        ("authority_handoff", "replica_remove"),
+    )
+    assert handed_off == {"ok": True, "lease": {"epoch": 4}}
+    assert captured["handoff"][2]["expected_partition_revision"] == 3
+    assert captured["handoff"][2]["expected_epoch"] == 3
+
+
 def test_distributed_agent_sync_tracks_independent_cursors_and_partial_state(
     monkeypatch, tmp_path
 ):

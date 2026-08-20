@@ -41,4 +41,7 @@ External-root moves fail closed when the selected node does not own the root;
 no topology phase copies original media. Read admission, promotion, demotion,
 drain, and removal publish revisioned replica observations through
 `adaos.sdk.distributed`. Removing a replica retains the configured root and its
-external files.
+external files. Replicated catalog phases preserve the last verified checkpoint,
+item count, byte count, and source witness when no external root is involved;
+promotion and demotion therefore cannot erase the data evidence used for
+fencing and recovery decisions.

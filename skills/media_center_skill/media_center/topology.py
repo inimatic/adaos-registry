@@ -261,6 +261,57 @@ class MediaCenterTopology:
             )
         return {"ok": True, "definition": definition.to_dict(), "group": group.to_dict(), "datasets": admitted}
 
+    def plan_topology_change(
+        self,
+        partition_id: str,
+        *,
+        action: str,
+        source_instance_id: str = "",
+        target_instance_id: str = "",
+        replica_role: str = "follower",
+    ) -> dict[str, Any]:
+        plan = distributed_sdk.plan_replica_change(
+            partition_id,
+            action=action,
+            source_instance_id=source_instance_id or None,
+            target_instance_id=target_instance_id or None,
+            replica_role=replica_role,
+        )
+        return {"ok": plan.status == "ready", "dry_run": True, "plan": plan.to_dict()}
+
+    def apply_topology_change(
+        self,
+        plan_digest: str,
+        *,
+        idempotency_key: str = "",
+    ) -> dict[str, Any]:
+        operation = distributed_sdk.apply_plan(
+            plan_digest,
+            idempotency_key=idempotency_key or f"media-center-topology-{uuid4().hex}",
+            approvals=("authority_handoff", "replica_remove"),
+        )
+        return {"ok": operation.state == "succeeded", "operation": operation.to_dict()}
+
+    def handoff_authority(
+        self,
+        partition_id: str,
+        target_instance_id: str,
+        *,
+        expected_partition_revision: int,
+        expected_epoch: int,
+        operation_id: str = "",
+        lease_seconds: int = 120,
+    ) -> dict[str, Any]:
+        lease = distributed_sdk.handoff_authority(
+            partition_id,
+            target_instance_id,
+            expected_partition_revision=max(1, int(expected_partition_revision)),
+            expected_epoch=max(0, int(expected_epoch)),
+            operation_id=operation_id or f"media-center-handoff-{uuid4().hex}",
+            lease_seconds=max(30, min(int(lease_seconds), 300)),
+        )
+        return {"ok": True, "lease": lease.to_dict()}
+
     def distributed_status(self, *, limit: int = 50) -> dict[str, Any]:
         try:
             inspection = distributed_sdk.inspect(limit=max(1, min(int(limit), 100)))

@@ -120,15 +120,25 @@ class LibraryAgentTopology:
                 "retryable": True,
                 "error_code": "media_agent_resource_pressure",
             }
+        previous = (
+            None
+            if witness is not None
+            else self._replica_for_partition_instance(
+                text(partition.get("partition_id")),
+                text(selected.get("instance_id")),
+            )
+        )
+        evidence = dict(witness or previous or {})
+        checkpoint = text(evidence.get("checkpoint")) or None
         receipt = {
             "phase": phase,
             "partition_id": text(partition.get("partition_id")),
             "instance_id": text(selected.get("instance_id")),
             "node_id": repository.node_id,
-            "checkpoint": (witness or {}).get("checkpoint"),
-            "content_witness": (witness or {}).get("content_witness"),
-            "item_count": int((witness or {}).get("available") or 0),
-            "byte_count": int((witness or {}).get("bytes") or 0),
+            "checkpoint": checkpoint,
+            "content_witness": evidence.get("content_witness") or checkpoint,
+            "item_count": int(evidence.get("available") or evidence.get("item_count") or 0),
+            "byte_count": int(evidence.get("bytes") or evidence.get("byte_count") or 0),
             "external_media_copied": False,
         }
         if phase in {"activate_read", "promote", "demote", "drain", "remove"}:
@@ -168,6 +178,7 @@ class LibraryAgentTopology:
         instance_id = text(selected.get("instance_id"))
         replica_id = stable_id("replica", partition_id, instance_id, size=28)
         previous = self._find_replica(replica_id)
+        evidence = dict(witness or previous or {})
         role = text(step.get("replica_role")) or "derived"
         lifecycle = "ready"
         if phase == "promote":
@@ -191,16 +202,23 @@ class LibraryAgentTopology:
             role=role,
             lifecycle=lifecycle,
             content_state=(
-                "non_empty" if int((witness or {}).get("available") or 0) else "empty"
+                text(evidence.get("content_state"))
+                or (
+                    "non_empty"
+                    if int(evidence.get("available") or evidence.get("item_count") or 0)
+                    else "empty"
+                )
             ),
             authority_epoch=authority_epoch,
-            checkpoint=text((witness or {}).get("checkpoint")) or None,
+            checkpoint=text(evidence.get("checkpoint")) or None,
             source_ref=(
                 f"media-root:{text((partition.get('selector') or {}).get('root_id'))}"
+                if text((partition.get("selector") or {}).get("root_id"))
+                else text(evidence.get("source_ref")) or None
             ),
             freshness_seconds=0,
-            item_count=int((witness or {}).get("available") or 0),
-            byte_count=int((witness or {}).get("bytes") or 0),
+            item_count=int(evidence.get("available") or evidence.get("item_count") or 0),
+            byte_count=int(evidence.get("bytes") or evidence.get("byte_count") or 0),
             observed_at=now_iso(),
             revision=int((previous or {}).get("revision") or 0) + 1,
         )
@@ -209,6 +227,17 @@ class LibraryAgentTopology:
             expected_revision=int((previous or {}).get("revision") or 0),
         )
         return {"ok": True, "replica": saved.to_dict()}
+
+    @staticmethod
+    def _replica_for_partition_instance(
+        partition_id: str,
+        instance_id: str,
+    ) -> dict[str, Any] | None:
+        if not partition_id or not instance_id:
+            return None
+        return LibraryAgentTopology._find_replica(
+            stable_id("replica", partition_id, instance_id, size=28)
+        )
 
     @staticmethod
     def _find_replica(replica_id: str) -> dict[str, Any] | None:

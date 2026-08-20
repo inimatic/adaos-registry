@@ -1518,6 +1518,83 @@ def define_topology(
         )
 
 
+@tool(summary="Create a reviewed Media Center topology-change plan.", side_effects="local_write")
+def plan_topology_change(
+    partition_id: str = "",
+    action: str = "",
+    source_instance_id: str = "",
+    target_instance_id: str = "",
+    replica_role: str = "follower",
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().plan_topology_change(
+            partition_id,
+            action=action,
+            source_instance_id=source_instance_id,
+            target_instance_id=target_instance_id,
+            replica_role=replica_role,
+        )
+    except Exception as exc:
+        key = "runtime.media_center.error.topology_plan_failed"
+        return _skill_error(
+            "topology_plan_failed",
+            human_message=_skill_text(key, "Could not create the Media Center topology plan."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Apply one explicitly reviewed Media Center topology plan.", side_effects="remote_write")
+def apply_topology_change(
+    plan_digest: str = "",
+    idempotency_key: str = "",
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().apply_topology_change(
+            plan_digest,
+            idempotency_key=idempotency_key,
+        )
+    except Exception as exc:
+        key = "runtime.media_center.error.topology_apply_failed"
+        return _skill_error(
+            "topology_apply_failed",
+            human_message=_skill_text(key, "Could not apply the Media Center topology plan."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
+@tool(summary="Perform an explicit fenced authority handoff.", side_effects="remote_write")
+def handoff_authority(
+    partition_id: str = "",
+    target_instance_id: str = "",
+    expected_partition_revision: int = 1,
+    expected_epoch: int = 0,
+    operation_id: str = "",
+    lease_seconds: int = 120,
+    **_: Any,
+) -> dict[str, Any]:
+    try:
+        return _topology().handoff_authority(
+            partition_id,
+            target_instance_id,
+            expected_partition_revision=expected_partition_revision,
+            expected_epoch=expected_epoch,
+            operation_id=operation_id,
+            lease_seconds=lease_seconds,
+        )
+    except Exception as exc:
+        key = "runtime.media_center.error.authority_handoff_failed"
+        return _skill_error(
+            "authority_handoff_failed",
+            human_message=_skill_text(key, "Could not hand off Media Center authority."),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
+
+
 @tool(summary="Return bounded generic distributed topology state for Media Center.", side_effects="none")
 def topology_status(limit: int = 50, **_: Any) -> dict[str, Any]:
     return _topology().distributed_status(limit=limit)
