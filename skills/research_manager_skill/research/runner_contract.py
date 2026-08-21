@@ -438,11 +438,14 @@ def _operation_sequence_fixture(
     if not seeds or any(isinstance(seed, bool) or not isinstance(seed, int) for seed in seeds):
         raise ValueError("operation sequence requires integer workflow_smoke seeds")
     arms = [dict(item) for item in dict(plan.get("operators") or {}).get("arms") or []]
-    if not arms:
-        raise ValueError("operation sequence requires at least one accepted arm")
-    # Prefer the intervention so the trusted rail cannot pass by exercising
-    # only a conventional baseline implementation.
-    arm = next((item for item in arms if item.get("role") == "intervention"), arms[0])
+    baseline = next((item for item in arms if item.get("role") == "baseline"), None)
+    intervention = next(
+        (item for item in arms if item.get("role") == "intervention"), None
+    )
+    if baseline is None or intervention is None:
+        raise ValueError(
+            "operation sequence requires accepted baseline and intervention arms"
+        )
     dataset = dict(plan.get("dataset") or {})
     analysis = dict(plan.get("analysis") or {})
     randomization = dict(plan.get("randomization") or {})
@@ -516,18 +519,117 @@ def _operation_sequence_fixture(
             "data_owner": copy.deepcopy(provider_binding),
         },
     }
-    request = {
+    request_base = {
         "experiment_id": "builder-contract-conformance",
         "experiment_revision_id": "builder-contract-conformance.r1",
-        "trial_id": f"builder-contract-{stage_id}-{arm['id']}-{seeds[0]}",
-        "run_id": f"builder-contract-{arm['id']}-{seeds[0]}",
         "attempt_number": 1,
         "profile": "preflight",
         "seed": int(seeds[0]),
-        "arm": arm,
         "conditions": conditions,
         "profile_conditions": profile_conditions,
     }
+    steps: list[dict[str, Any]] = [
+        {
+            "id": "dataset_status",
+            "kind": "operation",
+            "operation": "dataset_status",
+            "input": {},
+        }
+    ]
+    for role, arm in (("baseline", baseline), ("intervention", intervention)):
+        request = {
+            **copy.deepcopy(request_base),
+            "trial_id": f"builder-contract-{stage_id}-{arm['id']}-{seeds[0]}",
+            "run_id": f"builder-contract-{arm['id']}-{seeds[0]}",
+            "arm": copy.deepcopy(arm),
+        }
+        collect_assertions: list[dict[str, Any]] = [
+            {"pointer": "/complete", "equals": True},
+            {"pointer": "/result/arm_id", "equals": str(arm["id"])},
+            {"pointer": "/result/seed", "equals": int(seeds[0])},
+            {
+                "pointer": "/result/evidence_class",
+                "equals": "workflow_smoke",
+            },
+            {
+                "pointer": "/observations",
+                "contains": [
+                    {"pointer": "/metric/name", "equals": "primary_metric"},
+                    {
+                        "pointer": "/value",
+                        "equals_root_pointer": "/result/primary_metric",
+                    },
+                    {
+                        "pointer": "/evidence_role",
+                        "equals_root_pointer": "/result/evidence_class",
+                    },
+                ],
+            },
+        ]
+        if str(runner_id) != "$candidate":
+            collect_assertions.insert(
+                1,
+                {"pointer": "/provider_id", "equals": str(runner_id)},
+            )
+        if role == "intervention":
+            collect_assertions.append(
+                {
+                    "pointer": "/result/pairing_identity_digest",
+                    "equals_step_pointer": {
+                        "step": "collect_baseline",
+                        "pointer": "/result/pairing_identity_digest",
+                    },
+                }
+            )
+        steps.extend(
+            [
+                {
+                    "id": f"prepare_{role}",
+                    "kind": "operation",
+                    "operation": "prepare_attempt",
+                    "input": {"request": request},
+                },
+                {
+                    "id": f"execute_{role}",
+                    "kind": "execution_spec",
+                    "source_step": f"prepare_{role}",
+                    "timeout_seconds": min(
+                        300,
+                        max(30, int(smoke.get("max_wall_time_minutes") or 5) * 60),
+                    ),
+                },
+                {
+                    "id": f"collect_{role}",
+                    "kind": "operation",
+                    "operation": "collect_attempt",
+                    "input": {
+                        "output_ref": {
+                            "$bind": {
+                                "step": f"prepare_{role}",
+                                "pointer": "/output_ref",
+                            }
+                        }
+                    },
+                    "assert": collect_assertions,
+                },
+                {
+                    "id": f"verify_{role}_artifacts",
+                    "kind": "operation",
+                    "operation": "verify_artifact",
+                    "for_each": {
+                        "$bind": {
+                            "step": f"collect_{role}",
+                            "pointer": "/artifacts",
+                        }
+                    },
+                    "input": {
+                        "uri": {"$item": "/uri"},
+                        "digest": {"$item": "/digest"},
+                    },
+                    "assert": [{"pointer": "/ok", "equals": True}],
+                },
+            ]
+        )
     return {
         "id": "workflow_smoke.production_operation_sequence",
         "kind": "operation_sequence",
@@ -537,72 +639,7 @@ def _operation_sequence_fixture(
             300,
             max(30, int(smoke.get("max_wall_time_minutes") or 5) * 60),
         ),
-        "steps": [
-            {
-                "id": "dataset_status",
-                "kind": "operation",
-                "operation": "dataset_status",
-                "input": {},
-            },
-            {
-                "id": "prepare_attempt",
-                "kind": "operation",
-                "operation": "prepare_attempt",
-                "input": {"request": request},
-            },
-            {
-                "id": "execute_attempt",
-                "kind": "execution_spec",
-                "source_step": "prepare_attempt",
-                "timeout_seconds": min(
-                    300,
-                    max(30, int(smoke.get("max_wall_time_minutes") or 5) * 60),
-                ),
-            },
-            {
-                "id": "collect_attempt",
-                "kind": "operation",
-                "operation": "collect_attempt",
-                "input": {
-                    "output_ref": {
-                        "$bind": {"step": "prepare_attempt", "pointer": "/output_ref"}
-                    }
-                },
-                "assert": [
-                    {"pointer": "/complete", "equals": True},
-                    {
-                        "pointer": "/observations",
-                        "contains": [
-                            {
-                                "pointer": "/metric/name",
-                                "equals": "primary_metric",
-                            },
-                            {
-                                "pointer": "/value",
-                                "equals_root_pointer": "/result/primary_metric",
-                            },
-                            {
-                                "pointer": "/evidence_role",
-                                "equals_root_pointer": "/result/evidence_class",
-                            },
-                        ],
-                    },
-                ],
-            },
-            {
-                "id": "verify_artifacts",
-                "kind": "operation",
-                "operation": "verify_artifact",
-                "for_each": {
-                    "$bind": {"step": "collect_attempt", "pointer": "/artifacts"}
-                },
-                "input": {
-                    "uri": {"$item": "/uri"},
-                    "digest": {"$item": "/digest"},
-                },
-                "assert": [{"pointer": "/ok", "equals": True}],
-            },
-        ],
+        "steps": steps,
     }
 
 
@@ -617,7 +654,7 @@ def descriptor(
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.16.0",
+        "version": "1.17.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {

@@ -252,7 +252,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.16.0"
+    assert contract["version"] == "1.17.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -346,13 +346,17 @@ def test_runner_contract_materializes_plan_bound_trusted_operation_sequence() ->
     assert fixture["timeout_seconds"] == 300
     assert [item["id"] for item in fixture["steps"]] == [
         "dataset_status",
-        "prepare_attempt",
-        "execute_attempt",
-        "collect_attempt",
-        "verify_artifacts",
+        "prepare_baseline",
+        "execute_baseline",
+        "collect_baseline",
+        "verify_baseline_artifacts",
+        "prepare_intervention",
+        "execute_intervention",
+        "collect_intervention",
+        "verify_intervention_artifacts",
     ]
     request = fixture["steps"][1]["input"]["request"]
-    assert request["arm"] == {"id": "tlp", "role": "intervention"}
+    assert request["arm"] == {"id": "maxpool", "role": "baseline"}
     assert request["seed"] == 17
     assert request["profile_conditions"]["source_stage_id"] == "stage_smoke_cpu"
     assert request["profile_conditions"]["inference_allowed"] is False
@@ -364,6 +368,10 @@ def test_runner_contract_materializes_plan_bound_trusted_operation_sequence() ->
     }
     assert fixture["steps"][3]["assert"] == [
         {"pointer": "/complete", "equals": True},
+        {"pointer": "/provider_id", "equals": "tlp_runner"},
+        {"pointer": "/result/arm_id", "equals": "maxpool"},
+        {"pointer": "/result/seed", "equals": 17},
+        {"pointer": "/result/evidence_class", "equals": "workflow_smoke"},
         {
             "pointer": "/observations",
             "contains": [
@@ -379,6 +387,15 @@ def test_runner_contract_materializes_plan_bound_trusted_operation_sequence() ->
             ],
         },
     ]
+    intervention_request = fixture["steps"][5]["input"]["request"]
+    assert intervention_request["arm"] == {"id": "tlp", "role": "intervention"}
+    assert fixture["steps"][7]["assert"][-1] == {
+        "pointer": "/result/pairing_identity_digest",
+        "equals_step_pointer": {
+            "step": "collect_baseline",
+            "pointer": "/result/pairing_identity_digest",
+        },
+    }
     assert contract["digest"] == digest(
         {key: value for key, value in contract.items() if key != "digest"}
     )
@@ -398,6 +415,10 @@ def test_runner_contract_materializes_plan_bound_trusted_operation_sequence() ->
         "contract": "adaos.research.runner.v1",
         "data_owner": {"$candidate": "/skill_id"},
     }
+    assert not any(
+        assertion.get("pointer") == "/provider_id"
+        for assertion in symbolic_fixture["steps"][3]["assert"]
+    )
 
     dataset_schema = contract["operations"]["dataset_status"]["output_schema"]
     split_values = {
