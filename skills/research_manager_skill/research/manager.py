@@ -626,11 +626,49 @@ class ResearchManager:
         if not isinstance(collected, Mapping):
             raise ValueError("collect_attempt returned a non-object value")
         collected = dict(collected)
+        observations = [
+            dict(item)
+            for item in collected.get("observations") or []
+            if isinstance(item, Mapping)
+        ]
+        if len(observations) != len(list(collected.get("observations") or [])):
+            raise ValueError("collect_attempt returned a non-object observation")
+        acceptance_session = {
+            "session_id": (
+                "acceptance-session-"
+                + digest(
+                    {
+                        "candidate_id": candidate_id,
+                        "arm_id": str(arm.get("id") or ""),
+                        "spec_digest": str(prepared_arm["execution_spec_digest"]),
+                    }
+                ).removeprefix("sha256:")[:24]
+            ),
+            "attempt_id": (
+                "acceptance-attempt-"
+                + digest(
+                    {
+                        "candidate_id": candidate_id,
+                        "arm_id": str(arm.get("id") or ""),
+                    }
+                ).removeprefix("sha256:")[:24]
+            ),
+            "opened_at": "1970-01-01T00:00:00+00:00",
+        }
+        normalized_observations = [
+            normalize_observation(acceptance_session, item)
+            for item in observations
+        ]
         artifacts = [
             dict(item)
             for item in collected.get("artifacts") or []
             if isinstance(item, Mapping)
         ]
+        for artifact in artifacts:
+            if not str(artifact.get("role") or "").strip():
+                raise ValueError(
+                    "collect_attempt artifact role is required by ResearchManager ingestion"
+                )
         verified_artifacts = []
         for artifact in artifacts:
             ContentRef(
@@ -666,6 +704,7 @@ class ResearchManager:
             **dict(prepared_arm),
             "trial": trial,
             "collected": collected,
+            "normalized_observations": normalized_observations,
             "verified_artifacts": verified_artifacts,
             "collection_ok": bool(collected.get("complete")) and bool(artifacts),
             "verification_ok": len(verified_artifacts) == len(artifacts)

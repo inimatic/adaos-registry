@@ -225,7 +225,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.10.0"
+    assert contract["version"] == "1.11.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -502,6 +502,7 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
             "media_type": "application/json",
             "owner_ref": "skill:tlp_runner",
             "kind": "workflow-smoke-evidence",
+            "role": "workflow_smoke_evidence",
             "metadata": {"evidence_class": "workflow_smoke"},
         }
         for index, name in enumerate(indexed_output_names, start=5)
@@ -579,7 +580,20 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
                 "provider_id": project_id,
                 "complete": True,
                 "tracker_session_calls": 0,
-                "observations": [],
+                "observations": [
+                    {
+                        "metric": {
+                            "namespace": "runner",
+                            "name": "epochs_completed",
+                        },
+                        "value": 3,
+                        "value_type": "integer",
+                        "unit": "epochs",
+                        "split_role": "system",
+                        "step": {"axis": "epoch", "value": 3},
+                        "evidence_role": "diagnostic",
+                    }
+                ],
                 "artifacts": artifact_rows,
             }
         assert operation_id == "verify_artifact"

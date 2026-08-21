@@ -28,6 +28,71 @@ def _content_ref_schema() -> dict[str, Any]:
     }
 
 
+def _collected_artifact_schema() -> dict[str, Any]:
+    content_ref = _content_ref_schema()
+    return {
+        **content_ref,
+        "required": [*content_ref["required"], "role"],
+        "properties": {
+            **content_ref["properties"],
+            "role": {"type": "string", "minLength": 1},
+        },
+    }
+
+
+def _observation_schema() -> dict[str, Any]:
+    return {
+        "type": "object",
+        "required": ["metric", "value"],
+        "properties": {
+            "metric": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                    "namespace": {"type": "string", "minLength": 1},
+                    "name": {"type": "string", "minLength": 1},
+                },
+                "additionalProperties": False,
+            },
+            "value": {},
+            "value_type": {
+                "enum": [
+                    "float",
+                    "integer",
+                    "boolean",
+                    "string",
+                    "vector",
+                    "table",
+                    "distribution",
+                ]
+            },
+            "unit": {"type": "string"},
+            "direction": {"type": "string"},
+            "split_role": {
+                "enum": ["train", "validation", "robustness", "test", "system"]
+            },
+            "dataset_digest": {
+                "anyOf": [_sha256_schema(), {"type": "null"}],
+            },
+            "step": {
+                "type": "object",
+                "required": ["axis", "value"],
+                "properties": {
+                    "axis": {"type": "string", "minLength": 1},
+                    "value": {},
+                },
+                "additionalProperties": True,
+            },
+            "aggregation": {"type": "string"},
+            "observed_at": {"type": "string"},
+            "producer": {"type": "object"},
+            "evidence_role": {"type": "string"},
+            "event_id": {"type": "string", "minLength": 1},
+        },
+        "additionalProperties": True,
+    }
+
+
 def _split_binding_schema() -> dict[str, Any]:
     return {
         "type": "object",
@@ -295,7 +360,7 @@ def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.10.0",
+        "version": "1.11.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -534,11 +599,12 @@ def descriptor() -> dict[str, Any]:
                     "properties": {
                         "provider_id": {"type": "string", "minLength": 1},
                         "observations": {
-                            "type": ["array", "object"],
+                            "type": "array",
+                            "items": _observation_schema(),
                         },
                         "artifacts": {
                             "type": "array",
-                            "items": _content_ref_schema(),
+                            "items": _collected_artifact_schema(),
                         },
                         "complete": {"type": "boolean"},
                     },
@@ -546,8 +612,9 @@ def descriptor() -> dict[str, Any]:
                 },
                 "invariants": [
                     "provider_id equals the direction skill id",
-                    "observations use the canonical result_record paths",
+                    "every observation is directly accepted by ResearchManager normalize_observation and supplies metric.name plus value",
                     "artifacts contain portable content identities, never private host paths",
+                    "every collected artifact supplies the non-empty ingestion role consumed by ResearchManager",
                     "workflow-smoke collection reports tracker_session_calls=0 because ResearchManager owns tracking",
                     "for workflow-smoke, artifact digests are unique and their exact set equals artifacts_index.json.files digests; artifacts_index.json itself is excluded from both sets",
                 ],
