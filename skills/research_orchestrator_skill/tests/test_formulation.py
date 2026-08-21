@@ -634,6 +634,9 @@ def test_parent_scientific_contract_rejects_successor_drift_but_allows_smoke_pol
 
 def test_deterministic_successor_changes_only_engineering_smoke_contract() -> None:
     problem = _problem()
+    problem["background"] += (
+        " The workflow smoke is bounded and offline; the confirmatory profile is offline too."
+    )
     protocol = _protocol()
     implementation = _implementation(protocol)
     protocol["experimental_plan"]["stages"][0]["stop_conditions"].append(
@@ -679,6 +682,14 @@ def test_deterministic_successor_changes_only_engineering_smoke_contract() -> No
     assert derived["problem_frame"]["experimental_signature"] == problem[
         "experimental_signature"
     ]
+    assert "smoke is bounded and offline" not in derived["problem_frame"]["background"]
+    assert "network_mode=unrestricted" in derived["problem_frame"]["background"]
+    assert stage_quality_issues(
+        "problem_frame",
+        derived["problem_frame"],
+        required_workflow_smoke=binding["requirements"],
+        required_parent_problem=problem,
+    ) == []
     old_confirmation = next(
         item
         for item in protocol["experimental_plan"]["stages"]
@@ -720,6 +731,21 @@ def test_deterministic_successor_changes_only_engineering_smoke_contract() -> No
             "workflow"
         ]
     )
+
+
+def test_problem_frame_rejects_stale_offline_smoke_prose() -> None:
+    problem = _problem()
+    problem["background"] += " The workflow_smoke is offline."
+
+    issues = stage_quality_issues(
+        "problem_frame",
+        problem,
+        required_workflow_smoke={"network_mode": "unrestricted"},
+    )
+
+    assert issues == [
+        "problem frame must not retain offline-enforcement prose for unrestricted workflow_smoke"
+    ]
 
 
 def test_protocol_rejects_pair_labels_in_numeric_seed_values() -> None:

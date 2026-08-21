@@ -62,6 +62,17 @@ def _is_stale_offline_smoke_policy(value: Any) -> bool:
     return bool(_OFFLINE_ENFORCEMENT_RE.search(text) and _SMOKE_SCOPE_RE.search(text))
 
 
+def _text_without_stale_smoke_network_sentences(value: Any) -> str:
+    """Remove obsolete isolation prose instead of merely superseding it."""
+
+    sentences = re.split(r"(?<=[.!?])\s+|[\r\n]+", str(value or ""))
+    return " ".join(
+        sentence.strip()
+        for sentence in sentences
+        if sentence.strip() and not _is_stale_offline_smoke_policy(sentence)
+    ).strip()
+
+
 def _components_without_smoke_network_policy(
     components: list[Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
@@ -574,6 +585,18 @@ def stage_quality_issues(
                     issues.append(
                         f"problem frame must exactly preserve parent {field} under the selected inheritance policy"
                     )
+        smoke_policy = dict(required_workflow_smoke or {})
+        if str(smoke_policy.get("network_mode") or "") == "unrestricted":
+            prose = [
+                payload.get("background"),
+                payload.get("constraints"),
+                payload.get("assumptions"),
+                payload.get("open_questions"),
+            ]
+            if any(_is_stale_offline_smoke_policy(item) for item in prose):
+                issues.append(
+                    "problem frame must not retain offline-enforcement prose for unrestricted workflow_smoke"
+                )
     elif stage == "protocol_design":
         plan = payload["experimental_plan"]
         comparison = plan["comparison_design"]
@@ -1009,12 +1032,14 @@ def derive_inherited_formulation(
         "Научная постановка унаследована без повторного inference; изменена только "
         "типизированная политика неинференциального workflow_smoke."
     )
-    problem["background"] = (
-        str(problem["background"])
-        + " В этой successor-ревизии прежнее описание workflow_smoke как offline "
-        f"явно заменено capability-bound network_mode={smoke_network}; confirmatory "
-        "offline policy остается неизменной."
+    clean_background = _text_without_stale_smoke_network_sentences(
+        problem["background"]
     )
+    problem["background"] = (
+        clean_background
+        + " This successor binds workflow_smoke to the capability-bound requested "
+        f"network_mode={smoke_network}; the accepted confirmatory network policy is unchanged."
+    ).strip()
 
     plan = protocol["experimental_plan"]
     smoke = [
