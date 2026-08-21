@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.30` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.31` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -23,6 +23,12 @@ durable repository to the canonical SDK node identity. A one-time migration
 rewrites legacy `local` root, source, and delta identities in place while
 preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
+
+Topology admission uses the enclosing ProjectRelease digest, not an individual
+component package digest. The coordinator validates that identity against the
+current desired deployment and checks group and dataset compare-and-switch
+revisions before writing a service definition, group, or dataset. A mismatched
+or stale topology request therefore fails before topology mutation.
 
 Reviewed Project rollout is submitted as a durable background operation rather
 than held inside an interactive skill RPC. The tool returns the operation id as

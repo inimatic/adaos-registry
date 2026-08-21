@@ -327,11 +327,35 @@ class MediaCenterTopology:
         service_group: Mapping[str, Any],
         datasets: list[Mapping[str, Any]],
         expected_group_revision: int = 0,
+        deployment_id: str = DEPLOYMENT_ID,
     ) -> dict[str, Any]:
-        definition = distributed_sdk.define_service(
-            distributed_sdk.ServiceDefinition.from_mapping(service_definition)
+        requested_definition = distributed_sdk.ServiceDefinition.from_mapping(
+            service_definition
         )
         requested_group = distributed_sdk.ServiceGroup.from_mapping(service_group)
+        requested = [
+            distributed_sdk.Dataset.from_mapping(raw) for raw in datasets[:20]
+        ]
+        if (
+            requested_group.definition_id != requested_definition.definition_id
+            or requested_group.definition_version != requested_definition.version
+        ):
+            raise RuntimeError("media_center_definition_group_mismatch")
+
+        deployment = _dict(
+            deployment_sdk.inspect(str(deployment_id or DEPLOYMENT_ID), limit=1)
+        )
+        desired = _dict(deployment.get("desired"))
+        deployed_release = str(desired.get("release_digest") or "").strip()
+        if not deployed_release:
+            raise RuntimeError("media_center_deployment_release_unavailable")
+        if requested_definition.release_digest != deployed_release:
+            raise RuntimeError(
+                "media_center_topology_release_mismatch:"
+                f"expected={deployed_release}:"
+                f"requested={requested_definition.release_digest}"
+            )
+
         expected_group = max(0, int(expected_group_revision))
         current_group = None
         group_cursor: str | None = None
@@ -360,25 +384,17 @@ class MediaCenterTopology:
                 f"{requested_group.group_id}:expected={expected_group}:"
                 f"observed={observed_group_revision}"
             )
-        if (
+        group_unchanged = (
             current_group is not None
             and current_group.to_dict() == requested_group.to_dict()
-        ):
-            group = current_group
-        else:
+        )
+        if not group_unchanged:
             if requested_group.desired_revision != observed_group_revision + 1:
                 raise RuntimeError(
                     "media_center_group_revision_conflict:"
                     f"{requested_group.group_id}:next={observed_group_revision + 1}:"
                     f"requested={requested_group.desired_revision}"
                 )
-            group = distributed_sdk.define_group(
-                requested_group,
-                expected_revision=expected_group,
-            )
-        requested = [
-            distributed_sdk.Dataset.from_mapping(raw) for raw in datasets[:20]
-        ]
         wanted = {dataset.dataset_id for dataset in requested}
         existing: dict[str, Any] = {}
         cursor: str | None = None
@@ -393,11 +409,9 @@ class MediaCenterTopology:
             cursor = inspection.cursors.get("datasets")
             if not cursor:
                 break
-        admitted = []
         for dataset in requested:
             current = existing.get(dataset.dataset_id)
             if current is not None and current.to_dict() == dataset.to_dict():
-                admitted.append(current.to_dict())
                 continue
             expected_revision = 0 if current is None else current.desired_revision
             if dataset.desired_revision != expected_revision + 1:
@@ -406,6 +420,23 @@ class MediaCenterTopology:
                     f"{dataset.dataset_id}:expected={expected_revision + 1}:"
                     f"requested={dataset.desired_revision}"
                 )
+
+        definition = distributed_sdk.define_service(requested_definition)
+        group = (
+            current_group
+            if group_unchanged
+            else distributed_sdk.define_group(
+                requested_group,
+                expected_revision=expected_group,
+            )
+        )
+        admitted = []
+        for dataset in requested:
+            current = existing.get(dataset.dataset_id)
+            if current is not None and current.to_dict() == dataset.to_dict():
+                admitted.append(current.to_dict())
+                continue
+            expected_revision = 0 if current is None else current.desired_revision
             admitted.append(
                 distributed_sdk.define_dataset(
                     dataset,

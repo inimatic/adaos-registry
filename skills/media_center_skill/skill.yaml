@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.31
+version: 0.8.32
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -900,6 +900,7 @@ tools:
         maxItems: 20
         items: {type: object}
       expected_group_revision: {type: integer, minimum: 0, default: 0}
+      deployment_id: {type: string, minLength: 1, default: media-center-home}
     additionalProperties: true
   output_schema: {type: object}
 - name: register_agent

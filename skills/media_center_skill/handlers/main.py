@@ -1641,6 +1641,7 @@ def define_topology(
     service_group: Mapping[str, Any] | None = None,
     datasets: list[Mapping[str, Any]] | None = None,
     expected_group_revision: int = 0,
+    deployment_id: str = "media-center-home",
     **_: Any,
 ) -> dict[str, Any]:
     try:
@@ -1649,6 +1650,7 @@ def define_topology(
             service_group=service_group or {},
             datasets=datasets or [],
             expected_group_revision=expected_group_revision,
+            deployment_id=deployment_id,
         )
     except Exception as exc:
         key = "runtime.media_center.error.topology_define_failed"
