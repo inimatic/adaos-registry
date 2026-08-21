@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-21T07:40:04+00:00",
+  "updated_at": "2026-08-21T07:40:28+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -754,8 +754,8 @@
       "kind": "skill",
       "id": "research_evaluator_skill",
       "name": "research_evaluator_skill",
-      "version": "0.1.39",
-      "updated_at": "2026-08-20T17:47:13+00:00",
+      "version": "0.1.40",
+      "updated_at": "2026-08-21T07:40:28+00:00",
       "path": "skills/research_evaluator_skill",
       "manifest": "skills/research_evaluator_skill/skill.yaml",
       "source": {
