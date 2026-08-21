@@ -78,6 +78,34 @@ def _packet(
     return _validate_packet(packet)
 
 
+def _frozen_json_input(task: Mapping[str, Any], kind: str) -> dict[str, Any]:
+    descriptor = next(
+        (
+            dict(item)
+            for item in task.get("inputs") or []
+            if isinstance(item, Mapping) and str(item.get("kind") or "") == kind
+        ),
+        None,
+    )
+    if descriptor is None:
+        raise RuntimeError(f"calibration task has no frozen {kind} input")
+    path = Path(str(descriptor.get("path") or "")).resolve()
+    try:
+        value = json.loads(path.read_text(encoding="utf-8-sig"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError(f"calibration {kind} input is unavailable or invalid") from exc
+    if not isinstance(value, Mapping):
+        raise RuntimeError(f"calibration {kind} input is not an object")
+    result = dict(value)
+    if str(result.get("digest") or "") != str(descriptor.get("digest") or ""):
+        raise RuntimeError(f"calibration {kind} input differs from its frozen digest")
+    if _digest({key: item for key, item in result.items() if key != "digest"}) != str(
+        result.get("digest") or ""
+    ):
+        raise RuntimeError(f"calibration {kind} input has an invalid content digest")
+    return result
+
+
 def _environment_preflight(task_id: str) -> dict[str, Any]:
     response = invoke_skill(
         "research_evaluator_skill",
@@ -97,10 +125,17 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
         {},
         timeout=120,
     )
+    compilation = _frozen_json_input(task, "research_compilation")
+    experiment_plan = compilation.get("experiment_plan")
+    if not isinstance(experiment_plan, Mapping):
+        raise RuntimeError("frozen ResearchCompilation has no ExperimentPlan")
     manager_contract = invoke_skill(
         "research_manager_skill",
         "get_runner_contract",
-        {},
+        {
+            "experiment_plan": dict(experiment_plan),
+            "runner_id": "$candidate",
+        },
         timeout=120,
     )
     manager_identity = (
@@ -112,6 +147,13 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
         raise RuntimeError("research manager environment identity is unavailable")
     if not isinstance(manager_contract, Mapping) or not manager_contract.get("digest"):
         raise RuntimeError("research manager runner contract is unavailable")
+    projected_contract = _frozen_json_input(task, "runner_contract")
+    projected_base = dict(projected_contract)
+    projected_base.pop("digest", None)
+    if projected_base.pop("candidate_role", None) != "provider":
+        raise RuntimeError("frozen runner contract does not declare the candidate provider role")
+    if _digest(projected_base) != str(manager_contract.get("digest") or ""):
+        raise RuntimeError("frozen runner contract differs from the active plan-bound manager ABI")
     expected = task.get("environment_spec")
     if not isinstance(expected, Mapping):
         raise RuntimeError("calibration task does not freeze its environment")

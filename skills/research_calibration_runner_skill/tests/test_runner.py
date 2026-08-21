@@ -124,7 +124,16 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
         **identity,
         "current_skill": {"name": "research_manager_skill", "version": "0.13.0"},
     }
-    runner_contract_digest = "sha256:" + "2" * 64
+    runner_contract_base = {
+        "schema": "adaos.contract.operation_set.v1",
+        "contract": "adaos.research.runner.v1",
+    }
+    runner_contract_digest = module._digest(runner_contract_base)
+    projected_contract = {
+        **runner_contract_base,
+        "candidate_role": "provider",
+    }
+    projected_contract["digest"] = module._digest(projected_contract)
     task = {
         "digest": "sha256:" + "1" * 64,
         "environment_spec": {
@@ -145,6 +154,15 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
     }
     monkeypatch.setattr(module, "sdk_runtime_identity", lambda: identity)
     monkeypatch.setattr(
+        module,
+        "_frozen_json_input",
+        lambda _task, kind: (
+            {"experiment_plan": {"schema": "adaos.research.experiment_plan.v1"}}
+            if kind == "research_compilation"
+            else projected_contract
+        ),
+    )
+    monkeypatch.setattr(
         module.shutil,
         "disk_usage",
         lambda _path: SimpleNamespace(total=4096, used=1024, free=3072),
@@ -164,7 +182,7 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
         if method == "environment_identity":
             return {"ok": True, "runtime_identity": manager_identity}
         if method == "get_runner_contract":
-            return {"digest": runner_contract_digest}
+            return {**runner_contract_base, "digest": runner_contract_digest}
         raise AssertionError(method)
 
     monkeypatch.setattr(
@@ -183,6 +201,16 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
 
 def test_environment_preflight_rejects_disk_pressure_before_candidate_creation(monkeypatch) -> None:
     module = _module()
+    runner_contract_base = {
+        "schema": "adaos.contract.operation_set.v1",
+        "contract": "adaos.research.runner.v1",
+    }
+    runner_contract_digest = module._digest(runner_contract_base)
+    projected_contract = {
+        **runner_contract_base,
+        "candidate_role": "provider",
+    }
+    projected_contract["digest"] = module._digest(projected_contract)
     task = {
         "digest": "sha256:" + "1" * 64,
         "environment_spec": {
@@ -196,7 +224,7 @@ def test_environment_preflight_rejects_disk_pressure_before_candidate_creation(m
                 "research_calibration_runner_skill": "0.1.12",
                 "research_manager_skill": "0.24.0",
             },
-            "runner_contract_digest": "sha256:" + "3" * 64,
+            "runner_contract_digest": runner_contract_digest,
             "minimum_free_disk_bytes": 4096,
         },
     }
@@ -216,11 +244,20 @@ def test_environment_preflight_rejects_disk_pressure_before_candidate_creation(m
         if method == "environment_identity":
             return {"runtime_identity": {**local, "current_skill": {"version": "0.24.0"}}}
         if method == "get_runner_contract":
-            return {"digest": "sha256:" + "3" * 64}
+            return {**runner_contract_base, "digest": runner_contract_digest}
         raise AssertionError(method)
 
     monkeypatch.setattr(module, "invoke_skill", invoke)
     monkeypatch.setattr(module, "sdk_runtime_identity", lambda: local)
+    monkeypatch.setattr(
+        module,
+        "_frozen_json_input",
+        lambda _task, kind: (
+            {"experiment_plan": {"schema": "adaos.research.experiment_plan.v1"}}
+            if kind == "research_compilation"
+            else projected_contract
+        ),
+    )
     monkeypatch.setattr(
         module.shutil,
         "disk_usage",
