@@ -5624,7 +5624,7 @@ class ResearchOrchestrator:
                 )
             raise
 
-    def sync_study(
+    def _sync_study(
         self,
         direction_id: str,
         *,
@@ -5681,6 +5681,71 @@ class ResearchOrchestrator:
             source_event_id=f"experiment-state:{event_identity}",
         )
         return {"ok": True, "track": dict(track), "reconciliation": reconciled, "experiment": experiment}
+
+    def sync_study(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        actor: str = "system:research_orchestrator",
+    ) -> dict[str, Any]:
+        """Reconcile a Study and preserve downstream ingestion failures durably."""
+
+        try:
+            return self._sync_study(
+                direction_id,
+                task_id=task_id,
+                implementation_track_id=implementation_track_id,
+                actor=actor,
+            )
+        except Exception as exc:
+            state = self.get(
+                direction_id,
+                task_id=task_id,
+                implementation_track_id=implementation_track_id,
+            )
+            track = state.get("active_implementation_track")
+            if isinstance(track, Mapping):
+                failure = {
+                    "stage": "study_reconciliation",
+                    "error_class": type(exc).__name__,
+                    "message": _bounded_text(str(exc), 1000),
+                    "retryable": True,
+                }
+                self.repository.record_track_evaluation(
+                    str(track["track_id"]),
+                    status="experiment_failed",
+                    metadata={
+                        **dict(track.get("metadata") or {}),
+                        "study_failure": failure,
+                    },
+                )
+                failure_identity = contract_digest(
+                    {
+                        "track_ref": track.get("ref"),
+                        "study_id": track.get("study_id"),
+                        "experiment_id": track.get("experiment_id"),
+                        **failure,
+                    }
+                )
+                self.repository.activity(
+                    str(track["direction_id"]),
+                    "study",
+                    "reconciliation_failed",
+                    "ResearchManager could not reconcile or ingest the active Experiment.",
+                    {
+                        "implementation_track_ref": track.get("ref"),
+                        "study_ref": f"study:{track.get('study_id')}",
+                        "experiment_ref": f"experiment:{track.get('experiment_id')}",
+                        "failure": failure,
+                    },
+                    actor=actor,
+                    origin="skill:research_manager_skill",
+                    subject_ref=str(track.get("ref") or ""),
+                    source_event_id=f"study-reconciliation-failure:{failure_identity}",
+                )
+            raise
 
 
 __all__ = ["ResearchOrchestrator"]

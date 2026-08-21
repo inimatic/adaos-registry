@@ -696,3 +696,51 @@ def test_study_smoke_records_provider_admission_failure_before_lock(
     assert repository.evaluation["metadata"]["study_failure"]["stage"] == "execution_admission"
     assert repository.activity_record is not None
     assert repository.activity_record[0][2] == "execution_blocked"
+
+
+def test_study_sync_records_downstream_ingestion_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    track = {
+        "track_id": "task-1.track-001",
+        "ref": "implementation-track:task-1.track-001",
+        "direction_id": "direction",
+        "study_id": "study-1",
+        "experiment_id": "experiment-1",
+        "metadata": {},
+    }
+    state = {
+        "direction": {"direction_id": "direction"},
+        "active_implementation_track": track,
+    }
+
+    class Repository:
+        def __init__(self) -> None:
+            self.evaluation: dict | None = None
+            self.activity_record: tuple | None = None
+
+        def record_track_evaluation(self, track_id: str, **kwargs: object) -> dict:
+            self.evaluation = {"track_id": track_id, **kwargs}
+            return dict(self.evaluation)
+
+        def activity(self, *args: object, **kwargs: object) -> dict:
+            self.activity_record = (args, kwargs)
+            return {"event_id": "event-1"}
+
+    repository = Repository()
+    orchestrator = ResearchOrchestrator(
+        repository=repository,
+        skill_invoker=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            ValueError("observation metric.name is required")
+        ),
+    )
+    monkeypatch.setattr(orchestrator, "get", lambda *args, **kwargs: state)
+
+    with pytest.raises(ValueError, match="metric.name"):
+        orchestrator.sync_study("direction")
+
+    assert repository.evaluation is not None
+    assert repository.evaluation["status"] == "experiment_failed"
+    assert repository.evaluation["metadata"]["study_failure"]["stage"] == "study_reconciliation"
+    assert repository.activity_record is not None
+    assert repository.activity_record[0][2] == "reconciliation_failed"
