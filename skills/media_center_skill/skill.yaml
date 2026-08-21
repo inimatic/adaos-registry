@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.35
+version: 0.8.36
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -108,6 +108,7 @@ exports:
   - observe_agent_topology
   - plan_topology_change
   - apply_topology_change
+  - topology_operation_status
   - handoff_authority
   - topology_status
   - explain_route
@@ -997,6 +998,17 @@ tools:
     properties:
       plan_digest: {type: string, minLength: 1}
       idempotency_key: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: topology_operation_status
+  description: Read one durable topology operation without scanning topology history.
+  entry: handlers.main:topology_operation_status
+  side_effects: none
+  input_schema:
+    type: object
+    required: [operation_id]
+    properties:
+      operation_id: {type: string, minLength: 1}
     additionalProperties: true
   output_schema: {type: object}
 - name: handoff_authority

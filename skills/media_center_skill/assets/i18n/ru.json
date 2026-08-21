@@ -1,6 +1,7 @@
 {
   "runtime.media_center.error.topology_plan_failed": "Не удалось создать план изменения топологии Media Center.",
   "runtime.media_center.error.topology_apply_failed": "Не удалось применить план изменения топологии Media Center.",
+  "runtime.media_center.error.topology_status_failed": "Не удалось получить состояние операции топологии Media Center.",
   "runtime.media_center.error.authority_handoff_failed": "Не удалось передать полномочия Media Center.",
   "runtime.media_center.error.no_active_media_roots": "Сначала добавьте папку с медиа, затем запустите импорт.",
   "runtime.media_center.error.invalid_media_catalog_cursor": "Страница каталога изменилась. Обновите список.",

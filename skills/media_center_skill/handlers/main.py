@@ -1810,6 +1810,20 @@ def apply_topology_change(
         )
 
 
+@tool(summary="Read one durable Media Center topology operation.", side_effects="none")
+def topology_operation_status(operation_id: str = "", **_: Any) -> dict[str, Any]:
+    try:
+        return _topology().topology_operation_status(operation_id)
+    except Exception as exc:
+        key = "runtime.media_center.error.topology_status_failed"
+        return _skill_error(
+            "topology_status_failed",
+            human_message=_skill_text(
+                key, "Could not read the Media Center topology operation."
+            ),
+            i18n_key=key,
+            detail=str(exc)[:300],
+        )
 @tool(summary="Perform an explicit fenced authority handoff.", side_effects="remote_write")
 def handoff_authority(
     partition_id: str = "",

@@ -623,6 +623,11 @@ class MediaCenterTopology:
         )
         return {"ok": operation.state == "succeeded", "operation": operation.to_dict()}
 
+    @staticmethod
+    def topology_operation_status(operation_id: str) -> dict[str, Any]:
+        operation = distributed_sdk.get_operation(str(operation_id or "").strip())
+        return {"ok": True, "operation": operation.to_dict()}
+
     def handoff_authority(
         self,
         partition_id: str,

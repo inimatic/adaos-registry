@@ -1,6 +1,7 @@
 {
   "runtime.media_center.error.topology_plan_failed": "Could not create the Media Center topology plan.",
   "runtime.media_center.error.topology_apply_failed": "Could not apply the Media Center topology plan.",
+  "runtime.media_center.error.topology_status_failed": "Could not read the Media Center topology operation.",
   "runtime.media_center.error.authority_handoff_failed": "Could not hand off Media Center authority.",
   "runtime.media_center.error.no_active_media_roots": "Add a media folder first, then run import.",
   "runtime.media_center.error.invalid_media_catalog_cursor": "The catalog page changed. Refresh the list.",
