@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.36.0
+version: 0.37.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -105,8 +105,8 @@ tools:
     - errors
 - name: get_runner_contract
   description: Return the canonical content-addressed adaos.research.runner.v1 consumer
-    ABI used by Builder and direction skills, optionally materializing a trusted
-    operation sequence from an accepted ExperimentPlan.
+    ABI used by Builder and direction skills, optionally materializing a trusted operation
+    sequence from an accepted ExperimentPlan.
   entry: handlers.main:get_runner_contract
   input_schema:
     type: object
@@ -987,12 +987,13 @@ data_routes:
     - research-experiment
     - research-tracking
     - research-evidence
-updated_at: '2026-08-21T06:47:43+00:00'
+updated_at: '2026-08-21T07:38:20+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.900+5506.7db59cca
-    recorded_at: '2026-08-21T06:47:43+00:00'
+    min_version: 0.1.903+5516.e7fdd4a2
+    recorded_at: '2026-08-21T07:38:20+00:00'
     source: skill_push
-    min_commit: 962b6c80600c4b86fae07d5168a0be01e54ab6a8
-    min_short_commit: 962b6c80
-    build_date: '2026-08-21T09:45:38+03:00'
+    min_commit: e7fdd4a2db4159ea808b332bd1a34b4889d7b089
+    min_short_commit: e7fdd4a2
+    build_date: '2026-08-21T10:35:22+03:00'
+
