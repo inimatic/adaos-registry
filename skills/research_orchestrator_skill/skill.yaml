@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.71.0
+version: 0.72.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -976,6 +976,36 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: finalize_workflow_evidence
+  description: Finalize and independently verify a campaign-scoped operational Evidence
+    bundle without advancing the scientific claim lifecycle.
+  entry: handlers.main:finalize_workflow_evidence
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: get_activity
   description: Read durable stage activity for chat and widget projections.
   entry: handlers.main:get_activity
@@ -1425,12 +1455,13 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-21T04:40:53+00:00'
+updated_at: '2026-08-21T06:52:36+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.897+5496.49247406
-    recorded_at: '2026-08-21T04:40:53+00:00'
+    min_version: 0.1.901+5507.962b6c80
+    recorded_at: '2026-08-21T06:52:36+00:00'
     source: skill_push
-    min_commit: 492474062ad16727edd1e496fa4dd2b4c08265df
-    min_short_commit: '49247406'
-    build_date: '2026-08-21T07:37:52+03:00'
+    min_commit: 962b6c80600c4b86fae07d5168a0be01e54ab6a8
+    min_short_commit: 962b6c80
+    build_date: '2026-08-21T06:47:04+00:00'
+

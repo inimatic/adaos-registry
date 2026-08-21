@@ -777,6 +777,24 @@ def sync_study(
     )
 
 
+@tool(summary="Finalize an independently verified, non-inferential workflow Evidence bundle.", side_effects="external_write")
+def finalize_workflow_evidence(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().finalize_workflow_evidence(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
 @tool(summary="Read durable research formulation activity.", side_effects="none")
 def get_activity(
     direction_id: str,

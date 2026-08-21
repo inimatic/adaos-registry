@@ -2635,6 +2635,14 @@ class ResearchOrchestrator:
         if prototype and str(prototype.get("source_bundle_digest") or "") != str(bundle.get("digest") or ""):
             return [{"id": "refresh_formulation", "label": "Обновить постановку", "reason": "Artifact groups изменились; новая ревизия должна сослаться на актуальный digest."}]
         track_state = str((track or {}).get("status") or "")
+        track_metadata = dict((track or {}).get("metadata") or {})
+        workflow_evidence = track_metadata.get("workflow_evidence")
+        if isinstance(workflow_evidence, Mapping) and bool(
+            dict(workflow_evidence.get("verification") or {}).get("ok")
+        ):
+            return [{"id": "review_workflow_evidence", "label": "Review workflow evidence", "reason": "The selected execution campaign has an independently verified non-inferential Evidence bundle."}]
+        if track_state in {"experiment_results_ready", "experiment_finalized"}:
+            return [{"id": "finalize_workflow_evidence", "label": "Finalize workflow evidence", "reason": "Verify the exact ExperimentResult and freeze a campaign-scoped operational Evidence bundle without advancing the scientific claim lifecycle."}]
         if (track or {}).get("experiment_id"):
             return [{"id": "sync_study", "label": "Sync Study", "reason": "Import the latest ResearchManager attempts and evidence into the durable activity journal."}]
         if (track or {}).get("project_release_ref"):
@@ -5808,6 +5816,25 @@ class ResearchOrchestrator:
         )
         lifecycle = dict(experiment.get("lifecycle") or {})
         attempts = list(experiment.get("attempts") or [])
+        track = self.repository.record_track_evaluation(
+            str(track["track_id"]),
+            status=f"experiment_{str(lifecycle.get('state') or 'unknown')}",
+            metadata={
+                **dict(track.get("metadata") or {}),
+                "experiment_lifecycle": lifecycle,
+                "experiment_result_ref": (
+                    f"experiment-result:{dict(experiment['result'])['record_id']}"
+                    if isinstance(experiment.get("result"), Mapping)
+                    and dict(experiment["result"]).get("record_id")
+                    else None
+                ),
+                "experiment_result_verification": (
+                    dict(experiment["result_verification"])
+                    if isinstance(experiment.get("result_verification"), Mapping)
+                    else None
+                ),
+            },
+        )
         event_identity = contract_digest(
             {
                 "experiment_id": experiment_id,
@@ -5837,6 +5864,145 @@ class ResearchOrchestrator:
             source_event_id=f"experiment-state:{event_identity}",
         )
         return {"ok": True, "track": dict(track), "reconciliation": reconciled, "experiment": experiment}
+
+    def finalize_workflow_evidence(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        actor: str = "system:research_orchestrator",
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Finalize and verify one campaign-scoped non-inferential bundle."""
+
+        state = self.get(
+            direction_id,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+        )
+        track = state.get("active_implementation_track")
+        if not isinstance(track, Mapping) or not track.get("study_id") or not track.get("experiment_id"):
+            raise ValueError("workflow evidence requires an instantiated Study and Experiment")
+        study_id = str(track["study_id"])
+        experiment_id = str(track["experiment_id"])
+        self._invoke_skill(
+            "research_manager_skill",
+            "reconcile_experiment",
+            {"experiment_id": experiment_id, "actor": actor},
+            timeout=180,
+        )
+        experiment_state = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "get_experiment",
+                {"experiment_id": experiment_id},
+                timeout=120,
+            )
+        )
+        lifecycle = dict(experiment_state.get("lifecycle") or {})
+        if lifecycle.get("state") == "results_ready":
+            finalized = dict(
+                self._invoke_skill(
+                    "research_manager_skill",
+                    "finalize_experiment",
+                    {
+                        "experiment_id": experiment_id,
+                        "expected_generation": int(lifecycle.get("generation") or 0),
+                        "idempotency_key": f"{idempotency_key}:experiment-result",
+                        "actor": actor,
+                    },
+                    timeout=240,
+                )
+            )
+            experiment_state = dict(
+                self._invoke_skill(
+                    "research_manager_skill",
+                    "get_experiment",
+                    {"experiment_id": experiment_id},
+                    timeout=120,
+                )
+            )
+            lifecycle = dict(experiment_state.get("lifecycle") or {})
+        else:
+            finalized = {"reused": lifecycle.get("state") == "finalized"}
+        if lifecycle.get("state") != "finalized":
+            raise ValueError(
+                "workflow evidence requires completed attempts; "
+                f"Experiment is {lifecycle.get('state') or 'unknown'}"
+            )
+        result = experiment_state.get("result")
+        result_verification = experiment_state.get("result_verification")
+        if not isinstance(result, Mapping) or not isinstance(result_verification, Mapping):
+            raise ValueError("finalized Experiment has no independently verified ExperimentResult")
+        if not bool(result_verification.get("ok")):
+            raise ValueError("ExperimentResult failed independent verification")
+        bundle = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "export_evidence",
+                {
+                    "study_id": study_id,
+                    "scope": "workflow_validation",
+                    "experiment_id": experiment_id,
+                },
+                timeout=180,
+            )
+        )
+        verification = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "verify_evidence",
+                {"bundle_id": str(bundle["record_id"])},
+                timeout=180,
+            )
+        )
+        if not bool(verification.get("ok")):
+            raise ValueError("workflow Evidence bundle failed independent verification")
+        evidence_projection = {
+            "schema": "adaos.research.workflow_evidence_projection.v1",
+            "study_ref": f"study:{study_id}",
+            "experiment_ref": f"experiment:{experiment_id}",
+            "result_ref": f"experiment-result:{result['record_id']}",
+            "bundle_ref": f"evidence:{bundle['record_id']}",
+            "scope": "workflow_validation",
+            "inference_allowed": False,
+            "verification": verification,
+        }
+        track = self.repository.record_track_evaluation(
+            str(track["track_id"]),
+            status="workflow_evidence_ready",
+            metadata={
+                **dict(track.get("metadata") or {}),
+                "experiment_lifecycle": lifecycle,
+                "experiment_result_ref": evidence_projection["result_ref"],
+                "experiment_result_verification": dict(result_verification),
+                "workflow_evidence": evidence_projection,
+            },
+        )
+        self.repository.activity(
+            str(track["direction_id"]),
+            "evidence",
+            "workflow_evidence_ready",
+            "The exact smoke campaign has a content-addressed, independently verified operational Evidence bundle; scientific inference remains prohibited.",
+            {
+                "implementation_track_ref": track["ref"],
+                **evidence_projection,
+            },
+            actor=actor,
+            origin="skill:research_manager_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"workflow-evidence:{bundle['record_id']}",
+        )
+        return {
+            "ok": True,
+            "track": track,
+            "finalization": finalized,
+            "experiment": experiment_state,
+            "evidence": bundle,
+            "verification": verification,
+            "inference_allowed": False,
+        }
 
     def sync_study(
         self,

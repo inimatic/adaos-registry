@@ -836,6 +836,94 @@ def test_repeat_study_experiment_preserves_realization_and_parent_lineage(
     assert repository.activity_record[0][2] == "experiment_repeated"
 
 
+def test_finalize_workflow_evidence_does_not_advance_scientific_lifecycle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    track = {
+        "track_id": "task-1.track-001",
+        "ref": "implementation-track:task-1.track-001",
+        "direction_id": "direction",
+        "study_id": "study-1",
+        "experiment_id": "experiment-1",
+        "metadata": {},
+    }
+    state = {
+        "direction": {"direction_id": "direction"},
+        "active_implementation_track": track,
+    }
+
+    class Repository:
+        def __init__(self) -> None:
+            self.evaluation: dict | None = None
+            self.activity_record: tuple | None = None
+
+        def record_track_evaluation(self, track_id: str, **values: object) -> dict:
+            self.evaluation = {**track, "track_id": track_id, **values}
+            return dict(self.evaluation)
+
+        def activity(self, *args: object, **kwargs: object) -> dict:
+            self.activity_record = (args, kwargs)
+            return {"event_id": "event-evidence"}
+
+    calls: list[tuple[str, dict]] = []
+    get_count = 0
+
+    def invoke(_skill: str, operation: str, payload: dict, **_: object) -> dict:
+        nonlocal get_count
+        calls.append((operation, payload))
+        if operation == "reconcile_experiment":
+            return {"ok": True}
+        if operation == "get_experiment":
+            get_count += 1
+            if get_count == 1:
+                return {"lifecycle": {"state": "results_ready", "generation": 4}}
+            return {
+                "lifecycle": {"state": "finalized", "generation": 5},
+                "result": {"record_id": "result-1"},
+                "result_verification": {
+                    "schema": "adaos.research.experiment_result_verification.v1",
+                    "result_id": "result-1",
+                    "ok": True,
+                    "errors": [],
+                },
+            }
+        if operation == "finalize_experiment":
+            return {"result": {"record_id": "result-1"}}
+        if operation == "export_evidence":
+            assert payload["scope"] == "workflow_validation"
+            assert payload["experiment_id"] == "experiment-1"
+            return {"record_id": "bundle-1"}
+        if operation == "verify_evidence":
+            return {
+                "bundle_id": "bundle-1",
+                "scope": "workflow_validation",
+                "ok": True,
+                "errors": [],
+            }
+        raise AssertionError(operation)
+
+    repository = Repository()
+    orchestrator = ResearchOrchestrator(repository=repository, skill_invoker=invoke)
+    monkeypatch.setattr(orchestrator, "get", lambda *args, **kwargs: state)
+
+    result = orchestrator.finalize_workflow_evidence(
+        "direction",
+        actor="system:test",
+        idempotency_key="workflow-evidence-1",
+    )
+
+    assert result["ok"] is True
+    assert result["inference_allowed"] is False
+    assert "advance_workflow" not in [item[0] for item in calls]
+    assert repository.evaluation is not None
+    assert repository.evaluation["status"] == "workflow_evidence_ready"
+    projection = repository.evaluation["metadata"]["workflow_evidence"]
+    assert projection["bundle_ref"] == "evidence:bundle-1"
+    assert projection["inference_allowed"] is False
+    assert repository.activity_record is not None
+    assert repository.activity_record[0][2] == "workflow_evidence_ready"
+
+
 def test_study_sync_records_downstream_ingestion_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
