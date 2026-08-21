@@ -945,9 +945,16 @@ class ResearchManager:
             errors.append("accepted ResearchCompilation has no ExperimentPlan payload")
             return self._acceptance_receipt(profile, checks=checks, errors=errors)
 
-        canonical_contract = runner_contract_descriptor(plan, runner_id=candidate_id)
+        canonical_contracts = [
+            runner_contract_descriptor(plan, runner_id=candidate_id),
+            runner_contract_descriptor(plan, runner_id="$candidate"),
+        ]
         supplied_contract_digest = str(consumer_contract.get("digest") or "")
-        if supplied_contract_digest != canonical_contract["digest"] or consumer_contract != canonical_contract:
+        canonical_contract = next(
+            (item for item in canonical_contracts if consumer_contract == item),
+            canonical_contracts[0],
+        )
+        if consumer_contract not in canonical_contracts:
             errors.append("Development Session consumer_contract differs from the active ResearchManager ABI")
             return self._acceptance_receipt(
                 profile,

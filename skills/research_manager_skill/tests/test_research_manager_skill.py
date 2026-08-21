@@ -252,7 +252,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.14.0"
+    assert contract["version"] == "1.15.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -365,6 +365,22 @@ def test_runner_contract_materializes_plan_bound_trusted_operation_sequence() ->
     assert contract["digest"] == digest(
         {key: value for key, value in contract.items() if key != "digest"}
     )
+
+    symbolic = runner_contract_descriptor(
+        _acceptance_plan(),
+        runner_id="$candidate",
+    )
+    symbolic_fixture = next(
+        item
+        for item in symbolic["conformance_fixtures"]
+        if item["kind"] == "operation_sequence"
+    )
+    symbolic_runner = symbolic_fixture["steps"][1]["input"]["request"]["conditions"]["runner"]
+    assert symbolic_runner == {
+        "provider": {"$candidate": "/skill_id"},
+        "contract": "adaos.research.runner.v1",
+        "data_owner": {"$candidate": "/skill_id"},
+    }
 
     dataset_schema = contract["operations"]["dataset_status"]["output_schema"]
     split_values = {

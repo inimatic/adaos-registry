@@ -473,6 +473,11 @@ def _operation_sequence_fixture(
         "evidence_class": "workflow_smoke",
         "inference_allowed": False,
     }
+    provider_binding: Any = (
+        {"$candidate": "/skill_id"}
+        if str(runner_id) == "$candidate"
+        else str(runner_id)
+    )
     conditions = {
         "dataset": {
             "name": str(dataset.get("logical_name") or dataset.get("id") or "dataset"),
@@ -506,9 +511,9 @@ def _operation_sequence_fixture(
             "required_delivery": "durable-before-finalize",
         },
         "runner": {
-            "provider": str(runner_id),
+            "provider": provider_binding,
             "contract": "adaos.research.runner.v1",
-            "data_owner": str(runner_id),
+            "data_owner": copy.deepcopy(provider_binding),
         },
     }
     request = {
@@ -593,7 +598,7 @@ def descriptor(
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.14.0",
+        "version": "1.15.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
