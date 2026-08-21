@@ -149,6 +149,7 @@ def build_compilation(
     protocol_design: Mapping[str, Any],
     implementation_contract: Mapping[str, Any],
     source_ref_map: Mapping[str, str],
+    required_workflow_smoke: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compile LLM stage products into one auditable, model-independent handoff."""
 
@@ -160,6 +161,7 @@ def build_compilation(
         protocol,
         implementation,
         source_ref_map=source_ref_map,
+        required_workflow_smoke=required_workflow_smoke,
     )
     reference_map = {str(key): str(value) for key, value in source_ref_map.items()}
 

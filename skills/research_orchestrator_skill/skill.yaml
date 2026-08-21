@@ -525,6 +525,14 @@ tools:
         type:
         - string
         - 'null'
+      workflow_smoke_policy_id:
+        description: Explicit engineering-smoke policy. Provider-compatible mode may
+          relax only non-inferential smoke isolation after capability discovery; it
+          never changes confirmatory scientific requirements.
+        enum:
+        - enforced_offline
+        - provider_compatible_noninferential
+        - null
       model:
         type:
         - string

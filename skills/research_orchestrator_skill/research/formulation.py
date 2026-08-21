@@ -11,13 +11,16 @@ from jsonschema import Draft202012Validator
 from research.contracts import prototype_candidate_schema
 
 
-STAGE_SCHEMA_VERSION = "1.3.0"
+STAGE_SCHEMA_VERSION = "1.4.0"
+DEFAULT_WORKFLOW_SMOKE_POLICY_ID = "enforced_offline"
+PROVIDER_COMPATIBLE_WORKFLOW_SMOKE_POLICY_ID = "provider_compatible_noninferential"
 DEFAULT_WORKFLOW_SMOKE_POLICY = {
     "device": "cpu",
     "epochs": 3,
     "seed_values": [17],
     "inference_allowed": False,
     "network_mode": "offline",
+    "input_source": "deterministic_contract_fixture",
     "input_readiness": "required_before_execution",
     "workload_mode": "bounded",
 }
@@ -34,6 +37,63 @@ PROTOCOL_DECISION_AREAS = (
     "multiplicity",
     "practical_significance",
 )
+
+
+def resolve_workflow_smoke_policy(
+    policy_id: str | None,
+    *,
+    provider_status: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Resolve one explicit workflow-smoke policy against a provider snapshot.
+
+    Scientific confirmation is deliberately outside this choice.  The compatible
+    variant may relax network *enforcement* only for the non-inferential bounded
+    workflow smoke; it never interprets observed network silence as isolation.
+    """
+
+    selected = str(policy_id or DEFAULT_WORKFLOW_SMOKE_POLICY_ID).strip().lower()
+    if selected == DEFAULT_WORKFLOW_SMOKE_POLICY_ID:
+        return {
+            "schema": "adaos.research.workflow_smoke_policy_binding.v1",
+            "policy_id": selected,
+            "requirements": copy.deepcopy(DEFAULT_WORKFLOW_SMOKE_POLICY),
+            "provider": None,
+            "provider_digest": None,
+            "network_enforcement": "required",
+            "network_observation_required": True,
+        }
+    if selected != PROVIDER_COMPATIBLE_WORKFLOW_SMOKE_POLICY_ID:
+        raise ValueError(
+            "workflow_smoke_policy_id must be enforced_offline or "
+            "provider_compatible_noninferential"
+        )
+    status = dict(provider_status or {})
+    if status.get("schema") != "adaos.execution.provider_status.v1":
+        raise ValueError(
+            "provider_compatible_noninferential requires an authoritative "
+            "adaos.execution.provider_status.v1 snapshot"
+        )
+    provider = dict(status.get("provider") or {})
+    provider_id = str(provider.get("provider_id") or "").strip()
+    provider_digest = str(status.get("provider_digest") or "").strip()
+    if not provider_id or not re.fullmatch(r"sha256:[0-9a-f]{64}", provider_digest):
+        raise ValueError("execution provider status is missing a valid identity or digest")
+    features = {str(item) for item in provider.get("features") or ()}
+    offline_available = "network_offline" in features
+    requirements = copy.deepcopy(DEFAULT_WORKFLOW_SMOKE_POLICY)
+    requirements["network_mode"] = "offline" if offline_available else "unrestricted"
+    return {
+        "schema": "adaos.research.workflow_smoke_policy_binding.v1",
+        "policy_id": selected,
+        "requirements": requirements,
+        "provider": {
+            "provider_id": provider_id,
+            "features": sorted(features),
+        },
+        "provider_digest": provider_digest,
+        "network_enforcement": "available" if offline_available else "not_required",
+        "network_observation_required": True,
+    }
 
 
 def _object(properties: Mapping[str, Any], required: list[str]) -> dict[str, Any]:
@@ -640,6 +700,11 @@ def stage_quality_issues(
                     != str(smoke_policy["network_mode"])
                 )
                 or (
+                    "input_source" in smoke_policy
+                    and str(smoke[0]["input_policy"]["source"])
+                    != str(smoke_policy["input_source"])
+                )
+                or (
                     "input_readiness" in smoke_policy
                     and str(smoke[0]["input_policy"]["readiness"])
                     != str(smoke_policy["input_readiness"])
@@ -858,6 +923,7 @@ def assemble_candidate(
     implementation_contract: Mapping[str, Any],
     *,
     source_ref_map: Mapping[str, str] | None = None,
+    required_workflow_smoke: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compile validated stage artifacts into the LLM-owned prototype subset."""
 
@@ -869,7 +935,11 @@ def assemble_candidate(
         protocol,
         expected_effect_direction=str(problem["hypotheses"][0]["effect_direction"]),
         expected_experimental_signature=problem["experimental_signature"],
-        required_workflow_smoke=DEFAULT_WORKFLOW_SMOKE_POLICY,
+        required_workflow_smoke=(
+            required_workflow_smoke
+            if required_workflow_smoke is not None
+            else DEFAULT_WORKFLOW_SMOKE_POLICY
+        ),
     )
     implementation_issues = stage_quality_issues(
         "implementation_contract",
@@ -988,7 +1058,9 @@ def assemble_candidate(
 
 __all__ = [
     "CHECK_CATEGORIES",
+    "DEFAULT_WORKFLOW_SMOKE_POLICY_ID",
     "DEFAULT_WORKFLOW_SMOKE_POLICY",
+    "PROVIDER_COMPATIBLE_WORKFLOW_SMOKE_POLICY_ID",
     "PROTOCOL_DECISION_AREAS",
     "REQUIREMENT_CATEGORIES",
     "STAGES",
@@ -997,6 +1069,7 @@ __all__ = [
     "implementation_contract_schema",
     "problem_frame_schema",
     "provider_schema",
+    "resolve_workflow_smoke_policy",
     "protocol_design_schema",
     "schema_text_format",
     "stage_schema",

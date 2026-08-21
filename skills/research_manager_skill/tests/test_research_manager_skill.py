@@ -901,7 +901,20 @@ def test_execution_admission_rejects_unenforceable_network_before_lock() -> None
             "requested": "offline",
         }
     ]
+    assert admission["enforcement"]["network_policy"] == "unavailable"
     assert manager_module.experiment.state(manager.repository, experiment_id)["state"] == "draft"
+
+
+def test_execution_provider_status_is_read_only_and_content_addressed() -> None:
+    manager = ResearchManager()
+
+    status = manager.execution_provider_status()
+
+    assert status["schema"] == "adaos.execution.provider_status.v1"
+    assert status["provider"]["provider_id"] == "local-process"
+    assert status["provider"]["features"] == sorted(status["provider"]["features"])
+    assert status["provider_digest"] == manager_module.digest(status["provider"])
+    assert status["admission_contract"] == "adaos.execution.admission.v1"
 
 
 def test_end_to_end_research_kernel_survives_repository_reopen() -> None:

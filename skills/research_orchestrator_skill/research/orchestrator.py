@@ -36,8 +36,11 @@ from research.contracts import (
 from research.compiler import build_compilation
 from research.formulation import (
     DEFAULT_WORKFLOW_SMOKE_POLICY,
+    DEFAULT_WORKFLOW_SMOKE_POLICY_ID,
+    PROVIDER_COMPATIBLE_WORKFLOW_SMOKE_POLICY_ID,
     assemble_candidate,
     provider_schema,
+    resolve_workflow_smoke_policy,
     schema_text_format,
     stage_digest,
     stage_quality_issues,
@@ -549,6 +552,26 @@ class ResearchOrchestrator:
     def _artifact_owner_id(self, direction_id: str) -> str:
         state = self.repository.get_direction(direction_id)
         return str((state or {}).get("artifact_owner_skill_id") or direction_id)
+
+    def _resolve_workflow_smoke_policy(
+        self,
+        requested_policy_id: str | None,
+    ) -> dict[str, Any]:
+        policy_id = str(
+            requested_policy_id or DEFAULT_WORKFLOW_SMOKE_POLICY_ID
+        ).strip().lower()
+        provider_status: Mapping[str, Any] | None = None
+        if policy_id == PROVIDER_COMPATIBLE_WORKFLOW_SMOKE_POLICY_ID:
+            provider_status = self._invoke_skill(
+                "research_manager_skill",
+                "execution_provider_status",
+                {},
+                timeout=120,
+            )
+        return resolve_workflow_smoke_policy(
+            policy_id,
+            provider_status=provider_status,
+        )
 
     def _require_direction_project(self, direction_id: str) -> dict[str, Any]:
         state = self.repository.get_direction(direction_id)
@@ -2919,6 +2942,11 @@ class ResearchOrchestrator:
                     "provider_schema_digest": provider_schema_digest,
                     "input_digest": input_digest,
                     "task_scope": task_scope,
+                    "contract_bindings": {
+                        "workflow_smoke_policy": copy.deepcopy(
+                            dict(required_workflow_smoke or {})
+                        )
+                    },
                     "jobs": jobs,
                     "aggregate_usage": {
                         key: sum(
@@ -3016,6 +3044,10 @@ class ResearchOrchestrator:
         bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("attach at least one source before discussion")
+        workflow_smoke_binding = self._resolve_workflow_smoke_policy(
+            str((dialog_payload or {}).get("workflow_smoke_policy_id") or "") or None
+        )
+        workflow_smoke_policy = dict(workflow_smoke_binding["requirements"])
         current = self.repository.get_prototype(state.get("current_prototype_digest"))
         caller_payload = {"direction_id": token, **dict(dialog_payload or {})}
         dialog = self._dialog(caller_payload)
@@ -3076,6 +3108,21 @@ class ResearchOrchestrator:
             "source_context_prepared",
             "Source artifacts were deterministically compacted and selected for the formulation query.",
             {"run_id": run_id, "coverage": source_context["coverage"]},
+        )
+        self.repository.activity(
+            token,
+            "formulation",
+            "workflow_smoke_policy_resolved",
+            (
+                "The explicit non-inferential workflow-smoke policy was bound "
+                "to an authoritative executor capability snapshot."
+            ),
+            {
+                "run_id": run_id,
+                "binding": workflow_smoke_binding,
+                "scientific_confirmation_unchanged": True,
+            },
+            subject_ref=f"research-task:{active_task_id}",
         )
         request_identity = str(dialog.get("request_id") or "").strip() or uuid.uuid4().hex
         request_token = re.sub(r"[^A-Za-z0-9_.-]+", "-", request_identity).strip("-._")[:40] or uuid.uuid4().hex
@@ -3148,7 +3195,8 @@ class ResearchOrchestrator:
                     "problem_frame": problem,
                     "current_protocol": current_protocol,
                     "adaos_policy": {
-                        "workflow_smoke": copy.deepcopy(DEFAULT_WORKFLOW_SMOKE_POLICY),
+                        "workflow_smoke": copy.deepcopy(workflow_smoke_policy),
+                        "workflow_smoke_binding": copy.deepcopy(workflow_smoke_binding),
                         "confirmation": "must be separately budgeted and is the only inferential stage",
                         "pairing": "predeclare every paired unit; vary only the intervention",
                         "negative_results": "retain_and_report",
@@ -3165,7 +3213,22 @@ class ResearchOrchestrator:
                     "Mark each system component source_derived, policy_default, or proposed. Cite supplied SRC-### ids for every source-derived component, keep source_refs empty for the other statuses, and put every intentionally invariant detail in locked_invariants.",
                     "Make intervention_boundary identify the only allowed experimental difference. unresolved_choices must contain every missing implementation decision; it must be empty before ready_for_automation.",
                     "Use the supplied CPU smoke policy. Mark other non-source choices as proposed or policy_default, never source_derived.",
-                    "For workflow_smoke set execution_profile.network_mode=offline, input_policy.readiness=required_before_execution, budget.workload.mode=bounded, and provide non-empty named limits that make the complete run practical on CPU. Epoch count alone is not a bound. A deterministic_contract_fixture is preferred for engineering conformance when the accepted scientific dataset is not preprovisioned; it remains non-inferential.",
+                    (
+                        "For workflow_smoke copy the supplied adaos_policy.workflow_smoke "
+                        "values exactly, including network_mode, input source/readiness, "
+                        "device, epochs, seeds and bounded workload mode. Provide non-empty "
+                        "named limits that make the complete run practical on CPU; epoch "
+                        "count alone is not a bound. This stage remains non-inferential. "
+                        + (
+                            "Offline is an enforced requirement of the selected provider."
+                            if workflow_smoke_policy["network_mode"] == "offline"
+                            else (
+                                "Unrestricted network is an explicit provider-compatible "
+                                "engineering-smoke choice. Report observed access separately: "
+                                "accessed=false is observation, never proof of isolation."
+                            )
+                        )
+                    ),
                     "For confirmatory execution use input_policy.source=accepted_dataset. Declare whether its workload is full or bounded without silently inheriting the smoke subset.",
                     "Populate all nine keys in decisions_by_area and cite refs only for source-derived choices; AdaOS owns decision ids.",
                     "Resolve every candidate uncertainty from problem_frame into one of those nine decisions. A bounded proposed choice closes it; an optional extension is out of scope and is not a blocker.",
@@ -3189,7 +3252,7 @@ class ResearchOrchestrator:
                 max_tokens=5_500,
                 expected_effect_direction=str(problem["hypotheses"][0]["effect_direction"]),
                 expected_experimental_signature=problem["experimental_signature"],
-                required_workflow_smoke=DEFAULT_WORKFLOW_SMOKE_POLICY,
+                required_workflow_smoke=workflow_smoke_policy,
             )
             stage_telemetry["protocol_design"] = telemetry
             total_repairs += int(telemetry.get("repair_attempts") or 0)
@@ -3235,7 +3298,13 @@ class ResearchOrchestrator:
             stage_telemetry["implementation_contract"] = telemetry
             total_repairs += int(telemetry.get("repair_attempts") or 0)
 
-            candidate = assemble_candidate(problem, protocol, implementation, source_ref_map=source_ref_map)
+            candidate = assemble_candidate(
+                problem,
+                protocol,
+                implementation,
+                source_ref_map=source_ref_map,
+                required_workflow_smoke=workflow_smoke_policy,
+            )
             stage_values = {
                 "problem_frame": problem,
                 "protocol_design": protocol,
@@ -3253,6 +3322,7 @@ class ResearchOrchestrator:
                 protocol_design=protocol,
                 implementation_contract=implementation,
                 source_ref_map=source_ref_map,
+                required_workflow_smoke=workflow_smoke_policy,
             )
             self.repository.put_formulation_stage(
                 run_id=run_id,
@@ -3293,6 +3363,7 @@ class ResearchOrchestrator:
                 "pipeline": "research_compiler_v1",
                 "compilation_digest": compilation["digest"],
                 "traceability_digest": compilation["traceability_graph"]["digest"],
+                "workflow_smoke_policy_binding": workflow_smoke_binding,
                 "stages": [
                     {
                         "stage": stage_name,
@@ -3432,6 +3503,13 @@ class ResearchOrchestrator:
         problem = by_name["problem_frame"]["payload"]
         protocol = by_name["protocol_design"]["payload"]
         implementation = by_name["implementation_contract"]["payload"]
+        protocol_telemetry = dict(by_name["protocol_design"].get("telemetry") or {})
+        workflow_smoke_policy = dict(
+            dict(protocol_telemetry.get("contract_bindings") or {}).get(
+                "workflow_smoke_policy"
+            )
+            or DEFAULT_WORKFLOW_SMOKE_POLICY
+        )
         compilation = build_compilation(
             direction_id=token,
             task=self.repository.get_task(
@@ -3444,6 +3522,7 @@ class ResearchOrchestrator:
             protocol_design=protocol,
             implementation_contract=implementation,
             source_ref_map=source_ref_map,
+            required_workflow_smoke=workflow_smoke_policy,
         )
         stage_values = {
             "problem_frame": problem,
@@ -3498,6 +3577,7 @@ class ResearchOrchestrator:
             protocol,
             implementation,
             source_ref_map=source_ref_map,
+            required_workflow_smoke=workflow_smoke_policy,
         )
         current = self.repository.get_prototype(state.get("current_prototype_digest"))
         preview = materialize_prototype(

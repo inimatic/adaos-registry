@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Mapping
 
-from research.formulation import STAGES, assemble_candidate, provider_schema, stage_digest, stage_quality_issues, stage_schema, validate_stage
+from research.formulation import STAGES, assemble_candidate, provider_schema, resolve_workflow_smoke_policy, stage_digest, stage_quality_issues, stage_schema, validate_stage
 from research.compiler import build_compilation, project_execution_compilation
 
 
@@ -538,6 +538,50 @@ def test_protocol_accepts_a_complete_ordered_comparator_id_projection() -> None:
     )
 
     assert issues == []
+
+
+def test_provider_compatible_smoke_policy_uses_capabilities_without_claiming_isolation() -> None:
+    status = {
+        "schema": "adaos.execution.provider_status.v1",
+        "provider": {
+            "provider_id": "local-process",
+            "features": ["process", "network_observation"],
+        },
+        "provider_digest": "sha256:" + "7" * 64,
+    }
+
+    binding = resolve_workflow_smoke_policy(
+        "provider_compatible_noninferential",
+        provider_status=status,
+    )
+
+    assert binding["requirements"]["network_mode"] == "unrestricted"
+    assert binding["requirements"]["input_source"] == "deterministic_contract_fixture"
+    assert binding["network_enforcement"] == "not_required"
+    assert binding["network_observation_required"] is True
+    protocol = _protocol()
+    protocol["experimental_plan"]["stages"][0]["execution_profile"][
+        "network_mode"
+    ] = "unrestricted"
+    candidate = assemble_candidate(
+        _problem(),
+        protocol,
+        _implementation(protocol),
+        source_ref_map={REF: EXACT_REF},
+        required_workflow_smoke=binding["requirements"],
+    )
+    assert candidate["experimental_plan"]["stages"][0]["execution_profile"][
+        "network_mode"
+    ] == "unrestricted"
+
+
+def test_provider_compatible_smoke_policy_requires_authoritative_snapshot() -> None:
+    try:
+        resolve_workflow_smoke_policy("provider_compatible_noninferential")
+    except ValueError as exc:
+        assert "authoritative" in str(exc)
+    else:
+        raise AssertionError("provider-compatible policy must not be inferred")
 
 
 def test_protocol_rejects_pair_labels_in_numeric_seed_values() -> None:

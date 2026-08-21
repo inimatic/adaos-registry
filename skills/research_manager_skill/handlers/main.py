@@ -254,6 +254,11 @@ def assess_experiment_execution(
     )
 
 
+@tool("execution_provider_status")
+def execution_provider_status() -> dict[str, Any]:
+    return _manager().execution_provider_status()
+
+
 @tool("start_experiment")
 def start_experiment(
     experiment_id: str,

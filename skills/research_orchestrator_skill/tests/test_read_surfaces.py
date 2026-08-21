@@ -110,6 +110,42 @@ def test_staged_discussion_rejects_accepted_task_before_source_or_llm_work(monke
         )
 
 
+def test_provider_compatible_smoke_policy_is_resolved_through_manager_capabilities() -> None:
+    calls = []
+
+    def invoke(skill_id, operation, payload, **kwargs):
+        calls.append((skill_id, operation, payload, kwargs))
+        return {
+            "schema": "adaos.execution.provider_status.v1",
+            "provider": {
+                "provider_id": "local-process",
+                "features": ["process", "network_observation"],
+            },
+            "provider_digest": "sha256:" + "4" * 64,
+            "admission_contract": "adaos.execution.admission.v1",
+        }
+
+    orchestrator = ResearchOrchestrator(
+        repository=SimpleNamespace(),
+        skill_invoker=invoke,
+    )
+
+    binding = orchestrator._resolve_workflow_smoke_policy(
+        "provider_compatible_noninferential"
+    )
+
+    assert calls == [
+        (
+            "research_manager_skill",
+            "execution_provider_status",
+            {},
+            {"timeout": 120},
+        )
+    ]
+    assert binding["requirements"]["network_mode"] == "unrestricted"
+    assert binding["network_enforcement"] == "not_required"
+
+
 def test_implementation_project_keeps_direction_identity_outside_task_lifecycle(monkeypatch) -> None:
     stale = {
         "schema": "adaos.project.v1",

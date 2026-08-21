@@ -1783,11 +1783,43 @@ class ResearchManager:
             },
             "enforcement": {
                 "network_policy": (
-                    "not_required" if network_mode == "unrestricted" else "available"
+                    "not_required"
+                    if network_mode == "unrestricted"
+                    else (
+                        "available"
+                        if (
+                            (network_mode == "offline" and "network_offline" in features)
+                            or (
+                                network_mode == "allowlist"
+                                and "network_allowlist" in features
+                            )
+                        )
+                        else "unavailable"
+                    )
                 ),
                 "network_observation_required": True,
             },
             "blockers": blockers,
+        }
+
+    def execution_provider_status(self) -> dict[str, Any]:
+        """Expose the active executor contract without creating research state.
+
+        Research formulation may use this read-only projection to choose an
+        explicitly requested, non-inferential workflow-smoke policy.  The
+        executor remains the authority: consumers receive a content-addressed
+        capability snapshot rather than inferring support from provider names.
+        """
+
+        provider = dict(execution_capabilities())
+        provider["features"] = sorted(
+            {str(item) for item in provider.get("features") or ()}
+        )
+        return {
+            "schema": "adaos.execution.provider_status.v1",
+            "provider": provider,
+            "provider_digest": digest(provider),
+            "admission_contract": "adaos.execution.admission.v1",
         }
 
     def _experiment_records(self, experiment_id: str, kind: str) -> list[ResearchRecord]:
