@@ -9,7 +9,9 @@ import pytest
 
 def _module():
     path = Path(__file__).resolve().parents[1] / "handlers" / "main.py"
-    spec = importlib.util.spec_from_file_location("research_calibration_runner.handlers.main", path)
+    spec = importlib.util.spec_from_file_location(
+        "research_calibration_runner.handlers.main", path
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -46,7 +48,11 @@ def _packet(module):
         "instruction_inputs": [],
         "prohibited_actions": ["Do not inspect evaluator material."],
     }
-    return {**identity, "created_at": "2026-08-18T00:00:00Z", "digest": module._digest(identity)}
+    return {
+        **identity,
+        "created_at": "2026-08-18T00:00:00Z",
+        "digest": module._digest(identity),
+    }
 
 
 def test_packet_digest_and_candidate_identity_are_stable() -> None:
@@ -172,6 +178,7 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
         "standard_prompt_version",
         lambda: "adaos-skill-realization/0.2.0",
     )
+
     def invoke(_skill, method, *_args, **_kwargs):
         if method == "get_task":
             return {
@@ -199,7 +206,9 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
         module._environment_preflight("tlp-calibration-v1")
 
 
-def test_environment_preflight_rejects_disk_pressure_before_candidate_creation(monkeypatch) -> None:
+def test_environment_preflight_rejects_disk_pressure_before_candidate_creation(
+    monkeypatch,
+) -> None:
     module = _module()
     runner_contract_base = {
         "schema": "adaos.contract.operation_set.v1",
@@ -240,9 +249,15 @@ def test_environment_preflight_rejects_disk_pressure_before_candidate_creation(m
 
     def invoke(_skill, method, *_args, **_kwargs):
         if method == "get_task":
-            return {"ok": True, "task": task, "runtime_identity": {**local, "current_skill": {"version": "0.1.32"}}}
+            return {
+                "ok": True,
+                "task": task,
+                "runtime_identity": {**local, "current_skill": {"version": "0.1.32"}},
+            }
         if method == "environment_identity":
-            return {"runtime_identity": {**local, "current_skill": {"version": "0.24.0"}}}
+            return {
+                "runtime_identity": {**local, "current_skill": {"version": "0.24.0"}}
+            }
         if method == "get_runner_contract":
             return {**runner_contract_base, "digest": runner_contract_digest}
         raise AssertionError(method)
@@ -291,7 +306,9 @@ def _lineage(*results: dict) -> dict:
     }
 
 
-def test_execution_order_gate_admits_only_next_preregistered_attempt(monkeypatch) -> None:
+def test_execution_order_gate_admits_only_next_preregistered_attempt(
+    monkeypatch,
+) -> None:
     module = _module()
     lineage = _lineage(
         {
@@ -313,7 +330,9 @@ def test_execution_order_gate_admits_only_next_preregistered_attempt(monkeypatch
         module._execution_order_gate("task", "C0_raw", 2, "fixed_downstream")
 
 
-def test_execution_order_gate_rejects_unverifiable_or_drifted_lineage(monkeypatch) -> None:
+def test_execution_order_gate_rejects_unverifiable_or_drifted_lineage(
+    monkeypatch,
+) -> None:
     module = _module()
     unverifiable = _lineage(
         {
@@ -347,7 +366,9 @@ def test_release_attempt_delegates_exact_terminal_candidate(monkeypatch) -> None
     monkeypatch.setattr(
         module,
         "invoke_skill",
-        lambda skill, method, arguments, **_kwargs: calls.append((skill, method, arguments))
+        lambda skill, method, arguments, **_kwargs: calls.append(
+            (skill, method, arguments)
+        )
         or {"ok": True, "runtime_release": {"runtime_removed": True}},
     )
 
@@ -366,3 +387,78 @@ def test_release_attempt_delegates_exact_terminal_candidate(monkeypatch) -> None
             },
         )
     ]
+
+
+def test_prepare_reuses_exact_development_session_without_mutating_sources(
+    monkeypatch,
+) -> None:
+    module = _module()
+    packet = _packet(module)
+    candidate = module._candidate_id(packet)
+    session_id = "devcal2_" + packet["digest"].removeprefix("sha256:")[:24]
+    webspace_id = "builder-cal-" + packet["digest"].removeprefix("sha256:")[:16]
+    budget = {"budget_view": packet["budget_view"], **packet["budget"]}
+    session = {
+        "session_id": session_id,
+        "project_ref": f"project:{candidate}",
+        "focus": {"ref": f"skill:{candidate}"},
+        "handoff": {"execution_budget": budget},
+        "artifact_inputs": [
+            {"context_digest": packet["artifact_inputs"][0]["context_digest"]}
+        ],
+        "instruction_inputs": [],
+    }
+    monkeypatch.setattr(
+        module,
+        "_environment_preflight",
+        lambda _task_id: {"task_digest": packet["task_digest"]},
+    )
+    monkeypatch.setattr(module, "_packet", lambda *_args: packet)
+    monkeypatch.setattr(
+        module.development_sessions,
+        "get",
+        lambda value: session if value == session_id else None,
+    )
+    monkeypatch.setattr(
+        module.development_sessions,
+        "binding_for",
+        lambda value: {"builder_webspace_id": value, "session_id": session_id},
+    )
+    monkeypatch.setattr(
+        module.compositions,
+        "get",
+        lambda value: {"id": value, "ref": f"project:{value}"},
+    )
+    monkeypatch.setattr(
+        module,
+        "_ensure_project",
+        lambda *_args, **_kwargs: pytest.fail(
+            "recovery must not rematerialize the Project"
+        ),
+    )
+    monkeypatch.setattr(
+        module.development_sessions,
+        "create",
+        lambda *_args, **_kwargs: pytest.fail(
+            "recovery must not recreate the Development Session"
+        ),
+    )
+    monkeypatch.setattr(
+        module.development_sessions,
+        "bind",
+        lambda *_args, **_kwargs: pytest.fail(
+            "recovery must not rewrite the existing binding"
+        ),
+    )
+
+    prepared = module._prepare(
+        packet["task_id"],
+        packet["arm_id"],
+        packet["attempt_index"],
+        packet["budget_view"],
+        None,
+    )
+
+    assert prepared["recovered_preparation"] is True
+    assert prepared["candidate_id"] == candidate
+    assert prepared["binding"]["builder_webspace_id"] == webspace_id

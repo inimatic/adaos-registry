@@ -40,7 +40,9 @@ def _validate_packet(value: Mapping[str, Any]) -> dict[str, Any]:
     packet = dict(value)
     if packet.get("schema") != "adaos.research.calibration_packet.v1":
         raise ValueError("evaluator returned an unsupported calibration packet")
-    identity = {key: item for key, item in packet.items() if key not in {"created_at", "digest"}}
+    identity = {
+        key: item for key, item in packet.items() if key not in {"created_at", "digest"}
+    }
     if str(packet.get("digest") or "") != _digest(identity):
         raise ValueError("calibration packet digest does not match its content")
     if packet.get("arm_id") not in _ARMS:
@@ -93,7 +95,9 @@ def _frozen_json_input(task: Mapping[str, Any], kind: str) -> dict[str, Any]:
     try:
         value = json.loads(path.read_text(encoding="utf-8-sig"))
     except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise RuntimeError(f"calibration {kind} input is unavailable or invalid") from exc
+        raise RuntimeError(
+            f"calibration {kind} input is unavailable or invalid"
+        ) from exc
     if not isinstance(value, Mapping):
         raise RuntimeError(f"calibration {kind} input is not an object")
     result = dict(value)
@@ -151,9 +155,13 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
     projected_base = dict(projected_contract)
     projected_base.pop("digest", None)
     if projected_base.pop("candidate_role", None) != "provider":
-        raise RuntimeError("frozen runner contract does not declare the candidate provider role")
+        raise RuntimeError(
+            "frozen runner contract does not declare the candidate provider role"
+        )
     if _digest(projected_base) != str(manager_contract.get("digest") or ""):
-        raise RuntimeError("frozen runner contract differs from the active plan-bound manager ABI")
+        raise RuntimeError(
+            "frozen runner contract differs from the active plan-bound manager ABI"
+        )
     expected = task.get("environment_spec")
     if not isinstance(expected, Mapping):
         raise RuntimeError("calibration task does not freeze its environment")
@@ -174,7 +182,9 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
         ),
         "python_version": str(local.get("python_version") or ""),
         "platform": str(local.get("platform") or ""),
-        "runner_version": str(dict(local.get("current_skill") or {}).get("version") or ""),
+        "runner_version": str(
+            dict(local.get("current_skill") or {}).get("version") or ""
+        ),
         "evaluator_version": str(
             dict(evaluator_identity.get("current_skill") or {}).get("version") or ""
         ),
@@ -195,7 +205,9 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
         "core_source_tree_digest": str(expected.get("core_source_tree_digest") or ""),
         "python_version": str(expected.get("python_version") or ""),
         "platform": str(expected.get("platform") or ""),
-        "runner_version": str(components.get("research_calibration_runner_skill") or ""),
+        "runner_version": str(
+            components.get("research_calibration_runner_skill") or ""
+        ),
         "evaluator_version": str(components.get("research_evaluator_skill") or ""),
         "evaluator_core_commit": str(expected.get("core_commit") or ""),
         "manager_version": str(components.get("research_manager_skill") or ""),
@@ -206,7 +218,10 @@ def _environment_preflight(task_id: str) -> dict[str, Any]:
     if mismatches:
         raise RuntimeError(
             "calibration environment mismatch: "
-            + ", ".join(f"{key} expected={required[key]!r} actual={actual[key]!r}" for key in mismatches)
+            + ", ".join(
+                f"{key} expected={required[key]!r} actual={actual[key]!r}"
+                for key in mismatches
+            )
         )
     minimum_free_disk_bytes = int(expected.get("minimum_free_disk_bytes") or 0)
     if minimum_free_disk_bytes <= 0:
@@ -288,24 +303,27 @@ def _execution_order_gate(
         and (str(item.get("arm_id") or ""), int(item.get("attempt_index") or 0))
         in schedule
     ]
-    completed = {
-        (str(item["arm_id"]), int(item["attempt_index"]))
-        for item in results
-    }
+    completed = {(str(item["arm_id"]), int(item["attempt_index"])) for item in results}
     if len(completed) != len(results):
         raise RuntimeError("calibration lineage contains duplicate scheduled results")
 
     if results:
-        if any(not str(item.get("execution_started_at") or "").strip() for item in results):
+        if any(
+            not str(item.get("execution_started_at") or "").strip() for item in results
+        ):
             raise RuntimeError(
                 "calibration execution order is not verifiable from Builder start timestamps"
             )
         timestamps = [str(item["execution_started_at"]) for item in results]
         if len(timestamps) != len(set(timestamps)):
-            raise RuntimeError("calibration Builder start timestamps are not strictly ordered")
+            raise RuntimeError(
+                "calibration Builder start timestamps are not strictly ordered"
+            )
         observed = [
             (str(item["arm_id"]), int(item["attempt_index"]))
-            for item in sorted(results, key=lambda item: str(item["execution_started_at"]))
+            for item in sorted(
+                results, key=lambda item: str(item["execution_started_at"])
+            )
         ]
         if observed != schedule[: len(observed)]:
             raise RuntimeError(
@@ -323,7 +341,9 @@ def _execution_order_gate(
     next_expected = next((item for item in schedule if item not in completed), None)
     if next_expected != requested:
         expected_label = (
-            f"{next_expected[0]}:{next_expected[1]}" if next_expected else "series_complete"
+            f"{next_expected[0]}:{next_expected[1]}"
+            if next_expected
+            else "series_complete"
         )
         raise RuntimeError(
             "calibration execution order mismatch: "
@@ -447,7 +467,9 @@ def _ensure_project(candidate_id: str, packet: Mapping[str, Any]) -> dict[str, A
         if item.get("role") == "primary"
     )
     if primary_ref != f"skill:{candidate_id}":
-        raise ValueError("calibration Project primary target does not match candidate_id")
+        raise ValueError(
+            "calibration Project primary target does not match candidate_id"
+        )
     return {"created": created, "project": project, "primary_ref": primary_ref}
 
 
@@ -457,7 +479,11 @@ def _artifact_source(ref: str, audience: str) -> dict[str, str]:
     )
     if not match:
         raise ValueError(f"unsupported calibration artifact ref: {ref}")
-    return {"skill_id": match.group(1), "group_id": match.group(2), "audience": audience}
+    return {
+        "skill_id": match.group(1),
+        "group_id": match.group(2),
+        "audience": audience,
+    }
 
 
 def _attach_instruction(session_id: str, item: Mapping[str, Any]) -> dict[str, Any]:
@@ -470,7 +496,9 @@ def _attach_instruction(session_id: str, item: Mapping[str, Any]) -> dict[str, A
         try:
             value = json.loads(source.read_text(encoding="utf-8-sig"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ValueError(f"calibration JSON input is invalid: {item['input_id']}") from exc
+            raise ValueError(
+                f"calibration JSON input is invalid: {item['input_id']}"
+            ) from exc
         if isinstance(value, Mapping) and str(value.get("digest") or "") == declared:
             return development_sessions.attach_instruction(
                 session_id,
@@ -486,7 +514,11 @@ def _attach_instruction(session_id: str, item: Mapping[str, Any]) -> dict[str, A
             expected_digest=declared,
             media_type="application/json",
         )
-    media_type = "text/markdown" if source.suffix.lower() in {".md", ".markdown"} else "text/plain"
+    media_type = (
+        "text/markdown"
+        if source.suffix.lower() in {".md", ".markdown"}
+        else "text/plain"
+    )
     return development_sessions.attach_instruction_file(
         session_id,
         kind,
@@ -506,8 +538,86 @@ def _prepare(
     environment = _environment_preflight(task_id)
     packet = _packet(task_id, arm_id, attempt_index, budget_view)
     if str(packet["task_digest"]) != str(environment["task_digest"]):
-        raise ValueError("calibration packet task digest differs from environment preflight")
+        raise ValueError(
+            "calibration packet task digest differs from environment preflight"
+        )
     candidate = _candidate_id(packet, candidate_id)
+    session_id = "devcal2_" + str(packet["digest"]).removeprefix("sha256:")[:24]
+    builder_webspace_id = (
+        "builder-cal-" + str(packet["digest"]).removeprefix("sha256:")[:16]
+    )
+    try:
+        existing_session = development_sessions.get(session_id)
+    except development_sessions.DevelopmentSessionError:
+        existing_session = None
+    if existing_session is not None:
+        if str(existing_session.get("project_ref") or "") != f"project:{candidate}":
+            raise ValueError(
+                "existing calibration Development Session belongs to another Project"
+            )
+        if (
+            str((existing_session.get("focus") or {}).get("ref") or "")
+            != f"skill:{candidate}"
+        ):
+            raise ValueError(
+                "existing calibration Development Session has another focus target"
+            )
+        expected_budget = {
+            "budget_view": packet["budget_view"],
+            **dict(packet["budget"]),
+        }
+        if (
+            dict((existing_session.get("handoff") or {}).get("execution_budget") or {})
+            != expected_budget
+        ):
+            raise ValueError(
+                "existing Development Session execution budget differs from the frozen packet"
+            )
+        expected_contexts = [
+            str(item["context_digest"]) for item in packet["artifact_inputs"]
+        ]
+        actual_contexts = [
+            str(item.get("context_digest") or "")
+            for item in existing_session.get("artifact_inputs") or []
+        ]
+        if actual_contexts != expected_contexts:
+            raise ValueError(
+                "existing Development Session artifact views differ from the frozen packet"
+            )
+        expected_instruction_kinds = [
+            str(item["kind"]) for item in packet["instruction_inputs"]
+        ]
+        actual_instruction_kinds = [
+            str(item.get("kind") or "")
+            for item in existing_session.get("instruction_inputs") or []
+        ]
+        if actual_instruction_kinds != expected_instruction_kinds:
+            raise ValueError(
+                "existing Development Session instructions differ from the frozen packet"
+            )
+        binding = development_sessions.binding_for(builder_webspace_id)
+        if (
+            not isinstance(binding, Mapping)
+            or str(binding.get("session_id") or "") != session_id
+        ):
+            raise ValueError(
+                "existing calibration Development Session binding is unavailable or drifted"
+            )
+        project = compositions.get(candidate)
+        return {
+            "packet": packet,
+            "candidate_id": candidate,
+            "project": {
+                "created": False,
+                "project": project,
+                "primary_ref": f"skill:{candidate}",
+            },
+            "session": existing_session,
+            "binding": dict(binding),
+            "attached": list(existing_session.get("instruction_inputs") or []),
+            "environment": environment,
+            "recovered_preparation": True,
+        }
     project = _ensure_project(candidate, packet)
     automation_digest = next(
         (
@@ -517,7 +627,6 @@ def _prepare(
         ),
         str(packet["digest"]),
     )
-    session_id = "devcal2_" + str(packet["digest"]).removeprefix("sha256:")[:24]
     artifact_sources = [
         _artifact_source(str(item["ref"]), str(item.get("audience") or ""))
         for item in packet["artifact_inputs"]
@@ -529,8 +638,13 @@ def _prepare(
         artifact_groups=[],
         artifact_sources=artifact_sources,
         request=str(packet["base_request"]),
-        execution_budget={"budget_view": packet["budget_view"], **dict(packet["budget"])},
-        agent_profile=dict(packet["agent_profile"]) if packet.get("agent_profile") else None,
+        execution_budget={
+            "budget_view": packet["budget_view"],
+            **dict(packet["budget"]),
+        },
+        agent_profile=dict(packet["agent_profile"])
+        if packet.get("agent_profile")
+        else None,
         prohibited_actions=list(packet["prohibited_actions"]),
         primary_targets=[f"skill:{candidate}"],
         focus_ref=f"skill:{candidate}",
@@ -538,17 +652,30 @@ def _prepare(
         actor="skill:research_calibration_runner_skill",
     )
     session = created["session"]
-    expected_contexts = [str(item["context_digest"]) for item in packet["artifact_inputs"]]
-    actual_contexts = [str(item.get("context_digest") or "") for item in session["artifact_inputs"]]
+    expected_contexts = [
+        str(item["context_digest"]) for item in packet["artifact_inputs"]
+    ]
+    actual_contexts = [
+        str(item.get("context_digest") or "") for item in session["artifact_inputs"]
+    ]
     if actual_contexts != expected_contexts:
-        raise ValueError("Development Session artifact views differ from the frozen packet")
+        raise ValueError(
+            "Development Session artifact views differ from the frozen packet"
+        )
     expected_budget = {"budget_view": packet["budget_view"], **dict(packet["budget"])}
     if dict(session["handoff"].get("execution_budget") or {}) != expected_budget:
-        raise ValueError("Development Session execution budget differs from the frozen packet")
-    if packet.get("agent_profile") and dict(session["handoff"].get("agent_profile") or {}) != dict(packet["agent_profile"]):
-        raise ValueError("Development Session agent profile differs from the frozen packet")
-    attached = [_attach_instruction(session_id, item) for item in packet["instruction_inputs"]]
-    builder_webspace_id = "builder-cal-" + str(packet["digest"]).removeprefix("sha256:")[:16]
+        raise ValueError(
+            "Development Session execution budget differs from the frozen packet"
+        )
+    if packet.get("agent_profile") and dict(
+        session["handoff"].get("agent_profile") or {}
+    ) != dict(packet["agent_profile"]):
+        raise ValueError(
+            "Development Session agent profile differs from the frozen packet"
+        )
+    attached = [
+        _attach_instruction(session_id, item) for item in packet["instruction_inputs"]
+    ]
     binding = development_sessions.bind(session_id, builder_webspace_id)
     return {
         "packet": packet,
@@ -582,14 +709,20 @@ def _public_preparation(prepared: Mapping[str, Any]) -> dict[str, Any]:
         "artifact_context_digests": [
             item.get("context_digest") for item in session["artifact_inputs"]
         ],
-        "instruction_kinds": [item["kind"] for item in session.get("instruction_inputs") or []],
+        "instruction_kinds": [
+            item["kind"] for item in session.get("instruction_inputs") or []
+        ],
         "base_request": packet["base_request"],
         "budget": packet["budget"],
         "environment": prepared["environment"],
+        "recovered_preparation": bool(prepared.get("recovered_preparation")),
     }
 
 
-@tool(summary="Return the runner runtime identity used by calibration preflight.", side_effects="none")
+@tool(
+    summary="Return the runner runtime identity used by calibration preflight.",
+    side_effects="none",
+)
 def environment_identity(**_: Any) -> dict[str, Any]:
     return {
         "ok": True,
@@ -598,7 +731,10 @@ def environment_identity(**_: Any) -> dict[str, Any]:
     }
 
 
-@tool(summary="Prepare one isolated Builder candidate from a frozen calibration packet.", side_effects="local_write")
+@tool(
+    summary="Prepare one isolated Builder candidate from a frozen calibration packet.",
+    side_effects="local_write",
+)
 def prepare_attempt(
     task_id: str,
     arm_id: str,
@@ -607,10 +743,15 @@ def prepare_attempt(
     candidate_id: str | None = None,
     **_: Any,
 ) -> dict[str, Any]:
-    return _public_preparation(_prepare(task_id, arm_id, attempt_index, budget_view, candidate_id))
+    return _public_preparation(
+        _prepare(task_id, arm_id, attempt_index, budget_view, candidate_id)
+    )
 
 
-@tool(summary="Start native Builder Automation for one frozen calibration attempt.", side_effects="external_io")
+@tool(
+    summary="Start native Builder Automation for one frozen calibration attempt.",
+    side_effects="external_io",
+)
 def start_attempt(
     task_id: str,
     arm_id: str,
@@ -644,8 +785,13 @@ def start_attempt(
     return {**public, "execution_order_gate": execution_gate, "automation": result}
 
 
-@tool(summary="Read native Builder Automation state for one prepared candidate.", side_effects="none")
-def get_attempt(candidate_id: str, builder_webspace_id: str, **_: Any) -> dict[str, Any]:
+@tool(
+    summary="Read native Builder Automation state for one prepared candidate.",
+    side_effects="none",
+)
+def get_attempt(
+    candidate_id: str, builder_webspace_id: str, **_: Any
+) -> dict[str, Any]:
     if not _ID_RE.fullmatch(str(candidate_id or "")):
         raise ValueError("candidate_id is invalid")
     result = invoke_skill(
