@@ -27,8 +27,6 @@
             "selectedMediaItemId": null,
             "selectedMediaFavorite": false,
             "selectedPlaybackTargetId": "",
-            "autoplay": true,
-            "autoFullscreen": true,
             "deploymentReleaseDigest": "",
             "deploymentSubnetId": "",
             "deploymentCoordinatorNodeId": "",
@@ -485,37 +483,25 @@
                 ]
               },
               {
-                "id": "media-playback-settings",
-                "type": "item.details",
-                "area": "main",
-                "title": "Playback defaults",
-                "dataSource": {"kind": "skill", "name": "media_control_skill.get_settings", "params": {"profile_id": "$state.profileId"}, "cacheTtlMs": 0, "invalidationTags": ["media_control.settings"], "preserveLastValue": true, "maxRequestHz": 2},
-                "inputs": {"presentation": "body"}
-              },
-              {
                 "id": "media-autoplay-settings",
-                "type": "ui.actions",
+                "type": "input.toggle",
                 "area": "main",
                 "title": "Autoplay",
-                "inputs": {"variant": "segmented", "selectedStateKey": "autoplay", "buttons": [{"id": "on", "label": "On", "icon": "play-outline"}, {"id": "off", "label": "Off", "icon": "pause-outline"}]},
+                "dataSource": {"kind": "skill", "name": "media_control_skill.get_settings", "params": {"profile_id": "$state.profileId"}, "cacheTtlMs": 0, "invalidationTags": ["media_control.settings"], "preserveLastValue": true, "maxRequestHz": 2},
+                "inputs": {"valuePath": "settings.autoplay", "description": "Start the next queue item automatically."},
                 "actions": [
-                  {"on": "click:on", "type": "callSkill", "target": "media_control_skill.set_settings", "params": {"profile_id": "$state.profileId", "values": {"autoplay": true}}, "invalidates": ["media_control.settings"]},
-                  {"on": "click:on", "type": "updateState", "params": {"autoplay": true}},
-                  {"on": "click:off", "type": "callSkill", "target": "media_control_skill.set_settings", "params": {"profile_id": "$state.profileId", "values": {"autoplay": false}}, "invalidates": ["media_control.settings"]},
-                  {"on": "click:off", "type": "updateState", "params": {"autoplay": false}}
+                  {"on": "change", "type": "callSkill", "target": "media_control_skill.set_settings", "params": {"profile_id": "$state.profileId", "values": {"autoplay": "$event.checked"}}, "invalidates": ["media_control.settings"]}
                 ]
               },
               {
                 "id": "media-fullscreen-settings",
-                "type": "ui.actions",
+                "type": "input.toggle",
                 "area": "main",
                 "title": "Auto fullscreen",
-                "inputs": {"variant": "segmented", "selectedStateKey": "autoFullscreen", "buttons": [{"id": "on", "label": "On", "icon": "expand-outline"}, {"id": "off", "label": "Off", "icon": "contract-outline"}]},
+                "dataSource": {"kind": "skill", "name": "media_control_skill.get_settings", "params": {"profile_id": "$state.profileId"}, "cacheTtlMs": 0, "invalidationTags": ["media_control.settings"], "preserveLastValue": true, "maxRequestHz": 2},
+                "inputs": {"valuePath": "settings.auto_fullscreen", "description": "Enter fullscreen when video playback starts."},
                 "actions": [
-                  {"on": "click:on", "type": "callSkill", "target": "media_control_skill.set_settings", "params": {"profile_id": "$state.profileId", "values": {"auto_fullscreen": true}}, "invalidates": ["media_control.settings"]},
-                  {"on": "click:on", "type": "updateState", "params": {"autoFullscreen": true}},
-                  {"on": "click:off", "type": "callSkill", "target": "media_control_skill.set_settings", "params": {"profile_id": "$state.profileId", "values": {"auto_fullscreen": false}}, "invalidates": ["media_control.settings"]},
-                  {"on": "click:off", "type": "updateState", "params": {"autoFullscreen": false}}
+                  {"on": "change", "type": "callSkill", "target": "media_control_skill.set_settings", "params": {"profile_id": "$state.profileId", "values": {"auto_fullscreen": "$event.checked"}}, "invalidates": ["media_control.settings"]}
                 ]
               },
               {

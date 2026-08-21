@@ -200,6 +200,30 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-deployment-agent-actions",
         "media-deployment-status",
     } <= settings_ids
+    settings_widgets = {
+        widget["id"]: widget
+        for widget in modals["media_center_settings"]["schema"]["widgets"]
+    }
+    for widget_id, setting_key in {
+        "media-autoplay-settings": "autoplay",
+        "media-fullscreen-settings": "auto_fullscreen",
+    }.items():
+        widget = settings_widgets[widget_id]
+        assert widget["type"] == "input.toggle"
+        assert widget["dataSource"]["name"] == "media_control_skill.get_settings"
+        assert widget["inputs"]["valuePath"] == f"settings.{setting_key}"
+        assert widget["actions"] == [
+            {
+                "on": "change",
+                "type": "callSkill",
+                "target": "media_control_skill.set_settings",
+                "params": {
+                    "profile_id": "$state.profileId",
+                    "values": {setting_key: "$event.checked"},
+                },
+                "invalidates": ["media_control.settings"],
+            }
+        ]
     roots = next(
         widget
         for widget in modals["media_center_settings"]["schema"]["widgets"]
