@@ -135,12 +135,22 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     }
     assert widgets["media-home"]["inputs"]["collectionKey"] == "items"
     assert widgets["media-home"]["inputs"]["loadingStatusKey"] == "state"
-    assert widgets["media-home"]["inputs"]["emptyTextByState"] == {
+    empty_text_by_state = widgets["media-home"]["inputs"]["emptyTextByState"]
+    assert {
+        key: value
+        for key, value in empty_text_by_state.items()
+        if not key.endswith("_i18n")
+    } == {
         "unconfigured": "Add a media folder in Settings to begin.",
         "indexing": "Your media folders are being indexed.",
         "empty": "No playable media was found in the configured folders.",
         "unavailable": "Library state is temporarily unavailable.",
     }
+    assert {
+        key.removesuffix("_i18n")
+        for key in empty_text_by_state
+        if key.endswith("_i18n")
+    } == {"unconfigured", "indexing", "empty", "unavailable"}
     assert widgets["media-profile-selector"]["inputs"]["selectedStateKey"] == "profileId"
     assert widgets["media-profile-selector"]["visibleIf"] == (
         "$state.surfaceProfile == 'mobile_control'"
@@ -166,6 +176,47 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
         "media_control_skill.list_targets"
     )
     assert len(widgets["media-mobile-transport"]["actions"]) == 5
+
+
+def test_media_center_human_text_is_localized_by_skill_owned_dictionaries() -> None:
+    webui = json.loads((SCENARIO_ROOT / "webui.json").read_text(encoding="utf-8"))
+    english = json.loads(
+        (SKILL_ROOT / "assets" / "i18n" / "en.json").read_text(encoding="utf-8")
+    )
+    russian = json.loads(
+        (SKILL_ROOT / "assets" / "i18n" / "ru.json").read_text(encoding="utf-8")
+    )
+    technical_placeholders = {
+        "/mnt/media", "activation-id", "home", "node-id", "sha256:...",
+    }
+    human_fields = {
+        "title", "label", "saveLabel", "emptyText", "loadingText",
+        "errorText", "description", "confirmLabel", "cancelLabel",
+    }
+    referenced: set[str] = set()
+
+    for item in _walk_dicts(webui["ui"]["application"]):
+        for field in human_fields:
+            fallback = item.get(field)
+            if not isinstance(fallback, str) or not fallback or fallback in technical_placeholders:
+                continue
+            spec = item.get(f"{field}_i18n")
+            assert isinstance(spec, dict), f"missing {field}_i18n for {fallback!r}"
+            key = spec.get("key")
+            assert isinstance(key, str) and key.startswith("runtime.media_center.ui.")
+            referenced.add(key)
+        for field, spec in item.items():
+            if not field.endswith("_i18n") or not isinstance(spec, dict):
+                continue
+            key = spec.get("key")
+            if isinstance(key, str) and key.startswith("runtime.media_center.ui."):
+                referenced.add(key)
+
+    assert referenced
+    assert referenced <= set(english)
+    assert referenced <= set(russian)
+    assert all(english[key].strip() for key in referenced)
+    assert all(russian[key].strip() for key in referenced)
 
 
 def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:

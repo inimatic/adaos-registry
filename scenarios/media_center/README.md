@@ -26,7 +26,7 @@ Settings contains library roots, scan/import operations, profile/access and home
 - `media_control_skill` owns targets, persistent sessions, queues, commands, endpoint reconciliation, settings, and QoE.
 - The client app shell owns the single live media element, Media Session integration, mini/full/PiP presentation, local high-frequency state, and direct-to-routed playback fallback.
 
-Skill-specific human-readable errors and translations stay in each skill. The scenario does not bundle skill error dictionaries.
+Skill-specific human-readable errors and translations stay in each skill. The scenario references `runtime.media_center.ui.*` keys with English fallbacks but does not bundle dictionaries; `media_center_skill` owns both EN and RU resources.
 
 ## Validation
 

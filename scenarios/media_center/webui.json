@@ -8,7 +8,9 @@
           "id": "media_center",
           "title": "Media Center",
           "surfaceClass": "workspace",
-          "interaction": {"initialFocus": "widget:media-search"},
+          "interaction": {
+            "initialFocus": "widget:media-search"
+          },
           "initialState": {
             "profileId": "default",
             "mediaNavigation": "home",
@@ -47,21 +49,110 @@
             "profileStateKey": "surfaceProfile",
             "defaultProfile": "desktop",
             "profiles": {
-              "desktop": {"inputMode": "pointer_keyboard", "density": "compact", "overscanPx": 0, "maxContentWidthPx": 1440},
-              "tv": {"inputMode": "dpad", "density": "ten_foot", "overscanPx": 36, "maxContentWidthPx": 1920},
-              "mobile_control": {"inputMode": "touch", "density": "comfortable", "overscanPx": 0, "maxContentWidthPx": 720},
-              "embedded": {"inputMode": "embedded", "density": "compact", "overscanPx": 0, "maxContentWidthPx": 960}
+              "desktop": {
+                "inputMode": "pointer_keyboard",
+                "density": "compact",
+                "overscanPx": 0,
+                "maxContentWidthPx": 1440
+              },
+              "tv": {
+                "inputMode": "dpad",
+                "density": "ten_foot",
+                "overscanPx": 36,
+                "maxContentWidthPx": 1920
+              },
+              "mobile_control": {
+                "inputMode": "touch",
+                "density": "comfortable",
+                "overscanPx": 0,
+                "maxContentWidthPx": 720
+              },
+              "embedded": {
+                "inputMode": "embedded",
+                "density": "compact",
+                "overscanPx": 0,
+                "maxContentWidthPx": 960
+              }
             }
           },
           "layout": {
             "type": "single",
             "pattern": "stack",
-            "areas": [{"id": "main", "role": "main", "label": "Media Center"}],
+            "areas": [
+              {
+                "id": "main",
+                "role": "main",
+                "label": "Media Center",
+                "label_i18n": {
+                  "key": "runtime.media_center.ui.media_center"
+                }
+              }
+            ],
             "variants": [
-              {"id": "tv", "when": "$state.surfaceProfile == 'tv'", "type": "single", "pattern": "stack", "areas": [{"id": "main", "role": "main", "label": "Media Center TV"}]},
-              {"id": "mobile-control", "when": "$state.surfaceProfile == 'mobile_control'", "type": "single", "pattern": "stack", "areas": [{"id": "main", "role": "main", "label": "Media Center Remote"}]},
-              {"id": "embedded", "when": "$state.surfaceProfile == 'embedded'", "type": "single", "pattern": "stack", "areas": [{"id": "main", "role": "main", "label": "Media Center Embedded"}]},
-              {"id": "desktop", "default": true, "type": "single", "pattern": "stack", "areas": [{"id": "main", "role": "main", "label": "Media Center"}]}
+              {
+                "id": "tv",
+                "when": "$state.surfaceProfile == 'tv'",
+                "type": "single",
+                "pattern": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main",
+                    "label": "Media Center TV",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.media_center_tv"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "mobile-control",
+                "when": "$state.surfaceProfile == 'mobile_control'",
+                "type": "single",
+                "pattern": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main",
+                    "label": "Media Center Remote",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.media_center_remote"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "embedded",
+                "when": "$state.surfaceProfile == 'embedded'",
+                "type": "single",
+                "pattern": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main",
+                    "label": "Media Center Embedded",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.media_center_embedded"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "desktop",
+                "default": true,
+                "type": "single",
+                "pattern": "stack",
+                "areas": [
+                  {
+                    "id": "main",
+                    "role": "main",
+                    "label": "Media Center",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.media_center"
+                    }
+                  }
+                ]
+              }
             ]
           },
           "widgets": [
@@ -75,17 +166,51 @@
                 "variant": "adaptiveToolbar",
                 "size": "small",
                 "buttons": [
-                  {"id": "remote", "label": "Remote", "icon": "phone-portrait-outline"},
+                  {
+                    "id": "remote",
+                    "label": "Remote",
+                    "icon": "phone-portrait-outline",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.remote"
+                    }
+                  },
                   {
                     "id": "profile",
                     "label": "Profile",
                     "icon": "person-outline",
                     "selectedStateKey": "profileId",
                     "options": [
-                      {"id": "default", "value": "default", "label": "Personal", "icon": "person-outline"},
-                      {"id": "household", "value": "household", "label": "Household", "icon": "people-outline"},
-                      {"id": "kids", "value": "kids", "label": "Kids", "icon": "happy-outline"}
-                    ]
+                      {
+                        "id": "default",
+                        "value": "default",
+                        "label": "Personal",
+                        "icon": "person-outline",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.personal"
+                        }
+                      },
+                      {
+                        "id": "household",
+                        "value": "household",
+                        "label": "Household",
+                        "icon": "people-outline",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.household"
+                        }
+                      },
+                      {
+                        "id": "kids",
+                        "value": "kids",
+                        "label": "Kids",
+                        "icon": "happy-outline",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.kids"
+                        }
+                      }
+                    ],
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.profile"
+                    }
                   },
                   {
                     "id": "section",
@@ -93,16 +218,137 @@
                     "icon": "home-outline",
                     "selectedStateKey": "mediaNavigation",
                     "options": [
-                      {"id": "home", "value": "home", "label": "Home", "icon": "home-outline", "mediaSection": "home", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title", "mediaSearch": ""},
-                      {"id": "movies", "value": "movies", "label": "Movies", "icon": "film-outline", "mediaSection": "catalog", "mediaKind": "video", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title"},
-                      {"id": "series", "value": "series", "label": "Series", "icon": "albums-outline", "mediaSection": "collections", "mediaKind": "playable", "mediaCollectionKind": "series", "mediaFavoritesOnly": false, "mediaSort": "title"},
-                      {"id": "music", "value": "music", "label": "Music", "icon": "musical-notes-outline", "mediaSection": "catalog", "mediaKind": "audio", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title"},
-                      {"id": "audiobooks", "value": "audiobooks", "label": "Audiobooks", "icon": "book-outline", "mediaSection": "collections", "mediaKind": "playable", "mediaCollectionKind": "audiobook", "mediaFavoritesOnly": false, "mediaSort": "title"},
-                      {"id": "folders", "value": "folders", "label": "Folders", "icon": "folder-outline", "mediaSection": "folders", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title"},
-                      {"id": "playlists", "value": "playlists", "label": "Playlists", "icon": "list-outline", "mediaSection": "playlists", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title"},
-                      {"id": "favorites", "value": "favorites", "label": "Favorites", "icon": "star-outline", "mediaSection": "catalog", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": true, "mediaSort": "favorite"},
-                      {"id": "recent", "value": "recent", "label": "Recent", "icon": "time-outline", "mediaSection": "catalog", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "recent"}
-                    ]
+                      {
+                        "id": "home",
+                        "value": "home",
+                        "label": "Home",
+                        "icon": "home-outline",
+                        "mediaSection": "home",
+                        "mediaKind": "playable",
+                        "mediaCollectionKind": "",
+                        "mediaFavoritesOnly": false,
+                        "mediaSort": "title",
+                        "mediaSearch": "",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.home"
+                        }
+                      },
+                      {
+                        "id": "movies",
+                        "value": "movies",
+                        "label": "Movies",
+                        "icon": "film-outline",
+                        "mediaSection": "catalog",
+                        "mediaKind": "video",
+                        "mediaCollectionKind": "",
+                        "mediaFavoritesOnly": false,
+                        "mediaSort": "title",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.movies"
+                        }
+                      },
+                      {
+                        "id": "series",
+                        "value": "series",
+                        "label": "Series",
+                        "icon": "albums-outline",
+                        "mediaSection": "collections",
+                        "mediaKind": "playable",
+                        "mediaCollectionKind": "series",
+                        "mediaFavoritesOnly": false,
+                        "mediaSort": "title",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.series"
+                        }
+                      },
+                      {
+                        "id": "music",
+                        "value": "music",
+                        "label": "Music",
+                        "icon": "musical-notes-outline",
+                        "mediaSection": "catalog",
+                        "mediaKind": "audio",
+                        "mediaCollectionKind": "",
+                        "mediaFavoritesOnly": false,
+                        "mediaSort": "title",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.music"
+                        }
+                      },
+                      {
+                        "id": "audiobooks",
+                        "value": "audiobooks",
+                        "label": "Audiobooks",
+                        "icon": "book-outline",
+                        "mediaSection": "collections",
+                        "mediaKind": "playable",
+                        "mediaCollectionKind": "audiobook",
+                        "mediaFavoritesOnly": false,
+                        "mediaSort": "title",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.audiobooks"
+                        }
+                      },
+                      {
+                        "id": "folders",
+                        "value": "folders",
+                        "label": "Folders",
+                        "icon": "folder-outline",
+                        "mediaSection": "folders",
+                        "mediaKind": "playable",
+                        "mediaCollectionKind": "",
+                        "mediaFavoritesOnly": false,
+                        "mediaSort": "title",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.folders"
+                        }
+                      },
+                      {
+                        "id": "playlists",
+                        "value": "playlists",
+                        "label": "Playlists",
+                        "icon": "list-outline",
+                        "mediaSection": "playlists",
+                        "mediaKind": "playable",
+                        "mediaCollectionKind": "",
+                        "mediaFavoritesOnly": false,
+                        "mediaSort": "title",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.playlists"
+                        }
+                      },
+                      {
+                        "id": "favorites",
+                        "value": "favorites",
+                        "label": "Favorites",
+                        "icon": "star-outline",
+                        "mediaSection": "catalog",
+                        "mediaKind": "playable",
+                        "mediaCollectionKind": "",
+                        "mediaFavoritesOnly": true,
+                        "mediaSort": "favorite",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.favorites"
+                        }
+                      },
+                      {
+                        "id": "recent",
+                        "value": "recent",
+                        "label": "Recent",
+                        "icon": "time-outline",
+                        "mediaSection": "catalog",
+                        "mediaKind": "playable",
+                        "mediaCollectionKind": "",
+                        "mediaFavoritesOnly": false,
+                        "mediaSort": "recent",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.recent"
+                        }
+                      }
+                    ],
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.section"
+                    }
                   },
                   {
                     "id": "layout",
@@ -110,21 +356,96 @@
                     "icon": "albums-outline",
                     "selectedStateKey": "mediaDisplay",
                     "options": [
-                      {"id": "list", "value": "list", "label": "List", "icon": "list-outline"},
-                      {"id": "cards", "value": "cards", "label": "Grid", "icon": "grid-outline"},
-                      {"id": "rail", "value": "rail", "label": "Carousel", "icon": "albums-outline"}
-                    ]
+                      {
+                        "id": "list",
+                        "value": "list",
+                        "label": "List",
+                        "icon": "list-outline",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.list"
+                        }
+                      },
+                      {
+                        "id": "cards",
+                        "value": "cards",
+                        "label": "Grid",
+                        "icon": "grid-outline",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.grid"
+                        }
+                      },
+                      {
+                        "id": "rail",
+                        "value": "rail",
+                        "label": "Carousel",
+                        "icon": "albums-outline",
+                        "label_i18n": {
+                          "key": "runtime.media_center.ui.carousel"
+                        }
+                      }
+                    ],
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.layout"
+                    }
                   },
-                  {"id": "settings", "label": "Settings", "icon": "settings-outline"}
+                  {
+                    "id": "settings",
+                    "label": "Settings",
+                    "icon": "settings-outline",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.settings"
+                    }
+                  }
                 ]
               },
               "actions": [
-                {"on": "click:remote", "type": "openModal", "params": {"modalId": "media_center_remote"}},
-                {"on": "select:profile", "type": "updateState", "params": {"profileId": "$event.value", "mediaCursor": "", "selectedMediaItemId": null}},
-                {"on": "select:section", "type": "updateState", "params": {"mediaNavigation": "$event.value", "mediaSection": "$event.mediaSection", "mediaKind": "$event.mediaKind", "mediaCollectionKind": "$event.mediaCollectionKind", "mediaFavoritesOnly": "$event.mediaFavoritesOnly", "mediaSort": "$event.mediaSort", "mediaCursor": ""}},
-                {"on": "select:layout", "type": "updateState", "params": {"mediaDisplay": "$event.value"}},
-                {"on": "click:settings", "type": "openModal", "params": {"modalId": "media_center_settings"}}
-              ]
+                {
+                  "on": "click:remote",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_remote"
+                  }
+                },
+                {
+                  "on": "select:profile",
+                  "type": "updateState",
+                  "params": {
+                    "profileId": "$event.value",
+                    "mediaCursor": "",
+                    "selectedMediaItemId": null
+                  }
+                },
+                {
+                  "on": "select:section",
+                  "type": "updateState",
+                  "params": {
+                    "mediaNavigation": "$event.value",
+                    "mediaSection": "$event.mediaSection",
+                    "mediaKind": "$event.mediaKind",
+                    "mediaCollectionKind": "$event.mediaCollectionKind",
+                    "mediaFavoritesOnly": "$event.mediaFavoritesOnly",
+                    "mediaSort": "$event.mediaSort",
+                    "mediaCursor": ""
+                  }
+                },
+                {
+                  "on": "select:layout",
+                  "type": "updateState",
+                  "params": {
+                    "mediaDisplay": "$event.value"
+                  }
+                },
+                {
+                  "on": "click:settings",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_settings"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.media_center"
+              }
             },
             {
               "id": "media-mobile-now-playing",
@@ -132,8 +453,24 @@
               "area": "main",
               "title": "Now Playing",
               "visibleIf": "$state.surfaceProfile == 'mobile_control'",
-              "dataSource": {"kind": "stream", "receiver": "media_control.now_playing", "path": "items.0", "params": {"profile_id": "$state.profileId"}, "scope": "workspace", "invalidationTags": ["media_control.sessions"]},
-              "inputs": {"presentation": "body"}
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "media_control.now_playing",
+                "path": "items.0",
+                "params": {
+                  "profile_id": "$state.profileId"
+                },
+                "scope": "workspace",
+                "invalidationTags": [
+                  "media_control.sessions"
+                ]
+              },
+              "inputs": {
+                "presentation": "body"
+              },
+              "title_i18n": {
+                "key": "runtime.media_center.ui.now_playing"
+              }
             },
             {
               "id": "media-mobile-targets",
@@ -141,10 +478,49 @@
               "area": "main",
               "title": "Playback target",
               "visibleIf": "$state.surfaceProfile == 'mobile_control'",
-              "dataSource": {"kind": "skill", "name": "media_control_skill.list_targets", "params": {"limit": 20}, "cacheTtlMs": 1000, "invalidationTags": ["media_control.targets"], "preserveLastValue": true, "maxRequestHz": 1},
-              "inputs": {"itemKey": "id", "primaryKey": "label", "secondaryKey": "kind", "emptyText": "No playback targets are available."},
-              "collection": {"display": "list", "focusGroup": "media-mobile-targets", "virtualized": true, "cursor": {"enabled": false, "stateKey": "mediaCursor"}},
-              "actions": [{"on": "select", "type": "updateState", "params": {"selectedPlaybackTargetId": "$event.id"}}]
+              "dataSource": {
+                "kind": "skill",
+                "name": "media_control_skill.list_targets",
+                "params": {
+                  "limit": 20
+                },
+                "cacheTtlMs": 1000,
+                "invalidationTags": [
+                  "media_control.targets"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 1
+              },
+              "inputs": {
+                "itemKey": "id",
+                "primaryKey": "label",
+                "secondaryKey": "kind",
+                "emptyText": "No playback targets are available.",
+                "emptyText_i18n": {
+                  "key": "runtime.media_center.ui.no_playback_targets_are_available"
+                }
+              },
+              "collection": {
+                "display": "list",
+                "focusGroup": "media-mobile-targets",
+                "virtualized": true,
+                "cursor": {
+                  "enabled": false,
+                  "stateKey": "mediaCursor"
+                }
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "selectedPlaybackTargetId": "$event.id"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.playback_target"
+              }
             },
             {
               "id": "media-mobile-transport",
@@ -152,14 +528,121 @@
               "area": "main",
               "title": "Transport",
               "visibleIf": "$state.surfaceProfile == 'mobile_control'",
-              "inputs": {"variant": "toolbar", "buttons": [{"id": "previous", "icon": "play-skip-back-outline", "label": "Previous"}, {"id": "play", "icon": "play-outline", "label": "Play"}, {"id": "pause", "icon": "pause-outline", "label": "Pause"}, {"id": "next", "icon": "play-skip-forward-outline", "label": "Next"}, {"id": "stop", "icon": "stop-outline", "label": "Stop"}]},
+              "inputs": {
+                "variant": "toolbar",
+                "buttons": [
+                  {
+                    "id": "previous",
+                    "icon": "play-skip-back-outline",
+                    "label": "Previous",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.previous"
+                    }
+                  },
+                  {
+                    "id": "play",
+                    "icon": "play-outline",
+                    "label": "Play",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.play"
+                    }
+                  },
+                  {
+                    "id": "pause",
+                    "icon": "pause-outline",
+                    "label": "Pause",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.pause"
+                    }
+                  },
+                  {
+                    "id": "next",
+                    "icon": "play-skip-forward-outline",
+                    "label": "Next",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.next"
+                    }
+                  },
+                  {
+                    "id": "stop",
+                    "icon": "stop-outline",
+                    "label": "Stop",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.stop"
+                    }
+                  }
+                ]
+              },
               "actions": [
-                {"on": "click:previous", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "previous", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                {"on": "click:play", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "play", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                {"on": "click:pause", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "pause", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                {"on": "click:next", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "next", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                {"on": "click:stop", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "stop", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]}
-              ]
+                {
+                  "on": "click:previous",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "previous",
+                    "profile_id": "$state.profileId",
+                    "target_id": "$state.selectedPlaybackTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:play",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "play",
+                    "profile_id": "$state.profileId",
+                    "target_id": "$state.selectedPlaybackTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:pause",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "pause",
+                    "profile_id": "$state.profileId",
+                    "target_id": "$state.selectedPlaybackTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:next",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "next",
+                    "profile_id": "$state.profileId",
+                    "target_id": "$state.selectedPlaybackTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:stop",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "stop",
+                    "profile_id": "$state.profileId",
+                    "target_id": "$state.selectedPlaybackTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.transport"
+              }
             },
             {
               "id": "media-profile-selector",
@@ -172,30 +655,87 @@
                 "size": "small",
                 "selectedStateKey": "profileId",
                 "buttons": [
-                  {"id": "default", "label": "Personal", "icon": "person-outline"},
-                  {"id": "household", "label": "Household", "icon": "people-outline"},
-                  {"id": "kids", "label": "Kids", "icon": "happy-outline"}
+                  {
+                    "id": "default",
+                    "label": "Personal",
+                    "icon": "person-outline",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.personal"
+                    }
+                  },
+                  {
+                    "id": "household",
+                    "label": "Household",
+                    "icon": "people-outline",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.household"
+                    }
+                  },
+                  {
+                    "id": "kids",
+                    "label": "Kids",
+                    "icon": "happy-outline",
+                    "label_i18n": {
+                      "key": "runtime.media_center.ui.kids"
+                    }
+                  }
                 ]
               },
               "actions": [
-                {"on": "click", "type": "updateState", "params": {"profileId": "$event.id", "mediaCursor": "", "selectedMediaItemId": null}}
-              ]
+                {
+                  "on": "click",
+                  "type": "updateState",
+                  "params": {
+                    "profileId": "$event.id",
+                    "mediaCursor": "",
+                    "selectedMediaItemId": null
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.profile"
+              }
             },
             {
               "id": "media-search",
               "type": "input.text",
               "area": "main",
               "title": "Search",
-              "dataSource": {"kind": "static", "value": {"value": "$state.mediaSearch"}},
+              "dataSource": {
+                "kind": "static",
+                "value": {
+                  "value": "$state.mediaSearch"
+                }
+              },
               "inputs": {
                 "placeholder": "Title, filename, folder, artist, or series",
                 "initialValue": "",
                 "commitMode": "manual",
-                "saveLabel": "Search"
+                "saveLabel": "Search",
+                "placeholder_i18n": {
+                  "key": "runtime.media_center.ui.title_filename_folder_artist_or_series"
+                },
+                "saveLabel_i18n": {
+                  "key": "runtime.media_center.ui.search"
+                }
               },
               "actions": [
-                {"on": "change", "type": "updateState", "params": {"mediaSearch": "$event.value", "mediaSection": "catalog", "mediaKind": "playable", "mediaFavoritesOnly": false, "mediaSort": "title", "mediaCursor": ""}}
-              ]
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "mediaSearch": "$event.value",
+                    "mediaSection": "catalog",
+                    "mediaKind": "playable",
+                    "mediaFavoritesOnly": false,
+                    "mediaSort": "title",
+                    "mediaCursor": ""
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.search"
+              }
             },
             {
               "id": "media-home",
@@ -207,10 +747,22 @@
                 "kind": "stream",
                 "receiver": "media_center.library_state",
                 "path": "home",
-                "params": {"profile_id": "$state.profileId", "shared_surface": "$state.sharedSurface"},
+                "params": {
+                  "profile_id": "$state.profileId",
+                  "shared_surface": "$state.sharedSurface"
+                },
                 "scope": "workspace"
               },
-              "collection": {"display": "rail", "displayModeStateKey": "mediaDisplay", "focusGroup": "media-home", "virtualized": true, "cursor": {"enabled": false, "stateKey": "mediaCursor"}},
+              "collection": {
+                "display": "rail",
+                "displayModeStateKey": "mediaDisplay",
+                "focusGroup": "media-home",
+                "virtualized": true,
+                "cursor": {
+                  "enabled": false,
+                  "stateKey": "mediaCursor"
+                }
+              },
               "inputs": {
                 "collectionKey": "items",
                 "titleKey": "title",
@@ -227,15 +779,51 @@
                 "emptyText": "No media is available for this profile.",
                 "emptyTextByState": {
                   "unconfigured": "Add a media folder in Settings to begin.",
+                  "unconfigured_i18n": {
+                    "key": "runtime.media_center.ui.add_a_media_folder_in_settings_to_begin"
+                  },
                   "indexing": "Your media folders are being indexed.",
+                  "indexing_i18n": {
+                    "key": "runtime.media_center.ui.your_media_folders_are_being_indexed"
+                  },
                   "empty": "No playable media was found in the configured folders.",
-                  "unavailable": "Library state is temporarily unavailable."
+                  "empty_i18n": {
+                    "key": "runtime.media_center.ui.no_playable_media_was_found_in_the_configured_folders"
+                  },
+                  "unavailable": "Library state is temporarily unavailable.",
+                  "unavailable_i18n": {
+                    "key": "runtime.media_center.ui.library_state_is_temporarily_unavailable"
+                  }
+                },
+                "loadingText_i18n": {
+                  "key": "runtime.media_center.ui.loading_library"
+                },
+                "emptyText_i18n": {
+                  "key": "runtime.media_center.ui.no_media_is_available_for_this_profile"
                 }
               },
               "actions": [
-                {"on": "select", "type": "updateState", "params": {"playbackSourceType": "$event.queue_source_type", "playbackSourceId": "$event.queue_source_id", "selectedMediaItemId": "$event.id", "selectedMediaFavorite": "$event.favorite"}},
-                {"on": "select", "type": "openModal", "params": {"modalId": "media_center_player"}}
-              ]
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "playbackSourceType": "$event.queue_source_type",
+                    "playbackSourceId": "$event.queue_source_id",
+                    "selectedMediaItemId": "$event.id",
+                    "selectedMediaFavorite": "$event.favorite"
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_player"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.home"
+              }
             },
             {
               "id": "media-catalog",
@@ -246,18 +834,65 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.library",
-                "params": {"query": "$state.mediaSearch", "media_kind": "$state.mediaKind", "favorites_only": "$state.mediaFavoritesOnly", "sort": "$state.mediaSort", "limit": "$state.mediaPageSize", "cursor": "$state.mediaCursor", "auto_scan": true, "profile_id": "$state.profileId"},
+                "params": {
+                  "query": "$state.mediaSearch",
+                  "media_kind": "$state.mediaKind",
+                  "favorites_only": "$state.mediaFavoritesOnly",
+                  "sort": "$state.mediaSort",
+                  "limit": "$state.mediaPageSize",
+                  "cursor": "$state.mediaCursor",
+                  "auto_scan": true,
+                  "profile_id": "$state.profileId"
+                },
                 "cacheTtlMs": 0,
-                "invalidationTags": ["media_center.catalog"],
+                "invalidationTags": [
+                  "media_center.catalog"
+                ],
                 "preserveLastValue": true,
                 "maxRequestHz": 2
               },
-              "collection": {"display": "cards", "displayModeStateKey": "mediaDisplay", "focusGroup": "media-catalog", "virtualized": true, "cursor": {"enabled": true, "stateKey": "mediaCursor"}},
-              "inputs": {"titleKey": "title", "subtitleKey": "folder_path", "imageKey": "artwork.url", "badgeKey": "media_kind", "emptyText": "No matching playable media."},
+              "collection": {
+                "display": "cards",
+                "displayModeStateKey": "mediaDisplay",
+                "focusGroup": "media-catalog",
+                "virtualized": true,
+                "cursor": {
+                  "enabled": true,
+                  "stateKey": "mediaCursor"
+                }
+              },
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "folder_path",
+                "imageKey": "artwork.url",
+                "badgeKey": "media_kind",
+                "emptyText": "No matching playable media.",
+                "emptyText_i18n": {
+                  "key": "runtime.media_center.ui.no_matching_playable_media"
+                }
+              },
               "actions": [
-                {"on": "select", "type": "updateState", "params": {"playbackSourceType": "item", "playbackSourceId": "$event.id", "selectedMediaItemId": "$event.id", "selectedMediaFavorite": "$event.favorite"}},
-                {"on": "select", "type": "openModal", "params": {"modalId": "media_center_player"}}
-              ]
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "playbackSourceType": "item",
+                    "playbackSourceId": "$event.id",
+                    "selectedMediaItemId": "$event.id",
+                    "selectedMediaFavorite": "$event.favorite"
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_player"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.library"
+              }
             },
             {
               "id": "media-collections",
@@ -268,18 +903,59 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.list_collections",
-                "params": {"kind": "$state.mediaCollectionKind", "limit": "$state.mediaPageSize", "cursor": "$state.mediaCursor"},
+                "params": {
+                  "kind": "$state.mediaCollectionKind",
+                  "limit": "$state.mediaPageSize",
+                  "cursor": "$state.mediaCursor"
+                },
                 "cacheTtlMs": 0,
-                "invalidationTags": ["media_center.catalog"],
+                "invalidationTags": [
+                  "media_center.catalog"
+                ],
                 "preserveLastValue": true,
                 "maxRequestHz": 2
               },
-              "collection": {"display": "cards", "displayModeStateKey": "mediaDisplay", "focusGroup": "media-collections", "virtualized": true, "cursor": {"enabled": true, "stateKey": "mediaCursor"}},
-              "inputs": {"titleKey": "title", "subtitleKey": "kind", "badgeKey": "item_count", "emptyText": "No collections found."},
+              "collection": {
+                "display": "cards",
+                "displayModeStateKey": "mediaDisplay",
+                "focusGroup": "media-collections",
+                "virtualized": true,
+                "cursor": {
+                  "enabled": true,
+                  "stateKey": "mediaCursor"
+                }
+              },
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "kind",
+                "badgeKey": "item_count",
+                "emptyText": "No collections found.",
+                "emptyText_i18n": {
+                  "key": "runtime.media_center.ui.no_collections_found"
+                }
+              },
               "actions": [
-                {"on": "select", "type": "updateState", "params": {"playbackSourceType": "collection", "playbackSourceId": "$event.id", "selectedMediaItemId": null, "selectedMediaFavorite": false}},
-                {"on": "select", "type": "openModal", "params": {"modalId": "media_center_player"}}
-              ]
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "playbackSourceType": "collection",
+                    "playbackSourceId": "$event.id",
+                    "selectedMediaItemId": null,
+                    "selectedMediaFavorite": false
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_player"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.collections"
+              }
             },
             {
               "id": "media-folders",
@@ -290,18 +966,59 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.browse_folders",
-                "params": {"limit": "$state.mediaPageSize", "cursor": "$state.mediaCursor"},
+                "params": {
+                  "limit": "$state.mediaPageSize",
+                  "cursor": "$state.mediaCursor"
+                },
                 "cacheTtlMs": 0,
-                "invalidationTags": ["media_center.catalog"],
+                "invalidationTags": [
+                  "media_center.catalog"
+                ],
                 "preserveLastValue": true,
                 "maxRequestHz": 2
               },
-              "collection": {"display": "list", "displayModeStateKey": "mediaDisplay", "focusGroup": "media-folders", "virtualized": true, "cursor": {"enabled": true, "stateKey": "mediaCursor"}},
-              "inputs": {"titleKey": "name", "subtitleKey": "path", "iconKey": "folder-outline", "badgeKey": "source_count", "emptyText": "No indexed folders."},
+              "collection": {
+                "display": "list",
+                "displayModeStateKey": "mediaDisplay",
+                "focusGroup": "media-folders",
+                "virtualized": true,
+                "cursor": {
+                  "enabled": true,
+                  "stateKey": "mediaCursor"
+                }
+              },
+              "inputs": {
+                "titleKey": "name",
+                "subtitleKey": "path",
+                "iconKey": "folder-outline",
+                "badgeKey": "source_count",
+                "emptyText": "No indexed folders.",
+                "emptyText_i18n": {
+                  "key": "runtime.media_center.ui.no_indexed_folders"
+                }
+              },
               "actions": [
-                {"on": "select", "type": "updateState", "params": {"playbackSourceType": "folder", "playbackSourceId": "$event.queue_ref", "selectedMediaItemId": null, "selectedMediaFavorite": false}},
-                {"on": "select", "type": "openModal", "params": {"modalId": "media_center_player"}}
-              ]
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "playbackSourceType": "folder",
+                    "playbackSourceId": "$event.queue_ref",
+                    "selectedMediaItemId": null,
+                    "selectedMediaFavorite": false
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_player"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.folders"
+              }
             },
             {
               "id": "media-playlists",
@@ -312,31 +1029,86 @@
               "dataSource": {
                 "kind": "skill",
                 "name": "media_center_skill.list_playlists",
-                "params": {"profile_id": "$state.profileId", "limit": "$state.mediaPageSize", "cursor": "$state.mediaCursor"},
+                "params": {
+                  "profile_id": "$state.profileId",
+                  "limit": "$state.mediaPageSize",
+                  "cursor": "$state.mediaCursor"
+                },
                 "cacheTtlMs": 0,
-                "invalidationTags": ["media_center.catalog"],
+                "invalidationTags": [
+                  "media_center.catalog"
+                ],
                 "preserveLastValue": true,
                 "maxRequestHz": 2
               },
-              "collection": {"display": "cards", "displayModeStateKey": "mediaDisplay", "focusGroup": "media-playlists", "virtualized": true, "cursor": {"enabled": true, "stateKey": "mediaCursor"}},
-              "inputs": {"titleKey": "title", "subtitleKey": "visibility", "badgeKey": "item_count", "emptyText": "No playlists yet."},
+              "collection": {
+                "display": "cards",
+                "displayModeStateKey": "mediaDisplay",
+                "focusGroup": "media-playlists",
+                "virtualized": true,
+                "cursor": {
+                  "enabled": true,
+                  "stateKey": "mediaCursor"
+                }
+              },
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "visibility",
+                "badgeKey": "item_count",
+                "emptyText": "No playlists yet.",
+                "emptyText_i18n": {
+                  "key": "runtime.media_center.ui.no_playlists_yet"
+                }
+              },
               "actions": [
-                {"on": "select", "type": "updateState", "params": {"playbackSourceType": "playlist", "playbackSourceId": "$event.id", "selectedMediaItemId": null, "selectedMediaFavorite": false}},
-                {"on": "select", "type": "openModal", "params": {"modalId": "media_center_player"}}
-              ]
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "playbackSourceType": "playlist",
+                    "playbackSourceId": "$event.id",
+                    "selectedMediaItemId": null,
+                    "selectedMediaFavorite": false
+                  }
+                },
+                {
+                  "on": "select",
+                  "type": "openModal",
+                  "params": {
+                    "modalId": "media_center_player"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_center.ui.playlists"
+              }
             }
-          ]
+          ],
+          "title_i18n": {
+            "key": "runtime.media_center.ui.media_center"
+          }
         }
       },
       "modals": {
         "media_center_player": {
           "title": "Now Playing",
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_player",
             "title": "Now Playing",
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
             "widgets": [
               {
                 "id": "media-center-player",
@@ -348,23 +1120,70 @@
                   "kind": "skill",
                   "name": "media_center_skill.build_playback_queue",
                   "scope": "workspace",
-                  "params": {"source_type": "$state.playbackSourceType", "source_id": "$state.playbackSourceId", "profile_id": "$state.profileId", "limit": 10},
+                  "params": {
+                    "source_type": "$state.playbackSourceType",
+                    "source_id": "$state.playbackSourceId",
+                    "profile_id": "$state.profileId",
+                    "limit": 10
+                  },
                   "cacheTtlMs": 0,
-                  "invalidationTags": ["media_center.catalog"],
+                  "invalidationTags": [
+                    "media_center.catalog"
+                  ],
                   "preserveLastValue": true,
                   "maxRequestHz": 2
                 },
-                "inputs": {"compact": false, "readOnly": true, "showDiagnostics": false, "autoSelectFirst": true, "playlistLimit": 10}
+                "inputs": {
+                  "compact": false,
+                  "readOnly": true,
+                  "showDiagnostics": false,
+                  "autoSelectFirst": true,
+                  "playlistLimit": 10
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.now_playing"
+                }
               },
               {
                 "id": "media-center-player-favorite",
                 "type": "ui.actions",
                 "area": "main",
                 "visibleIf": "$state.playbackSourceType == 'item' && $state.selectedMediaFavorite != true",
-                "inputs": {"variant": "toolbar", "size": "small", "buttons": [{"id": "favorite", "label": "Favorite", "icon": "star-outline"}]},
+                "inputs": {
+                  "variant": "toolbar",
+                  "size": "small",
+                  "buttons": [
+                    {
+                      "id": "favorite",
+                      "label": "Favorite",
+                      "icon": "star-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.favorite"
+                      }
+                    }
+                  ]
+                },
                 "actions": [
-                  {"on": "click:favorite", "type": "callSkill", "target": "media_center_skill.set_favorite", "params": {"item_id": "$state.selectedMediaItemId", "favorite": true, "profile_id": "$state.profileId"}, "invalidates": ["media_center.catalog"]},
-                  {"on": "click:favorite", "type": "updateState", "params": {"selectedMediaFavorite": true}}
+                  {
+                    "on": "click:favorite",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_favorite",
+                    "params": {
+                      "item_id": "$state.selectedMediaItemId",
+                      "favorite": true,
+                      "profile_id": "$state.profileId"
+                    },
+                    "invalidates": [
+                      "media_center.catalog"
+                    ]
+                  },
+                  {
+                    "on": "click:favorite",
+                    "type": "updateState",
+                    "params": {
+                      "selectedMediaFavorite": true
+                    }
+                  }
                 ]
               },
               {
@@ -372,266 +1191,1198 @@
                 "type": "ui.actions",
                 "area": "main",
                 "visibleIf": "$state.playbackSourceType == 'item' && $state.selectedMediaFavorite == true",
-                "inputs": {"variant": "toolbar", "size": "small", "buttons": [{"id": "unfavorite", "label": "Unfavorite", "icon": "star-half-outline"}]},
+                "inputs": {
+                  "variant": "toolbar",
+                  "size": "small",
+                  "buttons": [
+                    {
+                      "id": "unfavorite",
+                      "label": "Unfavorite",
+                      "icon": "star-half-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.unfavorite"
+                      }
+                    }
+                  ]
+                },
                 "actions": [
-                  {"on": "click:unfavorite", "type": "callSkill", "target": "media_center_skill.set_favorite", "params": {"item_id": "$state.selectedMediaItemId", "favorite": false, "profile_id": "$state.profileId"}, "invalidates": ["media_center.catalog"]},
-                  {"on": "click:unfavorite", "type": "updateState", "params": {"selectedMediaFavorite": false}}
+                  {
+                    "on": "click:unfavorite",
+                    "type": "callSkill",
+                    "target": "media_center_skill.set_favorite",
+                    "params": {
+                      "item_id": "$state.selectedMediaItemId",
+                      "favorite": false,
+                      "profile_id": "$state.profileId"
+                    },
+                    "invalidates": [
+                      "media_center.catalog"
+                    ]
+                  },
+                  {
+                    "on": "click:unfavorite",
+                    "type": "updateState",
+                    "params": {
+                      "selectedMediaFavorite": false
+                    }
+                  }
                 ]
               },
               {
                 "id": "media-center-player-close",
                 "type": "ui.actions",
                 "area": "main",
-                "inputs": {"variant": "toolbar", "size": "small", "buttons": [{"id": "close", "label": "Close to mini-player", "icon": "contract-outline"}]},
-                "actions": [{"on": "click:close", "type": "closeModal"}]
+                "inputs": {
+                  "variant": "toolbar",
+                  "size": "small",
+                  "buttons": [
+                    {
+                      "id": "close",
+                      "label": "Close to mini-player",
+                      "icon": "contract-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.close_to_mini_player"
+                      }
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
+                ]
               }
-            ]
+            ],
+            "title_i18n": {
+              "key": "runtime.media_center.ui.now_playing"
+            }
+          },
+          "title_i18n": {
+            "key": "runtime.media_center.ui.now_playing"
           }
         },
         "media_center_remote": {
           "title": "Media Remote",
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_remote",
             "title": "Media Remote",
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
             "widgets": [
               {
                 "id": "media-targets",
                 "type": "ui.list",
                 "area": "main",
                 "title": "Playback target",
-                "dataSource": {"kind": "skill", "name": "media_control_skill.list_targets", "params": {"limit": 50}, "cacheTtlMs": 1000, "invalidationTags": ["media_control.targets"], "preserveLastValue": true, "maxRequestHz": 1},
-                "collection": {"display": "list", "focusGroup": "media-targets", "virtualized": true, "cursor": {"enabled": false, "stateKey": "mediaCursor"}},
-                "inputs": {"titleKey": "label", "subtitleKey": "kind", "badgeKey": "status", "emptyText": "No playback targets are online."},
-                "actions": [{"on": "select", "type": "updateState", "params": {"selectedPlaybackTargetId": "$event.id"}}]
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_control_skill.list_targets",
+                  "params": {
+                    "limit": 50
+                  },
+                  "cacheTtlMs": 1000,
+                  "invalidationTags": [
+                    "media_control.targets"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "collection": {
+                  "display": "list",
+                  "focusGroup": "media-targets",
+                  "virtualized": true,
+                  "cursor": {
+                    "enabled": false,
+                    "stateKey": "mediaCursor"
+                  }
+                },
+                "inputs": {
+                  "titleKey": "label",
+                  "subtitleKey": "kind",
+                  "badgeKey": "status",
+                  "emptyText": "No playback targets are online.",
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_playback_targets_are_online"
+                  }
+                },
+                "actions": [
+                  {
+                    "on": "select",
+                    "type": "updateState",
+                    "params": {
+                      "selectedPlaybackTargetId": "$event.id"
+                    }
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.playback_target"
+                }
               },
               {
                 "id": "media-remote-transport",
                 "type": "ui.actions",
                 "area": "main",
                 "title": "Transport",
-                "inputs": {"variant": "toolbar", "buttons": [{"id": "previous", "icon": "play-skip-back-outline"}, {"id": "play", "icon": "play-outline"}, {"id": "pause", "icon": "pause-outline"}, {"id": "next", "icon": "play-skip-forward-outline"}, {"id": "stop", "icon": "stop-outline"}]},
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "previous",
+                      "icon": "play-skip-back-outline",
+                      "label": "Previous",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.previous"
+                      }
+                    },
+                    {
+                      "id": "play",
+                      "icon": "play-outline",
+                      "label": "Play",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.play"
+                      }
+                    },
+                    {
+                      "id": "pause",
+                      "icon": "pause-outline",
+                      "label": "Pause",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.pause"
+                      }
+                    },
+                    {
+                      "id": "next",
+                      "icon": "play-skip-forward-outline",
+                      "label": "Next",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.next"
+                      }
+                    },
+                    {
+                      "id": "stop",
+                      "icon": "stop-outline",
+                      "label": "Stop",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.stop"
+                      }
+                    }
+                  ]
+                },
                 "actions": [
-                  {"on": "click:previous", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "previous", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                  {"on": "click:play", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "play", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                  {"on": "click:pause", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "pause", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                  {"on": "click:next", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "next", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]},
-                  {"on": "click:stop", "type": "callSkill", "target": "media_control_skill.voice_command", "params": {"action": "stop", "profile_id": "$state.profileId", "target_id": "$state.selectedPlaybackTargetId"}, "invalidates": ["media_control.sessions"]}
-                ]
+                  {
+                    "on": "click:previous",
+                    "type": "callSkill",
+                    "target": "media_control_skill.voice_command",
+                    "params": {
+                      "action": "previous",
+                      "profile_id": "$state.profileId",
+                      "target_id": "$state.selectedPlaybackTargetId"
+                    },
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
+                  },
+                  {
+                    "on": "click:play",
+                    "type": "callSkill",
+                    "target": "media_control_skill.voice_command",
+                    "params": {
+                      "action": "play",
+                      "profile_id": "$state.profileId",
+                      "target_id": "$state.selectedPlaybackTargetId"
+                    },
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
+                  },
+                  {
+                    "on": "click:pause",
+                    "type": "callSkill",
+                    "target": "media_control_skill.voice_command",
+                    "params": {
+                      "action": "pause",
+                      "profile_id": "$state.profileId",
+                      "target_id": "$state.selectedPlaybackTargetId"
+                    },
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
+                  },
+                  {
+                    "on": "click:next",
+                    "type": "callSkill",
+                    "target": "media_control_skill.voice_command",
+                    "params": {
+                      "action": "next",
+                      "profile_id": "$state.profileId",
+                      "target_id": "$state.selectedPlaybackTargetId"
+                    },
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
+                  },
+                  {
+                    "on": "click:stop",
+                    "type": "callSkill",
+                    "target": "media_control_skill.voice_command",
+                    "params": {
+                      "action": "stop",
+                      "profile_id": "$state.profileId",
+                      "target_id": "$state.selectedPlaybackTargetId"
+                    },
+                    "invalidates": [
+                      "media_control.sessions"
+                    ]
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.transport"
+                }
               },
               {
                 "id": "media-now-playing",
                 "type": "ui.list",
                 "area": "main",
                 "title": "Now Playing",
-                "dataSource": {"kind": "stream", "receiver": "media_control.now_playing", "scope": "workspace", "invalidationTags": ["media_control.sessions"]},
-                "inputs": {"titleKey": "active_item_id", "subtitleKey": "state", "badgeKey": "position_ms", "emptyText": "Nothing is playing."}
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_control.now_playing",
+                  "scope": "workspace",
+                  "invalidationTags": [
+                    "media_control.sessions"
+                  ]
+                },
+                "inputs": {
+                  "titleKey": "active_item_id",
+                  "subtitleKey": "state",
+                  "badgeKey": "position_ms",
+                  "emptyText": "Nothing is playing.",
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.nothing_is_playing"
+                  }
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.now_playing"
+                }
               },
-              {"id": "media-remote-close", "type": "ui.actions", "area": "main", "inputs": {"buttons": [{"id": "close", "label": "Close", "icon": "close-outline"}]}, "actions": [{"on": "click:close", "type": "closeModal"}]}
-            ]
+              {
+                "id": "media-remote-close",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "close",
+                      "label": "Close",
+                      "icon": "close-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.close"
+                      }
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
+                ]
+              }
+            ],
+            "title_i18n": {
+              "key": "runtime.media_center.ui.media_remote"
+            }
+          },
+          "title_i18n": {
+            "key": "runtime.media_center.ui.media_remote"
           }
         },
         "media_center_settings": {
           "title": "Media Center Settings",
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_settings",
             "title": "Media Center Settings",
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
             "widgets": [
               {
                 "id": "media-settings-actions",
                 "type": "ui.actions",
                 "area": "main",
                 "title": "Library",
-                "inputs": {"variant": "toolbar", "size": "small", "buttons": [{"id": "refresh", "label": "Refresh catalog", "icon": "sync-outline"}, {"id": "scan-roots", "label": "Scan folders", "icon": "folder-open-outline"}, {"id": "close", "label": "Close", "icon": "close-outline"}]},
+                "inputs": {
+                  "variant": "toolbar",
+                  "size": "small",
+                  "buttons": [
+                    {
+                      "id": "refresh",
+                      "label": "Refresh catalog",
+                      "icon": "sync-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.refresh_catalog"
+                      }
+                    },
+                    {
+                      "id": "scan-roots",
+                      "label": "Scan folders",
+                      "icon": "folder-open-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.scan_folders"
+                      }
+                    },
+                    {
+                      "id": "close",
+                      "label": "Close",
+                      "icon": "close-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.close"
+                      }
+                    }
+                  ]
+                },
                 "actions": [
-                  {"on": "click:refresh", "type": "callSkill", "target": "media_center_skill.sync_agent", "timeoutMs": 600000, "params": {"max_pages": 16, "limit": 1000}, "invalidates": ["media_center.catalog"]},
-                  {"on": "click:scan-roots", "type": "callSkill", "target": "media_center_skill.scan_roots", "timeoutMs": 600000, "params": {"limit": 5000}, "invalidates": ["media_center.catalog", "media_center.roots"]},
-                  {"on": "click:close", "type": "closeModal"}
-                ]
+                  {
+                    "on": "click:refresh",
+                    "type": "callSkill",
+                    "target": "media_center_skill.sync_agent",
+                    "timeoutMs": 600000,
+                    "params": {
+                      "max_pages": 16,
+                      "limit": 1000
+                    },
+                    "invalidates": [
+                      "media_center.catalog"
+                    ]
+                  },
+                  {
+                    "on": "click:scan-roots",
+                    "type": "callSkill",
+                    "target": "media_center_skill.scan_roots",
+                    "timeoutMs": 600000,
+                    "params": {
+                      "limit": 5000
+                    },
+                    "invalidates": [
+                      "media_center.catalog",
+                      "media_center.roots"
+                    ]
+                  },
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.library"
+                }
               },
               {
                 "id": "media-center-summary",
                 "type": "visual.metricTile",
                 "area": "main",
                 "title": "Catalog",
-                "dataSource": {"kind": "skill", "name": "media_center_skill.status", "params": {}, "cacheTtlMs": 1000, "invalidationTags": ["media_center.catalog"], "preserveLastValue": true, "maxRequestHz": 1},
-                "inputs": {"valuePath": "summary.available_count", "labelPath": "summary.title", "subtitlePath": "summary.subtitle", "descriptionPath": "summary.details", "colorPath": "ok"}
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.status",
+                  "params": {},
+                  "cacheTtlMs": 1000,
+                  "invalidationTags": [
+                    "media_center.catalog"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "valuePath": "summary.available_count",
+                  "labelPath": "summary.title",
+                  "subtitlePath": "summary.subtitle",
+                  "descriptionPath": "summary.details",
+                  "colorPath": "ok"
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.catalog"
+                }
               },
               {
                 "id": "media-root-path",
                 "type": "input.text",
                 "area": "main",
                 "title": "Add folder",
-                "dataSource": {"kind": "static", "value": {"value": "$state.mediaRootPath"}},
-                "inputs": {"placeholder": "/mnt/media", "initialValue": "", "commitMode": "manual", "saveLabel": "Add folder"},
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.mediaRootPath"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "/mnt/media",
+                  "initialValue": "",
+                  "commitMode": "manual",
+                  "saveLabel": "Add folder",
+                  "saveLabel_i18n": {
+                    "key": "runtime.media_center.ui.add_folder"
+                  }
+                },
                 "actions": [
-                  {"on": "change", "type": "updateState", "params": {"mediaRootPath": "$event.value"}},
-                  {"on": "change", "type": "callSkill", "target": "media_center_skill.import_folder", "timeoutMs": 600000, "params": {"path": "$event.value", "include_images": false, "limit": 5000}, "invalidates": ["media_center.catalog", "media_center.roots"]}
-                ]
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "mediaRootPath": "$event.value"
+                    }
+                  },
+                  {
+                    "on": "change",
+                    "type": "callSkill",
+                    "target": "media_center_skill.import_folder",
+                    "timeoutMs": 600000,
+                    "params": {
+                      "path": "$event.value",
+                      "include_images": false,
+                      "limit": 5000
+                    },
+                    "invalidates": [
+                      "media_center.catalog",
+                      "media_center.roots"
+                    ]
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.add_folder"
+                }
               },
               {
                 "id": "media-roots-table",
                 "type": "ui.table",
                 "area": "main",
                 "title": "Media folders",
-                "dataSource": {"kind": "skill", "name": "media_center_skill.list_roots", "params": {}, "cacheTtlMs": 0, "invalidationTags": ["media_center.roots"], "preserveLastValue": true, "maxRequestHz": 2},
-                "inputs": {"pagination": false, "emptyText": "No folders configured.", "columns": [{"key": "label", "label": "Label", "width": "140px"}, {"key": "path", "label": "Path"}, {"key": "last_status", "label": "Status", "width": "110px"}, {"key": "actions", "label": "", "kind": "buttons", "width": "52px", "buttons": [{"id": "delete", "icon": "trash-outline", "title": "Remove folder"}]}]},
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.list_roots",
+                  "params": {},
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "media_center.roots"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 2
+                },
+                "inputs": {
+                  "pagination": false,
+                  "emptyText": "No folders configured.",
+                  "columns": [
+                    {
+                      "key": "label",
+                      "label": "Label",
+                      "width": "140px",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.label"
+                      }
+                    },
+                    {
+                      "key": "path",
+                      "label": "Path",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.path"
+                      }
+                    },
+                    {
+                      "key": "last_status",
+                      "label": "Status",
+                      "width": "110px",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.status"
+                      }
+                    },
+                    {
+                      "key": "actions",
+                      "label": "",
+                      "kind": "buttons",
+                      "width": "52px",
+                      "buttons": [
+                        {
+                          "id": "delete",
+                          "icon": "trash-outline",
+                          "title": "Remove folder",
+                          "title_i18n": {
+                            "key": "runtime.media_center.ui.remove_folder"
+                          }
+                        }
+                      ]
+                    }
+                  ],
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_folders_configured"
+                  }
+                },
                 "actions": [
-                  {"on": "click:delete", "type": "updateState", "params": {"selectedMediaRootId": "$event.id"}},
-                  {"on": "click:delete", "type": "openModal", "params": {"modalId": "media_center_delete_root"}}
-                ]
+                  {
+                    "on": "click:delete",
+                    "type": "updateState",
+                    "params": {
+                      "selectedMediaRootId": "$event.id"
+                    }
+                  },
+                  {
+                    "on": "click:delete",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "media_center_delete_root"
+                    }
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.media_folders"
+                }
               },
               {
                 "id": "media-autoplay-settings",
                 "type": "input.toggle",
                 "area": "main",
                 "title": "Autoplay",
-                "dataSource": {"kind": "skill", "name": "media_control_skill.get_settings", "params": {"profile_id": "$state.profileId"}, "cacheTtlMs": 0, "invalidationTags": ["media_control.settings"], "preserveLastValue": true, "maxRequestHz": 2},
-                "inputs": {"valuePath": "settings.autoplay", "description": "Start the next queue item automatically."},
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_control_skill.get_settings",
+                  "params": {
+                    "profile_id": "$state.profileId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "media_control.settings"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 2
+                },
+                "inputs": {
+                  "valuePath": "settings.autoplay",
+                  "description": "Start the next queue item automatically.",
+                  "description_i18n": {
+                    "key": "runtime.media_center.ui.start_the_next_queue_item_automatically"
+                  }
+                },
                 "actions": [
-                  {"on": "change", "type": "callSkill", "target": "media_control_skill.set_settings", "params": {"profile_id": "$state.profileId", "values": {"autoplay": "$event.checked"}}, "invalidates": ["media_control.settings"]}
-                ]
+                  {
+                    "on": "change",
+                    "type": "callSkill",
+                    "target": "media_control_skill.set_settings",
+                    "params": {
+                      "profile_id": "$state.profileId",
+                      "values": {
+                        "autoplay": "$event.checked"
+                      }
+                    },
+                    "invalidates": [
+                      "media_control.settings"
+                    ]
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.autoplay"
+                }
               },
               {
                 "id": "media-fullscreen-settings",
                 "type": "input.toggle",
                 "area": "main",
                 "title": "Auto fullscreen",
-                "dataSource": {"kind": "skill", "name": "media_control_skill.get_settings", "params": {"profile_id": "$state.profileId"}, "cacheTtlMs": 0, "invalidationTags": ["media_control.settings"], "preserveLastValue": true, "maxRequestHz": 2},
-                "inputs": {"valuePath": "settings.auto_fullscreen", "description": "Enter fullscreen when video playback starts."},
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_control_skill.get_settings",
+                  "params": {
+                    "profile_id": "$state.profileId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "media_control.settings"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 2
+                },
+                "inputs": {
+                  "valuePath": "settings.auto_fullscreen",
+                  "description": "Enter fullscreen when video playback starts.",
+                  "description_i18n": {
+                    "key": "runtime.media_center.ui.enter_fullscreen_when_video_playback_starts"
+                  }
+                },
                 "actions": [
-                  {"on": "change", "type": "callSkill", "target": "media_control_skill.set_settings", "params": {"profile_id": "$state.profileId", "values": {"auto_fullscreen": "$event.checked"}}, "invalidates": ["media_control.settings"]}
-                ]
+                  {
+                    "on": "change",
+                    "type": "callSkill",
+                    "target": "media_control_skill.set_settings",
+                    "params": {
+                      "profile_id": "$state.profileId",
+                      "values": {
+                        "auto_fullscreen": "$event.checked"
+                      }
+                    },
+                    "invalidates": [
+                      "media_control.settings"
+                    ]
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.auto_fullscreen"
+                }
               },
               {
                 "id": "media-profile-policy",
                 "type": "item.details",
                 "area": "main",
                 "title": "Profiles and access",
-                "dataSource": {"kind": "skill", "name": "media_center_skill.get_profile", "params": {"profile_id": "$state.profileId"}, "cacheTtlMs": 0, "invalidationTags": ["media_center.profile"], "preserveLastValue": true, "maxRequestHz": 2},
-                "inputs": {"presentation": "body"}
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.get_profile",
+                  "params": {
+                    "profile_id": "$state.profileId"
+                  },
+                  "cacheTtlMs": 0,
+                  "invalidationTags": [
+                    "media_center.profile"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 2
+                },
+                "inputs": {
+                  "presentation": "body"
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.profiles_and_access"
+                }
               },
               {
                 "id": "media-metadata-operations",
                 "type": "ui.list",
                 "area": "main",
                 "title": "Metadata operations",
-                "dataSource": {"kind": "skill", "name": "media_center_skill.operations", "params": {"limit": 30}, "cacheTtlMs": 1000, "invalidationTags": ["media_center.operations"], "preserveLastValue": true, "maxRequestHz": 1},
-                "inputs": {"itemKey": "id", "primaryKey": "kind", "secondaryKey": "status", "metaKey": "error_code", "emptyText": "No background operations."},
-                "collection": {"display": "list", "focusGroup": "media-metadata-operations", "virtualized": true, "cursor": {"enabled": false, "stateKey": "mediaCursor"}}
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.operations",
+                  "params": {
+                    "limit": 30
+                  },
+                  "cacheTtlMs": 1000,
+                  "invalidationTags": [
+                    "media_center.operations"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "itemKey": "id",
+                  "primaryKey": "kind",
+                  "secondaryKey": "status",
+                  "metaKey": "error_code",
+                  "emptyText": "No background operations.",
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_background_operations"
+                  }
+                },
+                "collection": {
+                  "display": "list",
+                  "focusGroup": "media-metadata-operations",
+                  "virtualized": true,
+                  "cursor": {
+                    "enabled": false,
+                    "stateKey": "mediaCursor"
+                  }
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.metadata_operations"
+                }
               },
               {
                 "id": "media-agent-performance",
                 "type": "item.details",
                 "area": "main",
                 "title": "Storage and performance",
-                "dataSource": {"kind": "skill", "name": "media_library_agent.status", "params": {}, "cacheTtlMs": 1000, "invalidationTags": ["media_center.agent"], "preserveLastValue": true, "maxRequestHz": 1},
-                "inputs": {"presentation": "body"}
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_library_agent.status",
+                  "params": {},
+                  "cacheTtlMs": 1000,
+                  "invalidationTags": [
+                    "media_center.agent"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "presentation": "body"
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.storage_and_performance"
+                }
               },
               {
                 "id": "media-playback-qoe",
                 "type": "item.details",
                 "area": "main",
                 "title": "Playback diagnostics",
-                "dataSource": {"kind": "skill", "name": "media_control_skill.qoe_summary", "params": {"limit": 30}, "cacheTtlMs": 1000, "invalidationTags": ["media_control.qoe"], "preserveLastValue": true, "maxRequestHz": 1},
-                "inputs": {"presentation": "body"}
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_control_skill.qoe_summary",
+                  "params": {
+                    "limit": 30
+                  },
+                  "cacheTtlMs": 1000,
+                  "invalidationTags": [
+                    "media_control.qoe"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "presentation": "body"
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.playback_diagnostics"
+                }
               },
               {
                 "id": "media-diagnostic-export",
                 "type": "item.details",
                 "area": "main",
                 "title": "System diagnostics",
-                "dataSource": {"kind": "skill", "name": "media_center_skill.diagnostic_export", "params": {"deployment_id": "media-center-home"}, "cacheTtlMs": 1000, "invalidationTags": ["media_center.diagnostics"], "preserveLastValue": true, "maxRequestHz": 1},
-                "inputs": {"presentation": "body"}
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.diagnostic_export",
+                  "params": {
+                    "deployment_id": "media-center-home"
+                  },
+                  "cacheTtlMs": 1000,
+                  "invalidationTags": [
+                    "media_center.diagnostics"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "presentation": "body"
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.system_diagnostics"
+                }
               },
               {
                 "id": "media-deployment-release",
                 "type": "input.text",
                 "area": "main",
                 "title": "Project release digest",
-                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentReleaseDigest"}},
-                "inputs": {"placeholder": "sha256:...", "initialValue": "", "commitMode": "manual", "saveLabel": "Use release"},
-                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentReleaseDigest": "$event.value"}}]
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.deploymentReleaseDigest"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "sha256:...",
+                  "initialValue": "",
+                  "commitMode": "manual",
+                  "saveLabel": "Use release",
+                  "saveLabel_i18n": {
+                    "key": "runtime.media_center.ui.use_release"
+                  }
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "deploymentReleaseDigest": "$event.value"
+                    }
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.project_release_digest"
+                }
               },
               {
                 "id": "media-deployment-subnet",
                 "type": "input.text",
                 "area": "main",
                 "title": "Target subnet",
-                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentSubnetId"}},
-                "inputs": {"placeholder": "home", "initialValue": "", "commitMode": "manual", "saveLabel": "Use subnet"},
-                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentSubnetId": "$event.value"}}]
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.deploymentSubnetId"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "home",
+                  "initialValue": "",
+                  "commitMode": "manual",
+                  "saveLabel": "Use subnet",
+                  "saveLabel_i18n": {
+                    "key": "runtime.media_center.ui.use_subnet"
+                  }
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "deploymentSubnetId": "$event.value"
+                    }
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.target_subnet"
+                }
               },
               {
                 "id": "media-deployment-coordinator",
                 "type": "input.text",
                 "area": "main",
                 "title": "Coordinator node",
-                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentCoordinatorNodeId"}},
-                "inputs": {"placeholder": "node-id", "initialValue": "", "commitMode": "manual", "saveLabel": "Use node"},
-                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentCoordinatorNodeId": "$event.value"}}]
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.deploymentCoordinatorNodeId"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "node-id",
+                  "initialValue": "",
+                  "commitMode": "manual",
+                  "saveLabel": "Use node",
+                  "saveLabel_i18n": {
+                    "key": "runtime.media_center.ui.use_node"
+                  }
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "deploymentCoordinatorNodeId": "$event.value"
+                    }
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.coordinator_node"
+                }
               },
               {
                 "id": "media-deployment-plan-actions",
                 "type": "ui.actions",
                 "area": "main",
                 "title": "Nodes and agents",
-                "inputs": {"variant": "toolbar", "buttons": [{"id": "plan", "label": "Plan deployment", "icon": "git-network-outline"}]},
-                "actions": [{"on": "click:plan", "type": "callSkill", "target": "media_center_skill.configure_deployment", "params": {"release_digest": "$state.deploymentReleaseDigest", "subnet_id": "$state.deploymentSubnetId", "coordinator_node_id": "$state.deploymentCoordinatorNodeId", "all_matching_agents": true, "expected_revision": "$state.deploymentExpectedRevision", "reason": "Media Center settings"}, "invalidates": ["media_center.deployment"]}]
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "plan",
+                      "label": "Plan deployment",
+                      "icon": "git-network-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.plan_deployment"
+                      }
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:plan",
+                    "type": "callSkill",
+                    "target": "media_center_skill.configure_deployment",
+                    "params": {
+                      "release_digest": "$state.deploymentReleaseDigest",
+                      "subnet_id": "$state.deploymentSubnetId",
+                      "coordinator_node_id": "$state.deploymentCoordinatorNodeId",
+                      "all_matching_agents": true,
+                      "expected_revision": "$state.deploymentExpectedRevision",
+                      "reason": "Media Center settings"
+                    },
+                    "invalidates": [
+                      "media_center.deployment"
+                    ]
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.nodes_and_agents"
+                }
               },
               {
                 "id": "media-deployment-plan-digest",
                 "type": "input.text",
                 "area": "main",
                 "title": "Reviewed plan digest",
-                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentPlanDigest"}},
-                "inputs": {"placeholder": "sha256:...", "initialValue": "", "commitMode": "manual", "saveLabel": "Apply plan"},
-                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentPlanDigest": "$event.value"}}, {"on": "change", "type": "callSkill", "target": "media_center_skill.apply_deployment", "params": {"plan_digest": "$event.value"}, "invalidates": ["media_center.deployment"]}]
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.deploymentPlanDigest"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "sha256:...",
+                  "initialValue": "",
+                  "commitMode": "manual",
+                  "saveLabel": "Apply plan",
+                  "saveLabel_i18n": {
+                    "key": "runtime.media_center.ui.apply_plan"
+                  }
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "deploymentPlanDigest": "$event.value"
+                    }
+                  },
+                  {
+                    "on": "change",
+                    "type": "callSkill",
+                    "target": "media_center_skill.apply_deployment",
+                    "params": {
+                      "plan_digest": "$event.value"
+                    },
+                    "invalidates": [
+                      "media_center.deployment"
+                    ]
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.reviewed_plan_digest"
+                }
               },
               {
                 "id": "media-deployment-activation",
                 "type": "input.text",
                 "area": "main",
                 "title": "Agent activation",
-                "dataSource": {"kind": "static", "value": {"value": "$state.deploymentActivationId"}},
-                "inputs": {"placeholder": "activation-id", "initialValue": "", "commitMode": "manual", "saveLabel": "Select activation"},
-                "actions": [{"on": "change", "type": "updateState", "params": {"deploymentActivationId": "$event.value"}}]
+                "dataSource": {
+                  "kind": "static",
+                  "value": {
+                    "value": "$state.deploymentActivationId"
+                  }
+                },
+                "inputs": {
+                  "placeholder": "activation-id",
+                  "initialValue": "",
+                  "commitMode": "manual",
+                  "saveLabel": "Select activation",
+                  "saveLabel_i18n": {
+                    "key": "runtime.media_center.ui.select_activation"
+                  }
+                },
+                "actions": [
+                  {
+                    "on": "change",
+                    "type": "updateState",
+                    "params": {
+                      "deploymentActivationId": "$event.value"
+                    }
+                  }
+                ],
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.agent_activation"
+                }
               },
               {
                 "id": "media-deployment-agent-actions",
                 "type": "ui.actions",
                 "area": "main",
-                "inputs": {"variant": "toolbar", "buttons": [{"id": "drain", "label": "Drain", "icon": "pause-circle-outline"}, {"id": "remove", "label": "Remove", "icon": "trash-outline", "kind": "danger"}]},
-                "actions": [{"on": "click:drain", "type": "callSkill", "target": "media_center_skill.drain_activation", "params": {"activation_id": "$state.deploymentActivationId"}, "invalidates": ["media_center.deployment"]}, {"on": "click:remove", "type": "callSkill", "target": "media_center_skill.remove_activation", "params": {"activation_id": "$state.deploymentActivationId"}, "invalidates": ["media_center.deployment"]}]
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "drain",
+                      "label": "Drain",
+                      "icon": "pause-circle-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.drain"
+                      }
+                    },
+                    {
+                      "id": "remove",
+                      "label": "Remove",
+                      "icon": "trash-outline",
+                      "kind": "danger",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.remove"
+                      }
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:drain",
+                    "type": "callSkill",
+                    "target": "media_center_skill.drain_activation",
+                    "params": {
+                      "activation_id": "$state.deploymentActivationId"
+                    },
+                    "invalidates": [
+                      "media_center.deployment"
+                    ]
+                  },
+                  {
+                    "on": "click:remove",
+                    "type": "callSkill",
+                    "target": "media_center_skill.remove_activation",
+                    "params": {
+                      "activation_id": "$state.deploymentActivationId"
+                    },
+                    "invalidates": [
+                      "media_center.deployment"
+                    ]
+                  }
+                ]
               },
               {
                 "id": "media-deployment-status",
                 "type": "item.details",
                 "area": "main",
                 "title": "Distributed services",
-                "dataSource": {"kind": "skill", "name": "media_center_skill.deployment_status", "params": {"deployment_id": "media-center-home", "limit": 50}, "cacheTtlMs": 1000, "invalidationTags": ["media_center.deployment"], "preserveLastValue": true, "maxRequestHz": 1},
-                "inputs": {"presentation": "body"}
+                "dataSource": {
+                  "kind": "skill",
+                  "name": "media_center_skill.deployment_status",
+                  "params": {
+                    "deployment_id": "media-center-home",
+                    "limit": 50
+                  },
+                  "cacheTtlMs": 1000,
+                  "invalidationTags": [
+                    "media_center.deployment"
+                  ],
+                  "preserveLastValue": true,
+                  "maxRequestHz": 1
+                },
+                "inputs": {
+                  "presentation": "body"
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.distributed_services"
+                }
               }
-            ]
+            ],
+            "title_i18n": {
+              "key": "runtime.media_center.ui.media_center_settings"
+            }
+          },
+          "title_i18n": {
+            "key": "runtime.media_center.ui.media_center_settings"
           }
         },
         "media_center_delete_root": {
           "title": "Remove media folder",
           "scope": "workspace",
-          "presentation": {"kind": "modal", "restoreFocus": true},
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
           "schema": {
             "id": "media_center_delete_root",
             "title": "Remove media folder",
-            "layout": {"type": "stack", "areas": [{"id": "main", "role": "main"}]},
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
             "widgets": [
-              {"id": "media-delete-root-warning", "type": "static.markdown", "area": "main", "inputs": {"content": "Remove this folder from the agent? Catalog references are detached; original media files remain unchanged."}},
-              {"id": "media-delete-root-actions", "type": "ui.actions", "area": "main", "inputs": {"variant": "toolbar", "buttons": [{"id": "confirm", "label": "Remove", "icon": "trash-outline", "kind": "danger"}, {"id": "cancel", "label": "Cancel", "icon": "close-outline"}]}, "actions": [{"on": "click:confirm", "type": "callSkill", "target": "media_center_skill.delete_root", "params": {"root_id": "$state.selectedMediaRootId"}, "invalidates": ["media_center.catalog", "media_center.roots"]}, {"on": "click:confirm", "type": "updateState", "params": {"selectedMediaRootId": null, "mediaCursor": ""}}, {"on": "click:confirm", "type": "closeModal"}, {"on": "click:cancel", "type": "closeModal"}]}
-            ]
+              {
+                "id": "media-delete-root-warning",
+                "type": "static.markdown",
+                "area": "main",
+                "inputs": {
+                  "content": "Remove this folder from the agent? Catalog references are detached; original media files remain unchanged."
+                }
+              },
+              {
+                "id": "media-delete-root-actions",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "variant": "toolbar",
+                  "buttons": [
+                    {
+                      "id": "confirm",
+                      "label": "Remove",
+                      "icon": "trash-outline",
+                      "kind": "danger",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.remove"
+                      }
+                    },
+                    {
+                      "id": "cancel",
+                      "label": "Cancel",
+                      "icon": "close-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.cancel"
+                      }
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:confirm",
+                    "type": "callSkill",
+                    "target": "media_center_skill.delete_root",
+                    "params": {
+                      "root_id": "$state.selectedMediaRootId"
+                    },
+                    "invalidates": [
+                      "media_center.catalog",
+                      "media_center.roots"
+                    ]
+                  },
+                  {
+                    "on": "click:confirm",
+                    "type": "updateState",
+                    "params": {
+                      "selectedMediaRootId": null,
+                      "mediaCursor": ""
+                    }
+                  },
+                  {
+                    "on": "click:confirm",
+                    "type": "closeModal"
+                  },
+                  {
+                    "on": "click:cancel",
+                    "type": "closeModal"
+                  }
+                ]
+              }
+            ],
+            "title_i18n": {
+              "key": "runtime.media_center.ui.remove_media_folder"
+            }
+          },
+          "title_i18n": {
+            "key": "runtime.media_center.ui.remove_media_folder"
           }
         }
       }
