@@ -2325,6 +2325,9 @@ class ResearchOrchestrator:
                 reason="consumer_contract_refresh",
                 actor=actor,
             )
+            session = development_sessions.get(
+                str(updated_track["development_session_id"])
+            )
         else:
             updated_track = self.repository.bind_track_development(
                 str(track["track_id"]),

@@ -248,8 +248,10 @@ def test_observed_builder_trial_is_adopted_only_with_complete_immutable_identity
     assert orchestrator._observed_builder_trial_identity("skill", "direction") is None
 
 
+@pytest.mark.parametrize("released", [False, True])
 def test_consumer_contract_refresh_supersedes_only_the_development_session(
     monkeypatch: pytest.MonkeyPatch,
+    released: bool,
 ) -> None:
     old_contract = {
         "schema": "adaos.contract.operation_set.v1",
@@ -313,6 +315,8 @@ def test_consumer_contract_refresh_supersedes_only_the_development_session(
         "ref": "implementation-track:task-1.track-001",
         "primary_target_ref": "skill:direction",
     }
+    if released:
+        track["candidate_release_digest"] = "sha256:" + "a" * 64
     state = {
         "direction": {"direction_id": "direction"},
         "selected_task": {"ref": "research-task:task-1"},
@@ -335,6 +339,21 @@ def test_consumer_contract_refresh_supersedes_only_the_development_session(
 
     repository = Repository()
     orchestrator = ResearchOrchestrator(repository=repository)
+    scoped_session = {
+        **previous_session,
+        "session_id": "dev_direction_successor_scoped",
+    }
+    if released:
+        monkeypatch.setattr(
+            orchestrator,
+            "_successor_implementation_track",
+            lambda *args, **kwargs: {
+                **track,
+                "track_id": "task-1.track-successor",
+                "ref": "implementation-track:task-1.track-successor",
+                "development_session_id": scoped_session["session_id"],
+            },
+        )
     monkeypatch.setattr(orchestrator, "get", lambda *args, **kwargs: state)
     monkeypatch.setattr(
         orchestrator,
@@ -391,6 +410,15 @@ def test_consumer_contract_refresh_supersedes_only_the_development_session(
         "attach_instruction",
         attach_instruction,
     )
+    monkeypatch.setattr(
+        orchestrator_module.development_sessions,
+        "get",
+        lambda session_id: (
+            scoped_session
+            if session_id == scoped_session["session_id"]
+            else previous_session
+        ),
+    )
 
     result = orchestrator.refresh_development_contract("direction", actor="system:test")
 
@@ -420,7 +448,14 @@ def test_consumer_contract_refresh_supersedes_only_the_development_session(
     assert attached[0][2] == brief
     assert attached[1][2] == compilation
     assert attached[2][2] == current_contract
-    assert repository.bound is not None
+    if released:
+        assert repository.bound is None
+        assert result["development_session"]["session_id"] == scoped_session["session_id"]
+        assert result["implementation_track"]["development_session_id"] == scoped_session["session_id"]
+        assert repository.activity_record is not None
+        assert repository.activity_record[0][4]["development_session_id"] == scoped_session["session_id"]
+    else:
+        assert repository.bound is not None
     assert repository.activity_record is not None
 
 
