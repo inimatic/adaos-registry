@@ -793,6 +793,39 @@ class ResearchManager:
             )
         return result
 
+    @staticmethod
+    def _validate_paired_result_identity(
+        arm_trials: Sequence[Mapping[str, Any]],
+    ) -> str | None:
+        """Require one shared pairing identity across a paired smoke.
+
+        Per-arm schema validation cannot detect a digest derived from trial or
+        run identity.  The consumer owns both calls, so equality is an
+        executable, domain-neutral check at the boundary where the pair exists.
+        """
+
+        results = [
+            dict(item["canonical_result"])
+            for item in arm_trials
+            if isinstance(item.get("canonical_result"), Mapping)
+        ]
+        if len(arm_trials) < 2:
+            return (
+                str(results[0].get("pairing_identity_digest") or "")
+                if results
+                else None
+            )
+        if len(results) != len(arm_trials):
+            raise ValueError("paired workflow smoke omitted a canonical arm result")
+        identities = {
+            str(item.get("pairing_identity_digest") or "") for item in results
+        }
+        if len(identities) != 1 or not next(iter(identities), ""):
+            raise ValueError(
+                "paired workflow smoke arms must share one pairing_identity_digest"
+            )
+        return next(iter(identities))
+
     def validate_development_candidate(self, request: Mapping[str, Any]) -> dict[str, Any]:
         """Evaluate a DEV runner from the consumer side, without scientific execution.
 
@@ -1122,6 +1155,9 @@ class ResearchManager:
                     )
                     for item in prepared_arms
                 ]
+                pairing_identity_digest = self._validate_paired_result_identity(
+                    arm_trials
+                )
                 first_trial = arm_trials[0]
                 collection_ok = all(bool(item["collection_ok"]) for item in arm_trials)
                 verification_ok = all(bool(item["verification_ok"]) for item in arm_trials)
@@ -1151,6 +1187,14 @@ class ResearchManager:
                                 for item in arm_trial["verified_artifacts"]
                                 if item.get("ok")
                             ),
+                        },
+                        {
+                            "id": "runner.pairing_identity",
+                            "ok": bool(pairing_identity_digest),
+                            "digest": pairing_identity_digest,
+                            "arm_ids": [
+                                str(item["arm"]["id"]) for item in arm_trials
+                            ],
                         },
                     ]
                 )

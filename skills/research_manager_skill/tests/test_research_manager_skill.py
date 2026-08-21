@@ -248,7 +248,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.12.0"
+    assert contract["version"] == "1.13.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -796,6 +796,7 @@ def test_v14_system_executes_paired_baseline_and_intervention_smoke(
                 "digest": "sha256:" + ("4" if arm["role"] == "baseline" else "5") * 64,
             },
             "collected": {"complete": True, "artifacts": [{"arm": arm["id"]}]},
+            "canonical_result": _canonical_result(arm_id=str(arm["id"])),
             "verified_artifacts": [{"ok": True}],
             "collection_ok": True,
             "verification_ok": True,
@@ -822,6 +823,24 @@ def test_v14_system_executes_paired_baseline_and_intervention_smoke(
         "baseline",
         "intervention",
     ]
+    assert next(
+        item for item in receipt["checks"] if item["id"] == "runner.pairing_identity"
+    )["ok"] is True
+
+
+def test_paired_consumer_rejects_arm_specific_pairing_identity() -> None:
+    baseline = _canonical_result(arm_id="maxpool")
+    intervention = {
+        **_canonical_result(arm_id="tlp"),
+        "pairing_identity_digest": "sha256:" + "e" * 64,
+    }
+    with pytest.raises(ValueError, match="share one pairing_identity_digest"):
+        ResearchManager._validate_paired_result_identity(
+            [
+                {"canonical_result": baseline},
+                {"canonical_result": intervention},
+            ]
+        )
 
 
 def test_workflow_smoke_index_rejects_self_referential_digest() -> None:

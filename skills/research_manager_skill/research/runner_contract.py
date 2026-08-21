@@ -406,6 +406,11 @@ def _workflow_smoke_documents() -> dict[str, Any]:
                 "canonical JSON uses ensure_ascii=false, lexicographically sorted object keys, "
                 "and separators ',' and ':'"
             ),
+            "pairing_identity_digest": (
+                "sha256 identity of the initialization and paired randomization state shared "
+                "by both arms for one pairing unit; it MUST exclude arm_id, trial_id, run_id, "
+                "attempt_id, output paths and other arm-specific execution identity"
+            ),
         },
     }
 
@@ -415,7 +420,7 @@ def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.12.0",
+        "version": "1.13.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -700,6 +705,7 @@ def descriptor() -> dict[str, Any]:
                     "every observation is directly accepted by ResearchManager normalize_observation and supplies metric.name plus value",
                     "complete=true requires the canonical result record consumed by ExperimentPlan.runner_contract.result_record",
                     "result arm_id, seed and evidence_class equal the prepared request and result.primary_metric is repeated as a metric.name=primary_metric observation",
+                    "paired baseline and intervention collections for one seed return the same pairing_identity_digest; arm, trial, run and attempt identities are forbidden inputs to that digest",
                     "workflow-smoke primary_metric is engineering evidence only and does not authorize scientific inference",
                     "artifacts contain portable content identities, never private host paths",
                     "every collected artifact supplies the non-empty ingestion role consumed by ResearchManager",
