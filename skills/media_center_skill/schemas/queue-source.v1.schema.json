@@ -16,6 +16,30 @@
       },
       "additionalProperties": false
     },
+    "playback_control": {
+      "type": "object",
+      "required": ["schema", "adapter", "profile_id", "queue_source", "authority"],
+      "properties": {
+        "schema": {"const": "adaos.playback.endpoint_control.v1"},
+        "adapter": {
+          "type": "object",
+          "required": ["skill", "open_session_method", "pull_commands_method", "reconcile_method"],
+          "properties": {
+            "skill": {"type": "string", "minLength": 1},
+            "open_session_method": {"type": "string", "minLength": 1},
+            "pull_commands_method": {"type": "string", "minLength": 1},
+            "reconcile_method": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        },
+        "profile_id": {"type": "string", "minLength": 1},
+        "queue_source": {"type": "object"},
+        "authority": {"enum": ["endpoint_preferred", "coordinator_preferred"]},
+        "checkpoint_interval_seconds": {"type": "integer", "minimum": 5, "maximum": 300},
+        "command_poll_interval_ms": {"type": "integer", "minimum": 1000, "maximum": 30000}
+      },
+      "additionalProperties": false
+    },
     "items": {"type": "array", "maxItems": 500, "items": {"type": "object"}},
     "count": {"type": "integer", "minimum": 0, "maximum": 500},
     "limit": {"type": "integer", "minimum": 1, "maximum": 500},

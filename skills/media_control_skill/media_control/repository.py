@@ -344,6 +344,7 @@ class MediaControlRepository:
         route: Mapping[str, Any] | None = None,
         queue_source: Mapping[str, Any] | None = None,
         lease_seconds: int = 120,
+        retire_existing: bool = False,
     ) -> dict[str, Any]:
         target = self.get_target(target_id)
         if target is None or target["status"] != "available":
@@ -361,6 +362,16 @@ class MediaControlRepository:
         lease_expires = time.time() + max(30, min(900, int(lease_seconds or 120)))
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            retired_session_count = 0
+            if retire_existing:
+                retired_session_count = connection.execute(
+                    """
+                    UPDATE playback_sessions
+                    SET state='stopped',revision=revision+1,updated_at=?
+                    WHERE target_id=? AND state NOT IN ('stopped','ended')
+                    """,
+                    (created_at, target["id"]),
+                ).rowcount
             connection.execute(
                 """
                 INSERT INTO playback_sessions(
@@ -379,7 +390,12 @@ class MediaControlRepository:
             )
             self._replace_queue(connection, session_id, items)
             connection.commit()
-        return {"ok": True, "schema": SCHEMA_VERSION, "session": self.get_session(session_id)["session"]}
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "session": self.get_session(session_id)["session"],
+            "retired_session_count": retired_session_count,
+        }
 
     def get_target(self, target_id: str) -> dict[str, Any] | None:
         token = text(target_id)
@@ -612,17 +628,30 @@ class MediaControlRepository:
             connection.commit()
         return {"ok": True, "schema": CHECKPOINT_SCHEMA, "checkpoint_id": checkpoint_id, "session": self.get_session(token)["session"]}
 
-    def pull_commands(self, target_id: str, *, cursor: str = "", limit: int = 50) -> dict[str, Any]:
+    def pull_commands(
+        self,
+        target_id: str,
+        *,
+        session_id: str = "",
+        cursor: str = "",
+        limit: int = 50,
+    ) -> dict[str, Any]:
         self.apply_due_sleep_timers()
         after = decode_cursor(cursor)
         bounded = max(1, min(MAX_COMMAND_PAGE, int(limit or 50)))
         target = self.get_target(target_id)
         if target is None:
             return {"ok": False, "error": "playback_target_not_found"}
+        filters = ["target_id=?", "sequence>?"]
+        params: list[Any] = [target["id"], after]
+        if text(session_id):
+            filters.append("session_id=?")
+            params.append(text(session_id))
+        params.append(bounded + 1)
         with self.connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM playback_commands WHERE target_id=? AND sequence>? ORDER BY sequence LIMIT ?",
-                (target["id"], after, bounded + 1),
+                f"SELECT * FROM playback_commands WHERE {' AND '.join(filters)} ORDER BY sequence LIMIT ?",
+                tuple(params),
             ).fetchall()
         has_more = len(rows) > bounded
         visible = rows[:bounded]
@@ -793,21 +822,75 @@ class MediaControlRepository:
             desired_item_id = str(row["active_item_id"])
             action: dict[str, Any]
             if observed_item_id and observed_item_id != desired_item_id:
-                active = connection.execute(
+                observed_item = connection.execute(
+                    """
+                    SELECT * FROM playback_queue_items
+                    WHERE session_id=? AND item_id=?
+                    ORDER BY ordinal LIMIT 1
+                    """,
+                    (token, observed_item_id),
+                ).fetchone()
+                if (
+                    authority_token == "endpoint_preferred"
+                    and not pending_rows
+                    and observed_item is not None
+                ):
+                    descriptor = loads(observed_item["descriptor_json"], {})
+                    connection.execute(
+                        """
+                        UPDATE playback_sessions
+                        SET active_queue_index=?,active_item_id=?,work_id=?,variant_id=?,
+                            source_id=?,route_json=?,state=?,position_ms=?,duration_ms=?,
+                            rate=?,volume=?,muted=?,revision=revision+1,updated_at=?
+                        WHERE id=?
+                        """,
+                        (
+                            int(observed_item["ordinal"]),
+                            str(observed_item["item_id"]),
+                            str(observed_item["work_id"]),
+                            str(observed_item["variant_id"]),
+                            str(observed_item["source_id"]),
+                            dumps(descriptor.get("route") or {}),
+                            text(payload.get("state")) or str(row["state"]),
+                            max(0, int(payload.get("position_ms") or 0)),
+                            max(0, int(payload.get("duration_ms") or 0)),
+                            max(0.25, min(4.0, float(payload.get("rate") or row["rate"]))),
+                            max(
+                                0.0,
+                                min(
+                                    1.0,
+                                    float(
+                                        payload.get("volume")
+                                        if payload.get("volume") is not None
+                                        else row["volume"]
+                                    ),
+                                ),
+                            ),
+                            int(bool(payload.get("muted", row["muted"]))),
+                            now_iso(),
+                            token,
+                        ),
+                    )
+                    action = {
+                        "type": "noop",
+                        "reason": "endpoint_queue_advance_accepted",
+                    }
+                else:
+                    active = connection.execute(
                     """
                     SELECT descriptor_json FROM playback_queue_items
                     WHERE session_id=? AND ordinal=?
                     """,
                     (token, int(row["active_queue_index"])),
                 ).fetchone()
-                action = {
-                    "type": "load",
-                    "item_id": desired_item_id,
-                    "position_ms": int(row["position_ms"]),
-                    "state": str(row["state"]),
-                    "descriptor": loads(active["descriptor_json"], {}) if active else {},
-                    "reason": "endpoint_item_differs",
-                }
+                    action = {
+                        "type": "load",
+                        "item_id": desired_item_id,
+                        "position_ms": int(row["position_ms"]),
+                        "state": str(row["state"]),
+                        "descriptor": loads(active["descriptor_json"], {}) if active else {},
+                        "reason": "endpoint_item_differs",
+                    }
             elif pending_rows:
                 action = {
                     "type": "replay_commands",

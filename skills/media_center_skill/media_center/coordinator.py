@@ -3313,10 +3313,25 @@ class MediaCatalogCoordinator:
                     "route": plan["route"],
                 }
             )
+        queue_source = {"type": kind, "id": token, "ownership": ownership}
         return {
             "ok": True,
             "schema": "adaos.media_center.queue_source.v1",
-            "source": {"type": kind, "id": token, "ownership": ownership},
+            "source": queue_source,
+            "playback_control": {
+                "schema": "adaos.playback.endpoint_control.v1",
+                "adapter": {
+                    "skill": "media_control_skill",
+                    "open_session_method": "open_endpoint_session",
+                    "pull_commands_method": "pull_commands",
+                    "reconcile_method": "reconcile_endpoint",
+                },
+                "profile_id": profile,
+                "queue_source": queue_source,
+                "authority": "endpoint_preferred",
+                "checkpoint_interval_seconds": 15,
+                "command_poll_interval_ms": 2000,
+            },
             "items": queue,
             "count": len(queue),
             "limit": bounded,

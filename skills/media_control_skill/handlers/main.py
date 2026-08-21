@@ -172,6 +172,55 @@ def create_session(
     return _result_or_error(result)
 
 
+@tool(
+    summary="Register one endpoint and atomically replace its active playback session.",
+    side_effects="local_write",
+)
+def open_endpoint_session(
+    endpoint_id: str = "",
+    webspace_id: str = "",
+    label: str = "",
+    kind: str = "browser",
+    node_id: str = "",
+    capabilities: Mapping[str, Any] | None = None,
+    profile_id: str = "default",
+    actor_ref: str = "",
+    queue: list[Mapping[str, Any]] | None = None,
+    active_index: int = 0,
+    route: Mapping[str, Any] | None = None,
+    queue_source: Mapping[str, Any] | None = None,
+    lease_seconds: int = 120,
+    **_: Any,
+) -> dict[str, Any]:
+    repository = _repository()
+    target_result = repository.register_target(
+        endpoint_id,
+        webspace_id=webspace_id,
+        label=label,
+        kind=kind,
+        node_id=node_id,
+        capabilities=capabilities,
+    )
+    if not target_result.get("ok"):
+        return _result_or_error(target_result)
+    target = target_result["target"]
+    result = repository.create_session(
+        profile_id=profile_id,
+        target_id=target["id"],
+        actor_ref=actor_ref,
+        queue=queue or [],
+        active_index=active_index,
+        route=route,
+        queue_source=queue_source,
+        lease_seconds=lease_seconds,
+        retire_existing=True,
+    )
+    if result.get("ok"):
+        result["target"] = target
+        _publish_snapshot(repository, webspace_id=webspace_id)
+    return _result_or_error(result)
+
+
 @tool(summary="Read one playback session and a bounded queue page.", side_effects="none")
 def get_session(session_id: str = "", queue_limit: int = 10, queue_cursor: str = "", **_: Any) -> dict[str, Any]:
     try:
@@ -257,9 +306,22 @@ def checkpoint(
 
 
 @tool(summary="Pull ordered target commands through an opaque cursor.", side_effects="none")
-def pull_commands(target_id: str = "", cursor: str = "", limit: int = 50, **_: Any) -> dict[str, Any]:
+def pull_commands(
+    target_id: str = "",
+    session_id: str = "",
+    cursor: str = "",
+    limit: int = 50,
+    **_: Any,
+) -> dict[str, Any]:
     try:
-        return _result_or_error(_repository().pull_commands(target_id, cursor=cursor, limit=limit))
+        return _result_or_error(
+            _repository().pull_commands(
+                target_id,
+                session_id=session_id,
+                cursor=cursor,
+                limit=limit,
+            )
+        )
     except ValueError:
         return _error("invalid_media_control_cursor", "The command cursor changed. Refresh it.")
 

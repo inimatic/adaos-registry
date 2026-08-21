@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.40` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.41` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -24,10 +24,19 @@ rewrites legacy `local` root, source, and delta identities in place while
 preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
 
-The `0.6.40` release adds authoritative persisted playback toggles through the
+The `0.6.41` release adds an authoritative endpoint-session bridge between the
+app-shell media element and `media_control_skill`. Playback admission retires a
+prior active session for the same endpoint, commands are pulled for the exact
+session and acknowledged by monotonic endpoint observations, and autonomous
+queue advance is accepted under endpoint-preferred recovery. Remote controllers
+therefore observe the TV's durable Now Playing projection without entering the
+media byte path. The queue exposes a generic adapter descriptor, keeping Media
+Center method names out of the reusable client service.
+
+The `0.6.40` release added authoritative persisted playback toggles through the
 generic client `input.toggle` contract and explicit subscription-backed library
 collection states. `media_library_agent@0.6.19` publishes compact configuration
-and scan witnesses with every delta page; `media_center_skill@0.8.37` persists
+and scan witnesses with every delta page; `media_center_skill@0.8.38` persists
 those observations and does not mistake an older agent's absent witness for an
 empty configuration. The prior `0.6.38` closure republished its agent so every target
 node prepares a runtime slot bound to the exact Project package manifest digest.

@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-20T00:15:00+00:00",
+  "updated_at": "2026-08-21T14:00:00+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -380,8 +380,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.37",
-      "updated_at": "2026-08-21T05:10:00+00:00",
+      "version": "0.8.38",
+      "updated_at": "2026-08-21T14:00:00+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -402,8 +402,8 @@
       "kind": "skill",
       "id": "media_control_skill",
       "name": "media_control_skill",
-      "version": "0.2.0",
-      "updated_at": "2026-08-20T00:15:00+00:00",
+      "version": "0.2.1",
+      "updated_at": "2026-08-21T14:00:00+00:00",
       "path": "skills/media_control_skill",
       "manifest": "skills/media_control_skill/skill.yaml",
       "source": {
@@ -418,7 +418,7 @@
       "description": "Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 19
+      "tools_count": 20
     },
     {
       "kind": "skill",

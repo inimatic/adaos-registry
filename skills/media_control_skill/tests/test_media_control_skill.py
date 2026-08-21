@@ -75,6 +75,50 @@ def test_session_queue_is_persistent_and_server_paged():
     assert page["queue"]["pagination"]["limit"] == 30
 
 
+def test_endpoint_open_retires_previous_session_and_scopes_command_pull():
+    first = main.open_endpoint_session(
+        endpoint_id="browser-tv",
+        webspace_id="tv",
+        label="Living room TV",
+        kind="tv",
+        profile_id="alice",
+        queue=_queue(3),
+        active_index=0,
+    )
+    repository = MediaControlRepository()
+    command = repository.command(
+        first["session"]["id"],
+        command="play",
+        arguments={},
+        actor_ref="profile:alice",
+        expected_revision=first["session"]["revision"],
+        idempotency_key="first-play",
+    )
+    second = main.open_endpoint_session(
+        endpoint_id="browser-tv",
+        webspace_id="tv",
+        label="Living room TV",
+        kind="tv",
+        profile_id="alice",
+        queue=_queue(2),
+        active_index=1,
+    )
+
+    assert first["ok"] is True
+    assert second["ok"] is True
+    assert second["retired_session_count"] == 1
+    assert second["session"]["active_item_id"] == "item-1"
+    assert repository.get_session(first["session"]["id"])["session"]["state"] == "stopped"
+    scoped = repository.pull_commands(
+        second["target"]["id"], session_id=second["session"]["id"]
+    )
+    previous = repository.pull_commands(
+        second["target"]["id"], session_id=first["session"]["id"]
+    )
+    assert scoped["items"] == []
+    assert previous["items"][0]["id"] == command["command"]["id"]
+
+
 def test_commands_are_revision_safe_idempotent_and_lease_guarded():
     repository = MediaControlRepository()
     session = _session(repository)
@@ -334,6 +378,37 @@ def test_coordinator_preferred_reconcile_does_not_repeat_seek():
     }
     assert replay["action"] == first["action"]
     assert replay["idempotent_replay"] is True
+
+
+def test_endpoint_preferred_reconcile_accepts_autonomous_queue_advance():
+    repository = MediaControlRepository()
+    session = _session(repository)
+
+    advanced = repository.reconcile_endpoint(
+        session["id"],
+        target_id=session["target_id"],
+        endpoint_revision=1,
+        acknowledged_command_revision=0,
+        observed={
+            "active_item_id": "item-2",
+            "state": "playing",
+            "position_ms": 1500,
+            "duration_ms": 180_000,
+            "rate": 1,
+            "volume": 0.75,
+            "muted": False,
+        },
+        authority="endpoint_preferred",
+    )
+
+    assert advanced["action"] == {
+        "type": "noop",
+        "reason": "endpoint_queue_advance_accepted",
+    }
+    assert advanced["session"]["active_queue_index"] == 2
+    assert advanced["session"]["active_item_id"] == "item-2"
+    assert advanced["session"]["state"] == "playing"
+    assert advanced["session"]["position_ms"] == 1500
 
 
 def test_sleep_timer_expires_to_a_durable_pause_command():

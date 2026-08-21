@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.0
+version: 0.2.1
 description: Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.
 supported_locales: [en, ru]
 entry: handlers/main.py
@@ -19,7 +19,7 @@ lifecycle:
   rehydrate: rehydrate
 default_tool: now_playing
 exports:
-  tools: [ensure_schema, rehydrate, register_target, list_targets, create_session, get_session, command, update_queue, checkpoint, pull_commands, acknowledge_command, reconcile_endpoint, get_settings, set_settings, now_playing, record_qoe, qoe_summary, voice_command, status]
+  tools: [ensure_schema, rehydrate, register_target, list_targets, create_session, open_endpoint_session, get_session, command, update_queue, checkpoint, pull_commands, acknowledge_command, reconcile_endpoint, get_settings, set_settings, now_playing, record_qoe, qoe_summary, voice_command, status]
 tools:
 - name: ensure_schema
   entry: handlers.main:ensure_schema
@@ -80,6 +80,29 @@ tools:
       queue_source: {type: object}
       lease_seconds: {type: integer, minimum: 30, maximum: 900, default: 120}
       webspace_id: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: open_endpoint_session
+  entry: handlers.main:open_endpoint_session
+  description: Register an endpoint and atomically replace its active playback session.
+  side_effects: local_write
+  input_schema:
+    type: object
+    required: [endpoint_id, queue]
+    properties:
+      endpoint_id: {type: string, minLength: 1}
+      webspace_id: {type: string}
+      label: {type: string}
+      kind: {type: string, enum: [browser, tv, mobile, speaker, native], default: browser}
+      node_id: {type: string}
+      capabilities: {type: object}
+      profile_id: {type: string, default: default}
+      actor_ref: {type: string}
+      queue: {type: array, minItems: 1, maxItems: 500, items: {type: object}}
+      active_index: {type: integer, minimum: 0, default: 0}
+      route: {type: object}
+      queue_source: {type: object}
+      lease_seconds: {type: integer, minimum: 30, maximum: 900, default: 120}
     additionalProperties: true
   output_schema: {type: object}
 - name: get_session
@@ -154,6 +177,7 @@ tools:
     required: [target_id]
     properties:
       target_id: {type: string}
+      session_id: {type: string}
       cursor: {type: string}
       limit: {type: integer, minimum: 1, maximum: 100, default: 50}
     additionalProperties: true
