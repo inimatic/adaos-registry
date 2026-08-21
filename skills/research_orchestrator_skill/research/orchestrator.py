@@ -88,6 +88,19 @@ def _bounded_text(value: Any, limit: int) -> str:
     return text[: max(0, limit - 1)].rstrip() + "…"
 
 
+class StudyExecutionAdmissionError(ValueError):
+    """A Study profile cannot be enforced by the active execution provider."""
+
+    def __init__(self, admission: Mapping[str, Any]) -> None:
+        self.admission = dict(admission)
+        codes = ", ".join(
+            str(item.get("code") or "unsupported_requirement")
+            for item in self.admission.get("blockers") or ()
+            if isinstance(item, Mapping)
+        )
+        super().__init__(f"execution admission failed: {codes or 'provider mismatch'}")
+
+
 def _context_profile(value: str) -> dict[str, Any]:
     profile = str(value or "shared").strip().lower()
     if profile not in _RESEARCH_CONTEXT_PROFILES:
@@ -4919,7 +4932,7 @@ class ResearchOrchestrator:
             "dataset_status": dataset_status,
         }
 
-    def start_study_smoke(
+    def _start_study_smoke(
         self,
         direction_id: str,
         *,
@@ -4981,6 +4994,16 @@ class ResearchOrchestrator:
                 )
             )
             lifecycle = dict(experiment.get("lifecycle") or {})
+        admission = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "assess_experiment_execution",
+                {"experiment_id": experiment_id, "profile": "preflight"},
+                timeout=120,
+            )
+        )
+        if not bool(admission.get("admitted")):
+            raise StudyExecutionAdmissionError(admission)
         if lifecycle.get("state") == "review":
             self._invoke_skill(
                 "research_manager_skill",
@@ -5057,6 +5080,102 @@ class ResearchOrchestrator:
             source_event_id=f"experiment-start:{experiment_id}:preflight",
         )
         return {"ok": True, "reused": reused, "track": dict(track), "start": started}
+
+    def start_study_smoke(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        confirmed: bool = False,
+        actor: str = "user:local",
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Start a smoke profile and preserve a durable failure projection."""
+
+        if not confirmed:
+            raise ValueError(
+                "locking the compiled protocol and starting CPU smoke requires explicit confirmation"
+            )
+        try:
+            return self._start_study_smoke(
+                direction_id,
+                task_id=task_id,
+                implementation_track_id=implementation_track_id,
+                confirmed=confirmed,
+                actor=actor,
+                idempotency_key=idempotency_key,
+            )
+        except Exception as exc:
+            state = self.get(
+                direction_id,
+                task_id=task_id,
+                implementation_track_id=implementation_track_id,
+            )
+            track = state.get("active_implementation_track")
+            if isinstance(track, Mapping):
+                admission = (
+                    dict(exc.admission)
+                    if isinstance(exc, StudyExecutionAdmissionError)
+                    else None
+                )
+                failure_stage = (
+                    "execution_admission" if admission is not None else "smoke_start"
+                )
+                failure = {
+                    "stage": failure_stage,
+                    "error_class": type(exc).__name__,
+                    "message": _bounded_text(str(exc), 1000),
+                    "retryable": admission is None,
+                    "admission": admission,
+                }
+                self.repository.record_track_evaluation(
+                    str(track["track_id"]),
+                    status=(
+                        "experiment_blocked"
+                        if admission is not None
+                        else "experiment_failed"
+                    ),
+                    metadata={
+                        **dict(track.get("metadata") or {}),
+                        "study_failure": failure,
+                    },
+                )
+                failure_identity = contract_digest(
+                    {
+                        "track_ref": track.get("ref"),
+                        "study_id": track.get("study_id"),
+                        "experiment_id": track.get("experiment_id"),
+                        "stage": failure_stage,
+                        "error_class": type(exc).__name__,
+                        "message": failure["message"],
+                    }
+                )
+                self.repository.activity(
+                    str(track["direction_id"]),
+                    "study",
+                    (
+                        "execution_blocked"
+                        if admission is not None
+                        else "smoke_start_failed"
+                    ),
+                    (
+                        "The active executor cannot enforce the accepted smoke profile."
+                        if admission is not None
+                        else "ResearchManager could not start the accepted smoke profile."
+                    ),
+                    {
+                        "implementation_track_ref": track.get("ref"),
+                        "study_ref": f"study:{track.get('study_id')}",
+                        "experiment_ref": f"experiment:{track.get('experiment_id')}",
+                        "failure": failure,
+                    },
+                    actor=actor,
+                    origin="skill:research_manager_skill",
+                    subject_ref=str(track.get("ref") or ""),
+                    source_event_id=f"study-start-failure:{failure_identity}",
+                )
+            raise
 
     def sync_study(
         self,

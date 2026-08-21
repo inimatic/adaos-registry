@@ -538,3 +538,78 @@ def test_completed_automation_rebases_when_successor_session_differs(
     assert result["reused"] is False
     assert [item[0] for item in calls] == ["get_automation", "submit_automation"]
     assert calls[-1][1]["text"].startswith("Rebase the terminal Automation result")
+
+
+def test_study_smoke_records_provider_admission_failure_before_lock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    track = {
+        "track_id": "task-1.track-001",
+        "ref": "implementation-track:task-1.track-001",
+        "direction_id": "direction",
+        "study_id": "study-1",
+        "study_realization_digest": "sha256:" + "a" * 64,
+        "experiment_id": "experiment-1",
+        "metadata": {},
+    }
+    state = {
+        "direction": {"direction_id": "direction"},
+        "active_implementation_track": track,
+    }
+
+    class Repository:
+        def __init__(self) -> None:
+            self.evaluation: dict | None = None
+            self.activity_record: tuple | None = None
+
+        def record_track_evaluation(self, track_id: str, **kwargs: object) -> dict:
+            self.evaluation = {"track_id": track_id, **kwargs}
+            return dict(self.evaluation)
+
+        def activity(self, *args: object, **kwargs: object) -> dict:
+            self.activity_record = (args, kwargs)
+            return {"event_id": "event-1"}
+
+    operations: list[str] = []
+
+    def invoke(_skill: str, operation: str, _payload: dict, **_: object) -> dict:
+        operations.append(operation)
+        if operation == "get_study":
+            return {"workflow": {"state": "draft", "generation": 0}}
+        if operation == "advance_workflow":
+            return {"ok": True}
+        if operation == "get_experiment":
+            return {"lifecycle": {"state": "draft" if operations.count(operation) == 1 else "review", "generation": operations.count(operation) - 1}}
+        if operation == "submit_experiment_review":
+            return {"ok": True}
+        if operation == "assess_experiment_execution":
+            return {
+                "schema": "adaos.execution.admission.v1",
+                "admitted": False,
+                "provider": {"provider_id": "local-process", "features": []},
+                "blockers": [
+                    {
+                        "code": "network_policy_unenforceable",
+                        "requirement": "network_offline",
+                    }
+                ],
+            }
+        raise AssertionError(f"unexpected operation: {operation}")
+
+    repository = Repository()
+    orchestrator = ResearchOrchestrator(repository=repository, skill_invoker=invoke)
+    monkeypatch.setattr(orchestrator, "get", lambda *args, **kwargs: state)
+
+    with pytest.raises(ValueError, match="network_policy_unenforceable"):
+        orchestrator.start_study_smoke(
+            "direction",
+            confirmed=True,
+            idempotency_key="study-start-1",
+        )
+
+    assert "lock_experiment" not in operations
+    assert repository.evaluation is not None
+    assert repository.evaluation["status"] == "experiment_blocked"
+    assert repository.evaluation["metadata"]["study_failure"]["stage"] == "execution_admission"
+    assert repository.activity_record is not None
+    assert repository.activity_record[0][2] == "execution_blocked"
