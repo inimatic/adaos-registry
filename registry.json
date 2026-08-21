@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-20T23:49:06+00:00",
+  "updated_at": "2026-08-21T00:24:32+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -776,8 +776,8 @@
       "kind": "skill",
       "id": "research_manager_skill",
       "name": "research_manager_skill",
-      "version": "0.28.2",
-      "updated_at": "2026-08-20T12:03:30+00:00",
+      "version": "0.30.0",
+      "updated_at": "2026-08-21T00:24:32+00:00",
       "path": "skills/research_manager_skill",
       "manifest": "skills/research_manager_skill/skill.yaml",
       "source": {
@@ -796,7 +796,7 @@
         "startup_allowed": true,
         "background_refresh": false
       },
-      "tools_count": 36
+      "tools_count": 37
     },
     {
       "kind": "skill",
@@ -1005,8 +1005,8 @@
       "kind": "skill",
       "id": "tlp_structured_proof_02",
       "name": "tlp_structured_proof_02",
-      "version": "0.1.1",
-      "updated_at": "2026-08-20T20:49:40+00:00",
+      "version": "0.1.3",
+      "updated_at": "2026-08-21T00:01:17+00:00",
       "path": "skills/tlp_structured_proof_02",
       "manifest": "skills/tlp_structured_proof_02/skill.yaml",
       "source": {
@@ -1014,7 +1014,7 @@
         "manifest": "skills/tlp_structured_proof_02/skill.yaml",
         "forge": "adaos-root",
         "repository": "inimatic/adaos-registry",
-        "revision": "8d061338205b761e7ed4909733bc3ddfbd1be875",
+        "revision": "aa4640917f4cee9da6a33aedfe16af4da6d728a8",
         "path_scope": [
           "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/skills/tlp_structured_proof_02/"
         ]
@@ -1032,17 +1032,17 @@
       "activation": {
         "mode": "package_lock",
         "project_id": "tlp_structured_proof_02",
-        "release": "tlp_structured_proof_02@0.1.1",
-        "release_digest": "sha256:088798902f26d55111d1cab2f69010be7a4327ab6adbc6b8fc1bbed0264be92f",
-        "package_digest": "sha256:94935907518127ce1de79e1f4d90f999ac06a31e0daca17b1850fde4ae200beb"
+        "release": "tlp_structured_proof_02@0.1.3",
+        "release_digest": "sha256:861baef19cd070d12fd180c031a01ad000c3d775733942a9d6e598c8e88c5a89",
+        "package_digest": "sha256:24adf4b0ef2ac968e547a196d3aa9eeafcde24125da1f24969c3d8fae83c3c17"
       },
       "channels": {
         "stable": {
-          "release": "tlp_structured_proof_02@0.1.1",
-          "release_digest": "sha256:088798902f26d55111d1cab2f69010be7a4327ab6adbc6b8fc1bbed0264be92f",
-          "source_revision": "8d061338205b761e7ed4909733bc3ddfbd1be875",
-          "package_digest": "sha256:94935907518127ce1de79e1f4d90f999ac06a31e0daca17b1850fde4ae200beb",
-          "version": "0.1.1"
+          "release": "tlp_structured_proof_02@0.1.3",
+          "release_digest": "sha256:861baef19cd070d12fd180c031a01ad000c3d775733942a9d6e598c8e88c5a89",
+          "source_revision": "aa4640917f4cee9da6a33aedfe16af4da6d728a8",
+          "package_digest": "sha256:24adf4b0ef2ac968e547a196d3aa9eeafcde24125da1f24969c3d8fae83c3c17",
+          "version": "0.1.3"
         }
       }
     },

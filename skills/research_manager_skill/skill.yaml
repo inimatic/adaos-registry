@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.29.0
+version: 0.30.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -436,8 +436,8 @@ tools:
   output_schema:
     type: object
 - name: assess_experiment_execution
-  description: Read-only admission of an immutable execution profile against the
-    active executor before protocol lock or Run materialization.
+  description: Read-only admission of an immutable execution profile against the active
+    executor before protocol lock or Run materialization.
   entry: handlers.main:assess_experiment_execution
   input_schema:
     type: object
@@ -948,13 +948,13 @@ data_routes:
     - research-experiment
     - research-tracking
     - research-evidence
-updated_at: '2026-08-20T12:03:30+00:00'
+updated_at: '2026-08-21T00:24:32+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.871+5371.844d3154
-    recorded_at: '2026-08-20T12:03:30+00:00'
+    min_version: 0.1.893+5485.3c3dc542
+    recorded_at: '2026-08-21T00:24:32+00:00'
     source: skill_push
-    min_commit: 844d315426a767175d5238ede92ed415711ae16a
-    min_short_commit: 844d3154
-    build_date: '2026-08-20T15:00:43+03:00'
+    min_commit: 3c3dc54207dc803a95c65089c097c827517e7a28
+    min_short_commit: 3c3dc542
+    build_date: '2026-08-21T03:22:35+03:00'
 
