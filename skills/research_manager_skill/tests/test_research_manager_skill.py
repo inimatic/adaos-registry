@@ -252,7 +252,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.15.0"
+    assert contract["version"] == "1.16.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -362,6 +362,23 @@ def test_runner_contract_materializes_plan_bound_trusted_operation_sequence() ->
             "pointer": "/split_bindings/validation/dataset_digest",
         }
     }
+    assert fixture["steps"][3]["assert"] == [
+        {"pointer": "/complete", "equals": True},
+        {
+            "pointer": "/observations",
+            "contains": [
+                {"pointer": "/metric/name", "equals": "primary_metric"},
+                {
+                    "pointer": "/value",
+                    "equals_root_pointer": "/result/primary_metric",
+                },
+                {
+                    "pointer": "/evidence_role",
+                    "equals_root_pointer": "/result/evidence_class",
+                },
+            ],
+        },
+    ]
     assert contract["digest"] == digest(
         {key: value for key, value in contract.items() if key != "digest"}
     )

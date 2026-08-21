@@ -568,7 +568,26 @@ def _operation_sequence_fixture(
                         "$bind": {"step": "prepare_attempt", "pointer": "/output_ref"}
                     }
                 },
-                "assert": [{"pointer": "/complete", "equals": True}],
+                "assert": [
+                    {"pointer": "/complete", "equals": True},
+                    {
+                        "pointer": "/observations",
+                        "contains": [
+                            {
+                                "pointer": "/metric/name",
+                                "equals": "primary_metric",
+                            },
+                            {
+                                "pointer": "/value",
+                                "equals_root_pointer": "/result/primary_metric",
+                            },
+                            {
+                                "pointer": "/evidence_role",
+                                "equals_root_pointer": "/result/evidence_class",
+                            },
+                        ],
+                    },
+                ],
             },
             {
                 "id": "verify_artifacts",
@@ -598,7 +617,7 @@ def descriptor(
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.15.0",
+        "version": "1.16.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
