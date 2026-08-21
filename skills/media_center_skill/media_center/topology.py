@@ -254,7 +254,7 @@ class MediaCenterTopology:
                 ),
             ),
             compatibility=deployment_sdk.DeploymentCompatibilityPolicy(
-                minimum_runtime_version="0.1.868",
+                minimum_runtime_version="0.1.917",
                 required_protocols={"project_activation": "1", "distributed_topology": "1"},
                 allow_release_skew=allow_release_skew,
             ),
@@ -388,6 +388,26 @@ class MediaCenterTopology:
             current_group is not None
             and current_group.to_dict() == requested_group.to_dict()
         )
+        if (
+            current_group is not None
+            and current_group.definition_version != requested_definition.version
+        ):
+            current_definition = distributed_sdk.get_service_definition(
+                current_group.definition_id,
+                current_group.definition_version,
+            )
+            if (
+                current_definition.release_digest
+                != requested_definition.release_digest
+                and not requested_definition.accepts_release(
+                    current_definition.release_digest
+                )
+            ):
+                raise RuntimeError(
+                    "media_center_topology_release_overlap_required:"
+                    f"current={current_definition.release_digest}:"
+                    f"requested={requested_definition.release_digest}"
+                )
         if not group_unchanged:
             if requested_group.desired_revision != observed_group_revision + 1:
                 raise RuntimeError(
@@ -650,8 +670,34 @@ class MediaCenterTopology:
 
     def distributed_status(self, *, limit: int = 50) -> dict[str, Any]:
         try:
-            inspection = distributed_sdk.inspect(limit=max(1, min(int(limit), 100)))
-            return {"ok": True, **inspection.to_dict()}
+            bounded = max(1, min(int(limit), 100))
+            inspection = distributed_sdk.inspect(limit=bounded)
+            definitions: list[dict[str, Any]] = []
+            definition_errors: list[dict[str, str]] = []
+            seen: set[tuple[str, str]] = set()
+            for group in inspection.groups[:bounded]:
+                identity = (group.definition_id, group.definition_version)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                try:
+                    definition = distributed_sdk.get_service_definition(*identity)
+                    definitions.append(definition.to_dict())
+                except Exception as exc:
+                    definition_errors.append(
+                        {
+                            "definition_id": identity[0],
+                            "version": identity[1],
+                            "reason": str(exc)[:200],
+                        }
+                    )
+            return {
+                "ok": True,
+                **inspection.to_dict(),
+                "definitions": definitions,
+                "definition_errors": definition_errors,
+                "partial": bool(definition_errors),
+            }
         except Exception as exc:
             return {
                 "ok": False,

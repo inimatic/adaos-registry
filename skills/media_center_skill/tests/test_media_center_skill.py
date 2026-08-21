@@ -1219,6 +1219,8 @@ def test_media_topology_definition_is_idempotent_for_existing_datasets(monkeypat
     )
     existing_group = SimpleNamespace(
         group_id="home",
+        definition_id="agent",
+        definition_version="1",
         desired_revision=6,
         to_dict=lambda: {"group_id": "home", "desired_revision": 6},
     )
@@ -1366,6 +1368,135 @@ def test_media_topology_rejects_package_digest_before_any_mutation(monkeypatch):
         )
 
     assert mutations == []
+
+
+def test_media_topology_requires_release_overlap_before_any_mutation(monkeypatch):
+    from media_center import topology as topology_module
+
+    old_release = "sha256:" + "a" * 64
+    new_release = "sha256:" + "b" * 64
+    mutations = []
+    current_group = SimpleNamespace(
+        group_id="media-library-home",
+        definition_id="media-library-agent",
+        definition_version="1",
+        desired_revision=1,
+        to_dict=lambda: {"version": "1"},
+    )
+    monkeypatch.setattr(
+        topology_module.deployment_sdk,
+        "inspect",
+        lambda deployment_id, *, limit: SimpleNamespace(
+            to_dict=lambda: {"desired": {"release_digest": new_release}}
+        ),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "inspect",
+        lambda **kwargs: SimpleNamespace(
+            groups=(current_group,),
+            datasets=(),
+            cursors={"groups": None, "datasets": None},
+        ),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "get_service_definition",
+        lambda definition_id, version: SimpleNamespace(release_digest=old_release),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "define_service",
+        lambda value: mutations.append(("service", value)),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "define_group",
+        lambda value, **kwargs: mutations.append(("group", value)),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="media_center_topology_release_overlap_required",
+    ):
+        MediaCenterTopology().define_topology(
+            service_definition={
+                "schema": "adaos.distributed.service_definition.v2",
+                "definition_id": "media-library-agent",
+                "version": "2",
+                "release_digest": new_release,
+                "compatible_release_digests": [],
+                "compatible_components": ["skill:media_library_agent"],
+                "provided_contracts": ["media.catalog.v1"],
+                "topology_mode": "multi_instance",
+                "protocol_version": "1",
+                "required_capabilities": ["media.catalog"],
+                "trust_class": "trusted",
+                "adapter_contracts": ["adaos.distributed.adapter.v1"],
+                "health_protocol": "adaos.health.v1",
+                "drain_protocol": "adaos.drain.v1",
+            },
+            service_group={
+                "schema": "adaos.distributed.service_group.v1",
+                "group_id": "media-library-home",
+                "definition_id": "media-library-agent",
+                "definition_version": "2",
+                "desired_generation": 2,
+                "desired_instances": 2,
+                "authority_policy": "singleton_fenced",
+                "placement": {"mode": "selected_nodes", "node_ids": ["node-a"]},
+                "linked_datasets": [],
+                "route_policy": {"allow_partial": True},
+                "desired_revision": 2,
+                "observed_revision": 0,
+                "status": "pending",
+            },
+            datasets=[],
+            expected_group_revision=1,
+        )
+
+    assert mutations == []
+
+
+def test_media_topology_status_exposes_versioned_release_overlap(monkeypatch):
+    from media_center import topology as topology_module
+
+    group = SimpleNamespace(
+        definition_id="media-library-agent",
+        definition_version="2",
+    )
+    definition = SimpleNamespace(
+        to_dict=lambda: {
+            "schema": "adaos.distributed.service_definition.v2",
+            "definition_id": "media-library-agent",
+            "version": "2",
+            "release_digest": "sha256:" + "b" * 64,
+            "compatible_release_digests": ["sha256:" + "a" * 64],
+        }
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "inspect",
+        lambda **kwargs: SimpleNamespace(
+            groups=(group,),
+            to_dict=lambda: {
+                "schema": "adaos.distributed.inspection.v1",
+                "groups": [],
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "get_service_definition",
+        lambda definition_id, version: definition,
+    )
+
+    status = MediaCenterTopology().distributed_status(limit=50)
+
+    assert status["ok"] is True
+    assert status["definitions"] == [definition.to_dict()]
+    assert status["definition_errors"] == []
+    assert status["partial"] is False
 
 
 def test_deployment_status_consumes_bounded_history_and_orders_newest_operation(
