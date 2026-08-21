@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.28.2
+version: 0.29.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -435,6 +435,32 @@ tools:
         type: string
   output_schema:
     type: object
+- name: assess_experiment_execution
+  description: Read-only admission of an immutable execution profile against the
+    active executor before protocol lock or Run materialization.
+  entry: handlers.main:assess_experiment_execution
+  input_schema:
+    type: object
+    required:
+    - experiment_id
+    - profile
+    properties:
+      experiment_id:
+        type: string
+      profile:
+        enum:
+        - preflight
+        - confirmatory
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - schema
+    - admitted
+    - provider
+    - requested
+    - enforcement
+    - blockers
 - name: start_experiment
   description: Materialize paired trials and submit non-blocking CPU attempts for
     a locked profile.

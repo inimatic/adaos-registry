@@ -243,6 +243,17 @@ def lock_experiment(
     )
 
 
+@tool("assess_experiment_execution")
+def assess_experiment_execution(
+    experiment_id: str,
+    profile: str,
+) -> dict[str, Any]:
+    return _manager().assess_experiment_execution(
+        experiment_id=experiment_id,
+        profile=profile,
+    )
+
+
 @tool("start_experiment")
 def start_experiment(
     experiment_id: str,

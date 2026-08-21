@@ -25,6 +25,7 @@ from adaos.sdk.execution import (
     ExecutionNetworkPolicy,
     ExecutionResourceRequest,
     cancel as cancel_execution,
+    capabilities as execution_capabilities,
     reconcile,
     spec,
     submit,
@@ -1720,6 +1721,74 @@ class ResearchManager:
             idempotency_key=idempotency_key,
             actor=actor,
         )
+
+    def assess_experiment_execution(
+        self,
+        *,
+        experiment_id: str,
+        profile: str,
+    ) -> dict[str, Any]:
+        """Check immutable profile requirements against the active executor.
+
+        This read-only admission gate intentionally runs before protocol lock. It
+        does not prepare runner artifacts or reserve resources; those checks remain
+        part of submission. Its purpose is to reject known provider mismatches
+        without leaving a locked protocol or a synthetic Run behind.
+        """
+
+        if profile not in {"preflight", "confirmatory"}:
+            raise ValueError("execution profile must be preflight or confirmatory")
+        revision = experiment.latest_revision(self.repository, experiment_id)
+        conditions = dict(revision.payload["conditions"])
+        profile_conditions = dict(dict(conditions["execution"])[profile])
+        provider = dict(execution_capabilities())
+        features = {str(item) for item in provider.get("features") or ()}
+        network_mode = str(profile_conditions.get("network_mode") or "unrestricted")
+        gpu_count = int(profile_conditions.get("gpu_count") or 0)
+        blockers: list[dict[str, Any]] = []
+        if network_mode == "offline" and "network_offline" not in features:
+            blockers.append(
+                {
+                    "code": "network_policy_unenforceable",
+                    "requirement": "network_offline",
+                    "requested": network_mode,
+                }
+            )
+        if network_mode == "allowlist" and "network_allowlist" not in features:
+            blockers.append(
+                {
+                    "code": "network_policy_unenforceable",
+                    "requirement": "network_allowlist",
+                    "requested": network_mode,
+                }
+            )
+        if gpu_count > 0 and "gpu_allocation" not in features:
+            blockers.append(
+                {
+                    "code": "accelerator_unavailable",
+                    "requirement": "gpu_allocation",
+                    "requested": gpu_count,
+                }
+            )
+        return {
+            "schema": "adaos.execution.admission.v1",
+            "admitted": not blockers,
+            "experiment_id": experiment_id,
+            "experiment_revision_id": revision.record_id,
+            "profile": profile,
+            "provider": provider,
+            "requested": {
+                "network_mode": network_mode,
+                "gpu_count": gpu_count,
+            },
+            "enforcement": {
+                "network_policy": (
+                    "not_required" if network_mode == "unrestricted" else "available"
+                ),
+                "network_observation_required": True,
+            },
+            "blockers": blockers,
+        }
 
     def _experiment_records(self, experiment_id: str, kind: str) -> list[ResearchRecord]:
         value = experiment.get_experiment(self.repository, experiment_id)

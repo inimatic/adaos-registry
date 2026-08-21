@@ -870,6 +870,40 @@ def _advance(manager: ResearchManager, study_id: str, command: str, generation: 
     )
 
 
+def test_execution_admission_rejects_unenforceable_network_before_lock() -> None:
+    manager = ResearchManager()
+    created = _create(manager, f"admission-{uuid.uuid4().hex}")
+    study_id = created["study"]["record_id"]
+    conditions = _experiment_conditions()
+    conditions["execution"]["preflight"]["network_mode"] = "offline"
+    experiment_id = identity("experiment", {"study_id": study_id, "slug": "ADMISSION"})
+    manager.create_experiment(
+        study_id=study_id,
+        slug="ADMISSION",
+        title="Provider admission fixture",
+        purpose="Reject impossible policy before lock",
+        conditions=conditions,
+        experiment_id=experiment_id,
+        idempotency_key=f"{experiment_id}:create",
+    )
+
+    admission = manager.assess_experiment_execution(
+        experiment_id=experiment_id,
+        profile="preflight",
+    )
+
+    assert admission["admitted"] is False
+    assert admission["provider"]["provider_id"] == "local-process"
+    assert admission["blockers"] == [
+        {
+            "code": "network_policy_unenforceable",
+            "requirement": "network_offline",
+            "requested": "offline",
+        }
+    ]
+    assert manager_module.experiment.state(manager.repository, experiment_id)["state"] == "draft"
+
+
 def test_end_to_end_research_kernel_survives_repository_reopen() -> None:
     manager = ResearchManager()
     suffix = f"e2e-{uuid.uuid4().hex}"
