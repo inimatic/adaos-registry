@@ -396,7 +396,7 @@
       "description": "Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 60
+      "tools_count": 62
     },
     {
       "kind": "skill",
@@ -445,8 +445,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.17",
-      "updated_at": "2026-08-21T07:02:00+00:00",
+      "version": "0.6.18",
+      "updated_at": "2026-08-21T10:00:00+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {
