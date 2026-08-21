@@ -226,7 +226,10 @@ def derive_compact_calibration(
         "get_runner_contract",
         {
             "experiment_plan": dict(experiment_plan),
-            "runner_id": direction_skill_id,
+            # Calibration candidates receive disposable identities that do not
+            # exist when the task is frozen.  The trusted Builder interpreter
+            # resolves this symbolic owner to the actual candidate skill.
+            "runner_id": "$candidate",
         },
         timeout=120,
     )
@@ -707,10 +710,21 @@ def evaluate_builder_attempt(
                     instruction_values[kind] = json.loads(
                         source.read_text(encoding="utf-8-sig")
                     )
+            execution_compilation = instruction_values.get("research_compilation")
+            experiment_plan = (
+                dict(execution_compilation.get("experiment_plan") or {})
+                if isinstance(execution_compilation, Mapping)
+                else {}
+            )
+            if not experiment_plan:
+                raise RuntimeError("ResearchCompilation has no ExperimentPlan for consumer evaluation")
             contract_response = invoke_skill(
                 "research_manager_skill",
                 "get_runner_contract",
-                {},
+                {
+                    "experiment_plan": experiment_plan,
+                    "runner_id": "$candidate",
+                },
                 timeout=120,
             )
             if not isinstance(contract_response, Mapping):
