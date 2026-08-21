@@ -1602,10 +1602,12 @@ def test_media_topology_owns_agent_membership_and_commits_remote_observation(
 
     monkeypatch.setattr(topology_module.distributed_sdk, "register", fake_register)
     partition_value = SimpleNamespace(
+        partition_id="catalog-home",
         revision=1,
         to_dict=lambda: {"partition_id": "catalog-home", "revision": 1},
     )
     replica_value = SimpleNamespace(
+        replica_id="catalog-home-agent-b",
         revision=1,
         to_dict=lambda: {"replica_id": "catalog-home-agent-b", "revision": 1},
     )
@@ -1633,6 +1635,13 @@ def test_media_topology_owns_agent_membership_and_commits_remote_observation(
             captured.update(replica_expected=expected_revision) or value
         ),
     )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "inspect",
+        lambda **kwargs: SimpleNamespace(
+            partitions=(), replicas=(), cursors={}
+        ),
+    )
     topology = MediaCenterTopology()
     topology.invoke_agent = lambda *args, **kwargs: {
         "ok": True,
@@ -1655,6 +1664,84 @@ def test_media_topology_owns_agent_membership_and_commits_remote_observation(
     assert captured["partition_expected"] == 0
     assert captured["replica_expected"] == 0
     assert observed["external_media_copied"] is False
+
+
+def test_media_topology_reuses_unchanged_partition_and_advances_replica(
+    monkeypatch,
+):
+    from media_center import topology as topology_module
+
+    def partition(value):
+        payload = dict(value)
+        return SimpleNamespace(
+            partition_id=payload["partition_id"],
+            revision=int(payload["revision"]),
+            to_dict=lambda: dict(payload),
+        )
+
+    def replica(value):
+        payload = dict(value)
+        return SimpleNamespace(
+            replica_id=payload["replica_id"],
+            revision=int(payload["revision"]),
+            to_dict=lambda: dict(payload),
+        )
+
+    partition_payload = {"partition_id": "catalog-home", "revision": 5}
+    current_partition = partition(partition_payload)
+    current_replica = replica({"replica_id": "replica-a", "revision": 3})
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "Partition",
+        SimpleNamespace(from_mapping=partition),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "Replica",
+        SimpleNamespace(from_mapping=replica),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "inspect",
+        lambda **kwargs: SimpleNamespace(
+            partitions=(current_partition,),
+            replicas=(current_replica,),
+            cursors={},
+        ),
+    )
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "put_partition",
+        lambda *args, **kwargs: pytest.fail("unchanged partition must not be written"),
+    )
+    captured = {}
+
+    def observe_replica(value, *, expected_revision):
+        captured["revision"] = value.revision
+        captured["expected_revision"] = expected_revision
+        return value
+
+    monkeypatch.setattr(
+        topology_module.distributed_sdk,
+        "observe_replica",
+        observe_replica,
+    )
+    topology = MediaCenterTopology()
+    topology.invoke_agent = lambda *args, **kwargs: {
+        "ok": True,
+        "partition": {"partition_id": "catalog-home", "revision": 1},
+        "replica": {"replica_id": "replica-a", "revision": 1},
+        "external_media_copied": False,
+    }
+
+    observed = topology.observe_agent_topology(
+        "agent-a",
+        partition={"partition_id": "catalog-home"},
+        replica={"replica_id": "replica-a"},
+    )
+
+    assert observed["partition"] == partition_payload
+    assert captured == {"revision": 4, "expected_revision": 3}
 
 
 def test_media_topology_explains_only_declared_media_datasets(monkeypatch):

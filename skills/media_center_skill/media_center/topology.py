@@ -512,13 +512,37 @@ class MediaCenterTopology:
         replica_value = distributed_sdk.Replica.from_mapping(
             reported.get("replica") or {}
         )
-        saved_partition = distributed_sdk.put_partition(
-            partition_value,
-            expected_revision=max(0, partition_value.revision - 1),
+        current_partition = self._partition(partition_value.partition_id)
+        partition_payload = partition_value.to_dict()
+        if current_partition is None:
+            partition_payload["revision"] = 1
+            saved_partition = distributed_sdk.put_partition(
+                distributed_sdk.Partition.from_mapping(partition_payload),
+                expected_revision=0,
+            )
+        else:
+            current_payload = current_partition.to_dict()
+            comparable_candidate = dict(partition_payload)
+            comparable_current = dict(current_payload)
+            comparable_candidate.pop("revision", None)
+            comparable_current.pop("revision", None)
+            if comparable_candidate == comparable_current:
+                saved_partition = current_partition
+            else:
+                partition_payload["revision"] = current_partition.revision + 1
+                saved_partition = distributed_sdk.put_partition(
+                    distributed_sdk.Partition.from_mapping(partition_payload),
+                    expected_revision=current_partition.revision,
+                )
+
+        current_replica = self._replica(replica_value.replica_id)
+        replica_payload = replica_value.to_dict()
+        replica_payload["revision"] = (
+            1 if current_replica is None else current_replica.revision + 1
         )
         saved_replica = distributed_sdk.observe_replica(
-            replica_value,
-            expected_revision=max(0, replica_value.revision - 1),
+            distributed_sdk.Replica.from_mapping(replica_payload),
+            expected_revision=0 if current_replica is None else current_replica.revision,
         )
         return {
             "ok": True,
@@ -526,6 +550,46 @@ class MediaCenterTopology:
             "replica": saved_replica.to_dict(),
             "external_media_copied": bool(reported.get("external_media_copied")),
         }
+
+    @staticmethod
+    def _partition(partition_id: str) -> Any | None:
+        cursor: str | None = None
+        while True:
+            inspection = distributed_sdk.inspect(
+                cursors={"partitions": cursor} if cursor else None,
+                limit=100,
+            )
+            current = next(
+                (
+                    item
+                    for item in inspection.partitions
+                    if item.partition_id == partition_id
+                ),
+                None,
+            )
+            if current is not None:
+                return current
+            cursor = inspection.cursors.get("partitions")
+            if not cursor:
+                return None
+
+    @staticmethod
+    def _replica(replica_id: str) -> Any | None:
+        cursor: str | None = None
+        while True:
+            inspection = distributed_sdk.inspect(
+                cursors={"replicas": cursor} if cursor else None,
+                limit=100,
+            )
+            current = next(
+                (item for item in inspection.replicas if item.replica_id == replica_id),
+                None,
+            )
+            if current is not None:
+                return current
+            cursor = inspection.cursors.get("replicas")
+            if not cursor:
+                return None
 
     def plan_topology_change(
         self,

@@ -58,6 +58,23 @@ class LibraryAgentTopology:
                 freshness_seconds=0,
                 observed_at=now_iso(),
             )
+        elif partition_value.dataset_id in {
+            "media-catalog",
+            "media-catalog-authority",
+        }:
+            snapshot = repository.topology_catalog_snapshot(max_items=1)
+            item_count = int(snapshot.get("item_count") or 0)
+            shard = text(partition_value.selector.get("shard")) or "home"
+            replica_value = replace(
+                replica_value,
+                checkpoint=text(snapshot.get("checkpoint")) or None,
+                source_ref=f"catalog-state:{shard}",
+                content_state="non_empty" if item_count else "empty",
+                item_count=item_count,
+                byte_count=int(snapshot.get("byte_count") or 0),
+                freshness_seconds=0,
+                observed_at=now_iso(),
+            )
         return {
             "ok": True,
             "partition": partition_value.to_dict(),

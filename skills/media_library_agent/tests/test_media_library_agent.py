@@ -169,6 +169,54 @@ def test_agent_reports_local_topology_without_writing_control_plane(tmp_path):
     assert result["external_media_copied"] is False
 
 
+def test_agent_derives_catalog_witness_instead_of_trusting_caller(tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "agent.sqlite3", node_id="node-a"
+    )
+    partition = {
+        "schema": "adaos.distributed.partition.v1",
+        "partition_id": "media-catalog-authority:home",
+        "dataset_id": "media-catalog-authority",
+        "selector": {"shard": "home"},
+        "desired_replicas": 2,
+        "topology_generation": 1,
+        "authority_lease_id": None,
+        "authority_epoch": 0,
+        "checkpoint": "caller-controlled",
+        "status": "ready",
+        "revision": 1,
+    }
+    replica = {
+        "schema": "adaos.distributed.replica.v1",
+        "replica_id": "caller-controlled",
+        "partition_id": partition["partition_id"],
+        "instance_id": "media-agent-node-a",
+        "node_id": "node-a",
+        "role": "follower",
+        "lifecycle": "ready",
+        "content_state": "non_empty",
+        "authority_epoch": 0,
+        "checkpoint": "caller-controlled",
+        "source_ref": "caller-controlled",
+        "freshness_seconds": 99,
+        "item_count": 99,
+        "byte_count": 99,
+        "observed_at": "2026-08-19T00:00:00+00:00",
+        "revision": 1,
+    }
+
+    result = LibraryAgentTopology().observe(repository, partition, replica)
+
+    assert result["ok"] is True
+    assert result["replica"]["checkpoint"] == "catalog:0"
+    assert result["replica"]["source_ref"] == "catalog-state:home"
+    assert result["replica"]["content_state"] == "empty"
+    assert result["replica"]["item_count"] == 0
+    assert result["replica"]["byte_count"] == 0
+    assert result["replica"]["freshness_seconds"] == 0
+    assert result["external_media_copied"] is False
+
+
 def test_repository_migrates_legacy_local_identity_once(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
