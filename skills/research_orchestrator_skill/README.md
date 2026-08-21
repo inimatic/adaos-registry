@@ -37,7 +37,10 @@ experimental data or post-handoff scientific governance records.
    source nor its intake artifacts.
 6. Inspect the brief and use `open_builder_session`. Codex is deliberately not
    started by acceptance. `start_implementation` is the explicit one-shot
-   transition; it can only use the exact Development Session instruction.
+   transition; it can only use the exact Development Session instruction. If
+   the same implementation Project already has a published predecessor, the
+   successor Development Session starts a new Builder Change instead of
+   mutating or iterating the published Change.
 7. Use `sync_implementation`, then explicitly prepare and promote the normal
    Builder candidate with `prepare_project_release` and
    `publish_project_release`. The track stores both the candidate digest and
