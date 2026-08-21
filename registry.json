@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-20T23:49:06+00:00",
+  "updated_at": "2026-08-21T00:47:57+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -776,8 +776,8 @@
       "kind": "skill",
       "id": "research_manager_skill",
       "name": "research_manager_skill",
-      "version": "0.30.0",
-      "updated_at": "2026-08-21T00:24:32+00:00",
+      "version": "0.31.0",
+      "updated_at": "2026-08-21T00:47:57+00:00",
       "path": "skills/research_manager_skill",
       "manifest": "skills/research_manager_skill/skill.yaml",
       "source": {
@@ -796,7 +796,7 @@
         "startup_allowed": true,
         "background_refresh": false
       },
-      "tools_count": 37
+      "tools_count": 38
     },
     {
       "kind": "skill",

@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.30.1
+version: 0.31.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -963,12 +963,13 @@ data_routes:
     - research-experiment
     - research-tracking
     - research-evidence
-updated_at: '2026-08-21T00:24:32+00:00'
+updated_at: '2026-08-21T00:47:57+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.893+5485.3c3dc542
-    recorded_at: '2026-08-21T00:24:32+00:00'
+    min_version: 0.1.893+5486.8d0cdafb
+    recorded_at: '2026-08-21T00:47:57+00:00'
     source: skill_push
-    min_commit: 3c3dc54207dc803a95c65089c097c827517e7a28
-    min_short_commit: 3c3dc542
-    build_date: '2026-08-21T03:22:35+03:00'
+    min_commit: 8d0cdafb290d6ef880238c48594bbfad1d5413a0
+    min_short_commit: 8d0cdafb
+    build_date: '2026-08-21T03:28:11+03:00'
+
