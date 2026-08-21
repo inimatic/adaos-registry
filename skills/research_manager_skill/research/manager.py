@@ -2331,6 +2331,7 @@ class ResearchManager:
             str(prepared["spec_id"]),
             tuple(str(item) for item in prepared["command"]),
             working_directory=str(prepared["working_directory"]),
+            data_owner_ref=f"skill:{runner_provider}",
             trial_id=trial.record_id,
             run_id=run_id,
             package_ref=package_ref,
