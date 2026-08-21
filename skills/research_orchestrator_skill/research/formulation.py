@@ -498,6 +498,8 @@ def stage_quality_issues(
     expected_effect_direction: str | None = None,
     expected_experimental_signature: Mapping[str, Any] | None = None,
     required_workflow_smoke: Mapping[str, Any] | None = None,
+    required_parent_problem: Mapping[str, Any] | None = None,
+    required_parent_protocol: Mapping[str, Any] | None = None,
     expected_protocol_digest: str | None = None,
 ) -> list[str]:
     payload = validate_stage(stage, value)
@@ -526,6 +528,13 @@ def stage_quality_issues(
         signature = payload["experimental_signature"]
         if signature["baseline"]["id"] == signature["intervention"]["id"]:
             issues.append("experimental_signature baseline and intervention ids must be distinct")
+        if required_parent_problem is not None:
+            parent = validate_stage("problem_frame", required_parent_problem)
+            for field in ("research_question", "hypotheses", "experimental_signature"):
+                if payload.get(field) != parent.get(field):
+                    issues.append(
+                        f"problem frame must exactly preserve parent {field} under the selected inheritance policy"
+                    )
     elif stage == "protocol_design":
         plan = payload["experimental_plan"]
         comparison = plan["comparison_design"]
@@ -716,6 +725,51 @@ def stage_quality_issues(
                 )
             ):
                 issues.append("workflow_smoke must exactly preserve the AdaOS execution policy")
+        if required_parent_protocol is not None:
+            parent = validate_stage("protocol_design", required_parent_protocol)
+            parent_plan = parent["experimental_plan"]
+            preserved = (
+                "comparators",
+                "comparison_design",
+                "data_policy",
+                "reproducibility",
+            )
+            for field in preserved:
+                if plan.get(field) != parent_plan.get(field):
+                    issues.append(
+                        f"protocol must exactly preserve parent experimental_plan.{field} under the selected inheritance policy"
+                    )
+            parent_system = parent_plan["system_specification"]
+            for field in ("subject", "components", "intervention_boundary"):
+                if system_spec.get(field) != parent_system.get(field):
+                    issues.append(
+                        f"protocol must exactly preserve parent system_specification.{field} under the selected inheritance policy"
+                    )
+            parent_invariants = {
+                str(item)
+                for item in parent_system.get("locked_invariants") or []
+                if not re.search(r"(?i)network|offline|\u0441\u0435\u0442\w*", str(item))
+            }
+            if not parent_invariants.issubset(
+                {str(item) for item in system_spec.get("locked_invariants") or []}
+            ):
+                issues.append(
+                    "protocol must preserve every non-network parent locked invariant"
+                )
+            parent_confirmation = [
+                item
+                for item in parent_plan["stages"]
+                if item.get("evidence_class") == "confirmatory"
+            ]
+            if confirmation != parent_confirmation:
+                issues.append(
+                    "protocol must exactly preserve parent confirmatory stages under the selected inheritance policy"
+                )
+            for field in ("evaluation_plan", "decision_spec"):
+                if payload.get(field) != parent.get(field):
+                    issues.append(
+                        f"protocol must exactly preserve parent {field} under the selected inheritance policy"
+                    )
     elif stage == "implementation_contract":
         obligations = [
             (f"{group_name}.{category}.{index}.{field}", str(value))

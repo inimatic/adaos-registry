@@ -146,6 +146,53 @@ def test_provider_compatible_smoke_policy_is_resolved_through_manager_capabiliti
     assert binding["network_enforcement"] == "not_required"
 
 
+def test_parent_contract_inheritance_resolves_only_an_accepted_bound_compilation() -> None:
+    problem = {"title": "parent problem"}
+    protocol = {"title": "parent protocol"}
+    parent = {
+        "task_id": "direction.task-001",
+        "ref": "research-task:direction.task-001",
+        "status": "accepted",
+        "current_prototype_digest": "sha256:" + "1" * 64,
+        "accepted_compilation_digest": "sha256:" + "2" * 64,
+    }
+    repository = SimpleNamespace(
+        get_task=lambda task_id: parent if task_id == parent["task_id"] else None,
+        get_compilation_record=lambda digest: {
+            "prototype_digest": parent["current_prototype_digest"],
+            "source_bundle_digest": "sha256:" + "3" * 64,
+            "payload": {
+                "facets": {
+                    "research_problem": {
+                        "source_stage": "problem_frame",
+                        "payload": problem,
+                    },
+                    "experimental_protocol": {
+                        "source_stage": "protocol_design",
+                        "payload": protocol,
+                    },
+                }
+            },
+        },
+    )
+    orchestrator = ResearchOrchestrator(repository=repository)
+
+    inheritance = orchestrator._resolve_formulation_inheritance(
+        {
+            "branch_of_task_id": parent["task_id"],
+            "parent_task_id": None,
+        },
+        "preserve_parent_scientific_contract",
+    )
+
+    assert inheritance["parent_task_ref"] == parent["ref"]
+    assert inheritance["problem_frame"] == problem
+    assert inheritance["protocol_design"] == protocol
+    assert inheritance["parent_compilation_digest"] == parent[
+        "accepted_compilation_digest"
+    ]
+
+
 def test_implementation_project_keeps_direction_identity_outside_task_lifecycle(monkeypatch) -> None:
     stale = {
         "schema": "adaos.project.v1",

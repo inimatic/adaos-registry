@@ -573,6 +573,61 @@ class ResearchOrchestrator:
             provider_status=provider_status,
         )
 
+    def _resolve_formulation_inheritance(
+        self,
+        active_task: Mapping[str, Any],
+        requested_policy_id: str | None,
+    ) -> dict[str, Any] | None:
+        policy_id = str(requested_policy_id or "independent").strip().lower()
+        if policy_id == "independent":
+            return None
+        if policy_id != "preserve_parent_scientific_contract":
+            raise ValueError(
+                "formulation_inheritance_policy_id must be independent or "
+                "preserve_parent_scientific_contract"
+            )
+        parent_task_id = str(
+            active_task.get("branch_of_task_id")
+            or active_task.get("parent_task_id")
+            or ""
+        ).removeprefix("research-task:")
+        if not parent_task_id:
+            raise ValueError(
+                "preserve_parent_scientific_contract requires a parent or branch ResearchTask"
+            )
+        parent = self.repository.get_task(parent_task_id)
+        if not parent or parent.get("status") != "accepted":
+            raise ValueError(
+                "parent ResearchTask must have an accepted immutable compilation"
+            )
+        compilation_digest = str(parent.get("accepted_compilation_digest") or "")
+        record = self.repository.get_compilation_record(compilation_digest)
+        if not record or str(record.get("prototype_digest") or "") != str(
+            parent.get("current_prototype_digest") or ""
+        ):
+            raise ValueError("parent ResearchTask compilation/prototype binding is invalid")
+        compilation = dict(record.get("payload") or {})
+        facets = dict(compilation.get("facets") or {})
+
+        def facet(name: str, source_stage: str) -> dict[str, Any]:
+            value = dict(facets.get(name) or {})
+            if value.get("source_stage") != source_stage or not isinstance(
+                value.get("payload"), Mapping
+            ):
+                raise ValueError(f"parent compilation is missing the {name} facet")
+            return copy.deepcopy(dict(value["payload"]))
+
+        return {
+            "schema": "adaos.research.formulation_inheritance.v1",
+            "policy_id": policy_id,
+            "parent_task_ref": str(parent["ref"]),
+            "parent_prototype_digest": str(record["prototype_digest"]),
+            "parent_compilation_digest": compilation_digest,
+            "source_bundle_digest": str(record["source_bundle_digest"]),
+            "problem_frame": facet("research_problem", "problem_frame"),
+            "protocol_design": facet("experimental_protocol", "protocol_design"),
+        }
+
     def _require_direction_project(self, direction_id: str) -> dict[str, Any]:
         state = self.repository.get_direction(direction_id)
         owner_skill_id = str((state or {}).get("artifact_owner_skill_id") or direction_id)
@@ -2690,6 +2745,8 @@ class ResearchOrchestrator:
         expected_effect_direction: str | None = None,
         expected_experimental_signature: Mapping[str, Any] | None = None,
         required_workflow_smoke: Mapping[str, Any] | None = None,
+        required_parent_problem: Mapping[str, Any] | None = None,
+        required_parent_protocol: Mapping[str, Any] | None = None,
         expected_protocol_digest: str | None = None,
     ) -> tuple[dict[str, Any], dict[str, Any]]:
         schema = stage_schema(stage_name, allowed_source_refs=allowed_source_refs)
@@ -2867,6 +2924,8 @@ class ResearchOrchestrator:
                         expected_effect_direction=expected_effect_direction,
                         expected_experimental_signature=expected_experimental_signature,
                         required_workflow_smoke=required_workflow_smoke,
+                        required_parent_problem=required_parent_problem,
+                        required_parent_protocol=required_parent_protocol,
                         expected_protocol_digest=expected_protocol_digest,
                     )
                     if quality:
@@ -3041,6 +3100,9 @@ class ResearchOrchestrator:
                 "active ResearchTask has an accepted immutable formulation; create and "
                 "activate a new branch ResearchTask before requesting a revision"
             )
+        active_task = self.repository.get_task(active_task_id)
+        if not active_task:
+            raise ValueError("active ResearchTask does not exist")
         bundle = artifact_context.source_bundle(self._artifact_owner_id(token), audience=_FORMULATION_AUDIENCE)
         if not bundle.get("sources"):
             raise ValueError("attach at least one source before discussion")
@@ -3048,6 +3110,17 @@ class ResearchOrchestrator:
             str((dialog_payload or {}).get("workflow_smoke_policy_id") or "") or None
         )
         workflow_smoke_policy = dict(workflow_smoke_binding["requirements"])
+        inheritance = self._resolve_formulation_inheritance(
+            active_task,
+            str(
+                (dialog_payload or {}).get("formulation_inheritance_policy_id") or ""
+            )
+            or None,
+        )
+        if inheritance and str(inheritance["source_bundle_digest"]) != str(bundle["digest"]):
+            raise ValueError(
+                "parent scientific contract cannot be inherited after the source bundle changed"
+            )
         current = self.repository.get_prototype(state.get("current_prototype_digest"))
         caller_payload = {"direction_id": token, **dict(dialog_payload or {})}
         dialog = self._dialog(caller_payload)
@@ -3124,6 +3197,21 @@ class ResearchOrchestrator:
             },
             subject_ref=f"research-task:{active_task_id}",
         )
+        if inheritance:
+            self.repository.activity(
+                token,
+                "formulation",
+                "parent_contract_bound",
+                "The successor formulation was bound to an accepted parent scientific contract.",
+                {
+                    "run_id": run_id,
+                    "policy_id": inheritance["policy_id"],
+                    "parent_task_ref": inheritance["parent_task_ref"],
+                    "parent_prototype_digest": inheritance["parent_prototype_digest"],
+                    "parent_compilation_digest": inheritance["parent_compilation_digest"],
+                },
+                subject_ref=f"research-task:{active_task_id}",
+            )
         request_identity = str(dialog.get("request_id") or "").strip() or uuid.uuid4().hex
         request_token = re.sub(r"[^A-Za-z0-9_.-]+", "-", request_identity).strip("-._")[:40] or uuid.uuid4().hex
         request_prefix = f"adaos-research-{token}-{bundle['digest'].removeprefix('sha256:')[:12]}-{generation}-{request_token}"
@@ -3131,6 +3219,9 @@ class ResearchOrchestrator:
         stage_telemetry: dict[str, Any] = {}
         try:
             current_problem = (
+                copy.deepcopy(inheritance["problem_frame"])
+                if inheritance
+                else
                 {
                     key: current.get(key)
                     for key in ("title", "background", "research_question", "hypotheses", "source_grounding", "constraints", "assumptions", "open_questions", "experimental_signature")
@@ -3154,8 +3245,24 @@ class ResearchOrchestrator:
                         "source_silence": "unknown_not_false",
                         "one_primary_question": True,
                     },
+                    "inheritance": (
+                        {
+                            key: copy.deepcopy(value)
+                            for key, value in inheritance.items()
+                            if key != "protocol_design"
+                        }
+                        if inheritance
+                        else None
+                    ),
                 },
                 rules=[
+                    *(
+                        [
+                            "This is a scientific-contract-preserving successor. Copy parent research_question, hypotheses, and experimental_signature exactly; do not strengthen, weaken, redirect, or rename their scientific semantics. Only engineering policy may change in later stages."
+                        ]
+                        if inheritance
+                        else []
+                    ),
                     "Produce one falsifiable question; do not design the execution protocol in this stage.",
                     "Produce exactly one primary hypothesis for that question and no secondary research questions.",
                     "Name the intervention, comparator, measurable outcome and paired comparison explicitly; avoid vague words such as effectiveness or significance.",
@@ -3176,11 +3283,17 @@ class ResearchOrchestrator:
                 group_id=group_id,
                 request_id_prefix=request_prefix,
                 max_tokens=4_500,
+                required_parent_problem=(
+                    inheritance["problem_frame"] if inheritance else None
+                ),
             )
             stage_telemetry["problem_frame"] = telemetry
             total_repairs += int(telemetry.get("repair_attempts") or 0)
 
             current_protocol = (
+                copy.deepcopy(inheritance["protocol_design"])
+                if inheritance
+                else
                 {key: current.get(key) for key in ("experimental_plan", "evaluation_plan", "open_questions")}
                 if current
                 else None
@@ -3203,9 +3316,25 @@ class ResearchOrchestrator:
                         "ray": "deferred",
                         "runner_contract": "adaos.research.runner.v1",
                         "comparison_identity": "stable lowercase arm ids plus one exact primary minuend/subtrahend",
+                        "inheritance": (
+                            {
+                                key: copy.deepcopy(value)
+                                for key, value in inheritance.items()
+                                if key != "problem_frame"
+                            }
+                            if inheritance
+                            else None
+                        ),
                     },
                 },
                 rules=[
+                    *(
+                        [
+                            "This is a scientific-contract-preserving successor. Copy the parent comparators, comparison design, data policy, reproducibility, system subject/components/intervention boundary, complete confirmatory stages, evaluation plan, and decision specification exactly. Only workflow_smoke network/input enforcement prose and its non-inferential engineering obligations may change."
+                        ]
+                        if inheritance
+                        else []
+                    ),
                     "Design exactly separated workflow_smoke and confirmatory stages; smoke never supports a scientific claim.",
                     "In comparison_design give every comparator a stable lowercase machine id. The comparators array must contain either all ordered arm ids or all ordered arm labels, never a mixture. Declare exactly one baseline and at least one intervention, and bind the primary estimand to two declared arm ids as minuend and subtrahend.",
                     "Copy experimental_signature identity fields exactly: comparator ids and labels, dataset_id and dataset label, system subject, intervention boundary, and primary outcome name/measurement/unit. Do not substitute a related experiment or rephrase these identity fields.",
@@ -3253,6 +3382,9 @@ class ResearchOrchestrator:
                 expected_effect_direction=str(problem["hypotheses"][0]["effect_direction"]),
                 expected_experimental_signature=problem["experimental_signature"],
                 required_workflow_smoke=workflow_smoke_policy,
+                required_parent_protocol=(
+                    inheritance["protocol_design"] if inheritance else None
+                ),
             )
             stage_telemetry["protocol_design"] = telemetry
             total_repairs += int(telemetry.get("repair_attempts") or 0)

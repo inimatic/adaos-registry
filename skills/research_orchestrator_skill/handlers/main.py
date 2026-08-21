@@ -495,6 +495,7 @@ def chat(
     text: str,
     task_id: str | None = None,
     workflow_smoke_policy_id: str | None = None,
+    formulation_inheritance_policy_id: str | None = None,
     model: str | None = None,
     actor: str | None = None,
     invocation_origin: str | None = None,
@@ -506,6 +507,10 @@ def chat(
         dialog_payload["task_id"] = task_id
     if workflow_smoke_policy_id:
         dialog_payload["workflow_smoke_policy_id"] = workflow_smoke_policy_id
+    if formulation_inheritance_policy_id:
+        dialog_payload["formulation_inheritance_policy_id"] = (
+            formulation_inheritance_policy_id
+        )
     if invocation_origin:
         dialog_payload["invocation_origin"] = invocation_origin
     if _meta:

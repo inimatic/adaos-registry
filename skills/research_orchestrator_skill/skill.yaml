@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.59.0
+version: 0.60.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -532,6 +532,14 @@ tools:
         enum:
         - enforced_offline
         - provider_compatible_noninferential
+        - null
+      formulation_inheritance_policy_id:
+        description: Explicit successor policy. Parent preservation binds immutable
+          accepted scientific fields while allowing a separately admitted engineering-smoke
+          adaptation.
+        enum:
+        - independent
+        - preserve_parent_scientific_contract
         - null
       model:
         type:
@@ -1394,4 +1402,3 @@ compatibility:
     min_commit: 8d0cdafb290d6ef880238c48594bbfad1d5413a0
     min_short_commit: 8d0cdafb
     build_date: '2026-08-21T03:28:11+03:00'
-

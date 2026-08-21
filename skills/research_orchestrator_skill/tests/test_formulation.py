@@ -584,6 +584,54 @@ def test_provider_compatible_smoke_policy_requires_authoritative_snapshot() -> N
         raise AssertionError("provider-compatible policy must not be inferred")
 
 
+def test_parent_scientific_contract_rejects_successor_drift_but_allows_smoke_policy_change() -> None:
+    parent_problem = _problem()
+    changed_problem = copy.deepcopy(parent_problem)
+    changed_problem["research_question"] = "Does an unrelated optimizer improve accuracy?"
+
+    assert (
+        "problem frame must exactly preserve parent research_question under the selected inheritance policy"
+        in stage_quality_issues(
+            "problem_frame",
+            changed_problem,
+            required_parent_problem=parent_problem,
+        )
+    )
+
+    parent_protocol = _protocol()
+    successor = copy.deepcopy(parent_protocol)
+    successor["experimental_plan"]["stages"][0]["execution_profile"][
+        "network_mode"
+    ] = "unrestricted"
+    policy = {
+        "device": "cpu",
+        "epochs": 3,
+        "seed_values": [17],
+        "inference_allowed": False,
+        "network_mode": "unrestricted",
+        "input_source": "deterministic_contract_fixture",
+        "input_readiness": "required_before_execution",
+        "workload_mode": "bounded",
+    }
+    assert stage_quality_issues(
+        "protocol_design",
+        successor,
+        required_workflow_smoke=policy,
+        required_parent_protocol=parent_protocol,
+    ) == []
+
+    successor["experimental_plan"]["stages"][1]["budget"]["epochs"] = 160
+    assert (
+        "protocol must exactly preserve parent confirmatory stages under the selected inheritance policy"
+        in stage_quality_issues(
+            "protocol_design",
+            successor,
+            required_workflow_smoke=policy,
+            required_parent_protocol=parent_protocol,
+        )
+    )
+
+
 def test_protocol_rejects_pair_labels_in_numeric_seed_values() -> None:
     protocol = _protocol()
     confirmatory = next(
