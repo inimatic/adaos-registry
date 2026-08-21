@@ -5969,6 +5969,7 @@ class ResearchOrchestrator:
             "inference_allowed": False,
             "verification": verification,
         }
+        result_payload = dict(result.get("payload") or {})
         track = self.repository.record_track_evaluation(
             str(track["track_id"]),
             status="workflow_evidence_ready",
@@ -5979,6 +5980,44 @@ class ResearchOrchestrator:
                 "experiment_result_verification": dict(result_verification),
                 "workflow_evidence": evidence_projection,
             },
+        )
+        tracker_acceptance_id = str(result_payload.get("tracker_acceptance_id") or "")
+        tracker_export_digest = str(result_payload.get("tracker_export_digest") or "")
+        if tracker_acceptance_id and tracker_export_digest:
+            self.repository.activity(
+                str(track["direction_id"]),
+                "tracking",
+                "evidence_accepted",
+                "ResearchManager accepted a finalized provider export for the selected execution campaign.",
+                {
+                    "implementation_track_ref": track["ref"],
+                    "study_ref": f"study:{study_id}",
+                    "experiment_ref": f"experiment:{experiment_id}",
+                    "tracker_acceptance_ref": f"tracker-evidence-acceptance:{tracker_acceptance_id}",
+                    "tracker_export_digest": tracker_export_digest,
+                },
+                actor=str(result_payload.get("finalized_by") or actor),
+                origin="skill:research_manager_skill",
+                subject_ref=str(track["ref"]),
+                source_event_id=f"tracker-evidence-acceptance:{tracker_acceptance_id}",
+            )
+        self.repository.activity(
+            str(track["direction_id"]),
+            "evidence",
+            "experiment_result_verified",
+            "The consumer independently re-read the tracker export and every content-addressed runner artifact.",
+            {
+                "implementation_track_ref": track["ref"],
+                "study_ref": f"study:{study_id}",
+                "experiment_ref": f"experiment:{experiment_id}",
+                "result_ref": evidence_projection["result_ref"],
+                "verification": dict(result_verification),
+                "inference_allowed": False,
+            },
+            actor=actor,
+            origin="skill:research_manager_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"experiment-result-verification:{result['record_id']}",
         )
         self.repository.activity(
             str(track["direction_id"]),
@@ -5998,7 +6037,12 @@ class ResearchOrchestrator:
             "ok": True,
             "track": track,
             "finalization": finalized,
-            "experiment": experiment_state,
+            "experiment": {
+                "experiment_id": experiment_id,
+                "lifecycle": lifecycle,
+                "result_ref": evidence_projection["result_ref"],
+                "result_verification": dict(result_verification),
+            },
             "evidence": bundle,
             "verification": verification,
             "inference_allowed": False,
