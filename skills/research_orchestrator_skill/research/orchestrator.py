@@ -3363,7 +3363,6 @@ class ResearchOrchestrator:
                 "pipeline": "research_compiler_v1",
                 "compilation_digest": compilation["digest"],
                 "traceability_digest": compilation["traceability_graph"]["digest"],
-                "workflow_smoke_policy_binding": workflow_smoke_binding,
                 "stages": [
                     {
                         "stage": stage_name,
