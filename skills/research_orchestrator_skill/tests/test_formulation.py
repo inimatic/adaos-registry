@@ -636,6 +636,28 @@ def test_deterministic_successor_changes_only_engineering_smoke_contract() -> No
     problem = _problem()
     protocol = _protocol()
     implementation = _implementation(protocol)
+    protocol["experimental_plan"]["stages"][0]["stop_conditions"].append(
+        "Any network attempt must fail because workflow_smoke is offline."
+    )
+    protocol["experimental_plan"]["system_specification"]["components"].append(
+        {
+            "id": "run_log",
+            "role": "measurement",
+            "specification": "Record counts. Network is disabled in workflow_smoke.",
+            "settings": [
+                {"key": "network_access", "value": "disabled in workflow_smoke"},
+                {"key": "format", "value": "json"},
+            ],
+            "decision_status": "policy_default",
+            "source_refs": [],
+        }
+    )
+    implementation["checks_by_category"]["workflow"].append(
+        {
+            "check": "Network is disabled in both workflow_smoke and confirmatory profiles.",
+            "evidence": "Network isolation log.",
+        }
+    )
     binding = resolve_workflow_smoke_policy(
         "provider_compatible_noninferential",
         provider_status={
@@ -682,6 +704,22 @@ def test_deterministic_successor_changes_only_engineering_smoke_contract() -> No
         "protocol_digest"
     ] == stage_digest(derived["protocol_design"])
     assert "observation_not_isolation" in " ".join(new_smoke["stop_conditions"])
+    assert not any("must fail" in item for item in new_smoke["stop_conditions"])
+    run_log = next(
+        item
+        for item in derived["protocol_design"]["experimental_plan"][
+            "system_specification"
+        ]["components"]
+        if item["id"] == "run_log"
+    )
+    assert run_log["settings"] == [{"key": "format", "value": "json"}]
+    assert "disabled" not in run_log["specification"]
+    assert all(
+        "both workflow_smoke" not in str(item.get("check") or "")
+        for item in derived["implementation_contract"]["checks_by_category"][
+            "workflow"
+        ]
+    )
 
 
 def test_protocol_rejects_pair_labels_in_numeric_seed_values() -> None:

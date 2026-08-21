@@ -39,6 +39,45 @@ PROTOCOL_DECISION_AREAS = (
 )
 
 
+_NETWORK_POLICY_RE = re.compile(r"(?i)network|offline|\u0441\u0435\u0442\w*|\u043e\u0444\u043b\u0430\u0439\u043d")
+_OFFLINE_ENFORCEMENT_RE = re.compile(
+    r"(?i)offline|network[_ .-]?(?:disabled|denied|blocked)|"
+    r"(?:disable|deny|block|prohibit)\w*.{0,30}network|"
+    r"\u043e\u0444\u043b\u0430\u0439\u043d|\u043e\u0442\u043a\u043b\u044e\u0447\w*.{0,30}\u0441\u0435\u0442|"
+    r"\u0437\u0430\u043f\u0440\u0435\u0442\w*.{0,30}\u0441\u0435\u0442|\u043f\u043e\u043f\u044b\u0442\w*.{0,30}\u0441\u0435\u0442\w*.{0,30}\u043e\u0448\u0438\u0431"
+)
+_SMOKE_SCOPE_RE = re.compile(
+    r"(?i)workflow[_ -]?smoke|\bsmoke\b|\u0441\u043c\u043e\u0443\u043a|"
+    r"both profiles|all profiles|\u043e\u0431\u043e\u0438\w*\s+\u043f\u0440\u043e\u0444\u0438\u043b"
+)
+
+
+def _is_smoke_network_policy(value: Any) -> bool:
+    text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return bool(_NETWORK_POLICY_RE.search(text) and _SMOKE_SCOPE_RE.search(text))
+
+
+def _is_stale_offline_smoke_policy(value: Any) -> bool:
+    text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+    return bool(_OFFLINE_ENFORCEMENT_RE.search(text) and _SMOKE_SCOPE_RE.search(text))
+
+
+def _components_without_smoke_network_policy(
+    components: list[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    result = copy.deepcopy([dict(item) for item in components])
+    for component in result:
+        component["settings"] = [
+            item
+            for item in component.get("settings") or []
+            if not _is_smoke_network_policy(item)
+        ]
+        clauses = re.split(r"(?<=[.;])\s+", str(component.get("specification") or ""))
+        kept = [item for item in clauses if item and not _is_smoke_network_policy(item)]
+        component["specification"] = " ".join(kept).strip()
+    return result
+
+
 def resolve_workflow_smoke_policy(
     policy_id: str | None,
     *,
@@ -725,6 +764,26 @@ def stage_quality_issues(
                 )
             ):
                 issues.append("workflow_smoke must exactly preserve the AdaOS execution policy")
+            if str(smoke_policy.get("network_mode") or "") == "unrestricted":
+                stale_smoke_conditions = any(
+                    _OFFLINE_ENFORCEMENT_RE.search(str(item))
+                    for item in (smoke[0].get("stop_conditions") or [])
+                ) if smoke else False
+                stale_system_policy = any(
+                    _is_stale_offline_smoke_policy(item)
+                    for item in (
+                        list(system_spec.get("locked_invariants") or [])
+                        + list(system_spec.get("components") or [])
+                    )
+                )
+                stale_decision_policy = any(
+                    _is_stale_offline_smoke_policy(item)
+                    for item in payload.get("decisions_by_area", {}).values()
+                )
+                if stale_smoke_conditions or stale_system_policy or stale_decision_policy:
+                    issues.append(
+                        "unrestricted workflow_smoke must not retain offline-enforcement assertions"
+                    )
         if required_parent_protocol is not None:
             parent = validate_stage("protocol_design", required_parent_protocol)
             parent_plan = parent["experimental_plan"]
@@ -740,11 +799,19 @@ def stage_quality_issues(
                         f"protocol must exactly preserve parent experimental_plan.{field} under the selected inheritance policy"
                     )
             parent_system = parent_plan["system_specification"]
-            for field in ("subject", "components", "intervention_boundary"):
+            for field in ("subject", "intervention_boundary"):
                 if system_spec.get(field) != parent_system.get(field):
                     issues.append(
                         f"protocol must exactly preserve parent system_specification.{field} under the selected inheritance policy"
                     )
+            if _components_without_smoke_network_policy(
+                list(system_spec.get("components") or [])
+            ) != _components_without_smoke_network_policy(
+                list(parent_system.get("components") or [])
+            ):
+                issues.append(
+                    "protocol must exactly preserve parent scientific system components under the selected inheritance policy"
+                )
             parent_invariants = {
                 str(item)
                 for item in parent_system.get("locked_invariants") or []
@@ -779,6 +846,20 @@ def stage_quality_issues(
             if isinstance(item, Mapping)
             for field, value in item.items()
         ]
+        smoke_policy = dict(required_workflow_smoke or {})
+        if str(smoke_policy.get("network_mode") or "") == "unrestricted":
+            stale_obligations = [
+                value
+                for group_name in ("requirements_by_category", "checks_by_category")
+                for items in (payload.get(group_name) or {}).values()
+                for value in items or []
+                if isinstance(value, Mapping)
+                and _is_stale_offline_smoke_policy(value)
+            ]
+            if stale_obligations:
+                issues.append(
+                    "implementation contract must not claim offline enforcement for unrestricted workflow_smoke"
+                )
         per_epoch_test = re.compile(
             r"(?i)(?:test.{0,40}(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445)|"
             r"(?:per[- ]?epoch|every epoch|each epoch|\u043a\u0430\u0436\u0434\w*\s+\u044d\u043f\u043e\u0445).{0,40}test)"
@@ -908,14 +989,11 @@ def derive_inherited_formulation(
         raise ValueError("workflow smoke binding is not authoritative")
 
     smoke_network = str(policy.get("network_mode") or "")
-    smoke_filter = re.compile(
-        r"(?is)(?=.*(?:workflow[_ -]?smoke|\bsmoke\b|\u0441\u043c\u043e\u0443\u043a))"
-        r"(?=.*(?:network|offline|\u0441\u0435\u0442\w*))"
-    )
-
     def is_obsolete_smoke_network(value: Any) -> bool:
-        text = json.dumps(value, ensure_ascii=False, sort_keys=True)
-        return bool(smoke_filter.search(text))
+        return _is_smoke_network_policy(value)
+
+    def is_network_policy(value: Any) -> bool:
+        return bool(_NETWORK_POLICY_RE.search(str(value)))
 
     problem["constraints"] = [
         item
@@ -930,6 +1008,12 @@ def derive_inherited_formulation(
     problem["assistant_message"] = (
         "Научная постановка унаследована без повторного inference; изменена только "
         "типизированная политика неинференциального workflow_smoke."
+    )
+    problem["background"] = (
+        str(problem["background"])
+        + " В этой successor-ревизии прежнее описание workflow_smoke как offline "
+        f"явно заменено capability-bound network_mode={smoke_network}; confirmatory "
+        "offline policy остается неизменной."
     )
 
     plan = protocol["experimental_plan"]
@@ -957,7 +1041,7 @@ def derive_inherited_formulation(
     stage["stop_conditions"] = [
         item
         for item in stage.get("stop_conditions") or []
-        if not is_obsolete_smoke_network(item)
+        if not is_network_policy(item)
     ]
     stage["stop_conditions"].extend(
         [
@@ -967,6 +1051,9 @@ def derive_inherited_formulation(
         ]
     )
     system = plan["system_specification"]
+    system["components"] = _components_without_smoke_network_policy(
+        list(system.get("components") or [])
+    )
     system["locked_invariants"] = [
         item
         for item in system.get("locked_invariants") or []
@@ -1148,6 +1235,11 @@ def assemble_candidate(
     implementation_issues = stage_quality_issues(
         "implementation_contract",
         implementation,
+        required_workflow_smoke=(
+            required_workflow_smoke
+            if required_workflow_smoke is not None
+            else DEFAULT_WORKFLOW_SMOKE_POLICY
+        ),
         expected_experimental_signature=problem["experimental_signature"],
         expected_protocol_digest=stage_digest(protocol),
     )

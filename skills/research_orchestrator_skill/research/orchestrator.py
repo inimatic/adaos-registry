@@ -678,6 +678,7 @@ class ResearchOrchestrator:
             "implementation_contract": stage_quality_issues(
                 "implementation_contract",
                 values["implementation_contract"],
+                required_workflow_smoke=workflow_policy,
                 expected_experimental_signature=values["problem_frame"][
                     "experimental_signature"
                 ],
@@ -3620,6 +3621,7 @@ class ResearchOrchestrator:
                 max_tokens=4_500,
                 expected_experimental_signature=problem["experimental_signature"],
                 expected_protocol_digest=stage_digest(protocol),
+                required_workflow_smoke=workflow_smoke_policy,
             )
             stage_telemetry["implementation_contract"] = telemetry
             total_repairs += int(telemetry.get("repair_attempts") or 0)
