@@ -46,6 +46,25 @@ def test_agent_declares_core_managed_membership_and_health_projection():
     assert health["distributed"]["pressure"]["state"] == "normal"
 
 
+def test_delta_pages_include_compact_authoritative_library_state(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "delta-state.sqlite3", node_id="node-a"
+    )
+    repository.add_root(str(library))
+
+    page = repository.pull_deltas(limit=10)
+
+    assert page["library_state"] == {
+        "root_count": 1,
+        "source_count": 0,
+        "available_count": 0,
+        "active_job_count": 0,
+        "failed_job_count": 0,
+    }
+
+
 @pytest.fixture(autouse=True)
 def isolated_runtime(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_LIBRARY_AGENT_DB_PATH", str(tmp_path / "agent.sqlite3"))

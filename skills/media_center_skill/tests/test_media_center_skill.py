@@ -2053,6 +2053,7 @@ def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path
         ),
     )
     monkeypatch.setattr(main, "_coordinator", lambda repository=None: catalog)
+    monkeypatch.setattr(main, "_agent_sync_status", lambda: {"state": "idle"})
 
     result = main.set_favorite(
         item_id=item_id,
@@ -2065,6 +2066,8 @@ def test_personal_mutation_publishes_subscription_snapshot(monkeypatch, tmp_path
     assert published[-1][0] == "media_center.library_state"
     assert published[-1][1]["profile_id"] == "alice"
     assert published[-1][1]["personal_revision"] == 1
+    assert published[-1][1]["collection_state"]["state"] == "updating"
+    assert published[-1][1]["home"]["state"] == "updating"
     assert published[-1][2]["_meta"] == {
         "webspace_id": "desktop",
         "params": {"profile_id": "alice", "shared_surface": False},
@@ -2174,6 +2177,50 @@ def test_home_exposes_bounded_flattened_shelf_items(monkeypatch, tmp_path):
     assert home["items"]
     assert len(home["items"]) <= len(home["shelves"]) * 2
     assert all(item["shelf_id"] and item["shelf_title"] for item in home["items"])
+
+
+def test_collection_state_distinguishes_configuration_indexing_and_empty(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    page = _agent_page()
+    page["library_state"] = {
+        "root_count": 0,
+        "source_count": 0,
+        "available_count": 0,
+        "active_job_count": 0,
+        "failed_job_count": 0,
+    }
+    catalog.apply_agent_page(page, instance_id="instance-a")
+
+    assert catalog.collection_state(agent_sync={"state": "idle"})["state"] == (
+        "unconfigured"
+    )
+
+    page["library_state"] = {
+        **page["library_state"],
+        "root_count": 1,
+        "active_job_count": 1,
+    }
+    catalog.apply_agent_page(page, instance_id="instance-a")
+    indexing = catalog.collection_state(agent_sync={"state": "idle"})
+
+    assert indexing["state"] == "indexing"
+    assert indexing["configured"] is True
+    assert indexing["active_operation_count"] == 1
+
+    page["library_state"] = {
+        **page["library_state"],
+        "active_job_count": 0,
+    }
+    catalog.apply_agent_page(page, instance_id="instance-a")
+
+    assert catalog.collection_state(agent_sync={"state": "idle"})["state"] == (
+        "empty"
+    )
 
 
 def test_playlists_are_profile_scoped_ordered_and_revision_safe(monkeypatch, tmp_path):

@@ -1,6 +1,6 @@
 id: media_center
 name: media_center
-version: 0.6.4
+version: 0.6.5
 title: Media Center
 description: Distributed Media Center application with in-place library agents, a bounded coordinator catalog, persistent playback, and remote-control surfaces.
 type: desktop

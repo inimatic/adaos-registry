@@ -26,7 +26,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-20.10"
+COORDINATOR_SCHEMA_REVISION = "2026-08-21.11"
 SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
@@ -80,6 +80,21 @@ _LEADING_NUMBER = re.compile(r"^(?P<number>\d{1,4})(?:[ ._\-]+|$)")
 def _stable_id(prefix: str, *parts: Any, size: int = 24) -> str:
     raw = "\0".join(_text(part) for part in parts)
     return f"{prefix}_{hashlib.sha256(raw.encode('utf-8', errors='replace')).hexdigest()[:size]}"
+
+
+def _observed_count(value: Any) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return -1
+
+
+def _stored_observed_count(value: Any) -> int:
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError):
+        return -1
+    return parsed if parsed >= 0 else -1
 
 
 def _normalize_title(value: Any) -> str:
@@ -311,6 +326,11 @@ class MediaCatalogCoordinator:
                     availability TEXT NOT NULL DEFAULT 'unknown',
                     freshness TEXT NOT NULL DEFAULT 'unknown',
                     last_error TEXT NOT NULL DEFAULT '',
+                    root_count INTEGER NOT NULL DEFAULT -1,
+                    source_count INTEGER NOT NULL DEFAULT -1,
+                    available_count INTEGER NOT NULL DEFAULT -1,
+                    active_job_count INTEGER NOT NULL DEFAULT -1,
+                    failed_job_count INTEGER NOT NULL DEFAULT -1,
                     updated_at TEXT NOT NULL
                 );
                 CREATE TABLE IF NOT EXISTS personal_media_state (
@@ -450,10 +470,18 @@ class MediaCatalogCoordinator:
                     "PRAGMA table_info(agent_catalog_state)"
                 ).fetchall()
             }
-            if "instance_id" not in agent_columns:
-                connection.execute(
-                    "ALTER TABLE agent_catalog_state ADD COLUMN instance_id TEXT NOT NULL DEFAULT ''"
-                )
+            for name, definition in {
+                "instance_id": "TEXT NOT NULL DEFAULT ''",
+                "root_count": "INTEGER NOT NULL DEFAULT -1",
+                "source_count": "INTEGER NOT NULL DEFAULT -1",
+                "available_count": "INTEGER NOT NULL DEFAULT -1",
+                "active_job_count": "INTEGER NOT NULL DEFAULT -1",
+                "failed_job_count": "INTEGER NOT NULL DEFAULT -1",
+            }.items():
+                if name not in agent_columns:
+                    connection.execute(
+                        f"ALTER TABLE agent_catalog_state ADD COLUMN {name} {definition}"
+                    )
             connection.execute(
                 "CREATE VIRTUAL TABLE IF NOT EXISTS catalog_search USING fts5(item_id UNINDEXED, text, tokenize='unicode61 remove_diacritics 2')"
             )
@@ -953,6 +981,21 @@ class MediaCatalogCoordinator:
         if not agent_id:
             return {"ok": False, "error": "agent_identity_required", "schema": COORDINATOR_SCHEMA}
         items = [dict(item) for item in page.get("items") or [] if isinstance(item, Mapping)]
+        library_state = (
+            page.get("library_state")
+            if isinstance(page.get("library_state"), Mapping)
+            else {}
+        )
+        observed_counts = {
+            key: _observed_count(library_state.get(key))
+            for key in (
+                "root_count",
+                "source_count",
+                "available_count",
+                "active_job_count",
+                "failed_job_count",
+            )
+        }
         applied = ignored = removed = 0
         with self.repository.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -966,14 +1009,29 @@ class MediaCatalogCoordinator:
             last_sequence = max([int(item.get("sequence") or 0) for item in items] or [0])
             connection.execute(
                 """
-                INSERT INTO agent_catalog_state(agent_id, instance_id, node_id, cursor, last_sequence, availability, freshness, last_error, updated_at)
-                VALUES (?, ?, ?, ?, ?, 'available', 'fresh', '', ?)
+                INSERT INTO agent_catalog_state(
+                    agent_id, instance_id, node_id, cursor, last_sequence,
+                    availability, freshness, last_error, root_count,
+                    source_count, available_count, active_job_count,
+                    failed_job_count, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, 'available', 'fresh', '', ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(agent_id) DO UPDATE SET
                     instance_id=CASE WHEN excluded.instance_id<>''
                         THEN excluded.instance_id
                         ELSE agent_catalog_state.instance_id END,
                     node_id=excluded.node_id, cursor=excluded.cursor,
                     last_sequence=MAX(agent_catalog_state.last_sequence, excluded.last_sequence),
+                    root_count=CASE WHEN excluded.root_count>=0
+                        THEN excluded.root_count ELSE agent_catalog_state.root_count END,
+                    source_count=CASE WHEN excluded.source_count>=0
+                        THEN excluded.source_count ELSE agent_catalog_state.source_count END,
+                    available_count=CASE WHEN excluded.available_count>=0
+                        THEN excluded.available_count ELSE agent_catalog_state.available_count END,
+                    active_job_count=CASE WHEN excluded.active_job_count>=0
+                        THEN excluded.active_job_count ELSE agent_catalog_state.active_job_count END,
+                    failed_job_count=CASE WHEN excluded.failed_job_count>=0
+                        THEN excluded.failed_job_count ELSE agent_catalog_state.failed_job_count END,
                     availability='available', freshness='fresh', last_error='', updated_at=excluded.updated_at
                 """,
                 (
@@ -982,6 +1040,11 @@ class MediaCatalogCoordinator:
                     node_id,
                     _text(page.get("next_cursor")),
                     last_sequence,
+                    observed_counts["root_count"],
+                    observed_counts["source_count"],
+                    observed_counts["available_count"],
+                    observed_counts["active_job_count"],
+                    observed_counts["failed_job_count"],
                     now_iso(),
                 ),
             )
@@ -3833,6 +3896,73 @@ class MediaCatalogCoordinator:
         unavailable = [item["agent_id"] for item in agents if item["availability"] != "available"]
         stale = [item["agent_id"] for item in agents if item["freshness"] != "fresh"]
         return {"agents": agents, "expected_count": len(agents), "available_count": len(agents) - len(unavailable), "unavailable_agent_ids": unavailable, "stale_agent_ids": stale, "partial": bool(unavailable or stale), "fresh": not bool(unavailable or stale)}
+
+    def collection_state(
+        self, *, agent_sync: Mapping[str, Any] | None = None
+    ) -> dict[str, Any]:
+        participation = self.participation()
+        agents = [
+            dict(item)
+            for item in participation.get("agents") or []
+            if isinstance(item, Mapping)
+        ]
+        observed_roots = [
+            _stored_observed_count(item.get("root_count"))
+            for item in agents
+            if _stored_observed_count(item.get("root_count")) >= 0
+        ]
+        local_root_count = int(self.repository.list_roots().get("count") or 0)
+        root_count = max(sum(observed_roots), local_root_count)
+        configured: bool | None
+        if root_count > 0:
+            configured = True
+        elif agents and len(observed_roots) == len(agents):
+            configured = False
+        else:
+            configured = None
+
+        summary = self.repository.summary()
+        available_count = int(summary.get("available_count") or 0)
+        background = self.operations(limit=100)
+        coordinator_active = sum(
+            1
+            for item in background.get("items") or []
+            if str(item.get("status") or "").lower()
+            in {"queued", "running", "waiting_resources", "canceling"}
+        )
+        agent_active = sum(
+            _stored_observed_count(item.get("active_job_count"))
+            for item in agents
+            if _stored_observed_count(item.get("active_job_count")) >= 0
+        )
+        active_operation_count = coordinator_active + agent_active
+        sync = dict(agent_sync or {})
+        sync_state = str(sync.get("state") or "stopped").strip().lower()
+        synchronizing = sync_state in {"running", "catching_up"}
+
+        if available_count > 0:
+            state = "updating" if active_operation_count or synchronizing else "ready"
+        elif active_operation_count or synchronizing:
+            state = "indexing"
+        elif configured is True:
+            state = "empty"
+        elif configured is False:
+            state = "unconfigured"
+        elif sync_state in {"stopped", "idle", "unknown"}:
+            state = "loading"
+        else:
+            state = "unavailable"
+        return {
+            "schema": "adaos.media_center.collection_state.v1",
+            "state": state,
+            "configured": configured,
+            "root_count": root_count,
+            "available_count": available_count,
+            "active_operation_count": active_operation_count,
+            "partial": bool(participation.get("partial")),
+            "sync_state": sync_state,
+            "updated_at": now_iso(),
+        }
 
     def mark_agent_unavailable(self, agent_id: str, *, node_id: str = "", reason: str = "agent_unavailable") -> dict[str, Any]:
         token = _text(agent_id)

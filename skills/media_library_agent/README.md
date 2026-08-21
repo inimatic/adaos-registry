@@ -47,7 +47,7 @@ two seconds.
 
 ## Coordinator contract
 
-The coordinator pulls `adaos.media_library.source_delta.v1` records with an opaque cursor. Deltas are ordered per agent, source revisions are monotonic, and replay is idempotent. Folder segments are included in source metadata so search remains useful for numbered audiobook and album tracks. Derived rendition descriptors remain variants of the existing work and never become duplicate catalog rows. Node-local folder navigation is separately cursor-backed and never materializes an entire tree.
+The coordinator pulls `adaos.media_library.source_delta.v1` records with an opaque cursor. Deltas are ordered per agent, source revisions are monotonic, and replay is idempotent. Every page also carries a compact authoritative library-state witness with root, source, available-source, active-job, and failed-job counts. A rolling-upgrade coordinator treats a page from an older agent as unknown state instead of inferring that the library is unconfigured. Folder segments are included in source metadata so search remains useful for numbered audiobook and album tracks. Derived rendition descriptors remain variants of the existing work and never become duplicate catalog rows. Node-local folder navigation is separately cursor-backed and never materializes an entire tree.
 
 ## Distributed topology adapter
 

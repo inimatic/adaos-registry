@@ -1364,6 +1364,7 @@ class MediaLibraryAgentRepository:
         visible = rows[:bounded]
         items = [self._public_delta(row) for row in visible]
         next_sequence = int(visible[-1]["sequence"]) if visible else after
+        summary = self.summary()
         return {
             "ok": True,
             "schema": SCHEMA_VERSION,
@@ -1373,6 +1374,13 @@ class MediaLibraryAgentRepository:
             "next_cursor": encode_cursor(next_sequence),
             "has_more": has_more,
             "agent": {"id": self.agent_id, "node_id": self.node_id},
+            "library_state": {
+                "root_count": int(summary.get("root_count") or 0),
+                "source_count": int(summary.get("source_count") or 0),
+                "available_count": int(summary.get("available_count") or 0),
+                "active_job_count": int(summary.get("active_job_count") or 0),
+                "failed_job_count": int(summary.get("failed_job_count") or 0),
+            },
         }
 
     def search_sources(

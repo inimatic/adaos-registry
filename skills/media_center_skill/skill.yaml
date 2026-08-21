@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.36
+version: 0.8.37
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -1418,4 +1418,4 @@ nlu_hints:
         dialog_context: {type: object}
       additionalProperties: true
   entities: []
-updated_at: '2026-08-20T00:00:00+00:00'
+updated_at: '2026-08-21T00:00:00+00:00'

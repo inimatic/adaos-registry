@@ -118,12 +118,20 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert widgets["media-home"]["dataSource"] == {
         "kind": "stream",
         "receiver": "media_center.library_state",
-        "path": "home.items",
+        "path": "home",
         "params": {
             "profile_id": "$state.profileId",
             "shared_surface": "$state.sharedSurface",
         },
         "scope": "workspace",
+    }
+    assert widgets["media-home"]["inputs"]["collectionKey"] == "items"
+    assert widgets["media-home"]["inputs"]["loadingStatusKey"] == "state"
+    assert widgets["media-home"]["inputs"]["emptyTextByState"] == {
+        "unconfigured": "Add a media folder in Settings to begin.",
+        "indexing": "Your media folders are being indexed.",
+        "empty": "No playable media was found in the configured folders.",
+        "unavailable": "Library state is temporarily unavailable.",
     }
     assert widgets["media-profile-selector"]["inputs"]["selectedStateKey"] == "profileId"
     assert page["presentation"]["profileStateKey"] == "surfaceProfile"

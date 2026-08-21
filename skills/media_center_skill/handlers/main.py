@@ -156,13 +156,24 @@ def _compact_home_item(item: Mapping[str, Any]) -> dict[str, Any]:
     return {field: item[field] for field in fields if field in item}
 
 
-def _compact_home_snapshot(home: Mapping[str, Any]) -> dict[str, Any]:
+def _compact_home_snapshot(
+    home: Mapping[str, Any],
+    *,
+    collection_state: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    state = dict(collection_state or {})
     return {
         "ok": bool(home.get("ok")),
         "schema": str(home.get("schema") or COORDINATOR_SCHEMA),
         "profile_id": str(home.get("profile_id") or "default"),
         "profile": dict(home.get("profile") or {}),
         "shared_surface": bool(home.get("shared_surface")),
+        "state": str(state.get("state") or "loading"),
+        "configured": state.get("configured"),
+        "root_count": int(state.get("root_count") or 0),
+        "available_count": int(state.get("available_count") or 0),
+        "active_operation_count": int(state.get("active_operation_count") or 0),
+        "updated_at": str(state.get("updated_at") or now_iso()),
         "items": [
             _compact_home_item(item)
             for item in home.get("items") or []
@@ -183,12 +194,15 @@ def _publish_library_snapshot(
 
         profile = str(profile_id or "default").strip() or "default"
         surface_is_shared = _bool(shared_surface, False)
+        agent_sync = _agent_sync_status()
+        collection_state = catalog.collection_state(agent_sync=agent_sync)
         home = _compact_home_snapshot(
             catalog.home(
                 profile_id=profile,
                 limit=6,
                 shared_surface=surface_is_shared,
-            )
+            ),
+            collection_state=collection_state,
         )
         snapshot = {
             "schema": "adaos.media_center.library_state.v1",
@@ -196,9 +210,10 @@ def _publish_library_snapshot(
             "catalog_revision": catalog.catalog_revision(),
             "personal_revision": catalog.profile_revision(profile),
             "participation": catalog.participation(),
+            "collection_state": collection_state,
             "home": home,
             "operations": catalog.operations(limit=10),
-            "agent_sync": _agent_sync_status(),
+            "agent_sync": agent_sync,
         }
         stream_variable_publish(
             "media_center.library_state",
