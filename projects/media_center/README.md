@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.31` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.32` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -33,7 +33,9 @@ or stale topology request therefore fails before topology mutation.
 Reviewed Project rollout is submitted as a durable background operation rather
 than held inside an interactive skill RPC. The tool returns the operation id as
 soon as core accepts it; bounded deployment status and direct operation status
-then expose progress. Core serializes rollout work and resumes accepted/running
+then expose progress. Direct operation status is part of the exported skill
+contract, so clients do not need access to core-private deployment storage.
+Core serializes rollout work and resumes accepted/running
 operations after restart from their immutable authorization record.
 
 Coordinator rehydration restores process-owned workers and publishes the

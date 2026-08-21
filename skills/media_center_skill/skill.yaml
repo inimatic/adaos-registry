@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.32
+version: 0.8.33
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -98,6 +98,7 @@ exports:
   - deployment_status
   - configure_deployment
   - apply_deployment
+  - deployment_operation_status
   - drain_activation
   - remove_activation
   - define_topology
@@ -859,6 +860,17 @@ tools:
     properties:
       plan_digest: {type: string, minLength: 1}
       idempotency_key: {type: string}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: deployment_operation_status
+  description: Return one durable Project deployment operation by id.
+  entry: handlers.main:deployment_operation_status
+  side_effects: none
+  input_schema:
+    type: object
+    required: [operation_id]
+    properties:
+      operation_id: {type: string, minLength: 1}
     additionalProperties: true
   output_schema: {type: object}
 - name: drain_activation

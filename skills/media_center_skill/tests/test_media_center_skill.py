@@ -11,6 +11,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
@@ -31,6 +32,18 @@ _HANDLER_SPEC = importlib.util.spec_from_file_location(
 assert _HANDLER_SPEC and _HANDLER_SPEC.loader
 main = importlib.util.module_from_spec(_HANDLER_SPEC)
 _HANDLER_SPEC.loader.exec_module(main)
+
+
+def test_deployment_operation_status_is_exported_by_the_skill_contract() -> None:
+    manifest = yaml.safe_load((SKILL_ROOT / "skill.yaml").read_text(encoding="utf-8"))
+    exported = set(manifest["exports"]["tools"])
+    definitions = {item["name"]: item for item in manifest["tools"]}
+
+    assert "deployment_operation_status" in exported
+    assert definitions["deployment_operation_status"]["entry"] == (
+        "handlers.main:deployment_operation_status"
+    )
+    assert definitions["deployment_operation_status"]["side_effects"] == "none"
 
 
 def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
