@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Mapping
 from typing import Any, Callable, Protocol, TypeVar, cast
 
 
 class _Worker(Protocol):
-    def dispose(self, *, timeout: float = 5.0) -> None: ...
+    def dispose(self, *, timeout: float = 5.0) -> Mapping[str, Any] | None: ...
 
 
 _TWorker = TypeVar("_TWorker", bound=_Worker)
@@ -68,7 +69,16 @@ class MediaCenterBackgroundRuntime:
         status = getattr(worker, "status", None)
         return dict(status()) if callable(status) else {"state": "unknown", "revision": 0}
 
-    def dispose(self, *, timeout: float = 5.0) -> None:
+    @staticmethod
+    def _dispose_worker(worker: _Worker | None, *, timeout: float) -> dict[str, Any]:
+        if worker is None:
+            return {"stopped": True, "skipped": True}
+        result = worker.dispose(timeout=timeout)
+        if isinstance(result, Mapping):
+            return dict(result)
+        return {"stopped": True, "skipped": False}
+
+    def dispose(self, *, timeout: float = 30.0) -> dict[str, Any]:
         with self._lock:
             sync_worker = self._agent_sync_worker
             enrichment_worker = self._enrichment_worker
@@ -76,10 +86,15 @@ class MediaCenterBackgroundRuntime:
             self._agent_sync_path = ""
             self._enrichment_worker = None
             self._enrichment_path = ""
-        if sync_worker is not None:
-            sync_worker.dispose(timeout=timeout)
-        if enrichment_worker is not None:
-            enrichment_worker.dispose(timeout=timeout)
+        sync = self._dispose_worker(sync_worker, timeout=timeout)
+        enrichment = self._dispose_worker(enrichment_worker, timeout=timeout)
+        stopped = bool(sync.get("stopped")) and bool(enrichment.get("stopped"))
+        return {
+            "ok": stopped,
+            "stopped": stopped,
+            "agent_sync": sync,
+            "enrichment": enrichment,
+        }
 
 
 _BACKGROUND_RUNTIME = MediaCenterBackgroundRuntime()

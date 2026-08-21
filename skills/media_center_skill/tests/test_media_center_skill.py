@@ -41,8 +41,9 @@ def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
         def __init__(self, name: str):
             self.name = name
 
-        def dispose(self, *, timeout: float = 5.0) -> None:
+        def dispose(self, *, timeout: float = 5.0) -> dict[str, object]:
             disposed.append((self.name, timeout))
+            return {"stopped": True, "worker": self.name}
 
         def status(self) -> dict[str, object]:
             return {"state": "idle", "revision": 2, "worker": self.name}
@@ -57,7 +58,7 @@ def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
     assert disposed == [("sync-a", 0.2)]
     assert runtime.agent_sync_status()["worker"] == "sync-b"
 
-    runtime.dispose(timeout=1.5)
+    receipt = runtime.dispose(timeout=1.5)
 
     assert disposed == [
         ("sync-a", 0.2),
@@ -65,6 +66,53 @@ def test_background_runtime_reuses_and_disposes_process_owned_workers() -> None:
         ("enrichment-b", 1.5),
     ]
     assert runtime.agent_sync_status() == {"state": "stopped", "revision": 0}
+    assert receipt["stopped"] is True
+
+
+def test_rehydrate_defers_agent_catchup_to_bounded_background_worker(monkeypatch) -> None:
+    started: list[str] = []
+
+    class Worker:
+        def __init__(self, name: str):
+            self.name = name
+
+        def ensure_started(self) -> bool:
+            started.append(self.name)
+            return True
+
+        def status(self) -> dict[str, object]:
+            return {"state": "idle", "revision": 0}
+
+    class Repository:
+        def summary(self) -> dict[str, object]:
+            return {"total_count": 20_000}
+
+        def facets(self) -> dict[str, object]:
+            return {"media_kind": []}
+
+    class Catalog:
+        def catalog_revision(self) -> int:
+            return 42
+
+    repository = Repository()
+    catalog = Catalog()
+    monkeypatch.setattr(main, "_repository", lambda: repository)
+    monkeypatch.setattr(main, "_coordinator", lambda _repo=None: catalog)
+    monkeypatch.setattr(
+        main,
+        "_run_agent_sync",
+        lambda *_args, **_kwargs: pytest.fail("sync must be deferred"),
+    )
+    monkeypatch.setattr(main, "_agent_sync_runtime", lambda _catalog=None: Worker("sync"))
+    monkeypatch.setattr(main, "_enrichment_runtime", lambda _catalog=None: Worker("enrichment"))
+    monkeypatch.setattr(main, "_publish_library_snapshot", lambda *_args, **_kwargs: None)
+
+    result = main.rehydrate()
+
+    assert started == ["sync", "enrichment"]
+    assert result["agent_sync"]["deferred"] is True
+    assert result["agent_sync"]["mode"] == "background_cursor_catchup"
+    assert result["catalog_revision"] == 42
 
 
 def _resource(resource_id: str = "clip.mp4", *, source: str = "media_server") -> dict:

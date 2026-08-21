@@ -104,7 +104,7 @@ def _agent_sync_runtime(
         lambda: MediaAgentSyncWorker(
             lambda: _run_agent_sync(
                 coordinator,
-                max_pages=8,
+                max_pages=1,
                 limit=500,
                 timeout_seconds=30.0,
             ),
@@ -475,10 +475,10 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
 def rehydrate(**_: Any) -> dict[str, Any]:
     repo = _repository()
     catalog = _coordinator(repo)
-    sync = _run_agent_sync(catalog, max_pages=4)
-    _agent_sync_runtime(catalog).ensure_started()
+    sync_worker = _agent_sync_runtime(catalog)
+    sync_started = sync_worker.ensure_started()
     enrichment = _enrichment_runtime(catalog)
-    enrichment.ensure_started()
+    enrichment_started = enrichment.ensure_started()
     _publish_library_snapshot(
         catalog,
         profile_id=str(_.get("profile_id") or "default"),
@@ -490,8 +490,17 @@ def rehydrate(**_: Any) -> dict[str, Any]:
         "summary": repo.summary(),
         "facets": repo.facets(),
         "catalog_revision": catalog.catalog_revision(),
-        "agent_sync": sync,
-        "enrichment": {"running": True},
+        "agent_sync": {
+            "ok": True,
+            "deferred": True,
+            "mode": "background_cursor_catchup",
+            "worker_started": sync_started,
+            "status": sync_worker.status(),
+        },
+        "enrichment": {
+            "running": True,
+            "worker_started": enrichment_started,
+        },
     }
 
 
@@ -2642,11 +2651,18 @@ def operations(limit: int = 30, **_: Any) -> dict[str, Any]:
 @tool(summary="Stop the process-local enrichment worker.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
     global _coordinator_cached, _coordinator_path
-    background_runtime().dispose()
+    background = background_runtime().dispose(timeout=30.0)
+    if background.get("stopped") is not True:
+        raise RuntimeError("media_center_background_drain_timeout")
     with _coordinator_lock:
         _coordinator_cached = None
         _coordinator_path = ""
-    return {"ok": True, "schema": COORDINATOR_SCHEMA, "disposed": True}
+    return {
+        "ok": True,
+        "schema": COORDINATOR_SCHEMA,
+        "disposed": True,
+        "background": background,
+    }
 
 
 @tool(summary="Explain the MVP media-center workflow and admitted next steps.", side_effects="none")

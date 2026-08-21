@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.26` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.27` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -29,6 +29,13 @@ than held inside an interactive skill RPC. The tool returns the operation id as
 soon as core accepts it; bounded deployment status and direct operation status
 then expose progress. Core serializes rollout work and resumes accepted/running
 operations after restart from their immutable authorization record.
+
+Coordinator rehydration restores process-owned workers and publishes the
+available durable snapshot without synchronously draining agent deltas inside
+the activation transaction. Cursor catch-up continues in the observable
+background worker one bounded page at a time. Worker disposal reports whether
+the process-owned threads actually stopped, so a later slot switch fails closed
+instead of overlapping an unbounded writer with the new runtime.
 
 Active node agents declare their distributed membership contract in the skill
 manifest. The core runtime owns registration, lease renewal, stale-member

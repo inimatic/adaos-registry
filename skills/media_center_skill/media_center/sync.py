@@ -51,13 +51,19 @@ class MediaAgentSyncWorker:
             self._thread.start()
         return True
 
-    def dispose(self, *, timeout: float = 5.0) -> None:
+    def dispose(self, *, timeout: float = 30.0) -> dict[str, Any]:
         self._stop.set()
         self._wake.set()
         with self._lock:
             thread = self._thread
         if thread and thread.is_alive() and thread is not threading.current_thread():
             thread.join(timeout=max(0.0, timeout))
+        stopped = thread is None or not thread.is_alive()
+        if stopped:
+            with self._lock:
+                if self._thread is thread:
+                    self._thread = None
+        return {"stopped": stopped, "worker": "agent_sync"}
 
     def status(self) -> dict[str, Any]:
         with self._lock:
