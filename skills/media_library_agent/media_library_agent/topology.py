@@ -46,6 +46,10 @@ class LibraryAgentTopology:
             witness = repository.topology_root_witness(root_id)
             if witness is None:
                 raise ValueError("external_root_not_present_on_agent")
+            partition_value = replace(
+                partition_value,
+                checkpoint=text(witness.get("checkpoint")) or None,
+            )
             replica_value = replace(
                 replica_value,
                 checkpoint=text(witness.get("checkpoint")) or None,
@@ -65,6 +69,10 @@ class LibraryAgentTopology:
             snapshot = repository.topology_catalog_snapshot(max_items=1)
             item_count = int(snapshot.get("item_count") or 0)
             shard = text(partition_value.selector.get("shard")) or "home"
+            partition_value = replace(
+                partition_value,
+                checkpoint=text(snapshot.get("checkpoint")) or None,
+            )
             replica_value = replace(
                 replica_value,
                 checkpoint=text(snapshot.get("checkpoint")) or None,

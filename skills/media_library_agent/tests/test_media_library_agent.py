@@ -208,6 +208,7 @@ def test_agent_derives_catalog_witness_instead_of_trusting_caller(tmp_path):
     result = LibraryAgentTopology().observe(repository, partition, replica)
 
     assert result["ok"] is True
+    assert result["partition"]["checkpoint"] == "catalog:0"
     assert result["replica"]["checkpoint"] == "catalog:0"
     assert result["replica"]["source_ref"] == "catalog-state:home"
     assert result["replica"]["content_state"] == "empty"
