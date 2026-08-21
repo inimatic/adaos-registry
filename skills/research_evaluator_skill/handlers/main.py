@@ -850,10 +850,16 @@ def evaluate_builder_attempt(
             source_snapshot = inspect_skill_source(candidate_id)
             probe_request = hidden_probe_request(str(plan["digest"]))
             try:
+                # The digest is evaluator-owned provenance for the complete
+                # hidden fixture.  It is intentionally not part of the public
+                # provider ABI and must not be sent through strict tool input
+                # validation.
+                candidate_probe_request = copy.deepcopy(probe_request)
+                candidate_probe_request.pop("digest", None)
                 value = invoke_development_skill(
                     candidate_id,
                     "implementation_probe",
-                    {"request": probe_request},
+                    {"request": candidate_probe_request},
                     timeout=60,
                 )
                 if isinstance(value, Mapping):

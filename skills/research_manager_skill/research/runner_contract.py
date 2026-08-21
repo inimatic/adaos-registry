@@ -654,7 +654,7 @@ def descriptor(
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.17.0",
+        "version": "1.18.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -856,6 +856,7 @@ def descriptor(
                     "profile_conditions.input_policy is the sole input-source selector: deterministic_contract_fixture must execute the bounded production conformance path without opening the accepted dataset, while accepted_dataset selects the admitted scientific data path; providers must not require a private duplicate flag in conditions",
                     "arm is the exact accepted arm object; providers read arm.id instead of coercing the object to text",
                     "command[0] is the active Python interpreter and command[1] is an absolute runner path under the skill source",
+                    "environment never contains platform-protected runtime bindings: ADAOS_CURRENT_SKILL, ADAOS_SKILL_ENV_PATH, ADAOS_SKILL_INTERNAL_DATA_ROOT, ADAOS_SKILL_NAME, ADAOS_SKILL_ROOT, ADAOS_TASK_RUNTIME_DIR, PYTHONHOME, or PYTHONPATH; the trusted executor supplies them",
                     "working_directory is a pre-created skill-owned execution-output directory",
                     "each expected_outputs[i] is a relative path resolved exactly as Path(working_directory) / expected_outputs[i]; writing it under an undeclared implicit outputs/ subdirectory is missing output even when command exit_code is zero",
                     "output_ref is an opaque portable key that collect_attempt resolves to that same attempt directory",

@@ -949,6 +949,7 @@ def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
     }
     semantic_calls: list[dict] = []
     candidate_calls: list[dict] = []
+    probe_calls: list[dict] = []
 
     monkeypatch.setattr(handler_module, "EvaluationRepository", _Repository)
     monkeypatch.setattr(handler_module.development_sessions, "get", lambda _session_id: session)
@@ -987,11 +988,11 @@ def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
 
     monkeypatch.setattr(handler_module, "invoke_skill", invoke)
     monkeypatch.setattr(handler_module, "inspect_skill_source", lambda _candidate: source_snapshot)
-    monkeypatch.setattr(
-        handler_module,
-        "invoke_development_skill",
-        lambda *_args, **_kwargs: {"schema": "probe-result"},
-    )
+    def invoke_probe(_candidate_id: str, _operation_id: str, arguments: dict, **_kwargs):
+        probe_calls.append(arguments)
+        return {"schema": "probe-result"}
+
+    monkeypatch.setattr(handler_module, "invoke_development_skill", invoke_probe)
 
     def semantic(**kwargs):
         semantic_calls.append(kwargs)
@@ -1027,6 +1028,9 @@ def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
     assert semantic_calls[0]["source_snapshot"] is source_snapshot
     assert semantic_calls[0]["expected_source_digest"] == source_snapshot["source_digest"]
     assert semantic_calls[0]["probe_request"]["experiment_plan_digest"] == plan["digest"]
+    assert semantic_calls[0]["probe_request"]["digest"].startswith("sha256:")
+    assert "digest" not in probe_calls[0]["request"]
+    assert probe_calls[0]["request"]["experiment_plan_digest"] == plan["digest"]
     assert candidate_calls[0]["scientific_implementation"]["ok"] is True
     assert response["runtime_release"]["status"] == "deferred"
     assert response["lifecycle_errors"] == []

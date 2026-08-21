@@ -252,7 +252,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.17.0"
+    assert contract["version"] == "1.18.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -287,6 +287,10 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     )
     assert any(
         "undeclared implicit outputs/ subdirectory" in invariant
+        for invariant in prepare_contract["invariants"]
+    )
+    assert any(
+        "PYTHONPATH" in invariant and "trusted executor supplies them" in invariant
         for invariant in prepare_contract["invariants"]
     )
     for operation in contract["operations"].values():
