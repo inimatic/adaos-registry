@@ -5995,6 +5995,7 @@ class ResearchOrchestrator:
                     "experiment_ref": f"experiment:{experiment_id}",
                     "tracker_acceptance_ref": f"tracker-evidence-acceptance:{tracker_acceptance_id}",
                     "tracker_export_digest": tracker_export_digest,
+                    "source_recorded_at": result_payload.get("finalized_at"),
                 },
                 actor=str(result_payload.get("finalized_by") or actor),
                 origin="skill:research_manager_skill",
@@ -6013,6 +6014,7 @@ class ResearchOrchestrator:
                 "result_ref": evidence_projection["result_ref"],
                 "verification": dict(result_verification),
                 "inference_allowed": False,
+                "source_recorded_at": result_payload.get("finalized_at"),
             },
             actor=actor,
             origin="skill:research_manager_skill",
@@ -6027,6 +6029,7 @@ class ResearchOrchestrator:
             {
                 "implementation_track_ref": track["ref"],
                 **evidence_projection,
+                "source_recorded_at": dict(bundle.get("payload") or {}).get("finalized_at"),
             },
             actor=actor,
             origin="skill:research_manager_skill",
