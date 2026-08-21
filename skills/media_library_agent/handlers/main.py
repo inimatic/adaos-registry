@@ -258,6 +258,14 @@ def ensure_schema(**_: Any) -> dict[str, Any]:
     side_effects="local_write",
 )
 def rehydrate(**_: Any) -> dict[str, Any]:
+    if not _owns_background_worker():
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "deferred": True,
+            "deferred_to": "service_process",
+            "worker": {"running": False, "owner": "service_process"},
+        }
     repository, worker = _runtime()
     _ensure_worker_if_owned(worker)
     return {
@@ -850,7 +858,15 @@ def distributed_topology_transfer(**payload: Any) -> dict[str, Any]:
 
 @tool(summary="Stop process-local media-library workers.", side_effects="local_write")
 def dispose(**_: Any) -> dict[str, Any]:
-    _repository, worker = _runtime()
-    worker.dispose()
+    owner = "current_process" if _owns_background_worker() else "service_process"
+    if owner == "current_process":
+        _repository, worker = _runtime()
+        worker.dispose()
     _stop_progress_publisher()
-    return {"ok": True, "schema": SCHEMA_VERSION, "disposed": True}
+    return {
+        "ok": True,
+        "schema": SCHEMA_VERSION,
+        "disposed": owner == "current_process",
+        "owner": owner,
+        "deferred": owner == "service_process",
+    }

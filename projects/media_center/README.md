@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.29` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.30` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -46,6 +46,12 @@ The node-local agent closes every SQLite connection at the repository context
 boundary. Folder navigation uses a covering root/presence/folder index, keeping
 the grouping query bounded on large libraries and avoiding leaked readers that
 can delay scans, search, activation, or schema migration.
+
+The core-process lifecycle no longer opens the repository owned by the agent
+service. Rehydrate and dispose return explicit deferred receipts; schema
+migration and worker recovery run only after the service supervisor switches
+the active slot. This prevents an old service reader from overlapping a new
+slot's migration on large or slow databases.
 
 Active node agents declare their distributed membership contract in the skill
 manifest. The core runtime owns registration, lease renewal, stale-member

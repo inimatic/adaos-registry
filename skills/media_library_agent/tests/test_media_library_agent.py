@@ -468,6 +468,36 @@ def test_service_process_owns_background_worker(monkeypatch):
     assert main._owns_background_worker() is True
 
 
+def test_root_lifecycle_defers_repository_ownership_to_service(monkeypatch):
+    monkeypatch.setenv("ADAOS_RUNTIME_PORT", "8777")
+    monkeypatch.setenv("MEDIA_LIBRARY_AGENT_EMBEDDED_WORKER", "0")
+    monkeypatch.setattr(
+        main,
+        "_runtime",
+        lambda: (_ for _ in ()).throw(
+            AssertionError("root lifecycle opened the service-owned repository")
+        ),
+    )
+
+    rehydrated = main.rehydrate()
+    disposed = main.dispose()
+
+    assert rehydrated == {
+        "ok": True,
+        "schema": main.SCHEMA_VERSION,
+        "deferred": True,
+        "deferred_to": "service_process",
+        "worker": {"running": False, "owner": "service_process"},
+    }
+    assert disposed == {
+        "ok": True,
+        "schema": main.SCHEMA_VERSION,
+        "disposed": False,
+        "owner": "service_process",
+        "deferred": True,
+    }
+
+
 def test_bounded_watcher_debounces_changes_into_incremental_scan(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
