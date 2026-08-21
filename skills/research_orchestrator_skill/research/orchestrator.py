@@ -2151,11 +2151,34 @@ class ResearchOrchestrator:
         if not isinstance(track, Mapping) or not isinstance(previous, Mapping):
             raise ValueError("implementation track has no Development Session")
 
+        previous_contract, contract_envelope_nested = self._development_instruction_value(
+            str(previous["session_id"]), "consumer_contract"
+        )
+        brief, brief_envelope_nested = self._development_instruction_value(
+            str(previous["session_id"]), "automation_brief"
+        )
+        compilation, compilation_envelope_nested = self._development_instruction_value(
+            str(previous["session_id"]), "research_compilation"
+        )
+        plan = (
+            dict(compilation["experiment_plan"])
+            if isinstance(compilation.get("experiment_plan"), Mapping)
+            else dict(
+                dict(
+                    dict(compilation.get("facets") or {}).get("experiment_plan")
+                    or {}
+                ).get("payload")
+                or {}
+            )
+        )
+        if not plan:
+            raise ValueError("Development Session compilation has no ExperimentPlan")
+        _, runner_id = self._component_identity(str(track["primary_target_ref"]))
         current_contract = dict(
             self._invoke_skill(
                 "research_manager_skill",
                 "get_runner_contract",
-                {},
+                {"experiment_plan": plan, "runner_id": runner_id},
                 timeout=60,
             )
         )
@@ -2169,16 +2192,6 @@ class ResearchOrchestrator:
             )
         ):
             raise ValueError("ResearchManager returned an invalid runner consumer contract")
-
-        previous_contract, contract_envelope_nested = self._development_instruction_value(
-            str(previous["session_id"]), "consumer_contract"
-        )
-        brief, brief_envelope_nested = self._development_instruction_value(
-            str(previous["session_id"]), "automation_brief"
-        )
-        compilation, compilation_envelope_nested = self._development_instruction_value(
-            str(previous["session_id"]), "research_compilation"
-        )
         previous_digest = str(previous_contract.get("digest") or "").strip()
         instruction_envelope_nested = any(
             (
@@ -4378,11 +4391,16 @@ class ResearchOrchestrator:
             implementation_bundle = artifact_context.source_bundle(
                 owner_skill_id, audience=_IMPLEMENTATION_AUDIENCE
             )
+            plan_facet = dict(dict(compilation["facets"])["experiment_plan"])
+            experiment_plan = dict(plan_facet["payload"])
             consumer_contract = dict(
                 self._invoke_skill(
                     "research_manager_skill",
                     "get_runner_contract",
-                    {},
+                    {
+                        "experiment_plan": experiment_plan,
+                        "runner_id": owner_skill_id,
+                    },
                     timeout=60,
                 )
             )

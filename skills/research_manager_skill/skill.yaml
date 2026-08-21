@@ -105,10 +105,22 @@ tools:
     - errors
 - name: get_runner_contract
   description: Return the canonical content-addressed adaos.research.runner.v1 consumer
-    ABI used by Builder and direction skills.
+    ABI used by Builder and direction skills, optionally materializing a trusted
+    operation sequence from an accepted ExperimentPlan.
   entry: handlers.main:get_runner_contract
   input_schema:
     type: object
+    properties:
+      experiment_plan:
+        type: object
+      runner_id:
+        type: string
+        minLength: 1
+    dependentRequired:
+      experiment_plan:
+      - runner_id
+      runner_id:
+      - experiment_plan
     additionalProperties: false
   output_schema:
     type: object
@@ -984,4 +996,3 @@ compatibility:
     min_commit: 962b6c80600c4b86fae07d5168a0be01e54ab6a8
     min_short_commit: 962b6c80
     build_date: '2026-08-21T09:45:38+03:00'
-

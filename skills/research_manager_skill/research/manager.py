@@ -922,30 +922,6 @@ class ResearchManager:
             errors.append(f"unsupported acceptance profile: {profile}")
             return self._acceptance_receipt(profile, checks=checks, errors=errors)
 
-        canonical_contract = runner_contract_descriptor()
-        supplied_contract_digest = str(consumer_contract.get("digest") or "")
-        if supplied_contract_digest != canonical_contract["digest"] or consumer_contract != canonical_contract:
-            errors.append("Development Session consumer_contract differs from the active ResearchManager ABI")
-            return self._acceptance_receipt(
-                profile,
-                checks=[
-                    {
-                        "id": "runner.consumer_contract_identity",
-                        "ok": False,
-                        "expected_digest": canonical_contract["digest"],
-                        "actual_digest": supplied_contract_digest or None,
-                    }
-                ],
-                errors=errors,
-            )
-        checks.append(
-            {
-                "id": "runner.consumer_contract_identity",
-                "ok": True,
-                "digest": supplied_contract_digest,
-            }
-        )
-
         if (
             compilation.get("schema") == "adaos.research.compilation_projection.v1"
             and isinstance(compilation.get("experiment_plan"), Mapping)
@@ -968,6 +944,30 @@ class ResearchManager:
         if not plan:
             errors.append("accepted ResearchCompilation has no ExperimentPlan payload")
             return self._acceptance_receipt(profile, checks=checks, errors=errors)
+
+        canonical_contract = runner_contract_descriptor(plan, runner_id=candidate_id)
+        supplied_contract_digest = str(consumer_contract.get("digest") or "")
+        if supplied_contract_digest != canonical_contract["digest"] or consumer_contract != canonical_contract:
+            errors.append("Development Session consumer_contract differs from the active ResearchManager ABI")
+            return self._acceptance_receipt(
+                profile,
+                checks=[
+                    {
+                        "id": "runner.consumer_contract_identity",
+                        "ok": False,
+                        "expected_digest": canonical_contract["digest"],
+                        "actual_digest": supplied_contract_digest or None,
+                    }
+                ],
+                errors=errors,
+            )
+        checks.append(
+            {
+                "id": "runner.consumer_contract_identity",
+                "ok": True,
+                "digest": supplied_contract_digest,
+            }
+        )
 
         consumer_evidence: dict[str, Any] = {
             "candidate_ref": candidate_ref,

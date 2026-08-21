@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+from collections.abc import Mapping
 from typing import Any
 
 from research.contracts import digest
@@ -415,12 +417,183 @@ def _workflow_smoke_documents() -> dict[str, Any]:
     }
 
 
-def descriptor() -> dict[str, Any]:
+def _operation_sequence_fixture(
+    experiment_plan: Mapping[str, Any],
+    *,
+    runner_id: str,
+) -> dict[str, Any]:
+    """Materialize one bounded production-path sequence from consumer authority."""
+
+    plan = copy.deepcopy(dict(experiment_plan))
+    execution_profiles = [
+        (str(stage_id), dict(profile))
+        for stage_id, profile in dict(plan.get("execution") or {}).items()
+        if isinstance(profile, Mapping)
+        and str(profile.get("evidence_class") or "") == "workflow_smoke"
+    ]
+    if len(execution_profiles) != 1:
+        raise ValueError("operation sequence requires exactly one workflow_smoke profile")
+    stage_id, smoke = execution_profiles[0]
+    seeds = list(smoke.get("seeds") or [])
+    if not seeds or any(isinstance(seed, bool) or not isinstance(seed, int) for seed in seeds):
+        raise ValueError("operation sequence requires integer workflow_smoke seeds")
+    arms = [dict(item) for item in dict(plan.get("operators") or {}).get("arms") or []]
+    if not arms:
+        raise ValueError("operation sequence requires at least one accepted arm")
+    # Prefer the intervention so the trusted rail cannot pass by exercising
+    # only a conventional baseline implementation.
+    arm = next((item for item in arms if item.get("role") == "intervention"), arms[0])
+    dataset = dict(plan.get("dataset") or {})
+    analysis = dict(plan.get("analysis") or {})
+    randomization = dict(plan.get("randomization") or {})
+    result_record = dict(dict(plan.get("runner_contract") or {}).get("result_record") or {})
+    required_result_fields = {
+        "primary_metric_path",
+        "step_path",
+        "pairing_identity_path",
+    }
+    if not required_result_fields.issubset(result_record):
+        raise ValueError("operation sequence requires canonical result_record paths")
+    data_digest_binding = {
+        "$bind": {
+            "step": "dataset_status",
+            "pointer": "/split_bindings/validation/dataset_digest",
+        }
+    }
+    profile_conditions = {
+        "source_stage_id": stage_id,
+        "epochs": int(smoke["epochs"]),
+        "seeds": seeds,
+        "device": str(smoke["device"]),
+        "network_mode": str(smoke.get("network_mode") or "unrestricted"),
+        "workers": 0,
+        "wall_time_s": int(smoke.get("max_wall_time_minutes") or 5) * 60,
+        "workload": copy.deepcopy(dict(smoke.get("workload") or {})),
+        "input_policy": copy.deepcopy(dict(smoke.get("input_policy") or {})),
+        "evidence_class": "workflow_smoke",
+        "inference_allowed": False,
+    }
+    conditions = {
+        "dataset": {
+            "name": str(dataset.get("logical_name") or dataset.get("id") or "dataset"),
+            "version": data_digest_binding,
+            "policy_digest": str(dataset.get("policy_digest") or ""),
+            "split_strategy": str(dataset.get("split_strategy") or ""),
+            "evaluation_seal": str(dataset.get("evaluation_seal") or ""),
+        },
+        "operators": copy.deepcopy(dict(plan["operators"])),
+        "execution": {"preflight": copy.deepcopy(profile_conditions)},
+        "randomization": {
+            "named_streams": copy.deepcopy(list(randomization.get("named_streams") or [])),
+            "paired": True,
+            "unit": str(randomization.get("unit") or "seed"),
+            "invariant_fields": copy.deepcopy(list(randomization.get("invariant_fields") or [])),
+            "varied_fields": copy.deepcopy(list(randomization.get("varied_fields") or [])),
+        },
+        "analysis": {
+            "primary_metric": str(analysis.get("primary_metric") or "primary_metric"),
+            "primary_estimand": str(analysis.get("primary_estimand") or "primary_estimand"),
+            "primary_contrast": copy.deepcopy(dict(analysis.get("primary_contrast") or {})),
+            "paired": True,
+            "result_metric_path": str(result_record["primary_metric_path"]),
+            "result_step_path": str(result_record["step_path"]),
+            "initialization_digest_path": str(result_record["pairing_identity_path"]),
+            "uncertainty": copy.deepcopy(dict(analysis.get("uncertainty") or {})),
+            "stopping_rule": copy.deepcopy(dict(analysis.get("stopping_rule") or {})),
+        },
+        "tracker": {
+            "provider": "local-tracker",
+            "required_delivery": "durable-before-finalize",
+        },
+        "runner": {
+            "provider": str(runner_id),
+            "contract": "adaos.research.runner.v1",
+            "data_owner": str(runner_id),
+        },
+    }
+    request = {
+        "experiment_id": "builder-contract-conformance",
+        "experiment_revision_id": "builder-contract-conformance.r1",
+        "trial_id": f"builder-contract-{stage_id}-{arm['id']}-{seeds[0]}",
+        "run_id": f"builder-contract-{arm['id']}-{seeds[0]}",
+        "attempt_number": 1,
+        "profile": "preflight",
+        "seed": int(seeds[0]),
+        "arm": arm,
+        "conditions": conditions,
+        "profile_conditions": profile_conditions,
+    }
+    return {
+        "id": "workflow_smoke.production_operation_sequence",
+        "kind": "operation_sequence",
+        "required": True,
+        "runtime_scope": "task_runtime",
+        "timeout_seconds": min(
+            300,
+            max(30, int(smoke.get("max_wall_time_minutes") or 5) * 60),
+        ),
+        "steps": [
+            {
+                "id": "dataset_status",
+                "kind": "operation",
+                "operation": "dataset_status",
+                "input": {},
+            },
+            {
+                "id": "prepare_attempt",
+                "kind": "operation",
+                "operation": "prepare_attempt",
+                "input": {"request": request},
+            },
+            {
+                "id": "execute_attempt",
+                "kind": "execution_spec",
+                "source_step": "prepare_attempt",
+                "timeout_seconds": min(
+                    300,
+                    max(30, int(smoke.get("max_wall_time_minutes") or 5) * 60),
+                ),
+            },
+            {
+                "id": "collect_attempt",
+                "kind": "operation",
+                "operation": "collect_attempt",
+                "input": {
+                    "output_ref": {
+                        "$bind": {"step": "prepare_attempt", "pointer": "/output_ref"}
+                    }
+                },
+                "assert": [{"pointer": "/complete", "equals": True}],
+            },
+            {
+                "id": "verify_artifacts",
+                "kind": "operation",
+                "operation": "verify_artifact",
+                "for_each": {
+                    "$bind": {"step": "collect_attempt", "pointer": "/artifacts"}
+                },
+                "input": {
+                    "uri": {"$item": "/uri"},
+                    "digest": {"$item": "/digest"},
+                },
+                "assert": [{"pointer": "/ok", "equals": True}],
+            },
+        ],
+    }
+
+
+def descriptor(
+    experiment_plan: Mapping[str, Any] | None = None,
+    *,
+    runner_id: str | None = None,
+) -> dict[str, Any]:
+    if (experiment_plan is None) != (not str(runner_id or "").strip()):
+        raise ValueError("experiment_plan and runner_id must be supplied together")
     workflow_smoke_evidence = _workflow_smoke_documents()
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.13.0",
+        "version": "1.14.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -752,7 +925,17 @@ def descriptor() -> dict[str, Any]:
                     workflow_smoke_evidence["required_expected_outputs"]
                 ),
                 "documents": dict(workflow_smoke_evidence["documents"]),
-            }
+            },
+            *(
+                [
+                    _operation_sequence_fixture(
+                        experiment_plan,
+                        runner_id=str(runner_id),
+                    )
+                ]
+                if experiment_plan is not None and str(runner_id or "").strip()
+                else []
+            ),
         ],
     }
     return {**value, "digest": digest(value)}

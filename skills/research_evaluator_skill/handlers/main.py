@@ -214,10 +214,18 @@ def derive_compact_calibration(
     )
     if not isinstance(response, Mapping) or not response.get("ok"):
         raise RuntimeError("research orchestrator did not return compact execution contracts")
+    execution_compilation = dict(response.get("research_compilation") or {})
+    experiment_plan = execution_compilation.get("experiment_plan")
+    if not isinstance(experiment_plan, Mapping):
+        raise RuntimeError("execution compilation has no accepted ExperimentPlan")
+    direction_skill_id = source_direction or str(baseline["direction_skill_id"])
     consumer_contract = invoke_skill(
         "research_manager_skill",
         "get_runner_contract",
-        {},
+        {
+            "experiment_plan": dict(experiment_plan),
+            "runner_id": direction_skill_id,
+        },
         timeout=120,
     )
     if (
@@ -410,7 +418,7 @@ def derive_compact_calibration(
                 str(baseline["title"]),
             )
             + " (compact execution contracts)",
-            "direction_skill_id": source_direction or str(baseline["direction_skill_id"]),
+            "direction_skill_id": direction_skill_id,
             "expected_protocol_digest": str(brief["prototype_digest"]),
             "expected_smoke_profile": expected_smoke_profile,
             "consumer_evaluation": {

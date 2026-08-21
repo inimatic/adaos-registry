@@ -268,7 +268,11 @@ def test_consumer_contract_refresh_supersedes_only_the_development_session(
     }
     current_contract["digest"] = digest(current_contract)
     brief = {"schema": "brief", "digest": "sha256:" + "b" * 64}
-    compilation = {"schema": "compilation", "digest": "sha256:" + "c" * 64}
+    compilation = {
+        "schema": "compilation",
+        "digest": "sha256:" + "c" * 64,
+        "experiment_plan": _plan(),
+    }
     previous_session = {
         "session_id": "dev_direction_old",
         "project_ref": "project:direction_implementation",

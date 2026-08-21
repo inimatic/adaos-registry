@@ -59,10 +59,13 @@ def evaluate_development_candidate(request: Mapping[str, Any]) -> dict[str, Any]
 
 
 @tool("get_runner_contract")
-def get_runner_contract() -> dict[str, Any]:
-    """Return the canonical content-addressed research runner consumer ABI."""
+def get_runner_contract(
+    experiment_plan: Mapping[str, Any] | None = None,
+    runner_id: str | None = None,
+) -> dict[str, Any]:
+    """Return the canonical ABI, optionally with a plan-bound trusted fixture."""
 
-    return runner_contract_descriptor()
+    return runner_contract_descriptor(experiment_plan, runner_id=runner_id)
 
 
 @tool("create_study")

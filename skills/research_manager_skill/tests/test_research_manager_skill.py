@@ -149,7 +149,10 @@ def _acceptance_plan() -> dict:
 def _acceptance_envelope(profile: str) -> dict:
     compilation_digest = "sha256:" + "a" * 64
     brief_digest = "sha256:" + "b" * 64
-    consumer_contract = runner_contract_descriptor()
+    consumer_contract = runner_contract_descriptor(
+        _acceptance_plan(),
+        runner_id="tlp_runner",
+    )
     return {
         "schema": "adaos.builder.acceptance_candidate.v1",
         "profile": profile,
@@ -249,7 +252,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.13.0"
+    assert contract["version"] == "1.14.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -327,6 +330,40 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     assert any(
         "exact set equals artifacts_index.json.files" in invariant
         for invariant in contract["operations"]["collect_attempt"]["invariants"]
+    )
+
+
+def test_runner_contract_materializes_plan_bound_trusted_operation_sequence() -> None:
+    contract = runner_contract_descriptor(
+        _acceptance_plan(),
+        runner_id="tlp_runner",
+    )
+    fixture = next(
+        item
+        for item in contract["conformance_fixtures"]
+        if item["kind"] == "operation_sequence"
+    )
+    assert fixture["timeout_seconds"] == 300
+    assert [item["id"] for item in fixture["steps"]] == [
+        "dataset_status",
+        "prepare_attempt",
+        "execute_attempt",
+        "collect_attempt",
+        "verify_artifacts",
+    ]
+    request = fixture["steps"][1]["input"]["request"]
+    assert request["arm"] == {"id": "tlp", "role": "intervention"}
+    assert request["seed"] == 17
+    assert request["profile_conditions"]["source_stage_id"] == "stage_smoke_cpu"
+    assert request["profile_conditions"]["inference_allowed"] is False
+    assert request["conditions"]["dataset"]["version"] == {
+        "$bind": {
+            "step": "dataset_status",
+            "pointer": "/split_bindings/validation/dataset_digest",
+        }
+    }
+    assert contract["digest"] == digest(
+        {key: value for key, value in contract.items() if key != "digest"}
     )
 
     dataset_schema = contract["operations"]["dataset_status"]["output_schema"]
