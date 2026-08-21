@@ -225,11 +225,16 @@ def test_repository_schema_initialization_is_concurrency_safe(tmp_path):
         results = list(executor.map(initialize, range(16)))
 
     assert all(result["ok"] is True for result in results)
-    assert {result["schema_revision"] for result in results} == {"2"}
+    assert {result["schema_revision"] for result in results} == {"3"}
     with sqlite3.connect(database) as connection:
         rows = dict(connection.execute("SELECT key,value FROM agent_meta").fetchall())
+        indexes = {
+            str(row[1])
+            for row in connection.execute("PRAGMA index_list(sources)").fetchall()
+        }
     assert rows["node_id"] == "node-a"
-    assert rows["database_schema_revision"] == "2"
+    assert rows["database_schema_revision"] == "3"
+    assert "idx_media_agent_sources_folder" in indexes
 
 
 def test_current_schema_check_does_not_require_sqlite_writer_lock(tmp_path):
@@ -245,8 +250,21 @@ def test_current_schema_check_does_not_require_sqlite_writer_lock(tmp_path):
         blocker.close()
 
     assert result["ok"] is True
-    assert result["schema_revision"] == "2"
+    assert result["schema_revision"] == "3"
     assert time.monotonic() - started < 1.0
+
+
+def test_repository_context_closes_sqlite_connection(tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "closing-connection.sqlite3", node_id="node-a"
+    )
+    connection = repository.connect()
+
+    with connection as managed:
+        assert managed.execute("SELECT 1").fetchone()[0] == 1
+
+    with pytest.raises(sqlite3.ProgrammingError, match="closed database"):
+        connection.execute("SELECT 1")
 
 
 def test_runtime_prefers_sdk_node_identity(monkeypatch, tmp_path):

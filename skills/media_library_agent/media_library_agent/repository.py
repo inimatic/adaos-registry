@@ -9,6 +9,7 @@ import time
 import zlib
 from collections.abc import Iterator
 from pathlib import Path
+from types import TracebackType
 from typing import Any, Iterable, Mapping
 
 from .contracts import (
@@ -30,8 +31,21 @@ from .contracts import (
 ACTIVE_JOB_STATUSES = ("queued", "running", "waiting_resources", "canceling")
 TERMINAL_JOB_STATUSES = ("completed", "failed", "canceled")
 _CLOCK = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d$")
-_DATABASE_SCHEMA_REVISION = "2"
+_DATABASE_SCHEMA_REVISION = "3"
 _SCHEMA_LOCK_TIMEOUT_SECONDS = 300.0
+
+
+class _ClosingConnection(sqlite3.Connection):
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        try:
+            return super().__exit__(exc_type, exc_value, traceback)
+        finally:
+            self.close()
 
 
 @contextlib.contextmanager
@@ -132,7 +146,9 @@ class MediaLibraryAgentRepository:
         self.ensure_schema()
 
     def connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(str(self.db_path), timeout=30)
+        connection = sqlite3.connect(
+            str(self.db_path), timeout=30, factory=_ClosingConnection
+        )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA synchronous=NORMAL")
@@ -253,6 +269,8 @@ class MediaLibraryAgentRepository:
                     UNIQUE(root_id, relative_path)
                 );
                 CREATE INDEX IF NOT EXISTS idx_media_agent_sources_root ON sources(root_id, present, relative_path);
+                CREATE INDEX IF NOT EXISTS idx_media_agent_sources_folder
+                    ON sources(root_id, present, folder_path, revision);
                 CREATE INDEX IF NOT EXISTS idx_media_agent_sources_kind ON sources(media_kind, present);
                 CREATE VIRTUAL TABLE IF NOT EXISTS source_search USING fts5(
                     source_id UNINDEXED,

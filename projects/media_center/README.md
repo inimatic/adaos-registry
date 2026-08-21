@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.28` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.29` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -41,6 +41,11 @@ Bounded coordinator FTS applies profile, media-kind, source, collection, and
 availability filters before the candidate window is cut. A broad folder or
 filename match therefore cannot be filled by a different media kind before the
 requested audio or video rows are considered.
+
+The node-local agent closes every SQLite connection at the repository context
+boundary. Folder navigation uses a covering root/presence/folder index, keeping
+the grouping query bounded on large libraries and avoiding leaked readers that
+can delay scans, search, activation, or schema migration.
 
 Active node agents declare their distributed membership contract in the skill
 manifest. The core runtime owns registration, lease renewal, stale-member

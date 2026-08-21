@@ -445,8 +445,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.12",
-      "updated_at": "2026-08-21T01:15:00+00:00",
+      "version": "0.6.13",
+      "updated_at": "2026-08-21T01:30:00+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {
