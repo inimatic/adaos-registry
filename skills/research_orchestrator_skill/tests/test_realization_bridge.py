@@ -512,6 +512,10 @@ def test_completed_automation_rebases_when_successor_session_differs(
                 "status": "completed",
                 "session": {"development_session_id": "dev-direction-old"},
                 "task_id": "task-old",
+                "workflow_head": {
+                    "state": "verification",
+                    "delivery_status": "checkpoint",
+                },
             }
         assert operation == "submit_automation"
         return {
@@ -538,6 +542,73 @@ def test_completed_automation_rebases_when_successor_session_differs(
     assert result["reused"] is False
     assert [item[0] for item in calls] == ["get_automation", "submit_automation"]
     assert calls[-1][1]["text"].startswith("Rebase the terminal Automation result")
+
+
+def test_published_automation_starts_new_change_for_successor_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    track = {
+        "track_id": "task-1.track-successor",
+        "ref": "implementation-track:task-1.track-successor",
+        "primary_target_ref": "skill:direction",
+        "status": "development_ready",
+        "metadata": {},
+    }
+    session = {"session_id": "dev-direction-successor"}
+    state = {
+        "direction": {"direction_id": "direction", "ref": "research-direction:direction"},
+        "selected_task": None,
+        "active_implementation_track": track,
+        "development_session": session,
+    }
+
+    class Repository:
+        def record_track_evaluation(self, track_id: str, **kwargs: object) -> dict:
+            return {**track, "track_id": track_id, **kwargs}
+
+        def activity(self, *args: object, **kwargs: object) -> dict:
+            return {"event_id": "event-1"}
+
+    calls: list[tuple[str, dict]] = []
+
+    def invoke(_skill: str, operation: str, payload: dict, **_: object) -> dict:
+        calls.append((operation, payload))
+        if operation == "get_automation":
+            return {
+                "status": "completed",
+                "session": {"development_session_id": "dev-direction-old"},
+                "task_id": "task-old",
+                "workflow_head": {
+                    "state": "published",
+                    "delivery_status": "published",
+                    "can_plan_change_set": True,
+                },
+            }
+        assert operation == "start_automation"
+        return {
+            "ok": True,
+            "status": "automation_queued",
+            "automation": {
+                "status": "queued",
+                "task_id": "task-successor",
+                "updated_at": "2026-08-21T00:00:00Z",
+            },
+        }
+
+    orchestrator = ResearchOrchestrator(repository=Repository(), skill_invoker=invoke)
+    monkeypatch.setattr(orchestrator, "get", lambda *args, **kwargs: state)
+    monkeypatch.setattr(
+        orchestrator_module.development_sessions,
+        "bind",
+        lambda *args, **kwargs: {"ok": True},
+    )
+
+    result = orchestrator.start_implementation("direction")
+
+    assert result["development_session_rebase"] is True
+    assert result["published_predecessor"] is True
+    assert [item[0] for item in calls] == ["get_automation", "start_automation"]
+    assert "text" not in calls[-1][1]
 
 
 def test_study_smoke_records_provider_admission_failure_before_lock(

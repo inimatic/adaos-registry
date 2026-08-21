@@ -4685,7 +4685,38 @@ class ResearchOrchestrator:
             current_development_session_id
             and current_development_session_id != incoming_development_session_id
         )
-        if development_session_rebase and current_status in {
+        workflow_head = (
+            current.get("workflow_head")
+            if isinstance(current.get("workflow_head"), Mapping)
+            else {}
+        )
+        published_predecessor = bool(
+            str(workflow_head.get("state") or "").strip() == "published"
+            or str(workflow_head.get("delivery_status") or "").strip() == "published"
+        )
+        if (
+            development_session_rebase
+            and published_predecessor
+            and current_status in {"completed", "succeeded", "failed", "cancelled"}
+        ):
+            # A published Change is immutable.  The newly accepted Development
+            # Session must enter through Builder's new-Change path so its exact
+            # AutomationBrief becomes the canonical instruction envelope.
+            response = dict(
+                self._invoke_skill(
+                    "builder_sdk_control_skill",
+                    "start_automation",
+                    {
+                        "object_type": kind,
+                        "object_id": target_id,
+                        "webspace_id": webspace,
+                    },
+                    timeout=180,
+                )
+            )
+            reused = False
+            recovery_iteration = False
+        elif development_session_rebase and current_status in {
             "completed",
             "succeeded",
             "failed",
@@ -4772,6 +4803,7 @@ class ResearchOrchestrator:
                     "phase": projection.get("phase") or response.get("phase"),
                     "updated_at": projection.get("updated_at") or response.get("updated_at"),
                     "development_session_rebase": development_session_rebase,
+                    "published_predecessor": published_predecessor,
                 },
             },
         )
@@ -4798,6 +4830,7 @@ class ResearchOrchestrator:
                 "automation_task_id": task_ref or None,
                 "recovery_iteration": recovery_iteration,
                 "development_session_rebase": development_session_rebase,
+                "published_predecessor": published_predecessor,
                 "actor": actor,
             },
             actor=actor,
@@ -4810,6 +4843,7 @@ class ResearchOrchestrator:
             "reused": reused,
             "recovery_iteration": recovery_iteration,
             "development_session_rebase": development_session_rebase,
+            "published_predecessor": published_predecessor,
             "direction_ref": state["direction"]["ref"],
             "task_ref": (state.get("selected_task") or {}).get("ref"),
             "implementation_track_ref": track["ref"],

@@ -2255,8 +2255,46 @@ def get_automation(
     projection = result.get("automation") if isinstance(result.get("automation"), Mapping) else {}
     progress = projection.get("progress") if isinstance(projection.get("progress"), Mapping) else {}
     evidence = projection.get("evidence") if isinstance(projection.get("evidence"), Mapping) else {}
+    workflow_error: str | None = None
+    try:
+        workflow_value = workflow.get_state(kind, project_id)
+    except (RuntimeError, SdkRuntimeNotInitialized) as exc:
+        # Isolated skill validation has no AgentContext. Preserve the
+        # Automation read model and make the absent workflow head explicit.
+        workflow_value = {}
+        workflow_error = f"{type(exc).__name__}: {exc}"
+    governed = (
+        workflow_value.get("governed")
+        if isinstance(workflow_value.get("governed"), Mapping)
+        else {}
+    )
+    change_set = (
+        workflow_value.get("change_set")
+        if isinstance(workflow_value.get("change_set"), Mapping)
+        else {}
+    )
+    delivery = (
+        workflow_value.get("delivery")
+        if isinstance(workflow_value.get("delivery"), Mapping)
+        else {}
+    )
     return {
         **result,
+        "workflow_head": {
+            "schema": "adaos.builder.workflow_head.v1",
+            "available": workflow_error is None,
+            "error": workflow_error,
+            "state": governed.get("state"),
+            "generation": governed.get("generation"),
+            "change_set_id": change_set.get("change_set_id"),
+            "change_status": change_set.get("status"),
+            "delivery_status": delivery.get("status"),
+            "can_plan_change_set": bool(
+                dict(workflow_value.get("capabilities") or {}).get(
+                    "can_plan_change_set"
+                )
+            ),
+        },
         "status": projection.get("status"),
         "phase": projection.get("phase"),
         "task_id": projection.get("task_id"),

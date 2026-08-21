@@ -550,6 +550,51 @@ def test_start_automation_uses_exact_bound_instruction_without_manual_paste(monk
     assert launched[0]["development_session_id"] == "dev-tlp"
 
 
+def test_get_automation_exposes_compact_workflow_head(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module,
+        "_project_topic",
+        lambda *_args, **_kwargs: {"conversation_id": "conv", "topic_id": "topic"},
+    )
+    monkeypatch.setattr(
+        module.automation,
+        "get_state",
+        lambda **_kwargs: {
+            "ok": True,
+            "automation": {"status": "completed", "task_id": "task-old"},
+        },
+    )
+    monkeypatch.setattr(
+        module.workflow,
+        "get_state",
+        lambda *_args: {
+            "governed": {"state": "published", "generation": 15},
+            "change_set": {"change_set_id": "change-old", "status": "published"},
+            "delivery": {"status": "published"},
+            "capabilities": {"can_plan_change_set": True},
+        },
+    )
+
+    result = module.get_automation(
+        object_type="skill",
+        object_id="tlp_direction",
+        webspace_id="research-dev",
+    )
+
+    assert result["workflow_head"] == {
+        "schema": "adaos.builder.workflow_head.v1",
+        "available": True,
+        "error": None,
+        "state": "published",
+        "generation": 15,
+        "change_set_id": "change-old",
+        "change_status": "published",
+        "delivery_status": "published",
+        "can_plan_change_set": True,
+    }
+
+
 def test_submit_automation_rebinds_terminal_session_to_current_builder_host(monkeypatch) -> None:
     module = _module()
     submitted: list[tuple[str, dict]] = []
