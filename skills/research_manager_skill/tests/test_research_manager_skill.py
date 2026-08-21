@@ -530,10 +530,16 @@ def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) 
     from adaos.sdk.developer import validation as developer_validation
 
     invocations: list[tuple[str, dict]] = []
+    validation_calls: list[dict] = []
+
+    def validate_skill(*_args, **kwargs):
+        validation_calls.append(dict(kwargs))
+        return {"ok": True, "digest": "sha256:" + "1" * 64}
+
     monkeypatch.setattr(
         developer_validation,
         "validate_skill",
-        lambda *_args, **_kwargs: {"ok": True, "digest": "sha256:" + "1" * 64},
+        validate_skill,
     )
     monkeypatch.setattr(
         developer_validation,
@@ -584,6 +590,12 @@ def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) 
 
     monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
     envelope = _acceptance_envelope("research.consumer-contracts")
+    envelope["validation_budget"] = {
+        "schema": "adaos.builder.validation_budget.v1",
+        "packaged_pytest_wall_seconds": 180,
+        "source": "development_session.execution_budget",
+        "execution_max_wall_seconds": 10800,
+    }
     # This test isolates preparation ABI. Production consumer-contract
     # acceptance defaults to executing the complete bounded conformance path.
     envelope["execute_workflow_smoke"] = False
@@ -591,6 +603,14 @@ def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) 
     assert not receipt["errors"], receipt["errors"]
     assert receipt["ok"] is True
     assert [item[0] for item in invocations] == ["dataset_status", "prepare_attempt"]
+    assert validation_calls == [
+        {
+            "strict": True,
+            "probe_tools": True,
+            "run_tests": True,
+            "test_timeout_seconds": 180,
+        }
+    ]
     assert receipt["evidence"]["scientific_execution_started"] is False
 
 

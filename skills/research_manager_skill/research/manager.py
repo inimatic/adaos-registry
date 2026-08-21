@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 import jsonschema
 
 from adaos.domain.execution import ExecutionSpec
+from adaos.domain.development_validation import normalize_validation_budget
 from adaos.domain.runtime_bindings import ServiceBinding
 from adaos.sdk.data.secrets import get as get_secret
 from adaos.sdk.skills import invoke as invoke_skill
@@ -981,6 +982,28 @@ class ResearchManager:
             "compilation_digest": compilation.get("digest"),
             "scientific_execution_started": False,
         }
+        validation_budget = None
+        raw_validation_budget = value.get("validation_budget")
+        if isinstance(raw_validation_budget, Mapping):
+            try:
+                validation_budget = normalize_validation_budget(
+                    raw_validation_budget
+                )
+            except ValueError as exc:
+                errors.append(f"validation budget is invalid: {exc}")
+                return self._acceptance_receipt(
+                    profile,
+                    checks=checks,
+                    errors=errors,
+                    evidence=consumer_evidence,
+                )
+            checks.append(
+                {
+                    "id": "candidate.validation_budget",
+                    "ok": True,
+                    **validation_budget,
+                }
+            )
         try:
             from adaos.sdk.developer import validation as developer_validation
 
@@ -989,6 +1012,11 @@ class ResearchManager:
                 strict=True,
                 probe_tools=True,
                 run_tests=True,
+                test_timeout_seconds=(
+                    int(validation_budget["packaged_pytest_wall_seconds"])
+                    if validation_budget
+                    else None
+                ),
             )
             checks.append(
                 {

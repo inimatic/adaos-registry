@@ -936,6 +936,7 @@ def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
     session = {
         "session_id": "session",
         "project_ref": "project:test",
+        "handoff": {"execution_budget": {"max_wall_seconds": 10800}},
         "instruction_inputs": [
             {"kind": kind, "content_digest": value["digest"]}
             for kind, value in instruction_values.items()
@@ -950,6 +951,7 @@ def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
     semantic_calls: list[dict] = []
     candidate_calls: list[dict] = []
     probe_calls: list[dict] = []
+    manager_calls: list[dict] = []
 
     monkeypatch.setattr(handler_module, "EvaluationRepository", _Repository)
     monkeypatch.setattr(handler_module.development_sessions, "get", lambda _session_id: session)
@@ -964,10 +966,11 @@ def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
         lambda **_kwargs: {"automation": {"terminal": True, "status": "completed"}},
     )
 
-    def invoke(_skill_id: str, operation_id: str, _arguments: dict, **_kwargs):
+    def invoke(_skill_id: str, operation_id: str, arguments: dict, **_kwargs):
         if operation_id == "get_runner_contract":
             return {"digest": "sha256:" + "7" * 64}
         assert operation_id == "evaluate_development_candidate"
+        manager_calls.append(dict(arguments["request"]))
         return {
             "ok": True,
             "receipt_digest": "sha256:" + "8" * 64,
@@ -1023,6 +1026,12 @@ def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
     )
 
     assert response["evidence_valid_completion"] is True
+    assert manager_calls[0]["validation_budget"] == {
+        "schema": "adaos.builder.validation_budget.v1",
+        "packaged_pytest_wall_seconds": 180,
+        "source": "development_session.execution_budget",
+        "execution_max_wall_seconds": 10800,
+    }
     assert len(semantic_calls) == 1
     assert semantic_calls[0]["arm_trials"] == arm_trials
     assert semantic_calls[0]["source_snapshot"] is source_snapshot

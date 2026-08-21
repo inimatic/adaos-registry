@@ -8,9 +8,13 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping
 
+from adaos.domain.development_validation import (
+    derive_validation_budget,
+    normalize_validation_budget,
+)
+from adaos.domain.runtime_bindings import ContentRef
 from adaos.sdk.core.decorators import tool
 from adaos.sdk.core.environment import runtime_identity as sdk_runtime_identity
-from adaos.domain.runtime_bindings import ContentRef
 from adaos.sdk.builder import automation, development_sessions
 from adaos.sdk.data.blob import store as blob_store
 from adaos.sdk.developer.validation import (
@@ -670,6 +674,21 @@ def evaluate_builder_attempt(
             "lifecycle_errors": [],
         }
     session = development_sessions.get(development_session_id)
+    session_handoff = (
+        dict(session.get("handoff") or {})
+        if isinstance(session.get("handoff"), Mapping)
+        else {}
+    )
+    raw_validation_budget = session_handoff.get("validation_budget")
+    if isinstance(raw_validation_budget, Mapping):
+        validation_budget = normalize_validation_budget(raw_validation_budget)
+    else:
+        validation_budget = derive_validation_budget(
+            session_handoff.get("execution_budget")
+            if isinstance(session_handoff.get("execution_budget"), Mapping)
+            else None,
+            source="development_session.execution_budget",
+        )
     enriched_instructions = []
     instruction_values: dict[str, Any] = {}
     for descriptor in session.get("instruction_inputs") or []:
@@ -754,6 +773,7 @@ def evaluate_builder_attempt(
                         "candidate_ref": f"skill:{candidate_id}",
                         "candidate": {"id": candidate_id},
                         "execute_workflow_smoke": True,
+                        "validation_budget": validation_budget,
                         "contract_inputs": contract_inputs,
                         "instructions": {
                             kind: instruction_values[kind]
