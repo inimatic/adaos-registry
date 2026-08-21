@@ -65,14 +65,13 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
     assert page["interaction"]["initialFocus"] == "widget:media-search"
     assert page["initialState"]["mediaPageSize"] == 30
     assert page["initialState"]["mediaFavoritesOnly"] is False
+    assert page["initialState"]["mediaNavigation"] == "home"
     assert {
-        "media-center-header",
+        "media-browse-toolbar",
         "media-profile-selector",
         "media-mobile-now-playing",
         "media-mobile-targets",
         "media-mobile-transport",
-        "media-section-navigation",
-        "media-view-mode",
         "media-search",
         "media-home",
         "media-catalog",
@@ -84,17 +83,26 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
 
     assert widgets["media-search"]["inputs"]["commitMode"] == "manual"
     assert widgets["media-search"]["inputs"]["saveLabel"] == "Search"
-    navigation_ids = [
-        button["id"]
-        for button in widgets["media-section-navigation"]["inputs"]["buttons"]
-    ]
+    toolbar = widgets["media-browse-toolbar"]
+    assert toolbar["inputs"]["variant"] == "adaptiveToolbar"
+    assert toolbar["visibleIf"] == "$state.surfaceProfile != 'mobile_control'"
+    toolbar_buttons = {button["id"]: button for button in toolbar["inputs"]["buttons"]}
+    assert list(toolbar_buttons) == ["remote", "profile", "section", "layout", "settings"]
+    assert toolbar_buttons["profile"]["selectedStateKey"] == "profileId"
+    assert toolbar_buttons["section"]["selectedStateKey"] == "mediaNavigation"
+    navigation_ids = [option["id"] for option in toolbar_buttons["section"]["options"]]
     assert navigation_ids == [
         "home", "movies", "series", "music", "audiobooks", "folders",
         "playlists", "favorites", "recent",
     ]
-    assert [
-        button["id"] for button in widgets["media-view-mode"]["inputs"]["buttons"]
-    ] == ["list", "cards", "rail"]
+    assert [option["id"] for option in toolbar_buttons["layout"]["options"]] == [
+        "list", "cards", "rail",
+    ]
+    assert toolbar_buttons["layout"]["options"][2]["label"] == "Carousel"
+    assert {action["on"] for action in toolbar["actions"]} == {
+        "click:remote", "select:profile", "select:section", "select:layout",
+        "click:settings",
+    }
 
     catalog = widgets["media-catalog"]
     assert catalog["type"] == "ui.list"
@@ -134,6 +142,9 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
         "unavailable": "Library state is temporarily unavailable.",
     }
     assert widgets["media-profile-selector"]["inputs"]["selectedStateKey"] == "profileId"
+    assert widgets["media-profile-selector"]["visibleIf"] == (
+        "$state.surfaceProfile == 'mobile_control'"
+    )
     assert page["presentation"]["profileStateKey"] == "surfaceProfile"
     assert set(page["presentation"]["profiles"]) == {
         "desktop", "tv", "mobile_control", "embedded",

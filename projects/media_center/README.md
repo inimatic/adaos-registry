@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.41` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.42` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -32,6 +32,11 @@ queue advance is accepted under endpoint-preferred recovery. Remote controllers
 therefore observe the TV's durable Now Playing projection without entering the
 media byte path. The queue exposes a generic adapter descriptor, keeping Media
 Center method names out of the reusable client service.
+
+The `0.6.42` release compacts the browse surface into one adaptive UI-as-data
+toolbar for Remote, profile, section, layout, and Settings. The generic client
+renderer owns input behavior; Media Center labels, options, and actions remain
+scenario-owned.
 
 The `0.6.40` release added authoritative persisted playback toggles through the
 generic client `input.toggle` contract and explicit subscription-backed library

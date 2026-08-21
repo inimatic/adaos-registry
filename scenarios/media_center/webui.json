@@ -11,6 +11,7 @@
           "interaction": {"initialFocus": "widget:media-search"},
           "initialState": {
             "profileId": "default",
+            "mediaNavigation": "home",
             "mediaSection": "home",
             "mediaDisplay": "rail",
             "mediaKind": "playable",
@@ -65,21 +66,63 @@
           },
           "widgets": [
             {
-              "id": "media-center-header",
+              "id": "media-browse-toolbar",
               "type": "ui.actions",
               "area": "main",
               "title": "Media Center",
-              "visibleIf": "$state.surfaceProfile == 'desktop' || $state.surfaceProfile == 'embedded'",
+              "visibleIf": "$state.surfaceProfile != 'mobile_control'",
               "inputs": {
-                "variant": "toolbar",
+                "variant": "adaptiveToolbar",
                 "size": "small",
                 "buttons": [
                   {"id": "remote", "label": "Remote", "icon": "phone-portrait-outline"},
+                  {
+                    "id": "profile",
+                    "label": "Profile",
+                    "icon": "person-outline",
+                    "selectedStateKey": "profileId",
+                    "options": [
+                      {"id": "default", "value": "default", "label": "Personal", "icon": "person-outline"},
+                      {"id": "household", "value": "household", "label": "Household", "icon": "people-outline"},
+                      {"id": "kids", "value": "kids", "label": "Kids", "icon": "happy-outline"}
+                    ]
+                  },
+                  {
+                    "id": "section",
+                    "label": "Section",
+                    "icon": "home-outline",
+                    "selectedStateKey": "mediaNavigation",
+                    "options": [
+                      {"id": "home", "value": "home", "label": "Home", "icon": "home-outline", "mediaSection": "home", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title", "mediaSearch": ""},
+                      {"id": "movies", "value": "movies", "label": "Movies", "icon": "film-outline", "mediaSection": "catalog", "mediaKind": "video", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title"},
+                      {"id": "series", "value": "series", "label": "Series", "icon": "albums-outline", "mediaSection": "collections", "mediaKind": "playable", "mediaCollectionKind": "series", "mediaFavoritesOnly": false, "mediaSort": "title"},
+                      {"id": "music", "value": "music", "label": "Music", "icon": "musical-notes-outline", "mediaSection": "catalog", "mediaKind": "audio", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title"},
+                      {"id": "audiobooks", "value": "audiobooks", "label": "Audiobooks", "icon": "book-outline", "mediaSection": "collections", "mediaKind": "playable", "mediaCollectionKind": "audiobook", "mediaFavoritesOnly": false, "mediaSort": "title"},
+                      {"id": "folders", "value": "folders", "label": "Folders", "icon": "folder-outline", "mediaSection": "folders", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title"},
+                      {"id": "playlists", "value": "playlists", "label": "Playlists", "icon": "list-outline", "mediaSection": "playlists", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "title"},
+                      {"id": "favorites", "value": "favorites", "label": "Favorites", "icon": "star-outline", "mediaSection": "catalog", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": true, "mediaSort": "favorite"},
+                      {"id": "recent", "value": "recent", "label": "Recent", "icon": "time-outline", "mediaSection": "catalog", "mediaKind": "playable", "mediaCollectionKind": "", "mediaFavoritesOnly": false, "mediaSort": "recent"}
+                    ]
+                  },
+                  {
+                    "id": "layout",
+                    "label": "Layout",
+                    "icon": "albums-outline",
+                    "selectedStateKey": "mediaDisplay",
+                    "options": [
+                      {"id": "list", "value": "list", "label": "List", "icon": "list-outline"},
+                      {"id": "cards", "value": "cards", "label": "Grid", "icon": "grid-outline"},
+                      {"id": "rail", "value": "rail", "label": "Carousel", "icon": "albums-outline"}
+                    ]
+                  },
                   {"id": "settings", "label": "Settings", "icon": "settings-outline"}
                 ]
               },
               "actions": [
                 {"on": "click:remote", "type": "openModal", "params": {"modalId": "media_center_remote"}},
+                {"on": "select:profile", "type": "updateState", "params": {"profileId": "$event.value", "mediaCursor": "", "selectedMediaItemId": null}},
+                {"on": "select:section", "type": "updateState", "params": {"mediaNavigation": "$event.value", "mediaSection": "$event.mediaSection", "mediaKind": "$event.mediaKind", "mediaCollectionKind": "$event.mediaCollectionKind", "mediaFavoritesOnly": "$event.mediaFavoritesOnly", "mediaSort": "$event.mediaSort", "mediaCursor": ""}},
+                {"on": "select:layout", "type": "updateState", "params": {"mediaDisplay": "$event.value"}},
                 {"on": "click:settings", "type": "openModal", "params": {"modalId": "media_center_settings"}}
               ]
             },
@@ -123,6 +166,7 @@
               "type": "ui.actions",
               "area": "main",
               "title": "Profile",
+              "visibleIf": "$state.surfaceProfile == 'mobile_control'",
               "inputs": {
                 "variant": "segmented",
                 "size": "small",
@@ -135,57 +179,6 @@
               },
               "actions": [
                 {"on": "click", "type": "updateState", "params": {"profileId": "$event.id", "mediaCursor": "", "selectedMediaItemId": null}}
-              ]
-            },
-            {
-              "id": "media-section-navigation",
-              "type": "ui.actions",
-              "area": "main",
-              "inputs": {
-                "variant": "segmented",
-                "size": "small",
-                "selectedStateKey": "mediaSection",
-                "buttons": [
-                  {"id": "home", "label": "Home", "icon": "home-outline"},
-                  {"id": "movies", "label": "Movies", "icon": "film-outline"},
-                  {"id": "series", "label": "Series", "icon": "albums-outline"},
-                  {"id": "music", "label": "Music", "icon": "musical-notes-outline"},
-                  {"id": "audiobooks", "label": "Audiobooks", "icon": "book-outline"},
-                  {"id": "folders", "label": "Folders", "icon": "folder-outline"},
-                  {"id": "playlists", "label": "Playlists", "icon": "list-outline"},
-                  {"id": "favorites", "label": "Favorites", "icon": "star-outline"},
-                  {"id": "recent", "label": "Recent", "icon": "time-outline"}
-                ]
-              },
-              "actions": [
-                {"on": "click:home", "type": "updateState", "params": {"mediaSection": "home", "mediaCursor": "", "mediaSearch": ""}},
-                {"on": "click:movies", "type": "updateState", "params": {"mediaSection": "catalog", "mediaKind": "video", "mediaFavoritesOnly": false, "mediaSort": "title", "mediaCursor": ""}},
-                {"on": "click:series", "type": "updateState", "params": {"mediaSection": "collections", "mediaCollectionKind": "series", "mediaCursor": ""}},
-                {"on": "click:music", "type": "updateState", "params": {"mediaSection": "catalog", "mediaKind": "audio", "mediaFavoritesOnly": false, "mediaSort": "title", "mediaCursor": ""}},
-                {"on": "click:audiobooks", "type": "updateState", "params": {"mediaSection": "collections", "mediaCollectionKind": "audiobook", "mediaCursor": ""}},
-                {"on": "click:folders", "type": "updateState", "params": {"mediaSection": "folders", "mediaCursor": ""}},
-                {"on": "click:playlists", "type": "updateState", "params": {"mediaSection": "playlists", "mediaCursor": ""}},
-                {"on": "click:favorites", "type": "updateState", "params": {"mediaSection": "catalog", "mediaKind": "playable", "mediaFavoritesOnly": true, "mediaSort": "favorite", "mediaCursor": ""}},
-                {"on": "click:recent", "type": "updateState", "params": {"mediaSection": "catalog", "mediaKind": "playable", "mediaFavoritesOnly": false, "mediaSort": "recent", "mediaCursor": ""}}
-              ]
-            },
-            {
-              "id": "media-view-mode",
-              "type": "ui.actions",
-              "area": "main",
-              "visibleIf": "$state.surfaceProfile != 'mobile_control'",
-              "inputs": {
-                "variant": "segmented",
-                "size": "small",
-                "selectedStateKey": "mediaDisplay",
-                "buttons": [
-                  {"id": "list", "label": "List", "icon": "list-outline"},
-                  {"id": "cards", "label": "Grid", "icon": "grid-outline"},
-                  {"id": "rail", "label": "Rail", "icon": "albums-outline"}
-                ]
-              },
-              "actions": [
-                {"on": "click", "type": "updateState", "params": {"mediaDisplay": "$event.id"}}
               ]
             },
             {
