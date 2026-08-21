@@ -207,6 +207,29 @@ def _implementation_observation(
     }
 
 
+def _canonical_result(*, arm_id: str = "maxpool", value: float = 62.5) -> dict:
+    return {
+        "primary_metric": value,
+        "step": 3,
+        "pairing_identity_digest": "sha256:" + "f" * 64,
+        "arm_id": arm_id,
+        "seed": 17,
+        "evidence_class": "workflow_smoke",
+    }
+
+
+def _primary_observation(*, value: float = 62.5) -> dict:
+    return {
+        "metric": {"namespace": "research", "name": "primary_metric"},
+        "value": value,
+        "value_type": "float",
+        "unit": "percent",
+        "split_role": "validation",
+        "step": {"axis": "epoch", "value": 3},
+        "evidence_role": "workflow_smoke",
+    }
+
+
 def test_development_traceability_acceptance_is_digest_bound() -> None:
     manager = ResearchManager()
     accepted = manager.validate_development_candidate(
@@ -225,7 +248,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.11.0"
+    assert contract["version"] == "1.12.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -270,6 +293,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
         "run_log.json",
         "evaluation_audit.json",
         "implementation_observation.json",
+        "result_record.json",
         "artifacts_index.json",
     ]
     for schema in smoke_contract["documents"].values():
@@ -342,6 +366,67 @@ def test_development_consumer_rejects_symbolic_rng_seed_units() -> None:
             plan,
             runner_id="tlp_runner",
             dataset_digest="sha256:" + "a" * 64,
+        )
+
+
+def test_complete_runner_collection_requires_canonical_result() -> None:
+    with pytest.raises(ValueError, match="result.*required property"):
+        ResearchManager._validate_runner_collection(
+            {
+                "provider_id": "tlp_runner",
+                "observations": [_primary_observation()],
+                "artifacts": [
+                    {
+                        "uri": "skill-data:files/result.json",
+                        "digest": "sha256:" + "a" * 64,
+                        "size_bytes": 42,
+                        "media_type": "application/json",
+                        "owner_ref": "skill:tlp_runner",
+                        "role": "workflow_smoke_evidence",
+                    }
+                ],
+                "complete": True,
+            },
+            expected_provider_id="tlp_runner",
+            expected_arm_id="maxpool",
+            expected_seed=17,
+            expected_evidence_class="workflow_smoke",
+        )
+
+
+def test_runner_collection_binds_result_to_request_and_tracker_observation() -> None:
+    collection = {
+        "provider_id": "tlp_runner",
+        "observations": [_primary_observation()],
+        "artifacts": [
+            {
+                "uri": "skill-data:files/result.json",
+                "digest": "sha256:" + "a" * 64,
+                "size_bytes": 42,
+                "media_type": "application/json",
+                "owner_ref": "skill:tlp_runner",
+                "role": "workflow_smoke_evidence",
+            }
+        ],
+        "result": _canonical_result(),
+        "complete": True,
+    }
+    assert ResearchManager._validate_runner_collection(
+        collection,
+        expected_provider_id="tlp_runner",
+        expected_arm_id="maxpool",
+        expected_seed=17,
+        expected_evidence_class="workflow_smoke",
+    ) == _canonical_result()
+
+    mismatched = {**collection, "observations": [_primary_observation(value=50.0)]}
+    with pytest.raises(ValueError, match="repeat result.primary_metric"):
+        ResearchManager._validate_runner_collection(
+            mismatched,
+            expected_provider_id="tlp_runner",
+            expected_arm_id="maxpool",
+            expected_seed=17,
+            expected_evidence_class="workflow_smoke",
         )
 
 
@@ -534,6 +619,13 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
             "test_access": [],
         },
         "implementation_observation.json": _implementation_observation(),
+        "result_record.json": {
+            "status": "completed",
+            "result": _canonical_result(),
+            "observations": [_primary_observation()],
+            "evidence_class": "workflow_smoke",
+            "tracker_session_calls": 0,
+        },
         "artifacts_index.json": {
             "files": [
                 {
@@ -580,7 +672,9 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
                 "provider_id": project_id,
                 "complete": True,
                 "tracker_session_calls": 0,
+                "result": _canonical_result(),
                 "observations": [
+                    _primary_observation(),
                     {
                         "metric": {
                             "namespace": "runner",
@@ -591,7 +685,7 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
                         "unit": "epochs",
                         "split_role": "system",
                         "step": {"axis": "epoch", "value": 3},
-                        "evidence_role": "diagnostic",
+                        "evidence_role": "workflow_smoke",
                     }
                 ],
                 "artifacts": artifact_rows,
@@ -631,9 +725,11 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         "verify_artifact",
         "verify_artifact",
         "verify_artifact",
+        "verify_artifact",
     ]
     assert receipt["evidence"]["workflow_smoke_executed"] is True
     assert receipt["evidence"]["verified_artifacts"] == [
+        {"ok": True},
         {"ok": True},
         {"ok": True},
         {"ok": True},
@@ -769,6 +865,13 @@ def test_workflow_smoke_index_rejects_self_referential_digest() -> None:
                         "test_access": [],
                     },
                     "implementation_observation.json": _implementation_observation(),
+                    "result_record.json": {
+                        "status": "completed",
+                        "result": _canonical_result(),
+                        "observations": [_primary_observation()],
+                        "evidence_class": "workflow_smoke",
+                        "tracker_session_calls": 0,
+                    },
                     "artifacts_index.json": {
                         "files": [
                             {

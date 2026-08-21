@@ -93,6 +93,38 @@ def _observation_schema() -> dict[str, Any]:
     }
 
 
+def _result_record_schema() -> dict[str, Any]:
+    """Canonical scalar result consumed by ResearchManager.
+
+    ExperimentPlan has exposed these exact paths since schema 1.1, but runner
+    ABI 1.11 only typed observations and artifacts.  A provider could therefore
+    report ``complete=true`` without returning the record used to construct a
+    paired result.  Keep the record deliberately small and domain-neutral: the
+    accepted ExperimentPlan supplies the scientific meaning of the scalar.
+    """
+
+    return {
+        "type": "object",
+        "required": [
+            "primary_metric",
+            "step",
+            "pairing_identity_digest",
+            "arm_id",
+            "seed",
+            "evidence_class",
+        ],
+        "properties": {
+            "primary_metric": {"type": "number"},
+            "step": {"type": "integer", "minimum": 0},
+            "pairing_identity_digest": _sha256_schema(),
+            "arm_id": {"type": "string", "minLength": 1},
+            "seed": {"type": "integer"},
+            "evidence_class": {"enum": ["workflow_smoke", "confirmatory"]},
+        },
+        "additionalProperties": True,
+    }
+
+
 def _split_binding_schema() -> dict[str, Any]:
     return {
         "type": "object",
@@ -139,6 +171,7 @@ def _workflow_smoke_documents() -> dict[str, Any]:
             "run_log.json",
             "evaluation_audit.json",
             "implementation_observation.json",
+            "result_record.json",
             "artifacts_index.json",
         ],
         "documents": {
@@ -295,6 +328,28 @@ def _workflow_smoke_documents() -> dict[str, Any]:
                 },
                 "additionalProperties": True,
             },
+            "result_record.json": {
+                "type": "object",
+                "required": [
+                    "status",
+                    "result",
+                    "observations",
+                    "evidence_class",
+                    "tracker_session_calls",
+                ],
+                "properties": {
+                    "status": {"const": "completed"},
+                    "result": _result_record_schema(),
+                    "observations": {
+                        "type": "array",
+                        "minItems": 1,
+                        "items": _observation_schema(),
+                    },
+                    "evidence_class": {"const": "workflow_smoke"},
+                    "tracker_session_calls": {"const": 0},
+                },
+                "additionalProperties": True,
+            },
             "artifacts_index.json": {
                 "type": "object",
                 "required": ["files"],
@@ -360,7 +415,7 @@ def descriptor() -> dict[str, Any]:
     value: dict[str, Any] = {
         "schema": "adaos.contract.operation_set.v1",
         "contract": "adaos.research.runner.v1",
-        "version": "1.11.0",
+        "version": "1.12.0",
         "consumer_ref": "skill:research_manager_skill",
         "capability": "research.runner",
         "operations": {
@@ -592,10 +647,22 @@ def descriptor() -> dict[str, Any]:
                     "properties": {"output_ref": {"type": "string", "minLength": 1}},
                     "additionalProperties": False,
                 },
-                "output_required": ["provider_id", "observations", "artifacts", "complete"],
+                "output_required": [
+                    "provider_id",
+                    "observations",
+                    "artifacts",
+                    "result",
+                    "complete",
+                ],
                 "output_schema": {
                     "type": "object",
-                    "required": ["provider_id", "observations", "artifacts", "complete"],
+                    "required": [
+                        "provider_id",
+                        "observations",
+                        "artifacts",
+                        "result",
+                        "complete",
+                    ],
                     "properties": {
                         "provider_id": {"type": "string", "minLength": 1},
                         "observations": {
@@ -606,13 +673,34 @@ def descriptor() -> dict[str, Any]:
                             "type": "array",
                             "items": _collected_artifact_schema(),
                         },
+                        "result": {
+                            "anyOf": [_result_record_schema(), {"type": "null"}],
+                        },
                         "complete": {"type": "boolean"},
                     },
+                    "allOf": [
+                        {
+                            "if": {
+                                "required": ["complete"],
+                                "properties": {"complete": {"const": True}},
+                            },
+                            "then": {
+                                "properties": {
+                                    "observations": {"minItems": 1},
+                                    "artifacts": {"minItems": 1},
+                                    "result": _result_record_schema(),
+                                }
+                            },
+                        }
+                    ],
                     "additionalProperties": True,
                 },
                 "invariants": [
                     "provider_id equals the direction skill id",
                     "every observation is directly accepted by ResearchManager normalize_observation and supplies metric.name plus value",
+                    "complete=true requires the canonical result record consumed by ExperimentPlan.runner_contract.result_record",
+                    "result arm_id, seed and evidence_class equal the prepared request and result.primary_metric is repeated as a metric.name=primary_metric observation",
+                    "workflow-smoke primary_metric is engineering evidence only and does not authorize scientific inference",
                     "artifacts contain portable content identities, never private host paths",
                     "every collected artifact supplies the non-empty ingestion role consumed by ResearchManager",
                     "workflow-smoke collection reports tracker_session_calls=0 because ResearchManager owns tracking",

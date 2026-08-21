@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sys
@@ -32,7 +33,7 @@ from adaos.sdk.execution import (
 )
 
 from research import evidence, experiment, guidance
-from research.contracts import ResearchRecord, canonical_json, digest, identity, now
+from research.contracts import ResearchRecord, digest, identity, now
 from research.repository import ResearchRepository
 from research.runner_contract import descriptor as runner_contract_descriptor
 from research.tracker import LocalTracker, MlflowTracker, normalize_observation
@@ -626,6 +627,15 @@ class ResearchManager:
         if not isinstance(collected, Mapping):
             raise ValueError("collect_attempt returned a non-object value")
         collected = dict(collected)
+        canonical_result = cls._validate_runner_collection(
+            collected,
+            expected_provider_id=candidate_id,
+            expected_arm_id=str(arm.get("id") or ""),
+            expected_seed=int(seeds[0]),
+            expected_evidence_class=str(
+                profile_conditions.get("evidence_class") or "workflow_smoke"
+            ),
+        )
         observations = [
             dict(item)
             for item in collected.get("observations") or []
@@ -704,12 +714,84 @@ class ResearchManager:
             **dict(prepared_arm),
             "trial": trial,
             "collected": collected,
+            "canonical_result": canonical_result,
             "normalized_observations": normalized_observations,
             "verified_artifacts": verified_artifacts,
             "collection_ok": bool(collected.get("complete")) and bool(artifacts),
             "verification_ok": len(verified_artifacts) == len(artifacts)
             and all(bool(item.get("ok")) for item in verified_artifacts),
         }
+
+    @staticmethod
+    def _validate_runner_collection(
+        collection: Mapping[str, Any],
+        *,
+        expected_provider_id: str,
+        expected_arm_id: str,
+        expected_seed: int,
+        expected_evidence_class: str,
+    ) -> dict[str, Any] | None:
+        """Validate the exact provider result consumed by experiment summary.
+
+        JSON Schema closes the structural boundary.  The identity checks bind
+        the returned scalar to the prepared run, and the matching observation
+        ensures the tracker receives the same value that later enters paired
+        analysis.  A workflow-smoke scalar remains non-inferential by its
+        evidence class; requiring it only makes the engineering path complete.
+        """
+
+        value = dict(collection)
+        schema = dict(
+            dict(runner_contract_descriptor()["operations"])["collect_attempt"]
+        )["output_schema"]
+        try:
+            jsonschema.validate(value, schema)
+        except jsonschema.ValidationError as exc:
+            location = ".".join(str(item) for item in exc.absolute_path)
+            suffix = f" at {location}" if location else ""
+            raise ValueError(
+                f"collect_attempt violates ResearchManager runner ABI{suffix}: "
+                f"{exc.message}"
+            ) from exc
+        if str(value.get("provider_id") or "") != str(expected_provider_id):
+            raise ValueError("runner collection provider identity mismatch")
+        if not bool(value.get("complete")):
+            return None
+        result = dict(value["result"])
+        expected = {
+            "arm_id": str(expected_arm_id),
+            "seed": int(expected_seed),
+            "evidence_class": str(expected_evidence_class),
+        }
+        for field, expected_value in expected.items():
+            if result.get(field) != expected_value:
+                raise ValueError(
+                    f"collect_attempt result.{field} differs from the prepared request"
+                )
+        metric = result.get("primary_metric")
+        if isinstance(metric, bool) or not isinstance(metric, (int, float)):
+            raise ValueError("collect_attempt result.primary_metric must be numeric")
+        if not math.isfinite(float(metric)):
+            raise ValueError("collect_attempt result.primary_metric must be finite")
+        observations = [
+            dict(item)
+            for item in value.get("observations") or []
+            if isinstance(item, Mapping)
+        ]
+        matching = [
+            item
+            for item in observations
+            if str(dict(item.get("metric") or {}).get("name") or "")
+            == "primary_metric"
+            and item.get("value") == metric
+            and str(item.get("evidence_role") or "") == expected_evidence_class
+        ]
+        if not matching:
+            raise ValueError(
+                "collect_attempt must repeat result.primary_metric as a "
+                "metric.name=primary_metric observation with the same evidence_role"
+            )
+        return result
 
     def validate_development_candidate(self, request: Mapping[str, Any]) -> dict[str, Any]:
         """Evaluate a DEV runner from the consumer side, without scientific execution.
@@ -2393,8 +2475,21 @@ class ResearchManager:
         if not isinstance(result, Mapping):
             raise RuntimeError("runner provider returned a non-object collection")
         value = dict(result)
-        if str(value.get("provider_id") or "") != provider:
-            raise ValueError("runner collection provider identity mismatch")
+        profile = str(binding.payload.get("profile") or "")
+        evidence_class = (
+            "workflow_smoke"
+            if profile == "preflight"
+            else "confirmatory"
+            if profile == "confirmatory"
+            else profile
+        )
+        self._validate_runner_collection(
+            value,
+            expected_provider_id=provider,
+            expected_arm_id=str(binding.payload.get("arm_id") or ""),
+            expected_seed=int(binding.payload.get("seed")),
+            expected_evidence_class=evidence_class,
+        )
         return value
 
     def _ingest_attempt_progress(self, binding: ResearchRecord) -> list[dict[str, Any]]:
