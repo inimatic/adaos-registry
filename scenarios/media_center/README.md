@@ -56,4 +56,12 @@ for bounded initial/final windows. Only continued window-to-window growth is a
 leak failure; a one-time allocator or SQLite cache high-water mark remains
 visible but is governed by the separate 350 MiB absolute limit.
 
+The 2026-08-21 local server acceptance run passed for 3,600.063 seconds with
+20,000 catalog items and 307,950 applied agent deltas. It recorded no operation
+errors; p95 was 64.079 ms for FTS, 57.656 ms for catalog pages, 33.881 ms for
+playback plans, and 120.926 ms for delta application. RSS peaked at 39.02 MiB
+with 0.793 MiB sustained growth, and aggregate CPU p95 was 13.533%. This is
+server evidence only; the separate one-hour Android TV renderer gate remains
+mandatory.
+
 The harness reports one-time FTS/trigram backfill separately from p50/p95/max catalog FTS, cursor-page and local-discovery latency, encoded page bytes, process RSS, sample counts and the exact enforced budgets. Correctness assertions reject empty FTS/fuzzy results, incomplete search indexes and invalid page sizes. The same run migrates and removes 20,000 legacy works and collections, verifies 20,000 contextual works/memberships, and enforces a bounded migration budget. It uses generated descriptors and never needs private media bytes.

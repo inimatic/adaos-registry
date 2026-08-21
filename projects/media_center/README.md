@@ -136,6 +136,12 @@ leak detection compares bounded post-warmup baseline and terminal windows while
 still reporting the full high-water range and enforcing the 350 MiB absolute
 limit.
 
+The 2026-08-21 local server run passed that full gate for 3,600.063 seconds on
+20,000 items with 307,950 concurrent agent deltas, zero errors, 64.079 ms FTS
+p95, 39.02 MiB peak RSS, 0.793 MiB sustained RSS growth, and 13.533% aggregate
+CPU p95. Android TV, update-under-playback, and exact two-node `0.6.45`
+deployment evidence remain separate acceptance gates.
+
 When a complete topology-backed agent sync supersedes colocated compatibility
 mode, the coordinator retires unbound compatibility participation and marks its
 old source projections inactive. Cleanup is deferred while any distributed
