@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.71
+version: 0.1.72
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -1377,7 +1377,8 @@ tools:
         description: Caller-assigned immutable identity for this checkpoint operation.
       confirmed:
         type: boolean
-        description: Explicit confirmation before the Forge checkpoint and verification acceptance.
+        description: Explicit confirmation before the Forge checkpoint and verification
+          acceptance.
       webspace_id:
         type: string
   output_schema:
@@ -2170,12 +2171,13 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-08-20T20:30:00+00:00'
+updated_at: '2026-08-21T01:37:28+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.868+5320.5d9e1770
-    recorded_at: '2026-08-17T23:04:05+00:00'
+    min_version: 0.1.895+5490.e46bbe4b
+    recorded_at: '2026-08-21T01:37:28+00:00'
     source: skill_push
-    min_commit: 9a4e31d564680c3ef901ccfc4ecbba58a22d5678
-    min_short_commit: 9a4e31d5
-    build_date: '2026-08-18T02:03:56+03:00'
+    min_commit: e46bbe4b5fd1955ac4bc9ba84b7ca2816c0716ec
+    min_short_commit: e46bbe4b
+    build_date: '2026-08-21T01:24:28+00:00'
+
