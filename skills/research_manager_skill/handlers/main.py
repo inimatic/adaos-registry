@@ -446,8 +446,16 @@ def unblind_test(
 
 
 @tool("export_evidence")
-def export_evidence(study_id: str) -> dict[str, Any]:
-    return _manager().export_evidence(study_id)
+def export_evidence(
+    study_id: str,
+    scope: str = "study_claim",
+    experiment_id: str | None = None,
+) -> dict[str, Any]:
+    return _manager().export_evidence(
+        study_id,
+        scope=scope,
+        experiment_id=experiment_id,
+    )
 
 
 @tool("verify_evidence")

@@ -14,6 +14,7 @@ if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
 import research.manager as manager_module
+import research.evidence as evidence_module
 from research.contracts import ResearchRecord, digest, identity
 from research.manager import ResearchManager
 from research.runner_contract import descriptor as runner_contract_descriptor
@@ -1216,6 +1217,111 @@ def test_end_to_end_research_kernel_survives_repository_reopen() -> None:
     with pytest.raises(ValueError, match="finalized"):
         reopened.repository.put(
             ResearchRecord("observation", identity("observation", {"late": True}), study_id, 1, {"late": True})
+        )
+
+
+def test_workflow_validation_evidence_is_scoped_verified_and_non_finalizing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager = ResearchManager()
+    created = _create(manager, f"workflow-evidence-{uuid.uuid4().hex}")
+    study_id = created["study"]["record_id"]
+    experiment_id = identity("experiment", {"study_id": study_id, "slug": "SMOKE"})
+    manager.create_experiment(
+        study_id=study_id,
+        slug="SMOKE",
+        title="Workflow validation",
+        purpose="Exercise the accepted implementation without scientific inference",
+        conditions=_experiment_conditions(),
+        experiment_id=experiment_id,
+        idempotency_key=f"{experiment_id}:create",
+    )
+    result_id = identity("experiment_result", {"experiment_id": experiment_id, "fixture": True})
+    manager.repository.put(
+        ResearchRecord(
+            "experiment_result",
+            result_id,
+            study_id,
+            1,
+            {
+                "schema": "adaos.research.experiment_result.v1",
+                "experiment_id": experiment_id,
+                "evidence_class": "workflow_validation",
+            },
+        )
+    )
+    sibling_id = identity("experiment_result", {"experiment_id": "experiment.invalid", "fixture": True})
+    manager.repository.put(
+        ResearchRecord(
+            "experiment_result",
+            sibling_id,
+            study_id,
+            1,
+            {
+                "schema": "adaos.research.experiment_result.v1",
+                "experiment_id": "experiment.invalid",
+                "evidence_class": "workflow_validation",
+            },
+        )
+    )
+    monkeypatch.setattr(
+        manager_module.experiment,
+        "state",
+        lambda _repository, selected: {
+            "experiment_id": selected,
+            "state": "finalized",
+            "generation": 5,
+            "execution_profile": "preflight",
+        },
+    )
+
+    def verify(result: str) -> dict:
+        return {
+            "schema": "adaos.research.experiment_result_verification.v1",
+            "result_id": result,
+            "ok": True,
+            "errors": [],
+            "checked_artifacts": 3,
+        }
+
+    monkeypatch.setattr(manager, "verify_experiment_result", verify)
+    bundle = manager.export_evidence(
+        study_id,
+        scope="workflow_validation",
+        experiment_id=experiment_id,
+    )
+    assert bundle["payload"]["scope"] == "workflow_validation"
+    manifest_path = evidence_module._root() / f"{bundle['record_id']}.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    record_ids = {item["record_id"] for item in manifest["content_refs"]}
+    assert experiment_id in record_ids
+    assert result_id in record_ids
+    assert sibling_id not in record_ids
+
+    # Operational proof is a checkpoint, not a scientific finalization gate.
+    late_record = manager.repository.put(
+        ResearchRecord(
+            "observation",
+            identity("observation", {"study_id": study_id, "after": bundle["record_id"]}),
+            study_id,
+            2,
+            {"experiment_id": experiment_id, "after_workflow_evidence": True},
+        )
+    )
+    assert late_record.payload["after_workflow_evidence"] is True
+    verification = manager.verify_evidence(bundle["record_id"])
+    assert verification["ok"] is True
+    assert verification["scope"] == "workflow_validation"
+    assert verification["assurance_results"][0]["result_id"] == result_id
+    with pytest.raises(ValueError, match="study_claim evidence"):
+        manager.decide_claim(
+            study_id=study_id,
+            verdict="inconclusive",
+            rationale="Smoke cannot support a scientific claim.",
+            bundle_id=bundle["record_id"],
+            expected_generation=0,
+            idempotency_key=f"{study_id}:invalid-smoke-claim",
+            actor="user:test",
         )
 
 

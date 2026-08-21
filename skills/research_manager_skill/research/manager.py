@@ -3348,13 +3348,66 @@ class ResearchManager:
         )
         return {**result, "test_binding": {**dict(binding.payload), "sealed": False}}
 
-    def export_evidence(self, study_id: str) -> dict[str, Any]:
-        if workflow_state(self.repository, study_id)["state"] not in {"analysis", "claim_review", "complete"}:
-            raise ValueError("evidence can be finalized only after analysis")
-        return evidence.export(self.repository, study_id)
+    def export_evidence(
+        self,
+        study_id: str,
+        *,
+        scope: str = "study_claim",
+        experiment_id: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_scope = str(scope or "study_claim").strip().lower()
+        if normalized_scope == "claim":
+            normalized_scope = "study_claim"
+        lifecycle = workflow_state(self.repository, study_id)
+        assurances: list[dict[str, Any]] = []
+        if normalized_scope == "study_claim":
+            if lifecycle["state"] not in {"analysis", "claim_review", "complete"}:
+                raise ValueError("claim evidence can be finalized only after analysis")
+        elif normalized_scope == "workflow_validation":
+            selected_experiment_id = str(experiment_id or "").strip()
+            if not selected_experiment_id:
+                raise ValueError("workflow validation evidence requires experiment_id")
+            value = experiment.get_experiment(self.repository, selected_experiment_id)
+            if value.study_id != study_id:
+                raise ValueError("evidence Experiment belongs to another Study")
+            experiment_lifecycle = experiment.state(self.repository, selected_experiment_id)
+            if experiment_lifecycle["state"] != "finalized":
+                raise ValueError("workflow validation evidence requires a finalized Experiment")
+            results = self._experiment_records(selected_experiment_id, "experiment_result")
+            if not results:
+                raise ValueError("workflow validation evidence requires an ExperimentResult")
+            result = results[-1]
+            if str(result.payload.get("evidence_class") or "") != "workflow_validation":
+                raise ValueError("selected ExperimentResult is not workflow validation evidence")
+            verification = self.verify_experiment_result(result.record_id)
+            if not verification["ok"]:
+                raise ValueError("ExperimentResult failed independent verification")
+            assurances.append(verification)
+            experiment_id = selected_experiment_id
+        else:
+            raise ValueError("unsupported evidence scope")
+        return evidence.export(
+            self.repository,
+            study_id,
+            scope=normalized_scope,
+            experiment_id=experiment_id,
+            assurances=assurances,
+        )
 
     def verify_evidence(self, bundle_id: str) -> dict[str, Any]:
-        return evidence.verify(self.repository, bundle_id)
+        verification = evidence.verify(self.repository, bundle_id)
+        assurance_results: list[dict[str, Any]] = []
+        for assurance in verification.get("assurances") or []:
+            if str(assurance.get("schema") or "") != "adaos.research.experiment_result_verification.v1":
+                continue
+            result_id = str(assurance.get("result_id") or "")
+            current = self.verify_experiment_result(result_id)
+            assurance_results.append(current)
+            if not current["ok"]:
+                verification["errors"].append(f"experiment_result:{result_id}")
+        verification["assurance_results"] = assurance_results
+        verification["ok"] = not verification["errors"]
+        return verification
 
     def decide_claim(
         self,
@@ -3372,6 +3425,8 @@ class ResearchManager:
         verification = self.verify_evidence(bundle_id)
         if not verification["ok"]:
             raise ValueError("evidence bundle failed verification")
+        if verification.get("scope") != "study_claim":
+            raise ValueError("claim decisions require study_claim evidence")
         decision_id = identity("claim_decision", {"study_id": study_id, "bundle_id": bundle_id, "verdict": verdict, "rationale": rationale})
         decision = self.repository.put(
             ResearchRecord(

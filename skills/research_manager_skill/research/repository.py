@@ -86,11 +86,13 @@ class ResearchRepository:
             if existing.digest != record.digest:
                 raise ValueError(f"immutable {record.kind} record already exists with different content")
             return existing
-        if record.kind not in {"evidence_bundle", "claim_decision"} and self.list(
-            record.study_id,
-            "evidence_bundle",
-        ):
-            raise ValueError("evidence is finalized; research inputs are immutable")
+        if record.kind not in {"evidence_bundle", "claim_decision"}:
+            finalized_claim = any(
+                str(item.payload.get("scope") or "study_claim") == "study_claim"
+                for item in self.list(record.study_id, "evidence_bundle")
+            )
+            if finalized_claim:
+                raise ValueError("claim evidence is finalized; research inputs are immutable")
         self._db.execute(
             "INSERT INTO research_records(kind, record_id, study_id, generation, payload_json, digest, created_at) VALUES (:kind, :record_id, :study_id, :generation, :payload_json, :digest, :created_at)",
             {

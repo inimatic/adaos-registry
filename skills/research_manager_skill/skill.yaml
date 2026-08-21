@@ -1,5 +1,5 @@
 name: research_manager_skill
-version: 0.35.1
+version: 0.36.0
 description: Reusable provider-neutral research control plane for governed studies,
   experiments, runner providers, trackers and immutable evidence.
 entry: handlers/main.py
@@ -764,7 +764,8 @@ tools:
   output_schema:
     type: object
 - name: export_evidence
-  description: Finalize one portable content-addressed evidence manifest.
+  description: Finalize a portable content-addressed claim or workflow-validation
+    evidence manifest without promoting smoke output to scientific evidence.
   entry: handlers.main:export_evidence
   input_schema:
     type: object
@@ -773,6 +774,16 @@ tools:
     properties:
       study_id:
         type: string
+      scope:
+        type: string
+        enum:
+        - study_claim
+        - workflow_validation
+        default: study_claim
+      experiment_id:
+        type:
+        - string
+        - 'null'
   output_schema:
     type: object
 - name: verify_evidence
@@ -964,12 +975,13 @@ data_routes:
     - research-experiment
     - research-tracking
     - research-evidence
-updated_at: '2026-08-21T04:24:26+00:00'
+updated_at: '2026-08-21T06:47:43+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.897+5495.808d2e14
-    recorded_at: '2026-08-21T04:24:27+00:00'
+    min_version: 0.1.900+5506.7db59cca
+    recorded_at: '2026-08-21T06:47:43+00:00'
     source: skill_push
-    min_commit: 808d2e14d685218d9855bef06ee63768c0dded84
-    min_short_commit: 808d2e14
-    build_date: '2026-08-21T04:02:17+00:00'
+    min_commit: 962b6c80600c4b86fae07d5168a0be01e54ab6a8
+    min_short_commit: 962b6c80
+    build_date: '2026-08-21T09:45:38+03:00'
+

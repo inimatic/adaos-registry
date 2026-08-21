@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from collections.abc import Iterable, Mapping
 from typing import Any
 
 from research.contracts import ResearchRecord, canonical_json, digest, identity, now
@@ -20,12 +21,83 @@ def _root() -> Path:
     return root
 
 
-def _manifest(repository: ResearchRepository, study_id: str) -> dict[str, Any]:
+def _selected_records(
+    repository: ResearchRepository,
+    study_id: str,
+    *,
+    scope: str,
+    experiment_id: str | None,
+) -> list[ResearchRecord]:
     records = [
         item
         for item in repository.list(study_id)
         if item.kind not in {"evidence_bundle", "claim_decision"}
     ]
+    if scope == "study_claim":
+        return records
+    if scope != "workflow_validation" or not experiment_id:
+        raise ValueError("unsupported evidence scope or selector")
+
+    core_kinds = {
+        "study",
+        "hypothesis",
+        "protocol",
+        "analysis_plan",
+        "split_binding",
+        "study_realization",
+    }
+    selected = [item for item in records if item.kind in core_kinds]
+    selected.extend(
+        item
+        for item in records
+        if item.record_id == experiment_id
+        or str(item.payload.get("experiment_id") or "") == experiment_id
+    )
+
+    # Trial records predate Experiment and therefore have no experiment_id.
+    # Close the selected graph over the exact trials and groups referenced by
+    # this campaign's immutable Run records.
+    trial_ids = {
+        str(item.payload.get("trial_id") or "")
+        for item in selected
+        if item.kind == "run" and item.payload.get("trial_id")
+    }
+    trials = [
+        item
+        for item in records
+        if item.kind == "trial" and item.record_id in trial_ids
+    ]
+    selected.extend(trials)
+    group_ids = {
+        str(item.payload.get("trial_group_id") or "")
+        for item in trials
+        if item.payload.get("trial_group_id")
+    }
+    selected.extend(
+        item
+        for item in records
+        if item.kind == "trial_group" and item.record_id in group_ids
+    )
+    return sorted(
+        {f"{item.kind}:{item.record_id}": item for item in selected}.values(),
+        key=lambda item: (item.created_at, item.kind, item.record_id),
+    )
+
+
+def _manifest(
+    repository: ResearchRepository,
+    study_id: str,
+    *,
+    scope: str,
+    experiment_id: str | None,
+    assurances: Iterable[Mapping[str, Any]],
+) -> dict[str, Any]:
+    records = _selected_records(
+        repository,
+        study_id,
+        scope=scope,
+        experiment_id=experiment_id,
+    )
     refs = [
         {
             "uri": f"research-record:{item.kind}/{item.record_id}",
@@ -38,21 +110,45 @@ def _manifest(repository: ResearchRepository, study_id: str) -> dict[str, Any]:
         for item in records
     ]
     return {
-        "schema": "adaos.research.evidence_manifest.v1",
+        "schema": "adaos.research.evidence_manifest.v2",
         "study_id": study_id,
+        "scope": scope,
+        "selector": {"experiment_id": experiment_id} if experiment_id else {},
+        "assurances": [dict(item) for item in assurances],
         "content_refs": refs,
         "verification": {"operation": "research_manager_skill.verify_evidence", "algorithm": "sha256-canonical-json-v1"},
     }
 
 
-def export(repository: ResearchRepository, study_id: str) -> dict[str, Any]:
-    existing = repository.list(study_id, "evidence_bundle")
-    if existing:
-        return existing[-1].to_dict()
-    manifest = _manifest(repository, study_id)
+def export(
+    repository: ResearchRepository,
+    study_id: str,
+    *,
+    scope: str = "study_claim",
+    experiment_id: str | None = None,
+    assurances: Iterable[Mapping[str, Any]] = (),
+) -> dict[str, Any]:
+    manifest = _manifest(
+        repository,
+        study_id,
+        scope=scope,
+        experiment_id=experiment_id,
+        assurances=assurances,
+    )
     manifest["manifest_digest"] = digest(manifest)
     payload = canonical_json(manifest).encode("utf-8")
-    bundle_id = identity("evidence", {"study_id": study_id, "manifest_digest": manifest["manifest_digest"]})
+    bundle_id = identity(
+        "evidence",
+        {
+            "study_id": study_id,
+            "scope": scope,
+            "selector": manifest["selector"],
+            "manifest_digest": manifest["manifest_digest"],
+        },
+    )
+    existing = repository.get("evidence_bundle", bundle_id)
+    if existing is not None:
+        return existing.to_dict()
     path = _root() / f"{bundle_id}.json"
     temporary = path.with_suffix(".tmp")
     temporary.write_bytes(payload)
@@ -64,7 +160,10 @@ def export(repository: ResearchRepository, study_id: str) -> dict[str, Any]:
             study_id=study_id,
             generation=0,
             payload={
-                "schema": "adaos.research.evidence_bundle.v1",
+                "schema": "adaos.research.evidence_bundle.v2",
+                "scope": scope,
+                "selector": manifest["selector"],
+                "assurances": manifest["assurances"],
                 "manifest_digest": manifest["manifest_digest"],
                 "content_ref": {
                     "uri": f"skill-data:files/evidence/{bundle_id}.json",
@@ -102,6 +201,9 @@ def verify(repository: ResearchRepository, bundle_id: str) -> dict[str, Any]:
     return {
         "schema": "adaos.research.evidence_verification.v1",
         "bundle_id": bundle_id,
+        "scope": str(manifest.get("scope") or bundle.payload.get("scope") or "study_claim"),
+        "selector": dict(manifest.get("selector") or bundle.payload.get("selector") or {}),
+        "assurances": list(manifest.get("assurances") or bundle.payload.get("assurances") or []),
         "ok": not errors,
         "manifest_digest": claimed,
         "checked_refs": len(manifest.get("content_refs") or []),
