@@ -2139,6 +2139,8 @@ class ResearchOrchestrator:
         records both session identities in the research activity ledger.  This
         lets Builder re-evaluate (and, when necessary, repair) a candidate against
         the current ABI without mutating the historical handoff that produced it.
+        The ABI is materialized from that session's immutable ExperimentPlan,
+        so refresh cannot silently substitute another direction's fixture.
         """
 
         state = self.get(
