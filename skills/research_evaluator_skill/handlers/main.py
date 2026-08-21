@@ -145,6 +145,8 @@ def derive_compact_calibration(
     minimum_free_disk_bytes: int = 17_179_869_184,
     **_: Any,
 ) -> dict[str, Any]:
+    """Freeze matched arms with a plan-bound consumer conformance sequence."""
+
     repository = EvaluationRepository()
     baseline = repository.get_task(str(baseline_task_id))
     local_identity = sdk_runtime_identity()
