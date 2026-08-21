@@ -5246,9 +5246,13 @@ class ResearchOrchestrator:
         dataset_status = dict(
             self._invoke_skill(runner_id, "dataset_status", {}, timeout=180)
         )
-        if dataset_status.get("ready") is False:
-            raise ValueError("runner dataset is not ready for Study instantiation")
         splits = self._validated_split_bindings(dataset_status)
+        dataset_readiness = {
+            "ready": bool(dataset_status.get("ready")),
+            "execution_ready_without_network": bool(
+                dataset_status.get("execution_ready_without_network")
+            ),
+        }
         problem = dict(dict(compilation["facets"])["research_problem"]["payload"])
         hypotheses = [dict(item) for item in problem.get("hypotheses") or [] if isinstance(item, Mapping)]
         if not hypotheses:
@@ -5358,6 +5362,7 @@ class ResearchOrchestrator:
                 "study_realization_ref": track["study_realization_ref"],
                 "experiment_ref": study_ref["experiment_ref"],
                 "runner_ref": track["runner_ref"],
+                "dataset_readiness_at_instantiation": dataset_readiness,
             },
             actor=actor,
             origin="skill:research_manager_skill",
@@ -5371,6 +5376,7 @@ class ResearchOrchestrator:
             "experiment": experiment,
             "experiment_plan": dict(plan),
             "dataset_status": dataset_status,
+            "dataset_readiness": dataset_readiness,
         }
 
     def _start_study_smoke(

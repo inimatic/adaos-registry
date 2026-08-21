@@ -150,6 +150,18 @@ def test_study_split_admission_fails_closed_on_alias_or_unsealed_test() -> None:
         ResearchOrchestrator._validated_split_bindings(value)
 
 
+def test_study_split_identity_does_not_require_temporal_dataset_readiness() -> None:
+    value = _splits()
+    value["ready"] = False
+    value["execution_ready_without_network"] = False
+
+    splits = ResearchOrchestrator._validated_split_bindings(value)
+
+    assert set(splits) == {"validation", "robustness", "test"}
+    assert splits["test"]["sealed"] is True
+    assert len({item["dataset_digest"] for item in splits.values()}) == 1
+
+
 def test_release_and_external_activity_bindings_are_idempotent_and_exact() -> None:
     repository = OrchestratorRepository()
     repository.initialize("direction", "Direction")
