@@ -905,6 +905,80 @@ def test_execution_admission_rejects_unenforceable_network_before_lock() -> None
     assert manager_module.experiment.state(manager.repository, experiment_id)["state"] == "draft"
 
 
+def test_execution_admission_scopes_dataset_readiness_to_selected_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager = ResearchManager()
+    created = _create(manager, f"admission-input-{uuid.uuid4().hex}")
+    study_id = created["study"]["record_id"]
+    conditions = _experiment_conditions()
+    conditions["execution"]["preflight"].update(
+        {
+            "network_mode": "unrestricted",
+            "input_policy": {
+                "source": "deterministic_contract_fixture",
+                "readiness": "required_before_execution",
+                "sampling": "deterministic_prefix",
+            },
+        }
+    )
+    conditions["execution"]["confirmatory"].update(
+        {
+            "network_mode": "unrestricted",
+            "input_policy": {
+                "source": "accepted_dataset",
+                "readiness": "required_before_execution",
+                "sampling": "full",
+            },
+        }
+    )
+    experiment_id = identity(
+        "experiment", {"study_id": study_id, "slug": "INPUT-READINESS"}
+    )
+    manager.create_experiment(
+        study_id=study_id,
+        slug="INPUT-READINESS",
+        title="Profile-scoped input readiness",
+        purpose="Allow fixture smoke while scientific data remains unavailable",
+        conditions=conditions,
+        experiment_id=experiment_id,
+        idempotency_key=f"{experiment_id}:create",
+    )
+    calls: list[tuple[str, str]] = []
+
+    def invoke(skill_id: str, operation: str, _payload: dict, **_: object) -> dict:
+        calls.append((skill_id, operation))
+        return {
+            "dataset_id": "stl10_v1",
+            "ready": False,
+            "execution_ready_without_network": False,
+        }
+
+    monkeypatch.setattr(manager_module, "invoke_skill", invoke)
+
+    smoke = manager.assess_experiment_execution(
+        experiment_id=experiment_id,
+        profile="preflight",
+    )
+    confirmatory = manager.assess_experiment_execution(
+        experiment_id=experiment_id,
+        profile="confirmatory",
+    )
+
+    assert smoke["admitted"] is True
+    assert smoke["enforcement"]["input_readiness"]["reason"] == "profile_owned_fixture"
+    assert calls == [("fixture_runner_skill", "dataset_status")]
+    assert confirmatory["admitted"] is False
+    assert confirmatory["blockers"] == [
+        {
+            "code": "dataset_not_ready",
+            "requirement": "accepted_dataset",
+            "runner_provider": "fixture_runner_skill",
+        }
+    ]
+    assert confirmatory["enforcement"]["input_readiness"]["dataset_ready"] is False
+
+
 def test_execution_provider_status_is_read_only_and_content_addressed() -> None:
     manager = ResearchManager()
 

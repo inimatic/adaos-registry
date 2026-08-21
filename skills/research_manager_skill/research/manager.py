@@ -1746,6 +1746,13 @@ class ResearchManager:
         network_mode = str(profile_conditions.get("network_mode") or "unrestricted")
         gpu_count = int(profile_conditions.get("gpu_count") or 0)
         blockers: list[dict[str, Any]] = []
+        input_readiness: dict[str, Any] = {
+            "declared": False,
+            "source": None,
+            "required_before_execution": False,
+            "satisfied": True,
+            "reason": "not_declared",
+        }
         if network_mode == "offline" and "network_offline" not in features:
             blockers.append(
                 {
@@ -1770,6 +1777,119 @@ class ResearchManager:
                     "requested": gpu_count,
                 }
             )
+        input_policy = profile_conditions.get("input_policy")
+        if isinstance(input_policy, Mapping):
+            source = str(input_policy.get("source") or "").strip()
+            required = (
+                str(input_policy.get("readiness") or "").strip()
+                == "required_before_execution"
+            )
+            input_readiness = {
+                "declared": True,
+                "source": source or None,
+                "required_before_execution": required,
+                "satisfied": True,
+                "reason": "not_required" if not required else "profile_owned_fixture",
+            }
+            if required and source == "accepted_dataset":
+                runner = dict(conditions.get("runner") or {})
+                runner_provider = str(runner.get("provider") or "").strip()
+                if not runner_provider:
+                    input_readiness.update(
+                        satisfied=False,
+                        reason="runner_provider_missing",
+                    )
+                    blockers.append(
+                        {
+                            "code": "runner_provider_missing",
+                            "requirement": "accepted_dataset",
+                        }
+                    )
+                else:
+                    try:
+                        value = invoke_skill(
+                            runner_provider,
+                            "dataset_status",
+                            {},
+                            timeout=30,
+                        )
+                        if not isinstance(value, Mapping):
+                            raise RuntimeError(
+                                "runner provider returned a non-object dataset status"
+                            )
+                        dataset_status = dict(value)
+                        ready = bool(dataset_status.get("ready"))
+                        offline_ready = bool(
+                            dataset_status.get("execution_ready_without_network")
+                        )
+                        satisfied = ready and (
+                            network_mode != "offline" or offline_ready
+                        )
+                        input_readiness.update(
+                            satisfied=satisfied,
+                            reason=(
+                                "ready"
+                                if satisfied
+                                else (
+                                    "not_ready_without_network"
+                                    if ready and network_mode == "offline"
+                                    else "not_ready"
+                                )
+                            ),
+                            runner_provider=runner_provider,
+                            dataset_id=(
+                                dataset_status.get("dataset_id")
+                                or dataset_status.get("logical_name")
+                                or dataset_status.get("id")
+                            ),
+                            dataset_ready=ready,
+                            execution_ready_without_network=offline_ready,
+                        )
+                        if not satisfied:
+                            blockers.append(
+                                {
+                                    "code": "dataset_not_ready",
+                                    "requirement": (
+                                        "accepted_dataset_offline"
+                                        if network_mode == "offline"
+                                        else "accepted_dataset"
+                                    ),
+                                    "runner_provider": runner_provider,
+                                }
+                            )
+                    except Exception as exc:
+                        input_readiness.update(
+                            satisfied=False,
+                            reason="dataset_status_unavailable",
+                            runner_provider=runner_provider,
+                            error={
+                                "type": type(exc).__name__,
+                                "message": str(exc)[:500],
+                            },
+                        )
+                        blockers.append(
+                            {
+                                "code": "dataset_status_unavailable",
+                                "requirement": "accepted_dataset",
+                                "runner_provider": runner_provider,
+                            }
+                        )
+            elif required and source == "deterministic_contract_fixture":
+                input_readiness.update(
+                    satisfied=True,
+                    reason="profile_owned_fixture",
+                )
+            elif required:
+                input_readiness.update(
+                    satisfied=False,
+                    reason="unsupported_input_source",
+                )
+                blockers.append(
+                    {
+                        "code": "unsupported_input_source",
+                        "requirement": source or "declared_input_source",
+                    }
+                )
         return {
             "schema": "adaos.execution.admission.v1",
             "admitted": not blockers,
@@ -1780,6 +1900,7 @@ class ResearchManager:
             "requested": {
                 "network_mode": network_mode,
                 "gpu_count": gpu_count,
+                "input_policy": dict(input_policy) if isinstance(input_policy, Mapping) else None,
             },
             "enforcement": {
                 "network_policy": (
@@ -1798,6 +1919,7 @@ class ResearchManager:
                     )
                 ),
                 "network_observation_required": True,
+                "input_readiness": input_readiness,
             },
             "blockers": blockers,
         }
