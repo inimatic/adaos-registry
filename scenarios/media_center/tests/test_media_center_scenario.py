@@ -217,6 +217,11 @@ def test_media_center_human_text_is_localized_by_skill_owned_dictionaries() -> N
     assert referenced <= set(russian)
     assert all(english[key].strip() for key in referenced)
     assert all(russian[key].strip() for key in referenced)
+    assert all(any(character.isalpha() for character in russian[key]) for key in referenced)
+    assert sum(
+        any("\u0400" <= character <= "\u04ff" for character in russian[key])
+        for key in referenced
+    ) >= len(referenced) - 5
 
 
 def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
@@ -262,6 +267,7 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-fullscreen-settings",
         "media-profile-policy",
         "media-metadata-operations",
+        "media-artwork-operation",
         "media-agent-performance",
         "media-playback-qoe",
         "media-deployment-plan-actions",
@@ -270,6 +276,16 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-deployment-agent-actions",
         "media-deployment-status",
     } <= settings_ids
+    artwork_operation = next(
+        widget
+        for widget in modals["media_center_settings"]["schema"]["widgets"]
+        if widget["id"] == "media-artwork-operation"
+    )
+    assert artwork_operation["dataSource"] == {
+        "kind": "stream",
+        "receiver": "media_library_agent.rendition_progress",
+        "scope": "workspace",
+    }
     settings_widgets = {
         widget["id"]: widget
         for widget in modals["media_center_settings"]["schema"]["widgets"]

@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.43` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.44` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -42,6 +42,14 @@ The `0.6.43` release localizes the complete static Media Center surface in
 English and Russian. The scenario carries only stable key references and
 English fallbacks; dictionaries remain versioned assets of
 `media_center_skill@0.8.39`.
+
+The `0.6.44` release adds the node-local artwork pipeline. Embedded tags,
+bounded folder covers, and bounded video frames are normalized into a derived
+JPEG with exact-source evidence; originals are never copied or modified. The
+coordinator exposes a sanitized versioned artwork projection and Settings
+observes the durable agent job stream. It ships
+`media_library_agent@0.6.20`, `media_center_skill@0.8.40`, and scenario
+`0.6.8` as one compatibility closure.
 
 The `0.6.40` release added authoritative persisted playback toggles through the
 generic client `input.toggle` contract and explicit subscription-backed library

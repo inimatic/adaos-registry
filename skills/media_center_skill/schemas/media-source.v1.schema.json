@@ -15,7 +15,28 @@
     "icon": {"type": "string"}, "modified_at": {"type": "string"}, "content_path": {"type": "string"},
     "routed_content_path": {"type": "string"}, "playback_id": {"type": "string"}, "source_path": {"type": "string"},
     "favorite": {"type": "boolean"}, "play_count": {"type": "integer", "minimum": 0}, "tags": {"type": "array"},
-    "playable": {"type": "boolean"}, "preview": {"type": "string"}
+    "playable": {"type": "boolean"}, "preview": {"type": "string"},
+    "artwork": {
+      "type": "object",
+      "required": [
+        "schema", "state", "url", "provider_id", "source_kind",
+        "source_revision", "source_fingerprint", "width", "height",
+        "error_code"
+      ],
+      "properties": {
+        "schema": {"const": "adaos.media.artwork.v1"},
+        "state": {"enum": ["missing", "ready", "unavailable", "failed"]},
+        "url": {"type": "string"},
+        "provider_id": {"type": "string"},
+        "source_kind": {"type": "string"},
+        "source_revision": {"type": "integer", "minimum": 0},
+        "source_fingerprint": {"type": "string", "maxLength": 128},
+        "width": {"type": "integer", "minimum": 0},
+        "height": {"type": "integer", "minimum": 0},
+        "error_code": {"type": "string"}
+      },
+      "additionalProperties": false
+    }
   },
   "additionalProperties": false
 }

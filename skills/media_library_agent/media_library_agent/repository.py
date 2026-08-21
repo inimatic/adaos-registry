@@ -1038,6 +1038,7 @@ class MediaLibraryAgentRepository:
         *,
         descriptor: Mapping[str, Any],
         output_bytes: int,
+        artwork: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -1075,12 +1076,6 @@ class MediaLibraryAgentRepository:
             metadata = json_loads(source["metadata_json"], {})
             if not isinstance(metadata, dict):
                 metadata = {}
-            renditions = [
-                dict(item)
-                for item in metadata.get("derived_renditions") or []
-                if isinstance(item, Mapping)
-                and text(item.get("profile")) != str(job["profile"])
-            ]
             rendition_id = stable_id(
                 "rendition",
                 source["id"],
@@ -1089,7 +1084,7 @@ class MediaLibraryAgentRepository:
                 size=28,
             )
             target = json_loads(job["target_json"], {})
-            rendition = {
+            rendition: dict[str, Any] = {
                 "id": rendition_id,
                 "profile": str(job["profile"]),
                 "exact_source_id": str(source["id"]),
@@ -1111,8 +1106,33 @@ class MediaLibraryAgentRepository:
                 "size_bytes": max(0, int(output_bytes)),
                 "created_at": now_iso(),
             }
-            renditions.append(rendition)
-            metadata["derived_renditions"] = renditions[-8:]
+            if artwork is not None:
+                rendition = {
+                    "schema": "adaos.media.artwork.v1",
+                    "state": "ready",
+                    "profile": str(job["profile"]),
+                    "exact_source_id": str(source["id"]),
+                    "exact_source_revision": int(source["revision"]),
+                    "exact_source_fingerprint": str(source["fingerprint"]),
+                    "descriptor": dict(descriptor),
+                    "provider_id": text(artwork.get("provider_id")),
+                    "source_kind": text(artwork.get("source_kind")),
+                    "source_name": text(artwork.get("source_name")),
+                    "width": max(0, int(artwork.get("width") or 0)),
+                    "height": max(0, int(artwork.get("height") or 0)),
+                    "size_bytes": max(0, int(output_bytes)),
+                    "created_at": now_iso(),
+                }
+                metadata["artwork"] = rendition
+            else:
+                renditions = [
+                    dict(item)
+                    for item in metadata.get("derived_renditions") or []
+                    if isinstance(item, Mapping)
+                    and text(item.get("profile")) != str(job["profile"])
+                ]
+                renditions.append(rendition)
+                metadata["derived_renditions"] = renditions[-8:]
             next_revision = int(source["revision"]) + 1
             connection.execute(
                 """
@@ -1183,6 +1203,8 @@ class MediaLibraryAgentRepository:
         root_id = text(source.get("root_id"))
         relative_path = text(source.get("relative_path")).replace("\\", "/")
         now = now_iso()
+        descriptor = dict(source.get("descriptor") or {})
+        metadata = dict(source.get("metadata") or {})
         with self.connect() as connection:
             previous = connection.execute(
                 "SELECT * FROM sources WHERE root_id=? AND relative_path=?",
@@ -1191,9 +1213,12 @@ class MediaLibraryAgentRepository:
             operation = "added"
             if previous is not None:
                 operation = "restored" if not bool(previous["present"]) else "updated"
-                if str(previous["fingerprint"]) == text(
-                    source.get("fingerprint")
-                ) and bool(previous["present"]):
+                if (
+                    str(previous["fingerprint"]) == text(source.get("fingerprint"))
+                    and str(previous["descriptor_json"]) == json_dumps(descriptor)
+                    and str(previous["metadata_json"]) == json_dumps(metadata)
+                    and bool(previous["present"])
+                ):
                     operation = "unchanged"
                 elif str(previous["fingerprint"]) != text(source.get("fingerprint")):
                     connection.execute(
@@ -1215,8 +1240,6 @@ class MediaLibraryAgentRepository:
                 else stable_id("source", self.node_id, root_id, relative_path, size=28)
             )
             first_seen_at = str(previous["first_seen_at"]) if previous else now
-            descriptor = dict(source.get("descriptor") or {})
-            metadata = dict(source.get("metadata") or {})
             connection.execute(
                 """
                 INSERT INTO sources (

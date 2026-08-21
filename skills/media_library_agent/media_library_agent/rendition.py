@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import mimetypes
 import os
 import shutil
@@ -9,10 +10,13 @@ import time
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from .contracts import RENDITION_PLAN_SCHEMA, text
+from .contracts import ARTWORK_PLAN_SCHEMA, RENDITION_PLAN_SCHEMA, text
 
 
 CancelCallback = Callable[[], bool]
+ARTWORK_PROFILE = "artwork-card-v1"
+ARTWORK_NAMES = ("cover", "folder", "front", "poster", "album", "artwork")
+ARTWORK_EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 
 
 def _tokens(value: Any) -> set[str]:
@@ -114,6 +118,287 @@ def rendition_limits() -> dict[str, Any]:
     }
 
 
+def artwork_plan(source: Mapping[str, Any], *, force: bool = False) -> dict[str, Any]:
+    metadata = dict(source.get("metadata") or {})
+    artwork = (
+        dict(metadata.get("artwork") or {})
+        if isinstance(metadata.get("artwork"), Mapping)
+        else {}
+    )
+    current = bool(
+        artwork.get("state") == "ready"
+        and text(artwork.get("exact_source_fingerprint"))
+        == text(source.get("fingerprint"))
+    )
+    terminal = bool(
+        artwork.get("state") in {"unavailable", "failed"}
+        and text(artwork.get("exact_source_fingerprint"))
+        == text(source.get("fingerprint"))
+    )
+    return {
+        "schema": ARTWORK_PLAN_SCHEMA,
+        "source_id": text(source.get("id")),
+        "source_revision": int(source.get("revision") or 0),
+        "source_fingerprint": text(source.get("fingerprint")),
+        "required": bool(force or not (current or terminal)),
+        "state": "ready" if current else (text(artwork.get("state")) or "missing"),
+        "reasons": (
+            ["forced"] if force else
+            (["artwork_ready"] if current else
+             (["terminal_artwork_state"] if terminal else ["artwork_missing"]))
+        ),
+        "target": {
+            "profile": ARTWORK_PROFILE,
+            "kind": "artwork",
+            "mime_type": "image/jpeg",
+            "max_width": 720,
+            "max_height": 1080,
+            "quality": 84,
+            "max_output_bytes": 4 * 1024**2,
+        },
+        "artwork": artwork or None,
+        "resource_policy": {
+            "max_concurrent": 1,
+            "timeout_seconds": 45,
+            "max_output_bytes": 4 * 1024**2,
+            "max_input_bytes": 32 * 1024**2,
+        },
+    }
+
+
+def folder_artwork_witness(source_path: Path) -> dict[str, Any]:
+    candidate = folder_artwork_candidate(source_path)
+    if candidate is not None:
+        stat = candidate.stat()
+        return {
+            "name": candidate.name,
+            "size_bytes": int(stat.st_size),
+            "modified_ns": int(stat.st_mtime_ns),
+        }
+    return {}
+
+
+def folder_artwork_candidate(source_path: Path) -> Path | None:
+    names = set(ARTWORK_NAMES)
+    suffixes = set(ARTWORK_EXTENSIONS)
+    try:
+        entries = list(source_path.parent.iterdir())[:512]
+    except OSError:
+        return None
+    candidates = [
+        entry
+        for entry in entries
+        if entry.is_file()
+        and entry.stem.casefold() in names
+        and entry.suffix.casefold() in suffixes
+    ]
+    candidates.sort(
+        key=lambda entry: (
+            ARTWORK_NAMES.index(entry.stem.casefold()),
+            ARTWORK_EXTENSIONS.index(entry.suffix.casefold()),
+            entry.name.casefold(),
+        )
+    )
+    return candidates[0] if candidates else None
+
+
+def _embedded_artwork_bytes(source_path: Path, *, maximum: int) -> bytes | None:
+    try:
+        from mutagen import File as MutagenFile  # type: ignore[import-not-found]
+    except Exception:
+        return None
+    try:
+        media = MutagenFile(source_path)
+    except Exception:
+        return None
+    candidates: list[Any] = []
+    candidates.extend(list(getattr(media, "pictures", None) or []))
+    tags = getattr(media, "tags", None)
+    if isinstance(tags, Mapping):
+        for key, value in list(tags.items())[:500]:
+            if str(key).casefold() in {"covr", "cover", "metadata_block_picture"}:
+                candidates.extend(value if isinstance(value, (list, tuple)) else [value])
+                continue
+            if hasattr(value, "data") and str(key).upper().startswith("APIC"):
+                candidates.append(value)
+    for candidate in candidates:
+        payload = getattr(candidate, "data", candidate)
+        try:
+            data = bytes(payload)
+        except Exception:
+            continue
+        if 0 < len(data) <= maximum:
+            return data
+    return None
+
+
+def _render_artwork(
+    source: Path | bytes,
+    target_path: Path,
+    *,
+    maximum_size: tuple[int, int],
+    quality: int,
+    maximum_output_bytes: int,
+) -> dict[str, Any]:
+    from PIL import Image, ImageOps  # type: ignore[import-not-found]
+
+    partial = target_path.with_suffix(target_path.suffix + ".partial")
+    partial.unlink(missing_ok=True)
+    opened = io.BytesIO(source) if isinstance(source, bytes) else source
+    with Image.open(opened) as image:
+        width, height = image.size
+        if width <= 0 or height <= 0 or width * height > 40_000_000:
+            raise RuntimeError("artwork_input_dimensions_exceeded")
+        image = ImageOps.exif_transpose(image)
+        if getattr(image, "is_animated", False):
+            image.seek(0)
+        image.thumbnail(maximum_size, Image.Resampling.LANCZOS)
+        canvas = Image.new("RGB", image.size, "black")
+        if image.mode in {"RGBA", "LA"}:
+            canvas.paste(image, mask=image.getchannel("A"))
+        else:
+            canvas.paste(image.convert("RGB"))
+        canvas.save(
+            partial,
+            "JPEG",
+            quality=max(50, min(92, int(quality))),
+            optimize=True,
+        )
+        output_width, output_height = canvas.size
+    size_bytes = int(partial.stat().st_size)
+    if size_bytes <= 0 or size_bytes > maximum_output_bytes:
+        partial.unlink(missing_ok=True)
+        raise RuntimeError("artwork_output_limit_exceeded")
+    partial.replace(target_path)
+    return {
+        "size_bytes": size_bytes,
+        "mime_type": "image/jpeg",
+        "width": output_width,
+        "height": output_height,
+    }
+
+
+def _video_frame_artwork(
+    source_path: Path,
+    target_path: Path,
+    *,
+    cancelled: CancelCallback,
+    timeout_seconds: int,
+    maximum_output_bytes: int,
+) -> dict[str, Any]:
+    executable = shutil.which("ffmpeg")
+    if not executable:
+        raise RuntimeError("artwork_video_backend_unavailable")
+    partial = target_path.with_suffix(target_path.suffix + ".partial")
+    partial.unlink(missing_ok=True)
+    command = [
+        executable, "-nostdin", "-hide_banner", "-loglevel", "error",
+        "-protocol_whitelist", "file,pipe", "-ss", "5", "-i", str(source_path),
+        "-map", "0:v:0", "-frames:v", "1",
+        "-vf", "scale=w='min(720,iw)':h='min(1080,ih)':force_original_aspect_ratio=decrease",
+        "-threads", "1", "-q:v", "3", "-f", "image2", str(partial),
+    ]
+    process = subprocess.Popen(
+        command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+    )
+    started = time.monotonic()
+    error = b""
+    try:
+        while process.poll() is None:
+            if cancelled():
+                process.terminate()
+                raise RuntimeError("rendition_canceled")
+            if time.monotonic() - started > timeout_seconds:
+                process.terminate()
+                raise RuntimeError("artwork_timeout")
+            if partial.exists() and partial.stat().st_size > maximum_output_bytes:
+                process.terminate()
+                raise RuntimeError("artwork_output_limit_exceeded")
+            time.sleep(0.1)
+        _stdout, error = process.communicate(timeout=2)
+        if process.returncode != 0 or not partial.exists():
+            detail = error.decode("utf-8", errors="replace")[-1000:]
+            raise RuntimeError(f"artwork_video_frame_failed:{detail}")
+        if partial.stat().st_size > maximum_output_bytes:
+            raise RuntimeError("artwork_output_limit_exceeded")
+        partial.replace(target_path)
+        from PIL import Image  # type: ignore[import-not-found]
+        with Image.open(target_path) as image:
+            width, height = image.size
+        return {
+            "size_bytes": int(target_path.stat().st_size),
+            "mime_type": "image/jpeg",
+            "width": int(width),
+            "height": int(height),
+        }
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=2)
+        partial.unlink(missing_ok=True)
+
+
+def materialize_artwork(
+    source_path: Path,
+    target_path: Path,
+    job: Mapping[str, Any],
+    *,
+    cancelled: CancelCallback,
+) -> dict[str, Any]:
+    target = dict(job.get("target") or {})
+    maximum_input = max(1024, min(32 * 1024**2, int(target.get("max_input_bytes") or 32 * 1024**2)))
+    maximum_output = max(64 * 1024, min(4 * 1024**2, int(target.get("max_output_bytes") or 4 * 1024**2)))
+    maximum_size = (
+        max(64, min(1920, int(target.get("max_width") or 720))),
+        max(64, min(1920, int(target.get("max_height") or 1080))),
+    )
+    quality = max(50, min(92, int(target.get("quality") or 84)))
+    if cancelled():
+        raise RuntimeError("rendition_canceled")
+    embedded = _embedded_artwork_bytes(source_path, maximum=maximum_input)
+    if embedded:
+        return {
+            **_render_artwork(
+                embedded,
+                target_path,
+                maximum_size=maximum_size,
+                quality=quality,
+                maximum_output_bytes=maximum_output,
+            ),
+            "provider_id": "media_library_agent.embedded_cover.v1",
+            "source_kind": "embedded",
+        }
+    folder = folder_artwork_candidate(source_path)
+    if folder is not None:
+        if folder.stat().st_size > maximum_input:
+            raise RuntimeError("artwork_input_limit_exceeded")
+        return {
+            **_render_artwork(
+                folder,
+                target_path,
+                maximum_size=maximum_size,
+                quality=quality,
+                maximum_output_bytes=maximum_output,
+            ),
+            "provider_id": "media_library_agent.folder_artwork.v1",
+            "source_kind": "folder",
+            "source_name": folder.name,
+        }
+    if text(job.get("media_kind")) == "video":
+        return {
+            **_video_frame_artwork(
+                source_path,
+                target_path,
+                cancelled=cancelled,
+                timeout_seconds=45,
+                maximum_output_bytes=maximum_output,
+            ),
+            "provider_id": "media_library_agent.video_frame.v1",
+            "source_kind": "generated_frame",
+        }
+    raise RuntimeError("artwork_not_found")
+
+
 def derived_workspace(db_path: Path) -> Path:
     root = db_path.parent / "renditions"
     root.mkdir(parents=True, exist_ok=True)
@@ -121,7 +406,11 @@ def derived_workspace(db_path: Path) -> Path:
 
 
 def output_path(db_path: Path, job: Mapping[str, Any]) -> Path:
-    suffix = ".mp4" if text(job.get("media_kind")) == "video" else ".m4a"
+    suffix = (
+        ".jpg"
+        if text(job.get("profile")) == ARTWORK_PROFILE
+        else (".mp4" if text(job.get("media_kind")) == "video" else ".m4a")
+    )
     digest = hashlib.sha256(
         f"{text(job.get('id'))}:{text(job.get('source_fingerprint'))}".encode("utf-8")
     ).hexdigest()[:24]
@@ -264,7 +553,11 @@ def publish_derived_resource(
             f"rendition:{text(job.get('source_id'))}:"
             f"{int(job.get('source_revision') or 0)}:{text(job.get('profile'))}"
         ),
-        namespace="media-library-rendition",
+        namespace=(
+            "media-library-artwork"
+            if text(job.get("profile")) == ARTWORK_PROFILE
+            else "media-library-rendition"
+        ),
         variant=text(job.get("profile")) or "browser-mp4-v1",
         mime=text((job.get("target") or {}).get("mime_type"))
         or "application/octet-stream",

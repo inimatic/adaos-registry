@@ -3996,7 +3996,7 @@ class MediaCatalogCoordinator:
 
     def queue_background_job(self, kind: str, subject_ref: str, *, priority: int = 100) -> dict[str, Any]:
         kind_token = _text(kind)
-        if kind_token not in {"technical_probe", "metadata_enrichment", "thumbnail", "fingerprint", "embedding"}:
+        if kind_token not in {"technical_probe", "metadata_enrichment", "fingerprint", "embedding"}:
             return {"ok": False, "error": "unsupported_background_job"}
         job_id = _stable_id("mediajob", kind_token, subject_ref, now_iso(), size=24)
         now = now_iso()

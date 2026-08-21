@@ -12,6 +12,7 @@
   "runtime.media_library_agent.error.rendition_job_not_found": "The rendition job is no longer available.",
   "runtime.media_library_agent.error.rendition_queue_failed": "The compatible media rendition could not be queued.",
   "runtime.media_library_agent.error.rendition_cancel_failed": "The rendition job could not be canceled.",
+  "runtime.media_library_agent.error.artwork_queue_failed": "Artwork extraction could not be queued.",
   "runtime.media_library_agent.error.topology_join_failed": "This library agent could not join the Media Center topology.",
   "runtime.media_library_agent.error.topology_renew_failed": "This library agent could not renew its Media Center membership.",
   "runtime.media_library_agent.error.topology_observe_failed": "This library agent could not publish its shard state.",

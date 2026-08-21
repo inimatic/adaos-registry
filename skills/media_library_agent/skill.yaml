@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.19
+version: 0.6.20
 description: Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.
 supported_locales:
 - en
@@ -35,7 +35,9 @@ service:
 capabilities:
 - media.catalog
 - media.rendition
-dependencies: []
+dependencies:
+- pillow>=10.0.0
+- mutagen>=1.47.0
 events:
   subscribe:
   - sys.ready
@@ -66,6 +68,7 @@ exports:
   - set_resource_pressure
   - inspect_source
   - search_sources
+  - plan_artwork
   - plan_rendition
   - rendition_status
   - list_rendition_jobs
@@ -284,6 +287,20 @@ tools:
       endpoint_capabilities: {type: object}
       profile: {type: string, default: browser-mp4-v1}
       priority: {type: integer, minimum: 0, maximum: 1000, default: 50}
+      force: {type: boolean, default: false}
+    additionalProperties: true
+  output_schema: {type: object}
+- name: plan_artwork
+  entry: handlers.main:plan_artwork
+  description: Resolve embedded or folder artwork and queue one bounded derived JPEG.
+  side_effects: local_write
+  timeout_seconds: 15
+  input_schema:
+    type: object
+    required: [source_id]
+    properties:
+      source_id: {type: string, minLength: 1}
+      priority: {type: integer, minimum: 0, maximum: 1000, default: 350}
       force: {type: boolean, default: false}
     additionalProperties: true
   output_schema: {type: object}

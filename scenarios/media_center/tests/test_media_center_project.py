@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import jsonschema
@@ -9,7 +10,20 @@ import yaml
 
 REGISTRY_ROOT = Path(__file__).resolve().parents[3]
 PROJECT_ROOT = REGISTRY_ROOT / "projects" / "media_center"
-CORE_ROOT = Path(__file__).resolve().parents[4] / "adaos-media-center"
+
+
+def _core_root() -> Path:
+    configured = os.environ.get("ADAOS_CORE_ROOT", "").strip()
+    candidates = [Path(configured)] if configured else []
+    candidates.extend(Path(__file__).resolve().parents)
+    candidates.append(Path(__file__).resolve().parents[4] / "adaos-media-center")
+    for candidate in candidates:
+        if (candidate / "src" / "adaos" / "abi" / "project.v1.schema.json").is_file():
+            return candidate
+    return candidates[-1]
+
+
+CORE_ROOT = _core_root()
 
 
 def test_media_center_project_is_a_complete_distribution_boundary() -> None:

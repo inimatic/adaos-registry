@@ -380,8 +380,8 @@
       "kind": "skill",
       "id": "media_center_skill",
       "name": "media_center_skill",
-      "version": "0.8.38",
-      "updated_at": "2026-08-21T14:00:00+00:00",
+      "version": "0.8.40",
+      "updated_at": "2026-08-21T15:00:00+00:00",
       "path": "skills/media_center_skill",
       "manifest": "skills/media_center_skill/skill.yaml",
       "source": {
@@ -445,8 +445,8 @@
       "kind": "skill",
       "id": "media_library_agent",
       "name": "media_library_agent",
-      "version": "0.6.19",
-      "updated_at": "2026-08-21T10:00:00+00:00",
+      "version": "0.6.20",
+      "updated_at": "2026-08-21T15:00:00+00:00",
       "path": "skills/media_library_agent",
       "manifest": "skills/media_library_agent/skill.yaml",
       "source": {
@@ -460,7 +460,7 @@
       },
       "description": "Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.",
       "runtime_python": "3.11",
-      "tools_count": 25
+      "tools_count": 26
     },
     {
       "kind": "skill",
@@ -1215,8 +1215,8 @@
       "kind": "scenario",
       "id": "media_center",
       "name": "media_center",
-      "version": "0.6.5",
-      "updated_at": "2026-08-21T00:00:00+00:00",
+      "version": "0.6.8",
+      "updated_at": "2026-08-21T15:00:00+00:00",
       "path": "scenarios/media_center",
       "manifest": "scenarios/media_center/scenario.yaml",
       "source": {

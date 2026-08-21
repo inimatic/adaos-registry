@@ -26,7 +26,11 @@ from .contracts import (
     text,
 )
 from .rendition import (
+    ARTWORK_PROFILE,
+    artwork_plan,
     current_disk_usage,
+    folder_artwork_witness,
+    materialize_artwork,
     output_path,
     publish_derived_resource,
     rendition_limits,
@@ -38,6 +42,7 @@ from .repository import MediaLibraryAgentRepository
 RegisterCallback = Callable[[Path, Mapping[str, Any], Mapping[str, Any]], Mapping[str, Any]]
 PublishCallback = Callable[[Mapping[str, Any], str], None]
 TranscodeCallback = Callable[..., Mapping[str, Any]]
+ArtworkCallback = Callable[..., Mapping[str, Any]]
 PublishDerivedCallback = Callable[[Path, Mapping[str, Any]], Mapping[str, Any]]
 
 
@@ -51,6 +56,7 @@ class MediaLibraryAgentWorker:
         register: RegisterCallback | None = None,
         publish: PublishCallback | None = None,
         transcode: TranscodeCallback | None = None,
+        artwork: ArtworkCallback | None = None,
         publish_derived: PublishDerivedCallback | None = None,
         poll_seconds: float = 1.0,
     ):
@@ -58,6 +64,7 @@ class MediaLibraryAgentWorker:
         self._register = register or register_media_reference
         self._publish_callback = publish
         self._transcode = transcode or transcode_with_ffmpeg
+        self._artwork = artwork or materialize_artwork
         self._publish_derived = publish_derived or publish_derived_resource
         self._poll_seconds = max(0.05, min(10.0, float(poll_seconds)))
         self._stop = threading.Event()
@@ -121,17 +128,25 @@ class MediaLibraryAgentWorker:
         self._poll_watch_schedules()
         self._cleanup_invalidated_renditions()
         rendition = self.repository.next_queued_rendition_job()
+        queued = self.repository.next_queued_job()
+        artwork_waits_for_scan = bool(
+            rendition
+            and text(rendition.get("profile")) == ARTWORK_PROFILE
+            and queued is not None
+        )
+        if rendition is not None and not artwork_waits_for_scan:
+            claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
+            if claimed_rendition is not None:
+                return self._run_rendition_job(claimed_rendition)
+        if queued is not None:
+            claimed = self.repository.claim_job(queued["id"])
+            if claimed is not None:
+                return self._run_job(claimed)
         if rendition is not None:
             claimed_rendition = self.repository.claim_rendition_job(rendition["id"])
             if claimed_rendition is not None:
                 return self._run_rendition_job(claimed_rendition)
-        queued = self.repository.next_queued_job()
-        if queued is None:
-            return None
-        claimed = self.repository.claim_job(queued["id"])
-        if claimed is None:
-            return None
-        return self._run_job(claimed)
+        return None
 
     def _run_rendition_job(self, job: Mapping[str, Any]) -> dict[str, Any]:
         job_id = text(job.get("id"))
@@ -151,8 +166,14 @@ class MediaLibraryAgentWorker:
             return self._finish_rendition_failed(job_id, "source_path_invalid", str(exc))
         target_path = output_path(self.repository.db_path, job)
         limits = rendition_limits()
-        estimated = min(
-            int(limits["max_output_bytes"]), max(1, int(source.get("size_bytes") or 0))
+        is_artwork = text(job.get("profile")) == ARTWORK_PROFILE
+        estimated = (
+            int((job.get("target") or {}).get("max_output_bytes") or 4 * 1024**2)
+            if is_artwork
+            else min(
+                int(limits["max_output_bytes"]),
+                max(1, int(source.get("size_bytes") or 0)),
+            )
         )
         if current_disk_usage(self.repository.db_path) + estimated > int(
             limits["disk_quota_bytes"]
@@ -165,7 +186,8 @@ class MediaLibraryAgentWorker:
                 return self._finish_rendition_failed(
                     job_id, "rendition_canceled", status="canceled"
                 )
-            result = self._transcode(
+            processor = self._artwork if is_artwork else self._transcode
+            result = processor(
                 source_path,
                 target_path,
                 job,
@@ -196,6 +218,14 @@ class MediaLibraryAgentWorker:
                         job.get("source_fingerprint")
                     ),
                     "rendition_profile": text(job.get("profile")),
+                    **(
+                        {
+                            "artwork_provider": text(result.get("provider_id")),
+                            "artwork_source_kind": text(result.get("source_kind")),
+                        }
+                        if is_artwork
+                        else {}
+                    ),
                 }
             )
             descriptor["metadata"] = descriptor_metadata
@@ -207,6 +237,7 @@ class MediaLibraryAgentWorker:
                     or descriptor.get("size_bytes")
                     or target_path.stat().st_size
                 ),
+                artwork=(dict(result) if is_artwork else None),
             )
             if not completed.get("advertised"):
                 self._cleanup_published_descriptor(descriptor)
@@ -300,8 +331,11 @@ class MediaLibraryAgentWorker:
         metadata = dict(descriptor.get("metadata") or {})
         filename = text(descriptor.get("filename") or descriptor.get("resource_id"))
         if (
-            text(metadata.get("namespace")) != "media-library-rendition"
-            and not filename.startswith("media-library-rendition-")
+            text(metadata.get("namespace"))
+            not in {"media-library-rendition", "media-library-artwork"}
+            and not filename.startswith(
+                ("media-library-rendition-", "media-library-artwork-")
+            )
         ):
             return
         path = Path(text(descriptor.get("path")))
@@ -499,8 +533,12 @@ class MediaLibraryAgentWorker:
                     source_fingerprint = fingerprint(path, relative_path=relative_path, stat=stat)
                     previous = self.repository.source_by_path(root["id"], relative_path)
                     descriptor: Mapping[str, Any]
+                    previous_metadata = (
+                        dict(previous.get("metadata") or {}) if previous else {}
+                    )
                     if previous and previous["fingerprint"] == source_fingerprint and previous["present"]:
                         descriptor = previous.get("descriptor") or {}
+                        metadata = previous_metadata
                     else:
                         metadata = {
                             "media_library_agent_id": self.repository.agent_id,
@@ -515,6 +553,19 @@ class MediaLibraryAgentWorker:
                             ),
                         }
                         descriptor = self._register(path, root, metadata)
+                        metadata = dict(descriptor.get("metadata") or metadata)
+                    witness = folder_artwork_witness(path)
+                    prior_witness = previous_metadata.get("artwork_folder_witness")
+                    if prior_witness != witness:
+                        current_artwork = metadata.get("artwork")
+                        current_kind = (
+                            text(current_artwork.get("source_kind"))
+                            if isinstance(current_artwork, Mapping)
+                            else ""
+                        )
+                        if current_kind != "embedded":
+                            metadata.pop("artwork", None)
+                    metadata["artwork_folder_witness"] = witness
                     mime_type = text(descriptor.get("mime_type") or descriptor.get("mime")) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
                     source = {
                         "root_id": root["id"],
@@ -529,9 +580,19 @@ class MediaLibraryAgentWorker:
                         "fingerprint": source_fingerprint,
                         "resource_id": text(descriptor.get("resource_id") or descriptor.get("id")),
                         "descriptor": dict(descriptor),
-                        "metadata": dict(descriptor.get("metadata") or {}),
+                        "metadata": metadata,
                     }
-                    operation, _ = self.repository.upsert_source(source, job_id=job_id)
+                    operation, stored_source = self.repository.upsert_source(
+                        source, job_id=job_id
+                    )
+                    plan = artwork_plan(stored_source)
+                    if operation != "unchanged" and plan["required"]:
+                        self.repository.create_rendition_job(
+                            stored_source["id"],
+                            profile=ARTWORK_PROFILE,
+                            target=plan["target"],
+                            priority=350,
+                        )
                     if operation == "added":
                         counters["added_count"] += 1
                     elif operation in {"updated", "restored"}:

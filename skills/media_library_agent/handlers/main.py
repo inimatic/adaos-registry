@@ -24,7 +24,12 @@ from media_library_agent.contracts import (  # noqa: E402
     now_iso,
     text,
 )
-from media_library_agent.rendition import rendition_limits, rendition_plan  # noqa: E402
+from media_library_agent.rendition import (  # noqa: E402
+    ARTWORK_PROFILE,
+    artwork_plan,
+    rendition_limits,
+    rendition_plan,
+)
 from media_library_agent.repository import MediaLibraryAgentRepository, default_db_path  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
 from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
@@ -663,6 +668,58 @@ def search_sources(
         return _human_error(
             "invalid_cursor", "The catalog cursor has expired or is invalid."
         )
+
+
+@tool(
+    summary="Resolve and queue one bounded source artwork rendition.",
+    side_effects="local_write",
+)
+def plan_artwork(
+    source_id: str = "",
+    priority: int = 350,
+    force: bool = False,
+    **_: Any,
+) -> dict[str, Any]:
+    repository, worker = _runtime()
+    source = repository.get_source(source_id)
+    if source is None:
+        return _human_error(
+            "source_not_found",
+            "The media source is no longer available.",
+            source_id=text(source_id),
+        )
+    plan = artwork_plan(source, force=bool(force))
+    if not plan["required"]:
+        return {
+            "ok": True,
+            "schema": SCHEMA_VERSION,
+            "asynchronous": False,
+            "plan": plan,
+            "job": None,
+            "artwork": plan.get("artwork"),
+        }
+    queued = repository.create_rendition_job(
+        source_id,
+        profile=ARTWORK_PROFILE,
+        target=plan["target"],
+        priority=priority,
+        force=bool(force),
+    )
+    if not queued.get("ok"):
+        return _human_error(
+            text(queued.get("error")) or "artwork_queue_failed",
+            "Artwork extraction could not be queued.",
+            source_id=text(source_id),
+        )
+    _ensure_worker_if_owned(worker)
+    return {
+        "ok": True,
+        "schema": SCHEMA_VERSION,
+        "asynchronous": True,
+        "plan": plan,
+        "job": queued.get("job"),
+        "created": bool(queued.get("created")),
+    }
 
 
 @tool(

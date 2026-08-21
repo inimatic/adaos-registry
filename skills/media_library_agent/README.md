@@ -4,7 +4,7 @@
 
 ## Storage boundary
 
-Original media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design. A browser-compatible rendition is explicitly derived data: its exact source revision and fingerprint are recorded, and only that generated output may be copied to managed media storage.
+Original media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design. Browser-compatible renditions and normalized artwork are explicitly derived data: their exact source revision and fingerprint are recorded, and only generated outputs may be copied to managed media storage.
 
 The service declares `service.membership` instead of implementing a private
 heartbeat. AdaOS binds membership to the exact active Project component,
@@ -43,6 +43,8 @@ two seconds.
 - One rendition shares the agent's single background worker with scanning. Playback/critical pressure pauses it. CPU threads, RSS, timeout, output size, temporary disk quota, cancellation, and final publication are bounded by `MEDIA_LIBRARY_AGENT_RENDITION_*` settings.
 - The worker writes a `.partial` temporary file, atomically closes it, rechecks the source witness, publishes the derived resource, and atomically advertises it in a new source delta. A source change before or after publication invalidates the job and removes the generated resource.
 - `media_library_agent.rendition_progress` publishes the latest durable job at a bounded rate. Restart recovery requeues interrupted work; queued cancellation is immediately terminal.
+- Artwork uses the same durable queue with the low-priority `artwork-card-v1` profile. The agent tries embedded tags, a bounded folder-cover lookup, then a bounded video-frame extraction. It emits a maximum 720x1080 JPEG of at most 4 MiB with provider provenance and exact-source evidence; missing backends or artwork fail as observable jobs instead of blocking scans.
+- Queued scans run before automatic artwork work. An unchanged rescan preserves ready artwork and does not enqueue a duplicate; a changed source fingerprint or folder-cover witness invalidates the corresponding projection.
 - `search_sources` uses node-local Unicode FTS over names, folders, embedded metadata, and technical probe fields. Coordinator search remains the fast first stage; this endpoint is a bounded federated deep-search stage.
 
 ## Coordinator contract

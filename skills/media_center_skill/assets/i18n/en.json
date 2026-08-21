@@ -114,5 +114,6 @@
   "runtime.media_center.ui.add_a_media_folder_in_settings_to_begin": "Add a media folder in Settings to begin.",
   "runtime.media_center.ui.your_media_folders_are_being_indexed": "Your media folders are being indexed.",
   "runtime.media_center.ui.no_playable_media_was_found_in_the_configured_folders": "No playable media was found in the configured folders.",
-  "runtime.media_center.ui.library_state_is_temporarily_unavailable": "Library state is temporarily unavailable."
+  "runtime.media_center.ui.library_state_is_temporarily_unavailable": "Library state is temporarily unavailable.",
+  "runtime.media_center.ui.artwork_operation": "Artwork operation"
 }

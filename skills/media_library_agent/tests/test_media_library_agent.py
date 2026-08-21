@@ -19,7 +19,7 @@ if str(SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(SKILL_ROOT))
 
 from media_library_agent.repository import MediaLibraryAgentRepository  # noqa: E402
-from media_library_agent.rendition import rendition_plan  # noqa: E402
+from media_library_agent.rendition import artwork_plan, rendition_plan  # noqa: E402
 import media_library_agent.topology as topology_module  # noqa: E402
 from media_library_agent.topology import LibraryAgentTopology  # noqa: E402
 from media_library_agent.worker import MediaLibraryAgentWorker  # noqa: E402
@@ -1426,6 +1426,92 @@ def test_rendition_is_bounded_derived_and_tied_to_exact_source(tmp_path):
     ).validate(result)
 
 
+def test_folder_artwork_is_bounded_published_and_tied_to_exact_source(tmp_path):
+    from PIL import Image
+    from jsonschema import Draft202012Validator
+
+    library = tmp_path / "library"
+    album = library / "Artist" / "Album"
+    album.mkdir(parents=True)
+    original = album / "01.mp3"
+    original.write_bytes(b"original-audio")
+    cover = album / "Cover.png"
+    Image.new("RGB", (1600, 1600), "red").save(cover)
+    original_bytes = original.read_bytes()
+    cover_bytes = cover.read_bytes()
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "artwork.sqlite3", node_id="node-a"
+    )
+    published = tmp_path / "published" / "album-cover.jpg"
+
+    def register(path, _root, metadata):
+        return {
+            "resource_id": "audio-ref",
+            "path": str(path),
+            "source_path": str(path),
+            "mime_type": "audio/mpeg",
+            "metadata": metadata,
+        }
+
+    def publish(target, _job):
+        published.parent.mkdir(exist_ok=True)
+        published.write_bytes(target.read_bytes())
+        return {
+            "resource_id": "album-cover",
+            "filename": "album-cover.jpg",
+            "path": str(published),
+            "mime_type": "image/jpeg",
+            "size_bytes": published.stat().st_size,
+            "browser_path": "/media/album-cover.jpg",
+            "metadata": {"namespace": "media-library-artwork"},
+        }
+
+    worker = MediaLibraryAgentWorker(
+        repository,
+        register=register,
+        publish_derived=publish,
+    )
+    source = _rendition_source(repository, worker, library)
+    queued = repository.next_queued_rendition_job()
+
+    assert queued is not None and queued["profile"] == "artwork-card-v1"
+    result = worker.run_once()
+    assert result and result["status"] == "completed"
+    changed = repository.get_source(source["id"])
+    artwork = changed["metadata"]["artwork"]
+    assert artwork["state"] == "ready"
+    assert artwork["provider_id"] == "media_library_agent.folder_artwork.v1"
+    assert artwork["source_kind"] == "folder"
+    assert artwork["exact_source_id"] == source["id"]
+    assert artwork["exact_source_revision"] == source["revision"]
+    assert artwork["exact_source_fingerprint"] == source["fingerprint"]
+    assert artwork["descriptor"]["browser_path"] == "/media/album-cover.jpg"
+    assert 0 < artwork["width"] <= 720
+    assert 0 < artwork["height"] <= 1080
+    assert artwork_plan(changed)["required"] is False
+    assert original.read_bytes() == original_bytes
+    assert cover.read_bytes() == cover_bytes
+    assert list((tmp_path / "renditions").glob("*")) == []
+
+    rescan = repository.create_job(changed["root_id"], mode="full")
+    rescanned = worker.run_once()
+    assert rescanned and rescanned["id"] == rescan["job"]["id"]
+    stable = repository.get_source(source["id"])
+    assert stable is not None
+    assert stable["metadata"]["artwork"] == artwork
+    assert repository.next_queued_rendition_job() is None
+
+    Draft202012Validator(
+        json.loads(
+            (
+                SKILL_ROOT
+                / "schemas"
+                / "media-library-artwork-plan.v1.schema.json"
+            ).read_text(encoding="utf-8")
+        )
+    ).validate(artwork_plan(changed))
+
+
 def test_rendition_source_change_after_publish_is_not_advertised_and_is_cleaned(
     tmp_path,
 ):
@@ -1518,7 +1604,8 @@ def test_queued_rendition_cancellation_is_terminal_without_worker(tmp_path):
     canceled = repository.request_rendition_cancel(queued["job"]["id"])
     assert canceled["job"]["status"] == "canceled"
     assert canceled["job"]["finished_at"]
-    assert repository.next_queued_rendition_job() is None
+    remaining = repository.next_queued_rendition_job()
+    assert remaining is not None and remaining["profile"] == "artwork-card-v1"
 
 
 def test_agent_deep_search_covers_unicode_folders_and_technical_metadata(tmp_path):

@@ -653,6 +653,43 @@ def test_coordinator_applies_agent_deltas_and_searches_folder_segments(monkeypat
     assert replay["ignored_count"] == 2
 
 
+def test_coordinator_projects_safe_versioned_artwork_url(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "artwork.sqlite3"))
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    delta = _agent_delta(1, "Artist/Album/01.mp3")
+    delta["source"]["metadata"]["artwork"] = {
+        "schema": "adaos.media.artwork.v1",
+        "state": "ready",
+        "provider_id": "media_library_agent.folder_artwork.v1",
+        "source_kind": "folder",
+        "exact_source_revision": 1,
+        "exact_source_fingerprint": "fingerprint-1-1",
+        "width": 720,
+        "height": 720,
+        "descriptor": {
+            "browser_path": "/media/album-cover.jpg?token=secret",
+            "source_path": "/mnt/private/Artist/Album/Cover.jpg",
+        },
+    }
+
+    catalog.apply_agent_page(_agent_page(delta))
+    artwork = catalog.list_items(media_kind="audio")["items"][0]["artwork"]
+
+    assert artwork == {
+        "schema": "adaos.media.artwork.v1",
+        "state": "ready",
+        "url": "/media/album-cover.jpg",
+        "provider_id": "media_library_agent.folder_artwork.v1",
+        "source_kind": "folder",
+        "source_revision": 1,
+        "source_fingerprint": "fingerprint-1-1",
+        "width": 720,
+        "height": 720,
+        "error_code": "",
+    }
+    assert "/mnt/private" not in str(artwork)
+
+
 def test_coordinator_builds_typed_collections_and_bounded_cursor_pages(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     catalog = MediaCatalogCoordinator(MediaCenterRepository())

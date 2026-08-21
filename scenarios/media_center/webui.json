@@ -1917,6 +1917,23 @@
                 }
               },
               {
+                "id": "media-artwork-operation",
+                "type": "item.details",
+                "area": "main",
+                "title": "Artwork operation",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_library_agent.rendition_progress",
+                  "scope": "workspace"
+                },
+                "inputs": {
+                  "presentation": "body"
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.artwork_operation"
+                }
+              },
+              {
                 "id": "media-agent-performance",
                 "type": "item.details",
                 "area": "main",
