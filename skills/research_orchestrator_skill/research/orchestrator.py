@@ -5531,6 +5531,159 @@ class ResearchOrchestrator:
         )
         return {"ok": True, "reused": reused, "track": dict(track), "start": started}
 
+    def repeat_study_experiment(
+        self,
+        direction_id: str,
+        *,
+        task_id: str | None = None,
+        implementation_track_id: str | None = None,
+        reason: str = "execution_recovery",
+        actor: str = "user:local",
+        idempotency_key: str,
+    ) -> dict[str, Any]:
+        """Create a new execution campaign without changing scientific realization.
+
+        Study, StudyRealization, ResearchCompilation and ProjectRelease remain
+        immutable.  The previous Experiment is retained as lineage evidence and
+        the active ImplementationTrack is rebound to a fresh draft Experiment
+        with byte-for-byte equivalent conditions.
+        """
+
+        state = self.get(
+            direction_id,
+            task_id=task_id,
+            implementation_track_id=implementation_track_id,
+        )
+        track = state.get("active_implementation_track")
+        if not isinstance(track, Mapping) or not track.get("study_id") or not track.get("experiment_id"):
+            raise ValueError("repeat requires an instantiated Study and Experiment")
+        parent_experiment_id = str(track["experiment_id"])
+        parent = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "get_experiment",
+                {"experiment_id": parent_experiment_id},
+                timeout=120,
+            )
+        )
+        lifecycle = dict(parent.get("lifecycle") or {})
+        if lifecycle.get("state") not in {"failed", "cancelled", "finalized"}:
+            raise ValueError(
+                "repeat requires a terminal parent Experiment; "
+                f"observed {lifecycle.get('state') or 'unknown'}"
+            )
+        experiment_record = dict(parent.get("experiment") or {})
+        experiment_payload = dict(experiment_record.get("payload") or {})
+        revision = dict(parent.get("revision") or {})
+        revision_payload = dict(revision.get("payload") or {})
+        conditions = revision_payload.get("conditions")
+        if not isinstance(conditions, Mapping):
+            raise ValueError("parent Experiment has no immutable condition revision")
+        repeat_reason = str(reason or "execution_recovery").strip() or "execution_recovery"
+        identity = contract_digest(
+            {
+                "study_id": track["study_id"],
+                "study_realization_digest": track["study_realization_digest"],
+                "parent_experiment_id": parent_experiment_id,
+                "reason": repeat_reason,
+                "idempotency_key": idempotency_key,
+            }
+        ).removeprefix("sha256:")
+        experiment_id = f"experiment.{identity}"
+        repeated = dict(
+            self._invoke_skill(
+                "research_manager_skill",
+                "create_experiment",
+                {
+                    "study_id": str(track["study_id"]),
+                    "slug": f"repeat-{identity[:12]}",
+                    "title": str(experiment_payload.get("title") or "Primary experiment"),
+                    "purpose": str(experiment_payload.get("purpose") or "Repeated execution campaign"),
+                    "conditions": copy.deepcopy(dict(conditions)),
+                    "experiment_id": experiment_id,
+                    "idempotency_key": f"{idempotency_key}:experiment",
+                },
+                timeout=180,
+            )
+        )
+        created_record = dict(repeated.get("experiment") or {})
+        if str(created_record.get("record_id") or "") != experiment_id:
+            raise RuntimeError("ResearchManager returned another repeated Experiment identity")
+        track = self.repository.bind_track_study(
+            str(track["track_id"]),
+            study_id=str(track["study_id"]),
+            study_realization_ref=str(track["study_realization_ref"]),
+            study_realization_digest=str(track["study_realization_digest"]),
+            runner_ref=str(track["runner_ref"]),
+            experiment_id=experiment_id,
+        )
+        history = [
+            dict(item)
+            for item in dict(track.get("metadata") or {}).get("experiment_lineage") or []
+            if isinstance(item, Mapping)
+        ]
+        lineage_entry = {
+            "experiment_ref": f"experiment:{experiment_id}",
+            "parent_experiment_ref": f"experiment:{parent_experiment_id}",
+            "reason": repeat_reason,
+            "conditions_digest": str(revision_payload.get("conditions_digest") or ""),
+            "actor": actor,
+        }
+        if not any(item.get("experiment_ref") == lineage_entry["experiment_ref"] for item in history):
+            history.append(lineage_entry)
+        track = self.repository.record_track_evaluation(
+            str(track["track_id"]),
+            status="experiment_ready",
+            metadata={
+                **dict(track.get("metadata") or {}),
+                "experiment_lineage": history,
+            },
+        )
+        selected_task = state.get("selected_task") or state.get("active_task") or {}
+        if isinstance(selected_task, Mapping) and selected_task.get("task_id"):
+            studies = [
+                dict(item)
+                for item in dict(selected_task.get("metadata") or {}).get("matched_studies") or []
+                if isinstance(item, Mapping)
+            ]
+            study_ref = f"study:{track['study_id']}"
+            for item in studies:
+                if item.get("ref") == study_ref:
+                    previous = str(item.get("experiment_ref") or "")
+                    item["experiment_ref"] = f"experiment:{experiment_id}"
+                    item["status"] = "draft"
+                    item["parent_experiment_ref"] = previous or f"experiment:{parent_experiment_id}"
+            self.repository.merge_task_metadata(
+                str(selected_task["task_id"]),
+                {"matched_studies": studies},
+            )
+        self.repository.activity(
+            str(track["direction_id"]),
+            "study",
+            "experiment_repeated",
+            "A fresh execution campaign was created without changing the accepted scientific or engineering realization.",
+            {
+                "implementation_track_ref": track["ref"],
+                "study_ref": f"study:{track['study_id']}",
+                "study_realization_ref": track["study_realization_ref"],
+                "project_release_ref": track["project_release_ref"],
+                "experiment_ref": f"experiment:{experiment_id}",
+                "parent_experiment_ref": f"experiment:{parent_experiment_id}",
+                "reason": repeat_reason,
+            },
+            actor=actor,
+            origin="skill:research_manager_skill",
+            subject_ref=str(track["ref"]),
+            source_event_id=f"experiment-repeat:{experiment_id}",
+        )
+        return {
+            "ok": True,
+            "track": track,
+            "experiment": repeated,
+            "parent_experiment_id": parent_experiment_id,
+            "conditions_preserved": True,
+        }
+
     def start_study_smoke(
         self,
         direction_id: str,

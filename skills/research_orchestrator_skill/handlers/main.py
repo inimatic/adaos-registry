@@ -721,6 +721,26 @@ def instantiate_study(
     )
 
 
+@tool(summary="Create a fresh Experiment campaign for the same immutable StudyRealization.", side_effects="external_write")
+def repeat_study_experiment(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    reason: str = "execution_recovery",
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().repeat_study_experiment(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        reason=reason,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
 @tool(summary="Lock the compiled protocol and submit its bounded CPU workflow smoke.", side_effects="external_write")
 def start_study_smoke(
     direction_id: str,

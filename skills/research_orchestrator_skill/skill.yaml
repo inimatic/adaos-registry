@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.70.0
+version: 0.71.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -885,6 +885,38 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: repeat_study_experiment
+  description: Create a fresh execution campaign for the same immutable StudyRealization,
+    preserving the terminal parent Experiment as lineage evidence.
+  entry: handlers.main:repeat_study_experiment
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
+      reason:
+        type: string
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: start_study_smoke
   description: Explicitly lock the compiled protocol and submit its non-inferential
     CPU preflight through ResearchManager.
@@ -1402,4 +1434,3 @@ compatibility:
     min_commit: 492474062ad16727edd1e496fa4dd2b4c08265df
     min_short_commit: '49247406'
     build_date: '2026-08-21T07:37:52+03:00'
-

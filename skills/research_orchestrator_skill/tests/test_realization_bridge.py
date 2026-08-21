@@ -733,6 +733,109 @@ def test_study_smoke_records_provider_admission_failure_before_lock(
     assert repository.activity_record[0][2] == "execution_blocked"
 
 
+def test_repeat_study_experiment_preserves_realization_and_parent_lineage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    track = {
+        "track_id": "task-1.track-001",
+        "ref": "implementation-track:task-1.track-001",
+        "direction_id": "direction",
+        "study_id": "study-1",
+        "study_realization_ref": "study-realization:realization-1",
+        "study_realization_digest": "sha256:" + "a" * 64,
+        "project_release_ref": "project-release:project:sha256:" + "b" * 64,
+        "runner_ref": "skill:direction",
+        "experiment_id": "experiment.parent",
+        "metadata": {},
+    }
+    state = {
+        "direction": {"direction_id": "direction"},
+        "selected_task": {
+            "task_id": "task-1",
+            "metadata": {
+                "matched_studies": [
+                    {
+                        "ref": "study:study-1",
+                        "experiment_ref": "experiment:experiment.parent",
+                        "status": "finalized",
+                    }
+                ]
+            },
+        },
+        "active_implementation_track": track,
+    }
+
+    class Repository:
+        def __init__(self) -> None:
+            self.activity_record: tuple | None = None
+            self.task_metadata: dict | None = None
+
+        def bind_track_study(self, track_id: str, **values: object) -> dict:
+            return {**track, "track_id": track_id, **values, "status": "experiment_ready"}
+
+        def record_track_evaluation(self, track_id: str, **values: object) -> dict:
+            return {**track, "track_id": track_id, **values}
+
+        def merge_task_metadata(self, task_id: str, metadata: dict) -> dict:
+            self.task_metadata = {"task_id": task_id, **metadata}
+            return self.task_metadata
+
+        def activity(self, *args: object, **kwargs: object) -> dict:
+            self.activity_record = (args, kwargs)
+            return {"event_id": "event-repeat"}
+
+    calls: list[tuple[str, dict]] = []
+
+    def invoke(_skill: str, operation: str, payload: dict, **_: object) -> dict:
+        calls.append((operation, payload))
+        if operation == "get_experiment":
+            return {
+                "experiment": {
+                    "record_id": "experiment.parent",
+                    "payload": {"title": "Exact experiment", "purpose": "Exact purpose"},
+                },
+                "revision": {
+                    "payload": {
+                        "conditions": {"dataset": {}, "operators": {}, "execution": {}, "randomization": {}, "analysis": {}},
+                        "conditions_digest": "sha256:" + "c" * 64,
+                    }
+                },
+                "lifecycle": {"state": "finalized", "generation": 5},
+            }
+        if operation == "create_experiment":
+            return {
+                "experiment": {"record_id": payload["experiment_id"]},
+                "lifecycle": {"state": "draft", "generation": 0},
+            }
+        raise AssertionError(operation)
+
+    repository = Repository()
+    orchestrator = ResearchOrchestrator(repository=repository, skill_invoker=invoke)
+    monkeypatch.setattr(orchestrator, "get", lambda *args, **kwargs: state)
+
+    result = orchestrator.repeat_study_experiment(
+        "direction",
+        reason="owner_binding_recovery",
+        actor="system:test",
+        idempotency_key="repeat-1",
+    )
+
+    assert result["conditions_preserved"] is True
+    assert result["parent_experiment_id"] == "experiment.parent"
+    created = calls[-1][1]
+    assert created["study_id"] == "study-1"
+    assert created["experiment_id"].startswith("experiment.")
+    assert result["track"]["study_realization_digest"] == track["study_realization_digest"]
+    lineage = result["track"]["metadata"]["experiment_lineage"]
+    assert lineage[0]["parent_experiment_ref"] == "experiment:experiment.parent"
+    assert repository.task_metadata is not None
+    assert repository.task_metadata["matched_studies"][0]["experiment_ref"] == (
+        f"experiment:{created['experiment_id']}"
+    )
+    assert repository.activity_record is not None
+    assert repository.activity_record[0][2] == "experiment_repeated"
+
+
 def test_study_sync_records_downstream_ingestion_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
