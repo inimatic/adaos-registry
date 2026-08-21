@@ -1,5 +1,5 @@
 name: media_center_skill
-version: 0.8.34
+version: 0.8.35
 description: Distributed Media Center coordinator with federated discovery, bounded catalog, personalization, and rendition-aware playback.
 supported_locales:
 - en
@@ -990,6 +990,7 @@ tools:
   description: Apply one explicitly reviewed immutable topology-change plan.
   entry: handlers.main:apply_topology_change
   side_effects: remote_write
+  timeout_seconds: 600
   input_schema:
     type: object
     required: [plan_digest]
