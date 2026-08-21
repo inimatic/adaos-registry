@@ -607,15 +607,23 @@ class ResearchOrchestrator:
         ):
             raise ValueError("parent ResearchTask compilation/prototype binding is invalid")
         compilation = dict(record.get("payload") or {})
-        facets = dict(compilation.get("facets") or {})
+        run_id = str(compilation.get("run_id") or "")
+        rows = self.repository.formulation_stages(
+            str(parent["direction_id"]),
+            run_id=run_id,
+        )
+        by_name = {str(item.get("stage_name") or ""): dict(item) for item in rows}
 
-        def facet(name: str, source_stage: str) -> dict[str, Any]:
-            value = dict(facets.get(name) or {})
-            if value.get("source_stage") != source_stage or not isinstance(
-                value.get("payload"), Mapping
-            ):
-                raise ValueError(f"parent compilation is missing the {name} facet")
-            return copy.deepcopy(dict(value["payload"]))
+        def stage(name: str) -> dict[str, Any]:
+            value = by_name.get(name) or {}
+            payload = value.get("payload")
+            if value.get("status") != "succeeded" or not isinstance(payload, Mapping):
+                raise ValueError(
+                    f"parent compilation is missing the successful {name} stage"
+                )
+            if str(value.get("output_digest") or "") != stage_digest(payload):
+                raise ValueError(f"parent {name} stage digest drifted")
+            return copy.deepcopy(dict(payload))
 
         return {
             "schema": "adaos.research.formulation_inheritance.v1",
@@ -624,8 +632,9 @@ class ResearchOrchestrator:
             "parent_prototype_digest": str(record["prototype_digest"]),
             "parent_compilation_digest": compilation_digest,
             "source_bundle_digest": str(record["source_bundle_digest"]),
-            "problem_frame": facet("research_problem", "problem_frame"),
-            "protocol_design": facet("experimental_protocol", "protocol_design"),
+            "parent_formulation_run_id": run_id,
+            "problem_frame": stage("problem_frame"),
+            "protocol_design": stage("protocol_design"),
         }
 
     def _require_direction_project(self, direction_id: str) -> dict[str, Any]:

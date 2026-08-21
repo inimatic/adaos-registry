@@ -152,6 +152,7 @@ def test_parent_contract_inheritance_resolves_only_an_accepted_bound_compilation
     parent = {
         "task_id": "direction.task-001",
         "ref": "research-task:direction.task-001",
+        "direction_id": "direction",
         "status": "accepted",
         "current_prototype_digest": "sha256:" + "1" * 64,
         "accepted_compilation_digest": "sha256:" + "2" * 64,
@@ -162,18 +163,23 @@ def test_parent_contract_inheritance_resolves_only_an_accepted_bound_compilation
             "prototype_digest": parent["current_prototype_digest"],
             "source_bundle_digest": "sha256:" + "3" * 64,
             "payload": {
-                "facets": {
-                    "research_problem": {
-                        "source_stage": "problem_frame",
-                        "payload": problem,
-                    },
-                    "experimental_protocol": {
-                        "source_stage": "protocol_design",
-                        "payload": protocol,
-                    },
-                }
+                "run_id": "formulation-parent-1",
             },
         },
+        formulation_stages=lambda direction_id, run_id: [
+            {
+                "stage_name": "problem_frame",
+                "status": "succeeded",
+                "payload": problem,
+                "output_digest": orchestrator_module.stage_digest(problem),
+            },
+            {
+                "stage_name": "protocol_design",
+                "status": "succeeded",
+                "payload": protocol,
+                "output_digest": orchestrator_module.stage_digest(protocol),
+            },
+        ],
     )
     orchestrator = ResearchOrchestrator(repository=repository)
 
@@ -191,6 +197,7 @@ def test_parent_contract_inheritance_resolves_only_an_accepted_bound_compilation
     assert inheritance["parent_compilation_digest"] == parent[
         "accepted_compilation_digest"
     ]
+    assert inheritance["parent_formulation_run_id"] == "formulation-parent-1"
 
 
 def test_implementation_project_keeps_direction_identity_outside_task_lifecycle(monkeypatch) -> None:
