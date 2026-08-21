@@ -890,6 +890,156 @@ def stage_digest(value: Mapping[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
+def derive_inherited_formulation(
+    parent_problem: Mapping[str, Any],
+    parent_protocol: Mapping[str, Any],
+    parent_implementation: Mapping[str, Any],
+    *,
+    workflow_smoke_binding: Mapping[str, Any],
+) -> dict[str, dict[str, Any]]:
+    """Derive an engineering-only successor without re-inferring parent science."""
+
+    problem = validate_stage("problem_frame", parent_problem)
+    protocol = validate_stage("protocol_design", parent_protocol)
+    implementation = validate_stage("implementation_contract", parent_implementation)
+    binding = dict(workflow_smoke_binding or {})
+    policy = dict(binding.get("requirements") or {})
+    if binding.get("schema") != "adaos.research.workflow_smoke_policy_binding.v1":
+        raise ValueError("workflow smoke binding is not authoritative")
+
+    smoke_network = str(policy.get("network_mode") or "")
+    smoke_filter = re.compile(
+        r"(?is)(?=.*(?:workflow[_ -]?smoke|\bsmoke\b|\u0441\u043c\u043e\u0443\u043a))"
+        r"(?=.*(?:network|offline|\u0441\u0435\u0442\w*))"
+    )
+
+    def is_obsolete_smoke_network(value: Any) -> bool:
+        text = json.dumps(value, ensure_ascii=False, sort_keys=True)
+        return bool(smoke_filter.search(text))
+
+    problem["constraints"] = [
+        item
+        for item in problem.get("constraints") or []
+        if not is_obsolete_smoke_network(item)
+    ]
+    problem["constraints"].append(
+        "workflow_smoke использует явно связанную AdaOS policy "
+        f"network_mode={smoke_network}; эта неинференциальная стадия не изменяет "
+        "confirmatory scientific contract."
+    )
+    problem["assistant_message"] = (
+        "Научная постановка унаследована без повторного inference; изменена только "
+        "типизированная политика неинференциального workflow_smoke."
+    )
+
+    plan = protocol["experimental_plan"]
+    smoke = [
+        item for item in plan["stages"] if item.get("evidence_class") == "workflow_smoke"
+    ]
+    if len(smoke) != 1:
+        raise ValueError("parent protocol must contain exactly one workflow_smoke stage")
+    stage = smoke[0]
+    stage["execution_profile"]["device"] = str(policy["device"])
+    stage["execution_profile"]["network_mode"] = smoke_network
+    provider = dict(binding.get("provider") or {})
+    if provider.get("provider_id"):
+        stage["execution_profile"]["node"] = str(provider["provider_id"])
+    stage["budget"]["epochs"] = int(policy["epochs"])
+    stage["budget"]["seed_values"] = copy.deepcopy(list(policy["seed_values"]))
+    stage["budget"]["workload"]["mode"] = str(policy["workload_mode"])
+    stage["input_policy"]["source"] = str(policy["input_source"])
+    stage["input_policy"]["readiness"] = str(policy["input_readiness"])
+    stage["inference_allowed"] = bool(policy["inference_allowed"])
+    stage["purpose"] = (
+        "Bounded engineering conformance only; it cannot support a scientific claim. "
+        f"Requested network mode is {smoke_network}."
+    )
+    stage["stop_conditions"] = [
+        item
+        for item in stage.get("stop_conditions") or []
+        if not is_obsolete_smoke_network(item)
+    ]
+    stage["stop_conditions"].extend(
+        [
+            f"adaos.network.requested_mode={smoke_network}",
+            "adaos.network.access_observation_required=true",
+            "adaos.network.accessed=false_is_observation_not_isolation=true",
+        ]
+    )
+    system = plan["system_specification"]
+    system["locked_invariants"] = [
+        item
+        for item in system.get("locked_invariants") or []
+        if not is_obsolete_smoke_network(item)
+    ]
+    system["locked_invariants"].append(
+        f"workflow_smoke network_mode={smoke_network} is engineering-only and cannot alter confirmatory inference."
+    )
+    protocol["assistant_message"] = (
+        "Parent scientific protocol is preserved exactly; only the bounded "
+        f"workflow_smoke network policy is bound to {smoke_network}."
+    )
+
+    for groups in (
+        implementation["requirements_by_category"],
+        implementation["checks_by_category"],
+    ):
+        for category, items in groups.items():
+            groups[category] = [
+                item for item in items if not is_obsolete_smoke_network(item)
+            ]
+    implementation["requirements_by_category"]["execution"].append(
+        {
+            "requirement": (
+                "Execute workflow_smoke with the exact AdaOS-bound requested network "
+                f"mode {smoke_network}; never promote it to confirmatory evidence."
+            ),
+            "verification": (
+                "Run evidence records the requested mode, evidence_class=workflow_smoke, "
+                "and inference_allowed=false."
+            ),
+        }
+    )
+    implementation["requirements_by_category"]["observability"].append(
+        {
+            "requirement": (
+                "Record requested network mode, provider enforcement status, and observed "
+                "network access as three separate fields."
+            ),
+            "verification": (
+                "The run log contains network.requested_mode, network.enforcement, and "
+                "network.accessed; accessed=false is labelled observation_not_isolation."
+            ),
+        }
+    )
+    implementation["checks_by_category"]["workflow"].append(
+        {
+            "check": "The workflow smoke uses the exact capability-bound execution policy and remains non-inferential.",
+            "evidence": "Execution admission receipt and content-addressed run log.",
+        }
+    )
+    implementation["checks_by_category"]["evidence"].append(
+        {
+            "check": "Network enforcement and network observation are represented separately in portable evidence.",
+            "evidence": "Run-log fields requested_mode, enforcement, accessed, and observation_not_isolation.",
+        }
+    )
+    implementation["scientific_bindings"]["protocol_digest"] = stage_digest(protocol)
+    implementation["assistant_message"] = (
+        "Engineering obligations were deterministically adapted to the capability-bound "
+        "workflow smoke; parent scientific bindings remain unchanged."
+    )
+
+    problem = validate_stage("problem_frame", problem)
+    protocol = validate_stage("protocol_design", protocol)
+    implementation = validate_stage("implementation_contract", implementation)
+    return {
+        "problem_frame": problem,
+        "protocol_design": protocol,
+        "implementation_contract": implementation,
+    }
+
+
 def _flatten_requirements(grouped: Mapping[str, Any]) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for category in REQUIREMENT_CATEGORIES:
@@ -1120,6 +1270,7 @@ __all__ = [
     "STAGES",
     "STAGE_SCHEMA_VERSION",
     "assemble_candidate",
+    "derive_inherited_formulation",
     "implementation_contract_schema",
     "problem_frame_schema",
     "provider_schema",

@@ -149,6 +149,7 @@ def test_provider_compatible_smoke_policy_is_resolved_through_manager_capabiliti
 def test_parent_contract_inheritance_resolves_only_an_accepted_bound_compilation() -> None:
     problem = {"title": "parent problem"}
     protocol = {"title": "parent protocol"}
+    implementation = {"title": "parent implementation"}
     parent = {
         "task_id": "direction.task-001",
         "ref": "research-task:direction.task-001",
@@ -179,6 +180,12 @@ def test_parent_contract_inheritance_resolves_only_an_accepted_bound_compilation
                 "payload": protocol,
                 "output_digest": orchestrator_module.stage_digest(protocol),
             },
+            {
+                "stage_name": "implementation_contract",
+                "status": "succeeded",
+                "payload": implementation,
+                "output_digest": orchestrator_module.stage_digest(implementation),
+            },
         ],
     )
     orchestrator = ResearchOrchestrator(repository=repository)
@@ -194,6 +201,7 @@ def test_parent_contract_inheritance_resolves_only_an_accepted_bound_compilation
     assert inheritance["parent_task_ref"] == parent["ref"]
     assert inheritance["problem_frame"] == problem
     assert inheritance["protocol_design"] == protocol
+    assert inheritance["implementation_contract"] == implementation
     assert inheritance["parent_compilation_digest"] == parent[
         "accepted_compilation_digest"
     ]

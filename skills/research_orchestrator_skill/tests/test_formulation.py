@@ -3,7 +3,7 @@ from __future__ import annotations
 import copy
 from collections.abc import Mapping
 
-from research.formulation import STAGES, assemble_candidate, provider_schema, resolve_workflow_smoke_policy, stage_digest, stage_quality_issues, stage_schema, validate_stage
+from research.formulation import STAGES, assemble_candidate, derive_inherited_formulation, provider_schema, resolve_workflow_smoke_policy, stage_digest, stage_quality_issues, stage_schema, validate_stage
 from research.compiler import build_compilation, project_execution_compilation
 
 
@@ -630,6 +630,58 @@ def test_parent_scientific_contract_rejects_successor_drift_but_allows_smoke_pol
             required_parent_protocol=parent_protocol,
         )
     )
+
+
+def test_deterministic_successor_changes_only_engineering_smoke_contract() -> None:
+    problem = _problem()
+    protocol = _protocol()
+    implementation = _implementation(protocol)
+    binding = resolve_workflow_smoke_policy(
+        "provider_compatible_noninferential",
+        provider_status={
+            "schema": "adaos.execution.provider_status.v1",
+            "provider": {"provider_id": "local-process", "features": ["process"]},
+            "provider_digest": "sha256:" + "6" * 64,
+        },
+    )
+
+    derived = derive_inherited_formulation(
+        problem,
+        protocol,
+        implementation,
+        workflow_smoke_binding=binding,
+    )
+
+    assert derived["problem_frame"]["research_question"] == problem["research_question"]
+    assert derived["problem_frame"]["hypotheses"] == problem["hypotheses"]
+    assert derived["problem_frame"]["experimental_signature"] == problem[
+        "experimental_signature"
+    ]
+    old_confirmation = next(
+        item
+        for item in protocol["experimental_plan"]["stages"]
+        if item["evidence_class"] == "confirmatory"
+    )
+    new_confirmation = next(
+        item
+        for item in derived["protocol_design"]["experimental_plan"]["stages"]
+        if item["evidence_class"] == "confirmatory"
+    )
+    new_smoke = next(
+        item
+        for item in derived["protocol_design"]["experimental_plan"]["stages"]
+        if item["evidence_class"] == "workflow_smoke"
+    )
+    assert new_confirmation == old_confirmation
+    assert new_smoke["execution_profile"] == {
+        "node": "local-process",
+        "device": "cpu",
+        "network_mode": "unrestricted",
+    }
+    assert derived["implementation_contract"]["scientific_bindings"][
+        "protocol_digest"
+    ] == stage_digest(derived["protocol_design"])
+    assert "observation_not_isolation" in " ".join(new_smoke["stop_conditions"])
 
 
 def test_protocol_rejects_pair_labels_in_numeric_seed_values() -> None:

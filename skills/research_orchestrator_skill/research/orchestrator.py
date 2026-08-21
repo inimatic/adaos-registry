@@ -39,6 +39,7 @@ from research.formulation import (
     DEFAULT_WORKFLOW_SMOKE_POLICY_ID,
     PROVIDER_COMPATIBLE_WORKFLOW_SMOKE_POLICY_ID,
     assemble_candidate,
+    derive_inherited_formulation,
     provider_schema,
     resolve_workflow_smoke_policy,
     schema_text_format,
@@ -635,7 +636,135 @@ class ResearchOrchestrator:
             "parent_formulation_run_id": run_id,
             "problem_frame": stage("problem_frame"),
             "protocol_design": stage("protocol_design"),
+            "implementation_contract": stage("implementation_contract"),
         }
+
+    def _persist_inherited_formulation_stages(
+        self,
+        *,
+        direction_id: str,
+        run_id: str,
+        inheritance: Mapping[str, Any],
+        workflow_smoke_binding: Mapping[str, Any],
+        allowed_source_refs: set[str],
+    ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]]]:
+        values = derive_inherited_formulation(
+            inheritance["problem_frame"],
+            inheritance["protocol_design"],
+            inheritance["implementation_contract"],
+            workflow_smoke_binding=workflow_smoke_binding,
+        )
+        workflow_policy = dict(workflow_smoke_binding["requirements"])
+        quality = {
+            "problem_frame": stage_quality_issues(
+                "problem_frame",
+                values["problem_frame"],
+                allowed_source_refs=allowed_source_refs,
+                required_parent_problem=inheritance["problem_frame"],
+            ),
+            "protocol_design": stage_quality_issues(
+                "protocol_design",
+                values["protocol_design"],
+                allowed_source_refs=allowed_source_refs,
+                expected_effect_direction=str(
+                    values["problem_frame"]["hypotheses"][0]["effect_direction"]
+                ),
+                expected_experimental_signature=values["problem_frame"][
+                    "experimental_signature"
+                ],
+                required_workflow_smoke=workflow_policy,
+                required_parent_protocol=inheritance["protocol_design"],
+            ),
+            "implementation_contract": stage_quality_issues(
+                "implementation_contract",
+                values["implementation_contract"],
+                expected_experimental_signature=values["problem_frame"][
+                    "experimental_signature"
+                ],
+                expected_protocol_digest=stage_digest(values["protocol_design"]),
+            ),
+        }
+        blockers = [
+            f"{name}: {issue}"
+            for name, issues in quality.items()
+            for issue in issues
+        ]
+        if blockers:
+            raise ValueError(
+                "deterministic inherited formulation gate: " + "; ".join(blockers)
+            )
+        input_binding = {
+            "inheritance_policy_id": inheritance["policy_id"],
+            "parent_task_ref": inheritance["parent_task_ref"],
+            "parent_prototype_digest": inheritance["parent_prototype_digest"],
+            "parent_compilation_digest": inheritance["parent_compilation_digest"],
+            "parent_formulation_run_id": inheritance["parent_formulation_run_id"],
+            "workflow_smoke_policy": dict(workflow_smoke_binding),
+        }
+        telemetry_by_stage: dict[str, dict[str, Any]] = {}
+        for index, name in enumerate(
+            ("problem_frame", "protocol_design", "implementation_contract"),
+            start=1,
+        ):
+            schema = stage_schema(name, allowed_source_refs=allowed_source_refs)
+            telemetry = {
+                "producer": "deterministic_parent_inheritance",
+                "resolved_model": "not_invoked",
+                "resolved_provider": "adaos",
+                "structured_output": True,
+                "repair_attempts": 0,
+                "schema_digest": stage_digest(schema),
+                "provider_schema_digest": stage_digest(provider_schema(schema)),
+                "input_digest": stage_digest(
+                    {"binding": input_binding, "stage": name}
+                ),
+                "task_scope": f"research.formulation.{name}",
+                "usage": {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0},
+                "aggregate_usage": {
+                    "input_tokens": 0,
+                    "output_tokens": 0,
+                    "total_tokens": 0,
+                },
+                "contract_bindings": {
+                    "workflow_smoke_policy": (
+                        workflow_policy if name == "protocol_design" else {}
+                    ),
+                    "parent_compilation_digest": inheritance[
+                        "parent_compilation_digest"
+                    ],
+                },
+            }
+            output_digest = stage_digest(values[name])
+            self.repository.put_formulation_stage(
+                run_id=run_id,
+                direction_id=direction_id,
+                stage_index=index,
+                stage_name=name,
+                status="succeeded",
+                input_digest=telemetry["input_digest"],
+                output_digest=output_digest,
+                payload=values[name],
+                telemetry=telemetry,
+            )
+            self.repository.activity(
+                direction_id,
+                "formulation",
+                "stage_inherited",
+                (
+                    f"Formulation stage {index}/3 ({name}) was deterministically "
+                    "derived from the accepted parent contract."
+                ),
+                {
+                    "run_id": run_id,
+                    "stage": name,
+                    "output_digest": output_digest,
+                    "parent_compilation_digest": inheritance[
+                        "parent_compilation_digest"
+                    ],
+                },
+            )
+            telemetry_by_stage[name] = telemetry
+        return values, telemetry_by_stage
 
     def _require_direction_project(self, direction_id: str) -> dict[str, Any]:
         state = self.repository.get_direction(direction_id)
@@ -3227,6 +3356,62 @@ class ResearchOrchestrator:
         total_repairs = 0
         stage_telemetry: dict[str, Any] = {}
         try:
+            if inheritance:
+                stage_values, stage_telemetry = self._persist_inherited_formulation_stages(
+                    direction_id=token,
+                    run_id=run_id,
+                    inheritance=inheritance,
+                    workflow_smoke_binding=workflow_smoke_binding,
+                    allowed_source_refs=allowed_refs,
+                )
+                resumed = self.resume_compilation(
+                    token,
+                    run_id,
+                    actor=str(actor or "compiler:parent-inheritance"),
+                )
+                prototype = dict(resumed["prototype"])
+                message, completion = _completion_projection(prototype)
+                self.repository.activity(
+                    token,
+                    "formulation",
+                    "succeeded",
+                    message,
+                    {
+                        "run_id": run_id,
+                        "pipeline": "deterministic_parent_inheritance_v1",
+                        "prototype_digest": prototype["digest"],
+                        "directive_digest": directive["text_digest"],
+                        "parent_compilation_digest": inheritance[
+                            "parent_compilation_digest"
+                        ],
+                        "stage_digests": {
+                            name: stage_digest(value)
+                            for name, value in stage_values.items()
+                        },
+                        **completion,
+                    },
+                    subject_ref=f"research-task:{active_task_id}",
+                )
+                self._emit(
+                    message,
+                    dialog,
+                    group_id=group_id,
+                    phase="completed",
+                    status="succeeded",
+                    seq=999_999,
+                )
+                return {
+                    **resumed,
+                    "message": message,
+                    "formulation_run": {
+                        "run_id": run_id,
+                        "pipeline": "deterministic_parent_inheritance_v1",
+                        "stages": self.repository.formulation_stages(
+                            token, run_id=run_id
+                        ),
+                        "repairs": 0,
+                    },
+                }
             current_problem = (
                 copy.deepcopy(inheritance["problem_frame"])
                 if inheritance
