@@ -2592,6 +2592,45 @@ def test_catalog_search_bounds_broad_window_but_finds_rare_late_match(
     assert late["ranking"]["candidate_count"] == 1
 
 
+def test_catalog_search_filters_media_kind_before_bounded_candidate_window(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    monkeypatch.delenv("MEDIA_CENTER_SEARCH_CANDIDATE_LIMIT", raising=False)
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            *[
+                _agent_delta(
+                    index,
+                    f"Music Videos/Video {index:03d}.mp4",
+                    kind="video",
+                )
+                for index in range(1, 301)
+            ],
+            *[
+                _agent_delta(
+                    300 + index,
+                    f"Audiobooks/Folder Music/Track {index:03d}.mp3",
+                    kind="audio",
+                )
+                for index in range(1, 11)
+            ],
+        )
+    )
+
+    page = catalog.list_items(
+        query="Music", media_kind="audio", limit=30, sort="title"
+    )
+
+    assert page["count"] == 10
+    assert {item["media_kind"] for item in page["items"]} == {"audio"}
+    assert all("Folder Music" in item["folder_path"] for item in page["items"])
+    assert page["ranking"]["candidate_count"] == 10
+
+
 def test_source_revision_coalesces_queued_enrichment_and_bounds_history(
     monkeypatch, tmp_path
 ):

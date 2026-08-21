@@ -2066,13 +2066,20 @@ class MediaCatalogCoordinator:
         search_candidate_count = 0
         with self.repository.connect() as connection:
             if query_token:
-                search_where = "WHERE " + " AND ".join(filters)
                 rows = connection.execute(
                     f"""
                     WITH search_input(query_label) AS (VALUES (?)),
                     search_candidates AS MATERIALIZED (
-                        SELECT rowid,item_id FROM catalog_search
-                        WHERE catalog_search.text MATCH ? LIMIT ?
+                        SELECT catalog_search.rowid,catalog_search.item_id
+                        FROM catalog_search
+                        CROSS JOIN catalog_items c
+                            ON c.rowid=catalog_search.rowid
+                            AND c.id=catalog_search.item_id
+                        LEFT JOIN personal_media_state ps
+                            ON ps.item_id=c.id AND ps.profile_id=?
+                        WHERE catalog_search.text MATCH ?
+                            AND {' AND '.join(filters)}
+                        LIMIT ?
                     ),
                     search_page AS MATERIALIZED (
                         SELECT c.id,
@@ -2089,9 +2096,7 @@ class MediaCatalogCoordinator:
                         CROSS JOIN catalog_items c
                             ON c.rowid=candidate.rowid AND c.id=candidate.item_id
                         CROSS JOIN search_input
-                        LEFT JOIN personal_media_state ps
-                            ON ps.item_id=c.id AND ps.profile_id=?
-                        {search_where} ORDER BY {order} LIMIT ? OFFSET ?
+                        ORDER BY {order} LIMIT ? OFFSET ?
                     )
                     SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
                         COALESCE(ps.resume_ms,0) AS profile_resume_ms,
@@ -2110,10 +2115,10 @@ class MediaCatalogCoordinator:
                     """,
                     (
                         query_token,
-                        fts_query,
-                        search_candidate_limit,
                         profile,
+                        fts_query,
                         *params[1:],
+                        search_candidate_limit,
                         page_size + 1,
                         resolved_offset,
                         profile,
@@ -2126,13 +2131,26 @@ class MediaCatalogCoordinator:
                 else:
                     search_candidate_count = int(
                         connection.execute(
-                            """
+                            f"""
                             SELECT COUNT(*) FROM (
-                                SELECT 1 FROM catalog_search
-                                WHERE catalog_search.text MATCH ? LIMIT ?
+                                SELECT 1
+                                FROM catalog_search
+                                CROSS JOIN catalog_items c
+                                    ON c.rowid=catalog_search.rowid
+                                    AND c.id=catalog_search.item_id
+                                LEFT JOIN personal_media_state ps
+                                    ON ps.item_id=c.id AND ps.profile_id=?
+                                WHERE catalog_search.text MATCH ?
+                                    AND {' AND '.join(filters)}
+                                LIMIT ?
                             )
                             """,
-                            (fts_query, search_candidate_limit),
+                            (
+                                profile,
+                                fts_query,
+                                *params[1:],
+                                search_candidate_limit,
+                            ),
                         ).fetchone()[0]
                     )
             else:
