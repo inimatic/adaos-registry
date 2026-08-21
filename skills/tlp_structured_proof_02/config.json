@@ -1,0 +1,36 @@
+{
+  "schema": "adaos.tlp.runner.config.v1",
+  "dataset_id": "stl10_v1",
+  "arms": {
+    "model_pool2_max": "MaxPool2d",
+    "model_pool2_tlp_centered": "CenteredTLP"
+  },
+  "profiles": {
+    "preflight": {
+      "source_stage_id": "workflow_smoke",
+      "epochs": 3,
+      "seeds": [17],
+      "network_mode": "unrestricted",
+      "inference_allowed": false
+    },
+    "confirmatory": {
+      "source_stage_id": "confirmatory",
+      "epochs": 120,
+      "seeds": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      "network_mode": "offline",
+      "sampling": "full",
+      "inference_allowed": true
+    }
+  },
+  "determinism": {
+    "num_workers": 0,
+    "tf32": false,
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": true,
+    "rng_streams": ["initialization", "sampling", "augmentation", "analysis"]
+  },
+  "evidence": {
+    "historical_notebook": "exploratory_untrusted_not_confirmatory",
+    "workflow_smoke": "workflow_evidence_only"
+  }
+}

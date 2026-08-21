@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updated_at": "2026-08-21T04:24:26+00:00",
+  "updated_at": "2026-08-21T05:45:26+00:00",
   "skills": [
     {
       "kind": "skill",
@@ -1011,13 +1011,7 @@
       "manifest": "skills/tlp_structured_proof_02/skill.yaml",
       "source": {
         "path": "skills/tlp_structured_proof_02",
-        "manifest": "skills/tlp_structured_proof_02/skill.yaml",
-        "forge": "adaos-root",
-        "repository": "inimatic/adaos-registry",
-        "revision": "0926500d4b2f3a2dbbc6814e9ac50bf94d2c3a07",
-        "path_scope": [
-          "subnets/sn_6acf0c01/nodes/8db40740-b3ff-44bf-baf5-9fb013b35b01/skills/tlp_structured_proof_02/"
-        ]
+        "manifest": "skills/tlp_structured_proof_02/skill.yaml"
       },
       "install": {
         "kind": "skill",
@@ -1028,23 +1022,7 @@
       "description": "Governed STL-10 MaxPool2d versus centered per-channel TLP pool2 research runner.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 7,
-      "activation": {
-        "mode": "package_lock",
-        "project_id": "tlp_structured_proof_02",
-        "release": "tlp_structured_proof_02@0.1.7",
-        "release_digest": "sha256:45f0d4ebb49d5db5ab55d2ec1aa4e93e05e7a3c05eb34c506551b078f660e59a",
-        "package_digest": "sha256:0bd9779df5db0c358d1082be6cde0b13a09ec27039c73f6b29e68bedf3a65d6b"
-      },
-      "channels": {
-        "stable": {
-          "release": "tlp_structured_proof_02@0.1.7",
-          "release_digest": "sha256:45f0d4ebb49d5db5ab55d2ec1aa4e93e05e7a3c05eb34c506551b078f660e59a",
-          "source_revision": "0926500d4b2f3a2dbbc6814e9ac50bf94d2c3a07",
-          "package_digest": "sha256:0bd9779df5db0c358d1082be6cde0b13a09ec27039c73f6b29e68bedf3a65d6b",
-          "version": "0.1.7"
-        }
-      }
+      "tools_count": 7
     },
     {
       "kind": "skill",

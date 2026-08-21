@@ -1,0 +1,25 @@
+schema: "adaos.research.direction.v1"
+schema_version: "1.0.0"
+direction_id: "tlp_structured_proof_02"
+title: "STL-10: paired MaxPool2d versus centered per-channel TLP at pool2"
+status: "implementation_ready"
+owner: "skill:tlp_structured_proof_02"
+source_bundle_digest: "sha256:9543309f431086f083bf9a5f4d7b5a7fcf55e64b6d619325ab791d4ee9cc633d"
+accepted_prototype_digest: "sha256:8cfd815af7ff271e98830fef4f6f25e7558ff6f219d9ba1eaef719de809ef6a3"
+automation_brief_digest: "sha256:f68cc6b9a98e3ba40c150d734e332e383f043dea2adad782adef0c6b3c724241"
+contracts:
+  runner: "adaos.research.runner.v1"
+  primary_data: "skill-owned"
+  tracker: "adaos.research.tracker.v1"
+implementation:
+  state: "ready"
+  entrypoints: ["prepare_attempt", "collect_attempt", "verify_artifact", "dataset_status"]
+  missing: []
+  plan_digest: "sha256:437428712380909b8c451f14c79996d8ae82f794b5d9856ae8142617b5a60d7c"
+  profiles:
+    preflight: {source_stage_id: workflow_smoke, device: cpu, epochs: 3, seeds: [17], inference_allowed: false}
+    confirmatory: {source_stage_id: confirmatory, device: cpu, epochs: 120, seeds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10], inference_allowed: true}
+constraints:
+  no_direction_scenario: true
+  no_notebook_output_as_evidence: true
+  no_undeclared_confirmatory_claims: true
