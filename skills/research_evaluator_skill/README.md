@@ -86,3 +86,8 @@ including the JSON Schemas for `run_log.json`, `evaluation_audit.json`, and
 `artifacts_index.json`. The judge may remain hidden, but it must not require an
 undisclosed filename, shape, or seed-label convention. This separates genuine
 implementation failure from benchmark-harness ambiguity.
+
+Evaluator-owned digests identify complete hidden probe fixtures for audit and
+evidence references. They are not injected into a provider request unless the
+public probe input schema declares them; strict ABI validation therefore sees
+exactly the published request shape.
