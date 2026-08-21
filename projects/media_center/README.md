@@ -48,7 +48,7 @@ bounded folder covers, and bounded video frames are normalized into a derived
 JPEG with exact-source evidence; originals are never copied or modified. The
 coordinator exposes a sanitized versioned artwork projection and Settings
 observes the durable agent job stream. It ships
-`media_library_agent@0.6.20`, `media_center_skill@0.8.40`, and scenario
+`media_library_agent@0.6.20`, `media_center_skill@0.8.41`, and scenario
 `0.6.8` as one compatibility closure.
 
 The `0.6.45` release requires core `0.1.917` and adds the coordinator-side

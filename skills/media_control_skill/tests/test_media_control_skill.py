@@ -486,3 +486,16 @@ def test_declared_stream_subscriptions_have_runtime_handlers():
     assert '@subscribe("sys.ready")' in source
     assert '"webio.stream.snapshot.requested"' in source
     assert 'receivers=("media_control.now_playing",)' in source
+
+
+def test_media_control_runtime_uses_only_public_adaos_sdk() -> None:
+    source = "\n".join(
+        path.read_text(encoding="utf-8")
+        for root in (SKILL_ROOT / "handlers", SKILL_ROOT / "media_control")
+        for path in sorted(root.rglob("*.py"))
+    )
+
+    assert "from adaos.sdk" in source
+    assert "adaos.services" not in source
+    assert "adaos.apps" not in source
+    assert "adaos.domain" not in source
