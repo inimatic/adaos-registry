@@ -208,7 +208,7 @@ def test_agent_derives_catalog_witness_instead_of_trusting_caller(tmp_path):
     result = LibraryAgentTopology().observe(repository, partition, replica)
 
     assert result["ok"] is True
-    assert result["partition"]["checkpoint"] == "catalog:0"
+    assert result["partition"]["checkpoint"] == "caller-controlled"
     assert result["replica"]["checkpoint"] == "catalog:0"
     assert result["replica"]["source_ref"] == "catalog-state:home"
     assert result["replica"]["content_state"] == "empty"
@@ -216,6 +216,113 @@ def test_agent_derives_catalog_witness_instead_of_trusting_caller(tmp_path):
     assert result["replica"]["byte_count"] == 0
     assert result["replica"]["freshness_seconds"] == 0
     assert result["external_media_copied"] is False
+
+
+def test_follower_reports_persisted_replica_without_rewriting_partition(tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "agent.sqlite3", node_id="node-b"
+    )
+    repository.save_topology_replica_snapshot(
+        "media-catalog-authority:home",
+        checkpoint="catalog:42",
+        content_witness="sha256:" + "b" * 64,
+        payload_digest="sha256:" + "c" * 64,
+        item_count=42,
+        byte_count=2048,
+        payload={"schema": "adaos.media_library.catalog_snapshot.v1", "items": []},
+    )
+    partition = {
+        "schema": "adaos.distributed.partition.v1",
+        "partition_id": "media-catalog-authority:home",
+        "dataset_id": "media-catalog-authority",
+        "selector": {"shard": "home"},
+        "desired_replicas": 2,
+        "topology_generation": 4,
+        "authority_lease_id": "authority-home-7",
+        "authority_epoch": 7,
+        "checkpoint": "catalog:42",
+        "status": "ready",
+        "revision": 9,
+    }
+    replica = {
+        "schema": "adaos.distributed.replica.v1",
+        "replica_id": "replica-home-node-b",
+        "partition_id": partition["partition_id"],
+        "instance_id": "media-agent-node-b",
+        "node_id": "node-b",
+        "role": "follower",
+        "lifecycle": "ready",
+        "content_state": "unknown",
+        "authority_epoch": 7,
+        "checkpoint": None,
+        "source_ref": None,
+        "freshness_seconds": None,
+        "item_count": None,
+        "byte_count": None,
+        "observed_at": "2026-08-19T00:00:00+00:00",
+        "revision": 1,
+    }
+
+    result = LibraryAgentTopology().observe(repository, partition, replica)
+
+    assert result["partition"]["checkpoint"] == "catalog:42"
+    assert result["replica"]["checkpoint"] == "catalog:42"
+    assert result["replica"]["content_state"] == "non_empty"
+    assert result["replica"]["item_count"] == 42
+    assert result["replica"]["byte_count"] == 2048
+
+
+def test_authority_recovers_partition_witness_from_persisted_replica(tmp_path):
+    repository = MediaLibraryAgentRepository(
+        tmp_path / "agent.sqlite3", node_id="node-b"
+    )
+    repository.save_topology_replica_snapshot(
+        "media-catalog-authority:home",
+        checkpoint="catalog:42",
+        content_witness="sha256:" + "b" * 64,
+        payload_digest="sha256:" + "c" * 64,
+        item_count=42,
+        byte_count=2048,
+        payload={"schema": "adaos.media_library.catalog_snapshot.v1", "items": []},
+    )
+    partition = {
+        "schema": "adaos.distributed.partition.v1",
+        "partition_id": "media-catalog-authority:home",
+        "dataset_id": "media-catalog-authority",
+        "selector": {"shard": "home"},
+        "desired_replicas": 2,
+        "topology_generation": 4,
+        "authority_lease_id": "authority-home-8",
+        "authority_epoch": 8,
+        "checkpoint": "catalog:0",
+        "status": "moving",
+        "revision": 10,
+    }
+    replica = {
+        "schema": "adaos.distributed.replica.v1",
+        "replica_id": "replica-home-node-b",
+        "partition_id": partition["partition_id"],
+        "instance_id": "media-agent-node-b",
+        "node_id": "node-b",
+        "role": "authority",
+        "lifecycle": "ready",
+        "content_state": "unknown",
+        "authority_epoch": 8,
+        "checkpoint": None,
+        "source_ref": None,
+        "freshness_seconds": None,
+        "item_count": None,
+        "byte_count": None,
+        "observed_at": "2026-08-19T00:00:00+00:00",
+        "revision": 1,
+    }
+
+    result = LibraryAgentTopology().observe(repository, partition, replica)
+
+    assert result["partition"]["checkpoint"] == "catalog:42"
+    assert result["replica"]["checkpoint"] == "catalog:42"
+    assert result["replica"]["role"] == "authority"
+    assert result["replica"]["authority_epoch"] == 8
 
 
 def test_repository_migrates_legacy_local_identity_once(tmp_path):

@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.33` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.37` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -25,11 +25,14 @@ preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
 
 Catalog replica observation derives its checkpoint, item count, byte count, and
-source reference from the node-local repository instead of trusting a caller's
-witness. Re-observing an unchanged partition reuses its current revision while
-the coordinator advances only the replica revision with compare-and-switch.
-This prevents a stale catalog witness from being admitted before a reviewed
-transfer and avoids artificial partition revisions during health observation.
+source reference from node-local repository evidence instead of trusting a
+caller's witness. A follower reports its persisted transferred snapshot only
+as Replica state and cannot replace the canonical authority checkpoint. After
+promotion, an authority with no local roots can recover that checkpoint from
+the same persisted snapshot. Re-observing an unchanged partition reuses its
+current revision while the coordinator advances only the replica revision with
+compare-and-switch. This prevents an empty follower from regressing a live
+partition and preserves verified metadata across activation restart.
 
 Topology admission uses the enclosing ProjectRelease digest, not an individual
 component package digest. The coordinator validates that identity against the

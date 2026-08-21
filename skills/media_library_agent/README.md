@@ -60,9 +60,12 @@ drain, and removal publish revisioned replica observations through
 external files. Replicated catalog phases preserve the last verified checkpoint,
 item count, byte count, and source witness when no external root is involved;
 promotion and demotion therefore cannot erase the data evidence used for
-fencing and recovery decisions. Partition and replica checkpoints are derived
-from the same node-local snapshot, so authority handoff cannot compare a
-caller-supplied partition witness with verified replica state.
+fencing and recovery decisions. A follower reports its persisted transfer as
+Replica evidence without changing the authoritative Partition checkpoint. An
+authority derives both witnesses from its local catalog or, after promotion,
+from the persisted replica snapshot. Authority handoff therefore cannot compare
+a caller-supplied partition witness with verified replica state, and an empty
+follower cannot regress the canonical checkpoint.
 
 Read activation and promotion fail closed until the target publishes the
 source checkpoint and item witness. Small catalog-state snapshots may use the

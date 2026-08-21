@@ -66,13 +66,29 @@ class LibraryAgentTopology:
             "media-catalog",
             "media-catalog-authority",
         }:
-            snapshot = repository.topology_catalog_snapshot(max_items=1)
+            local_snapshot = repository.topology_catalog_snapshot(max_items=1)
+            replicated_snapshot = repository.topology_replica_snapshot(
+                partition_value.partition_id
+            )
+            snapshot = (
+                replicated_snapshot
+                if replicated_snapshot is not None
+                and (
+                    replica_value.role == "follower"
+                    or int(local_snapshot.get("item_count") or 0) == 0
+                )
+                else local_snapshot
+            )
             item_count = int(snapshot.get("item_count") or 0)
             shard = text(partition_value.selector.get("shard")) or "home"
-            partition_value = replace(
-                partition_value,
-                checkpoint=text(snapshot.get("checkpoint")) or None,
-            )
+            if (
+                partition_value.dataset_id != "media-catalog-authority"
+                or replica_value.role == "authority"
+            ):
+                partition_value = replace(
+                    partition_value,
+                    checkpoint=text(snapshot.get("checkpoint")) or None,
+                )
             replica_value = replace(
                 replica_value,
                 checkpoint=text(snapshot.get("checkpoint")) or None,
