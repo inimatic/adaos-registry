@@ -290,6 +290,11 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         widget["id"]: widget
         for widget in modals["media_center_settings"]["schema"]["widgets"]
     }
+    assert settings_widgets["media-metadata-operations"]["dataSource"] == {
+        "kind": "stream",
+        "receiver": "media_center.operation_state",
+        "scope": "workspace",
+    }
     for widget_id, setting_key in {
         "media-autoplay-settings": "autoplay",
         "media-fullscreen-settings": "auto_fullscreen",

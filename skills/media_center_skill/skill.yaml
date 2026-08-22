@@ -1320,20 +1320,17 @@ data_routes:
     preserve_last_value: true
     invalidation_tags: [media_center.profile]
 - surface: widget:media-center-operations
-  route: tool
-  tool: operations
+  route: stream
+  receiver: media_center.operation_state
   owner: skill:media_center_skill
   first_paint: bounded recent enrichment and rendition operations
-  recovery: repeat operations after an operation invalidation
+  recovery: request a fresh operation snapshot after stream reconnection
   guard_visibility: sanitized operation phases and machine error codes
-  budget: {max_payload_bytes: 262144, max_items: 30, snapshot_policy: manual}
+  budget: {max_payload_bytes: 262144, max_publish_hz: 1, max_items: 30, snapshot_policy: on_subscribe}
   read_policy:
-    mode: explicit
-    triggers: [mount, explicit_refresh, targeted_invalidation]
-    cache_ttl_ms: 1000
-    max_request_hz: 1
+    mode: subscription
+    triggers: [mount, stream_update]
     preserve_last_value: true
-    invalidation_tags: [media_center.operations]
 - surface: widget:media-center-diagnostics
   route: tool/details
   tool: diagnostic_export
