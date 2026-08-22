@@ -2,6 +2,9 @@
 
 `media_control_skill` is the persistent control plane for Media Center playback. It owns target registration, session identity, revisioned queues and commands, control leases, checkpoints, per-profile settings, and bounded QoE evidence. It never proxies media bytes.
 
+Version `0.2.2` is a provenance-only package revision for Project `0.6.46`;
+runtime behavior is unchanged from `0.2.1`.
+
 Controllers may live in a different webspace from the playback target. Commands are optimistic, idempotent, and lease-guarded. The endpoint pulls an ordered command stream and acknowledges application; stale controllers receive an explicit revision conflict. A phone therefore controls a TV without becoming part of the source-to-TV data path.
 
 `open_endpoint_session()` is the endpoint admission boundary used by the app shell. It registers the browser/TV identity and creates the new queue session in one tool call while atomically retiring any older active session for that target. Command pulls can be scoped to the exact session, so a restarted endpoint never replays historical commands from a prior playback run.

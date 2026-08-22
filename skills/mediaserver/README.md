@@ -1,5 +1,8 @@
 # Mediaserver Target Architecture
 
+Version `0.9.16` is a provenance-only package revision for Project `0.6.46`;
+runtime behavior is unchanged from `0.9.15`.
+
 Status: target contract and implementation checklist for the mediaserver stress
 case. Phase 3 migration is implemented: the skill now publishes a summary-only
 Yjs projection plus a bounded page route for media rows. Phase 4 has migrated

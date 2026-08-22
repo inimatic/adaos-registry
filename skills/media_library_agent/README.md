@@ -2,6 +2,9 @@
 
 `media_library_agent` is the node-local data-plane component of Media Center. It owns media roots, asynchronous filesystem discovery, reference registration, durable scan and rendition jobs, folder navigation, technical deep search, and ordered source deltas. It does not own the global catalog, grouping, personalization, playback sessions, or deployment policy.
 
+Version `0.6.21` is a provenance-only package revision for Project `0.6.46`;
+runtime behavior is unchanged from `0.6.20`.
+
 ## Storage boundary
 
 Original media bytes remain at their original paths. The agent calls `adaos.sdk.io.media.register_media_file`, which records an allowlisted reference for range playback; it never copies the source into `.adaos`. Removing or draining the skill retains external media by design. Browser-compatible renditions and normalized artwork are explicitly derived data: their exact source revision and fingerprint are recorded, and only generated outputs may be copied to managed media storage.

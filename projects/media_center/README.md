@@ -63,7 +63,10 @@ The `0.6.46` release keeps the accepted `0.6.45` topology and upgrades
 refresh now derive their row count from the ordinary catalog table's strict
 one-to-one rowid invariant. They never execute `COUNT(*)` against the FTS5
 virtual table, which previously could hold a large-library status request for
-minutes while reading the complete token payload.
+minutes while reading the complete token payload. Scenario `0.6.9`, control
+skill `0.2.2`, library agent `0.6.21`, and Media Server `0.9.16` allocate new
+immutable package identities for the new Project source revision even though
+their runtime behavior is unchanged.
 
 The `0.6.40` release added authoritative persisted playback toggles through the
 generic client `input.toggle` contract and explicit subscription-backed library
