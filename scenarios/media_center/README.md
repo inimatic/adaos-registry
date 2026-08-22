@@ -2,9 +2,10 @@
 
 Media Center is a Project-composed household media application. Its scenario is UI-as-data only; domain identity, indexing, playback, control, and byte delivery remain in skills, app shell, and core boundaries.
 
-Version `0.6.12` moves metadata operation observability to the coordinator's
-bounded subscription stream for Project `0.6.48`; the rest of the UI-as-data
-behavior is unchanged from `0.6.9`.
+Version `0.6.13` adds a path-centric folder browser for Project `0.6.52`.
+Folders and direct media share one cursor-backed page, but declarative typed
+selection sends a folder into drill-down and sends only a media item to the
+player. Breadcrumbs navigate back without materializing a directory tree.
 
 ## Surfaces
 
@@ -14,7 +15,12 @@ The main page follows familiar media-center navigation: Home, Movies, Series, Mu
 
 Home consumes the subscription-backed `media_center.library_state` snapshot. It keeps the loading state until the first snapshot and maps the skill-owned collection state to distinct indexing, unconfigured, configured-empty, unavailable, and profile-empty presentations. Favorites, recent state, catalog revision, and partial-agent status therefore converge across browsers in the same webspace without synchronizing the full catalog. Folder navigation remains an alternative first-class workflow.
 
-Selecting an item, collection, folder, or playlist opens the playback modal. `build_playback_queue` returns endpoint-independent variant/route plans; the modal exposes only ten entries, while the control plane can persist a full bounded queue of 500. Closing the modal leaves the app-shell media element alive in the mini-player. Stop remains explicit.
+Selecting an item, collection, or playlist opens the playback modal. Selecting
+a folder enters that folder; selecting a direct media file inside it opens the
+player. `build_playback_queue` returns endpoint-independent variant/route plans;
+the modal exposes only ten entries, while the control plane can persist a full
+bounded queue of 500. Closing the modal leaves the app-shell media element alive
+in the mini-player. Stop remains explicit.
 
 Media Center modals are workspace-scoped UI-as-data surfaces. The client therefore does not stamp the currently displayed node onto coordinator reads or actions; source-node selection remains an explicit playback-plan concern. This keeps the same modal valid on desktop, TV, controller, and federated-node views.
 
@@ -68,4 +74,11 @@ with 0.793 MiB sustained growth, and aggregate CPU p95 was 13.533%. This is
 server evidence only; the separate one-hour Android TV renderer gate remains
 mandatory.
 
-The harness reports one-time FTS/trigram backfill separately from p50/p95/max catalog FTS, cursor-page and local-discovery latency, encoded page bytes, process RSS, sample counts and the exact enforced budgets. Correctness assertions reject empty FTS/fuzzy results, incomplete search indexes and invalid page sizes. The same run migrates and removes 20,000 legacy works and collections, verifies 20,000 contextual works/memberships, and enforces a bounded migration budget. It uses generated descriptors and never needs private media bytes.
+The harness reports one-time FTS/trigram and folder-index backfill separately
+from p50/p95/max catalog FTS, cursor-page, Home, root-folder, leaf-folder and
+local-discovery latency, encoded page bytes, process RSS, sample counts and the
+exact enforced budgets. Correctness assertions reject empty FTS/fuzzy results,
+incomplete search indexes and invalid page sizes. The same run migrates and
+removes 20,000 legacy works and collections, verifies 20,000 contextual
+works/memberships, and enforces a bounded migration budget. It uses generated
+descriptors and never needs private media bytes.

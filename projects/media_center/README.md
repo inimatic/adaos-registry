@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.51` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.52` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -23,6 +23,17 @@ durable repository to the canonical SDK node identity. A one-time migration
 rewrites legacy `local` root, source, and delta identities in place while
 preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
+
+The `0.6.52` release hardens the large-library browser path. The coordinator
+does not wake its agent worker for ordinary reads and publishes a library
+snapshot only when the bounded sync summary changes. Continue, Recent, and
+Favorites start from indexed profile state instead of sorting the complete
+catalog. A transactionally maintained metadata-only folder projection provides
+folders-first, cursor-backed drill-down with breadcrumbs and direct files;
+source bytes remain at their original paths. On the 20,000-item local gate,
+`home` p95 was 227.967 ms, root folders 14.280 ms, and a 30-file leaf page
+28.246 ms. Scenario `0.6.13` uses typed UI-as-data selection so folder clicks
+navigate and media clicks open playback.
 
 The `0.6.51` release makes root removal visible to the distributed catalog
 without deleting source media. `media_library_agent@0.6.26` atomically disables
