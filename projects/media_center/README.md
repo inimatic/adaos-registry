@@ -74,8 +74,9 @@ state through its own replayable stream, builds a full library snapshot only
 when enrichment settles, adds queue claim/recent indexes, recovers stale
 running jobs, and prunes terminal receipts in bounded batches. This removes
 the sustained full-home rebuild observed on the 68,000-item `.30` library.
-Scenario `0.6.10`, control skill `0.2.3`, library agent `0.6.22`, and Media
-Server `0.9.17` are provenance-only package revisions for the release closure.
+Scenario `0.6.11` consumes the new operation stream. Control skill `0.2.3`,
+library agent `0.6.22`, and Media Server `0.9.17` are provenance-only package
+revisions for the release closure.
 
 The exact `0.6.46` release was subsequently rolled across both `.30` nodes by
 deployment revision `50` and operation
