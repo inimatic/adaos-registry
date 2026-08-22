@@ -1040,6 +1040,35 @@ def test_search_indexes_use_catalog_rowids_for_addressed_updates(
         ).fetchone()[0] == 1
 
 
+def test_diagnostics_never_count_scans_the_fts_virtual_table(monkeypatch, tmp_path):
+    monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
+    repository = MediaCenterRepository()
+    catalog = MediaCatalogCoordinator(repository)
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Example/movie.mp4", kind="video"))
+    )
+    statements: list[str] = []
+    original_connect = repository.connect
+
+    def traced_connect():
+        connection = original_connect()
+        connection.set_trace_callback(statements.append)
+        return connection
+
+    monkeypatch.setattr(repository, "connect", traced_connect)
+
+    refreshed = catalog.refresh_search_index()
+    diagnostics = catalog.diagnostics()
+
+    assert refreshed["indexed_count"] == 1
+    assert diagnostics["search"]["indexed_rows"] == 1
+    normalized = [" ".join(statement.lower().split()) for statement in statements]
+    assert not any(
+        statement.startswith("select count(*) from catalog_search")
+        for statement in normalized
+    )
+
+
 def test_search_rowid_migration_rebuilds_legacy_fts_rows(monkeypatch, tmp_path):
     monkeypatch.setenv("MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3"))
     repository = MediaCenterRepository()

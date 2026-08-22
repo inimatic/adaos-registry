@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.45` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.46` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -57,6 +57,13 @@ active `ServiceDefinition` v2 through the public distributed SDK, and an
 upgrade that omits the current exact release is rejected before any Media
 Center topology mutation. Physical two-node rolling acceptance remains a
 separate recorded gate.
+
+The `0.6.46` release keeps the accepted `0.6.45` topology and upgrades
+`media_center_skill` to `0.8.42`. Compact diagnostics and explicit search-index
+refresh now derive their row count from the ordinary catalog table's strict
+one-to-one rowid invariant. They never execute `COUNT(*)` against the FTS5
+virtual table, which previously could hold a large-library status request for
+minutes while reading the complete token payload.
 
 The `0.6.40` release added authoritative persisted playback toggles through the
 generic client `input.toggle` contract and explicit subscription-backed library

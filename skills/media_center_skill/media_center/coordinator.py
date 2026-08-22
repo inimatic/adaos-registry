@@ -913,7 +913,7 @@ class MediaCatalogCoordinator:
             self._backfill_search(connection)
             connection.commit()
             indexed = int(
-                connection.execute("SELECT COUNT(*) FROM catalog_search").fetchone()[0]
+                connection.execute("SELECT COUNT(*) FROM catalog_items").fetchone()[0]
             )
         return {
             "ok": True,
@@ -4209,7 +4209,6 @@ class MediaCatalogCoordinator:
             works = int(connection.execute("SELECT COUNT(*) FROM media_works").fetchone()[0])
             variants = int(connection.execute("SELECT COUNT(*) FROM media_variants").fetchone()[0])
             collections = int(connection.execute("SELECT COUNT(*) FROM media_collections").fetchone()[0])
-            search_rows = int(connection.execute("SELECT COUNT(*) FROM catalog_search").fetchone()[0])
             jobs = {
                 str(row["status"]): int(row["count"])
                 for row in connection.execute(
@@ -4236,6 +4235,10 @@ class MediaCatalogCoordinator:
                 ).fetchall()
             ]
         summary = self.repository.summary()
+        # FTS5 COUNT(*) scans every indexed token payload and can take minutes
+        # for large libraries. Search rows have a strict one-to-one catalog
+        # rowid invariant, so the ordinary catalog count is the bounded witness.
+        search_rows = int(summary["total_count"])
         recommendations: list[dict[str, Any]] = []
         if not agents:
             recommendations.append(

@@ -30,7 +30,9 @@ Every plan carries an `adaos.media_center.playback_route.v1` contract. A source-
 Coordinator FTS rows share the owning `catalog_items.rowid`. Incremental agent
 updates therefore replace search and fuzzy-search records by indexed row id
 instead of scanning the full virtual table; schema migration rebuilds legacy
-FTS rows once before publishing the new schema revision.
+FTS rows once before publishing the new schema revision. Compact diagnostics
+and refresh receipts use the ordinary catalog row count implied by this
+one-to-one invariant; they never count-scan the FTS5 token payload.
 
 Delta ingestion queues durable enrichment jobs. A newer source revision cancels an older queued job for the same item and kind, retains only the eight newest terminal receipts, and leaves at most one queued metadata, embedding, and fingerprint job per subject. This keeps durable observability without allowing repeated scans to grow the queue or RSS without bound. One low-priority worker selects a versioned provider, records bounded `MetadataClaim` rows with provenance/confidence, and publishes terminal operation progress. The built-in deterministic provider uses only indexed filename, folder, tag, and technical evidence. Technical probes, exact/perceptual fingerprints, thumbnails, and embeddings use the same provider/job boundary; unavailable providers fail explicitly rather than blocking catalog reads or touching source bytes. Perceptual duplicate groups are review-only evidence: no candidate is automatically merged or deleted.
 
