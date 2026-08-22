@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.50` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.51` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -23,6 +23,13 @@ durable repository to the canonical SDK node identity. A one-time migration
 rewrites legacy `local` root, source, and delta identities in place while
 preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
+
+The `0.6.51` release makes root removal visible to the distributed catalog
+without deleting source media. `media_library_agent@0.6.26` atomically disables
+the root, requests cancellation of active scans, marks its present sources as
+missing, and emits ordered `removed` deltas. Repeating the operation is
+idempotent. Re-adding the same root can restore the retained source evidence,
+while ordinary catalog reads stop presenting files from a disabled root.
 
 The `0.6.50` release adds validated reuse of an unchanged catalog transfer
 snapshot in `media_library_agent@0.6.25`. Before reuse, the agent compares the
