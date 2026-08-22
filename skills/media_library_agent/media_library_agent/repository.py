@@ -1931,7 +1931,8 @@ class MediaLibraryAgentRepository:
             return cached
         target = directory / f"{artifact}.zlib"
         temporary = directory / f"{artifact}.part"
-        compressor = zlib.compressobj(level=6)
+        # Catalog transfer favors bounded preparation latency over archive size.
+        compressor = zlib.compressobj(level=1)
         payload_hash = hashlib.sha256()
         payload_bytes = 0
         emitted_items = 0
