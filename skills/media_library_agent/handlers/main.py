@@ -418,7 +418,7 @@ def add_root(
 
 
 @tool(
-    summary="Disable a media root while retaining external files and indexed evidence.",
+    summary="Disable a media root and tombstone its active catalog sources while retaining external files and evidence.",
     side_effects="local_write",
 )
 def remove_root(root_id: str = "", **_: Any) -> dict[str, Any]:

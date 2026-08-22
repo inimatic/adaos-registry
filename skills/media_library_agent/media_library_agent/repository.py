@@ -633,23 +633,70 @@ class MediaLibraryAgentRepository:
     def disable_root(self, root_id: str) -> dict[str, Any]:
         token = text(root_id)
         with self.connect() as connection:
-            changed = connection.execute(
-                "UPDATE roots SET enabled=0, updated_at=?, revision=revision+1 WHERE id=?",
-                (now_iso(), token),
-            ).rowcount
+            root = connection.execute(
+                "SELECT * FROM roots WHERE id=?", (token,)
+            ).fetchone()
+            if root is None:
+                return {
+                    "ok": False,
+                    "error": "root_not_found",
+                    "root_id": token,
+                    "schema": SCHEMA_VERSION,
+                }
+            if not bool(root["enabled"]):
+                return {
+                    "ok": True,
+                    "schema": SCHEMA_VERSION,
+                    "root": self._public_root(root),
+                    "roots": self.list_roots()["items"],
+                    "disabled": True,
+                    "deduplicated": True,
+                    "tombstoned_source_count": 0,
+                    "source_files_deleted": False,
+                }
+
+            now = now_iso()
+            root_revision = int(root["revision"] or 0) + 1
+            connection.execute(
+                "UPDATE roots SET enabled=0, updated_at=?, revision=? WHERE id=?",
+                (now, root_revision, token),
+            )
+            placeholders = ",".join("?" for _ in ACTIVE_JOB_STATUSES)
+            connection.execute(
+                f"UPDATE scan_jobs SET cancel_requested=1, revision=revision+1 "
+                f"WHERE root_id=? AND status IN ({placeholders})",
+                (token, *ACTIVE_JOB_STATUSES),
+            )
+            rows = connection.execute(
+                "SELECT * FROM sources WHERE root_id=? AND present=1",
+                (token,),
+            ).fetchall()
+            job_id = stable_id("root-disabled", token, root_revision, size=24)
+            for row in rows:
+                source_revision = int(row["revision"] or 0) + 1
+                connection.execute(
+                    "UPDATE sources SET present=0, last_seen_at=?, revision=? WHERE id=?",
+                    (now, source_revision, str(row["id"])),
+                )
+                changed = connection.execute(
+                    "SELECT * FROM sources WHERE id=?", (str(row["id"]),)
+                ).fetchone()
+                self._insert_delta(
+                    connection,
+                    "removed",
+                    self._public_source(changed),
+                    job_id=job_id,
+                )
             connection.commit()
-        if not changed:
-            return {
-                "ok": False,
-                "error": "root_not_found",
-                "root_id": token,
-                "schema": SCHEMA_VERSION,
-            }
         return {
             "ok": True,
             "schema": SCHEMA_VERSION,
             "root": self.get_root(token),
             "roots": self.list_roots()["items"],
+            "disabled": True,
+            "deduplicated": False,
+            "tombstoned_source_count": len(rows),
+            "source_files_deleted": False,
         }
 
     def active_job_for_root(self, root_id: str) -> dict[str, Any] | None:
@@ -1206,6 +1253,11 @@ class MediaLibraryAgentRepository:
         descriptor = dict(source.get("descriptor") or {})
         metadata = dict(source.get("metadata") or {})
         with self.connect() as connection:
+            root = connection.execute(
+                "SELECT enabled FROM roots WHERE id=?", (root_id,)
+            ).fetchone()
+            if root is None or not bool(root["enabled"]):
+                raise RuntimeError("root_disabled")
             previous = connection.execute(
                 "SELECT * FROM sources WHERE root_id=? AND relative_path=?",
                 (root_id, relative_path),

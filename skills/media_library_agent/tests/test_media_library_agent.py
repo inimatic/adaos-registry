@@ -522,6 +522,44 @@ def test_incremental_scan_emits_only_changes_and_tombstones(tmp_path):
     assert tombstone["items"][0]["source"]["present"] is False
 
 
+def test_disabling_root_tombstones_sources_without_deleting_files(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    first_song = library / "01.mp3"
+    second_song = library / "02.mp3"
+    first_song.write_bytes(b"first")
+    second_song.write_bytes(b"second")
+
+    imported = main.import_folder(path=str(library))
+    _wait(imported["job"]["id"])
+    added = main.pull_deltas(limit=10)
+    assert [item["operation"] for item in added["items"]] == ["added", "added"]
+
+    disabled = main.remove_root(root_id=imported["root"]["id"])
+
+    assert disabled["ok"] is True
+    assert disabled["disabled"] is True
+    assert disabled["deduplicated"] is False
+    assert disabled["tombstoned_source_count"] == 2
+    assert disabled["source_files_deleted"] is False
+    assert main.list_roots()["items"] == []
+    assert len(main.list_roots(include_disabled=True)["items"]) == 1
+    tombstones = main.pull_deltas(cursor=added["next_cursor"], limit=10)
+    assert [item["operation"] for item in tombstones["items"]] == [
+        "removed",
+        "removed",
+    ]
+    assert all(item["source"]["present"] is False for item in tombstones["items"])
+    assert first_song.read_bytes() == b"first"
+    assert second_song.read_bytes() == b"second"
+
+    repeated = main.remove_root(root_id=imported["root"]["id"])
+    assert repeated["ok"] is True
+    assert repeated["deduplicated"] is True
+    assert repeated["tombstoned_source_count"] == 0
+    assert main.pull_deltas(cursor=tombstones["next_cursor"], limit=10)["items"] == []
+
+
 def test_duplicate_scan_request_returns_active_job(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
