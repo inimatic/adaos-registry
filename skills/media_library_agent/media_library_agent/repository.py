@@ -1847,6 +1847,70 @@ class MediaLibraryAgentRepository:
             raise ValueError("topology_transfer_checkpoint_invalid")
         return int(token[7:])
 
+    @staticmethod
+    def _cached_topology_catalog_transfer(
+        directory: Path,
+        *,
+        header: Mapping[str, Any],
+    ) -> dict[str, Any] | None:
+        expected_header = dict(header)
+        for candidate in sorted(
+            directory.glob("*.zlib"),
+            key=lambda path: path.stat().st_mtime_ns,
+            reverse=True,
+        ):
+            try:
+                payload_hash = hashlib.sha256()
+                decompressor = zlib.decompressobj()
+                first_line = bytearray()
+                line_count = 0
+                ends_with_newline = False
+                with candidate.open("rb") as handle:
+                    while chunk := handle.read(256 * 1024):
+                        payload_hash.update(chunk)
+                        expanded = decompressor.decompress(chunk)
+                        if expanded:
+                            line_count += expanded.count(b"\n")
+                            ends_with_newline = expanded.endswith(b"\n")
+                            if b"\n" not in first_line:
+                                first_line.extend(expanded)
+                                if b"\n" in first_line:
+                                    del first_line[first_line.index(b"\n") + 1 :]
+                    tail = decompressor.flush()
+                    if tail:
+                        line_count += tail.count(b"\n")
+                        ends_with_newline = tail.endswith(b"\n")
+                        if b"\n" not in first_line:
+                            first_line.extend(tail)
+                            if b"\n" in first_line:
+                                del first_line[first_line.index(b"\n") + 1 :]
+                if not decompressor.eof or not ends_with_newline:
+                    continue
+                observed_header = json_loads(
+                    bytes(first_line).split(b"\n", 1)[0].decode("utf-8"),
+                    {},
+                )
+                if observed_header != expected_header:
+                    continue
+                item_count = int(expected_header.get("item_count") or 0)
+                if line_count != item_count + 1:
+                    continue
+                return {
+                    "schema": "adaos.distributed.transfer_manifest.v1",
+                    "artifact_id": candidate.stem,
+                    "encoding": "zlib+ndjson",
+                    "payload_digest": "sha256:" + payload_hash.hexdigest(),
+                    "payload_bytes": candidate.stat().st_size,
+                    "item_count": item_count,
+                    "byte_count": int(expected_header.get("byte_count") or 0),
+                    "checkpoint": expected_header.get("checkpoint"),
+                    "content_witness": expected_header.get("content_witness"),
+                    "external_media_copied": False,
+                }
+            except (OSError, UnicodeDecodeError, zlib.error):
+                continue
+        return None
+
     def prepare_topology_catalog_transfer(
         self, *, artifact_id: str, root_id: str = ""
     ) -> dict[str, Any]:
@@ -1862,6 +1926,9 @@ class MediaLibraryAgentRepository:
             "byte_count": int(summary.get("byte_count") or 0),
         }
         directory = self._topology_transfer_dir()
+        cached = self._cached_topology_catalog_transfer(directory, header=header)
+        if cached is not None:
+            return cached
         target = directory / f"{artifact}.zlib"
         temporary = directory / f"{artifact}.part"
         compressor = zlib.compressobj(level=6)

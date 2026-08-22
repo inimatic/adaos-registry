@@ -1218,6 +1218,17 @@ def test_large_catalog_uses_chunked_data_plane_without_media_copy(tmp_path):
     assert manifest["item_count"] == 1001
     assert manifest["external_media_copied"] is False
 
+    cached_manifest = source_repository.prepare_topology_catalog_transfer(
+        artifact_id="snapshot-redundant-export",
+        root_id=root["id"],
+    )
+    assert cached_manifest == manifest
+    assert not (
+        source_repository.db_path.parent
+        / "topology_transfers"
+        / "snapshot-redundant-export.zlib"
+    ).exists()
+
     target_repository = MediaLibraryAgentRepository(
         tmp_path / "large-target.sqlite3",
         node_id="node-b",
@@ -1504,9 +1515,7 @@ def test_folder_artwork_is_bounded_published_and_tied_to_exact_source(tmp_path):
     Draft202012Validator(
         json.loads(
             (
-                SKILL_ROOT
-                / "schemas"
-                / "media-library-artwork-plan.v1.schema.json"
+                SKILL_ROOT / "schemas" / "media-library-artwork-plan.v1.schema.json"
             ).read_text(encoding="utf-8")
         )
     ).validate(artwork_plan(changed))
