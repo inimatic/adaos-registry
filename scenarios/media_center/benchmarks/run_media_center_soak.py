@@ -202,6 +202,7 @@ def run(
         stop = threading.Event()
         completed = {"agent_delta_items": 0}
         last_page: dict[str, Any] = {}
+        largest_page: dict[str, Any] = {}
         last_plan: dict[str, Any] = {}
         last_search: dict[str, Any] = {}
         shared_lock = threading.Lock()
@@ -247,7 +248,7 @@ def run(
 
         def page_reader() -> None:
             cursor = ""
-            nonlocal last_page
+            nonlocal last_page, largest_page
             while not stop.is_set():
                 result = _record_call(
                     "catalog_page",
@@ -261,6 +262,10 @@ def run(
                     cursor = str(result.get("pagination", {}).get("next_cursor") or "")
                     with shared_lock:
                         last_page = result
+                        if int(result.get("count") or 0) > int(
+                            largest_page.get("count") or 0
+                        ):
+                            largest_page = result
                 stop.wait(0.08)
 
         def playback_reader() -> None:
@@ -328,8 +333,9 @@ def run(
                 worker.join(timeout=10)
         elapsed = time.monotonic() - started
 
+        measured_page = largest_page or last_page
         encoded_page_bytes = len(
-            json.dumps(last_page, ensure_ascii=False, default=str).encode("utf-8")
+            json.dumps(measured_page, ensure_ascii=False, default=str).encode("utf-8")
         )
         wal_path = Path(f"{db_path}-wal")
         steady_rss = _rss_window_summary(steady_rss_samples)
@@ -376,7 +382,7 @@ def run(
             },
             "result": {
                 "fts_count": int(last_search.get("count") or 0),
-                "page_count": int(last_page.get("count") or 0),
+                "page_count": int(measured_page.get("count") or 0),
                 "page_bytes": encoded_page_bytes,
                 "playback_ok": bool(last_plan.get("ok")),
                 "playback_source_id": str(last_plan.get("source_id") or ""),

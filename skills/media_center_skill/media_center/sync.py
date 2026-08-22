@@ -37,10 +37,11 @@ class MediaAgentSyncWorker:
         self._last_result: dict[str, Any] = {}
         self._updated_at = _now()
 
-    def ensure_started(self) -> bool:
+    def ensure_started(self, *, wake: bool = False) -> bool:
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
-                self._wake.set()
+                if wake:
+                    self._wake.set()
                 return False
             self._stop.clear()
             self._thread = threading.Thread(
@@ -100,6 +101,7 @@ class MediaAgentSyncWorker:
             if key in result
         }
         with self._lock:
+            previous_summary = dict(self._last_result)
             self._state = (
                 "catching_up"
                 if result.get("ok") and result.get("has_more")
@@ -110,7 +112,13 @@ class MediaAgentSyncWorker:
             self._last_result = summary
             self._revision += 1
             self._updated_at = _now()
-        if self.publish is not None:
+        publish_required = bool(
+            not previous_summary
+            or summary != previous_summary
+            or int(result.get("applied_count") or 0) > 0
+            or result.get("has_more")
+        )
+        if publish_required and self.publish is not None:
             try:
                 self._context.run(self.publish)
             except Exception:

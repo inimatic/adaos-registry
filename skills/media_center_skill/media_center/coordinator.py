@@ -27,7 +27,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-22.12"
+COORDINATOR_SCHEMA_REVISION = "2026-08-23.1"
 SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
@@ -81,6 +81,21 @@ _LEADING_NUMBER = re.compile(r"^(?P<number>\d{1,4})(?:[ ._\-]+|$)")
 def _stable_id(prefix: str, *parts: Any, size: int = 24) -> str:
     raw = "\0".join(_text(part) for part in parts)
     return f"{prefix}_{hashlib.sha256(raw.encode('utf-8', errors='replace')).hexdigest()[:size]}"
+
+
+def _folder_nodes(folder_path: Any) -> list[tuple[str, str, str]]:
+    segments = [
+        part
+        for part in _text(folder_path).replace("\\", "/").split("/")
+        if part
+    ]
+    nodes: list[tuple[str, str, str]] = []
+    parent = ""
+    for name in segments:
+        path = "/".join(part for part in (parent, name) if part)
+        nodes.append((path, parent, name))
+        parent = path
+    return nodes
 
 
 def _observed_count(value: Any) -> int:
@@ -218,10 +233,27 @@ class MediaCatalogCoordinator:
                 "variant_id": "TEXT NOT NULL DEFAULT ''",
                 "collection_id": "TEXT NOT NULL DEFAULT ''",
                 "quality_json": "TEXT NOT NULL DEFAULT '{}'",
+                "maturity_rating": "INTEGER NOT NULL DEFAULT 0",
+                "explicit": "INTEGER NOT NULL DEFAULT 0",
             }
+            policy_columns_added = any(
+                name not in columns for name in ("maturity_rating", "explicit")
+            )
             for name, definition in additions.items():
                 if name not in columns:
                     connection.execute(f"ALTER TABLE catalog_items ADD COLUMN {name} {definition}")
+            if policy_columns_added:
+                connection.execute(
+                    """
+                    UPDATE catalog_items SET
+                        maturity_rating=MAX(0,MIN(21,COALESCE(CAST(
+                            json_extract(metadata_json,'$.maturity_rating')
+                            AS INTEGER),0))),
+                        explicit=CASE WHEN lower(CAST(COALESCE(
+                            json_extract(metadata_json,'$.explicit'),0) AS TEXT))
+                            IN ('1','true','yes','on') THEN 1 ELSE 0 END
+                    """
+                )
             connection.executescript(
                 """
                 CREATE INDEX IF NOT EXISTS idx_media_center_agent_source ON catalog_items(agent_id, source_id);
@@ -229,6 +261,23 @@ class MediaCatalogCoordinator:
                 CREATE INDEX IF NOT EXISTS idx_media_center_collection ON catalog_items(collection_id, missing);
                 CREATE INDEX IF NOT EXISTS idx_media_center_folder_browse
                     ON catalog_items(agent_id, root_id, folder_path, missing);
+                CREATE TABLE IF NOT EXISTS catalog_folder_nodes (
+                    agent_id TEXT NOT NULL,
+                    node_id TEXT NOT NULL DEFAULT '',
+                    root_id TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    parent TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    source_count INTEGER NOT NULL DEFAULT 0,
+                    revision INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY(agent_id, root_id, path)
+                );
+                CREATE INDEX IF NOT EXISTS idx_media_center_folder_parent
+                    ON catalog_folder_nodes(parent, name COLLATE NOCASE,
+                        agent_id, root_id, path);
+                CREATE INDEX IF NOT EXISTS idx_media_center_folder_files
+                    ON catalog_items(folder_path, missing, media_kind,
+                        maturity_rating, explicit, title COLLATE NOCASE, id);
                 CREATE INDEX IF NOT EXISTS idx_media_center_browse_title
                     ON catalog_items(missing,media_kind,title COLLATE NOCASE,id);
                 CREATE INDEX IF NOT EXISTS idx_media_center_browse_size
@@ -473,6 +522,19 @@ class MediaCatalogCoordinator:
                     connection.execute(
                         f"ALTER TABLE personal_media_state ADD COLUMN {name} {definition}"
                     )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_personal_media_recent_item "
+                "ON personal_media_state(profile_id,last_played_at DESC,item_id)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_personal_media_continue "
+                "ON personal_media_state(profile_id,completed,last_played_at DESC,item_id) "
+                "WHERE resume_ms>0 AND last_played_at<>''"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_personal_media_favorite "
+                "ON personal_media_state(profile_id,item_id) WHERE favorite=1"
+            )
             agent_columns = {
                 str(row["name"])
                 for row in connection.execute(
@@ -519,6 +581,15 @@ class MediaCatalogCoordinator:
                     for profile_id, label, kind, policy in default_profiles
                 ],
             )
+            connection.execute(
+                """
+                INSERT OR IGNORE INTO personal_media_state(
+                    profile_id,item_id,favorite,updated_at
+                )
+                SELECT 'default',id,1,? FROM catalog_items WHERE favorite=1
+                """,
+                (now,),
+            )
             for profile_row in connection.execute(
                 "SELECT id,kind,policy_json FROM media_profiles"
             ).fetchall():
@@ -558,6 +629,7 @@ class MediaCatalogCoordinator:
                 """,
                 (now,),
             ).rowcount
+            self._rebuild_folder_nodes(connection)
             self._backfill_search(connection)
             self._ensure_search_rowids(connection)
             connection.execute(
@@ -573,6 +645,119 @@ class MediaCatalogCoordinator:
             "retired_legacy_count": max(0, int(retired_legacy_count or 0)),
             "identity_repair": identity_repair,
         }
+
+    @staticmethod
+    def _rebuild_folder_nodes(connection: sqlite3.Connection) -> None:
+        connection.execute("DELETE FROM catalog_folder_nodes")
+        connection.execute(
+            """
+            WITH RECURSIVE expanded(
+                agent_id,node_id,root_id,path,parent,name,rest,revision
+            ) AS (
+                SELECT agent_id,node_id,root_id,
+                    CASE WHEN instr(folder_path,'/')>0
+                        THEN substr(folder_path,1,instr(folder_path,'/')-1)
+                        ELSE folder_path END,
+                    '',
+                    CASE WHEN instr(folder_path,'/')>0
+                        THEN substr(folder_path,1,instr(folder_path,'/')-1)
+                        ELSE folder_path END,
+                    CASE WHEN instr(folder_path,'/')>0
+                        THEN substr(folder_path,instr(folder_path,'/')+1)
+                        ELSE '' END,
+                    catalog_revision
+                FROM catalog_items
+                WHERE missing=0 AND folder_path<>''
+                UNION ALL
+                SELECT agent_id,node_id,root_id,
+                    path || '/' || CASE WHEN instr(rest,'/')>0
+                        THEN substr(rest,1,instr(rest,'/')-1)
+                        ELSE rest END,
+                    path,
+                    CASE WHEN instr(rest,'/')>0
+                        THEN substr(rest,1,instr(rest,'/')-1)
+                        ELSE rest END,
+                    CASE WHEN instr(rest,'/')>0
+                        THEN substr(rest,instr(rest,'/')+1)
+                        ELSE '' END,
+                    revision
+                FROM expanded WHERE rest<>''
+            )
+            INSERT INTO catalog_folder_nodes(
+                agent_id,node_id,root_id,path,parent,name,source_count,revision
+            )
+            SELECT agent_id,MAX(node_id),root_id,path,MAX(parent),MAX(name),
+                COUNT(*),MAX(revision)
+            FROM expanded WHERE path<>'' AND name<>''
+            GROUP BY agent_id,root_id,path
+            """
+        )
+
+    @staticmethod
+    def _adjust_folder_nodes(
+        connection: sqlite3.Connection,
+        *,
+        agent_id: str,
+        node_id: str,
+        root_id: str,
+        folder_path: str,
+        delta: int,
+        revision: int,
+    ) -> None:
+        nodes = _folder_nodes(folder_path)
+        if not nodes:
+            return
+        if delta > 0:
+            connection.executemany(
+                """
+                INSERT INTO catalog_folder_nodes(
+                    agent_id,node_id,root_id,path,parent,name,source_count,revision
+                ) VALUES (?,?,?,?,?,?,1,?)
+                ON CONFLICT(agent_id,root_id,path) DO UPDATE SET
+                    node_id=excluded.node_id,
+                    parent=excluded.parent,
+                    name=excluded.name,
+                    source_count=catalog_folder_nodes.source_count+1,
+                    revision=MAX(catalog_folder_nodes.revision,excluded.revision)
+                """,
+                [
+                    (
+                        agent_id,
+                        node_id,
+                        root_id,
+                        path,
+                        parent,
+                        name,
+                        revision,
+                    )
+                    for path, parent, name in nodes
+                ],
+            )
+            return
+        if delta < 0:
+            connection.executemany(
+                """
+                UPDATE catalog_folder_nodes
+                SET source_count=source_count-1,revision=MAX(revision,?)
+                WHERE agent_id=? AND root_id=? AND path=?
+                """,
+                [(revision, agent_id, root_id, path) for path, _parent, _name in nodes],
+            )
+            connection.execute(
+                "DELETE FROM catalog_folder_nodes WHERE source_count<=0"
+            )
+            return
+        connection.executemany(
+            """
+            UPDATE catalog_folder_nodes
+            SET node_id=?,revision=MAX(revision,?)
+            WHERE agent_id=? AND root_id=? AND path=?
+            """,
+            [
+                (node_id, revision, agent_id, root_id, path)
+                for path, _parent, _name in nodes
+            ],
+        )
 
     def _repair_contextual_audio_identity(
         self, connection: sqlite3.Connection
@@ -919,15 +1104,34 @@ class MediaCatalogCoordinator:
                 connection.execute(
                     "UPDATE catalog_items SET search_text='' WHERE agent_id=''"
                 )
+                connection.execute(
+                    """
+                    UPDATE catalog_items SET
+                        maturity_rating=MAX(0,MIN(21,COALESCE(CAST(
+                            json_extract(metadata_json,'$.maturity_rating')
+                            AS INTEGER),0))),
+                        explicit=CASE WHEN lower(CAST(COALESCE(
+                            json_extract(metadata_json,'$.explicit'),0) AS TEXT))
+                            IN ('1','true','yes','on') THEN 1 ELSE 0 END
+                    WHERE agent_id=''
+                    """
+                )
             self._backfill_search(connection)
+            self._rebuild_folder_nodes(connection)
             connection.commit()
             indexed = int(
                 connection.execute("SELECT COUNT(*) FROM catalog_items").fetchone()[0]
+            )
+            folder_nodes = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM catalog_folder_nodes"
+                ).fetchone()[0]
             )
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "indexed_count": indexed,
+            "folder_node_count": folder_nodes,
             "force_legacy": bool(force_legacy),
         }
 
@@ -1077,7 +1281,8 @@ class MediaCatalogCoordinator:
         if not source_id or source_revision < 1:
             return "ignored"
         previous = connection.execute(
-            "SELECT id,source_revision,variant_id FROM catalog_items "
+            "SELECT id,source_revision,variant_id,folder_path,missing,"
+            "agent_id,node_id,root_id FROM catalog_items "
             "WHERE agent_id=? AND source_id=?",
             (agent_id, source_id),
         ).fetchone()
@@ -1091,6 +1296,16 @@ class MediaCatalogCoordinator:
                     "UPDATE catalog_items SET missing=1, source_revision=?, catalog_revision=?, last_seen_at=? WHERE id=?",
                     (source_revision, revision, now_iso(), str(previous["id"])),
                 )
+                if not bool(previous["missing"]):
+                    self._adjust_folder_nodes(
+                        connection,
+                        agent_id=str(previous["agent_id"]),
+                        node_id=str(previous["node_id"]),
+                        root_id=str(previous["root_id"]),
+                        folder_path=str(previous["folder_path"]),
+                        delta=-1,
+                        revision=revision,
+                    )
                 connection.execute(
                     """
                     UPDATE media_variants SET available=0,revision=revision+1
@@ -1106,7 +1321,15 @@ class MediaCatalogCoordinator:
         if not name:
             return "ignored"
         relative_path = _text(source.get("relative_path") or metadata.get("relative_path") or name).replace("\\", "/")
-        folder_path = _text(source.get("folder_path") or metadata.get("folder_path")).replace("\\", "/").strip("/")
+        folder_path = "/".join(
+            part
+            for part in _text(
+                source.get("folder_path") or metadata.get("folder_path")
+            )
+            .replace("\\", "/")
+            .split("/")
+            if part
+        )
         mime_type = _text(source.get("mime_type") or descriptor.get("mime_type") or descriptor.get("mime")) or "application/octet-stream"
         kind = _text(source.get("media_kind")) or _media_kind(mime_type, name)
         title = _text(descriptor.get("title")) or _title_from_name(name)
@@ -1126,7 +1349,17 @@ class MediaCatalogCoordinator:
         content_path = _text(descriptor.get("content_path"))
         routed_path = _text(descriptor.get("routed_content_path") or descriptor.get("browser_path"))
         source_path = _text(descriptor.get("source_path") or descriptor.get("path"))
+        retired_legacy_rows: list[sqlite3.Row] = []
         if source_path:
+            retired_legacy_rows = connection.execute(
+                """
+                SELECT agent_id,node_id,root_id,folder_path
+                FROM catalog_items
+                WHERE source='media_server' AND agent_id='' AND missing=0
+                    AND source_path=?
+                """,
+                (source_path,),
+            ).fetchall()
             connection.execute(
                 """
                 UPDATE catalog_items
@@ -1150,6 +1383,20 @@ class MediaCatalogCoordinator:
                 ),
             },
         )
+        try:
+            maturity_rating = max(
+                0, min(21, int(metadata.get("maturity_rating") or 0))
+            )
+        except (TypeError, ValueError):
+            maturity_rating = 0
+        explicit_value = metadata.get("explicit", False)
+        if isinstance(explicit_value, str):
+            explicit_value = explicit_value.strip().lower() in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
         catalog_revision = self._next_catalog_revision(connection)
         connection.execute(
             """
@@ -1159,8 +1406,9 @@ class MediaCatalogCoordinator:
                 descriptor_json, metadata_json, fingerprint, indexed_at, last_seen_at,
                 missing, favorite, play_count, tags_json, agent_id, node_id, root_id,
                 source_id, source_revision, folder_path, search_text, catalog_revision,
-                work_id, variant_id, collection_id, quality_json
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, '[]', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                work_id, variant_id, collection_id, quality_json,
+                maturity_rating, explicit
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, 0, '[]', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET source=excluded.source, resource_id=excluded.resource_id,
                 name=excluded.name, title=excluded.title, media_kind=excluded.media_kind,
                 mime_type=excluded.mime_type, size_bytes=excluded.size_bytes,
@@ -1174,7 +1422,9 @@ class MediaCatalogCoordinator:
                 source_revision=excluded.source_revision, folder_path=excluded.folder_path,
                 search_text=excluded.search_text, catalog_revision=excluded.catalog_revision,
                 work_id=excluded.work_id, variant_id=excluded.variant_id,
-                collection_id=excluded.collection_id, quality_json=excluded.quality_json
+                collection_id=excluded.collection_id, quality_json=excluded.quality_json,
+                maturity_rating=excluded.maturity_rating,
+                explicit=excluded.explicit
             """,
             (
                 item_id, f"agent:{agent_id}", _text(source.get("resource_id") or descriptor.get("resource_id") or descriptor.get("id")),
@@ -1184,8 +1434,44 @@ class MediaCatalogCoordinator:
                 agent_id, node_id, _text(source.get("root_id") or delta.get("root_id")), source_id, source_revision,
                 folder_path, search_text, catalog_revision, work_id, variant_id, collection_id,
                 _json_dumps(self._quality(descriptor, metadata)),
+                maturity_rating, int(bool(explicit_value)),
             ),
         )
+        previous_scope = (
+            str(previous["agent_id"]),
+            str(previous["root_id"]),
+            str(previous["folder_path"]),
+        ) if previous and not bool(previous["missing"]) else None
+        current_scope = (agent_id, _text(source.get("root_id") or delta.get("root_id")), folder_path)
+        if previous_scope and previous_scope != current_scope:
+            self._adjust_folder_nodes(
+                connection,
+                agent_id=previous_scope[0],
+                node_id=str(previous["node_id"]),
+                root_id=previous_scope[1],
+                folder_path=previous_scope[2],
+                delta=-1,
+                revision=catalog_revision,
+            )
+        self._adjust_folder_nodes(
+            connection,
+            agent_id=current_scope[0],
+            node_id=node_id,
+            root_id=current_scope[1],
+            folder_path=current_scope[2],
+            delta=0 if previous_scope == current_scope else 1,
+            revision=catalog_revision,
+        )
+        for legacy_row in retired_legacy_rows:
+            self._adjust_folder_nodes(
+                connection,
+                agent_id=str(legacy_row["agent_id"]),
+                node_id=str(legacy_row["node_id"]),
+                root_id=str(legacy_row["root_id"]),
+                folder_path=str(legacy_row["folder_path"]),
+                delta=-1,
+                revision=catalog_revision,
+            )
         self._replace_search(connection, item_id, search_text)
         connection.execute(
             """
@@ -1739,6 +2025,9 @@ class MediaCatalogCoordinator:
                     ).rowcount or 0),
                 )
                 connection.execute(
+                    "DELETE FROM catalog_folder_nodes WHERE agent_id=?", (agent_id,)
+                )
+                connection.execute(
                     "DELETE FROM agent_catalog_state WHERE agent_id=?", (agent_id,)
                 )
             connection.commit()
@@ -2013,6 +2302,8 @@ class MediaCatalogCoordinator:
         cursor: str = "",
         include_missing: bool = False,
         favorites_only: bool = False,
+        history_only: bool = False,
+        continue_only: bool = False,
         sort: str = "recent",
         profile_id: str = "default",
         collection_id: str = "",
@@ -2035,6 +2326,7 @@ class MediaCatalogCoordinator:
             {
                 "q": query_token.casefold(), "kind": media_kind, "source": source, "missing": bool(include_missing),
                 "favorites": bool(favorites_only), "sort": sort_token, "profile": profile,
+                "history": bool(history_only), "continue": bool(continue_only),
                 "profile_revision": int(profile_record["revision"]), "collection": collection_id,
             }
         )
@@ -2043,13 +2335,26 @@ class MediaCatalogCoordinator:
         else:
             resolved_offset = max(0, int(offset or 0))
             cursor_anchor = None
+        personal_driven = bool(
+            not query_token and (favorites_only or history_only or continue_only)
+        )
         filters: list[str] = []
         params: list[Any] = [profile]
+        if personal_driven:
+            filters.append("ps.profile_id=?")
         if not include_missing:
             filters.append("c.missing=0")
         filters.append("COALESCE(ps.hidden,0)=0")
         if favorites_only:
-            filters.append("COALESCE(ps.favorite, c.favorite)=1")
+            filters.append(
+                "ps.favorite=1"
+                if personal_driven
+                else "COALESCE(ps.favorite,c.favorite)=1"
+            )
+        if history_only or continue_only:
+            filters.append("ps.last_played_at<>''")
+        if continue_only:
+            filters.extend(["ps.resume_ms>0", "ps.completed=0"])
         kind = _text(media_kind).lower()
         if kind == "playable":
             admitted = sorted(allowed_kinds & {"audio", "video"})
@@ -2068,14 +2373,10 @@ class MediaCatalogCoordinator:
         maximum_rating = max(
             0, min(21, int(policy.get("maximum_maturity_rating") or 0))
         )
-        filters.append(
-            "COALESCE(CAST(json_extract(c.metadata_json,'$.maturity_rating') AS INTEGER),0)<=?"
-        )
+        filters.append("c.maturity_rating<=?")
         params.append(maximum_rating)
         if not bool(policy.get("allow_explicit", False)):
-            filters.append(
-                "COALESCE(CAST(json_extract(c.metadata_json,'$.explicit') AS INTEGER),0)=0"
-            )
+            filters.append("c.explicit=0")
         if _text(source) and _text(source) != "all":
             filters.append("c.source=?")
             params.append(_text(source))
@@ -2089,7 +2390,11 @@ class MediaCatalogCoordinator:
                 terms = [query_token]
             fts_query = " AND ".join(f'"{term.replace(chr(34), chr(34) * 2)}"*' for term in terms)
         where = f"WHERE {' AND '.join(filters)}" if filters else ""
-        from_sql = "catalog_items c LEFT JOIN personal_media_state ps ON ps.item_id=c.id AND ps.profile_id=?"
+        from_sql = (
+            "personal_media_state ps JOIN catalog_items c ON c.id=ps.item_id"
+            if personal_driven
+            else "catalog_items c LEFT JOIN personal_media_state ps ON ps.item_id=c.id AND ps.profile_id=?"
+        )
         if query_token:
             order = "catalog_rank,c.rowid"
         else:
@@ -2115,8 +2420,14 @@ class MediaCatalogCoordinator:
                     ),
                 ),
                 "recent": (
-                    "COALESCE(ps.last_played_at,c.modified_at) DESC, c.id",
-                    (("COALESCE(ps.last_played_at,c.modified_at)", "desc"), ("c.id", "asc")),
+                    "ps.last_played_at DESC, c.id"
+                    if personal_driven
+                    else "COALESCE(ps.last_played_at,c.modified_at) DESC, c.id",
+                    (
+                        (("ps.last_played_at", "desc"), ("c.id", "asc"))
+                        if personal_driven
+                        else (("COALESCE(ps.last_played_at,c.modified_at)", "desc"), ("c.id", "asc"))
+                    ),
                 ),
             }
             order, sort_keys = sort_contracts.get(sort_token, sort_contracts["recent"])
@@ -2572,6 +2883,7 @@ class MediaCatalogCoordinator:
         agent_id: str = "",
         root_id: str = "",
         parent: str = "",
+        profile_id: str = "default",
         limit: int = 30,
         cursor: str = "",
     ) -> dict[str, Any]:
@@ -2579,62 +2891,125 @@ class MediaCatalogCoordinator:
         agent = _text(agent_id)
         root = _text(root_id)
         parent_path = _text(parent).replace("\\", "/").strip("/")
+        profile = _text(profile_id) or "default"
+        profile_record = self.get_profile(profile)["profile"]
+        policy = dict(profile_record.get("policy") or {})
         signature = _cursor_signature(
-            {"agent": agent, "root": root, "parent": parent_path}
+            {
+                "agent": agent,
+                "root": root,
+                "parent": parent_path,
+                "profile": profile,
+                "profile_revision": int(profile_record["revision"]),
+            }
         )
         offset = _decode_cursor(cursor, signature) if _text(cursor) else 0
-        filters = ["missing=0"]
-        params: list[Any] = []
-        if agent:
-            filters.append("agent_id=?")
-            params.append(agent)
-        if root:
-            filters.append("root_id=?")
-            params.append(root)
-        if parent_path:
-            filters.append("folder_path LIKE ? ESCAPE '\\'")
-            params.append(
-                parent_path.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-                + "/%"
-            )
-            relative_start = len(parent_path) + 2
+        filters = ["c.missing=0", "COALESCE(ps.hidden,0)=0"]
+        visibility_params: list[Any] = [profile]
+        allowed_kinds = sorted(
+            {
+                _text(item).lower()
+                for item in policy.get("allowed_media_kinds") or []
+                if _text(item).lower() in {"audio", "video"}
+            }
+        )
+        if allowed_kinds:
+            placeholders = ",".join("?" for _ in allowed_kinds)
+            filters.append(f"c.media_kind IN ({placeholders})")
+            visibility_params.extend(allowed_kinds)
         else:
-            filters.append("folder_path<>''")
-            relative_start = 1
+            filters.append("1=0")
+        filters.append("c.maturity_rating<=?")
+        visibility_params.append(
+            max(0, min(21, int(policy.get("maximum_maturity_rating") or 0)))
+        )
+        if not bool(policy.get("allow_explicit", False)):
+            filters.append("c.explicit=0")
         where = " AND ".join(filters)
-        sql = f"""
-            WITH scoped AS (
-                SELECT agent_id, node_id, root_id, catalog_revision,
-                    substr(folder_path, ?) AS relative_path
-                FROM catalog_items WHERE {where}
-            ), projected AS (
-                SELECT agent_id, node_id, root_id, catalog_revision,
-                    CASE WHEN instr(relative_path, '/')>0
-                        THEN substr(relative_path, 1, instr(relative_path, '/')-1)
-                        ELSE relative_path END AS child_name
-                FROM scoped WHERE relative_path<>''
-            )
-            SELECT agent_id, node_id, root_id, child_name,
-                COUNT(*) AS source_count, MAX(catalog_revision) AS revision
-            FROM projected WHERE child_name<>''
-            GROUP BY agent_id, node_id, root_id, child_name
-            ORDER BY lower(child_name), agent_id, root_id
+        folder_filters = ["f.parent=?"]
+        folder_params: list[Any] = [parent_path]
+        if agent:
+            folder_filters.append("f.agent_id=?")
+            folder_params.append(agent)
+        if root:
+            folder_filters.append("f.root_id=?")
+            folder_params.append(root)
+        folder_sql = f"""
+            SELECT f.* FROM catalog_folder_nodes f
+            WHERE {' AND '.join(folder_filters)}
+                AND EXISTS (
+                    SELECT 1 FROM catalog_items c
+                    LEFT JOIN personal_media_state ps
+                        ON ps.item_id=c.id AND ps.profile_id=?
+                    WHERE c.agent_id=f.agent_id AND c.root_id=f.root_id
+                        AND (c.folder_path=f.path OR
+                            substr(c.folder_path,1,length(f.path)+1)=f.path || '/')
+                        AND {where}
+                )
         """
-        query_params = [relative_start, *params]
+        folder_query_params = [*folder_params, *visibility_params]
+        direct_filters = [*filters, "c.folder_path=?"]
+        direct_params = [*visibility_params, parent_path]
+        if agent:
+            direct_filters.append("c.agent_id=?")
+            direct_params.append(agent)
+        if root:
+            direct_filters.append("c.root_id=?")
+            direct_params.append(root)
+        direct_where = " AND ".join(direct_filters)
         with self.repository.connect() as connection:
-            total = int(
+            folder_total = int(
                 connection.execute(
-                    f"SELECT COUNT(*) FROM ({sql})", tuple(query_params)
+                    f"SELECT COUNT(*) FROM ({folder_sql})",
+                    tuple(folder_query_params),
                 ).fetchone()[0]
             )
-            rows = connection.execute(
-                f"{sql} LIMIT ? OFFSET ?",
-                (*query_params, bounded, offset),
-            ).fetchall()
+            file_total = int(
+                connection.execute(
+                    f"""
+                    SELECT COUNT(*) FROM catalog_items c
+                    LEFT JOIN personal_media_state ps
+                        ON ps.item_id=c.id AND ps.profile_id=?
+                    WHERE {direct_where}
+                    """,
+                    tuple(direct_params),
+                ).fetchone()[0]
+            )
+            folder_rows: list[sqlite3.Row] = []
+            if offset < folder_total:
+                folder_rows = connection.execute(
+                    f"{folder_sql} "
+                    "ORDER BY f.name COLLATE NOCASE,f.agent_id,f.root_id,f.path "
+                    "LIMIT ? OFFSET ?",
+                    (*folder_query_params, bounded, offset),
+                ).fetchall()
+            remaining = bounded - len(folder_rows)
+            file_rows: list[sqlite3.Row] = []
+            if remaining > 0:
+                file_offset = max(0, offset - folder_total)
+                file_rows = connection.execute(
+                    f"""
+                    SELECT c.*, COALESCE(ps.favorite,c.favorite) AS profile_favorite,
+                        COALESCE(ps.resume_ms,0) AS profile_resume_ms,
+                        COALESCE(ps.duration_ms,0) AS profile_duration_ms,
+                        COALESCE(ps.completed,0) AS profile_completed,
+                        COALESCE(ps.rating,0) AS profile_rating,
+                        COALESCE(ps.hidden,0) AS profile_hidden,
+                        COALESCE(ps.last_played_at,'') AS profile_last_played_at,
+                        COALESCE(ps.revision,0) AS profile_revision
+                    FROM catalog_items c
+                    LEFT JOIN personal_media_state ps
+                        ON ps.item_id=c.id AND ps.profile_id=?
+                    WHERE {direct_where}
+                    ORDER BY c.title COLLATE NOCASE,c.id LIMIT ? OFFSET ?
+                    """,
+                    (*direct_params, remaining, file_offset),
+                ).fetchall()
+        total = folder_total + file_total
         items = []
-        for row in rows:
-            name = str(row["child_name"])
-            path = "/".join(item for item in (parent_path, name) if item)
+        for row in folder_rows:
+            name = str(row["name"])
+            path = str(row["path"])
             items.append(
                 {
                     "schema": FOLDER_NODE_SCHEMA,
@@ -2652,28 +3027,63 @@ class MediaCatalogCoordinator:
                     "queue_ref": f"{row['agent_id']}:{path}",
                     "parent": parent_path,
                     "name": name,
+                    "entry_type": "folder",
+                    "navigable": True,
+                    "icon": "folder-outline",
                     "source_count": int(row["source_count"]),
                     "revision": int(row["revision"]),
                 }
             )
+        for row in file_rows:
+            item = self._public_coordinator_item(row, profile)
+            item.update(
+                {
+                    "entry_type": "media",
+                    "path": "/".join(
+                        part for part in (parent_path, str(row["name"])) if part
+                    ),
+                    "parent": parent_path,
+                    "icon": (
+                        "musical-notes-outline"
+                        if str(row["media_kind"]) == "audio"
+                        else "videocam-outline"
+                    ),
+                }
+            )
+            items.append(item)
         next_offset = offset + len(items)
         breadcrumbs = [
             {
+                "name": "Folders",
+                "name_i18n": {"key": "runtime.media_center.ui.folders"},
+                "path": "",
+                "root": True,
+            }
+        ] + [
+            {
                 "name": segment,
                 "path": "/".join(parent_path.split("/")[: index + 1]),
+                "root": False,
             }
             for index, segment in enumerate(parent_path.split("/"))
             if segment
         ]
         participation = self.participation()
+        folder_items = [item for item in items if item.get("entry_type") == "folder"]
+        file_items = [item for item in items if item.get("entry_type") == "media"]
         return {
             "ok": True,
             "schema": COORDINATOR_SCHEMA,
             "items": items,
+            "folders": folder_items,
+            "files": file_items,
             "count": len(items),
+            "folder_count": len(folder_items),
+            "file_count": len(file_items),
             "total_count": total,
             "parent": parent_path,
             "breadcrumbs": breadcrumbs,
+            "can_go_up": bool(parent_path),
             "partial": participation["partial"],
             "participation": participation,
             "pagination": {
@@ -3362,10 +3772,15 @@ class MediaCatalogCoordinator:
         )
         shelves = []
         flattened: list[dict[str, Any]] = []
+        recommendation_signals: list[dict[str, Any]] = []
         for shelf_id, title, options in (
-            ("continue", "Continue", {"sort": "recent"}),
+            (
+                "continue",
+                "Continue",
+                {"sort": "recent", "continue_only": True},
+            ),
             ("favorites", "Favorites", {"favorites_only": True, "sort": "favorite"}),
-            ("recent", "Recent", {"sort": "recent"}),
+            ("recent", "Recent", {"sort": "recent", "history_only": True}),
             ("movies", "Movies", {"media_kind": "video", "sort": "title"}),
             ("music", "Music", {"media_kind": "audio", "sort": "title"}),
         ):
@@ -3375,6 +3790,8 @@ class MediaCatalogCoordinator:
             }:
                 continue
             page = self.list_items(profile_id=profile_id, limit=bounded, **options)
+            if shelf_id in {"favorites", "recent"}:
+                recommendation_signals.extend(page["items"])
             shelves.append({"id": shelf_id, "title": title, "layout": "rail", "items": page["items"], "partial": page["partial"]})
             flattened.extend(
                 dict(item)
@@ -3431,13 +3848,13 @@ class MediaCatalogCoordinator:
             }
             for item in playlist_page["items"]
         )
-        folder_page = self.folders(limit=bounded)
+        folder_page = self.folders(profile_id=profile_id, limit=bounded)
         shelves.append(
             {
                 "id": "folders",
                 "title": "Folders",
                 "layout": "rail",
-                "items": folder_page["items"],
+                "items": folder_page["folders"],
                 "partial": folder_page["partial"],
             }
         )
@@ -3449,10 +3866,12 @@ class MediaCatalogCoordinator:
                 "queue_source_type": "folder",
                 "queue_source_id": _text(item.get("queue_ref")),
             }
-            for item in folder_page["items"]
+            for item in folder_page["folders"]
         )
         recommendation_page = self.recommendations(
-            profile_id=profile_id, limit=bounded
+            profile_id=profile_id,
+            limit=bounded,
+            _signals=recommendation_signals,
         )
         if recommendation_page["enabled"]:
             shelves.append(
@@ -3497,7 +3916,11 @@ class MediaCatalogCoordinator:
         }
 
     def recommendations(
-        self, *, profile_id: str = "default", limit: int = 12
+        self,
+        *,
+        profile_id: str = "default",
+        limit: int = 12,
+        _signals: Iterable[Mapping[str, Any]] | None = None,
     ) -> dict[str, Any]:
         bounded = max(1, min(20, int(limit or 12)))
         profile = self.get_profile(profile_id)["profile"]
@@ -3512,21 +3935,22 @@ class MediaCatalogCoordinator:
                 "partial": self.participation()["partial"],
                 "algorithm": "disabled_by_profile",
             }
-        favorites = self.list_items(
-            profile_id=profile["id"],
-            favorites_only=True,
-            sort="favorite",
-            limit=MAX_PAGE_SIZE,
-        )["items"]
-        recent = self.list_items(
-            profile_id=profile["id"], sort="recent", limit=MAX_PAGE_SIZE
-        )["items"]
-        recent = [
-            item
-            for item in recent
-            if _text(item.get("personal", {}).get("last_played_at"))
-        ]
-        signals = favorites + [item for item in recent if item not in favorites]
+        if _signals is None:
+            favorites = self.list_items(
+                profile_id=profile["id"],
+                favorites_only=True,
+                sort="favorite",
+                limit=MAX_PAGE_SIZE,
+            )["items"]
+            recent = self.list_items(
+                profile_id=profile["id"],
+                sort="recent",
+                history_only=True,
+                limit=MAX_PAGE_SIZE,
+            )["items"]
+            signals = favorites + [item for item in recent if item not in favorites]
+        else:
+            signals = [dict(item) for item in _signals]
         preferred_kinds: dict[str, int] = {}
         preferred_folders: dict[str, int] = {}
         for item in signals[:60]:
@@ -3540,7 +3964,7 @@ class MediaCatalogCoordinator:
                 )
         candidates: list[dict[str, Any]] = []
         cursor = ""
-        for _page in range(3):
+        for _page in range(3 if signals else 1):
             page = self.list_items(
                 profile_id=profile["id"],
                 sort="title",

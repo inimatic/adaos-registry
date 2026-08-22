@@ -808,14 +808,8 @@ def on_media_center_snapshot_requested(event: Any) -> None:
 
 @subscribe("media_library_agent.catalog.changed")
 def on_agent_catalog_changed(event: Any) -> None:
-    payload = _event_payload(event)
     catalog = _coordinator()
-    _agent_sync_runtime(catalog).ensure_started()
-    _publish_library_snapshot(
-        catalog,
-        profile_id=str(payload.get("profile_id") or "default"),
-        webspace_id=str(payload.get("webspace_id") or ""),
-    )
+    _agent_sync_runtime(catalog).ensure_started(wake=True)
 
 
 @tool(summary="Pull bounded idempotent deltas from ready library agents.", side_effects="local_write")
@@ -2505,6 +2499,7 @@ def browse_folders(
     agent_id: str = "",
     root_id: str = "",
     parent: str = "",
+    profile_id: str = "default",
     limit: int = 30,
     cursor: str = "",
     **_: Any,
@@ -2514,6 +2509,7 @@ def browse_folders(
             agent_id=agent_id,
             root_id=root_id,
             parent=parent,
+            profile_id=profile_id,
             limit=limit,
             cursor=cursor,
         )

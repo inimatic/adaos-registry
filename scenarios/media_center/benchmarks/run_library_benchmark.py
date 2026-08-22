@@ -172,6 +172,22 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
             return result
 
         page_timings, page_result = _measure(page, samples=40)
+        home_timings, home_result = _measure(
+            lambda: catalog.home(profile_id="default", limit=6),
+            samples=12,
+        )
+        folder_timings, folder_result = _measure(
+            lambda: catalog.folders(profile_id="default", limit=30),
+            samples=12,
+        )
+        folder_leaf_timings, folder_leaf_result = _measure(
+            lambda: catalog.folders(
+                profile_id="default",
+                parent="Movies/Year 2012",
+                limit=30,
+            ),
+            samples=12,
+        )
         discovery_timings, discovery_result = _measure(
             lambda: catalog.discovery_search(
                 "Moovie 00042", profile_id="default", media_kind="video", limit=30
@@ -247,6 +263,24 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
                 "max": round(max(page_timings), 3),
                 "samples": len(page_timings),
             },
+            "home_ms": {
+                "p50": _percentile(home_timings, 0.5),
+                "p95": _percentile(home_timings, 0.95),
+                "max": round(max(home_timings), 3),
+                "samples": len(home_timings),
+            },
+            "folder_page_ms": {
+                "p50": _percentile(folder_timings, 0.5),
+                "p95": _percentile(folder_timings, 0.95),
+                "max": round(max(folder_timings), 3),
+                "samples": len(folder_timings),
+            },
+            "folder_leaf_page_ms": {
+                "p50": _percentile(folder_leaf_timings, 0.5),
+                "p95": _percentile(folder_leaf_timings, 0.95),
+                "max": round(max(folder_leaf_timings), 3),
+                "samples": len(folder_leaf_timings),
+            },
             "local_discovery_ms": {
                 "p50": _percentile(discovery_timings, 0.5),
                 "p95": _percentile(discovery_timings, 0.95),
@@ -267,11 +301,17 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
                 "fts": search_result["count"],
                 "fts_by_query": search_result_counts,
                 "page": page_result["count"],
+                "home": len(home_result["items"]),
+                "folders": folder_result["count"],
+                "folder_leaf": folder_leaf_result["count"],
                 "discovery": discovery_result["count"],
             },
             "budgets": {
                 "fts_p95_ms": 150,
                 "catalog_page_p95_ms": 100,
+                "home_p95_ms": 500,
+                "folder_page_p95_ms": 150,
+                "folder_leaf_page_p95_ms": 150,
                 "local_discovery_p95_ms": 500,
                 "encoded_page_bytes": 512 * 1024,
                 "identity_migration_ms": 60_000,
@@ -281,6 +321,9 @@ def run(*, count: int = 20_000, enforce: bool = False) -> dict[str, Any]:
         for metric, budget in (
             ("fts_ms", "fts_p95_ms"),
             ("catalog_page_ms", "catalog_page_p95_ms"),
+            ("home_ms", "home_p95_ms"),
+            ("folder_page_ms", "folder_page_p95_ms"),
+            ("folder_leaf_page_ms", "folder_leaf_page_p95_ms"),
             ("local_discovery_ms", "local_discovery_p95_ms"),
         ):
             if metrics[metric]["p95"] > metrics["budgets"][budget]:

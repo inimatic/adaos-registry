@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "adaos.media_center.folder_node.v1",
   "type": "object",
-  "required": ["schema", "id", "agent_id", "node_id", "root_id", "path", "queue_ref", "parent", "name", "source_count", "revision"],
+  "required": ["schema", "id", "agent_id", "node_id", "root_id", "path", "queue_ref", "parent", "name", "entry_type", "navigable", "source_count", "revision"],
   "properties": {
     "schema": {"const": "adaos.media_center.folder_node.v1"},
     "id": {"type": "string", "minLength": 1},
@@ -13,6 +13,9 @@
     "queue_ref": {"type": "string", "minLength": 1},
     "parent": {"type": "string"},
     "name": {"type": "string", "minLength": 1},
+    "entry_type": {"const": "folder"},
+    "navigable": {"const": true},
+    "icon": {"const": "folder-outline"},
     "source_count": {"type": "integer", "minimum": 1},
     "revision": {"type": "integer", "minimum": 1}
   },

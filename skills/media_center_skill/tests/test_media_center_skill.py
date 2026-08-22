@@ -2114,6 +2114,46 @@ def test_agent_sync_worker_continues_bounded_cursor_catchup() -> None:
     assert worker.status()["last_result"]["has_more"] is False
 
 
+def test_agent_sync_worker_does_not_wake_or_republish_for_unchanged_reads() -> None:
+    completed = threading.Event()
+    calls = 0
+    published = []
+
+    def sync():
+        nonlocal calls
+        calls += 1
+        completed.set()
+        return {
+            "ok": True,
+            "mode": "distributed",
+            "agent_count": 1,
+            "applied_count": 0,
+            "has_more": False,
+        }
+
+    worker = MediaAgentSyncWorker(
+        sync,
+        publish=lambda: published.append(calls),
+        poll_seconds=30,
+    )
+    try:
+        assert worker.ensure_started() is True
+        assert completed.wait(2.0) is True
+        assert worker.ensure_started() is False
+        time.sleep(0.1)
+        assert calls == 1
+        assert published == [1]
+
+        completed.clear()
+        assert worker.ensure_started(wake=True) is False
+        assert completed.wait(2.0) is True
+    finally:
+        worker.dispose()
+
+    assert calls == 2
+    assert published == [1]
+
+
 def test_complete_distributed_sync_retires_local_compatibility_state(
     monkeypatch, tmp_path
 ):
@@ -2366,6 +2406,7 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
     root = catalog.folders(limit=1)
     second = catalog.folders(limit=1, cursor=root["pagination"]["next_cursor"])
     nested = catalog.folders(parent="Shows/Example", limit=30)
+    leaf = catalog.folders(parent="Shows/Example/Season 2", limit=30)
 
     assert {"series", "season", "album", "disc", "audiobook", "book_part"} <= kinds
     assert root["count"] == 1
@@ -2373,8 +2414,37 @@ def test_hierarchical_collections_and_folder_browse_are_bounded(monkeypatch, tmp
     assert second["items"][0]["path"] != root["items"][0]["path"]
     assert nested["items"][0]["path"] == "Shows/Example/Season 2"
     assert nested["items"][0]["queue_ref"] == "agent-node-a:Shows/Example/Season 2"
-    assert nested["breadcrumbs"][-1] == {"name": "Example", "path": "Shows/Example"}
+    assert nested["breadcrumbs"][0] == {
+        "name": "Folders",
+        "name_i18n": {"key": "runtime.media_center.ui.folders"},
+        "path": "",
+        "root": True,
+    }
+    assert nested["breadcrumbs"][-1] == {
+        "name": "Example",
+        "path": "Shows/Example",
+        "root": False,
+    }
+    assert leaf["folder_count"] == 0
+    assert leaf["file_count"] == 1
+    assert leaf["items"][0]["entry_type"] == "media"
+    assert leaf["items"][0]["media_kind"] == "video"
     _validate_schema("folder-node.v1.schema.json", nested["items"][0])
+
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(
+                1,
+                "Shows/Example/Season 2/Example.S02E03.mp4",
+                kind="video",
+                revision=2,
+                operation="removed",
+            )
+        )
+    )
+    removed_leaf = catalog.folders(parent="Shows/Example/Season 2", limit=30)
+    assert removed_leaf["items"] == []
+    assert removed_leaf["total_count"] == 0
 
 
 def test_home_exposes_bounded_flattened_shelf_items(monkeypatch, tmp_path):
@@ -2394,6 +2464,54 @@ def test_home_exposes_bounded_flattened_shelf_items(monkeypatch, tmp_path):
     assert home["items"]
     assert len(home["items"]) <= len(home["shelves"]) * 2
     assert all(item["shelf_id"] and item["shelf_title"] for item in home["items"])
+
+
+def test_home_history_shelves_are_personal_index_driven(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(_agent_delta(1, "Movies/Example.mp4", kind="video"))
+    )
+    item_id = catalog.list_items(sort="title", limit=1)["items"][0]["id"]
+
+    initial = {item["id"]: item for item in catalog.home(limit=3)["shelves"]}
+    assert initial["continue"]["items"] == []
+    assert initial["recent"]["items"] == []
+
+    catalog.checkpoint(
+        item_id,
+        profile_id="default",
+        position_ms=30_000,
+        duration_ms=120_000,
+    )
+    active = {item["id"]: item for item in catalog.home(limit=3)["shelves"]}
+    assert [item["id"] for item in active["continue"]["items"]] == [item_id]
+    assert [item["id"] for item in active["recent"]["items"]] == [item_id]
+
+    catalog.checkpoint(
+        item_id,
+        profile_id="default",
+        position_ms=120_000,
+        duration_ms=120_000,
+        completed=True,
+    )
+    completed = {item["id"]: item for item in catalog.home(limit=3)["shelves"]}
+    assert completed["continue"]["items"] == []
+    assert [item["id"] for item in completed["recent"]["items"]] == [item_id]
+    with catalog.repository.connect() as connection:
+        indexes = {
+            str(row["name"])
+            for row in connection.execute(
+                "PRAGMA index_list(personal_media_state)"
+            ).fetchall()
+        }
+    assert {
+        "idx_personal_media_recent_item",
+        "idx_personal_media_continue",
+        "idx_personal_media_favorite",
+    } <= indexes
 
 
 def test_collection_state_distinguishes_configuration_indexing_and_empty(
