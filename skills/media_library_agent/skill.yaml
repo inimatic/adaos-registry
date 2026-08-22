@@ -1,6 +1,7 @@
 name: media_library_agent
-version: 0.6.23
-description: Distributed node-local media discovery and bounded rendition agent with durable jobs and ordered catalog deltas.
+version: 0.6.24
+description: Distributed node-local media discovery and bounded rendition agent with
+  durable jobs and ordered catalog deltas.
 supported_locales:
 - en
 - ru
@@ -83,44 +84,65 @@ tools:
   entry: handlers.main:ensure_schema
   description: Ensure the durable agent schema.
   side_effects: local_write
-  input_schema: {type: object, additionalProperties: true}
-  output_schema: {type: object}
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: rehydrate
   entry: handlers.main:rehydrate
   description: Resume queued agent work after activation.
   side_effects: local_write
-  input_schema: {type: object, additionalProperties: true}
-  output_schema: {type: object}
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: add_root
   entry: handlers.main:add_root
   description: Add a node-local media root without copying media bytes.
   side_effects: local_write
   input_schema:
     type: object
-    required: [path]
+    required:
+    - path
     properties:
-      path: {type: string, minLength: 1}
-      label: {type: string}
-      include_images: {type: boolean, default: false}
-      follow_symlinks: {type: boolean, default: false}
+      path:
+        type: string
+        minLength: 1
+      label:
+        type: string
+      include_images:
+        type: boolean
+        default: false
+      follow_symlinks:
+        type: boolean
+        default: false
       exclusions:
         type: array
         maxItems: 64
-        items: {type: string, maxLength: 300}
-      scan_window: {type: object}
+        items:
+          type: string
+          maxLength: 300
+      scan_window:
+        type: object
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: remove_root
   entry: handlers.main:remove_root
   description: Disable a root while retaining its external files and indexed evidence.
   side_effects: local_write
   input_schema:
     type: object
-    required: [root_id]
+    required:
+    - root_id
     properties:
-      root_id: {type: string}
+      root_id:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: list_roots
   entry: handlers.main:list_roots
   description: List roots owned by this node agent.
@@ -128,9 +150,12 @@ tools:
   input_schema:
     type: object
     properties:
-      include_disabled: {type: boolean, default: false}
+      include_disabled:
+        type: boolean
+        default: false
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: start_scan
   entry: handlers.main:start_scan
   description: Queue incremental root scans and return durable job identifiers immediately.
@@ -139,11 +164,20 @@ tools:
   input_schema:
     type: object
     properties:
-      root_id: {type: string}
-      mode: {type: string, enum: [incremental, reconcile, full], default: incremental}
-      webspace_id: {type: string}
+      root_id:
+        type: string
+      mode:
+        type: string
+        enum:
+        - incremental
+        - reconcile
+        - full
+        default: incremental
+      webspace_id:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: import_folder
   entry: handlers.main:import_folder
   description: Add a folder and queue its first asynchronous in-place scan.
@@ -151,31 +185,47 @@ tools:
   timeout_seconds: 15
   input_schema:
     type: object
-    required: [path]
+    required:
+    - path
     properties:
-      path: {type: string, minLength: 1}
-      label: {type: string}
-      include_images: {type: boolean, default: false}
-      follow_symlinks: {type: boolean, default: false}
+      path:
+        type: string
+        minLength: 1
+      label:
+        type: string
+      include_images:
+        type: boolean
+        default: false
+      follow_symlinks:
+        type: boolean
+        default: false
       exclusions:
         type: array
         maxItems: 64
-        items: {type: string, maxLength: 300}
-      scan_window: {type: object}
-      webspace_id: {type: string}
+        items:
+          type: string
+          maxLength: 300
+      scan_window:
+        type: object
+      webspace_id:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: scan_status
   entry: handlers.main:scan_status
   description: Return one bounded durable scan progress record.
   side_effects: none
   input_schema:
     type: object
-    required: [job_id]
+    required:
+    - job_id
     properties:
-      job_id: {type: string}
+      job_id:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: list_jobs
   entry: handlers.main:list_jobs
   description: List recent bounded scan jobs.
@@ -183,21 +233,30 @@ tools:
   input_schema:
     type: object
     properties:
-      root_id: {type: string}
-      limit: {type: integer, minimum: 1, maximum: 100, default: 20}
+      root_id:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: cancel_scan
   entry: handlers.main:cancel_scan
   description: Cooperatively cancel one scan.
   side_effects: local_write
   input_schema:
     type: object
-    required: [job_id]
+    required:
+    - job_id
     properties:
-      job_id: {type: string}
+      job_id:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: pull_deltas
   entry: handlers.main:pull_deltas
   description: Pull ordered idempotent source deltas through an opaque cursor.
@@ -205,11 +264,18 @@ tools:
   input_schema:
     type: object
     properties:
-      cursor: {type: string}
-      root_id: {type: string}
-      limit: {type: integer, minimum: 1, maximum: 1000, default: 250}
+      cursor:
+        type: string
+      root_id:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 1000
+        default: 250
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: browse_folders
   entry: handlers.main:browse_folders
   description: Browse indexed folder hierarchy.
@@ -217,79 +283,140 @@ tools:
   input_schema:
     type: object
     properties:
-      root_id: {type: string}
-      parent: {type: string}
-      limit: {type: integer, minimum: 1, maximum: 500, default: 100}
-      cursor: {type: string}
+      root_id:
+        type: string
+      parent:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 500
+        default: 100
+      cursor:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: configure_schedule
   entry: handlers.main:configure_schedule
   description: Configure periodic root reconciliation.
   side_effects: local_write
   input_schema:
     type: object
-    required: [root_id]
+    required:
+    - root_id
     properties:
-      root_id: {type: string}
-      enabled: {type: boolean, default: true}
-      interval_seconds: {type: integer, minimum: 300, maximum: 604800, default: 21600}
-      debounce_seconds: {type: integer, minimum: 1, maximum: 3600, default: 30}
-      watch_enabled: {type: boolean, default: false}
-      watch_poll_seconds: {type: integer, minimum: 5, maximum: 3600, default: 30}
+      root_id:
+        type: string
+      enabled:
+        type: boolean
+        default: true
+      interval_seconds:
+        type: integer
+        minimum: 300
+        maximum: 604800
+        default: 21600
+      debounce_seconds:
+        type: integer
+        minimum: 1
+        maximum: 3600
+        default: 30
+      watch_enabled:
+        type: boolean
+        default: false
+      watch_poll_seconds:
+        type: integer
+        minimum: 5
+        maximum: 3600
+        default: 30
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: set_resource_pressure
   entry: handlers.main:set_resource_pressure
   description: Pause or resume background scans according to playback pressure.
   side_effects: local_write
   input_schema:
     type: object
-    required: [level]
+    required:
+    - level
     properties:
-      level: {type: string, enum: [normal, playback, critical]}
+      level:
+        type: string
+        enum:
+        - normal
+        - playback
+        - critical
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: inspect_source
   entry: handlers.main:inspect_source
   description: Inspect one source descriptor without reading media bytes.
   side_effects: none
   input_schema:
     type: object
-    required: [source_id]
+    required:
+    - source_id
     properties:
-      source_id: {type: string}
+      source_id:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: search_sources
   entry: handlers.main:search_sources
   description: Search one node-local shard including technical metadata.
   side_effects: none
   input_schema:
     type: object
-    required: [query]
+    required:
+    - query
     properties:
-      query: {type: string, minLength: 1, maxLength: 500}
-      limit: {type: integer, minimum: 1, maximum: 100, default: 30}
-      cursor: {type: string}
+      query:
+        type: string
+        minLength: 1
+        maxLength: 500
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 30
+      cursor:
+        type: string
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: plan_rendition
   entry: handlers.main:plan_rendition
-  description: Plan and queue a bounded browser-compatible derived rendition when required.
+  description: Plan and queue a bounded browser-compatible derived rendition when
+    required.
   side_effects: local_write
   timeout_seconds: 15
   input_schema:
     type: object
-    required: [source_id]
+    required:
+    - source_id
     properties:
-      source_id: {type: string, minLength: 1}
-      endpoint_capabilities: {type: object}
-      profile: {type: string, default: browser-mp4-v1}
-      priority: {type: integer, minimum: 0, maximum: 1000, default: 50}
-      force: {type: boolean, default: false}
+      source_id:
+        type: string
+        minLength: 1
+      endpoint_capabilities:
+        type: object
+      profile:
+        type: string
+        default: browser-mp4-v1
+      priority:
+        type: integer
+        minimum: 0
+        maximum: 1000
+        default: 50
+      force:
+        type: boolean
+        default: false
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: plan_artwork
   entry: handlers.main:plan_artwork
   description: Resolve embedded or folder artwork and queue one bounded derived JPEG.
@@ -297,24 +424,38 @@ tools:
   timeout_seconds: 15
   input_schema:
     type: object
-    required: [source_id]
+    required:
+    - source_id
     properties:
-      source_id: {type: string, minLength: 1}
-      priority: {type: integer, minimum: 0, maximum: 1000, default: 350}
-      force: {type: boolean, default: false}
+      source_id:
+        type: string
+        minLength: 1
+      priority:
+        type: integer
+        minimum: 0
+        maximum: 1000
+        default: 350
+      force:
+        type: boolean
+        default: false
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: rendition_status
   entry: handlers.main:rendition_status
   description: Return one bounded durable rendition job.
   side_effects: none
   input_schema:
     type: object
-    required: [job_id]
+    required:
+    - job_id
     properties:
-      job_id: {type: string, minLength: 1}
+      job_id:
+        type: string
+        minLength: 1
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: list_rendition_jobs
   entry: handlers.main:list_rendition_jobs
   description: List recent bounded rendition jobs.
@@ -322,39 +463,58 @@ tools:
   input_schema:
     type: object
     properties:
-      source_id: {type: string}
-      limit: {type: integer, minimum: 1, maximum: 100, default: 20}
+      source_id:
+        type: string
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: cancel_rendition
   entry: handlers.main:cancel_rendition
   description: Cooperatively cancel one queued or running rendition.
   side_effects: local_write
   input_schema:
     type: object
-    required: [job_id]
+    required:
+    - job_id
     properties:
-      job_id: {type: string, minLength: 1}
+      job_id:
+        type: string
+        minLength: 1
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: status
   entry: handlers.main:status
   description: Return compact agent health, progress, and capacity.
   side_effects: none
-  input_schema: {type: object, additionalProperties: true}
-  output_schema: {type: object}
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: observe_topology
   entry: handlers.main:observe_topology
-  description: Validate and report one node-local partition replica to the authority plane.
+  description: Validate and report one node-local partition replica to the authority
+    plane.
   side_effects: none
   input_schema:
     type: object
-    required: [partition, replica]
+    required:
+    - partition
+    - replica
     properties:
-      partition: {type: object}
-      replica: {type: object}
+      partition:
+        type: object
+      replica:
+        type: object
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: distributed_topology_phase
   entry: handlers.main:distributed_topology_phase
   description: Execute one reviewed idempotent topology adapter phase.
@@ -362,22 +522,49 @@ tools:
   timeout_seconds: 600
   input_schema:
     type: object
-    required: [schema, target_node_id, selected_instance_id, operation_id, plan_digest, plan, phase, authority_epoch, idempotency_key, step, dataset, partition]
+    required:
+    - schema
+    - target_node_id
+    - selected_instance_id
+    - operation_id
+    - plan_digest
+    - plan
+    - phase
+    - authority_epoch
+    - idempotency_key
+    - step
+    - dataset
+    - partition
     properties:
-      schema: {const: adaos.distributed.topology_phase_request.v1}
-      target_node_id: {type: string}
-      selected_instance_id: {type: string}
-      operation_id: {type: string}
-      plan_digest: {type: string}
-      plan: {type: object}
-      phase: {type: string}
-      authority_epoch: {type: integer, minimum: 0}
-      idempotency_key: {type: string, minLength: 1}
-      step: {type: object}
-      dataset: {type: object}
-      partition: {type: object}
+      schema:
+        const: adaos.distributed.topology_phase_request.v1
+      target_node_id:
+        type: string
+      selected_instance_id:
+        type: string
+      operation_id:
+        type: string
+      plan_digest:
+        type: string
+      plan:
+        type: object
+      phase:
+        type: string
+      authority_epoch:
+        type: integer
+        minimum: 0
+      idempotency_key:
+        type: string
+        minLength: 1
+      step:
+        type: object
+      dataset:
+        type: object
+      partition:
+        type: object
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: distributed_topology_transfer
   entry: handlers.main:distributed_topology_transfer
   description: Read or write one bounded reviewed derived-catalog transfer chunk.
@@ -385,30 +572,67 @@ tools:
   timeout_seconds: 600
   input_schema:
     type: object
-    required: [schema, target_node_id, selected_instance_id, operation_id, plan_digest, plan, direction, authority_epoch, idempotency_key, transfer_id, manifest, step, dataset, partition]
+    required:
+    - schema
+    - target_node_id
+    - selected_instance_id
+    - operation_id
+    - plan_digest
+    - plan
+    - direction
+    - authority_epoch
+    - idempotency_key
+    - transfer_id
+    - manifest
+    - step
+    - dataset
+    - partition
     properties:
-      schema: {const: adaos.distributed.topology_transfer_request.v1}
-      target_node_id: {type: string}
-      selected_instance_id: {type: string}
-      operation_id: {type: string}
-      plan_digest: {type: string}
-      plan: {type: object}
-      direction: {enum: [read, write]}
-      authority_epoch: {type: integer, minimum: 0}
-      idempotency_key: {type: string, minLength: 1}
-      transfer_id: {type: string, minLength: 1}
-      manifest: {type: object}
-      step: {type: object}
-      dataset: {type: object}
-      partition: {type: object}
+      schema:
+        const: adaos.distributed.topology_transfer_request.v1
+      target_node_id:
+        type: string
+      selected_instance_id:
+        type: string
+      operation_id:
+        type: string
+      plan_digest:
+        type: string
+      plan:
+        type: object
+      direction:
+        enum:
+        - read
+        - write
+      authority_epoch:
+        type: integer
+        minimum: 0
+      idempotency_key:
+        type: string
+        minLength: 1
+      transfer_id:
+        type: string
+        minLength: 1
+      manifest:
+        type: object
+      step:
+        type: object
+      dataset:
+        type: object
+      partition:
+        type: object
     additionalProperties: true
-  output_schema: {type: object}
+  output_schema:
+    type: object
 - name: dispose
   entry: handlers.main:dispose
   description: Stop process-local background workers.
   side_effects: local_write
-  input_schema: {type: object, additionalProperties: true}
-  output_schema: {type: object}
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
 data_routes:
 - surface: widget:media-library-agent-status
   route: tool/details
@@ -417,14 +641,20 @@ data_routes:
   first_paint: bounded local agent health, capacity, schedules, and pressure
   recovery: repeat status after scan or pressure invalidation
   guard_visibility: aggregate counts and limits; no configured root paths
-  budget: {max_payload_bytes: 131072, snapshot_policy: manual}
+  budget:
+    max_payload_bytes: 131072
+    snapshot_policy: manual
   read_policy:
     mode: explicit
-    triggers: [mount, explicit_refresh, targeted_invalidation]
+    triggers:
+    - mount
+    - explicit_refresh
+    - targeted_invalidation
     cache_ttl_ms: 1000
     max_request_hz: 1
     preserve_last_value: true
-    invalidation_tags: [media_center.agent]
+    invalidation_tags:
+    - media_center.agent
 - surface: modal:media-center-settings
   route: stream
   receiver: media_library_agent.progress
@@ -449,7 +679,8 @@ data_routes:
   owner: skill:media_library_agent
   first_paint: empty root and scan registry
   recovery: WAL recovery and queued job rehydration
-  guard_visibility: only public bounded tools expose metadata; media bytes remain external
+  guard_visibility: only public bounded tools expose metadata; media bytes remain
+    external
   budget:
     max_payload_bytes: 1048576
 - surface: modal:media-center-renditions
@@ -485,8 +716,11 @@ memory_budget:
     max_items: 100
     cleanup_hook: dispose
 llm_hints:
-  description: Node-local asynchronous media discovery agent used by the Media Center coordinator.
-  aliases: [media library agent, media scanner]
+  description: Node-local asynchronous media discovery agent used by the Media Center
+    coordinator.
+  aliases:
+  - media library agent
+  - media scanner
   primary_actions:
   - id: media_library_agent.import_folder
     intent: media_center.import_folder
@@ -496,4 +730,13 @@ llm_hints:
     intent: media_center.scan
     tool: start_scan
     side_effect_class: local_write
-updated_at: '2026-08-21T00:00:00+00:00'
+updated_at: '2026-08-22T19:28:14+00:00'
+compatibility:
+  adaos_core:
+    min_version: 0.1.917+5569.8cb8b68b
+    recorded_at: '2026-08-22T19:28:14+00:00'
+    source: skill_push
+    min_commit: 8cb8b68b583de12d1a50ca9ea827f6969be7888c
+    min_short_commit: 8cb8b68b
+    build_date: '2026-08-22T07:02:58+03:00'
+
