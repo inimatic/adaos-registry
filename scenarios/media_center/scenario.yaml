@@ -2,7 +2,8 @@ id: media_center
 name: media_center
 version: 0.6.9
 title: Media Center
-description: Distributed Media Center application with in-place library agents, a bounded coordinator catalog, persistent playback, and remote-control surfaces.
+description: Distributed Media Center application with in-place library agents, a
+  bounded coordinator catalog, persistent playback, and remote-control surfaces.
 type: desktop
 supported_locales:
 - en
@@ -28,7 +29,8 @@ guidance:
   schema: adaos.scenario.guidance.v1
   readme: README.md
   overview:
-    en: Browse and play local media through a durable catalog while keeping files at their original storage paths.
+    en: Browse and play local media through a durable catalog while keeping files
+      at their original storage paths.
   presentation:
     channels:
     - web
@@ -46,7 +48,8 @@ guidance:
     help_intent: media_center.help
     next_steps_intent: media_center.next_steps
 llm_hints:
-  description: Media Center application for distributed in-place libraries, compact bounded browsing, persistent playback, and remote control.
+  description: Media Center application for distributed in-place libraries, compact
+    bounded browsing, persistent playback, and remote control.
   aliases:
   - Media Center
   - media center
@@ -84,4 +87,5 @@ nlu:
     entities: []
 steps: []
 prototype: scenario_default
-updated_at: '2026-08-21T00:00:00+00:00'
+updated_at: '2026-08-22T10:46:39+00:00'
+
