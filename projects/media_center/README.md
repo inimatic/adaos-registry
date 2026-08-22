@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.49` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.50` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -24,13 +24,19 @@ rewrites legacy `local` root, source, and delta identities in place while
 preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
 
-The `0.6.49` release adds validated reuse of an unchanged catalog transfer
-snapshot in `media_library_agent@0.6.24`. Before reuse, the agent compares the
+The `0.6.50` release adds validated reuse of an unchanged catalog transfer
+snapshot in `media_library_agent@0.6.25`. Before reuse, the agent compares the
 exact catalog witness and checkpoint, validates the complete zlib stream, and
 checks the declared item count. A changed or corrupt snapshot is ignored and
-rebuilt. This avoids repeatedly scanning and compressing the same large catalog
-during authority handoff while retaining metadata-only transfer and direct
-references to media at its original storage location.
+rebuilt. New snapshots use a latency-oriented compression level. This avoids
+repeatedly scanning and expensively recompressing the same large catalog during
+authority handoff while retaining metadata-only transfer and direct references
+to media at its original storage location.
+
+`0.6.49` remained a local prepublication build. Stand validation exposed a
+ten-minute cold snapshot timeout, so its source closure was not published and
+`0.6.50` received a fresh immutable release identity after the bounded
+compression correction.
 
 The `0.6.41` release adds an authoritative endpoint-session bridge between the
 app-shell media element and `media_control_skill`. Playback admission retires a
