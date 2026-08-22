@@ -1,5 +1,5 @@
 name: media_control_skill
-version: 0.2.2
+version: 0.2.3
 description: Persistent Media Center control plane for playback targets, sessions, queues, commands, checkpoints, and settings.
 supported_locales: [en, ru]
 entry: handlers/main.py

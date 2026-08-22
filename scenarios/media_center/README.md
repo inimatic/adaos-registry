@@ -2,8 +2,9 @@
 
 Media Center is a Project-composed household media application. Its scenario is UI-as-data only; domain identity, indexing, playback, control, and byte delivery remain in skills, app shell, and core boundaries.
 
-Version `0.6.9` is a provenance-only package revision for Project `0.6.46`;
-the UI-as-data behavior is unchanged from `0.6.8`.
+Version `0.6.10` moves metadata operation observability to the coordinator's
+bounded subscription stream for Project `0.6.47`; the rest of the UI-as-data
+behavior is unchanged from `0.6.9`.
 
 ## Surfaces
 
