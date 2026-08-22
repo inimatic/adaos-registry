@@ -1,5 +1,5 @@
 name: media_library_agent
-version: 0.6.24
+version: 0.6.25
 description: Distributed node-local media discovery and bounded rendition agent with
   durable jobs and ordered catalog deltas.
 supported_locales:
@@ -730,11 +730,11 @@ llm_hints:
     intent: media_center.scan
     tool: start_scan
     side_effect_class: local_write
-updated_at: '2026-08-22T19:28:14+00:00'
+updated_at: '2026-08-22T19:31:11+00:00'
 compatibility:
   adaos_core:
     min_version: 0.1.917+5569.8cb8b68b
-    recorded_at: '2026-08-22T19:28:14+00:00'
+    recorded_at: '2026-08-22T19:31:11+00:00'
     source: skill_push
     min_commit: 8cb8b68b583de12d1a50ca9ea827f6969be7888c
     min_short_commit: 8cb8b68b
