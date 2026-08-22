@@ -18,6 +18,12 @@ ARM_IDS = (
     "C4_over_specified",
 )
 
+CALIBRATION_EXCLUSION_RULES = (
+    "Only a preregistered platform outage before candidate execution may exclude an attempt.",
+    "Model refusal, timeout after candidate execution begins, schema failure, protocol drift, and implementation or evidence failure remain scored failures of the primary correctness endpoint.",
+    "Resource budget excess is never excluded and is recorded only by budget_compliant and the budgeted secondary endpoint.",
+)
+
 
 def now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
@@ -110,6 +116,9 @@ def freeze_task(value: Mapping[str, Any]) -> dict[str, Any]:
         "C3_typed_execution": {"research_compilation", "automation_brief", "conformance_fixture"},
         "C4_over_specified": {"research_compilation", "automation_brief", "conformance_fixture", "prescribed_scaffold"},
     }
+    if schema_version == "1.10.0":
+        expected_kinds["C3_typed_execution"].add("runner_contract")
+        expected_kinds["C4_over_specified"].add("runner_contract")
     for arm_id, kinds in expected_kinds.items():
         actual = {inputs[input_id]["kind"] for input_id in arms[arm_id]["instruction_input_ids"]}
         if actual != kinds:
@@ -117,9 +126,9 @@ def freeze_task(value: Mapping[str, Any]) -> dict[str, Any]:
     seeds = list(validated["repetitions"]["paired_seeds"])
     if validated["repetitions"]["attempts_per_arm"] != len(seeds):
         raise ValueError("attempts_per_arm must equal paired_seeds length")
-    if schema_version in {"1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0"} and validated["repetitions"]["model_random_seed_control"] != "unsupported_not_claimed":
+    if schema_version in {"1.1.0", "1.2.0", "1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0", "1.9.0", "1.10.0"} and validated["repetitions"]["model_random_seed_control"] != "unsupported_not_claimed":
         raise ValueError("calibration must not claim unsupported model random-seed control")
-    if schema_version in {"1.3.0", "1.4.0", "1.5.0", "1.6.0"}:
+    if schema_version in {"1.3.0", "1.4.0", "1.5.0", "1.6.0", "1.7.0", "1.8.0", "1.9.0", "1.10.0"}:
         comparison = dict(validated["comparison_plan"])
         if int(comparison["planned_pairs"]) != len(seeds):
             raise ValueError("comparison planned_pairs must equal paired_seeds length")
@@ -142,9 +151,25 @@ def freeze_task(value: Mapping[str, Any]) -> dict[str, Any]:
         }
         if abs(first_counts[comparison["control_arm"]] - first_counts[comparison["treatment_arm"]]) > 1:
             raise ValueError("comparison execution order must be counterbalanced")
+    if schema_version in {"1.7.0", "1.8.0", "1.9.0", "1.10.0"} and tuple(validated["exclusion_rules"]) != CALIBRATION_EXCLUSION_RULES:
+        raise ValueError(
+            "v1.7+ calibration exclusion rules must keep correctness and resource endpoints separate"
+        )
     check_ids = [str(item["check_id"]) for item in validated["rubric"]["checks"]]
     if len(check_ids) != len(set(check_ids)):
         raise ValueError("rubric check ids must be unique")
+    if schema_version in {"1.9.0", "1.10.0"} and set(check_ids) != {
+        "context_isolation",
+        "protocol_fidelity",
+        "native_skill_validation",
+        "runner_conformance",
+        "scientific_implementation",
+        "cpu_workflow_smoke",
+        "evidence_manifest",
+    }:
+        raise ValueError(
+            "v1.9+ calibration requires the complete scientific implementation rubric"
+        )
     return validated
 
 
@@ -152,4 +177,14 @@ def validate_result(value: Mapping[str, Any]) -> dict[str, Any]:
     return validate("research.calibration_result.v1.schema.json", value)
 
 
-__all__ = ["ARM_IDS", "canonical", "digest", "file_digest", "freeze_task", "now", "validate", "validate_result"]
+__all__ = [
+    "ARM_IDS",
+    "CALIBRATION_EXCLUSION_RULES",
+    "canonical",
+    "digest",
+    "file_digest",
+    "freeze_task",
+    "now",
+    "validate",
+    "validate_result",
+]

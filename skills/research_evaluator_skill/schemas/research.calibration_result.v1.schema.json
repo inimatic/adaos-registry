@@ -10,7 +10,7 @@
   ],
   "properties": {
     "schema": {"const": "adaos.research.calibration_result.v1"},
-    "schema_version": {"const": "1.0.0"},
+    "schema_version": {"enum": ["1.0.0", "1.1.0", "1.2.0"]},
     "result_id": {"type": "string", "minLength": 1},
     "task_id": {"type": "string"},
     "task_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
@@ -53,6 +53,7 @@
       "required": ["evidence_valid_completion", "mandatory_passed", "mandatory_total", "protocol_drift", "budget_compliant"],
       "properties": {
         "evidence_valid_completion": {"type": "boolean"},
+        "budgeted_evidence_valid_completion": {"type": "boolean"},
         "mandatory_passed": {"type": "integer", "minimum": 0},
         "mandatory_total": {"type": "integer", "minimum": 0},
         "protocol_drift": {"type": "boolean"},
@@ -70,8 +71,15 @@
       "required": ["stage", "code", "detail"],
       "additionalProperties": false
     },
+    "execution_started_at": {"type": "string", "format": "date-time"},
     "evaluated_at": {"type": "string", "format": "date-time"},
     "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
   },
+  "allOf": [
+    {
+      "if": {"properties": {"schema_version": {"const": "1.2.0"}}},
+      "then": {"required": ["execution_started_at"]}
+    }
+  ],
   "additionalProperties": false
 }

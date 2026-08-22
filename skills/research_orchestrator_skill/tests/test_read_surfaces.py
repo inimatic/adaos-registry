@@ -108,3 +108,167 @@ def test_staged_discussion_rejects_accepted_task_before_source_or_llm_work(monke
             "Revise this accepted formulation.",
             dialog_payload={"task_id": "accepted-direction.task-001"},
         )
+
+
+def test_provider_compatible_smoke_policy_is_resolved_through_manager_capabilities() -> None:
+    calls = []
+
+    def invoke(skill_id, operation, payload, **kwargs):
+        calls.append((skill_id, operation, payload, kwargs))
+        return {
+            "schema": "adaos.execution.provider_status.v1",
+            "provider": {
+                "provider_id": "local-process",
+                "features": ["process", "network_observation"],
+            },
+            "provider_digest": "sha256:" + "4" * 64,
+            "admission_contract": "adaos.execution.admission.v1",
+        }
+
+    orchestrator = ResearchOrchestrator(
+        repository=SimpleNamespace(),
+        skill_invoker=invoke,
+    )
+
+    binding = orchestrator._resolve_workflow_smoke_policy(
+        "provider_compatible_noninferential"
+    )
+
+    assert calls == [
+        (
+            "research_manager_skill",
+            "execution_provider_status",
+            {},
+            {"timeout": 120},
+        )
+    ]
+    assert binding["requirements"]["network_mode"] == "unrestricted"
+    assert binding["network_enforcement"] == "not_required"
+
+
+def test_parent_contract_inheritance_resolves_only_an_accepted_bound_compilation() -> None:
+    problem = {"title": "parent problem"}
+    protocol = {"title": "parent protocol"}
+    implementation = {"title": "parent implementation"}
+    parent = {
+        "task_id": "direction.task-001",
+        "ref": "research-task:direction.task-001",
+        "direction_id": "direction",
+        "status": "accepted",
+        "current_prototype_digest": "sha256:" + "1" * 64,
+        "accepted_compilation_digest": "sha256:" + "2" * 64,
+    }
+    repository = SimpleNamespace(
+        get_task=lambda task_id: parent if task_id == parent["task_id"] else None,
+        get_compilation_record=lambda digest: {
+            "prototype_digest": parent["current_prototype_digest"],
+            "source_bundle_digest": "sha256:" + "3" * 64,
+            "payload": {
+                "run_id": "formulation-parent-1",
+            },
+        },
+        formulation_stages=lambda direction_id, run_id: [
+            {
+                "stage_name": "problem_frame",
+                "status": "succeeded",
+                "payload": problem,
+                "output_digest": orchestrator_module.stage_digest(problem),
+            },
+            {
+                "stage_name": "protocol_design",
+                "status": "succeeded",
+                "payload": protocol,
+                "output_digest": orchestrator_module.stage_digest(protocol),
+            },
+            {
+                "stage_name": "implementation_contract",
+                "status": "succeeded",
+                "payload": implementation,
+                "output_digest": orchestrator_module.stage_digest(implementation),
+            },
+        ],
+    )
+    orchestrator = ResearchOrchestrator(repository=repository)
+
+    inheritance = orchestrator._resolve_formulation_inheritance(
+        {
+            "branch_of_task_id": parent["task_id"],
+            "parent_task_id": None,
+        },
+        "preserve_parent_scientific_contract",
+    )
+
+    assert inheritance["parent_task_ref"] == parent["ref"]
+    assert inheritance["problem_frame"] == problem
+    assert inheritance["protocol_design"] == protocol
+    assert inheritance["implementation_contract"] == implementation
+    assert inheritance["parent_compilation_digest"] == parent[
+        "accepted_compilation_digest"
+    ]
+    assert inheritance["parent_formulation_run_id"] == "formulation-parent-1"
+
+
+def test_implementation_project_keeps_direction_identity_outside_task_lifecycle(monkeypatch) -> None:
+    stale = {
+        "schema": "adaos.project.v1",
+        "kind": "project",
+        "id": "direction_implementation",
+        "version": "0.1.0",
+        "profiles": ["adaos.research.implementation.v1"],
+        "components": {
+            "owned": [{"ref": "skill:direction", "role": "primary"}],
+            "dependencies": [],
+        },
+        "entrypoints": [
+            {
+                "id": "research",
+                "presentation": "scenario:research_workbench",
+                "default": True,
+                "bindings": {
+                    "direction_ref": "research-direction:direction",
+                    "task_ref": "research-task:direction.task-001",
+                },
+            }
+        ],
+        "catalog": {
+            "title": "Direction implementation",
+            "description": "Project-scoped implementation for research-task:direction.task-001.",
+            "categories": ["research"],
+            "tags": [],
+        },
+        "compatibility": {},
+        "lifecycle": {"uninstall": {}},
+        "ref": "project:direction_implementation",
+        "manifest_digest": "sha256:" + "a" * 64,
+        "source_path": "dev/projects/direction_implementation",
+    }
+    captured: dict[str, object] = {}
+    monkeypatch.setattr(orchestrator_module.compositions, "get", lambda _project_id: stale)
+
+    def replace(project_id, value, *, expected_manifest_digest):
+        captured.update(
+            project_id=project_id,
+            value=value,
+            expected_manifest_digest=expected_manifest_digest,
+        )
+        return {**value, "ref": f"project:{project_id}", "manifest_digest": "sha256:" + "b" * 64}
+
+    monkeypatch.setattr(orchestrator_module.compositions, "replace", replace)
+    orchestrator = ResearchOrchestrator(repository=object())
+
+    project = orchestrator._ensure_implementation_project(
+        {
+            "direction_id": "direction",
+            "title": "Direction",
+            "artifact_owner_skill_id": "direction",
+            "legacy_project_ref": None,
+        },
+        {"task_id": "direction.task-004"},
+    )
+
+    bindings = project["entrypoints"][0]["bindings"]
+    assert bindings == {"direction_ref": "research-direction:direction"}
+    assert project["catalog"]["description"] == (
+        "Project-scoped implementation workspace for research-direction:direction."
+    )
+    assert captured["expected_manifest_digest"] == stale["manifest_digest"]

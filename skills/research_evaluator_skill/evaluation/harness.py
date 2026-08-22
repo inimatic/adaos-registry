@@ -156,10 +156,10 @@ def evaluate_candidate(task_value: Mapping[str, Any], candidate: Mapping[str, An
     failure = copy.deepcopy(candidate.get("failure")) if isinstance(candidate.get("failure"), Mapping) else None
     evidence_valid = (
         mandatory_passed == len(mandatory)
-        and budget_compliant
         and not protocol_drift
         and failure is None
     )
+    budgeted_evidence_valid = evidence_valid and budget_compliant
     if not evidence_valid and failure is None:
         failed = [item for item in mandatory if item["status"] != "pass"]
         if failed:
@@ -171,11 +171,10 @@ def evaluate_candidate(task_value: Mapping[str, Any], candidate: Mapping[str, An
             }
         elif protocol_drift:
             failure = {"stage": "implementation", "code": "protocol_drift", "detail": "Produced protocol digest differs from the frozen task."}
-        else:
-            failure = {"stage": "runtime_infrastructure", "code": "budget_exceeded", "detail": "Candidate exceeded the selected preregistered budget."}
+    execution_started_at = str(candidate.get("execution_started_at") or "").strip()
     result: dict[str, Any] = {
         "schema": "adaos.research.calibration_result.v1",
-        "schema_version": "1.0.0",
+        "schema_version": "1.2.0" if execution_started_at else "1.1.0",
         "result_id": f"result-{task['task_id']}-{arm_id}-{attempt_index}-{budget_view}",
         "task_id": task["task_id"],
         "task_digest": task["digest"],
@@ -190,6 +189,7 @@ def evaluate_candidate(task_value: Mapping[str, Any], candidate: Mapping[str, An
         "checks": checks,
         "metrics": {
             "evidence_valid_completion": evidence_valid,
+            "budgeted_evidence_valid_completion": budgeted_evidence_valid,
             "mandatory_passed": mandatory_passed,
             "mandatory_total": len(mandatory),
             "protocol_drift": protocol_drift,
@@ -198,6 +198,8 @@ def evaluate_candidate(task_value: Mapping[str, Any], candidate: Mapping[str, An
         "failure": failure,
         "evaluated_at": now(),
     }
+    if execution_started_at:
+        result["execution_started_at"] = execution_started_at
     result["digest"] = digest(result)
     return validate_result(result)
 
@@ -244,6 +246,7 @@ def _paired_comparison(
             raise ValueError("paired calibration contains a duplicate arm attempt")
         by_pair[key] = item
     pairs = []
+    expected_sequence: list[tuple[str, int]] = []
     treatment_wins = control_wins = ties = 0
     for scheduled in plan["execution_order"]:
         attempt_index = int(scheduled["attempt_index"])
@@ -251,6 +254,12 @@ def _paired_comparison(
         control = by_pair.get((control_arm, attempt_index))
         treatment = by_pair.get((treatment_arm, attempt_index))
         complete = control is not None and treatment is not None
+        expected_sequence.extend(
+            (
+                (str(scheduled["first_arm"]), attempt_index),
+                (str(scheduled["second_arm"]), attempt_index),
+            )
+        )
         control_value = (
             bool(dict(control.get("metrics") or {}).get(endpoint)) if control else None
         )
@@ -280,12 +289,85 @@ def _paired_comparison(
                 "second_arm": str(scheduled["second_arm"]),
                 "control_value": control_value,
                 "treatment_value": treatment_value,
+                "control_started_at": (
+                    str(control.get("execution_started_at") or "") or None
+                    if control
+                    else None
+                ),
+                "treatment_started_at": (
+                    str(treatment.get("execution_started_at") or "") or None
+                    if treatment
+                    else None
+                ),
                 "outcome": outcome,
             }
         )
     complete_pairs = sum(1 for item in pairs if item["outcome"] != "missing")
     planned_pairs = int(plan["planned_pairs"])
     complete = complete_pairs == planned_pairs
+    scheduled_rows = [
+        (key, by_pair[key])
+        for key in expected_sequence
+        if key in by_pair
+    ]
+    execution_order_verifiable = bool(scheduled_rows) and all(
+        str(row.get("execution_started_at") or "").strip()
+        for _, row in scheduled_rows
+    )
+    observation_source = (
+        "execution_started_at"
+        if execution_order_verifiable
+        else "evaluated_at_legacy"
+    )
+    observed_sequence = sorted(
+        scheduled_rows,
+        key=lambda item: (
+            str(
+                item[1].get("execution_started_at")
+                if execution_order_verifiable
+                else item[1].get("evaluated_at")
+                or ""
+            ),
+            expected_sequence.index(item[0]),
+        ),
+    )
+    observed_keys = [key for key, _ in observed_sequence]
+    observed_timestamps = [
+        str(
+            row.get("execution_started_at")
+            if execution_order_verifiable
+            else row.get("evaluated_at")
+            or ""
+        )
+        for _, row in observed_sequence
+    ]
+    timestamps_unique = len(observed_timestamps) == len(set(observed_timestamps))
+    expected_prefix = expected_sequence[: len(observed_keys)]
+    execution_order_valid = observed_keys == expected_prefix and timestamps_unique
+    execution_order_violations = [
+        {
+            "position": position,
+            "expected_arm": expected[0],
+            "expected_attempt_index": expected[1],
+            "observed_arm": observed[0],
+            "observed_attempt_index": observed[1],
+        }
+        for position, (expected, observed) in enumerate(
+            zip(expected_prefix, observed_keys, strict=True), start=1
+        )
+        if expected != observed
+    ]
+    if not timestamps_unique and observed_keys:
+        execution_order_violations.append(
+            {
+                "position": None,
+                "expected_arm": None,
+                "expected_attempt_index": None,
+                "observed_arm": None,
+                "observed_attempt_index": None,
+                "reason": "execution timestamps are not strictly ordered",
+            }
+        )
     p_value = _one_sided_sign_p(treatment_wins, control_wins) if complete else None
     paired_risk_difference = (
         (treatment_wins - control_wins) / planned_pairs if complete else None
@@ -293,17 +375,22 @@ def _paired_comparison(
     alpha = float(plan["alpha"])
     supports = bool(
         complete
+        and execution_order_verifiable
+        and execution_order_valid
         and p_value is not None
         and p_value <= alpha
         and treatment_wins > control_wins
     )
-    claim_status = (
-        "supports_local_advantage"
-        if supports
-        else "does_not_support_local_advantage"
-        if complete
-        else "incomplete_no_claim"
-    )
+    if not complete:
+        claim_status = "incomplete_no_claim"
+    elif not execution_order_verifiable:
+        claim_status = "execution_order_unverifiable_no_claim"
+    elif not execution_order_valid:
+        claim_status = "execution_order_violation_no_claim"
+    elif supports:
+        claim_status = "supports_local_advantage"
+    else:
+        claim_status = "does_not_support_local_advantage"
     return {
         "control_arm": control_arm,
         "treatment_arm": treatment_arm,
@@ -312,6 +399,20 @@ def _paired_comparison(
         "planned_pairs": planned_pairs,
         "complete_pairs": complete_pairs,
         "complete": complete,
+        "execution_order_verifiable": execution_order_verifiable,
+        "execution_order_valid": execution_order_valid,
+        "execution_order_observation_source": observation_source,
+        "execution_order_violations": execution_order_violations,
+        "observed_execution_sequence": [
+            {
+                "arm_id": key[0],
+                "attempt_index": key[1],
+                "observed_at": timestamp,
+            }
+            for key, timestamp in zip(
+                observed_keys, observed_timestamps, strict=True
+            )
+        ],
         "treatment_wins": treatment_wins,
         "control_wins": control_wins,
         "ties": ties,
@@ -356,6 +457,15 @@ def summarize(task: Mapping[str, Any], results: list[Mapping[str, Any]]) -> dict
     for arm_id in ARM_IDS:
         rows = [dict(item) for item in results if item.get("arm_id") == arm_id]
         successes = sum(1 for item in rows if item.get("metrics", {}).get("evidence_valid_completion"))
+        budgeted_successes = sum(
+            1
+            for item in rows
+            if item.get("metrics", {}).get(
+                "budgeted_evidence_valid_completion",
+                item.get("metrics", {}).get("evidence_valid_completion")
+                and item.get("metrics", {}).get("budget_compliant"),
+            )
+        )
         failures: dict[str, int] = {}
         for item in rows:
             stage = str((item.get("failure") or {}).get("stage") or "none")
@@ -367,7 +477,9 @@ def summarize(task: Mapping[str, Any], results: list[Mapping[str, Any]]) -> dict
                 "expected": expected,
                 "complete": len(rows) == expected,
                 "evidence_valid_completions": successes,
+                "budgeted_evidence_valid_completions": budgeted_successes,
                 "rate": successes / len(rows) if rows else None,
+                "budgeted_rate": budgeted_successes / len(rows) if rows else None,
                 "wilson_95": _wilson(successes, len(rows)),
                 "failure_stages": failures,
                 "mean_model_tokens": sum(item["budget_usage"]["model_tokens"] for item in rows) / len(rows) if rows else None,
@@ -378,7 +490,7 @@ def summarize(task: Mapping[str, Any], results: list[Mapping[str, Any]]) -> dict
     all_arms_complete = all(item["complete"] for item in arms)
     identity = {
         "schema": "adaos.research.calibration_summary.v1",
-        "schema_version": "1.1.0" if primary_comparison else "1.0.0",
+        "schema_version": "1.2.0" if primary_comparison else "1.0.0",
         "task_id": task["task_id"],
         "task_digest": task["digest"],
         "primary_endpoint": "evidence_valid_completion",
@@ -413,7 +525,7 @@ def build_recomputable_package(
     summary = summarize(task, selected_results)
     identity = {
         "schema": "adaos.research.calibration_package.v1",
-        "schema_version": "1.1.0" if task.get("comparison_plan") else "1.0.0",
+        "schema_version": "1.2.0" if task.get("comparison_plan") else "1.0.0",
         "task": dict(task),
         "budget_view": str(budget_view),
         "packets": selected_packets,
@@ -422,7 +534,7 @@ def build_recomputable_package(
         "recompute": {
             "algorithm": "evaluation.harness:summarize",
             "algorithm_contract": (
-                "adaos.research.calibration_summary.v1.1"
+                "adaos.research.calibration_summary.v1.2"
                 if task.get("comparison_plan")
                 else "adaos.research.calibration_summary.v1"
             ),

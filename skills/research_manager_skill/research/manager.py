@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import sys
@@ -14,6 +15,7 @@ from urllib.parse import urlsplit
 import jsonschema
 
 from adaos.domain.execution import ExecutionSpec
+from adaos.domain.development_validation import normalize_validation_budget
 from adaos.domain.runtime_bindings import ServiceBinding
 from adaos.sdk.data.secrets import get as get_secret
 from adaos.sdk.skills import invoke as invoke_skill
@@ -25,13 +27,14 @@ from adaos.sdk.execution import (
     ExecutionNetworkPolicy,
     ExecutionResourceRequest,
     cancel as cancel_execution,
+    capabilities as execution_capabilities,
     reconcile,
     spec,
     submit,
 )
 
 from research import evidence, experiment, guidance
-from research.contracts import ResearchRecord, canonical_json, digest, identity, now
+from research.contracts import ResearchRecord, digest, identity, now
 from research.repository import ResearchRepository
 from research.runner_contract import descriptor as runner_contract_descriptor
 from research.tracker import LocalTracker, MlflowTracker, normalize_observation
@@ -243,6 +246,9 @@ class ResearchManager:
         verified_artifacts: Sequence[Mapping[str, Any]],
         expected_seed_labels: Sequence[str],
         expected_profile: Mapping[str, Any],
+        expected_plan_digest: str | None = None,
+        expected_system_digest: str | None = None,
+        expected_arm: Mapping[str, Any] | None = None,
     ) -> None:
         contract = cls._workflow_smoke_contract()
         documents = dict(trial.get("documents") or {})
@@ -303,6 +309,37 @@ class ResearchManager:
                 "pairing-unit identities"
             )
 
+        implementation = dict(documents["implementation_observation.json"])
+        implementation_identity = dict(implementation["implementation"])
+        if str(implementation.get("execution_path_digest") or "") != digest(
+            implementation_identity
+        ):
+            raise ValueError(
+                "workflow smoke execution_path_digest is not the canonical implementation digest"
+            )
+        expected_arm_value = dict(expected_arm or {})
+        if expected_plan_digest and str(implementation.get("experiment_plan_digest") or "") != str(
+            expected_plan_digest
+        ):
+            raise ValueError(
+                "workflow smoke implementation observation differs from the accepted ExperimentPlan"
+            )
+        if expected_system_digest and str(implementation.get("system_digest") or "") != str(
+            expected_system_digest
+        ):
+            raise ValueError(
+                "workflow smoke implementation observation differs from the accepted scientific system"
+            )
+        if expected_arm_value:
+            actual_arm = dict(implementation.get("arm") or {})
+            if any(
+                str(actual_arm.get(key) or "") != str(expected_arm_value.get(key) or "")
+                for key in ("id", "role")
+            ):
+                raise ValueError(
+                    "workflow smoke implementation observation differs from the requested arm"
+                )
+
         outputs = {
             str(item.get("path") or ""): dict(item)
             for item in trial.get("outputs") or []
@@ -330,9 +367,20 @@ class ResearchManager:
             )
         if not bool(collected.get("complete")):
             raise ValueError("workflow-smoke collection is not complete")
-        if len(index_files) != len(artifacts):
+        index_digests = [str(item.get("digest") or "") for item in index_files]
+        artifact_digests = [str(item.get("digest") or "") for item in artifacts]
+        if len(set(index_digests)) != len(index_digests):
             raise ValueError(
-                "artifacts_index.json and collect_attempt returned different artifact counts"
+                "artifacts_index.json contains duplicate artifact identities"
+            )
+        if len(set(artifact_digests)) != len(artifact_digests):
+            raise ValueError("collect_attempt returned duplicate artifact identities")
+        if set(index_digests) != set(artifact_digests):
+            missing = sorted(set(index_digests) - set(artifact_digests))
+            extra = sorted(set(artifact_digests) - set(index_digests))
+            raise ValueError(
+                "workflow-smoke collection must exactly equal artifacts_index.json.files "
+                f"by digest and exclude the index itself; missing={missing}, extra={extra}"
             )
         if len(verified_artifacts) != len(artifacts) or not all(
             bool(item.get("ok") or item.get("verified"))
@@ -340,9 +388,7 @@ class ResearchManager:
         ):
             raise ValueError("verify_artifact rejected one or more indexed identities")
 
-        collected_by_digest = {
-            str(item.get("digest") or ""): item for item in artifacts
-        }
+        collected_by_digest = dict(zip(artifact_digests, artifacts, strict=True))
         for item in index_files:
             path = str(item.get("path") or "")
             digest_value = str(item.get("digest") or "")
@@ -366,6 +412,421 @@ class ResearchManager:
                     f"workflow-smoke artifact {path} has inconsistent content digests"
                 )
 
+    @classmethod
+    def _prepare_acceptance_arm(
+        cls,
+        *,
+        developer_validation: Any,
+        candidate_id: str,
+        compilation: Mapping[str, Any],
+        plan: Mapping[str, Any],
+        brief: Mapping[str, Any],
+        conditions: Mapping[str, Any],
+        manager_profile: str,
+        profile_conditions: Mapping[str, Any],
+        input_policy: Mapping[str, Any],
+        network_mode: str,
+        seeds: Sequence[int],
+        arm: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Prepare one arm without allowing the consumer to rewrite its semantics."""
+
+        arm_value = dict(arm)
+        arm_id = str(arm_value.get("id") or "").strip()
+        if not arm_id:
+            raise ValueError("ExperimentPlan arm has no stable id")
+        arm_token = re.sub(r"[^A-Za-z0-9_.-]+", "-", arm_id).strip("-.")
+        smoke_request = {
+            "experiment_id": f"acceptance:{str(compilation.get('digest') or '')[-16:]}",
+            "experiment_revision_id": str(plan.get("digest") or "acceptance-plan"),
+            "trial_id": f"acceptance-trial-{arm_token}",
+            "run_id": f"acceptance-run-{arm_token}",
+            "attempt_number": 1,
+            "profile": str(manager_profile),
+            "seed": int(seeds[0]),
+            "arm": arm_value,
+            "conditions": dict(conditions),
+            "profile_conditions": dict(profile_conditions),
+        }
+        prepared = developer_validation.invoke_skill(
+            candidate_id,
+            "prepare_attempt",
+            {"request": smoke_request},
+            timeout=120,
+        )
+        if not isinstance(prepared, Mapping):
+            raise ValueError("prepare_attempt returned a non-object value")
+        prepared = dict(prepared)
+        if prepared.get("contract") != "adaos.research.runner.v1":
+            raise ValueError("prepare_attempt returned an incompatible runner contract")
+        if str(prepared.get("provider_id") or "") != candidate_id:
+            raise ValueError("prepare_attempt returned another provider identity")
+        package = dict(prepared.get("package_ref") or {})
+        package_ref = ContentRef(
+            uri=str(package["uri"]),
+            digest=str(package["digest"]),
+            size_bytes=int(package["size_bytes"]),
+            media_type=str(package["media_type"]),
+            owner_ref=str(package["owner_ref"]),
+            kind=str(package.get("kind") or "execution-package"),
+            metadata=dict(package.get("metadata") or {}),
+        )
+        command = [str(item) for item in prepared.get("command") or []]
+        expected_outputs = [str(item) for item in prepared.get("expected_outputs") or []]
+        required_smoke_outputs = [
+            str(item)
+            for item in cls._workflow_smoke_contract().get("required_expected_outputs") or []
+        ]
+        missing_smoke_outputs = [
+            item for item in required_smoke_outputs if item not in expected_outputs
+        ]
+        if missing_smoke_outputs:
+            raise ValueError(
+                "prepare_attempt expected_outputs omits workflow-smoke consumer documents: "
+                + ", ".join(missing_smoke_outputs)
+            )
+        required_fields = {
+            "code_digest": str(prepared.get("code_digest") or ""),
+            "environment_digest": str(prepared.get("environment_digest") or ""),
+            "working_directory": str(prepared.get("working_directory") or ""),
+            "output_ref": str(prepared.get("output_ref") or ""),
+            "spec_id": str(prepared.get("spec_id") or ""),
+        }
+        if len(command) < 2 or any(not item for item in required_fields.values()):
+            raise ValueError("prepare_attempt returned an incomplete executable package")
+        if not all(
+            re.fullmatch(r"sha256:[0-9a-f]{64}", required_fields[key])
+            for key in ("code_digest", "environment_digest")
+        ):
+            raise ValueError("runner code or environment identity is not a SHA-256 digest")
+        protocol_digest = str(brief.get("prototype_digest") or "")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", protocol_digest):
+            raise ValueError("AutomationBrief has no immutable ResearchPrototype identity")
+        execution_spec = ExecutionSpec(
+            spec_id=required_fields["spec_id"],
+            owner_ref=f"skill:{candidate_id}",
+            command=tuple(command),
+            working_directory=required_fields["working_directory"],
+            trial_id=smoke_request["trial_id"],
+            run_id=smoke_request["run_id"],
+            package_ref=package_ref,
+            code_digest=required_fields["code_digest"],
+            environment_digest=required_fields["environment_digest"],
+            environment={
+                str(key): str(item)
+                for key, item in dict(prepared.get("environment") or {}).items()
+            }
+            | {
+                "ADAOS_RESEARCH_WORKLOAD_JSON": json.dumps(
+                    dict(profile_conditions.get("workload") or {}),
+                    ensure_ascii=True,
+                    sort_keys=True,
+                ),
+                "ADAOS_RESEARCH_INPUT_POLICY_JSON": json.dumps(
+                    dict(input_policy),
+                    ensure_ascii=True,
+                    sort_keys=True,
+                ),
+            },
+            resources=ExecutionResourceRequest(
+                cpu_cores=int(profile_conditions.get("cpu_threads") or 2),
+                memory_mb=int(profile_conditions.get("memory_mb") or 4096),
+                wall_time_s=int(profile_conditions.get("wall_time_s") or 1800),
+                max_log_bytes=int(
+                    profile_conditions.get("max_log_bytes") or 2 * 1024 * 1024
+                ),
+            ),
+            network=ExecutionNetworkPolicy(mode=network_mode),
+            determinism=ExecutionDeterminism(
+                mode="exploratory",
+                rng_streams={
+                    name: int(seeds[0]) + index
+                    for index, name in enumerate(ExecutionDeterminism.REQUIRED_STREAMS)
+                },
+                deterministic_algorithms=True,
+            ),
+            budget=ExecutionBudget(
+                max_attempts=1,
+                max_compute_seconds=int(
+                    profile_conditions.get("max_compute_seconds")
+                    or profile_conditions.get("wall_time_s")
+                    or 1800
+                ),
+                max_storage_bytes=int(
+                    profile_conditions.get("max_storage_bytes")
+                    or 2 * 1024 * 1024 * 1024
+                ),
+            ),
+            expected_outputs=tuple(expected_outputs),
+            metadata={
+                "protocol_digest": protocol_digest,
+                "stage": "workflow_smoke",
+                "evidence_class": "workflow_smoke",
+                "epochs": int(profile_conditions["epochs"]),
+                "seeds": [int(item) for item in seeds],
+                "inference_allowed": bool(profile_conditions.get("inference_allowed")),
+                "workload": dict(profile_conditions.get("workload") or {}),
+                "input_policy": dict(input_policy),
+                "network_mode": network_mode,
+                "runner_output_ref": required_fields["output_ref"],
+                "manager_profile": manager_profile,
+                "arm_id": arm_id,
+                "arm_role": str(arm_value.get("role") or ""),
+                "experiment_plan_digest": str(plan.get("digest") or ""),
+                "system_digest": str(dict(plan.get("system") or {}).get("digest") or ""),
+            },
+        )
+        return {
+            "arm": arm_value,
+            "prepared_attempt": prepared,
+            "execution_spec": execution_spec.to_dict(),
+            "execution_spec_digest": execution_spec.digest,
+            "output_ref": required_fields["output_ref"],
+            "protocol_digest": protocol_digest,
+        }
+
+    @classmethod
+    def _execute_acceptance_arm(
+        cls,
+        *,
+        developer_validation: Any,
+        candidate_id: str,
+        prepared_arm: Mapping[str, Any],
+        plan: Mapping[str, Any],
+        profile_conditions: Mapping[str, Any],
+        seeds: Sequence[int],
+    ) -> dict[str, Any]:
+        arm = dict(prepared_arm["arm"])
+        execution_spec = dict(prepared_arm["execution_spec"])
+        trial = developer_validation.execute_spec(
+            candidate_id,
+            execution_spec,
+            idempotency_key=(
+                "consumer-smoke-"
+                + digest(
+                    {
+                        "candidate_id": candidate_id,
+                        "protocol_digest": str(prepared_arm["protocol_digest"]),
+                        "spec_digest": str(prepared_arm["execution_spec_digest"]),
+                        "arm_id": str(arm.get("id") or ""),
+                    }
+                ).removeprefix("sha256:")[:24]
+            ),
+            timeout=min(float(profile_conditions.get("wall_time_s") or 1800), 3600),
+        )
+        if not bool(trial.get("ok")):
+            raise RuntimeError(
+                f"consumer workflow smoke failed for arm {arm.get('id')}: "
+                + str(trial.get("failure") or trial.get("missing_outputs") or "unknown")
+            )
+        collected = developer_validation.invoke_skill(
+            candidate_id,
+            "collect_attempt",
+            {"output_ref": str(prepared_arm["output_ref"])},
+            timeout=120,
+        )
+        if not isinstance(collected, Mapping):
+            raise ValueError("collect_attempt returned a non-object value")
+        collected = dict(collected)
+        canonical_result = cls._validate_runner_collection(
+            collected,
+            expected_provider_id=candidate_id,
+            expected_arm_id=str(arm.get("id") or ""),
+            expected_seed=int(seeds[0]),
+            expected_evidence_class=str(
+                profile_conditions.get("evidence_class") or "workflow_smoke"
+            ),
+        )
+        observations = [
+            dict(item)
+            for item in collected.get("observations") or []
+            if isinstance(item, Mapping)
+        ]
+        if len(observations) != len(list(collected.get("observations") or [])):
+            raise ValueError("collect_attempt returned a non-object observation")
+        acceptance_session = {
+            "session_id": (
+                "acceptance-session-"
+                + digest(
+                    {
+                        "candidate_id": candidate_id,
+                        "arm_id": str(arm.get("id") or ""),
+                        "spec_digest": str(prepared_arm["execution_spec_digest"]),
+                    }
+                ).removeprefix("sha256:")[:24]
+            ),
+            "attempt_id": (
+                "acceptance-attempt-"
+                + digest(
+                    {
+                        "candidate_id": candidate_id,
+                        "arm_id": str(arm.get("id") or ""),
+                    }
+                ).removeprefix("sha256:")[:24]
+            ),
+            "opened_at": "1970-01-01T00:00:00+00:00",
+        }
+        normalized_observations = [
+            normalize_observation(acceptance_session, item)
+            for item in observations
+        ]
+        artifacts = [
+            dict(item)
+            for item in collected.get("artifacts") or []
+            if isinstance(item, Mapping)
+        ]
+        for artifact in artifacts:
+            if not str(artifact.get("role") or "").strip():
+                raise ValueError(
+                    "collect_attempt artifact role is required by ResearchManager ingestion"
+                )
+        verified_artifacts = []
+        for artifact in artifacts:
+            ContentRef(
+                uri=str(artifact["uri"]),
+                digest=str(artifact["digest"]),
+                size_bytes=int(artifact["size_bytes"]),
+                media_type=str(artifact["media_type"]),
+                owner_ref=str(artifact["owner_ref"]),
+                kind=str(artifact.get("kind") or "workflow-smoke-evidence"),
+                metadata=dict(artifact.get("metadata") or {}),
+            )
+            verified = developer_validation.invoke_skill(
+                candidate_id,
+                "verify_artifact",
+                {
+                    "uri": str(artifact.get("uri") or ""),
+                    "digest": str(artifact.get("digest") or ""),
+                },
+                timeout=60,
+            )
+            verified_artifacts.append(dict(verified or {}))
+        cls._validate_workflow_smoke_evidence(
+            trial=trial,
+            collected=collected,
+            verified_artifacts=verified_artifacts,
+            expected_seed_labels=[f"seed-{int(item)}" for item in seeds],
+            expected_profile=profile_conditions,
+            expected_plan_digest=str(plan.get("digest") or ""),
+            expected_system_digest=str(dict(plan.get("system") or {}).get("digest") or "") or None,
+            expected_arm=arm,
+        )
+        return {
+            **dict(prepared_arm),
+            "trial": trial,
+            "collected": collected,
+            "canonical_result": canonical_result,
+            "normalized_observations": normalized_observations,
+            "verified_artifacts": verified_artifacts,
+            "collection_ok": bool(collected.get("complete")) and bool(artifacts),
+            "verification_ok": len(verified_artifacts) == len(artifacts)
+            and all(bool(item.get("ok")) for item in verified_artifacts),
+        }
+
+    @staticmethod
+    def _validate_runner_collection(
+        collection: Mapping[str, Any],
+        *,
+        expected_provider_id: str,
+        expected_arm_id: str,
+        expected_seed: int,
+        expected_evidence_class: str,
+    ) -> dict[str, Any] | None:
+        """Validate the exact provider result consumed by experiment summary.
+
+        JSON Schema closes the structural boundary.  The identity checks bind
+        the returned scalar to the prepared run, and the matching observation
+        ensures the tracker receives the same value that later enters paired
+        analysis.  A workflow-smoke scalar remains non-inferential by its
+        evidence class; requiring it only makes the engineering path complete.
+        """
+
+        value = dict(collection)
+        schema = dict(
+            dict(runner_contract_descriptor()["operations"])["collect_attempt"]
+        )["output_schema"]
+        try:
+            jsonschema.validate(value, schema)
+        except jsonschema.ValidationError as exc:
+            location = ".".join(str(item) for item in exc.absolute_path)
+            suffix = f" at {location}" if location else ""
+            raise ValueError(
+                f"collect_attempt violates ResearchManager runner ABI{suffix}: "
+                f"{exc.message}"
+            ) from exc
+        if str(value.get("provider_id") or "") != str(expected_provider_id):
+            raise ValueError("runner collection provider identity mismatch")
+        if not bool(value.get("complete")):
+            return None
+        result = dict(value["result"])
+        expected = {
+            "arm_id": str(expected_arm_id),
+            "seed": int(expected_seed),
+            "evidence_class": str(expected_evidence_class),
+        }
+        for field, expected_value in expected.items():
+            if result.get(field) != expected_value:
+                raise ValueError(
+                    f"collect_attempt result.{field} differs from the prepared request"
+                )
+        metric = result.get("primary_metric")
+        if isinstance(metric, bool) or not isinstance(metric, (int, float)):
+            raise ValueError("collect_attempt result.primary_metric must be numeric")
+        if not math.isfinite(float(metric)):
+            raise ValueError("collect_attempt result.primary_metric must be finite")
+        observations = [
+            dict(item)
+            for item in value.get("observations") or []
+            if isinstance(item, Mapping)
+        ]
+        matching = [
+            item
+            for item in observations
+            if str(dict(item.get("metric") or {}).get("name") or "")
+            == "primary_metric"
+            and item.get("value") == metric
+            and str(item.get("evidence_role") or "") == expected_evidence_class
+        ]
+        if not matching:
+            raise ValueError(
+                "collect_attempt must repeat result.primary_metric as a "
+                "metric.name=primary_metric observation with the same evidence_role"
+            )
+        return result
+
+    @staticmethod
+    def _validate_paired_result_identity(
+        arm_trials: Sequence[Mapping[str, Any]],
+    ) -> str | None:
+        """Require one shared pairing identity across a paired smoke.
+
+        Per-arm schema validation cannot detect a digest derived from trial or
+        run identity.  The consumer owns both calls, so equality is an
+        executable, domain-neutral check at the boundary where the pair exists.
+        """
+
+        results = [
+            dict(item["canonical_result"])
+            for item in arm_trials
+            if isinstance(item.get("canonical_result"), Mapping)
+        ]
+        if len(arm_trials) < 2:
+            return (
+                str(results[0].get("pairing_identity_digest") or "")
+                if results
+                else None
+            )
+        if len(results) != len(arm_trials):
+            raise ValueError("paired workflow smoke omitted a canonical arm result")
+        identities = {
+            str(item.get("pairing_identity_digest") or "") for item in results
+        }
+        if len(identities) != 1 or not next(iter(identities), ""):
+            raise ValueError(
+                "paired workflow smoke arms must share one pairing_identity_digest"
+            )
+        return next(iter(identities))
+
     def validate_development_candidate(self, request: Mapping[str, Any]) -> dict[str, Any]:
         """Evaluate a DEV runner from the consumer side, without scientific execution.
 
@@ -376,8 +837,13 @@ class ResearchManager:
         """
 
         value = dict(request or {})
-        execute_workflow_smoke = bool(value.get("execute_workflow_smoke"))
         profile = str(value.get("profile") or "").strip()
+        execute_workflow_smoke = bool(
+            value.get(
+                "execute_workflow_smoke",
+                profile == "research.consumer-contracts",
+            )
+        )
         checks: list[dict[str, Any]] = []
         errors: list[str] = []
         candidate_ref = str(value.get("candidate_ref") or "").strip()
@@ -457,30 +923,6 @@ class ResearchManager:
             errors.append(f"unsupported acceptance profile: {profile}")
             return self._acceptance_receipt(profile, checks=checks, errors=errors)
 
-        canonical_contract = runner_contract_descriptor()
-        supplied_contract_digest = str(consumer_contract.get("digest") or "")
-        if supplied_contract_digest != canonical_contract["digest"] or consumer_contract != canonical_contract:
-            errors.append("Development Session consumer_contract differs from the active ResearchManager ABI")
-            return self._acceptance_receipt(
-                profile,
-                checks=[
-                    {
-                        "id": "runner.consumer_contract_identity",
-                        "ok": False,
-                        "expected_digest": canonical_contract["digest"],
-                        "actual_digest": supplied_contract_digest or None,
-                    }
-                ],
-                errors=errors,
-            )
-        checks.append(
-            {
-                "id": "runner.consumer_contract_identity",
-                "ok": True,
-                "digest": supplied_contract_digest,
-            }
-        )
-
         if (
             compilation.get("schema") == "adaos.research.compilation_projection.v1"
             and isinstance(compilation.get("experiment_plan"), Mapping)
@@ -504,11 +946,64 @@ class ResearchManager:
             errors.append("accepted ResearchCompilation has no ExperimentPlan payload")
             return self._acceptance_receipt(profile, checks=checks, errors=errors)
 
+        canonical_contracts = [
+            runner_contract_descriptor(plan, runner_id=candidate_id),
+            runner_contract_descriptor(plan, runner_id="$candidate"),
+        ]
+        supplied_contract_digest = str(consumer_contract.get("digest") or "")
+        canonical_contract = next(
+            (item for item in canonical_contracts if consumer_contract == item),
+            canonical_contracts[0],
+        )
+        if consumer_contract not in canonical_contracts:
+            errors.append("Development Session consumer_contract differs from the active ResearchManager ABI")
+            return self._acceptance_receipt(
+                profile,
+                checks=[
+                    {
+                        "id": "runner.consumer_contract_identity",
+                        "ok": False,
+                        "expected_digest": canonical_contract["digest"],
+                        "actual_digest": supplied_contract_digest or None,
+                    }
+                ],
+                errors=errors,
+            )
+        checks.append(
+            {
+                "id": "runner.consumer_contract_identity",
+                "ok": True,
+                "digest": supplied_contract_digest,
+            }
+        )
+
         consumer_evidence: dict[str, Any] = {
             "candidate_ref": candidate_ref,
             "compilation_digest": compilation.get("digest"),
             "scientific_execution_started": False,
         }
+        validation_budget = None
+        raw_validation_budget = value.get("validation_budget")
+        if isinstance(raw_validation_budget, Mapping):
+            try:
+                validation_budget = normalize_validation_budget(
+                    raw_validation_budget
+                )
+            except ValueError as exc:
+                errors.append(f"validation budget is invalid: {exc}")
+                return self._acceptance_receipt(
+                    profile,
+                    checks=checks,
+                    errors=errors,
+                    evidence=consumer_evidence,
+                )
+            checks.append(
+                {
+                    "id": "candidate.validation_budget",
+                    "ok": True,
+                    **validation_budget,
+                }
+            )
         try:
             from adaos.sdk.developer import validation as developer_validation
 
@@ -517,12 +1012,18 @@ class ResearchManager:
                 strict=True,
                 probe_tools=True,
                 run_tests=True,
+                test_timeout_seconds=(
+                    int(validation_budget["packaged_pytest_wall_seconds"])
+                    if validation_budget
+                    else None
+                ),
             )
             checks.append(
                 {
                     "id": "candidate.native_validation",
                     "ok": bool(native.get("ok")),
                     "digest": native.get("digest"),
+                    "source_digest": native.get("source_digest"),
                 }
             )
             if not bool(native.get("ok")):
@@ -625,263 +1126,110 @@ class ResearchManager:
             baseline = next((item for item in arms if item.get("role") == "baseline"), None)
             if baseline is None:
                 raise ValueError("ExperimentPlan has no baseline arm")
-            smoke_request = {
-                "experiment_id": f"acceptance:{str(compilation.get('digest') or '')[-16:]}",
-                "experiment_revision_id": str(plan.get("digest") or "acceptance-plan"),
-                "trial_id": "acceptance-trial",
-                "run_id": "acceptance-run",
-                "attempt_number": 1,
-                "profile": str(manager_profile),
-                "seed": int(seeds[0]),
-                "arm": baseline,
-                "conditions": conditions,
-                "profile_conditions": profile_conditions,
-            }
-            prepared = developer_validation.invoke_skill(
-                candidate_id,
-                "prepare_attempt",
-                {"request": smoke_request},
-                timeout=120,
+            intervention = next(
+                (item for item in arms if item.get("role") == "intervention"), None
             )
-            if not isinstance(prepared, Mapping):
-                raise ValueError("prepare_attempt returned a non-object value")
-            prepared = dict(prepared)
-            if prepared.get("contract") != "adaos.research.runner.v1":
-                raise ValueError("prepare_attempt returned an incompatible runner contract")
-            if str(prepared.get("provider_id") or "") != candidate_id:
-                raise ValueError("prepare_attempt returned another provider identity")
-            package = dict(prepared.get("package_ref") or {})
-            ContentRef(
-                uri=str(package["uri"]),
-                digest=str(package["digest"]),
-                size_bytes=int(package["size_bytes"]),
-                media_type=str(package["media_type"]),
-                owner_ref=str(package["owner_ref"]),
-                kind=str(package.get("kind") or "execution-package"),
-                metadata=dict(package.get("metadata") or {}),
-            )
-            command = [str(item) for item in prepared.get("command") or []]
-            expected_outputs = [
-                str(item) for item in prepared.get("expected_outputs") or []
-            ]
-            smoke_contract = self._workflow_smoke_contract()
-            required_smoke_outputs = [
-                str(item)
-                for item in smoke_contract.get("required_expected_outputs") or []
-            ]
-            missing_smoke_outputs = [
-                item for item in required_smoke_outputs if item not in expected_outputs
-            ]
-            if missing_smoke_outputs:
-                raise ValueError(
-                    "prepare_attempt expected_outputs omits workflow-smoke consumer "
-                    "documents: " + ", ".join(missing_smoke_outputs)
+            # ExperimentPlan v1.4 makes the system boundary executable.  Its
+            # workflow smoke must therefore exercise both sides of the
+            # intervention, while legacy plans retain the prior baseline-only
+            # preparation behavior for stored-record compatibility.
+            smoke_arms = [baseline]
+            if isinstance(plan.get("system"), Mapping):
+                if intervention is None:
+                    raise ValueError("ExperimentPlan system has no intervention arm")
+                smoke_arms.append(intervention)
+            prepared_arms = [
+                self._prepare_acceptance_arm(
+                    developer_validation=developer_validation,
+                    candidate_id=candidate_id,
+                    compilation=compilation,
+                    plan=plan,
+                    brief=brief,
+                    conditions=conditions,
+                    manager_profile=str(manager_profile),
+                    profile_conditions=profile_conditions,
+                    input_policy=input_policy,
+                    network_mode=network_mode,
+                    seeds=[int(item) for item in seeds],
+                    arm=arm,
                 )
-            required_fields = {
-                "code_digest": str(prepared.get("code_digest") or ""),
-                "environment_digest": str(prepared.get("environment_digest") or ""),
-                "working_directory": str(prepared.get("working_directory") or ""),
-                "output_ref": str(prepared.get("output_ref") or ""),
-                "spec_id": str(prepared.get("spec_id") or ""),
-            }
-            if len(command) < 2 or any(not item for item in required_fields.values()):
-                raise ValueError("prepare_attempt returned an incomplete executable package")
-            if not all(
-                re.fullmatch(r"sha256:[0-9a-f]{64}", required_fields[key])
-                for key in ("code_digest", "environment_digest")
-            ):
-                raise ValueError("runner code or environment identity is not a SHA-256 digest")
-            protocol_digest = str(brief.get("prototype_digest") or "")
-            if not re.fullmatch(r"sha256:[0-9a-f]{64}", protocol_digest):
-                raise ValueError("AutomationBrief has no immutable ResearchPrototype identity")
-            execution_spec = ExecutionSpec(
-                spec_id=required_fields["spec_id"],
-                owner_ref=f"skill:{candidate_id}",
-                command=tuple(command),
-                working_directory=required_fields["working_directory"],
-                trial_id=smoke_request["trial_id"],
-                run_id=smoke_request["run_id"],
-                package_ref=ContentRef(
-                    uri=str(package["uri"]),
-                    digest=str(package["digest"]),
-                    size_bytes=int(package["size_bytes"]),
-                    media_type=str(package["media_type"]),
-                    owner_ref=str(package["owner_ref"]),
-                    kind=str(package.get("kind") or "execution-package"),
-                    metadata=dict(package.get("metadata") or {}),
-                ),
-                code_digest=required_fields["code_digest"],
-                environment_digest=required_fields["environment_digest"],
-                environment={
-                    str(key): str(item)
-                    for key, item in dict(prepared.get("environment") or {}).items()
-                }
-                | {
-                    "ADAOS_RESEARCH_WORKLOAD_JSON": json.dumps(
-                        dict(profile_conditions.get("workload") or {}),
-                        ensure_ascii=True,
-                        sort_keys=True,
-                    ),
-                    "ADAOS_RESEARCH_INPUT_POLICY_JSON": json.dumps(
-                        input_policy,
-                        ensure_ascii=True,
-                        sort_keys=True,
-                    ),
-                },
-                resources=ExecutionResourceRequest(
-                    cpu_cores=int(profile_conditions.get("cpu_threads") or 2),
-                    memory_mb=int(profile_conditions.get("memory_mb") or 4096),
-                    wall_time_s=int(profile_conditions.get("wall_time_s") or 1800),
-                    max_log_bytes=int(
-                        profile_conditions.get("max_log_bytes") or 2 * 1024 * 1024
-                    ),
-                ),
-                network=ExecutionNetworkPolicy(mode=network_mode),
-                determinism=ExecutionDeterminism(
-                    mode="exploratory",
-                    rng_streams={
-                        name: int(seeds[0]) + index
-                        for index, name in enumerate(
-                            ExecutionDeterminism.REQUIRED_STREAMS
-                        )
-                    },
-                    deterministic_algorithms=True,
-                ),
-                budget=ExecutionBudget(
-                    max_attempts=1,
-                    max_compute_seconds=int(
-                        profile_conditions.get("max_compute_seconds")
-                        or profile_conditions.get("wall_time_s")
-                        or 1800
-                    ),
-                    max_storage_bytes=int(
-                        profile_conditions.get("max_storage_bytes")
-                        or 2 * 1024 * 1024 * 1024
-                    ),
-                ),
-                expected_outputs=tuple(expected_outputs),
-                metadata={
-                    "protocol_digest": protocol_digest,
-                    "stage": "workflow_smoke",
-                    "evidence_class": "workflow_smoke",
-                    "epochs": int(profile_conditions["epochs"]),
-                    "seeds": [int(item) for item in seeds],
-                    "inference_allowed": bool(
-                        profile_conditions.get("inference_allowed")
-                    ),
-                    "workload": dict(profile_conditions.get("workload") or {}),
-                    "input_policy": input_policy,
-                    "network_mode": network_mode,
-                    "runner_output_ref": required_fields["output_ref"],
-                    "manager_profile": manager_profile,
-                },
-            )
+                for arm in smoke_arms
+            ]
+            first_prepared = prepared_arms[0]
             consumer_evidence.update(
                 {
                     "experiment_plan_digest": plan.get("digest"),
-                    "prepared_attempt": prepared,
-                    "execution_spec": execution_spec.to_dict(),
+                    "system_digest": dict(plan.get("system") or {}).get("digest"),
+                    "prepared_attempt": first_prepared["prepared_attempt"],
+                    "execution_spec": first_prepared["execution_spec"],
+                    "prepared_arms": prepared_arms,
+                    "paired_smoke_required": len(smoke_arms) == 2,
                 }
             )
             checks.append(
                 {
                     "id": "runner.prepare_attempt",
                     "ok": True,
-                    "contract": prepared["contract"],
-                    "provider_id": prepared["provider_id"],
-                    "package_digest": package["digest"],
-                    "code_digest": required_fields["code_digest"],
-                    "environment_digest": required_fields["environment_digest"],
+                    "contract": "adaos.research.runner.v1",
+                    "provider_id": candidate_id,
+                    "arm_ids": [str(item["arm"]["id"]) for item in prepared_arms],
+                    "arm_count": len(prepared_arms),
                     "profile": manager_profile,
                     "seed": seeds[0],
                 }
             )
             if execute_workflow_smoke:
-                trial = developer_validation.execute_spec(
-                    candidate_id,
-                    execution_spec.to_dict(),
-                    idempotency_key=(
-                        "consumer-smoke-"
-                        + digest(
-                            {
-                                "candidate_id": candidate_id,
-                                "protocol_digest": protocol_digest,
-                                "spec_digest": execution_spec.digest,
-                            }
-                        ).removeprefix("sha256:")[:24]
-                    ),
-                    timeout=min(float(profile_conditions.get("wall_time_s") or 1800), 3600),
-                )
-                consumer_evidence["trial"] = trial
-                if not bool(trial.get("ok")):
-                    raise RuntimeError(
-                        "consumer workflow smoke failed: "
-                        + str(trial.get("failure") or trial.get("missing_outputs") or "unknown")
+                arm_trials = [
+                    self._execute_acceptance_arm(
+                        developer_validation=developer_validation,
+                        candidate_id=candidate_id,
+                        prepared_arm=item,
+                        plan=plan,
+                        profile_conditions=profile_conditions,
+                        seeds=[int(seed) for seed in seeds],
                     )
-                collected = developer_validation.invoke_skill(
-                    candidate_id,
-                    "collect_attempt",
-                    {"output_ref": required_fields["output_ref"]},
-                    timeout=120,
-                )
-                if not isinstance(collected, Mapping):
-                    raise ValueError("collect_attempt returned a non-object value")
-                collected = dict(collected)
-                artifacts = [
-                    dict(item)
-                    for item in collected.get("artifacts") or []
-                    if isinstance(item, Mapping)
+                    for item in prepared_arms
                 ]
-                verified_artifacts = []
-                for artifact in artifacts:
-                    ContentRef(
-                        uri=str(artifact["uri"]),
-                        digest=str(artifact["digest"]),
-                        size_bytes=int(artifact["size_bytes"]),
-                        media_type=str(artifact["media_type"]),
-                        owner_ref=str(artifact["owner_ref"]),
-                        kind=str(artifact.get("kind") or "workflow-smoke-evidence"),
-                        metadata=dict(artifact.get("metadata") or {}),
-                    )
-                    verified = developer_validation.invoke_skill(
-                        candidate_id,
-                        "verify_artifact",
-                        {
-                            "uri": str(artifact.get("uri") or ""),
-                            "digest": str(artifact.get("digest") or ""),
-                        },
-                        timeout=60,
-                    )
-                    verified_artifacts.append(dict(verified or {}))
-                collection_ok = bool(collected.get("complete")) and bool(artifacts)
-                verification_ok = len(verified_artifacts) == len(artifacts) and all(
-                    bool(item.get("ok")) for item in verified_artifacts
+                pairing_identity_digest = self._validate_paired_result_identity(
+                    arm_trials
                 )
-                self._validate_workflow_smoke_evidence(
-                    trial=trial,
-                    collected=collected,
-                    verified_artifacts=verified_artifacts,
-                    expected_seed_labels=[f"seed-{int(item)}" for item in seeds],
-                    expected_profile=profile_conditions,
-                )
+                first_trial = arm_trials[0]
+                collection_ok = all(bool(item["collection_ok"]) for item in arm_trials)
+                verification_ok = all(bool(item["verification_ok"]) for item in arm_trials)
                 checks.extend(
                     [
                         {
                             "id": "runner.workflow_smoke",
-                            "ok": bool(trial.get("ok")),
-                            "trial_digest": trial.get("digest"),
+                            "ok": all(bool(item["trial"].get("ok")) for item in arm_trials),
+                            "trial_digests": [item["trial"].get("digest") for item in arm_trials],
+                            "arm_ids": [str(item["arm"]["id"]) for item in arm_trials],
+                            "paired": len(arm_trials) == 2,
                         },
                         {
                             "id": "runner.collection",
                             "ok": collection_ok,
-                            "artifact_count": len(artifacts),
+                            "artifact_count": sum(
+                                len(item["collected"].get("artifacts") or [])
+                                for item in arm_trials
+                            ),
                         },
                         {
                             "id": "runner.artifact_verification",
                             "ok": verification_ok,
                             "verified_count": sum(
-                                1 for item in verified_artifacts if item.get("ok")
+                                1
+                                for arm_trial in arm_trials
+                                for item in arm_trial["verified_artifacts"]
+                                if item.get("ok")
                             ),
+                        },
+                        {
+                            "id": "runner.pairing_identity",
+                            "ok": bool(pairing_identity_digest),
+                            "digest": pairing_identity_digest,
+                            "arm_ids": [
+                                str(item["arm"]["id"]) for item in arm_trials
+                            ],
                         },
                     ]
                 )
@@ -891,10 +1239,13 @@ class ResearchManager:
                     errors.append("verify_artifact rejected one or more collected identities")
                 consumer_evidence.update(
                     {
-                        "collected": collected,
-                        "verified_artifacts": verified_artifacts,
+                        "trial": first_trial["trial"],
+                        "collected": first_trial["collected"],
+                        "verified_artifacts": first_trial["verified_artifacts"],
+                        "arm_trials": arm_trials,
                         "scientific_execution_started": False,
                         "workflow_smoke_executed": True,
+                        "paired_workflow_smoke_executed": len(arm_trials) == 2,
                     }
                 )
         except Exception as exc:
@@ -1571,6 +1922,228 @@ class ResearchManager:
             actor=actor,
         )
 
+    def assess_experiment_execution(
+        self,
+        *,
+        experiment_id: str,
+        profile: str,
+    ) -> dict[str, Any]:
+        """Check immutable profile requirements against the active executor.
+
+        This read-only admission gate intentionally runs before protocol lock. It
+        does not prepare runner artifacts or reserve resources; those checks remain
+        part of submission. Its purpose is to reject known provider mismatches
+        without leaving a locked protocol or a synthetic Run behind.
+        """
+
+        if profile not in {"preflight", "confirmatory"}:
+            raise ValueError("execution profile must be preflight or confirmatory")
+        revision = experiment.latest_revision(self.repository, experiment_id)
+        conditions = dict(revision.payload["conditions"])
+        profile_conditions = dict(dict(conditions["execution"])[profile])
+        provider = dict(execution_capabilities())
+        features = {str(item) for item in provider.get("features") or ()}
+        network_mode = str(profile_conditions.get("network_mode") or "unrestricted")
+        gpu_count = int(profile_conditions.get("gpu_count") or 0)
+        blockers: list[dict[str, Any]] = []
+        input_readiness: dict[str, Any] = {
+            "declared": False,
+            "source": None,
+            "required_before_execution": False,
+            "satisfied": True,
+            "reason": "not_declared",
+        }
+        if network_mode == "offline" and "network_offline" not in features:
+            blockers.append(
+                {
+                    "code": "network_policy_unenforceable",
+                    "requirement": "network_offline",
+                    "requested": network_mode,
+                }
+            )
+        if network_mode == "allowlist" and "network_allowlist" not in features:
+            blockers.append(
+                {
+                    "code": "network_policy_unenforceable",
+                    "requirement": "network_allowlist",
+                    "requested": network_mode,
+                }
+            )
+        if gpu_count > 0 and "gpu_allocation" not in features:
+            blockers.append(
+                {
+                    "code": "accelerator_unavailable",
+                    "requirement": "gpu_allocation",
+                    "requested": gpu_count,
+                }
+            )
+        input_policy = profile_conditions.get("input_policy")
+        if isinstance(input_policy, Mapping):
+            source = str(input_policy.get("source") or "").strip()
+            required = (
+                str(input_policy.get("readiness") or "").strip()
+                == "required_before_execution"
+            )
+            input_readiness = {
+                "declared": True,
+                "source": source or None,
+                "required_before_execution": required,
+                "satisfied": True,
+                "reason": "not_required" if not required else "profile_owned_fixture",
+            }
+            if required and source == "accepted_dataset":
+                runner = dict(conditions.get("runner") or {})
+                runner_provider = str(runner.get("provider") or "").strip()
+                if not runner_provider:
+                    input_readiness.update(
+                        satisfied=False,
+                        reason="runner_provider_missing",
+                    )
+                    blockers.append(
+                        {
+                            "code": "runner_provider_missing",
+                            "requirement": "accepted_dataset",
+                        }
+                    )
+                else:
+                    try:
+                        value = invoke_skill(
+                            runner_provider,
+                            "dataset_status",
+                            {},
+                            timeout=30,
+                        )
+                        if not isinstance(value, Mapping):
+                            raise RuntimeError(
+                                "runner provider returned a non-object dataset status"
+                            )
+                        dataset_status = dict(value)
+                        ready = bool(dataset_status.get("ready"))
+                        offline_ready = bool(
+                            dataset_status.get("execution_ready_without_network")
+                        )
+                        satisfied = ready and (
+                            network_mode != "offline" or offline_ready
+                        )
+                        input_readiness.update(
+                            satisfied=satisfied,
+                            reason=(
+                                "ready"
+                                if satisfied
+                                else (
+                                    "not_ready_without_network"
+                                    if ready and network_mode == "offline"
+                                    else "not_ready"
+                                )
+                            ),
+                            runner_provider=runner_provider,
+                            dataset_id=(
+                                dataset_status.get("dataset_id")
+                                or dataset_status.get("logical_name")
+                                or dataset_status.get("id")
+                            ),
+                            dataset_ready=ready,
+                            execution_ready_without_network=offline_ready,
+                        )
+                        if not satisfied:
+                            blockers.append(
+                                {
+                                    "code": "dataset_not_ready",
+                                    "requirement": (
+                                        "accepted_dataset_offline"
+                                        if network_mode == "offline"
+                                        else "accepted_dataset"
+                                    ),
+                                    "runner_provider": runner_provider,
+                                }
+                            )
+                    except Exception as exc:
+                        input_readiness.update(
+                            satisfied=False,
+                            reason="dataset_status_unavailable",
+                            runner_provider=runner_provider,
+                            error={
+                                "type": type(exc).__name__,
+                                "message": str(exc)[:500],
+                            },
+                        )
+                        blockers.append(
+                            {
+                                "code": "dataset_status_unavailable",
+                                "requirement": "accepted_dataset",
+                                "runner_provider": runner_provider,
+                            }
+                        )
+            elif required and source == "deterministic_contract_fixture":
+                input_readiness.update(
+                    satisfied=True,
+                    reason="profile_owned_fixture",
+                )
+            elif required:
+                input_readiness.update(
+                    satisfied=False,
+                    reason="unsupported_input_source",
+                )
+                blockers.append(
+                    {
+                        "code": "unsupported_input_source",
+                        "requirement": source or "declared_input_source",
+                    }
+                )
+        return {
+            "schema": "adaos.execution.admission.v1",
+            "admitted": not blockers,
+            "experiment_id": experiment_id,
+            "experiment_revision_id": revision.record_id,
+            "profile": profile,
+            "provider": provider,
+            "requested": {
+                "network_mode": network_mode,
+                "gpu_count": gpu_count,
+                "input_policy": dict(input_policy) if isinstance(input_policy, Mapping) else None,
+            },
+            "enforcement": {
+                "network_policy": (
+                    "not_required"
+                    if network_mode == "unrestricted"
+                    else (
+                        "available"
+                        if (
+                            (network_mode == "offline" and "network_offline" in features)
+                            or (
+                                network_mode == "allowlist"
+                                and "network_allowlist" in features
+                            )
+                        )
+                        else "unavailable"
+                    )
+                ),
+                "network_observation_required": True,
+                "input_readiness": input_readiness,
+            },
+            "blockers": blockers,
+        }
+
+    def execution_provider_status(self) -> dict[str, Any]:
+        """Expose the active executor contract without creating research state.
+
+        Research formulation may use this read-only projection to choose an
+        explicitly requested, non-inferential workflow-smoke policy.  The
+        executor remains the authority: consumers receive a content-addressed
+        capability snapshot rather than inferring support from provider names.
+        """
+
+        provider = dict(execution_capabilities())
+        provider["features"] = sorted(
+            {str(item) for item in provider.get("features") or ()}
+        )
+        return {
+            "schema": "adaos.execution.provider_status.v1",
+            "provider": provider,
+            "provider_digest": digest(provider),
+            "admission_contract": "adaos.execution.admission.v1",
+        }
+
     def _experiment_records(self, experiment_id: str, kind: str) -> list[ResearchRecord]:
         value = experiment.get_experiment(self.repository, experiment_id)
         return [
@@ -1793,6 +2366,7 @@ class ResearchManager:
             str(prepared["spec_id"]),
             tuple(str(item) for item in prepared["command"]),
             working_directory=str(prepared["working_directory"]),
+            data_owner_ref=f"skill:{runner_provider}",
             trial_id=trial.record_id,
             run_id=run_id,
             package_ref=package_ref,
@@ -1805,7 +2379,9 @@ class ResearchManager:
                 wall_time_s=int(profile_conditions.get("wall_time_s") or 7200),
                 max_log_bytes=int(profile_conditions.get("max_log_bytes") or 2 * 1024 * 1024),
             ),
-            network=ExecutionNetworkPolicy(mode="unrestricted"),
+            network=ExecutionNetworkPolicy(
+                mode=str(profile_conditions.get("network_mode") or "unrestricted")
+            ),
             determinism=ExecutionDeterminism(
                 mode="confirmatory" if profile == "confirmatory" else "exploratory",
                 rng_streams=streams,
@@ -1979,8 +2555,21 @@ class ResearchManager:
         if not isinstance(result, Mapping):
             raise RuntimeError("runner provider returned a non-object collection")
         value = dict(result)
-        if str(value.get("provider_id") or "") != provider:
-            raise ValueError("runner collection provider identity mismatch")
+        profile = str(binding.payload.get("profile") or "")
+        evidence_class = (
+            "workflow_smoke"
+            if profile == "preflight"
+            else "confirmatory"
+            if profile == "confirmatory"
+            else profile
+        )
+        self._validate_runner_collection(
+            value,
+            expected_provider_id=provider,
+            expected_arm_id=str(binding.payload.get("arm_id") or ""),
+            expected_seed=int(binding.payload.get("seed")),
+            expected_evidence_class=evidence_class,
+        )
         return value
 
     def _ingest_attempt_progress(self, binding: ResearchRecord) -> list[dict[str, Any]]:
@@ -2794,13 +3383,66 @@ class ResearchManager:
         )
         return {**result, "test_binding": {**dict(binding.payload), "sealed": False}}
 
-    def export_evidence(self, study_id: str) -> dict[str, Any]:
-        if workflow_state(self.repository, study_id)["state"] not in {"analysis", "claim_review", "complete"}:
-            raise ValueError("evidence can be finalized only after analysis")
-        return evidence.export(self.repository, study_id)
+    def export_evidence(
+        self,
+        study_id: str,
+        *,
+        scope: str = "study_claim",
+        experiment_id: str | None = None,
+    ) -> dict[str, Any]:
+        normalized_scope = str(scope or "study_claim").strip().lower()
+        if normalized_scope == "claim":
+            normalized_scope = "study_claim"
+        lifecycle = workflow_state(self.repository, study_id)
+        assurances: list[dict[str, Any]] = []
+        if normalized_scope == "study_claim":
+            if lifecycle["state"] not in {"analysis", "claim_review", "complete"}:
+                raise ValueError("claim evidence can be finalized only after analysis")
+        elif normalized_scope == "workflow_validation":
+            selected_experiment_id = str(experiment_id or "").strip()
+            if not selected_experiment_id:
+                raise ValueError("workflow validation evidence requires experiment_id")
+            value = experiment.get_experiment(self.repository, selected_experiment_id)
+            if value.study_id != study_id:
+                raise ValueError("evidence Experiment belongs to another Study")
+            experiment_lifecycle = experiment.state(self.repository, selected_experiment_id)
+            if experiment_lifecycle["state"] != "finalized":
+                raise ValueError("workflow validation evidence requires a finalized Experiment")
+            results = self._experiment_records(selected_experiment_id, "experiment_result")
+            if not results:
+                raise ValueError("workflow validation evidence requires an ExperimentResult")
+            result = results[-1]
+            if str(result.payload.get("evidence_class") or "") != "workflow_validation":
+                raise ValueError("selected ExperimentResult is not workflow validation evidence")
+            verification = self.verify_experiment_result(result.record_id)
+            if not verification["ok"]:
+                raise ValueError("ExperimentResult failed independent verification")
+            assurances.append(verification)
+            experiment_id = selected_experiment_id
+        else:
+            raise ValueError("unsupported evidence scope")
+        return evidence.export(
+            self.repository,
+            study_id,
+            scope=normalized_scope,
+            experiment_id=experiment_id,
+            assurances=assurances,
+        )
 
     def verify_evidence(self, bundle_id: str) -> dict[str, Any]:
-        return evidence.verify(self.repository, bundle_id)
+        verification = evidence.verify(self.repository, bundle_id)
+        assurance_results: list[dict[str, Any]] = []
+        for assurance in verification.get("assurances") or []:
+            if str(assurance.get("schema") or "") != "adaos.research.experiment_result_verification.v1":
+                continue
+            result_id = str(assurance.get("result_id") or "")
+            current = self.verify_experiment_result(result_id)
+            assurance_results.append(current)
+            if not current["ok"]:
+                verification["errors"].append(f"experiment_result:{result_id}")
+        verification["assurance_results"] = assurance_results
+        verification["ok"] = not verification["errors"]
+        return verification
 
     def decide_claim(
         self,
@@ -2818,6 +3460,8 @@ class ResearchManager:
         verification = self.verify_evidence(bundle_id)
         if not verification["ok"]:
             raise ValueError("evidence bundle failed verification")
+        if verification.get("scope") != "study_claim":
+            raise ValueError("claim decisions require study_claim evidence")
         decision_id = identity("claim_decision", {"study_id": study_id, "bundle_id": bundle_id, "verdict": verdict, "rationale": rationale})
         decision = self.repository.put(
             ResearchRecord(

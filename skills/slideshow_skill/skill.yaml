@@ -9,6 +9,7 @@ webui_owner: shared
 runtime:
   type: python
   kind: service
+  in_process_events: true
   module: handlers.main
   env:
     mode: venv

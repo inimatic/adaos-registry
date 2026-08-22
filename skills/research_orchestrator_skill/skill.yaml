@@ -1,5 +1,5 @@
 name: research_orchestrator_skill
-version: 0.45.0
+version: 0.75.0
 description: Durable pre-Codex orchestration for reusable AdaOS research directions,
   bounded tasks, compilations, and implementation tracks.
 supported_locales:
@@ -52,6 +52,8 @@ exports:
   - accept_prototype
   - get_automation_brief
   - open_builder_session
+  - refresh_development_contract
+  - branch_implementation_track
   - get_activity
   - get_formulation_run
   - get_compilation
@@ -523,6 +525,22 @@ tools:
         type:
         - string
         - 'null'
+      workflow_smoke_policy_id:
+        description: Explicit engineering-smoke policy. Provider-compatible mode may
+          relax only non-inferential smoke isolation after capability discovery; it
+          never changes confirmatory scientific requirements.
+        enum:
+        - enforced_offline
+        - provider_compatible_noninferential
+        - null
+      formulation_inheritance_policy_id:
+        description: Explicit successor policy. Parent preservation binds immutable
+          accepted scientific fields while allowing a separately admitted engineering-smoke
+          adaptation.
+        enum:
+        - independent
+        - preserve_parent_scientific_contract
+        - null
       model:
         type:
         - string
@@ -645,6 +663,58 @@ tools:
         type:
         - string
         - 'null'
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: refresh_development_contract
+  description: Supersede the exact Development Session when its admitted consumer
+    ABI has changed, preserving the accepted scientific and engineering instructions.
+  entry: handlers.main:refresh_development_contract
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: branch_implementation_track
+  description: Create an idempotent successor ImplementationTrack for a repaired realization
+    while preserving predecessor release, Study, and Experiment identity.
+  entry: handlers.main:branch_implementation_track
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      reason:
+        type: string
+      actor:
+        type: string
     additionalProperties: true
   output_schema:
     type: object
@@ -815,6 +885,38 @@ tools:
     additionalProperties: true
   output_schema:
     type: object
+- name: repeat_study_experiment
+  description: Create a fresh execution campaign for the same immutable StudyRealization,
+    preserving the terminal parent Experiment as lineage evidence.
+  entry: handlers.main:repeat_study_experiment
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
+      reason:
+        type: string
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
 - name: start_study_smoke
   description: Explicitly lock the compiled protocol and submit its non-inferential
     CPU preflight through ResearchManager.
@@ -869,6 +971,36 @@ tools:
         type:
         - string
         - 'null'
+      actor:
+        type: string
+    additionalProperties: true
+  output_schema:
+    type: object
+- name: finalize_workflow_evidence
+  description: Finalize and independently verify a campaign-scoped operational Evidence
+    bundle without advancing the scientific claim lifecycle.
+  entry: handlers.main:finalize_workflow_evidence
+  side_effects: external_write
+  timeout_seconds: 300
+  input_schema:
+    type: object
+    required:
+    - direction_id
+    - idempotency_key
+    properties:
+      direction_id:
+        type: string
+      task_id:
+        type:
+        - string
+        - 'null'
+      implementation_track_id:
+        type:
+        - string
+        - 'null'
+      idempotency_key:
+        type: string
+        minLength: 1
       actor:
         type: string
     additionalProperties: true
@@ -1323,13 +1455,13 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-19T23:46:36+00:00'
+updated_at: '2026-08-21T07:40:04+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.868+5316.46d944eb
-    recorded_at: '2026-08-19T23:46:37+00:00'
+    min_version: 0.1.904+5517.70d7d20b
+    recorded_at: '2026-08-21T07:40:04+00:00'
     source: skill_push
-    min_commit: 46d944ebf6880e8b9ec6aa494b4b92a898a9e4e7
-    min_short_commit: 46d944eb
-    build_date: '2026-08-20T02:40:40+03:00'
+    min_commit: 70d7d20b24b646d8d84f404c5685a8e14418da8d
+    min_short_commit: 70d7d20b
+    build_date: '2026-08-21T07:36:48+00:00'
 

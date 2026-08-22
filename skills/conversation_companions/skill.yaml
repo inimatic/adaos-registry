@@ -85,6 +85,21 @@ exports:
   - reset_session
   - get_diagnostics
   - publish_diagnostics
+  - dispose
+memory_budget:
+  expected_rss_mb: 64
+  caches:
+  - name: diagnostics_cache
+    storage: process_memory
+    max_items: 64
+    ttl_seconds: 2
+    cleanup_hook: dispose
+  - name: diagnostics_stream_fingerprints
+    storage: process_memory
+    max_items: 64
+    cleanup_hook: dispose
+lifecycle:
+  dispose: dispose
 tools:
 - name: start
   description: Start or resume the first-run character onboarding flow.
@@ -256,6 +271,19 @@ tools:
     - ok
     - items
     - privacy
+- name: dispose
+  description: Release bounded process-local diagnostics caches during runtime unload.
+  entry: handlers.main:dispose
+  side_effects: read_only
+  side_effect_class: read_only
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - cleared
 data_routes:
 - surface: conversation trial feedback
   route: skill-local
@@ -264,6 +292,9 @@ data_routes:
   first_paint: deterministic onboarding, no LLM dependency
   recovery: reset_session clears local session state only
   guard_visibility: local skill state; no device-control side effects
+  budget:
+    max_items: 200
+    max_payload_bytes: 524288
 llm_hints:
   description: Conversational character skill. It creates a low-friction first impression,
     helps users choose or tune a persona, and answers without device-control tools.

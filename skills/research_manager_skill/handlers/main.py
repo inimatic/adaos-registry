@@ -59,10 +59,13 @@ def evaluate_development_candidate(request: Mapping[str, Any]) -> dict[str, Any]
 
 
 @tool("get_runner_contract")
-def get_runner_contract() -> dict[str, Any]:
-    """Return the canonical content-addressed research runner consumer ABI."""
+def get_runner_contract(
+    experiment_plan: Mapping[str, Any] | None = None,
+    runner_id: str | None = None,
+) -> dict[str, Any]:
+    """Return the canonical ABI, optionally with a plan-bound trusted fixture."""
 
-    return runner_contract_descriptor()
+    return runner_contract_descriptor(experiment_plan, runner_id=runner_id)
 
 
 @tool("create_study")
@@ -241,6 +244,22 @@ def lock_experiment(
         idempotency_key=idempotency_key or f"ui:lock:{experiment_id}:{expected_generation}",
         actor=actor,
     )
+
+
+@tool("assess_experiment_execution")
+def assess_experiment_execution(
+    experiment_id: str,
+    profile: str,
+) -> dict[str, Any]:
+    return _manager().assess_experiment_execution(
+        experiment_id=experiment_id,
+        profile=profile,
+    )
+
+
+@tool("execution_provider_status")
+def execution_provider_status() -> dict[str, Any]:
+    return _manager().execution_provider_status()
 
 
 @tool("start_experiment")
@@ -430,8 +449,16 @@ def unblind_test(
 
 
 @tool("export_evidence")
-def export_evidence(study_id: str) -> dict[str, Any]:
-    return _manager().export_evidence(study_id)
+def export_evidence(
+    study_id: str,
+    scope: str = "study_claim",
+    experiment_id: str | None = None,
+) -> dict[str, Any]:
+    return _manager().export_evidence(
+        study_id,
+        scope=scope,
+        experiment_id=experiment_id,
+    )
 
 
 @tool("verify_evidence")

@@ -1665,6 +1665,32 @@ def plan_change_set(
     }
 
 
+@tool(
+    "rebase_change",
+    summary="Rebase one stale Builder Change after deterministic affected-ref verification.",
+    side_effects="local_write",
+)
+def rebase_change(
+    change_id: str,
+    expected_project_generation: int,
+    verified_unchanged_refs: list[str],
+    object_type: str = DEFAULT_PROJECT_KIND,
+    object_id: str = DEFAULT_PROJECT_ID,
+) -> dict[str, Any]:
+    """Expose the Project aggregate's explicit optimistic-concurrency repair."""
+
+    kind, project_id = _identity(object_type, object_id)
+    return workflow.rebase_change(
+        kind,
+        project_id,
+        str(change_id or "").strip(),
+        expected_project_generation=expected_project_generation,
+        verified_unchanged_refs=[
+            str(item).strip() for item in verified_unchanged_refs if str(item).strip()
+        ],
+    )
+
+
 @tool("add_change_issues", summary="Add follow-up issues to the active Builder change set.", side_effects="local_write")
 def add_change_issues(
     request: str,
@@ -2229,8 +2255,46 @@ def get_automation(
     projection = result.get("automation") if isinstance(result.get("automation"), Mapping) else {}
     progress = projection.get("progress") if isinstance(projection.get("progress"), Mapping) else {}
     evidence = projection.get("evidence") if isinstance(projection.get("evidence"), Mapping) else {}
+    workflow_error: str | None = None
+    try:
+        workflow_value = workflow.get_state(kind, project_id)
+    except (RuntimeError, SdkRuntimeNotInitialized) as exc:
+        # Isolated skill validation has no AgentContext. Preserve the
+        # Automation read model and make the absent workflow head explicit.
+        workflow_value = {}
+        workflow_error = f"{type(exc).__name__}: {exc}"
+    governed = (
+        workflow_value.get("governed")
+        if isinstance(workflow_value.get("governed"), Mapping)
+        else {}
+    )
+    change_set = (
+        workflow_value.get("change_set")
+        if isinstance(workflow_value.get("change_set"), Mapping)
+        else {}
+    )
+    delivery = (
+        workflow_value.get("delivery")
+        if isinstance(workflow_value.get("delivery"), Mapping)
+        else {}
+    )
     return {
         **result,
+        "workflow_head": {
+            "schema": "adaos.builder.workflow_head.v1",
+            "available": workflow_error is None,
+            "error": workflow_error,
+            "state": governed.get("state"),
+            "generation": governed.get("generation"),
+            "change_set_id": change_set.get("change_set_id"),
+            "change_status": change_set.get("status"),
+            "delivery_status": delivery.get("status"),
+            "can_plan_change_set": bool(
+                dict(workflow_value.get("capabilities") or {}).get(
+                    "can_plan_change_set"
+                )
+            ),
+        },
         "status": projection.get("status"),
         "phase": projection.get("phase"),
         "task_id": projection.get("task_id"),
@@ -2247,6 +2311,26 @@ def get_automation(
         "stderr_path": evidence.get("stderr_path"),
         "result_path": evidence.get("result_path"),
     }
+
+
+@tool(
+    "release_candidate_runtime",
+    summary="Release a terminal skill candidate's DEV runtime while retaining evidence.",
+    side_effects="local_write",
+)
+def release_candidate_runtime(
+    object_id: str,
+    development_session_id: str,
+    object_type: str = "skill",
+) -> dict[str, Any]:
+    kind, project_id = _identity(object_type, object_id)
+    if kind != "skill":
+        raise ValueError("candidate runtime release requires object_type=skill")
+    return automation.release_candidate_runtime(
+        object_type=kind,
+        object_id=project_id,
+        development_session_id=str(development_session_id or "").strip(),
+    )
 
 
 @tool("get_process", summary="Project dependent Change, Prototype, Implementation, Trial, and Release provenance.", side_effects="none")
@@ -2799,12 +2883,18 @@ def submit_automation(
     kind, project_id = _identity(object_type, object_id)
     source = _webspace_id(webspace_id, _meta)
     topic = _project_topic(kind, project_id, webspace_id=source)
+    admitted_session = _bound_development_session(kind, project_id, source)
     return automation.submit(
         text,
         object_type=kind,
         object_id=project_id,
         webspace_id=source,
         conversation_id=str(conversation_id or topic.get("conversation_id") or "").strip() or None,
+        development_session_id=(
+            str(admitted_session["session"]["session_id"])
+            if admitted_session
+            else None
+        ),
     )
 
 
@@ -2991,10 +3081,13 @@ def push_project(
     object_id: str = DEFAULT_PROJECT_ID,
     message: str | None = None,
     checkpoint_id: str | None = None,
+    confirmed: bool = False,
     webspace_id: str | None = None,
     _meta: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     kind, project_id = _identity(object_type, object_id)
+    if not confirmed:
+        raise ValueError("Forge checkpoint requires explicit user confirmation")
     checkpoint_change_id = str(checkpoint_id or "").strip()
     if not checkpoint_change_id:
         raise ValueError("checkpoint_id is required")
@@ -3068,9 +3161,10 @@ def push_project(
     change_id = str(evidence.get("change_id") or "").strip()
     package_digest = str(result.get("package_digest") or "").strip()
     source_revision = str(result.get("source_revision") or commit or "").strip()
-    if not package_digest or not source_revision:
+    version = str(result.get("version") or "").strip()
+    if not package_digest or not source_revision or not version:
         raise ValueError(
-            "Forge checkpoint did not return immutable package/source identities; "
+            "Forge checkpoint did not return immutable version/package/source identities; "
             "the updated artifact pipeline must be available"
         )
     workflow_result = workflow.transition(
@@ -3085,6 +3179,8 @@ def push_project(
             "context_packet_digest": context_packet_digest or None,
             "package_digest": package_digest,
             "source_revision": source_revision,
+            "version": version,
+            "confirmed": True,
         },
     )
     workflow_projection = (
@@ -3113,23 +3209,40 @@ def push_project(
     }
 
 
-def _checkpoint_candidate_id(project_id: str, delivery: Mapping[str, Any]) -> str | None:
+def _checkpoint_candidate_id(
+    kind: str,
+    project_id: str,
+    delivery: Mapping[str, Any],
+) -> tuple[str, str] | None:
     version = str(delivery.get("version") or "").strip()
     package_digest = str(delivery.get("package_digest") or "").strip()
+    if not version:
+        # Compatibility recovery for checkpoints created before the control
+        # skill forwarded the already available Forge semantic version.  The
+        # candidate is accepted only after package and source identities are
+        # compared below, so a later DEV manifest cannot authorize different
+        # bytes accidentally.
+        try:
+            project = projects.describe(kind, project_id)
+        except Exception:
+            project = {}
+        version = str(project.get("version") or "").strip()
     if not version or not package_digest.startswith("sha256:"):
         return None
-    return f"{project_id}-{version.replace('.', '-')}-{package_digest[-12:]}"
+    return f"{project_id}-{version.replace('.', '-')}-{package_digest[-12:]}", version
 
 
 def _recover_running_checkpoint_candidate(
+    kind: str,
     project_id: str,
     delivery: Mapping[str, Any],
 ) -> dict[str, Any] | None:
     """Recover an exact Trial after its external result outlived a local rollback."""
 
-    candidate_id = _checkpoint_candidate_id(project_id, delivery)
-    if not candidate_id:
+    identity = _checkpoint_candidate_id(kind, project_id, delivery)
+    if not identity:
         return None
+    candidate_id, checkpoint_version = identity
     try:
         result = projects.get_candidate(candidate_id)
     except Exception:
@@ -3140,7 +3253,7 @@ def _recover_running_checkpoint_candidate(
     expected = {
         "candidate_id": candidate_id,
         "project_id": project_id,
-        "version": str(delivery.get("version") or "").strip(),
+        "version": checkpoint_version,
         "package_digest": str(delivery.get("package_digest") or "").strip(),
         "source_revision": str(delivery.get("source_revision") or "").strip(),
     }
@@ -3204,7 +3317,8 @@ def _ensure_trial_waiting_before_result(
         return
     if str(delivery.get("status") or "") == "activating" and governed_state == "trial_waiting":
         return
-    if str(delivery.get("status") or "") != "checkpoint" or governed_state != "trial_ready":
+    delivery_status = str(delivery.get("status") or "")
+    if delivery_status not in {"checkpoint", "activating"} or governed_state != "trial_ready":
         raise ValueError("Trial result cannot be reconciled from the current Builder state")
     workflow.transition(
         kind,
@@ -3314,7 +3428,16 @@ def publish_project(
             project_id,
             source_webspace_id,
         )
-        if not bool(capabilities.get("can_prepare_candidate")):
+        governed_workflow = (
+            workflow_before.get("governed")
+            if isinstance(workflow_before.get("governed"), Mapping)
+            else {}
+        )
+        reconciles_half_applied_waiting = (
+            str(delivery.get("status") or "") == "activating"
+            and str(governed_workflow.get("state") or "") == "trial_ready"
+        )
+        if not bool(capabilities.get("can_prepare_candidate")) and not reconciles_half_applied_waiting:
             raise ValueError(
                 "Candidate preparation requires the current completed Automation result "
                 "and no active trial"
@@ -3366,7 +3489,11 @@ def publish_project(
             },
         )
         try:
-            recovered_result = None if stale_candidate_id else _recover_running_checkpoint_candidate(project_id, delivery)
+            recovered_result = (
+                None
+                if stale_candidate_id
+                else _recover_running_checkpoint_candidate(kind, project_id, delivery)
+            )
             if recovered_result is not None:
                 result = recovered_result
             elif stale_candidate_id:
@@ -3790,6 +3917,7 @@ __all__ = [
     "push_project",
     "read_project_file",
     "record_development_feedback",
+    "release_candidate_runtime",
     "save_prompt_context",
     "save_project_file",
     "select_preview",

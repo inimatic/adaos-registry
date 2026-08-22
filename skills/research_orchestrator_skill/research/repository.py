@@ -623,6 +623,16 @@ class OrchestratorRepository:
         primary_target_ref: str,
         development_session_id: str,
     ) -> dict[str, Any]:
+        current = self.get_track(track_id)
+        if not current:
+            raise ValueError("implementation track does not exist")
+        if (
+            current.get("project_ref") == project_ref
+            and current.get("primary_target_ref") == primary_target_ref
+            and current.get("development_session_id") == development_session_id
+            and current.get("status") == "development_ready"
+        ):
+            return current
         self._db.execute(
             "UPDATE research_implementation_tracks SET project_ref=:project_ref, primary_target_ref=:primary_target_ref, development_session_id=:session_id, status='development_ready', revision=revision+1, updated_at=:updated_at WHERE track_id=:track_id",
             {

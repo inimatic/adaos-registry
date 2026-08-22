@@ -1,5 +1,5 @@
 name: research_calibration_runner_skill
-version: 0.1.11
+version: 0.1.17
 description: Contamination-aware execution bridge from frozen research calibration
   packets to native Builder Automation.
 supported_locales:
@@ -18,6 +18,7 @@ exports:
   - prepare_attempt
   - start_attempt
   - get_attempt
+  - release_attempt
   - environment_identity
 tools:
 - name: environment_identity
@@ -143,6 +144,28 @@ tools:
     - ok
     - candidate_id
     - automation
+- name: release_attempt
+  description: Release a terminal calibration candidate DEV runtime after the independent
+    result is durable, retaining source and evidence.
+  entry: handlers.main:release_attempt
+  side_effects: local_write
+  timeout_seconds: 600
+  input_schema:
+    type: object
+    additionalProperties: false
+    required:
+    - candidate_id
+    - development_session_id
+    properties:
+      candidate_id:
+        type: string
+      development_session_id:
+        type: string
+  output_schema:
+    type: object
+    required:
+    - ok
+    - candidate_id
 data_routes:
 - surface: calibration execution state
   route: tool/details
@@ -194,13 +217,13 @@ nlu_hints:
   examples: []
   slot_schemas: {}
   entities: []
-updated_at: '2026-08-19T12:13:00+00:00'
+updated_at: '2026-08-21T11:48:46+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.867+5287.56dc1e7c
-    recorded_at: '2026-08-19T12:13:00+00:00'
+    min_version: 0.1.911+5548.415c0357
+    recorded_at: '2026-08-21T11:48:46+00:00'
     source: skill_push
-    min_commit: 56dc1e7c860a6597be5932fab78ca8324c83438a
-    min_short_commit: 56dc1e7c
-    build_date: '2026-08-19T15:12:33+03:00'
+    min_commit: 415c0357ed326622e5e16f264487204bfefc8584
+    min_short_commit: 415c0357
+    build_date: '2026-08-21T14:48:29+03:00'
 

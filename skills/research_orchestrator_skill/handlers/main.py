@@ -494,6 +494,8 @@ def chat(
     direction_id: str,
     text: str,
     task_id: str | None = None,
+    workflow_smoke_policy_id: str | None = None,
+    formulation_inheritance_policy_id: str | None = None,
     model: str | None = None,
     actor: str | None = None,
     invocation_origin: str | None = None,
@@ -503,6 +505,12 @@ def chat(
     dialog_payload = dict(payload)
     if task_id:
         dialog_payload["task_id"] = task_id
+    if workflow_smoke_policy_id:
+        dialog_payload["workflow_smoke_policy_id"] = workflow_smoke_policy_id
+    if formulation_inheritance_policy_id:
+        dialog_payload["formulation_inheritance_policy_id"] = (
+            formulation_inheritance_policy_id
+        )
     if invocation_origin:
         dialog_payload["invocation_origin"] = invocation_origin
     if _meta:
@@ -578,6 +586,40 @@ def open_builder_session(
         implementation_track_id=implementation_track_id,
         builder_webspace_id=builder_webspace_id,
         base_url=base_url,
+    )
+
+
+@tool(summary="Supersede a Development Session when the admitted consumer ABI changes.", side_effects="local_write")
+def refresh_development_contract(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().refresh_development_contract(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+    )
+
+
+@tool(summary="Branch an immutable research realization onto its current Development Session.", side_effects="local_write")
+def branch_implementation_track(
+    direction_id: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    reason: str = "realization_repair",
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().branch_implementation_track(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        reason=reason,
+        actor=actor,
     )
 
 
@@ -679,6 +721,26 @@ def instantiate_study(
     )
 
 
+@tool(summary="Create a fresh Experiment campaign for the same immutable StudyRealization.", side_effects="external_write")
+def repeat_study_experiment(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    reason: str = "execution_recovery",
+    actor: str = "user:local",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().repeat_study_experiment(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        reason=reason,
+        actor=actor,
+        idempotency_key=idempotency_key,
+    )
+
+
 @tool(summary="Lock the compiled protocol and submit its bounded CPU workflow smoke.", side_effects="external_write")
 def start_study_smoke(
     direction_id: str,
@@ -712,6 +774,24 @@ def sync_study(
         task_id=task_id,
         implementation_track_id=implementation_track_id,
         actor=actor,
+    )
+
+
+@tool(summary="Finalize an independently verified, non-inferential workflow Evidence bundle.", side_effects="external_write")
+def finalize_workflow_evidence(
+    direction_id: str,
+    idempotency_key: str,
+    task_id: str | None = None,
+    implementation_track_id: str | None = None,
+    actor: str = "system:research_orchestrator",
+    **_: Any,
+) -> dict[str, Any]:
+    return _orchestrator().finalize_workflow_evidence(
+        direction_id,
+        task_id=task_id,
+        implementation_track_id=implementation_track_id,
+        actor=actor,
+        idempotency_key=idempotency_key,
     )
 
 

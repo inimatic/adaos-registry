@@ -3,15 +3,24 @@ from __future__ import annotations
 import copy
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any, Mapping
 
+from adaos.domain.development_validation import (
+    derive_validation_budget,
+    normalize_validation_budget,
+)
+from adaos.domain.runtime_bindings import ContentRef
 from adaos.sdk.core.decorators import tool
 from adaos.sdk.core.environment import runtime_identity as sdk_runtime_identity
-from adaos.domain.runtime_bindings import ContentRef
 from adaos.sdk.builder import automation, development_sessions
 from adaos.sdk.data.blob import store as blob_store
+from adaos.sdk.developer.validation import (
+    inspect_skill_source,
+    invoke_skill as invoke_development_skill,
+)
 from adaos.sdk.skills import invoke as invoke_skill
 
 
@@ -19,7 +28,12 @@ _SKILL_ROOT = Path(__file__).resolve().parents[1]
 if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
-from evaluation.contracts import ARM_IDS, freeze_task  # noqa: E402
+from evaluation.contracts import (  # noqa: E402
+    ARM_IDS,
+    CALIBRATION_EXCLUSION_RULES,
+    file_digest,
+    freeze_task,
+)
 from evaluation.harness import (  # noqa: E402
     build_recomputable_package,
     evaluate_candidate,
@@ -28,6 +42,67 @@ from evaluation.harness import (  # noqa: E402
 )
 from evaluation.independent import build_independent_candidate  # noqa: E402
 from evaluation.repository import EvaluationRepository  # noqa: E402
+from evaluation.public_contract import (  # noqa: E402
+    assert_hidden_profile_is_public,
+    project_tlp_consumer_contract,
+    project_tlp_probe_contract,
+)
+from evaluation.tlp_semantics import (  # noqa: E402
+    evaluate_tlp_implementation,
+    hidden_probe_request,
+)
+
+
+def _snapshot_hidden_inputs(
+    task_id: str,
+    hidden_inputs: list[Mapping[str, Any]],
+    hidden_store: Any,
+    *,
+    rubric_path: Path | None = None,
+) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """Copy hidden judge inputs into immutable owner-scoped blob storage.
+
+    A newly derived task deliberately adopts the evaluator's current hidden rubric.
+    Every other hidden input must still match the baseline digest before it is
+    snapshotted, preventing an unrelated mutable source file from silently changing
+    the benchmark.
+    """
+
+    current_rubric = (rubric_path or (_SKILL_ROOT / "benchmarks" / "tlp" / "hidden-rubric.json")).resolve()
+    snapshots: list[dict[str, Any]] = []
+    blob_refs: dict[str, str] = {}
+    for raw_item in hidden_inputs:
+        item = copy.deepcopy(dict(raw_item))
+        kind = str(item.get("kind") or "")
+        source = current_rubric if kind == "hidden_rubric" else Path(str(item["path"])).resolve()
+        if not source.is_file():
+            raise ValueError(f"hidden calibration input is unavailable: {item.get('input_id')}")
+        if kind == "hidden_rubric":
+            rubric = json.loads(source.read_text(encoding="utf-8-sig"))
+            if tuple(rubric.get("exclusions") or ()) != CALIBRATION_EXCLUSION_RULES:
+                raise ValueError("current hidden rubric does not match calibration endpoint semantics")
+        elif file_digest(source) != str(item.get("digest") or ""):
+            raise ValueError(
+                f"baseline hidden calibration input changed unexpectedly: {item.get('input_id')}"
+            )
+        payload = source.read_bytes()
+        content_digest = "sha256:" + hashlib.sha256(payload).hexdigest()
+        blob = hidden_store.put_bytes(
+            f"{task_id}-{item['input_id']}{source.suffix}",
+            payload,
+            media_type="application/json" if source.suffix.lower() == ".json" else "application/octet-stream",
+        )
+        materialized = hidden_store.materialize_path(blob)
+        item.update(
+            {
+                "path": str(materialized),
+                "digest": content_digest,
+                "ref": f"calibration-hidden://{task_id}/{item['input_id']}/{content_digest}",
+            }
+        )
+        snapshots.append(item)
+        blob_refs[str(item["input_id"])] = str(blob["ref"])
+    return snapshots, blob_refs
 
 
 @tool(summary="Ensure the independent research-evaluation ledger.", side_effects="local_write")
@@ -66,13 +141,16 @@ def derive_compact_calibration(
     source_direction_id: str | None = None,
     source_task_id: str | None = None,
     reasoning_effort: str = "high",
-    standard_prompt_version: str = "adaos-skill-realization/0.1.0",
+    standard_prompt_version: str = "adaos-skill-realization/0.8.0",
     attempts_per_arm: int = 5,
     paired_seeds: list[int] | None = None,
     max_model_tokens: int = 5_000_000,
     max_wall_seconds: int = 10_800,
+    minimum_free_disk_bytes: int = 17_179_869_184,
     **_: Any,
 ) -> dict[str, Any]:
+    """Freeze matched arms with a plan-bound consumer conformance sequence."""
+
     repository = EvaluationRepository()
     baseline = repository.get_task(str(baseline_task_id))
     local_identity = sdk_runtime_identity()
@@ -142,10 +220,21 @@ def derive_compact_calibration(
     )
     if not isinstance(response, Mapping) or not response.get("ok"):
         raise RuntimeError("research orchestrator did not return compact execution contracts")
+    execution_compilation = dict(response.get("research_compilation") or {})
+    experiment_plan = execution_compilation.get("experiment_plan")
+    if not isinstance(experiment_plan, Mapping):
+        raise RuntimeError("execution compilation has no accepted ExperimentPlan")
+    direction_skill_id = source_direction or str(baseline["direction_skill_id"])
     consumer_contract = invoke_skill(
         "research_manager_skill",
         "get_runner_contract",
-        {},
+        {
+            "experiment_plan": dict(experiment_plan),
+            # Calibration candidates receive disposable identities that do not
+            # exist when the task is frozen.  The trusted Builder interpreter
+            # resolves this symbolic owner to the actual candidate skill.
+            "runner_id": "$candidate",
+        },
         timeout=120,
     )
     if (
@@ -155,6 +244,17 @@ def derive_compact_calibration(
         or not consumer_contract.get("digest")
     ):
         raise RuntimeError("research manager did not return its exact runner consumer ABI")
+    public_conformance_path = _SKILL_ROOT / "benchmarks" / "tlp" / "conformance-fixture.json"
+    public_conformance = json.loads(
+        public_conformance_path.read_text(encoding="utf-8-sig")
+    )
+    if not isinstance(public_conformance, Mapping):
+        raise RuntimeError("public TLP implementation conformance contract is invalid")
+    projected_consumer_contract = project_tlp_consumer_contract(
+        consumer_contract,
+        public_conformance,
+    )
+    projected_probe_contract = project_tlp_probe_contract(public_conformance)
     manager_response = invoke_skill(
         "research_manager_skill",
         "environment_identity",
@@ -229,10 +329,12 @@ def derive_compact_calibration(
             + ", ".join(sorted(set(mismatches)))
         )
     input_store = blob_store("calibration_inputs")
+    hidden_store = blob_store("calibration_hidden_inputs")
     projected_inputs = {
         "research_compilation": dict(response["research_compilation"]),
         "automation_brief": dict(response["automation_brief"]),
-        "conformance_fixture": dict(consumer_contract),
+        "runner_contract": projected_consumer_contract,
+        "conformance_fixture": projected_probe_contract,
     }
     replacements = {}
     for kind, value in projected_inputs.items():
@@ -243,6 +345,30 @@ def derive_compact_calibration(
             "digest": str(value["digest"]),
             "blob_ref": str(blob["ref"]),
         }
+    current_hidden_rubric = json.loads(
+        (_SKILL_ROOT / "benchmarks" / "tlp" / "hidden-rubric.json").read_text(
+            encoding="utf-8-sig"
+        )
+    )
+    assert_hidden_profile_is_public(
+        public_conformance,
+        dict(current_hidden_rubric.get("implementation_profile") or {}),
+    )
+    rubric_checks = [
+        {
+            "check_id": str(item["check_id"]),
+            "stage": str(item["stage"]),
+            "evaluation_mode": str(item["mode"]),
+            "mandatory": True,
+            "description": str(item["pass"]),
+        }
+        for item in current_hidden_rubric.get("checks") or []
+        if isinstance(item, Mapping)
+    ]
+    if not rubric_checks or not any(
+        item["check_id"] == "scientific_implementation" for item in rubric_checks
+    ):
+        raise ValueError("current hidden rubric has no scientific implementation gate")
     task = copy.deepcopy(baseline)
     for field in ("schema", "frozen_at", "digest"):
         task.pop(field, None)
@@ -293,10 +419,15 @@ def derive_compact_calibration(
     }
     task.update(
         {
-            "schema_version": "1.6.0",
+            "schema_version": "1.10.0",
             "task_id": str(task_id),
-            "title": str(baseline["title"]) + " (compact execution contracts)",
-            "direction_skill_id": source_direction or str(baseline["direction_skill_id"]),
+            "title": re.sub(
+                r"(?: \(compact execution contracts\))+$",
+                "",
+                str(baseline["title"]),
+            )
+            + " (compact execution contracts)",
+            "direction_skill_id": direction_skill_id,
             "expected_protocol_digest": str(brief["prototype_digest"]),
             "expected_smoke_profile": expected_smoke_profile,
             "consumer_evaluation": {
@@ -323,6 +454,7 @@ def derive_compact_calibration(
                 "core_source_tree_clean": True,
                 "core_source_tree_digest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
                 "runner_contract_digest": str(consumer_contract["digest"]),
+                "minimum_free_disk_bytes": int(minimum_free_disk_bytes),
             },
             "measurement_policy": {
                 "model_token_charge": "input_plus_output_including_cached",
@@ -362,13 +494,49 @@ def derive_compact_calibration(
                 "missing_policy": "incomplete_no_claim",
                 "claim_scope": "local_tlp_fixed_stack",
             },
+            "exclusion_rules": list(CALIBRATION_EXCLUSION_RULES),
+            "rubric": {
+                "primary_endpoint": str(current_hidden_rubric["primary_endpoint"]),
+                "checks": rubric_checks,
+                "failure_stages": list(baseline["rubric"]["failure_stages"]),
+            },
         }
+    )
+    task["hidden_inputs"], hidden_blob_refs = _snapshot_hidden_inputs(
+        str(task_id),
+        [dict(item) for item in baseline["hidden_inputs"]],
+        hidden_store,
     )
     for item in task["inputs"]:
         replacement = replacements.get(str(item["kind"]))
         if replacement:
             item.update({key: replacement[key] for key in ("path", "digest")})
             item["ref"] = f"calibration-input://{task_id}/{item['kind']}/{replacement['digest']}"
+    runner_input_id = "runner-contract"
+    if not any(
+        str(item.get("kind") or "") == "runner_contract"
+        for item in task["inputs"]
+    ):
+        runner_replacement = replacements["runner_contract"]
+        task["inputs"].append(
+            {
+                "input_id": runner_input_id,
+                "kind": "runner_contract",
+                "ref": (
+                    f"calibration-input://{task_id}/runner_contract/"
+                    f"{runner_replacement['digest']}"
+                ),
+                "digest": runner_replacement["digest"],
+                "path": runner_replacement["path"],
+                "visible_arms": ["C3_typed_execution", "C4_over_specified"],
+            }
+        )
+        for arm in task["arms"]:
+            if str(arm.get("arm_id") or "") in {
+                "C3_typed_execution",
+                "C4_over_specified",
+            }:
+                arm["instruction_input_ids"].append(runner_input_id)
     stored = repository.put_task(freeze_task(task))
     return {
         "ok": True,
@@ -383,6 +551,7 @@ def derive_compact_calibration(
             "execution_compilation_digest": projected_inputs["research_compilation"]["digest"],
             "execution_automation_brief_digest": projected_inputs["automation_brief"]["digest"],
             "blob_refs": {kind: item["blob_ref"] for kind, item in replacements.items()},
+            "hidden_blob_refs": hidden_blob_refs,
         },
     }
 
@@ -460,6 +629,24 @@ def record_calibration_result(
     }
 
 
+def _deferred_runtime_release() -> dict[str, Any]:
+    """Keep runtime lifecycle outside the process that loaded candidate code.
+
+    On Windows, importing a candidate with native dependencies maps its DLLs
+    into this evaluator process.  Deleting the DEV runtime before this process
+    exits therefore fails even though a subsequent runner-owned release is
+    safe.  The calibration runner already owns the attempt lifecycle and
+    releases the exact terminal candidate after this result is durable.
+    """
+
+    return {
+        "schema": "adaos.research.runtime_release_delegation.v1",
+        "status": "deferred",
+        "owner_ref": "skill:research_calibration_runner_skill",
+        "reason": "evaluator_process_may_hold_candidate_native_modules",
+    }
+
+
 @tool(summary="Execute the hidden deterministic judge over one terminal Builder candidate.", side_effects="local_write")
 def evaluate_builder_attempt(
     task_id: str,
@@ -483,8 +670,25 @@ def evaluate_builder_attempt(
             "result": existing,
             "evidence_valid_completion": existing["metrics"]["evidence_valid_completion"],
             "operation_errors": [],
+            "runtime_release": _deferred_runtime_release(),
+            "lifecycle_errors": [],
         }
     session = development_sessions.get(development_session_id)
+    session_handoff = (
+        dict(session.get("handoff") or {})
+        if isinstance(session.get("handoff"), Mapping)
+        else {}
+    )
+    raw_validation_budget = session_handoff.get("validation_budget")
+    if isinstance(raw_validation_budget, Mapping):
+        validation_budget = normalize_validation_budget(raw_validation_budget)
+    else:
+        validation_budget = derive_validation_budget(
+            session_handoff.get("execution_budget")
+            if isinstance(session_handoff.get("execution_budget"), Mapping)
+            else None,
+            source="development_session.execution_budget",
+        )
     enriched_instructions = []
     instruction_values: dict[str, Any] = {}
     for descriptor in session.get("instruction_inputs") or []:
@@ -513,6 +717,8 @@ def evaluate_builder_attempt(
     dataset = None
     verified = []
     collected = None
+    arm_trials = []
+    scientific_implementation = None
     errors = []
     if projection.get("status") == "completed":
         try:
@@ -523,10 +729,21 @@ def evaluate_builder_attempt(
                     instruction_values[kind] = json.loads(
                         source.read_text(encoding="utf-8-sig")
                     )
+            execution_compilation = instruction_values.get("research_compilation")
+            experiment_plan = (
+                dict(execution_compilation.get("experiment_plan") or {})
+                if isinstance(execution_compilation, Mapping)
+                else {}
+            )
+            if not experiment_plan:
+                raise RuntimeError("ResearchCompilation has no ExperimentPlan for consumer evaluation")
             contract_response = invoke_skill(
                 "research_manager_skill",
                 "get_runner_contract",
-                {},
+                {
+                    "experiment_plan": experiment_plan,
+                    "runner_id": "$candidate",
+                },
                 timeout=120,
             )
             if not isinstance(contract_response, Mapping):
@@ -556,6 +773,7 @@ def evaluate_builder_attempt(
                         "candidate_ref": f"skill:{candidate_id}",
                         "candidate": {"id": candidate_id},
                         "execute_workflow_smoke": True,
+                        "validation_budget": validation_budget,
                         "contract_inputs": contract_inputs,
                         "instructions": {
                             kind: instruction_values[kind]
@@ -582,6 +800,7 @@ def evaluate_builder_attempt(
             validation = {
                 "ok": bool(native.get("ok")),
                 "digest": native.get("digest"),
+                "source_digest": native.get("source_digest"),
             }
             prepare = {
                 "ok": bool(consumer.get("ok")),
@@ -596,6 +815,11 @@ def evaluate_builder_attempt(
                 if isinstance(item, Mapping)
             ]
             collected = dict(evidence.get("collected") or {}) or None
+            arm_trials = [
+                dict(item)
+                for item in evidence.get("arm_trials") or []
+                if isinstance(item, Mapping)
+            ]
             errors.extend(str(item) for item in consumer.get("errors") or [])
         except Exception as exc:
             errors.append(f"{type(exc).__name__}: {exc}")
@@ -605,6 +829,83 @@ def evaluate_builder_attempt(
             f"Builder Automation ended with status {projection.get('status')}"
             + (f": {terminal_error}" if terminal_error else "")
         )
+    rubric_ids = {
+        str(item.get("check_id") or "")
+        for item in task.get("rubric", {}).get("checks") or []
+        if isinstance(item, Mapping)
+    }
+    if "scientific_implementation" in rubric_ids:
+        probe_request: dict[str, Any] = {}
+        probe_result = None
+        probe_error = None
+        source_snapshot = None
+        try:
+            plan = dict(
+                dict(instruction_values.get("research_compilation") or {}).get(
+                    "experiment_plan"
+                )
+                or {}
+            )
+            if not plan.get("digest") or not isinstance(plan.get("system"), Mapping):
+                raise ValueError(
+                    "scientific implementation evaluation requires ExperimentPlan v1.4 system"
+                )
+            hidden_rubric_item = next(
+                (
+                    dict(item)
+                    for item in task.get("hidden_inputs") or []
+                    if isinstance(item, Mapping)
+                    and str(item.get("kind") or "") == "hidden_rubric"
+                ),
+                None,
+            )
+            if hidden_rubric_item is None:
+                raise ValueError("frozen hidden rubric is unavailable")
+            hidden_rubric_path = Path(str(hidden_rubric_item["path"])).resolve()
+            hidden_rubric = json.loads(
+                hidden_rubric_path.read_text(encoding="utf-8-sig")
+            )
+            if file_digest(hidden_rubric_path) != str(hidden_rubric_item["digest"]):
+                raise ValueError("frozen hidden rubric digest changed")
+            source_snapshot = inspect_skill_source(candidate_id)
+            probe_request = hidden_probe_request(str(plan["digest"]))
+            try:
+                # The digest is evaluator-owned provenance for the complete
+                # hidden fixture.  It is intentionally not part of the public
+                # provider ABI and must not be sent through strict tool input
+                # validation.
+                candidate_probe_request = copy.deepcopy(probe_request)
+                candidate_probe_request.pop("digest", None)
+                value = invoke_development_skill(
+                    candidate_id,
+                    "implementation_probe",
+                    {"request": candidate_probe_request},
+                    timeout=60,
+                )
+                if isinstance(value, Mapping):
+                    probe_result = dict(value)
+                else:
+                    probe_error = "implementation_probe returned no mapping"
+            except Exception as exc:
+                probe_error = f"{type(exc).__name__}: {exc}"
+            scientific_implementation = evaluate_tlp_implementation(
+                profile=dict(hidden_rubric.get("implementation_profile") or {}),
+                plan=plan,
+                source_snapshot=source_snapshot,
+                expected_source_digest=str((validation or {}).get("source_digest") or "")
+                or None,
+                arm_trials=arm_trials,
+                probe_request=probe_request,
+                probe_result=probe_result,
+                probe_error=probe_error,
+            )
+        except Exception as exc:
+            scientific_implementation = {
+                "ok": False,
+                "detail": f"scientific implementation evaluation failed: {type(exc).__name__}: {exc}",
+                "evidence_refs": [],
+                "diagnostics": [f"{type(exc).__name__}: {exc}"],
+            }
     candidate = build_independent_candidate(
         task=task,
         packet=packet,
@@ -617,6 +918,7 @@ def evaluate_builder_attempt(
         dataset=dataset,
         verified_artifacts=verified,
         collected=collected,
+        scientific_implementation=scientific_implementation,
         operation_errors=errors,
     )
     stored = repository.put_result(evaluate_candidate(task, candidate))
@@ -626,6 +928,8 @@ def evaluate_builder_attempt(
         "result": stored,
         "evidence_valid_completion": stored["metrics"]["evidence_valid_completion"],
         "operation_errors": errors,
+        "runtime_release": _deferred_runtime_release(),
+        "lifecycle_errors": [],
     }
 
 
@@ -658,9 +962,13 @@ def summarize_calibration(
             f"`{comparison['control_wins']}` / `{comparison['ties']}`\n"
             f"- one-sided exact p: `{comparison['p_value']}` at alpha `{comparison['alpha']}`\n"
             f"- paired risk difference: `{comparison['paired_risk_difference']}`\n"
+            f"- execution order verifiable / valid: "
+            f"`{comparison['execution_order_verifiable']}` / "
+            f"`{comparison['execution_order_valid']}`\n"
             f"- conclusion: `{comparison['claim_status']}` within `{comparison['claim_scope']}`\n\n"
             "The paired seed controls the scientific workload, not model sampling; "
-            "the execution order is preregistered and counterbalanced."
+            "the execution order is preregistered and a claim is admitted only when "
+            "Builder start timestamps prove that exact counterbalanced sequence."
         )
     return {"ok": True, "summary": summary, "content": content}
 

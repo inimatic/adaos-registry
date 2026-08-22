@@ -1,0 +1,603 @@
+name: tlp_structured_proof_02
+version: 0.1.7
+description: Governed STL-10 MaxPool2d versus centered per-channel TLP pool2 research
+  runner.
+supported_locales:
+- en
+- ru
+entry: handlers/main.py
+default_tool: describe_direction
+runtime:
+  python: '3.11'
+  env:
+    allow_heavy_dependencies: true
+dependencies:
+- torch>=1.13
+- torchvision>=0.14
+events:
+  subscribe: []
+  publish: []
+exports:
+  tools:
+  - describe_direction
+  - validate_research_prototype
+  - execution_readiness
+  - prepare_attempt
+  - collect_attempt
+  - verify_artifact
+  - dataset_status
+provider_contracts:
+- contract: adaos.research.runner.v1
+  capability: research.runner
+  operations:
+  - prepare_attempt
+  - collect_attempt
+  - verify_artifact
+  - dataset_status
+tools:
+- name: describe_direction
+  description: Return the typed research-direction descriptor and current implementation
+    readiness.
+  entry: handlers.main:describe_direction
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - direction
+    - readiness
+- name: validate_research_prototype
+  description: Run domain-specific checks over a candidate ResearchPrototype without
+    accepting it.
+  entry: handlers.main:validate_research_prototype
+  input_schema:
+    type: object
+    required:
+    - prototype
+    properties:
+      prototype:
+        type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - accepted
+    - issues
+- name: execution_readiness
+  description: Report whether Codex has implemented the experimental runner contract.
+  entry: handlers.main:execution_readiness
+  input_schema:
+    type: object
+    additionalProperties: true
+  output_schema:
+    type: object
+    required:
+    - ok
+    - ready
+    - missing
+- name: prepare_attempt
+  description: Prepare an ExecutionSpec-compatible command without submitting it.
+  entry: handlers.main:prepare_attempt
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - request
+    properties:
+      request:
+        type: object
+        required:
+        - experiment_id
+        - experiment_revision_id
+        - trial_id
+        - run_id
+        - attempt_number
+        - profile
+        - seed
+        - arm
+        - conditions
+        - profile_conditions
+        properties:
+          experiment_id:
+            type: string
+            minLength: 1
+          experiment_revision_id:
+            type: string
+            minLength: 1
+          trial_id:
+            type: string
+            minLength: 1
+          run_id:
+            type: string
+            minLength: 1
+          attempt_number:
+            type: integer
+            minimum: 1
+          profile:
+            enum:
+            - preflight
+            - confirmatory
+            description: ResearchManager lifecycle profile. Use preflight for workflow_smoke
+              evidence and confirmatory for confirmatory evidence; scientific stage
+              identity is carried separately by profile_conditions.source_stage_id.
+          seed:
+            type: integer
+          arm:
+            type: object
+            required:
+            - id
+            - role
+            properties:
+              id:
+                type: string
+                minLength: 1
+              role:
+                enum:
+                - baseline
+                - intervention
+              label:
+                type: string
+              specification:
+                type: string
+            additionalProperties: true
+          conditions:
+            type: object
+            required:
+            - dataset
+            - operators
+            - execution
+            - randomization
+            - analysis
+            - tracker
+            - runner
+            additionalProperties: true
+          profile_conditions:
+            type: object
+            required:
+            - source_stage_id
+            - epochs
+            - seeds
+            - device
+            - evidence_class
+            - inference_allowed
+            - network_mode
+            - workload
+            - input_policy
+            properties:
+              source_stage_id:
+                type: string
+                minLength: 1
+              epochs:
+                type: integer
+                minimum: 1
+              seeds:
+                type: array
+                items:
+                  type: integer
+                minItems: 1
+              device:
+                type: string
+                minLength: 1
+              evidence_class:
+                enum:
+                - workflow_smoke
+                - confirmatory
+              inference_allowed:
+                type: boolean
+              network_mode:
+                enum:
+                - offline
+                - unrestricted
+              workload:
+                type: object
+              input_policy:
+                type: object
+            additionalProperties: true
+        additionalProperties: true
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - contract
+    - provider_id
+    - package_ref
+    - code_digest
+    - environment_digest
+    - spec_id
+    - command
+    - working_directory
+    - output_ref
+    - expected_outputs
+    properties:
+      contract:
+        const: adaos.research.runner.v1
+      provider_id:
+        type: string
+        minLength: 1
+      package_ref:
+        type: object
+        required:
+        - uri
+        - digest
+        - size_bytes
+        - media_type
+        - owner_ref
+        properties:
+          uri:
+            type: string
+            minLength: 1
+          digest:
+            type: string
+            pattern: ^sha256:[0-9a-f]{64}$
+          size_bytes:
+            type: integer
+            minimum: 0
+          media_type:
+            type: string
+            minLength: 1
+          owner_ref:
+            type: string
+            pattern: ^skill:[A-Za-z0-9_.-]+$
+          kind:
+            type: string
+            minLength: 1
+          metadata:
+            type: object
+        additionalProperties: true
+      code_digest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      environment_digest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+      spec_id:
+        type: string
+        minLength: 1
+      command:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        minItems: 2
+      working_directory:
+        type: string
+        minLength: 1
+      output_ref:
+        type: string
+        minLength: 1
+      expected_outputs:
+        type: array
+        items:
+          type: string
+          minLength: 1
+        minItems: 1
+      environment:
+        type: object
+        additionalProperties:
+          type: string
+    additionalProperties: true
+- name: collect_attempt
+  description: Collect canonical observations and portable immutable artifact references.
+  entry: handlers.main:collect_attempt
+  side_effects: read_only
+  input_schema:
+    type: object
+    required:
+    - output_ref
+    properties:
+      output_ref:
+        type: string
+        minLength: 1
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - provider_id
+    - observations
+    - artifacts
+    - result
+    - complete
+    properties:
+      provider_id:
+        type: string
+        minLength: 1
+      observations:
+        type: array
+        items:
+          type: object
+          required:
+          - metric
+          - value
+          properties:
+            metric:
+              type: object
+              required:
+              - name
+              properties:
+                namespace:
+                  type: string
+                  minLength: 1
+                name:
+                  type: string
+                  minLength: 1
+              additionalProperties: false
+            value: {}
+            value_type:
+              enum:
+              - float
+              - integer
+              - boolean
+              - string
+              - vector
+              - table
+              - distribution
+            unit:
+              type: string
+            direction:
+              type: string
+            split_role:
+              enum:
+              - train
+              - validation
+              - robustness
+              - test
+              - system
+            dataset_digest:
+              anyOf:
+              - type: string
+                pattern: ^sha256:[0-9a-f]{64}$
+              - type: 'null'
+            step:
+              type: object
+              required:
+              - axis
+              - value
+              properties:
+                axis:
+                  type: string
+                  minLength: 1
+                value: {}
+              additionalProperties: true
+            aggregation:
+              type: string
+            observed_at:
+              type: string
+            producer:
+              type: object
+            evidence_role:
+              type: string
+            event_id:
+              type: string
+              minLength: 1
+          additionalProperties: true
+      artifacts:
+        type: array
+        items:
+          type: object
+          required:
+          - uri
+          - digest
+          - size_bytes
+          - media_type
+          - owner_ref
+          - role
+          properties:
+            uri:
+              type: string
+              minLength: 1
+            digest:
+              type: string
+              pattern: ^sha256:[0-9a-f]{64}$
+            size_bytes:
+              type: integer
+              minimum: 0
+            media_type:
+              type: string
+              minLength: 1
+            owner_ref:
+              type: string
+              pattern: ^skill:[A-Za-z0-9_.-]+$
+            role:
+              type: string
+              minLength: 1
+            kind:
+              type: string
+              minLength: 1
+            metadata:
+              type: object
+          additionalProperties: true
+      result:
+        anyOf:
+        - type: object
+          required:
+          - primary_metric
+          - step
+          - pairing_identity_digest
+          - arm_id
+          - seed
+          - evidence_class
+          properties:
+            primary_metric:
+              type: number
+            step:
+              type: integer
+              minimum: 0
+            pairing_identity_digest:
+              type: string
+              pattern: ^sha256:[0-9a-f]{64}$
+            arm_id:
+              type: string
+              minLength: 1
+            seed:
+              type: integer
+            evidence_class:
+              enum:
+              - workflow_smoke
+              - confirmatory
+          additionalProperties: true
+        - type: 'null'
+      complete:
+        type: boolean
+    allOf:
+    - if:
+        required:
+        - complete
+        properties:
+          complete:
+            const: true
+      then:
+        properties:
+          observations:
+            minItems: 1
+          artifacts:
+            minItems: 1
+          result:
+            type: object
+            required:
+            - primary_metric
+            - step
+            - pairing_identity_digest
+            - arm_id
+            - seed
+            - evidence_class
+            properties:
+              primary_metric:
+                type: number
+              step:
+                type: integer
+                minimum: 0
+              pairing_identity_digest:
+                type: string
+                pattern: ^sha256:[0-9a-f]{64}$
+              arm_id:
+                type: string
+                minLength: 1
+              seed:
+                type: integer
+              evidence_class:
+                enum:
+                - workflow_smoke
+                - confirmatory
+            additionalProperties: true
+    additionalProperties: true
+- name: verify_artifact
+  description: Verify exact content bytes by SHA256.
+  entry: handlers.main:verify_artifact
+  side_effects: read_only
+  input_schema:
+    type: object
+    required:
+    - uri
+    - digest
+    properties:
+      uri:
+        type: string
+        minLength: 1
+      digest:
+        type: string
+        pattern: ^sha256:[0-9a-f]{64}$
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - ok
+    properties:
+      ok:
+        type: boolean
+    additionalProperties: true
+- name: dataset_status
+  description: Return distinct immutable validation, robustness and sealed-test identities.
+  entry: handlers.main:dataset_status
+  side_effects: read_only
+  input_schema:
+    type: object
+    additionalProperties: false
+  output_schema:
+    type: object
+    required:
+    - dataset_id
+    - ready
+    - execution_ready_without_network
+    - split_bindings
+    properties:
+      dataset_id:
+        type: string
+        minLength: 1
+      ready:
+        type: boolean
+      execution_ready_without_network:
+        type: boolean
+      split_bindings:
+        type: object
+        required:
+        - validation
+        - robustness
+        - test
+        properties:
+          validation: &id001
+            type: object
+            required:
+            - digest
+            - dataset_digest
+            - locator
+            - sealed
+            properties:
+              digest:
+                type: string
+                pattern: ^sha256:[0-9a-f]{64}$
+              dataset_digest:
+                type: string
+                pattern: ^sha256:[0-9a-f]{64}$
+              locator:
+                type: string
+                minLength: 1
+              sealed:
+                type: boolean
+            additionalProperties: true
+          robustness: *id001
+          test: *id001
+        additionalProperties: false
+    additionalProperties: true
+research_direction:
+  schema: adaos.research.direction.v1
+  schema_version: 1.0.0
+  owner: skill:tlp_structured_proof_02
+  descriptor: research.yaml
+  primary_data_owner: skill:tlp_structured_proof_02
+  runner_contract: adaos.research.runner.v1
+  pre_codex: false
+presentations:
+- id: research-workbench
+  scenario: research_workbench
+  contract: adaos.research.direction.v1
+  default: true
+  bindings:
+    direction_ref: skill:self
+llm_hints:
+  description: Research direction owned by tlp_structured_proof_02. The shared research
+    orchestrator governs intake and formulation.
+  aliases:
+  - research direction
+  primary_actions:
+  - id: tlp_structured_proof_02.describe_direction
+    intent: tlp_structured_proof_02.describe_direction
+    tool: describe_direction
+    side_effect_class: read_only
+    examples:
+    - Describe this research direction
+    - What remains before this research can run?
+  examples: []
+  owner_hints:
+  - skill:tlp_structured_proof_02
+nlu_hints:
+  aliases:
+  - research direction
+  examples: []
+  slot_schemas: {}
+  entities: []
+prototype: research_direction
+updated_at: '2026-08-21T05:45:26+00:00'
+title: TLP structured realization proof 02 — research assets

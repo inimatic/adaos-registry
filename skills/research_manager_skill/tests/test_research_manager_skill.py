@@ -14,7 +14,8 @@ if str(_SKILL_ROOT) not in sys.path:
     sys.path.insert(0, str(_SKILL_ROOT))
 
 import research.manager as manager_module
-from research.contracts import ResearchRecord, identity
+import research.evidence as evidence_module
+from research.contracts import ResearchRecord, digest, identity
 from research.manager import ResearchManager
 from research.runner_contract import descriptor as runner_contract_descriptor
 from research.tracker import MlflowTracker, TrackerConflict
@@ -148,7 +149,10 @@ def _acceptance_plan() -> dict:
 def _acceptance_envelope(profile: str) -> dict:
     compilation_digest = "sha256:" + "a" * 64
     brief_digest = "sha256:" + "b" * 64
-    consumer_contract = runner_contract_descriptor()
+    consumer_contract = runner_contract_descriptor(
+        _acceptance_plan(),
+        runner_id="tlp_runner",
+    )
     return {
         "schema": "adaos.builder.acceptance_candidate.v1",
         "profile": profile,
@@ -184,6 +188,52 @@ def _smoke_expected_outputs() -> list[str]:
     )
 
 
+def _implementation_observation(
+    *, arm_id: str = "maxpool", role: str = "baseline"
+) -> dict:
+    implementation = {
+        "source_files": [
+            {"path": "handlers/runner.py", "digest": "sha256:" + "a" * 64}
+        ],
+        "callables": {
+            "model_factory": "build_model",
+            "training_entrypoint": "run_workflow_smoke",
+        },
+    }
+    return {
+        "schema": "adaos.research.implementation_observation.v1",
+        "experiment_plan_digest": "sha256:" + "d" * 64,
+        "system_digest": "sha256:" + "9" * 64,
+        "arm": {"id": arm_id, "role": role},
+        "execution_path_digest": digest(implementation),
+        "implementation": implementation,
+        "observed": {"path_executed": True},
+    }
+
+
+def _canonical_result(*, arm_id: str = "maxpool", value: float = 62.5) -> dict:
+    return {
+        "primary_metric": value,
+        "step": 3,
+        "pairing_identity_digest": "sha256:" + "f" * 64,
+        "arm_id": arm_id,
+        "seed": 17,
+        "evidence_class": "workflow_smoke",
+    }
+
+
+def _primary_observation(*, value: float = 62.5) -> dict:
+    return {
+        "metric": {"namespace": "research", "name": "primary_metric"},
+        "value": value,
+        "value_type": "float",
+        "unit": "percent",
+        "split_role": "validation",
+        "step": {"axis": "epoch", "value": 3},
+        "evidence_role": "workflow_smoke",
+    }
+
+
 def test_development_traceability_acceptance_is_digest_bound() -> None:
     manager = ResearchManager()
     accepted = manager.validate_development_candidate(
@@ -202,7 +252,7 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     contract = runner_contract_descriptor()
     identity = {key: item for key, item in contract.items() if key != "digest"}
     assert contract["digest"] == manager_module.digest(identity)
-    assert contract["version"] == "1.4.0"
+    assert contract["version"] == "1.18.0"
     assert set(contract["operations"]) == {
         "prepare_attempt",
         "collect_attempt",
@@ -212,6 +262,37 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     assert contract["operations"]["prepare_attempt"]["input_schema"]["required"] == [
         "request"
     ]
+    prepare_contract = contract["operations"]["prepare_attempt"]
+    assert prepare_contract["execution_output_layout"] == {
+        "path_base": "working_directory",
+        "resolution": "Path(working_directory) / expected_outputs[i]",
+        "success_condition": "every resolved expected output is a regular file after command exit",
+        "subdirectory_policy": (
+            "encode every subdirectory explicitly in expected_outputs; an undeclared implicit "
+            "outputs/ prefix is invalid"
+        ),
+    }
+    profile_schema = prepare_contract["input_schema"]["properties"]["request"][
+        "properties"
+    ]["profile"]
+    assert profile_schema["enum"] == ["preflight", "confirmatory"]
+    assert prepare_contract["profile_mapping"]["preflight"] == {
+        "required_evidence_class": "workflow_smoke",
+        "scientific_stage_field": "profile_conditions.source_stage_id",
+        "inference_allowed": False,
+    }
+    assert any(
+        "workflow_smoke is not a valid request.profile" in invariant
+        for invariant in prepare_contract["invariants"]
+    )
+    assert any(
+        "undeclared implicit outputs/ subdirectory" in invariant
+        for invariant in prepare_contract["invariants"]
+    )
+    assert any(
+        "PYTHONPATH" in invariant and "trusted executor supplies them" in invariant
+        for invariant in prepare_contract["invariants"]
+    )
     for operation in contract["operations"].values():
         jsonschema.Draft202012Validator.check_schema(operation["input_schema"])
         jsonschema.Draft202012Validator.check_schema(operation["output_schema"])
@@ -219,11 +300,129 @@ def test_runner_consumer_contract_is_content_addressed_and_exact() -> None:
     assert smoke_contract["required_expected_outputs"] == [
         "run_log.json",
         "evaluation_audit.json",
+        "implementation_observation.json",
+        "result_record.json",
         "artifacts_index.json",
     ]
     for schema in smoke_contract["documents"].values():
         jsonschema.Draft202012Validator.check_schema(schema)
+    assert contract["conformance_fixtures"] == [
+        {
+            "id": "workflow_smoke.evidence_documents",
+            "kind": "document_set",
+            "required": True,
+            "runtime_scope": "task_runtime",
+            "selection": "newest_complete",
+            "required_documents": smoke_contract["required_expected_outputs"],
+            "documents": smoke_contract["documents"],
+        }
+    ]
     assert "MUST NOT index itself" in smoke_contract["collection"]["index_boundary"]
+    exact_set = smoke_contract["collection"]["exact_artifact_set"]
+    assert exact_set == {
+        "authority": "artifacts_index.json.files",
+        "collection": "collect_attempt.artifacts",
+        "identity_key": "digest",
+        "relation": "set_equal",
+        "unique": True,
+        "excluded_paths": ["artifacts_index.json"],
+        "canonical_example": {
+            "index_paths": ["run_log.json", "evaluation_audit.json"],
+            "collected_paths": ["run_log.json", "evaluation_audit.json"],
+        },
+    }
+    assert any(
+        "exact set equals artifacts_index.json.files" in invariant
+        for invariant in contract["operations"]["collect_attempt"]["invariants"]
+    )
+
+
+def test_runner_contract_materializes_plan_bound_trusted_operation_sequence() -> None:
+    contract = runner_contract_descriptor(
+        _acceptance_plan(),
+        runner_id="tlp_runner",
+    )
+    fixture = next(
+        item
+        for item in contract["conformance_fixtures"]
+        if item["kind"] == "operation_sequence"
+    )
+    assert fixture["timeout_seconds"] == 300
+    assert [item["id"] for item in fixture["steps"]] == [
+        "dataset_status",
+        "prepare_baseline",
+        "execute_baseline",
+        "collect_baseline",
+        "verify_baseline_artifacts",
+        "prepare_intervention",
+        "execute_intervention",
+        "collect_intervention",
+        "verify_intervention_artifacts",
+    ]
+    request = fixture["steps"][1]["input"]["request"]
+    assert request["arm"] == {"id": "maxpool", "role": "baseline"}
+    assert request["seed"] == 17
+    assert request["profile_conditions"]["source_stage_id"] == "stage_smoke_cpu"
+    assert request["profile_conditions"]["inference_allowed"] is False
+    assert request["conditions"]["dataset"]["version"] == {
+        "$bind": {
+            "step": "dataset_status",
+            "pointer": "/split_bindings/validation/dataset_digest",
+        }
+    }
+    assert fixture["steps"][3]["assert"] == [
+        {"pointer": "/complete", "equals": True},
+        {"pointer": "/provider_id", "equals": "tlp_runner"},
+        {"pointer": "/result/arm_id", "equals": "maxpool"},
+        {"pointer": "/result/seed", "equals": 17},
+        {"pointer": "/result/evidence_class", "equals": "workflow_smoke"},
+        {
+            "pointer": "/observations",
+            "contains": [
+                {"pointer": "/metric/name", "equals": "primary_metric"},
+                {
+                    "pointer": "/value",
+                    "equals_root_pointer": "/result/primary_metric",
+                },
+                {
+                    "pointer": "/evidence_role",
+                    "equals_root_pointer": "/result/evidence_class",
+                },
+            ],
+        },
+    ]
+    intervention_request = fixture["steps"][5]["input"]["request"]
+    assert intervention_request["arm"] == {"id": "tlp", "role": "intervention"}
+    assert fixture["steps"][7]["assert"][-1] == {
+        "pointer": "/result/pairing_identity_digest",
+        "equals_step_pointer": {
+            "step": "collect_baseline",
+            "pointer": "/result/pairing_identity_digest",
+        },
+    }
+    assert contract["digest"] == digest(
+        {key: value for key, value in contract.items() if key != "digest"}
+    )
+
+    symbolic = runner_contract_descriptor(
+        _acceptance_plan(),
+        runner_id="$candidate",
+    )
+    symbolic_fixture = next(
+        item
+        for item in symbolic["conformance_fixtures"]
+        if item["kind"] == "operation_sequence"
+    )
+    symbolic_runner = symbolic_fixture["steps"][1]["input"]["request"]["conditions"]["runner"]
+    assert symbolic_runner == {
+        "provider": {"$candidate": "/skill_id"},
+        "contract": "adaos.research.runner.v1",
+        "data_owner": {"$candidate": "/skill_id"},
+    }
+    assert not any(
+        assertion.get("pointer") == "/provider_id"
+        for assertion in symbolic_fixture["steps"][3]["assert"]
+    )
 
     dataset_schema = contract["operations"]["dataset_status"]["output_schema"]
     split_values = {
@@ -266,14 +465,81 @@ def test_development_consumer_rejects_symbolic_rng_seed_units() -> None:
         )
 
 
+def test_complete_runner_collection_requires_canonical_result() -> None:
+    with pytest.raises(ValueError, match="result.*required property"):
+        ResearchManager._validate_runner_collection(
+            {
+                "provider_id": "tlp_runner",
+                "observations": [_primary_observation()],
+                "artifacts": [
+                    {
+                        "uri": "skill-data:files/result.json",
+                        "digest": "sha256:" + "a" * 64,
+                        "size_bytes": 42,
+                        "media_type": "application/json",
+                        "owner_ref": "skill:tlp_runner",
+                        "role": "workflow_smoke_evidence",
+                    }
+                ],
+                "complete": True,
+            },
+            expected_provider_id="tlp_runner",
+            expected_arm_id="maxpool",
+            expected_seed=17,
+            expected_evidence_class="workflow_smoke",
+        )
+
+
+def test_runner_collection_binds_result_to_request_and_tracker_observation() -> None:
+    collection = {
+        "provider_id": "tlp_runner",
+        "observations": [_primary_observation()],
+        "artifacts": [
+            {
+                "uri": "skill-data:files/result.json",
+                "digest": "sha256:" + "a" * 64,
+                "size_bytes": 42,
+                "media_type": "application/json",
+                "owner_ref": "skill:tlp_runner",
+                "role": "workflow_smoke_evidence",
+            }
+        ],
+        "result": _canonical_result(),
+        "complete": True,
+    }
+    assert ResearchManager._validate_runner_collection(
+        collection,
+        expected_provider_id="tlp_runner",
+        expected_arm_id="maxpool",
+        expected_seed=17,
+        expected_evidence_class="workflow_smoke",
+    ) == _canonical_result()
+
+    mismatched = {**collection, "observations": [_primary_observation(value=50.0)]}
+    with pytest.raises(ValueError, match="repeat result.primary_metric"):
+        ResearchManager._validate_runner_collection(
+            mismatched,
+            expected_provider_id="tlp_runner",
+            expected_arm_id="maxpool",
+            expected_seed=17,
+            expected_evidence_class="workflow_smoke",
+        )
+
+
 def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) -> None:
     from adaos.sdk.developer import validation as developer_validation
 
     invocations: list[tuple[str, dict]] = []
+    validation_calls: list[dict] = []
+
+    def validate_skill(*_args, **kwargs):
+        validation_calls.append(dict(kwargs))
+        return {"ok": True, "digest": "sha256:" + "1" * 64}
+
     monkeypatch.setattr(
         developer_validation,
         "validate_skill",
-        lambda *_args, **_kwargs: {"ok": True, "digest": "sha256:" + "1" * 64},
+        validate_skill,
     )
     monkeypatch.setattr(
         developer_validation,
@@ -323,12 +589,28 @@ def test_development_consumer_acceptance_invokes_exact_manager_abi(monkeypatch) 
         }
 
     monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
-    receipt = ResearchManager().validate_development_candidate(
-        _acceptance_envelope("research.consumer-contracts")
-    )
+    envelope = _acceptance_envelope("research.consumer-contracts")
+    envelope["validation_budget"] = {
+        "schema": "adaos.builder.validation_budget.v1",
+        "packaged_pytest_wall_seconds": 180,
+        "source": "development_session.execution_budget",
+        "execution_max_wall_seconds": 10800,
+    }
+    # This test isolates preparation ABI. Production consumer-contract
+    # acceptance defaults to executing the complete bounded conformance path.
+    envelope["execute_workflow_smoke"] = False
+    receipt = ResearchManager().validate_development_candidate(envelope)
     assert not receipt["errors"], receipt["errors"]
     assert receipt["ok"] is True
     assert [item[0] for item in invocations] == ["dataset_status", "prepare_attempt"]
+    assert validation_calls == [
+        {
+            "strict": True,
+            "probe_tools": True,
+            "run_tests": True,
+            "test_timeout_seconds": 180,
+        }
+    ]
     assert receipt["evidence"]["scientific_execution_started"] is False
 
 
@@ -380,6 +662,7 @@ def test_development_consumer_acceptance_reads_public_compilation_projection(
 
     monkeypatch.setattr(developer_validation, "invoke_skill", invoke)
     envelope = _acceptance_envelope("research.consumer-contracts")
+    envelope["execute_workflow_smoke"] = False
     compilation = envelope["instructions"]["research_compilation"]
     compilation["schema"] = "adaos.research.compilation_projection.v1"
     compilation["experiment_plan"] = compilation.pop("facets")["experiment_plan"]["payload"]
@@ -409,7 +692,9 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         role: {**item, "sealed": role == "test"} for role, item in _splits().items()
     }
     smoke_outputs = _smoke_expected_outputs()
-    indexed_output_names = smoke_outputs[:2]
+    indexed_output_names = [
+        name for name in smoke_outputs if name != "artifacts_index.json"
+    ]
     artifact_rows = [
         {
             "uri": f"skill-data:files/acceptance/{name}",
@@ -418,6 +703,7 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
             "media_type": "application/json",
             "owner_ref": "skill:tlp_runner",
             "kind": "workflow-smoke-evidence",
+            "role": "workflow_smoke_evidence",
             "metadata": {"evidence_class": "workflow_smoke"},
         }
         for index, name in enumerate(indexed_output_names, start=5)
@@ -447,6 +733,14 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         "evaluation_audit.json": {
             "per_stage": {"workflow_smoke": {"test_evaluations_count": 0}},
             "test_access": [],
+        },
+        "implementation_observation.json": _implementation_observation(),
+        "result_record.json": {
+            "status": "completed",
+            "result": _canonical_result(),
+            "observations": [_primary_observation()],
+            "evidence_class": "workflow_smoke",
+            "tracker_session_calls": 0,
         },
         "artifacts_index.json": {
             "files": [
@@ -494,7 +788,22 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
                 "provider_id": project_id,
                 "complete": True,
                 "tracker_session_calls": 0,
-                "observations": [],
+                "result": _canonical_result(),
+                "observations": [
+                    _primary_observation(),
+                    {
+                        "metric": {
+                            "namespace": "runner",
+                            "name": "epochs_completed",
+                        },
+                        "value": 3,
+                        "value_type": "integer",
+                        "unit": "epochs",
+                        "split_role": "system",
+                        "step": {"axis": "epoch", "value": 3},
+                        "evidence_role": "workflow_smoke",
+                    }
+                ],
                 "artifacts": artifact_rows,
             }
         assert operation_id == "verify_artifact"
@@ -531,12 +840,123 @@ def test_development_consumer_evaluation_runs_exact_collection_and_verifier_abi(
         "collect_attempt",
         "verify_artifact",
         "verify_artifact",
+        "verify_artifact",
+        "verify_artifact",
     ]
     assert receipt["evidence"]["workflow_smoke_executed"] is True
     assert receipt["evidence"]["verified_artifacts"] == [
         {"ok": True},
         {"ok": True},
+        {"ok": True},
+        {"ok": True},
     ]
+
+
+def test_v14_system_executes_paired_baseline_and_intervention_smoke(
+    monkeypatch,
+) -> None:
+    from adaos.sdk.developer import validation as developer_validation
+
+    monkeypatch.setattr(
+        developer_validation,
+        "validate_skill",
+        lambda *_args, **_kwargs: {
+            "ok": True,
+            "digest": "sha256:" + "1" * 64,
+            "source_digest": "sha256:" + "2" * 64,
+        },
+    )
+    monkeypatch.setattr(
+        developer_validation,
+        "activate_skill",
+        lambda project_id: {"ok": True, "project_id": project_id, "version": "0.1.0"},
+    )
+    monkeypatch.setattr(
+        developer_validation,
+        "invoke_skill",
+        lambda _project_id, operation_id, _arguments, **_kwargs: {
+            "dataset_id": "stl10_torchvision",
+            "ready": True,
+            "execution_ready_without_network": True,
+            "split_bindings": {
+                role: {**item, "sealed": role == "test"}
+                for role, item in _splits().items()
+            },
+        }
+        if operation_id == "dataset_status"
+        else None,
+    )
+    prepared_roles: list[str] = []
+    executed_roles: list[str] = []
+
+    def prepare_arm(**kwargs):
+        arm = dict(kwargs["arm"])
+        prepared_roles.append(str(arm["role"]))
+        return {
+            "arm": arm,
+            "prepared_attempt": {"arm": arm},
+            "execution_spec": {"metadata": {"arm_id": arm["id"]}},
+            "execution_spec_digest": "sha256:" + "3" * 64,
+            "output_ref": f"skill-data:files/{arm['id']}",
+            "protocol_digest": "sha256:" + "c" * 64,
+        }
+
+    def execute_arm(**kwargs):
+        prepared = dict(kwargs["prepared_arm"])
+        arm = dict(prepared["arm"])
+        executed_roles.append(str(arm["role"]))
+        return {
+            **prepared,
+            "trial": {
+                "ok": True,
+                "digest": "sha256:" + ("4" if arm["role"] == "baseline" else "5") * 64,
+            },
+            "collected": {"complete": True, "artifacts": [{"arm": arm["id"]}]},
+            "canonical_result": _canonical_result(arm_id=str(arm["id"])),
+            "verified_artifacts": [{"ok": True}],
+            "collection_ok": True,
+            "verification_ok": True,
+        }
+
+    monkeypatch.setattr(ResearchManager, "_prepare_acceptance_arm", staticmethod(prepare_arm))
+    monkeypatch.setattr(ResearchManager, "_execute_acceptance_arm", staticmethod(execute_arm))
+    envelope = _acceptance_envelope("research.consumer-contracts")
+    envelope["execute_workflow_smoke"] = True
+    plan = envelope["instructions"]["research_compilation"]["facets"][
+        "experiment_plan"
+    ]["payload"]
+    plan["schema_version"] = "1.4.0"
+    plan["system"] = {"digest": "sha256:" + "9" * 64, "subject": "TLP"}
+
+    receipt = ResearchManager().validate_development_candidate(envelope)
+
+    assert receipt["ok"] is True, receipt["errors"]
+    assert prepared_roles == ["baseline", "intervention"]
+    assert executed_roles == ["baseline", "intervention"]
+    assert receipt["evidence"]["paired_smoke_required"] is True
+    assert receipt["evidence"]["paired_workflow_smoke_executed"] is True
+    assert [item["arm"]["role"] for item in receipt["evidence"]["arm_trials"]] == [
+        "baseline",
+        "intervention",
+    ]
+    assert next(
+        item for item in receipt["checks"] if item["id"] == "runner.pairing_identity"
+    )["ok"] is True
+
+
+def test_paired_consumer_rejects_arm_specific_pairing_identity() -> None:
+    baseline = _canonical_result(arm_id="maxpool")
+    intervention = {
+        **_canonical_result(arm_id="tlp"),
+        "pairing_identity_digest": "sha256:" + "e" * 64,
+    }
+    with pytest.raises(ValueError, match="share one pairing_identity_digest"):
+        ResearchManager._validate_paired_result_identity(
+            [
+                {"canonical_result": baseline},
+                {"canonical_result": intervention},
+            ]
+        )
 
 
 def test_workflow_smoke_index_rejects_self_referential_digest() -> None:
@@ -578,6 +998,14 @@ def test_workflow_smoke_index_rejects_self_referential_digest() -> None:
                             "workflow_smoke": {"test_evaluations_count": 0}
                         },
                         "test_access": [],
+                    },
+                    "implementation_observation.json": _implementation_observation(),
+                    "result_record.json": {
+                        "status": "completed",
+                        "result": _canonical_result(),
+                        "observations": [_primary_observation()],
+                        "evidence_class": "workflow_smoke",
+                        "tracker_session_calls": 0,
                     },
                     "artifacts_index.json": {
                         "files": [
@@ -694,6 +1122,127 @@ def _advance(manager: ResearchManager, study_id: str, command: str, generation: 
     )
 
 
+def test_execution_admission_rejects_unenforceable_network_before_lock() -> None:
+    manager = ResearchManager()
+    created = _create(manager, f"admission-{uuid.uuid4().hex}")
+    study_id = created["study"]["record_id"]
+    conditions = _experiment_conditions()
+    conditions["execution"]["preflight"]["network_mode"] = "offline"
+    experiment_id = identity("experiment", {"study_id": study_id, "slug": "ADMISSION"})
+    manager.create_experiment(
+        study_id=study_id,
+        slug="ADMISSION",
+        title="Provider admission fixture",
+        purpose="Reject impossible policy before lock",
+        conditions=conditions,
+        experiment_id=experiment_id,
+        idempotency_key=f"{experiment_id}:create",
+    )
+
+    admission = manager.assess_experiment_execution(
+        experiment_id=experiment_id,
+        profile="preflight",
+    )
+
+    assert admission["admitted"] is False
+    assert admission["provider"]["provider_id"] == "local-process"
+    assert admission["blockers"] == [
+        {
+            "code": "network_policy_unenforceable",
+            "requirement": "network_offline",
+            "requested": "offline",
+        }
+    ]
+    assert admission["enforcement"]["network_policy"] == "unavailable"
+    assert manager_module.experiment.state(manager.repository, experiment_id)["state"] == "draft"
+
+
+def test_execution_admission_scopes_dataset_readiness_to_selected_profile(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager = ResearchManager()
+    created = _create(manager, f"admission-input-{uuid.uuid4().hex}")
+    study_id = created["study"]["record_id"]
+    conditions = _experiment_conditions()
+    conditions["execution"]["preflight"].update(
+        {
+            "network_mode": "unrestricted",
+            "input_policy": {
+                "source": "deterministic_contract_fixture",
+                "readiness": "required_before_execution",
+                "sampling": "deterministic_prefix",
+            },
+        }
+    )
+    conditions["execution"]["confirmatory"].update(
+        {
+            "network_mode": "unrestricted",
+            "input_policy": {
+                "source": "accepted_dataset",
+                "readiness": "required_before_execution",
+                "sampling": "full",
+            },
+        }
+    )
+    experiment_id = identity(
+        "experiment", {"study_id": study_id, "slug": "INPUT-READINESS"}
+    )
+    manager.create_experiment(
+        study_id=study_id,
+        slug="INPUT-READINESS",
+        title="Profile-scoped input readiness",
+        purpose="Allow fixture smoke while scientific data remains unavailable",
+        conditions=conditions,
+        experiment_id=experiment_id,
+        idempotency_key=f"{experiment_id}:create",
+    )
+    calls: list[tuple[str, str]] = []
+
+    def invoke(skill_id: str, operation: str, _payload: dict, **_: object) -> dict:
+        calls.append((skill_id, operation))
+        return {
+            "dataset_id": "stl10_v1",
+            "ready": False,
+            "execution_ready_without_network": False,
+        }
+
+    monkeypatch.setattr(manager_module, "invoke_skill", invoke)
+
+    smoke = manager.assess_experiment_execution(
+        experiment_id=experiment_id,
+        profile="preflight",
+    )
+    confirmatory = manager.assess_experiment_execution(
+        experiment_id=experiment_id,
+        profile="confirmatory",
+    )
+
+    assert smoke["admitted"] is True
+    assert smoke["enforcement"]["input_readiness"]["reason"] == "profile_owned_fixture"
+    assert calls == [("fixture_runner_skill", "dataset_status")]
+    assert confirmatory["admitted"] is False
+    assert confirmatory["blockers"] == [
+        {
+            "code": "dataset_not_ready",
+            "requirement": "accepted_dataset",
+            "runner_provider": "fixture_runner_skill",
+        }
+    ]
+    assert confirmatory["enforcement"]["input_readiness"]["dataset_ready"] is False
+
+
+def test_execution_provider_status_is_read_only_and_content_addressed() -> None:
+    manager = ResearchManager()
+
+    status = manager.execution_provider_status()
+
+    assert status["schema"] == "adaos.execution.provider_status.v1"
+    assert status["provider"]["provider_id"] == "local-process"
+    assert status["provider"]["features"] == sorted(status["provider"]["features"])
+    assert status["provider_digest"] == manager_module.digest(status["provider"])
+    assert status["admission_contract"] == "adaos.execution.admission.v1"
+
+
 def test_end_to_end_research_kernel_survives_repository_reopen() -> None:
     manager = ResearchManager()
     suffix = f"e2e-{uuid.uuid4().hex}"
@@ -783,6 +1332,111 @@ def test_end_to_end_research_kernel_survives_repository_reopen() -> None:
     with pytest.raises(ValueError, match="finalized"):
         reopened.repository.put(
             ResearchRecord("observation", identity("observation", {"late": True}), study_id, 1, {"late": True})
+        )
+
+
+def test_workflow_validation_evidence_is_scoped_verified_and_non_finalizing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    manager = ResearchManager()
+    created = _create(manager, f"workflow-evidence-{uuid.uuid4().hex}")
+    study_id = created["study"]["record_id"]
+    experiment_id = identity("experiment", {"study_id": study_id, "slug": "SMOKE"})
+    manager.create_experiment(
+        study_id=study_id,
+        slug="SMOKE",
+        title="Workflow validation",
+        purpose="Exercise the accepted implementation without scientific inference",
+        conditions=_experiment_conditions(),
+        experiment_id=experiment_id,
+        idempotency_key=f"{experiment_id}:create",
+    )
+    result_id = identity("experiment_result", {"experiment_id": experiment_id, "fixture": True})
+    manager.repository.put(
+        ResearchRecord(
+            "experiment_result",
+            result_id,
+            study_id,
+            1,
+            {
+                "schema": "adaos.research.experiment_result.v1",
+                "experiment_id": experiment_id,
+                "evidence_class": "workflow_validation",
+            },
+        )
+    )
+    sibling_id = identity("experiment_result", {"experiment_id": "experiment.invalid", "fixture": True})
+    manager.repository.put(
+        ResearchRecord(
+            "experiment_result",
+            sibling_id,
+            study_id,
+            1,
+            {
+                "schema": "adaos.research.experiment_result.v1",
+                "experiment_id": "experiment.invalid",
+                "evidence_class": "workflow_validation",
+            },
+        )
+    )
+    monkeypatch.setattr(
+        manager_module.experiment,
+        "state",
+        lambda _repository, selected: {
+            "experiment_id": selected,
+            "state": "finalized",
+            "generation": 5,
+            "execution_profile": "preflight",
+        },
+    )
+
+    def verify(result: str) -> dict:
+        return {
+            "schema": "adaos.research.experiment_result_verification.v1",
+            "result_id": result,
+            "ok": True,
+            "errors": [],
+            "checked_artifacts": 3,
+        }
+
+    monkeypatch.setattr(manager, "verify_experiment_result", verify)
+    bundle = manager.export_evidence(
+        study_id,
+        scope="workflow_validation",
+        experiment_id=experiment_id,
+    )
+    assert bundle["payload"]["scope"] == "workflow_validation"
+    manifest_path = evidence_module._root() / f"{bundle['record_id']}.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    record_ids = {item["record_id"] for item in manifest["content_refs"]}
+    assert experiment_id in record_ids
+    assert result_id in record_ids
+    assert sibling_id not in record_ids
+
+    # Operational proof is a checkpoint, not a scientific finalization gate.
+    late_record = manager.repository.put(
+        ResearchRecord(
+            "observation",
+            identity("observation", {"study_id": study_id, "after": bundle["record_id"]}),
+            study_id,
+            2,
+            {"experiment_id": experiment_id, "after_workflow_evidence": True},
+        )
+    )
+    assert late_record.payload["after_workflow_evidence"] is True
+    verification = manager.verify_evidence(bundle["record_id"])
+    assert verification["ok"] is True
+    assert verification["scope"] == "workflow_validation"
+    assert verification["assurance_results"][0]["result_id"] == result_id
+    with pytest.raises(ValueError, match="study_claim evidence"):
+        manager.decide_claim(
+            study_id=study_id,
+            verdict="inconclusive",
+            rationale="Smoke cannot support a scientific claim.",
+            bundle_id=bundle["record_id"],
+            expected_generation=0,
+            idempotency_key=f"{study_id}:invalid-smoke-claim",
+            actor="user:test",
         )
 
 

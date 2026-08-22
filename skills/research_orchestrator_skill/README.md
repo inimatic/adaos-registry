@@ -37,7 +37,10 @@ experimental data or post-handoff scientific governance records.
    source nor its intake artifacts.
 6. Inspect the brief and use `open_builder_session`. Codex is deliberately not
    started by acceptance. `start_implementation` is the explicit one-shot
-   transition; it can only use the exact Development Session instruction.
+   transition; it can only use the exact Development Session instruction. If
+   the same implementation Project already has a published predecessor, the
+   successor Development Session starts a new Builder Change instead of
+   mutating or iterating the published Change.
 7. Use `sync_implementation`, then explicitly prepare and promote the normal
    Builder candidate with `prepare_project_release` and
    `publish_project_release`. The track stores both the candidate digest and
@@ -67,7 +70,10 @@ The default path uses three bounded LLM stages: `problem_frame`,
 `protocol_design`, and `implementation_contract`. AdaOS then compiles five
 stable facets: `source_analysis`, `research_problem`,
 `experimental_protocol`, `engineering_contract`, and the provider-neutral
-`experiment_plan`. The protocol stage must assign
+`experiment_plan`. ExperimentPlan v1.4 retains a digest-bound `system` object
+with the scientific subject, component settings, intervention boundary, and
+locked invariants. A bounded execution profile may reduce workload, but cannot
+silently replace that system with a surrogate. The protocol stage must assign
 stable arm ids and one exact primary minuend/subtrahend. Since formulation
 stage contract v1.2, `problem_frame.experimental_signature` freezes only the
 cross-stage scientific identity: subject, dataset, baseline, intervention,

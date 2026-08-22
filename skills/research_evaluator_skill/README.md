@@ -18,8 +18,18 @@ contexts, and scores results from evidence references rather than self-reports.
 Every task must contain all five arms, paired seeds, both `fixed_downstream` and
 `fixed_total_system` budgets, a frozen rubric, and at least one hidden evaluator
 input. The primary endpoint is `evidence_valid_completion`: all mandatory checks
-pass, the protocol has not drifted, the selected budget is respected, and no
-unresolved failure was reported.
+pass, the protocol has not drifted, and no unresolved implementation or evidence
+failure was reported. Resource compliance is a distinct secondary endpoint,
+`budgeted_evidence_valid_completion`; token or wall-clock excess must not silently
+turn a correct implementation into an incorrect one.
+
+Calibration-task schema v1.7 makes that separation part of the frozen contract:
+only a platform outage before candidate execution is excludable; post-start model,
+schema, protocol, implementation, and evidence failures count against correctness,
+while resource-budget excess affects only the budgeted secondary endpoint.
+Visible execution contracts and hidden judge inputs are snapshotted into separate
+owner-scoped content-addressed stores before freezing. A later source-tree edit can
+therefore neither invalidate nor silently mutate an already frozen task.
 
 For the primary AdaOS-versus-raw claim, calibration task v1.4 preregisters
 `C0_raw` as control and `C3_typed_execution` as treatment. It requires at least
@@ -35,6 +45,10 @@ commit, component versions, model profile, budgets, and environment. The
 paired seed controls the scientific workload, not model sampling (which the
 provider does not expose). Predeclared counterbalancing reduces execution-order
 confounding but does not justify a universal autonomous-science claim.
+Calibration summary v1.2 additionally requires durable Builder
+`execution_started_at` timestamps to reproduce that exact order. Missing,
+duplicate, or reordered timestamps yield an explicit no-claim status even when
+all outcome rows exist and the sign test would otherwise cross alpha.
 
 ## Boundary and workflow
 
@@ -72,3 +86,8 @@ including the JSON Schemas for `run_log.json`, `evaluation_audit.json`, and
 `artifacts_index.json`. The judge may remain hidden, but it must not require an
 undisclosed filename, shape, or seed-label convention. This separates genuine
 implementation failure from benchmark-harness ambiguity.
+
+Evaluator-owned digests identify complete hidden probe fixtures for audit and
+evidence references. They are not injected into a provider request unless the
+public probe input schema declares them; strict ABI validation therefore sees
+exactly the published request shape.

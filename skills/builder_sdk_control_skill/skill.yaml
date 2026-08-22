@@ -1,5 +1,5 @@
 name: builder_sdk_control_skill
-version: 0.1.64
+version: 0.1.72
 description: SDK-only backend for the functional Builder DEV scenario.
 entry: handlers/main.py
 runtime:
@@ -540,6 +540,41 @@ tools:
         minimum: 0
   output_schema:
     type: object
+- name: rebase_change
+  description: Rebase one stale Builder Change after deterministic verification of
+    its affected refs.
+  entry: handlers.main:rebase_change
+  side_effects: local_write
+  input_schema:
+    type: object
+    required:
+    - change_id
+    - expected_project_generation
+    - verified_unchanged_refs
+    properties:
+      change_id:
+        type: string
+        minLength: 1
+      expected_project_generation:
+        type: integer
+        minimum: 0
+      verified_unchanged_refs:
+        type: array
+        minItems: 1
+        maxItems: 100
+        items:
+          type: string
+          minLength: 1
+      object_type:
+        type: string
+        enum:
+        - scenario
+        - skill
+      object_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
 - name: add_change_issues
   description: Add follow-up issues to the active Builder change set without replacing
     its history.
@@ -1049,6 +1084,31 @@ tools:
         minLength: 1
   output_schema:
     type: object
+- name: release_candidate_runtime
+  description: Release a terminal skill candidate DEV runtime while retaining its
+    governed source, Builder session, and evidence.
+  entry: handlers.main:release_candidate_runtime
+  side_effects: local_write
+  timeout_seconds: 600
+  input_schema:
+    type: object
+    additionalProperties: false
+    required:
+    - object_id
+    - development_session_id
+    properties:
+      object_type:
+        type: string
+        const: skill
+        default: skill
+      object_id:
+        type: string
+        minLength: 1
+      development_session_id:
+        type: string
+        minLength: 1
+  output_schema:
+    type: object
 - name: get_process_tree
   description: List dependent Process nodes for collection-tree renderers.
   entry: handlers.main:get_process_tree
@@ -1293,12 +1353,13 @@ tools:
 - name: push_project
   description: Checkpoint a DEV project as an exact Forge revision and immutable package.
   entry: handlers.main:push_project
-  side_effects: local_write
+  side_effects: external_write
   timeout_seconds: 120
   input_schema:
     type: object
     required:
     - checkpoint_id
+    - confirmed
     properties:
       object_type:
         type: string
@@ -1314,6 +1375,10 @@ tools:
         type: string
         minLength: 1
         description: Caller-assigned immutable identity for this checkpoint operation.
+      confirmed:
+        type: boolean
+        description: Explicit confirmation before the Forge checkpoint and verification
+          acceptance.
       webspace_id:
         type: string
   output_schema:
@@ -2106,12 +2171,13 @@ data_routes:
   guard_visibility:
     degraded_state: publication history is stale
     metric: data_route.builder_changes_read
-updated_at: '2026-08-19T09:55:00+00:00'
+updated_at: '2026-08-21T01:37:28+00:00'
 compatibility:
   adaos_core:
-    min_version: 0.1.854+5188.9a4e31d5
-    recorded_at: '2026-08-17T23:04:05+00:00'
+    min_version: 0.1.895+5490.e46bbe4b
+    recorded_at: '2026-08-21T01:37:28+00:00'
     source: skill_push
-    min_commit: 9a4e31d564680c3ef901ccfc4ecbba58a22d5678
-    min_short_commit: 9a4e31d5
-    build_date: '2026-08-18T02:03:56+03:00'
+    min_commit: e46bbe4b5fd1955ac4bc9ba84b7ca2816c0716ec
+    min_short_commit: e46bbe4b
+    build_date: '2026-08-21T01:24:28+00:00'
+

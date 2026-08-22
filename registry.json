@@ -135,8 +135,8 @@
       "kind": "skill",
       "id": "builder_sdk_control_skill",
       "name": "builder_sdk_control_skill",
-      "version": "0.1.64",
-      "updated_at": "2026-08-19T09:55:00+00:00",
+      "version": "0.1.72",
+      "updated_at": "2026-08-21T01:37:28+00:00",
       "path": "skills/builder_sdk_control_skill",
       "manifest": "skills/builder_sdk_control_skill/skill.yaml",
       "source": {
@@ -151,7 +151,7 @@
       "description": "SDK-only backend for the functional Builder DEV scenario.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 57
+      "tools_count": 59
     },
     {
       "kind": "skill",
@@ -775,8 +775,8 @@
       "kind": "skill",
       "id": "research_calibration_runner_skill",
       "name": "research_calibration_runner_skill",
-      "version": "0.1.11",
-      "updated_at": "2026-08-19T12:13:00+00:00",
+      "version": "0.1.17",
+      "updated_at": "2026-08-21T11:48:46+00:00",
       "path": "skills/research_calibration_runner_skill",
       "manifest": "skills/research_calibration_runner_skill/skill.yaml",
       "source": {
@@ -791,14 +791,14 @@
       "description": "Contamination-aware execution bridge from frozen research calibration packets to native Builder Automation.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 4
+      "tools_count": 5
     },
     {
       "kind": "skill",
       "id": "research_evaluator_skill",
       "name": "research_evaluator_skill",
-      "version": "0.1.26",
-      "updated_at": "2026-08-19T18:58:06+00:00",
+      "version": "0.1.43",
+      "updated_at": "2026-08-21T13:06:41+00:00",
       "path": "skills/research_evaluator_skill",
       "manifest": "skills/research_evaluator_skill/skill.yaml",
       "source": {
@@ -819,8 +819,8 @@
       "kind": "skill",
       "id": "research_manager_skill",
       "name": "research_manager_skill",
-      "version": "0.20.0",
-      "updated_at": "2026-08-19T16:38:07+00:00",
+      "version": "0.43.0",
+      "updated_at": "2026-08-21T21:22:21+00:00",
       "path": "skills/research_manager_skill",
       "manifest": "skills/research_manager_skill/skill.yaml",
       "source": {
@@ -839,14 +839,14 @@
         "startup_allowed": true,
         "background_refresh": false
       },
-      "tools_count": 36
+      "tools_count": 38
     },
     {
       "kind": "skill",
       "id": "research_orchestrator_skill",
       "name": "research_orchestrator_skill",
-      "version": "0.45.0",
-      "updated_at": "2026-08-19T23:46:36+00:00",
+      "version": "0.75.0",
+      "updated_at": "2026-08-21T07:40:04+00:00",
       "path": "skills/research_orchestrator_skill",
       "manifest": "skills/research_orchestrator_skill/skill.yaml",
       "source": {
@@ -861,7 +861,7 @@
       "description": "Durable pre-Codex orchestration for reusable AdaOS research directions, bounded tasks, compilations, and implementation tracks.",
       "entry": "handlers/main.py",
       "runtime_python": "3.11",
-      "tools_count": 37
+      "tools_count": 41
     },
     {
       "kind": "skill",
@@ -1043,6 +1043,29 @@
         "background_refresh": false
       },
       "tools_count": 5
+    },
+    {
+      "kind": "skill",
+      "id": "tlp_structured_proof_02",
+      "name": "tlp_structured_proof_02",
+      "version": "0.1.7",
+      "updated_at": "2026-08-21T05:45:26+00:00",
+      "path": "skills/tlp_structured_proof_02",
+      "manifest": "skills/tlp_structured_proof_02/skill.yaml",
+      "source": {
+        "path": "skills/tlp_structured_proof_02",
+        "manifest": "skills/tlp_structured_proof_02/skill.yaml"
+      },
+      "install": {
+        "kind": "skill",
+        "name": "tlp_structured_proof_02",
+        "id": "tlp_structured_proof_02"
+      },
+      "title": "TLP structured realization proof 02 — research assets",
+      "description": "Governed STL-10 MaxPool2d versus centered per-channel TLP pool2 research runner.",
+      "entry": "handlers/main.py",
+      "runtime_python": "3.11",
+      "tools_count": 7
     },
     {
       "kind": "skill",

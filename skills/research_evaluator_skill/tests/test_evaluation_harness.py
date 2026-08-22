@@ -7,9 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from evaluation.contracts import ARM_IDS, freeze_task
+from evaluation.contracts import ARM_IDS, CALIBRATION_EXCLUSION_RULES, freeze_task
 from evaluation.harness import build_recomputable_package, evaluate_candidate, prepare_arm, summarize
 from evaluation.independent import build_independent_candidate
+from handlers.main import _snapshot_hidden_inputs
 
 
 def _sha(value: bytes) -> str:
@@ -133,6 +134,213 @@ def test_freeze_task_requires_exact_c0_c4_delivery_contract(task_value) -> None:
         freeze_task(invalid)
 
 
+def test_v17_freeze_enforces_separate_correctness_and_resource_endpoints(task_value) -> None:
+    valid = copy.deepcopy(task_value)
+    valid["schema_version"] = "1.7.0"
+    valid["exclusion_rules"] = list(CALIBRATION_EXCLUSION_RULES)
+    valid["comparison_plan"] = _paired_task(task_value)["comparison_plan"]
+    valid["repetitions"] = {
+        "attempts_per_arm": 5,
+        "paired_seeds": [17, 23, 47, 71, 101],
+        "model_random_seed_control": "unsupported_not_claimed",
+    }
+    valid["consumer_evaluation"] = {
+        "max_wall_seconds": 1200,
+        "timeout_result_policy": "persist_terminal_failure",
+        "repeat_policy": "return_existing_result",
+    }
+    valid["expected_smoke_profile"].update(
+        {
+            "network_enforcement_required": False,
+            "max_wall_seconds": 600,
+            "workload": {"mode": "bounded", "limits": []},
+            "input_policy": {
+                "source": "deterministic_contract_fixture",
+                "readiness": "required_before_execution",
+                "sampling": "deterministic_seeded",
+            },
+        }
+    )
+    valid["environment_spec"]["runner_contract_digest"] = "sha256:" + "6" * 64
+    valid["environment_spec"]["component_versions"]["research_manager_skill"] = "0.1.0"
+
+    frozen = freeze_task(valid)
+    assert frozen["exclusion_rules"] == list(CALIBRATION_EXCLUSION_RULES)
+
+    invalid = copy.deepcopy(valid)
+    invalid["exclusion_rules"][-1] = "Budget exhaustion is a correctness failure."
+    with pytest.raises(ValueError, match="correctness and resource endpoints separate"):
+        freeze_task(invalid)
+
+
+def test_v18_freeze_requires_preregistered_runtime_disk_headroom(task_value) -> None:
+    valid = copy.deepcopy(task_value)
+    valid["schema_version"] = "1.8.0"
+    valid["exclusion_rules"] = list(CALIBRATION_EXCLUSION_RULES)
+    valid["comparison_plan"] = _paired_task(task_value)["comparison_plan"]
+    valid["repetitions"] = {
+        "attempts_per_arm": 5,
+        "paired_seeds": [17, 23, 47, 71, 101],
+        "model_random_seed_control": "unsupported_not_claimed",
+    }
+    valid["consumer_evaluation"] = {
+        "max_wall_seconds": 1200,
+        "timeout_result_policy": "persist_terminal_failure",
+        "repeat_policy": "return_existing_result",
+    }
+    valid["expected_smoke_profile"].update(
+        {
+            "network_enforcement_required": False,
+            "max_wall_seconds": 600,
+            "workload": {"mode": "bounded", "limits": []},
+            "input_policy": {
+                "source": "deterministic_contract_fixture",
+                "readiness": "required_before_execution",
+                "sampling": "deterministic_seeded",
+            },
+        }
+    )
+    valid["environment_spec"].update(
+        {
+            "runner_contract_digest": "sha256:" + "6" * 64,
+            "minimum_free_disk_bytes": 17_179_869_184,
+        }
+    )
+    valid["environment_spec"]["component_versions"]["research_manager_skill"] = "0.1.0"
+
+    frozen = freeze_task(valid)
+    assert frozen["environment_spec"]["minimum_free_disk_bytes"] == 17_179_869_184
+
+    invalid = copy.deepcopy(valid)
+    del invalid["environment_spec"]["minimum_free_disk_bytes"]
+    with pytest.raises(ValueError, match="minimum_free_disk_bytes"):
+        freeze_task(invalid)
+
+
+def test_v19_freeze_requires_the_scientific_implementation_gate(task_value) -> None:
+    valid = copy.deepcopy(task_value)
+    valid["schema_version"] = "1.9.0"
+    valid["exclusion_rules"] = list(CALIBRATION_EXCLUSION_RULES)
+    valid["comparison_plan"] = _paired_task(task_value)["comparison_plan"]
+    valid["repetitions"] = {
+        "attempts_per_arm": 5,
+        "paired_seeds": [17, 23, 47, 71, 101],
+        "model_random_seed_control": "unsupported_not_claimed",
+    }
+    valid["consumer_evaluation"] = {
+        "max_wall_seconds": 1200,
+        "timeout_result_policy": "persist_terminal_failure",
+        "repeat_policy": "return_existing_result",
+    }
+    valid["expected_smoke_profile"].update(
+        {
+            "network_enforcement_required": False,
+            "max_wall_seconds": 600,
+            "workload": {"mode": "bounded", "limits": []},
+            "input_policy": {
+                "source": "deterministic_contract_fixture",
+                "readiness": "required_before_execution",
+                "sampling": "deterministic_seeded",
+            },
+        }
+    )
+    valid["environment_spec"].update(
+        {
+            "runner_contract_digest": "sha256:" + "6" * 64,
+            "minimum_free_disk_bytes": 17_179_869_184,
+        }
+    )
+    valid["environment_spec"]["component_versions"][
+        "research_manager_skill"
+    ] = "0.1.0"
+    stages = {
+        "context_isolation": "source_understanding",
+        "protocol_fidelity": "operationalization",
+        "native_skill_validation": "implementation",
+        "runner_conformance": "implementation",
+        "scientific_implementation": "implementation",
+        "cpu_workflow_smoke": "runtime_infrastructure",
+        "evidence_manifest": "scientific_evaluation",
+    }
+    valid["rubric"]["checks"] = [
+        {
+            "check_id": check_id,
+            "stage": stage,
+            "evaluation_mode": "deterministic",
+            "mandatory": True,
+            "description": f"Independently verify the mandatory {check_id} condition.",
+        }
+        for check_id, stage in stages.items()
+    ]
+
+    frozen = freeze_task(valid)
+    assert {item["check_id"] for item in frozen["rubric"]["checks"]} == set(stages)
+
+    invalid = copy.deepcopy(valid)
+    invalid["rubric"]["checks"] = [
+        item
+        for item in invalid["rubric"]["checks"]
+        if item["check_id"] != "scientific_implementation"
+    ]
+    with pytest.raises(ValueError, match="scientific implementation rubric"):
+        freeze_task(invalid)
+
+
+def test_hidden_judge_inputs_are_snapshotted_before_freeze(tmp_path: Path) -> None:
+    class MemoryBlobStore:
+        def __init__(self, root: Path) -> None:
+            self.root = root
+            self.root.mkdir(parents=True, exist_ok=True)
+
+        def put_bytes(self, name: str, data: bytes, *, media_type: str) -> dict:
+            path = self.root / name
+            path.write_bytes(data)
+            return {"ref": f"blob://{name}", "path": str(path), "media_type": media_type}
+
+        def materialize_path(self, blob: dict) -> Path:
+            return Path(blob["path"])
+
+    rubric_path = tmp_path / "hidden-rubric.json"
+    rubric_path.write_text(
+        json.dumps({"exclusions": list(CALIBRATION_EXCLUSION_RULES)}),
+        encoding="utf-8",
+    )
+    oracle_path = tmp_path / "oracle.json"
+    oracle_path.write_text('{"legacy":true}', encoding="utf-8")
+    oracle_digest = _sha(oracle_path.read_bytes())
+    values = [
+        {
+            "input_id": "hidden-rubric",
+            "kind": "hidden_rubric",
+            "ref": "source://rubric",
+            "digest": "sha256:" + "0" * 64,
+            "path": "obsolete-rubric.json",
+        },
+        {
+            "input_id": "legacy-oracle",
+            "kind": "legacy_implementation",
+            "ref": "source://oracle",
+            "digest": oracle_digest,
+            "path": str(oracle_path),
+        },
+    ]
+
+    snapshots, refs = _snapshot_hidden_inputs(
+        "task-v1",
+        values,
+        MemoryBlobStore(tmp_path / "blobs"),
+        rubric_path=rubric_path,
+    )
+    snapshot_paths = [Path(item["path"]) for item in snapshots]
+    before = [path.read_bytes() for path in snapshot_paths]
+    rubric_path.write_text("{}", encoding="utf-8")
+    oracle_path.write_text("{}", encoding="utf-8")
+
+    assert [path.read_bytes() for path in snapshot_paths] == before
+    assert set(refs) == {"hidden-rubric", "legacy-oracle"}
+    assert all(item["ref"].startswith("calibration-hidden://task-v1/") for item in snapshots)
+
+
 def test_prepare_arm_never_projects_hidden_evaluator_material(task_value, monkeypatch) -> None:
     frozen = freeze_task(task_value)
     monkeypatch.setattr(
@@ -161,8 +369,16 @@ def test_prepare_arm_never_projects_hidden_evaluator_material(task_value, monkey
     assert packet["agent_profile"]["model"] == "gpt-5.4"
 
 
-def _candidate(*, arm_id: str, attempt_index: int, seed: int, failed: str | None = None, tokens: int = 9000) -> dict:
-    return {
+def _candidate(
+    *,
+    arm_id: str,
+    attempt_index: int,
+    seed: int,
+    failed: str | None = None,
+    tokens: int = 9000,
+    execution_started_at: str | None = None,
+) -> dict:
+    value = {
         "arm_id": arm_id,
         "attempt_index": attempt_index,
         "paired_seed": seed,
@@ -176,6 +392,9 @@ def _candidate(*, arm_id: str, attempt_index: int, seed: int, failed: str | None
             for check_id in ("protocol_fidelity", "runner_conformance", "evidence_manifest")
         ],
     }
+    if execution_started_at:
+        value["execution_started_at"] = execution_started_at
+    return value
 
 
 def _paired_task(task_value: dict) -> dict:
@@ -214,28 +433,28 @@ def _paired_task(task_value: dict) -> dict:
 def _paired_results(task: dict, *, control_passes: set[int] | None = None) -> list[dict]:
     passing = set(control_passes or set())
     rows = []
-    for index, seed in enumerate(task["repetitions"]["paired_seeds"], start=1):
-        rows.append(
-            evaluate_candidate(
-                task,
-                _candidate(
-                    arm_id="C0_raw",
-                    attempt_index=index,
-                    seed=seed,
-                    failed=None if index in passing else "runner_conformance",
-                ),
+    sequence = 0
+    for scheduled in task["comparison_plan"]["execution_order"]:
+        index = int(scheduled["attempt_index"])
+        seed = int(scheduled["paired_seed"])
+        for arm_id in (scheduled["first_arm"], scheduled["second_arm"]):
+            rows.append(
+                evaluate_candidate(
+                    task,
+                    _candidate(
+                        arm_id=arm_id,
+                        attempt_index=index,
+                        seed=seed,
+                        failed=(
+                            None
+                            if arm_id == "C3_typed_execution" or index in passing
+                            else "runner_conformance"
+                        ),
+                        execution_started_at=f"2026-08-18T00:{sequence:02d}:00Z",
+                    ),
+                )
             )
-        )
-        rows.append(
-            evaluate_candidate(
-                task,
-                _candidate(
-                    arm_id="C3_typed_execution",
-                    attempt_index=index,
-                    seed=seed,
-                ),
-            )
-        )
+            sequence += 1
     return rows
 
 
@@ -247,7 +466,10 @@ def test_evaluator_computes_primary_endpoint_budget_and_first_failure(task_value
 
     assert passed["metrics"]["evidence_valid_completion"] is True
     assert failed["failure"]["stage"] == "implementation"
-    assert over_budget["failure"]["code"] == "budget_exceeded"
+    assert over_budget["metrics"]["evidence_valid_completion"] is True
+    assert over_budget["metrics"]["budget_compliant"] is False
+    assert over_budget["metrics"]["budgeted_evidence_valid_completion"] is False
+    assert over_budget["failure"] is None
 
     summary = summarize(task, [passed, failed, over_budget])
     assert summary["complete"] is False
@@ -286,6 +508,8 @@ def test_five_clean_c3_wins_cross_preregistered_exact_threshold(task_value) -> N
     assert comparison["ties"] == 0
     assert comparison["p_value"] == pytest.approx(0.03125)
     assert comparison["paired_risk_difference"] == 1.0
+    assert comparison["execution_order_verifiable"] is True
+    assert comparison["execution_order_valid"] is True
     assert comparison["claim_status"] == "supports_local_advantage"
 
 
@@ -309,6 +533,23 @@ def test_paired_summary_rejects_duplicate_attempts(task_value) -> None:
     rows = _paired_results(task)
     with pytest.raises(ValueError, match="duplicate arm attempts"):
         summarize(task, [*rows, rows[0]])
+
+
+def test_paired_summary_refuses_claim_when_execution_order_drifted(task_value) -> None:
+    task = _paired_task(task_value)
+    rows = _paired_results(task)
+    rows[0]["execution_started_at"], rows[1]["execution_started_at"] = (
+        rows[1]["execution_started_at"],
+        rows[0]["execution_started_at"],
+    )
+
+    comparison = summarize(task, rows)["primary_comparison"]
+
+    assert comparison["complete"] is True
+    assert comparison["execution_order_verifiable"] is True
+    assert comparison["execution_order_valid"] is False
+    assert comparison["execution_order_violations"][0]["position"] == 1
+    assert comparison["claim_status"] == "execution_order_violation_no_claim"
 
 
 def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(task_value) -> None:
@@ -396,6 +637,51 @@ def test_independent_judge_derives_checks_instead_of_accepting_candidate_claims(
     evaluated = evaluate_candidate(task, candidate)
     assert evaluated["metrics"]["evidence_valid_completion"] is False
     assert evaluated["failure"]["stage"] == "implementation"
+
+    canonical_run_log = {
+        "stage": "workflow_smoke",
+        "device": "cpu",
+        "epochs_completed": 3,
+        "seeds": ["seed-17"],
+        "inference_allowed": False,
+        "evidence_class": "workflow_smoke",
+    }
+    canonical_audit = {
+        "per_stage": {"workflow_smoke": {"test_evaluations_count": 0}},
+        "test_access": [],
+    }
+    accepted = build_independent_candidate(
+        task=task,
+        packet=packet,
+        candidate_id="candidate",
+        session=session,
+        automation={
+            "budget_usage": {
+                "observed": {"model_tokens": 100, "wall_seconds": 10, "attempts": 1}
+            }
+        },
+        validation={"ok": True, "digest": "sha256:" + "3" * 64},
+        prepare={"ok": True, "execution_spec": spec},
+        trial={
+            "ok": True,
+            "digest": "sha256:" + "5" * 64,
+            "documents": {
+                "run_log.json": canonical_run_log,
+                "evaluation_audit.json": canonical_audit,
+                "artifacts_index.json": {"files": []},
+            },
+            "outputs": [],
+        },
+        dataset={"ok": True},
+        verified_artifacts=[],
+        collected=None,
+    )
+
+    accepted_statuses = {
+        item["check_id"]: item["status"] for item in accepted["checks"]
+    }
+    assert accepted_statuses["protocol_fidelity"] == "pass"
+    assert accepted_statuses["cpu_workflow_smoke"] == "pass"
 
 
 def test_independent_judge_rejects_string_pair_ids_as_rng_seeds(task_value, monkeypatch) -> None:
@@ -538,7 +824,7 @@ def test_independent_judge_preserves_terminal_builder_failure_stage(task_value, 
     }
 
 
-def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypatch) -> None:
+def test_builder_evaluation_returns_existing_result_without_reexecuting_or_releasing(monkeypatch) -> None:
     from handlers import main as handler_module
 
     stored = {
@@ -565,6 +851,13 @@ def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypa
         "get_state",
         lambda **_kwargs: (_ for _ in ()).throw(AssertionError("must not read Builder state")),
     )
+    monkeypatch.setattr(
+        handler_module,
+        "invoke_skill",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("must not invoke another skill")
+        ),
+    )
 
     response = handler_module.evaluate_builder_attempt(
         task_id="task",
@@ -577,3 +870,176 @@ def test_builder_evaluation_returns_existing_result_without_reexecuting(monkeypa
 
     assert response["idempotent_replay"] is True
     assert response["result"] is stored
+    assert response["runtime_release"] == {
+        "schema": "adaos.research.runtime_release_delegation.v1",
+        "status": "deferred",
+        "owner_ref": "skill:research_calibration_runner_skill",
+        "reason": "evaluator_process_may_hold_candidate_native_modules",
+    }
+    assert response["lifecycle_errors"] == []
+
+
+def test_builder_evaluation_runs_hidden_semantic_probe_over_paired_trials(
+    tmp_path: Path, monkeypatch
+) -> None:
+    from handlers import main as handler_module
+
+    rubric_path = tmp_path / "hidden-rubric.json"
+    rubric_path.write_text(
+        json.dumps({"implementation_profile": {"subject": "tlp"}}),
+        encoding="utf-8",
+    )
+    plan = {
+        "digest": "sha256:" + "1" * 64,
+        "system": {"digest": "sha256:" + "2" * 64},
+    }
+    task = {
+        "rubric": {"checks": [{"check_id": "scientific_implementation"}]},
+        "hidden_inputs": [
+            {
+                "kind": "hidden_rubric",
+                "path": str(rubric_path),
+                "digest": _sha(rubric_path.read_bytes()),
+            }
+        ],
+        "inputs": [],
+    }
+    packet = {"packet_id": "packet"}
+
+    class _Repository:
+        @staticmethod
+        def get_task(_task_id: str) -> dict:
+            return task
+
+        @staticmethod
+        def get_packet(*_args, **_kwargs) -> dict:
+            return packet
+
+        @staticmethod
+        def find_result(*_args, **_kwargs):
+            return None
+
+        @staticmethod
+        def put_result(value: dict) -> dict:
+            return value
+
+    instruction_values = {
+        "research_compilation": {
+            "digest": "sha256:" + "3" * 64,
+            "experiment_plan": plan,
+        },
+        "automation_brief": {
+            "digest": "sha256:" + "4" * 64,
+            "compilation_digest": "sha256:" + "3" * 64,
+        },
+    }
+    session = {
+        "session_id": "session",
+        "project_ref": "project:test",
+        "handoff": {"execution_budget": {"max_wall_seconds": 10800}},
+        "instruction_inputs": [
+            {"kind": kind, "content_digest": value["digest"]}
+            for kind, value in instruction_values.items()
+        ],
+    }
+    arm_trials = [{"arm": {"id": "maxpool", "role": "baseline"}}, {"arm": {"id": "tlp", "role": "intervention"}}]
+    source_snapshot = {
+        "source_digest": "sha256:" + "5" * 64,
+        "digest": "sha256:" + "6" * 64,
+        "files": [],
+    }
+    semantic_calls: list[dict] = []
+    candidate_calls: list[dict] = []
+    probe_calls: list[dict] = []
+    manager_calls: list[dict] = []
+
+    monkeypatch.setattr(handler_module, "EvaluationRepository", _Repository)
+    monkeypatch.setattr(handler_module.development_sessions, "get", lambda _session_id: session)
+    monkeypatch.setattr(
+        handler_module.development_sessions,
+        "get_instruction",
+        lambda _session_id, kind: {"value": instruction_values[kind]},
+    )
+    monkeypatch.setattr(
+        handler_module.automation,
+        "get_state",
+        lambda **_kwargs: {"automation": {"terminal": True, "status": "completed"}},
+    )
+
+    def invoke(_skill_id: str, operation_id: str, arguments: dict, **_kwargs):
+        if operation_id == "get_runner_contract":
+            return {"digest": "sha256:" + "7" * 64}
+        assert operation_id == "evaluate_development_candidate"
+        manager_calls.append(dict(arguments["request"]))
+        return {
+            "ok": True,
+            "receipt_digest": "sha256:" + "8" * 64,
+            "checks": [
+                {
+                    "id": "candidate.native_validation",
+                    "ok": True,
+                    "digest": "sha256:" + "9" * 64,
+                    "source_digest": source_snapshot["source_digest"],
+                }
+            ],
+            "evidence": {
+                "execution_spec": {},
+                "arm_trials": arm_trials,
+            },
+            "errors": [],
+        }
+
+    monkeypatch.setattr(handler_module, "invoke_skill", invoke)
+    monkeypatch.setattr(handler_module, "inspect_skill_source", lambda _candidate: source_snapshot)
+    def invoke_probe(_candidate_id: str, _operation_id: str, arguments: dict, **_kwargs):
+        probe_calls.append(arguments)
+        return {"schema": "probe-result"}
+
+    monkeypatch.setattr(handler_module, "invoke_development_skill", invoke_probe)
+
+    def semantic(**kwargs):
+        semantic_calls.append(kwargs)
+        return {"ok": True, "detail": "verified", "evidence_refs": ["evidence://semantic"]}
+
+    monkeypatch.setattr(handler_module, "evaluate_tlp_implementation", semantic)
+
+    def build_candidate(**kwargs):
+        candidate_calls.append(kwargs)
+        return {"candidate": True}
+
+    monkeypatch.setattr(handler_module, "build_independent_candidate", build_candidate)
+    monkeypatch.setattr(
+        handler_module,
+        "evaluate_candidate",
+        lambda _task, _candidate: {
+            "metrics": {"evidence_valid_completion": True},
+            "digest": "sha256:" + "a" * 64,
+        },
+    )
+    response = handler_module.evaluate_builder_attempt(
+        task_id="task",
+        arm_id="C3_typed_execution",
+        attempt_index=1,
+        candidate_id="candidate",
+        development_session_id="session",
+        builder_webspace_id="builder",
+    )
+
+    assert response["evidence_valid_completion"] is True
+    assert manager_calls[0]["validation_budget"] == {
+        "schema": "adaos.builder.validation_budget.v1",
+        "packaged_pytest_wall_seconds": 180,
+        "source": "development_session.execution_budget",
+        "execution_max_wall_seconds": 10800,
+    }
+    assert len(semantic_calls) == 1
+    assert semantic_calls[0]["arm_trials"] == arm_trials
+    assert semantic_calls[0]["source_snapshot"] is source_snapshot
+    assert semantic_calls[0]["expected_source_digest"] == source_snapshot["source_digest"]
+    assert semantic_calls[0]["probe_request"]["experiment_plan_digest"] == plan["digest"]
+    assert semantic_calls[0]["probe_request"]["digest"].startswith("sha256:")
+    assert "digest" not in probe_calls[0]["request"]
+    assert probe_calls[0]["request"]["experiment_plan_digest"] == plan["digest"]
+    assert candidate_calls[0]["scientific_implementation"]["ok"] is True
+    assert response["runtime_release"]["status"] == "deferred"
+    assert response["lifecycle_errors"] == []

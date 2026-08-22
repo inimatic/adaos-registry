@@ -4,7 +4,6 @@ import asyncio
 import copy
 import importlib.util
 import json
-import logging
 import sys
 import threading
 import time
@@ -16,21 +15,6 @@ import pytest
 
 
 SKILL_ROOT = Path(__file__).resolve().parents[1]
-
-
-def _find_repo_root() -> Path:
-    marker = Path("src") / "adaos" / "services"
-    candidates = [Path.cwd(), *SKILL_ROOT.parents]
-    for root in candidates:
-        if (root / marker).exists():
-            return root
-    raise FileNotFoundError(f"Cannot find AdaOS repo root containing {marker}")
-
-
-REPO_ROOT = _find_repo_root()
-SRC_ROOT = REPO_ROOT / "src"
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
 
 
 def _load_module():
@@ -4267,7 +4251,6 @@ def test_schedule_dev_runtime_reload_publishes_materialization_event_without_run
                 "event_payload": dict(event_payload or {}),
             }
         )
-        reload_done.set()
         return {"ok": True}
 
     monkeypatch.setattr(webspace_runtime, "reload_webspace_from_scenario", _reload)

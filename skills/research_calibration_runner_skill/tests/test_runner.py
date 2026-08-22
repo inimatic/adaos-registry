@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import importlib.util
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 
 def _module():
     path = Path(__file__).resolve().parents[1] / "handlers" / "main.py"
-    spec = importlib.util.spec_from_file_location("research_calibration_runner.handlers.main", path)
+    spec = importlib.util.spec_from_file_location(
+        "research_calibration_runner.handlers.main", path
+    )
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -45,7 +48,11 @@ def _packet(module):
         "instruction_inputs": [],
         "prohibited_actions": ["Do not inspect evaluator material."],
     }
-    return {**identity, "created_at": "2026-08-18T00:00:00Z", "digest": module._digest(identity)}
+    return {
+        **identity,
+        "created_at": "2026-08-18T00:00:00Z",
+        "digest": module._digest(identity),
+    }
 
 
 def test_packet_digest_and_candidate_identity_are_stable() -> None:
@@ -123,7 +130,16 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
         **identity,
         "current_skill": {"name": "research_manager_skill", "version": "0.13.0"},
     }
-    runner_contract_digest = "sha256:" + "2" * 64
+    runner_contract_base = {
+        "schema": "adaos.contract.operation_set.v1",
+        "contract": "adaos.research.runner.v1",
+    }
+    runner_contract_digest = module._digest(runner_contract_base)
+    projected_contract = {
+        **runner_contract_base,
+        "candidate_role": "provider",
+    }
+    projected_contract["digest"] = module._digest(projected_contract)
     task = {
         "digest": "sha256:" + "1" * 64,
         "environment_spec": {
@@ -139,14 +155,30 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
                 "research_manager_skill": "0.13.0",
             },
             "runner_contract_digest": runner_contract_digest,
+            "minimum_free_disk_bytes": 1024,
         },
     }
     monkeypatch.setattr(module, "sdk_runtime_identity", lambda: identity)
+    monkeypatch.setattr(
+        module,
+        "_frozen_json_input",
+        lambda _task, kind: (
+            {"experiment_plan": {"schema": "adaos.research.experiment_plan.v1"}}
+            if kind == "research_compilation"
+            else projected_contract
+        ),
+    )
+    monkeypatch.setattr(
+        module.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(total=4096, used=1024, free=3072),
+    )
     monkeypatch.setattr(
         module.builder_automation,
         "standard_prompt_version",
         lambda: "adaos-skill-realization/0.2.0",
     )
+
     def invoke(_skill, method, *_args, **_kwargs):
         if method == "get_task":
             return {
@@ -157,7 +189,7 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
         if method == "environment_identity":
             return {"ok": True, "runtime_identity": manager_identity}
         if method == "get_runner_contract":
-            return {"digest": runner_contract_digest}
+            return {**runner_contract_base, "digest": runner_contract_digest}
         raise AssertionError(method)
 
     monkeypatch.setattr(
@@ -172,3 +204,261 @@ def test_environment_preflight_compares_frozen_runtime(monkeypatch) -> None:
     task["environment_spec"]["core_commit"] = "b" * 40
     with pytest.raises(RuntimeError, match="core_commit"):
         module._environment_preflight("tlp-calibration-v1")
+
+
+def test_environment_preflight_rejects_disk_pressure_before_candidate_creation(
+    monkeypatch,
+) -> None:
+    module = _module()
+    runner_contract_base = {
+        "schema": "adaos.contract.operation_set.v1",
+        "contract": "adaos.research.runner.v1",
+    }
+    runner_contract_digest = module._digest(runner_contract_base)
+    projected_contract = {
+        **runner_contract_base,
+        "candidate_role": "provider",
+    }
+    projected_contract["digest"] = module._digest(projected_contract)
+    task = {
+        "digest": "sha256:" + "1" * 64,
+        "environment_spec": {
+            "core_commit": "a" * 40,
+            "python_version": "3.11.9",
+            "platform": "windows-test",
+            "core_source_tree_clean": True,
+            "core_source_tree_digest": "sha256:" + "2" * 64,
+            "component_versions": {
+                "research_evaluator_skill": "0.1.32",
+                "research_calibration_runner_skill": "0.1.12",
+                "research_manager_skill": "0.24.0",
+            },
+            "runner_contract_digest": runner_contract_digest,
+            "minimum_free_disk_bytes": 4096,
+        },
+    }
+    local = {
+        "core": {
+            "git_commit": "a" * 40,
+            "source_tree": {"clean": True, "tracked_diff_digest": "sha256:" + "2" * 64},
+        },
+        "python_version": "3.11.9",
+        "platform": "windows-test",
+        "current_skill": {"version": "0.1.12"},
+    }
+
+    def invoke(_skill, method, *_args, **_kwargs):
+        if method == "get_task":
+            return {
+                "ok": True,
+                "task": task,
+                "runtime_identity": {**local, "current_skill": {"version": "0.1.32"}},
+            }
+        if method == "environment_identity":
+            return {
+                "runtime_identity": {**local, "current_skill": {"version": "0.24.0"}}
+            }
+        if method == "get_runner_contract":
+            return {**runner_contract_base, "digest": runner_contract_digest}
+        raise AssertionError(method)
+
+    monkeypatch.setattr(module, "invoke_skill", invoke)
+    monkeypatch.setattr(module, "sdk_runtime_identity", lambda: local)
+    monkeypatch.setattr(
+        module,
+        "_frozen_json_input",
+        lambda _task, kind: (
+            {"experiment_plan": {"schema": "adaos.research.experiment_plan.v1"}}
+            if kind == "research_compilation"
+            else projected_contract
+        ),
+    )
+    monkeypatch.setattr(
+        module.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(total=4096, used=2048, free=2048),
+    )
+
+    with pytest.raises(RuntimeError, match="before candidate execution"):
+        module._environment_preflight("tlp-calibration-v1")
+
+
+def _lineage(*results: dict) -> dict:
+    return {
+        "ok": True,
+        "task": {
+            "comparison_plan": {
+                "execution_order": [
+                    {
+                        "attempt_index": 1,
+                        "first_arm": "C0_raw",
+                        "second_arm": "C3_typed_execution",
+                    },
+                    {
+                        "attempt_index": 2,
+                        "first_arm": "C3_typed_execution",
+                        "second_arm": "C0_raw",
+                    },
+                ]
+            }
+        },
+        "results": list(results),
+    }
+
+
+def test_execution_order_gate_admits_only_next_preregistered_attempt(
+    monkeypatch,
+) -> None:
+    module = _module()
+    lineage = _lineage(
+        {
+            "arm_id": "C0_raw",
+            "attempt_index": 1,
+            "budget_view": "fixed_downstream",
+            "execution_started_at": "2026-08-18T00:00:00Z",
+        }
+    )
+    monkeypatch.setattr(module, "invoke_skill", lambda *_args, **_kwargs: lineage)
+
+    receipt = module._execution_order_gate(
+        "task", "C3_typed_execution", 1, "fixed_downstream"
+    )
+
+    assert receipt["status"] == "next_preregistered_attempt"
+    assert receipt["completed"] == 1
+    with pytest.raises(RuntimeError, match="expected C3_typed_execution:1"):
+        module._execution_order_gate("task", "C0_raw", 2, "fixed_downstream")
+
+
+def test_execution_order_gate_rejects_unverifiable_or_drifted_lineage(
+    monkeypatch,
+) -> None:
+    module = _module()
+    unverifiable = _lineage(
+        {
+            "arm_id": "C0_raw",
+            "attempt_index": 1,
+            "budget_view": "fixed_downstream",
+        }
+    )
+    monkeypatch.setattr(module, "invoke_skill", lambda *_args, **_kwargs: unverifiable)
+    with pytest.raises(RuntimeError, match="not verifiable"):
+        module._execution_order_gate(
+            "task", "C3_typed_execution", 1, "fixed_downstream"
+        )
+
+    drifted = _lineage(
+        {
+            "arm_id": "C3_typed_execution",
+            "attempt_index": 1,
+            "budget_view": "fixed_downstream",
+            "execution_started_at": "2026-08-18T00:00:00Z",
+        }
+    )
+    monkeypatch.setattr(module, "invoke_skill", lambda *_args, **_kwargs: drifted)
+    with pytest.raises(RuntimeError, match="already drifted"):
+        module._execution_order_gate("task", "C0_raw", 1, "fixed_downstream")
+
+
+def test_release_attempt_delegates_exact_terminal_candidate(monkeypatch) -> None:
+    module = _module()
+    calls: list[tuple[str, str, dict]] = []
+    monkeypatch.setattr(
+        module,
+        "invoke_skill",
+        lambda skill, method, arguments, **_kwargs: calls.append(
+            (skill, method, arguments)
+        )
+        or {"ok": True, "runtime_release": {"runtime_removed": True}},
+    )
+
+    result = module.release_attempt("tlp_cal_c3_a1_fd_deadbeef", "devcal2_deadbeef")
+
+    assert result["ok"] is True
+    assert result["runtime_removed"] is True
+    assert calls == [
+        (
+            "builder_sdk_control_skill",
+            "release_candidate_runtime",
+            {
+                "object_type": "skill",
+                "object_id": "tlp_cal_c3_a1_fd_deadbeef",
+                "development_session_id": "devcal2_deadbeef",
+            },
+        )
+    ]
+
+
+def test_prepare_reuses_exact_development_session_without_mutating_sources(
+    monkeypatch,
+) -> None:
+    module = _module()
+    packet = _packet(module)
+    candidate = module._candidate_id(packet)
+    session_id = "devcal2_" + packet["digest"].removeprefix("sha256:")[:24]
+    webspace_id = "builder-cal-" + packet["digest"].removeprefix("sha256:")[:16]
+    budget = {"budget_view": packet["budget_view"], **packet["budget"]}
+    session = {
+        "session_id": session_id,
+        "project_ref": f"project:{candidate}",
+        "focus": {"ref": f"skill:{candidate}"},
+        "handoff": {"execution_budget": budget},
+        "artifact_inputs": [
+            {"context_digest": packet["artifact_inputs"][0]["context_digest"]}
+        ],
+        "instruction_inputs": [],
+    }
+    monkeypatch.setattr(
+        module,
+        "_environment_preflight",
+        lambda _task_id: {"task_digest": packet["task_digest"]},
+    )
+    monkeypatch.setattr(module, "_packet", lambda *_args: packet)
+    monkeypatch.setattr(
+        module.development_sessions,
+        "get",
+        lambda value: session if value == session_id else None,
+    )
+    monkeypatch.setattr(
+        module.development_sessions,
+        "binding_for",
+        lambda value: {"builder_webspace_id": value, "session_id": session_id},
+    )
+    monkeypatch.setattr(
+        module.compositions,
+        "get",
+        lambda value: {"id": value, "ref": f"project:{value}"},
+    )
+    monkeypatch.setattr(
+        module,
+        "_ensure_project",
+        lambda *_args, **_kwargs: pytest.fail(
+            "recovery must not rematerialize the Project"
+        ),
+    )
+    monkeypatch.setattr(
+        module.development_sessions,
+        "create",
+        lambda *_args, **_kwargs: pytest.fail(
+            "recovery must not recreate the Development Session"
+        ),
+    )
+    monkeypatch.setattr(
+        module.development_sessions,
+        "bind",
+        lambda *_args, **_kwargs: pytest.fail(
+            "recovery must not rewrite the existing binding"
+        ),
+    )
+
+    prepared = module._prepare(
+        packet["task_id"],
+        packet["arm_id"],
+        packet["attempt_index"],
+        packet["budget_view"],
+        None,
+    )
+
+    assert prepared["recovered_preparation"] is True
+    assert prepared["candidate_id"] == candidate
+    assert prepared["binding"]["builder_webspace_id"] == webspace_id

@@ -2,10 +2,14 @@ from __future__ import annotations
 
 import importlib.util
 import sys
+import threading
+import time
 import types
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
+
+import yaml
 
 
 if "y_py" not in sys.modules:
@@ -74,6 +78,27 @@ def _load_infrascope_module():
             sys.modules.pop(service_key, None)
         else:
             sys.modules[service_key] = previous_service_module
+
+
+def test_infrascope_runtime_diagnostics_is_declared_read_only():
+    manifest_path = Path(__file__).resolve().parents[1] / "skill.yaml"
+    manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    tools = {
+        entry["name"]: entry
+        for entry in manifest.get("tools", [])
+        if isinstance(entry, dict) and entry.get("name")
+    }
+
+    assert tools["infrascope_runtime_diagnostics"]["side_effects"] == "read_only"
+
+
+def _wait_until(predicate, *, timeout_s: float = 2.0) -> None:
+    deadline = time.monotonic() + timeout_s
+    while time.monotonic() < deadline:
+        if predicate():
+            return
+        time.sleep(0.01)
+    raise AssertionError("condition was not met before timeout")
 
 
 def test_infrascope_skill_projects_overview_summary_and_incident_rows(monkeypatch):
@@ -383,6 +408,7 @@ def test_infrascope_stream_snapshot_request_publishes_requested_receiver(monkeyp
             "receiver": "infrascope.inventory.members",
         }
     )
+    _wait_until(lambda: len(published) == 1)
 
     assert published == [
         (
@@ -479,6 +505,7 @@ def test_infrascope_stream_snapshot_request_uses_direct_receiver_builders(monkey
     mod.on_webio_stream_snapshot_requested(
         {"webspace_id": "ws-1", "receiver": "infrascope.operations.active"},
     )
+    _wait_until(lambda: len(published) == 2)
 
     assert calls["snapshot"] == 0
     assert [item[0] for item in published] == [
@@ -533,10 +560,160 @@ def test_infrascope_overview_stream_snapshot_uses_compact_direct_builder(monkeyp
     mod.on_webio_stream_snapshot_requested(
         {"webspace_id": "ws-1", "receiver": "infrascope.overview.health_strip"},
     )
+    _wait_until(lambda: len(published) == 1)
 
     assert published[0][0] == "infrascope.overview.health_strip"
     assert "details" not in published[0][1][0]
     assert published[0][1][0]["details_receiver"] == "infrascope.inspector.member-1"
+
+
+def test_infrascope_stream_snapshot_handler_uses_bounded_worker_and_coalesces(monkeypatch):
+    mod = _load_infrascope_module()
+    started = threading.Event()
+    release = threading.Event()
+    worker_threads: list[int] = []
+    published: list[tuple[str, object]] = []
+
+    def _blocking_builder(receiver, *, webspace_id):
+        worker_threads.append(threading.get_ident())
+        started.set()
+        assert release.wait(timeout=2.0)
+        return [{"id": "member-1"}]
+
+    monkeypatch.setattr(mod, "_build_stream_snapshot_payload", _blocking_builder)
+    monkeypatch.setattr(
+        mod,
+        "_publish_stream_payload",
+        lambda receiver, data, **kwargs: published.append((receiver, data)),
+    )
+
+    caller_thread = threading.get_ident()
+    before = time.monotonic()
+    mod.on_webio_stream_snapshot_requested(
+        {"webspace_id": "ws-1", "receiver": "infrascope.inventory.members"},
+    )
+    handler_elapsed = time.monotonic() - before
+
+    assert handler_elapsed < 0.1
+    assert started.wait(timeout=1.0)
+    mod._schedule_stream_snapshot_response(
+        "infrascope.inventory.members",
+        webspace_id="ws-1",
+    )
+    diagnostics = mod.infrascope_runtime_diagnostics()["stream_snapshot"]
+    assert diagnostics["active"] == 1
+    assert diagnostics["inflight_coalesced_total"] == 1
+    assert diagnostics["active_peak"] == 1
+
+    release.set()
+    _wait_until(lambda: len(published) == 1)
+    _wait_until(lambda: mod.infrascope_runtime_diagnostics()["stream_snapshot"]["active"] == 0)
+
+    assert len(worker_threads) == 1
+    assert worker_threads[0] != caller_thread
+    assert published == [("infrascope.inventory.members", [{"id": "member-1"}])]
+    diagnostics = mod.infrascope_runtime_diagnostics()["stream_snapshot"]
+    assert diagnostics["scheduled_total"] == 1
+    assert diagnostics["completed_total"] == 1
+    assert diagnostics["failed_total"] == 0
+    assert diagnostics["last_receiver"] == "infrascope.inventory.members"
+
+
+def test_infrascope_runtime_diagnostics_survives_separate_module_loader(monkeypatch):
+    subscription_mod = _load_infrascope_module()
+    tool_mod = _load_infrascope_module()
+    persisted: dict[str, object] = {}
+    published: list[tuple[str, object]] = []
+
+    monkeypatch.setattr(
+        subscription_mod,
+        "_build_stream_snapshot_payload",
+        lambda receiver, *, webspace_id: [{"id": f"{webspace_id}:{receiver}"}],
+    )
+    monkeypatch.setattr(
+        subscription_mod,
+        "_publish_stream_payload",
+        lambda receiver, data, **kwargs: published.append((receiver, data)),
+    )
+    monkeypatch.setattr(
+        subscription_mod,
+        "skill_memory_set",
+        lambda key, value: persisted.__setitem__(key, value),
+    )
+    monkeypatch.setattr(
+        tool_mod,
+        "skill_memory_get",
+        lambda key, default=None: persisted.get(key, default),
+    )
+
+    subscription_mod.on_webio_stream_snapshot_requested(
+        {"webspace_id": "ws-shared", "receiver": "infrascope.inventory.members"},
+    )
+    _wait_until(lambda: len(published) == 1)
+    _wait_until(
+        lambda: subscription_mod.infrascope_runtime_diagnostics()["stream_snapshot"]["active"] == 0
+    )
+
+    diagnostics = tool_mod.infrascope_runtime_diagnostics()
+    assert diagnostics["status_source"] == "skill_memory"
+    assert diagnostics["active_state_stale"] is False
+    assert diagnostics["stream_snapshot"]["requested_total"] == 1
+    assert diagnostics["stream_snapshot"]["completed_total"] == 1
+    assert diagnostics["stream_snapshot"]["active"] == 0
+    assert diagnostics["stream_snapshot"]["last_receiver"] == "infrascope.inventory.members"
+
+
+def test_infrascope_runtime_drain_suppresses_obsolete_snapshot_publish(monkeypatch):
+    mod = _load_infrascope_module()
+    started = threading.Event()
+    release = threading.Event()
+    published: list[tuple[str, object]] = []
+    persisted: list[dict[str, object]] = []
+
+    def _blocking_builder(receiver, *, webspace_id):
+        started.set()
+        assert release.wait(timeout=2.0)
+        return [{"id": "stale-member"}]
+
+    monkeypatch.setattr(mod, "_build_stream_snapshot_payload", _blocking_builder)
+    monkeypatch.setattr(
+        mod,
+        "_publish_stream_payload",
+        lambda receiver, data, **kwargs: published.append((receiver, data)),
+    )
+    monkeypatch.setattr(
+        mod,
+        "skill_memory_set",
+        lambda _key, value: persisted.append(dict(value)),
+    )
+
+    mod.on_webio_stream_snapshot_requested(
+        {"webspace_id": "ws-1", "receiver": "infrascope.inventory.members"},
+    )
+    assert started.wait(timeout=1.0)
+
+    cleanup = mod.infrascope_runtime_drain(reason="scenario_deactivated")
+    assert cleanup["stream_task_total"] == 1
+    release.set()
+    _wait_until(
+        lambda: mod.infrascope_runtime_diagnostics()["stream_snapshot"][
+            "stale_publish_suppressed_total"
+        ]
+        == 1
+    )
+    _wait_until(
+        lambda: mod.infrascope_runtime_diagnostics()["stream_snapshot"]["retiring_active"]
+        == 0
+    )
+
+    assert published == []
+    assert len(persisted) == 2
+    assert persisted[0]["last_lifecycle_reason"] == "scenario_deactivated"
+    assert persisted[-1]["active"] == 0
+    assert persisted[-1]["retiring_active"] == 0
+    assert persisted[-1]["stale_publish_suppressed_total"] == 1
+    assert persisted[-1]["persist_attempted_total"] == 2
+    assert persisted[-1]["persisted_total"] == 2
 
 
 def test_infrascope_adds_skill_migration_operation_row(monkeypatch):

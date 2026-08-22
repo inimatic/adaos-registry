@@ -12,6 +12,7 @@ _CHECK_IDS = (
     "protocol_fidelity",
     "native_skill_validation",
     "runner_conformance",
+    "scientific_implementation",
     "cpu_workflow_smoke",
     "evidence_manifest",
 )
@@ -103,6 +104,7 @@ def build_independent_candidate(
     dataset: Mapping[str, Any] | None,
     verified_artifacts: Sequence[Mapping[str, Any]],
     collected: Mapping[str, Any] | None,
+    scientific_implementation: Mapping[str, Any] | None = None,
     operation_errors: Sequence[str] = (),
 ) -> dict[str, Any]:
     refs = [f"builder://automation/{candidate_id}", f"builder://development-session/{session['session_id']}"]
@@ -125,6 +127,7 @@ def build_independent_candidate(
     )
     expected_epochs = int(expected_smoke.get("epochs") or 3)
     expected_seeds = list(expected_smoke.get("seeds") or [17])
+    expected_seed_labels = [f"seed-{int(item)}" for item in expected_seeds]
     expected_inference = bool(expected_smoke.get("inference_allowed", False))
     expected_gpu_count = int(expected_smoke.get("gpu_count") or 0)
     expected_network_mode = str(expected_smoke.get("network_mode") or "offline")
@@ -195,7 +198,12 @@ def build_independent_candidate(
     )
     run_network = dict(run_log.get("network") or {})
     provider = dict((trial or {}).get("provider") or {})
-    extended_execution_contract = str(task.get("schema_version") or "") == "1.6.0"
+    extended_execution_contract = str(task.get("schema_version") or "") in {
+        "1.6.0",
+        "1.7.0",
+        "1.8.0",
+        "1.9.0",
+    }
     network_ok = not extended_execution_contract or all(
         (
             str(run_network.get("mode") or "") == expected_network_mode,
@@ -211,7 +219,7 @@ def build_independent_candidate(
             run_log.get("stage") == expected_stage,
             run_log.get("device") == str(expected_smoke.get("device") or "cpu"),
             int(run_log.get("epochs_completed") or 0) == expected_epochs,
-            list(run_log.get("seeds") or []) == expected_seeds,
+            list(run_log.get("seeds") or []) == expected_seed_labels,
             run_log.get("inference_allowed") is expected_inference,
             str(run_log.get("evidence_class") or "") == expected_evidence_class,
             "input_policy" not in expected_smoke
@@ -264,9 +272,28 @@ def build_independent_candidate(
         ),
         _check("native_skill_validation", validation_ok, [str((validation or {}).get("digest") or "")], "strict validation, probing and packaged tests passed" if validation_ok else "native validation or packaged tests failed"),
         _check("runner_conformance", runner_ok, refs, "public runner operations passed consumer checks" if runner_ok else "runner operation checks failed"),
-        _check("cpu_workflow_smoke", smoke_ok, [str((trial or {}).get("digest") or "")], "real three-epoch CPU workflow smoke completed" if smoke_ok else "CPU smoke or no-test audit failed"),
-        _check("evidence_manifest", evidence_ok, [str((trial or {}).get("digest") or "")], "content identities reconstructed and smoke remained non-confirmatory" if evidence_ok else "evidence identities or classification failed"),
     ]
+    rubric_ids = {
+        str(item.get("check_id") or "")
+        for item in task.get("rubric", {}).get("checks") or []
+        if isinstance(item, Mapping)
+    }
+    if "scientific_implementation" in rubric_ids:
+        semantic = dict(scientific_implementation or {})
+        checks.append(
+            _check(
+                "scientific_implementation",
+                bool(semantic.get("ok")),
+                list(semantic.get("evidence_refs") or refs),
+                str(semantic.get("detail") or "scientific implementation was not independently evaluated"),
+            )
+        )
+    checks.extend(
+        [
+            _check("cpu_workflow_smoke", smoke_ok, [str((trial or {}).get("digest") or "")], "real three-epoch CPU workflow smoke completed" if smoke_ok else "CPU smoke or no-test audit failed"),
+            _check("evidence_manifest", evidence_ok, [str((trial or {}).get("digest") or "")], "content identities reconstructed and smoke remained non-confirmatory" if evidence_ok else "evidence identities or classification failed"),
+        ]
+    )
     if operation_errors:
         detail = "; ".join(str(item) for item in operation_errors)
         for check in checks:
@@ -313,6 +340,14 @@ def build_independent_candidate(
         },
         "checks": checks,
     }
+    execution_started_at = str(
+        automation.get("created_at") or session.get("created_at") or ""
+    ).strip()
+    if execution_started_at:
+        # Builder owns this timestamp.  Keeping it in the evaluator input lets
+        # the recomputable package prove the preregistered arm order without
+        # granting the evaluator access to Builder's private state directory.
+        candidate["execution_started_at"] = execution_started_at
     if terminal_failure is not None:
         candidate["failure"] = terminal_failure
     return candidate

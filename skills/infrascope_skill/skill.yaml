@@ -254,6 +254,14 @@ tools:
         type: string
   output_schema:
     type: object
+- name: infrascope_runtime_diagnostics
+  description: Return bounded stream snapshot queue and latency diagnostics.
+  entry: handlers.main:infrascope_runtime_diagnostics
+  side_effects: read_only
+  input_schema:
+    type: object
+  output_schema:
+    type: object
 - name: get_overview_summary
   description: Return the summary tile payload for the Infrascope overview.
   entry: handlers.main:get_overview_summary
