@@ -643,7 +643,11 @@ class MediaLibraryAgentRepository:
                     "root_id": token,
                     "schema": SCHEMA_VERSION,
                 }
-            if not bool(root["enabled"]):
+            rows = connection.execute(
+                "SELECT * FROM sources WHERE root_id=? AND present=1",
+                (token,),
+            ).fetchall()
+            if not bool(root["enabled"]) and not rows:
                 return {
                     "ok": True,
                     "schema": SCHEMA_VERSION,
@@ -667,10 +671,6 @@ class MediaLibraryAgentRepository:
                 f"WHERE root_id=? AND status IN ({placeholders})",
                 (token, *ACTIVE_JOB_STATUSES),
             )
-            rows = connection.execute(
-                "SELECT * FROM sources WHERE root_id=? AND present=1",
-                (token,),
-            ).fetchall()
             job_id = stable_id("root-disabled", token, root_revision, size=24)
             for row in rows:
                 source_revision = int(row["revision"] or 0) + 1

@@ -560,6 +560,45 @@ def test_disabling_root_tombstones_sources_without_deleting_files(tmp_path):
     assert main.pull_deltas(cursor=tombstones["next_cursor"], limit=10)["items"] == []
 
 
+def test_disabling_legacy_disabled_root_repairs_present_sources(tmp_path):
+    library = tmp_path / "library"
+    library.mkdir()
+    database = tmp_path / "legacy-disabled.sqlite3"
+    repository = MediaLibraryAgentRepository(database, node_id="node-a")
+    root = repository.add_root(str(library))["root"]
+    operation, source = repository.upsert_source(
+        {
+            "root_id": root["id"],
+            "relative_path": "Album/01.mp3",
+            "folder_path": "Album",
+            "name": "01.mp3",
+            "media_kind": "audio",
+            "mime_type": "audio/mpeg",
+            "size_bytes": 5,
+            "modified_ns": 1,
+            "inode": 1,
+            "fingerprint": "legacy-disabled-fingerprint",
+            "resource_id": "media-ref",
+            "descriptor": {},
+            "metadata": {},
+        },
+        job_id="legacy-disabled-scan",
+    )
+    assert operation == "added"
+    with repository.connect() as connection:
+        connection.execute("UPDATE roots SET enabled=0 WHERE id=?", (root["id"],))
+        connection.commit()
+
+    repaired = repository.disable_root(root["id"])
+
+    assert repaired["ok"] is True
+    assert repaired["deduplicated"] is False
+    assert repaired["tombstoned_source_count"] == 1
+    assert repository.get_source(source["id"])["present"] is False
+    deltas = repository.pull_deltas(limit=10)["items"]
+    assert [item["operation"] for item in deltas] == ["added", "removed"]
+
+
 def test_duplicate_scan_request_returns_active_job(tmp_path):
     library = tmp_path / "library"
     library.mkdir()
