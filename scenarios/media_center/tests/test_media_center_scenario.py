@@ -76,6 +76,7 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
         "media-home",
         "media-catalog",
         "media-collections",
+        "media-folder-breadcrumbs",
         "media-folders",
         "media-playlists",
     } == set(widgets)

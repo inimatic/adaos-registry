@@ -23,6 +23,7 @@
             "mediaPageSize": 30,
             "mediaFavoritesOnly": false,
             "mediaSort": "title",
+            "mediaFolderParent": "",
             "mediaRootPath": "",
             "selectedMediaRootId": null,
             "playbackSourceType": "item",
@@ -425,6 +426,7 @@
                     "mediaCollectionKind": "$event.mediaCollectionKind",
                     "mediaFavoritesOnly": "$event.mediaFavoritesOnly",
                     "mediaSort": "$event.mediaSort",
+                    "mediaFolderParent": "",
                     "mediaCursor": ""
                   }
                 },
@@ -958,6 +960,54 @@
               }
             },
             {
+              "id": "media-folder-breadcrumbs",
+              "type": "ui.list",
+              "area": "main",
+              "visibleIf": "$state.mediaSection == 'folders'",
+              "dataSource": {
+                "kind": "skill",
+                "name": "media_center_skill.browse_folders",
+                "params": {
+                  "parent": "$state.mediaFolderParent",
+                  "profile_id": "$state.profileId",
+                  "limit": "$state.mediaPageSize",
+                  "cursor": "$state.mediaCursor"
+                },
+                "cacheTtlMs": 0,
+                "invalidationTags": [
+                  "media_center.catalog"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 2
+              },
+              "collection": {
+                "display": "rail",
+                "focusGroup": "media-folder-breadcrumbs",
+                "virtualized": false,
+                "cursor": {
+                  "enabled": false,
+                  "stateKey": "mediaCursor"
+                }
+              },
+              "inputs": {
+                "collectionKey": "breadcrumbs",
+                "titleKey": "name",
+                "hideTitle": true,
+                "cardMinWidth": 120,
+                "emptyText": ""
+              },
+              "actions": [
+                {
+                  "on": "select",
+                  "type": "updateState",
+                  "params": {
+                    "mediaFolderParent": "$event.path",
+                    "mediaCursor": ""
+                  }
+                }
+              ]
+            },
+            {
               "id": "media-folders",
               "type": "ui.list",
               "area": "main",
@@ -967,6 +1017,8 @@
                 "kind": "skill",
                 "name": "media_center_skill.browse_folders",
                 "params": {
+                  "parent": "$state.mediaFolderParent",
+                  "profile_id": "$state.profileId",
                   "limit": "$state.mediaPageSize",
                   "cursor": "$state.mediaCursor"
                 },
@@ -990,8 +1042,9 @@
               "inputs": {
                 "titleKey": "name",
                 "subtitleKey": "path",
-                "iconKey": "folder-outline",
+                "iconKey": "icon",
                 "badgeKey": "source_count",
+                "selectEventKey": "entry_type",
                 "emptyText": "No indexed folders.",
                 "emptyText_i18n": {
                   "key": "runtime.media_center.ui.no_indexed_folders"
@@ -999,17 +1052,27 @@
               },
               "actions": [
                 {
-                  "on": "select",
+                  "on": "select:folder",
                   "type": "updateState",
                   "params": {
-                    "playbackSourceType": "folder",
-                    "playbackSourceId": "$event.queue_ref",
+                    "mediaFolderParent": "$event.path",
+                    "mediaCursor": "",
                     "selectedMediaItemId": null,
                     "selectedMediaFavorite": false
                   }
                 },
                 {
-                  "on": "select",
+                  "on": "select:media",
+                  "type": "updateState",
+                  "params": {
+                    "playbackSourceType": "item",
+                    "playbackSourceId": "$event.id",
+                    "selectedMediaItemId": "$event.id",
+                    "selectedMediaFavorite": "$event.favorite"
+                  }
+                },
+                {
+                  "on": "select:media",
                   "type": "openModal",
                   "params": {
                     "modalId": "media_center_player"
