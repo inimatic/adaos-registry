@@ -68,6 +68,17 @@ skill `0.2.2`, library agent `0.6.21`, and Media Server `0.9.16` allocate new
 immutable package identities for the new Project source revision even though
 their runtime behavior is unchanged.
 
+The exact `0.6.46` release was subsequently rolled across both `.30` nodes by
+deployment revision `50` and operation
+`deploymentop.01M0MHYGHXNCXVRA772C4E2G5Z`. Exact-only topology definition v24
+and generation `22` report both stable instances ready with `partial=false`.
+Against 68,429 catalog rows and a 1.1 GiB coordinator database, compact status
+completed in 0.803 seconds and exact filename search in 0.165 seconds. Range
+playback remained `206 audio/mpeg`, the source witness was unchanged, and the
+agent continued to report external-reference storage with no copied media
+bytes. Android TV interaction and the one-hour browser soak remain separate
+acceptance gates.
+
 The `0.6.40` release added authoritative persisted playback toggles through the
 generic client `input.toggle` contract and explicit subscription-backed library
 collection states. `media_library_agent@0.6.19` publishes compact configuration
@@ -149,8 +160,8 @@ limit.
 The 2026-08-21 local server run passed that full gate for 3,600.063 seconds on
 20,000 items with 307,950 concurrent agent deltas, zero errors, 64.079 ms FTS
 p95, 39.02 MiB peak RSS, 0.793 MiB sustained RSS growth, and 13.533% aggregate
-CPU p95. Android TV, update-under-playback, and exact two-node `0.6.45`
-deployment evidence remain separate acceptance gates.
+CPU p95. Exact two-node deployment is now recorded through `0.6.46`; Android
+TV and update-under-playback evidence remain separate acceptance gates.
 
 When a complete topology-backed agent sync supersedes colocated compatibility
 mode, the coordinator retires unbound compatibility participation and marks its
