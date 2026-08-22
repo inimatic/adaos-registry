@@ -2,7 +2,7 @@
 
 `media_control_skill` is the persistent control plane for Media Center playback. It owns target registration, session identity, revisioned queues and commands, control leases, checkpoints, per-profile settings, and bounded QoE evidence. It never proxies media bytes.
 
-Version `0.2.3` is a provenance-only package revision for Project `0.6.47`;
+Version `0.2.4` is a provenance-only package revision for Project `0.6.48`;
 runtime behavior is unchanged from `0.2.2`.
 
 Controllers may live in a different webspace from the playback target. Commands are optimistic, idempotent, and lease-guarded. The endpoint pulls an ordered command stream and acknowledges application; stale controllers receive an explicit revision conflict. A phone therefore controls a TV without becoming part of the source-to-TV data path.

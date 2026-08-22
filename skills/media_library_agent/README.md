@@ -2,7 +2,7 @@
 
 `media_library_agent` is the node-local data-plane component of Media Center. It owns media roots, asynchronous filesystem discovery, reference registration, durable scan and rendition jobs, folder navigation, technical deep search, and ordered source deltas. It does not own the global catalog, grouping, personalization, playback sessions, or deployment policy.
 
-Version `0.6.22` is a provenance-only package revision for Project `0.6.47`;
+Version `0.6.23` is a provenance-only package revision for Project `0.6.48`;
 runtime behavior is unchanged from `0.6.21`.
 
 ## Storage boundary

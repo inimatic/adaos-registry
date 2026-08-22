@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.47` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.48` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -68,15 +68,19 @@ skill `0.2.2`, library agent `0.6.21`, and Media Server `0.9.16` allocate new
 immutable package identities for the new Project source revision even though
 their runtime behavior is unchanged.
 
-The `0.6.47` release separates high-rate metadata progress from catalog and
-personal projections. `media_center_skill@0.8.43` publishes bounded operation
+The `0.6.48` release separates high-rate metadata progress from catalog and
+personal projections. `media_center_skill@0.8.44` publishes bounded operation
 state through its own replayable stream, builds a full library snapshot only
 when enrichment settles, adds queue claim/recent indexes, recovers stale
 running jobs, and prunes terminal receipts in bounded batches. This removes
 the sustained full-home rebuild observed on the 68,000-item `.30` library.
-Scenario `0.6.11` consumes the new operation stream. Control skill `0.2.3`,
-library agent `0.6.22`, and Media Server `0.9.17` are provenance-only package
+Scenario `0.6.12` consumes the new operation stream. Control skill `0.2.4`,
+library agent `0.6.23`, and Media Server `0.9.18` are provenance-only package
 revisions for the release closure.
+
+`0.6.47` remained a local prepublication build. Its source revision changed
+when the final composition documentation was corrected, so immutable release
+admission rejected replacement and `0.6.48` received fresh package identities.
 
 The exact `0.6.46` release was subsequently rolled across both `.30` nodes by
 deployment revision `50` and operation

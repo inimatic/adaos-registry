@@ -1,6 +1,6 @@
 # Mediaserver Target Architecture
 
-Version `0.9.17` is a provenance-only package revision for Project `0.6.47`;
+Version `0.9.18` is a provenance-only package revision for Project `0.6.48`;
 runtime behavior is unchanged from `0.9.16`.
 
 Status: target contract and implementation checklist for the mediaserver stress
