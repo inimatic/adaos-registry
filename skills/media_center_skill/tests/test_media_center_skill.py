@@ -2281,7 +2281,7 @@ def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
         lambda catalog, **kwargs: published.append((catalog, kwargs)),
     )
 
-    main.on_library_snapshot_requested(
+    main.on_media_center_snapshot_requested(
         {
             "receiver": "media_center.library_state",
             "webspace_id": "television",
@@ -2299,6 +2299,26 @@ def test_library_snapshot_request_preserves_receiver_params(monkeypatch):
             },
         )
     ]
+
+
+def test_operation_snapshot_request_is_workspace_scoped(monkeypatch):
+    published = []
+    coordinator = object()
+    monkeypatch.setattr(main, "_coordinator", lambda repository=None: coordinator)
+    monkeypatch.setattr(
+        main,
+        "_publish_operation_snapshot",
+        lambda catalog, **kwargs: published.append((catalog, kwargs)),
+    )
+
+    main.on_media_center_snapshot_requested(
+        {
+            "receiver": "media_center.operation_state",
+            "webspace_id": "desktop",
+        }
+    )
+
+    assert published == [(coordinator, {"webspace_id": "desktop"})]
 
 
 def test_library_snapshot_publish_failure_is_observable(monkeypatch, tmp_path, caplog):
@@ -3236,6 +3256,105 @@ def test_enrichment_worker_coalesces_publication_and_exposes_pacing(
     assert len(published) == 1
     assert worker.work_interval_seconds == 0.25
     assert worker.publish_interval_seconds == 30
+
+
+def test_enrichment_worker_publishes_full_snapshot_only_when_queue_settles(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(_agent_page(_agent_delta(1, "Music/one.mp3")))
+    progress = []
+    settled = []
+    worker = MediaEnrichmentWorker(
+        catalog,
+        publish=lambda: progress.append("progress"),
+        publish_settled=lambda: settled.append("settled"),
+        poll_seconds=0.2,
+        work_interval_seconds=0.02,
+        publish_interval_seconds=300,
+    )
+
+    worker.ensure_started()
+    deadline = time.monotonic() + 5
+    while not settled and time.monotonic() < deadline:
+        time.sleep(0.02)
+    worker.dispose(timeout=2)
+
+    assert progress
+    assert settled == ["settled"]
+
+
+def test_background_job_indexes_recovery_and_exact_active_count(monkeypatch, tmp_path):
+    monkeypatch.setenv(
+        "MEDIA_CENTER_DB_PATH", str(tmp_path / "media_center.sqlite3")
+    )
+    catalog = MediaCatalogCoordinator(MediaCenterRepository())
+    catalog.apply_agent_page(
+        _agent_page(
+            _agent_delta(1, "Music/one.mp3"),
+            _agent_delta(2, "Music/two.mp3"),
+        )
+    )
+    first = catalog.claim_background_job()
+    second = catalog.claim_background_job()
+    assert first is not None and second is not None
+    with catalog.repository.connect() as connection:
+        connection.execute(
+            "UPDATE media_background_jobs SET updated_at='2000-01-01T00:00:00+00:00' "
+            "WHERE id IN (?, ?)",
+            (first["id"], second["id"]),
+        )
+        connection.execute(
+            "UPDATE media_background_jobs SET attempts=3 WHERE id=?",
+            (second["id"],),
+        )
+        connection.commit()
+
+    recovered = catalog.recover_stale_background_jobs(stale_seconds=60)
+    state = catalog.operation_state(limit=1)
+    with catalog.repository.connect() as connection:
+        indexes = {
+            str(row["name"])
+            for row in connection.execute(
+                "PRAGMA index_list(media_background_jobs)"
+            ).fetchall()
+        }
+        claim_plan = " ".join(
+            str(row["detail"])
+            for row in connection.execute(
+                """
+                EXPLAIN QUERY PLAN SELECT * FROM media_background_jobs
+                WHERE status='queued' AND attempts<3
+                ORDER BY priority,created_at LIMIT 1
+                """
+            ).fetchall()
+        )
+        recent_plan = " ".join(
+            str(row["detail"])
+            for row in connection.execute(
+                """
+                EXPLAIN QUERY PLAN SELECT * FROM media_background_jobs
+                ORDER BY updated_at DESC LIMIT 30
+                """
+            ).fetchall()
+        )
+
+    assert recovered == {
+        "ok": True,
+        "retried": 1,
+        "failed": 1,
+        "stale_seconds": 60.0,
+    }
+    assert state["active_count"] == state["counts"]["queued"]
+    assert {
+        "idx_media_center_background_claim",
+        "idx_media_center_background_recent",
+    } <= indexes
+    assert "idx_media_center_background_claim" in claim_plan
+    assert "idx_media_center_background_recent" in recent_plan
 
 
 def test_library_stream_snapshot_is_compact(monkeypatch, tmp_path):

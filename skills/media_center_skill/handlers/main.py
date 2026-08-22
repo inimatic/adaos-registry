@@ -72,7 +72,8 @@ def _enrichment_runtime(
         path,
         lambda: MediaEnrichmentWorker(
             coordinator,
-            publish=lambda: _publish_library_snapshot(coordinator),
+            publish=lambda: _publish_operation_snapshot(coordinator),
+            publish_settled=lambda: _publish_library_snapshot(coordinator),
         ),
     )
 
@@ -212,7 +213,6 @@ def _publish_library_snapshot(
             "participation": catalog.participation(),
             "collection_state": collection_state,
             "home": home,
-            "operations": catalog.operations(limit=10),
             "agent_sync": agent_sync,
         }
         stream_variable_publish(
@@ -241,6 +241,33 @@ def _publish_library_snapshot(
             "library snapshot publish failed profile=%s shared_surface=%s webspace=%s",
             str(profile_id or "default"),
             bool(shared_surface),
+            str(webspace_id or "default"),
+        )
+        return False
+
+
+def _publish_operation_snapshot(
+    catalog: MediaCatalogCoordinator,
+    *,
+    webspace_id: str = "",
+) -> bool:
+    try:
+        from adaos.sdk.io import stream_variable_publish
+
+        snapshot = catalog.operation_state(limit=30)
+        stream_variable_publish(
+            "media_center.operation_state",
+            snapshot,
+            var_id="media_center.operations",
+            ttl_ms=120000,
+            _meta={
+                **({"webspace_id": webspace_id} if webspace_id else {}),
+            },
+        )
+        return True
+    except Exception:
+        _log.exception(
+            "operation snapshot publish failed webspace=%s",
             str(webspace_id or "default"),
         )
         return False
@@ -741,15 +768,23 @@ def on_sys_ready(_: Any) -> None:
     _agent_sync_runtime(catalog).ensure_started()
     _enrichment_runtime(catalog).ensure_started()
     _publish_library_snapshot(catalog)
+    _publish_operation_snapshot(catalog)
 
 
 @subscribe(
     "webio.stream.snapshot.requested",
-    receivers=("media_center.library_state",),
+    receivers=("media_center.library_state", "media_center.operation_state"),
 )
-def on_library_snapshot_requested(event: Any) -> None:
+def on_media_center_snapshot_requested(event: Any) -> None:
     payload = _event_payload(event)
-    if str(payload.get("receiver") or "") != "media_center.library_state":
+    receiver = str(payload.get("receiver") or "")
+    if receiver == "media_center.operation_state":
+        _publish_operation_snapshot(
+            _coordinator(),
+            webspace_id=str(payload.get("webspace_id") or ""),
+        )
+        return
+    if receiver != "media_center.library_state":
         return
     params = payload.get("params")
     receiver_params = dict(params) if isinstance(params, Mapping) else {}
@@ -2666,9 +2701,8 @@ def queue_background_job(kind: str = "", subject_ref: str = "", priority: int = 
     result = catalog.queue_background_job(kind, subject_ref, priority=priority)
     if result.get("ok"):
         _enrichment_runtime(catalog).ensure_started()
-        _publish_library_snapshot(
+        _publish_operation_snapshot(
             catalog,
-            profile_id=str(_.get("profile_id") or "default"),
             webspace_id=str(_.get("webspace_id") or ""),
         )
     return result

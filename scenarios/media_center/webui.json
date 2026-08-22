@@ -1881,17 +1881,9 @@
                 "area": "main",
                 "title": "Metadata operations",
                 "dataSource": {
-                  "kind": "skill",
-                  "name": "media_center_skill.operations",
-                  "params": {
-                    "limit": 30
-                  },
-                  "cacheTtlMs": 1000,
-                  "invalidationTags": [
-                    "media_center.operations"
-                  ],
-                  "preserveLastValue": true,
-                  "maxRequestHz": 1
+                  "kind": "stream",
+                  "receiver": "media_center.operation_state",
+                  "scope": "workspace"
                 },
                 "inputs": {
                   "itemKey": "id",

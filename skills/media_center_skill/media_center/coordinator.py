@@ -6,6 +6,7 @@ import json
 import os
 import re
 import sqlite3
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -26,7 +27,7 @@ from .discovery import discovery_score, fold_text
 
 
 COORDINATOR_SCHEMA = "adaos.media_center.coordinator.v2"
-COORDINATOR_SCHEMA_REVISION = "2026-08-21.11"
+COORDINATOR_SCHEMA_REVISION = "2026-08-22.12"
 SEARCH_ROWID_REVISION = "1"
 AUDIO_CONTEXT_IDENTITY_REVISION = "1"
 CATALOG_ITEM_SCHEMA = "adaos.media_center.media_source.v1"
@@ -439,6 +440,14 @@ class MediaCatalogCoordinator:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_media_center_background_subject "
                 "ON media_background_jobs(subject_ref,kind,status,updated_at DESC,id)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_media_center_background_claim "
+                "ON media_background_jobs(status,attempts,priority,created_at,id)"
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_media_center_background_recent "
+                "ON media_background_jobs(updated_at DESC,id DESC)"
             )
             alias_columns = {
                 str(row["name"])
@@ -3938,12 +3947,10 @@ class MediaCatalogCoordinator:
 
         summary = self.repository.summary()
         available_count = int(summary.get("available_count") or 0)
-        background = self.operations(limit=100)
+        background_counts = self.background_job_counts()
         coordinator_active = sum(
-            1
-            for item in background.get("items") or []
-            if str(item.get("status") or "").lower()
-            in {"queued", "running", "waiting_resources", "canceling"}
+            background_counts.get(status, 0)
+            for status in ("queued", "running", "waiting_resources", "canceling")
         )
         agent_active = sum(
             _stored_observed_count(item.get("active_job_count"))
@@ -4045,6 +4052,78 @@ class MediaCatalogCoordinator:
                 (str(row["id"]),),
             ).fetchone()
         return dict(claimed) if claimed else None
+
+    def recover_stale_background_jobs(
+        self, *, stale_seconds: float = 900.0
+    ) -> dict[str, Any]:
+        bounded = max(60.0, min(float(stale_seconds), 86400.0))
+        cutoff = (
+            datetime.now(timezone.utc) - timedelta(seconds=bounded)
+        ).isoformat()
+        now = now_iso()
+        with self.repository.connect() as connection:
+            retried = connection.execute(
+                """
+                UPDATE media_background_jobs
+                SET status='queued', error_code='background_worker_interrupted',
+                    progress_json=?, started_at='', finished_at='', updated_at=?
+                WHERE status='running' AND updated_at<? AND attempts<3
+                """,
+                (
+                    _json_dumps(
+                        {"phase": "retry", "completed": 0, "total": 1}
+                    ),
+                    now,
+                    cutoff,
+                ),
+            ).rowcount
+            failed = connection.execute(
+                """
+                UPDATE media_background_jobs
+                SET status='failed', error_code='background_worker_interrupted',
+                    progress_json=?, finished_at=?, updated_at=?
+                WHERE status='running' AND updated_at<? AND attempts>=3
+                """,
+                (
+                    _json_dumps(
+                        {"phase": "failed", "completed": 0, "total": 1}
+                    ),
+                    now,
+                    now,
+                    cutoff,
+                ),
+            ).rowcount
+            connection.commit()
+        return {
+            "ok": True,
+            "retried": int(retried),
+            "failed": int(failed),
+            "stale_seconds": bounded,
+        }
+
+    def prune_terminal_background_jobs(
+        self, *, retain: int = 10000, batch_size: int = 5000
+    ) -> dict[str, Any]:
+        retained = max(1000, min(int(retain), 100000))
+        bounded_batch = max(1, min(int(batch_size), 5000))
+        with self.repository.connect() as connection:
+            removed = connection.execute(
+                """
+                DELETE FROM media_background_jobs WHERE id IN (
+                    SELECT id FROM media_background_jobs
+                    WHERE status IN ('completed','failed','canceled')
+                    ORDER BY updated_at DESC,id DESC LIMIT ? OFFSET ?
+                )
+                """,
+                (bounded_batch, retained),
+            ).rowcount
+            connection.commit()
+        return {
+            "ok": True,
+            "removed": int(removed),
+            "retained": retained,
+            "batch_size": bounded_batch,
+        }
 
     def finish_background_job(
         self,
@@ -4203,6 +4282,31 @@ class MediaCatalogCoordinator:
         with self.repository.connect() as connection:
             rows = connection.execute("SELECT * FROM media_background_jobs ORDER BY updated_at DESC LIMIT ?", (bounded,)).fetchall()
         return {"ok": True, "schema": COORDINATOR_SCHEMA, "items": [dict(row) | {"progress": _json_loads(row["progress_json"]) or {}} for row in rows], "count": len(rows)}
+
+    def background_job_counts(self) -> dict[str, int]:
+        with self.repository.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT status,COUNT(*) AS count FROM media_background_jobs
+                GROUP BY status
+                """
+            ).fetchall()
+        return {str(row["status"]): int(row["count"]) for row in rows}
+
+    def operation_state(self, *, limit: int = 30) -> dict[str, Any]:
+        operations = self.operations(limit=limit)
+        counts = self.background_job_counts()
+        active_count = sum(
+            counts.get(status, 0)
+            for status in ("queued", "running", "waiting_resources", "canceling")
+        )
+        return {
+            **operations,
+            "schema": "adaos.media_center.operation_state.v1",
+            "counts": counts,
+            "active_count": active_count,
+            "updated_at": now_iso(),
+        }
 
     def diagnostics(self) -> dict[str, Any]:
         with self.repository.connect() as connection:

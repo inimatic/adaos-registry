@@ -154,14 +154,17 @@ class MediaEnrichmentWorker:
         coordinator: MediaCatalogCoordinator,
         *,
         providers: tuple[MetadataProvider, ...] | None = None,
-        publish: Callable[[], None] | None = None,
+        publish: Callable[[], Any] | None = None,
+        publish_settled: Callable[[], Any] | None = None,
         poll_seconds: float = 2.0,
-        work_interval_seconds: float = 0.1,
-        publish_interval_seconds: float = 10.0,
+        work_interval_seconds: float = 0.2,
+        publish_interval_seconds: float = 2.0,
+        maintenance_interval_jobs: int = 1000,
     ):
         self.coordinator = coordinator
         self.providers = providers or (DeterministicLocalProvider(),)
         self.publish = publish
+        self.publish_settled = publish_settled
         self.poll_seconds = max(0.2, min(float(poll_seconds), 30.0))
         self.work_interval_seconds = max(
             0.02, min(float(work_interval_seconds), 5.0)
@@ -169,7 +172,12 @@ class MediaEnrichmentWorker:
         self.publish_interval_seconds = max(
             1.0, min(float(publish_interval_seconds), 300.0)
         )
+        self.maintenance_interval_jobs = max(
+            100, min(int(maintenance_interval_jobs), 10000)
+        )
         self._last_publish_monotonic = 0.0
+        self._completed_since_maintenance = 0
+        self._worked_since_idle = False
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
@@ -181,6 +189,8 @@ class MediaEnrichmentWorker:
                 self._wake.set()
                 return False
             self._stop.clear()
+            self.coordinator.recover_stale_background_jobs()
+            self.coordinator.prune_terminal_background_jobs()
             self._thread = threading.Thread(
                 target=self._loop,
                 name="media-center-enrichment",
@@ -207,6 +217,7 @@ class MediaEnrichmentWorker:
         job = self.coordinator.claim_background_job()
         if job is None:
             return None
+        self._worked_since_idle = True
         job_id = str(job["id"])
         kind = str(job["kind"])
         subject = self.coordinator.enrichment_subject(str(job["subject_ref"]))
@@ -245,6 +256,12 @@ class MediaEnrichmentWorker:
             result = self.coordinator.fail_background_job(
                 job_id, error_code="enrichment_provider_failed", retryable=True
             )
+        self._completed_since_maintenance += 1
+        if self._completed_since_maintenance >= self.maintenance_interval_jobs:
+            try:
+                self.coordinator.prune_terminal_background_jobs()
+            finally:
+                self._completed_since_maintenance = 0
         publish_at = time.monotonic()
         if self.publish and (
             self._last_publish_monotonic == 0.0
@@ -262,6 +279,20 @@ class MediaEnrichmentWorker:
         while not self._stop.is_set():
             result = self.run_once()
             if result is None:
+                if self._worked_since_idle:
+                    if self.publish:
+                        try:
+                            self.publish()
+                        except Exception:
+                            pass
+                    settled_published = True
+                    if self.publish_settled:
+                        try:
+                            settled_published = self.publish_settled() is not False
+                        except Exception:
+                            settled_published = False
+                    if settled_published:
+                        self._worked_since_idle = False
                 self._wake.wait(self.poll_seconds)
                 self._wake.clear()
             else:
