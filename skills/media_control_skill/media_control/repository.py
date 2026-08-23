@@ -1179,21 +1179,52 @@ class MediaControlRepository:
 
     def now_playing(self, *, profile_id: str = "", target_id: str = "", limit: int = 20) -> dict[str, Any]:
         self.apply_due_sleep_timers()
-        filters = ["state NOT IN ('stopped','ended')"]
+        filters = ["s.state NOT IN ('stopped','ended')"]
         params: list[Any] = []
         if text(profile_id):
-            filters.append("profile_id=?")
+            filters.append("s.profile_id=?")
             params.append(text(profile_id))
         if text(target_id):
             target = self.get_target(target_id)
             if target is None:
                 return {"ok": False, "error": "playback_target_not_found"}
-            filters.append("target_id=?")
+            filters.append("s.target_id=?")
             params.append(target["id"])
         params.append(max(1, min(50, int(limit or 20))))
         with self.connect() as connection:
-            rows = connection.execute(f"SELECT * FROM playback_sessions WHERE {' AND '.join(filters)} ORDER BY updated_at DESC LIMIT ?", tuple(params)).fetchall()
-        items = [self._public_session(row) for row in rows]
+            rows = connection.execute(
+                f"""
+                SELECT s.*,
+                       t.label AS target_label,
+                       t.kind AS target_kind,
+                       q.title AS active_title,
+                       q.descriptor_json AS active_descriptor_json
+                FROM playback_sessions AS s
+                LEFT JOIN playback_targets AS t ON t.id=s.target_id
+                LEFT JOIN playback_queue_items AS q
+                  ON q.session_id=s.id AND q.ordinal=s.active_queue_index
+                WHERE {' AND '.join(filters)}
+                ORDER BY s.updated_at DESC
+                LIMIT ?
+                """,
+                tuple(params),
+            ).fetchall()
+        items = []
+        for row in rows:
+            item = self._public_session(row)
+            descriptor = loads(row["active_descriptor_json"], {})
+            item.update(
+                {
+                    "title": text(row["active_title"]) or item["active_item_id"],
+                    "media_kind": text(
+                        descriptor.get("media_kind") or descriptor.get("kind")
+                    ),
+                    "artwork": dict(descriptor.get("artwork") or {}),
+                    "target_label": text(row["target_label"]) or item["target_id"],
+                    "target_kind": text(row["target_kind"]),
+                }
+            )
+            items.append(item)
         return {"ok": True, "schema": SCHEMA_VERSION, "items": items, "count": len(items), "updated_at": now_iso()}
 
     def diagnostics(self) -> dict[str, Any]:

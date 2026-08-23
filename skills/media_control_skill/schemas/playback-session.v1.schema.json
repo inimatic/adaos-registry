@@ -13,6 +13,8 @@
     "endpoint_observation_revision": {"type": "integer", "minimum": 0}, "endpoint_last_seen_at": {"type": "string"},
     "endpoint_state": {"type": "object"}, "sleep_timer_at": {"type": "number", "minimum": 0}, "control_lease": {"type": "object"},
     "interruption": {"type": "object"}, "checkpoint_at": {"type": "string"}, "created_at": {"type": "string"}, "updated_at": {"type": "string"},
-    "revision": {"type": "integer", "minimum": 1}, "queue": {"type": "object"}, "target": {"type": ["object", "null"]}
+    "revision": {"type": "integer", "minimum": 1}, "queue": {"type": "object"}, "target": {"type": ["object", "null"]},
+    "title": {"type": "string"}, "media_kind": {"type": "string"}, "artwork": {"type": "object"},
+    "target_label": {"type": "string"}, "target_kind": {"type": "string"}
   }, "additionalProperties": false
 }

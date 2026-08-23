@@ -4,5 +4,16 @@
   "runtime.media_control.error.playback_revision_conflict": "Playback changed on another controller. Refresh and retry.",
   "runtime.media_control.error.playback_queue_revision_conflict": "The queue changed on another controller. Refresh and retry.",
   "runtime.media_control.error.playback_control_lease_conflict": "Another controller currently owns this playback session.",
-  "runtime.media_control.error.no_active_playback": "There is no active playback session."
+  "runtime.media_control.error.no_active_playback": "There is no active playback session.",
+  "runtime.media_control.ui.media_remote": "Media Remote",
+  "runtime.media_control.ui.control_active_playback": "Control active playback",
+  "runtime.media_control.ui.remote": "Remote",
+  "runtime.media_control.ui.control_device": "Control device",
+  "runtime.media_control.ui.now_playing": "Now Playing",
+  "runtime.media_control.ui.playback": "Playback",
+  "runtime.media_control.ui.previous": "Previous",
+  "runtime.media_control.ui.play": "Play",
+  "runtime.media_control.ui.pause": "Pause",
+  "runtime.media_control.ui.next": "Next",
+  "runtime.media_control.ui.stop": "Stop"
 }

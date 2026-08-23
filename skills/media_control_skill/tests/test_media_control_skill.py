@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -73,6 +74,22 @@ def test_session_queue_is_persistent_and_server_paged():
     assert page["queue"]["total_count"] == 12
     assert page["queue"]["pagination"]["has_more"] is False
     assert page["queue"]["pagination"]["limit"] == 30
+
+
+def test_now_playing_exposes_human_titles_and_target_labels():
+    repository = MediaControlRepository()
+    session = _session(repository)
+
+    projection = repository.now_playing(
+        profile_id="alice",
+        target_id=session["target_id"],
+        limit=1,
+    )
+
+    assert projection["count"] == 1
+    assert projection["items"][0]["title"] == "Episode 0"
+    assert projection["items"][0]["target_label"] == "Living room TV"
+    assert projection["items"][0]["target_kind"] == "tv"
 
 
 def test_endpoint_open_retires_previous_session_and_scopes_command_pull():
@@ -486,6 +503,29 @@ def test_declared_stream_subscriptions_have_runtime_handlers():
     assert '@subscribe("sys.ready")' in source
     assert '"webio.stream.snapshot.requested"' in source
     assert 'receivers=("media_control.now_playing",)' in source
+
+
+def test_media_remote_surfaces_are_owned_by_media_control_skill():
+    webui = json.loads((SKILL_ROOT / "webui.json").read_text(encoding="utf-8"))
+
+    assert webui["resources"]["media_control.i18n.en"]["path"] == "i18n/en.json"
+    assert webui["resources"]["media_control.i18n.ru"]["path"] == "i18n/ru.json"
+    assert webui["apps"][0]["id"] == "media_remote_app"
+    assert webui["widgets"][0]["id"] == "media_remote_compact"
+    assert {
+        (item["extensionPoint"], item["id"])
+        for item in webui["contributions"]
+    } == {
+        ("desktop.apps", "media_remote_app"),
+        ("desktop.widgets", "media_remote_compact"),
+    }
+    modal = webui["registry"]["modals"]["media_control_remote_modal"]
+    widgets = {item["id"]: item for item in modal["schema"]["widgets"]}
+    assert widgets["media-control-target"]["type"] == "input.selector"
+    assert widgets["media-control-now-playing"]["inputs"]["titleKey"] == "title"
+    assert widgets["media-control-transport"]["actions"][1]["target"] == (
+        "media_control_skill.voice_command"
+    )
 
 
 def test_media_control_runtime_uses_only_public_adaos_sdk() -> None:

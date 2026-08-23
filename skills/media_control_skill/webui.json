@@ -1,0 +1,424 @@
+{
+  "$schema": "../../../../src/adaos/abi/webui.v1.schema.json",
+  "resources": {
+    "media_control.i18n.en": {
+      "kind": "data",
+      "role": "i18n",
+      "locale": "en",
+      "path": "i18n/en.json",
+      "mime": "application/json",
+      "delivery": "core"
+    },
+    "media_control.i18n.ru": {
+      "kind": "data",
+      "role": "i18n",
+      "locale": "ru",
+      "path": "i18n/ru.json",
+      "mime": "application/json",
+      "delivery": "core"
+    }
+  },
+  "apps": [
+    {
+      "id": "media_remote_app",
+      "title": "Media Remote",
+      "subtitle": "Control active playback",
+      "icon": "phone-portrait-outline",
+      "launchModal": "media_control_remote_modal",
+      "action": {
+        "navigate": "media_control_skill.remote"
+      },
+      "title_i18n": {
+        "key": "runtime.media_control.ui.media_remote"
+      },
+      "subtitle_i18n": {
+        "key": "runtime.media_control.ui.control_active_playback"
+      }
+    }
+  ],
+  "widgets": [
+    {
+      "id": "media_remote_compact",
+      "type": "ui.actions",
+      "title": "Media Remote",
+      "icon": "phone-portrait-outline",
+      "inputs": {
+        "variant": "toolbar",
+        "size": "small",
+        "buttons": [
+          {
+            "id": "open",
+            "icon": "phone-portrait-outline",
+            "label": "Remote",
+            "label_i18n": {
+              "key": "runtime.media_control.ui.remote"
+            }
+          },
+          {
+            "id": "previous",
+            "icon": "play-skip-back-outline",
+            "label": "Previous",
+            "label_i18n": {
+              "key": "runtime.media_control.ui.previous"
+            }
+          },
+          {
+            "id": "play",
+            "icon": "play-outline",
+            "label": "Play",
+            "label_i18n": {
+              "key": "runtime.media_control.ui.play"
+            }
+          },
+          {
+            "id": "pause",
+            "icon": "pause-outline",
+            "label": "Pause",
+            "label_i18n": {
+              "key": "runtime.media_control.ui.pause"
+            }
+          },
+          {
+            "id": "next",
+            "icon": "play-skip-forward-outline",
+            "label": "Next",
+            "label_i18n": {
+              "key": "runtime.media_control.ui.next"
+            }
+          }
+        ]
+      },
+      "actions": [
+        {
+          "on": "click:open",
+          "type": "navigate",
+          "params": {
+            "to": "media_control_skill.remote",
+            "surface": "modal",
+            "modalId": "media_control_remote_modal"
+          }
+        },
+        {
+          "on": "click:previous",
+          "type": "callSkill",
+          "target": "media_control_skill.voice_command",
+          "params": {
+            "action": "previous",
+            "profile_id": "default"
+          },
+          "invalidates": [
+            "media_control.sessions"
+          ]
+        },
+        {
+          "on": "click:play",
+          "type": "callSkill",
+          "target": "media_control_skill.voice_command",
+          "params": {
+            "action": "play",
+            "profile_id": "default"
+          },
+          "invalidates": [
+            "media_control.sessions"
+          ]
+        },
+        {
+          "on": "click:pause",
+          "type": "callSkill",
+          "target": "media_control_skill.voice_command",
+          "params": {
+            "action": "pause",
+            "profile_id": "default"
+          },
+          "invalidates": [
+            "media_control.sessions"
+          ]
+        },
+        {
+          "on": "click:next",
+          "type": "callSkill",
+          "target": "media_control_skill.voice_command",
+          "params": {
+            "action": "next",
+            "profile_id": "default"
+          },
+          "invalidates": [
+            "media_control.sessions"
+          ]
+        }
+      ],
+      "title_i18n": {
+        "key": "runtime.media_control.ui.media_remote"
+      }
+    }
+  ],
+  "registry": {
+    "modals": {
+      "media_control_remote_modal": {
+        "title": "Media Remote",
+        "schema": {
+          "id": "media_control_remote_modal",
+          "title": "Media Remote",
+          "layout": {
+            "type": "single",
+            "pattern": "stack",
+            "areas": [
+              {
+                "id": "main",
+                "role": "main"
+              }
+            ]
+          },
+          "widgets": [
+            {
+              "id": "media-control-target",
+              "type": "input.selector",
+              "area": "main",
+              "title": "Control device",
+              "dataSource": {
+                "kind": "skill",
+                "name": "media_control_skill.list_targets",
+                "params": {
+                  "limit": 50
+                },
+                "cacheTtlMs": 1000,
+                "invalidationTags": [
+                  "media_control.targets"
+                ],
+                "preserveLastValue": true,
+                "maxRequestHz": 1
+              },
+              "inputs": {
+                "value": "$state.mediaControlTargetId",
+                "optionLabelPath": "label",
+                "optionValuePath": "id",
+                "optionMetaPaths": [
+                  "kind",
+                  "status"
+                ],
+                "searchable": false,
+                "placeholder": "Choose a playback device"
+              },
+              "actions": [
+                {
+                  "on": "change",
+                  "type": "updateState",
+                  "params": {
+                    "mediaControlTargetId": "$event.value"
+                  }
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_control.ui.control_device"
+              }
+            },
+            {
+              "id": "media-control-now-playing",
+              "type": "ui.list",
+              "area": "main",
+              "title": "Now Playing",
+              "dataSource": {
+                "kind": "stream",
+                "receiver": "media_control.now_playing",
+                "params": {
+                  "profile_id": "default",
+                  "target_id": "$state.mediaControlTargetId"
+                },
+                "scope": "workspace",
+                "invalidationTags": [
+                  "media_control.sessions"
+                ]
+              },
+              "collection": {
+                "display": "list",
+                "virtualized": true,
+                "cursor": {
+                  "enabled": false,
+                  "stateKey": "mediaControlCursor"
+                }
+              },
+              "inputs": {
+                "titleKey": "title",
+                "subtitleKey": "target_label",
+                "badgeKey": "state",
+                "imageKey": "artwork.url",
+                "emptyText": "Nothing is playing on this device."
+              },
+              "title_i18n": {
+                "key": "runtime.media_control.ui.now_playing"
+              }
+            },
+            {
+              "id": "media-control-transport",
+              "type": "ui.actions",
+              "area": "main",
+              "title": "Playback",
+              "inputs": {
+                "variant": "toolbar",
+                "size": "small",
+                "buttons": [
+                  {
+                    "id": "previous",
+                    "icon": "play-skip-back-outline",
+                    "label": "Previous",
+                    "label_i18n": {
+                      "key": "runtime.media_control.ui.previous"
+                    }
+                  },
+                  {
+                    "id": "play",
+                    "icon": "play-outline",
+                    "label": "Play",
+                    "label_i18n": {
+                      "key": "runtime.media_control.ui.play"
+                    }
+                  },
+                  {
+                    "id": "pause",
+                    "icon": "pause-outline",
+                    "label": "Pause",
+                    "label_i18n": {
+                      "key": "runtime.media_control.ui.pause"
+                    }
+                  },
+                  {
+                    "id": "next",
+                    "icon": "play-skip-forward-outline",
+                    "label": "Next",
+                    "label_i18n": {
+                      "key": "runtime.media_control.ui.next"
+                    }
+                  },
+                  {
+                    "id": "stop",
+                    "icon": "stop-outline",
+                    "label": "Stop",
+                    "label_i18n": {
+                      "key": "runtime.media_control.ui.stop"
+                    }
+                  }
+                ]
+              },
+              "actions": [
+                {
+                  "on": "click:previous",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "previous",
+                    "profile_id": "default",
+                    "target_id": "$state.mediaControlTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:play",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "play",
+                    "profile_id": "default",
+                    "target_id": "$state.mediaControlTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:pause",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "pause",
+                    "profile_id": "default",
+                    "target_id": "$state.mediaControlTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:next",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "next",
+                    "profile_id": "default",
+                    "target_id": "$state.mediaControlTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                },
+                {
+                  "on": "click:stop",
+                  "type": "callSkill",
+                  "target": "media_control_skill.voice_command",
+                  "params": {
+                    "action": "stop",
+                    "profile_id": "default",
+                    "target_id": "$state.mediaControlTargetId"
+                  },
+                  "invalidates": [
+                    "media_control.sessions"
+                  ]
+                }
+              ],
+              "title_i18n": {
+                "key": "runtime.media_control.ui.playback"
+              }
+            }
+          ],
+          "interface": {
+            "schema": "adaos.ui.modal.interface.v1",
+            "routes": {
+              "remote": {
+                "view": "media_control_skill.remote"
+              }
+            },
+            "defaultRoute": "remote"
+          },
+          "title_i18n": {
+            "key": "runtime.media_control.ui.media_remote"
+          }
+        },
+        "implements": [
+          "media_control_skill.remote"
+        ],
+        "title_i18n": {
+          "key": "runtime.media_control.ui.media_remote"
+        }
+      }
+    },
+    "widgets": {}
+  },
+  "contributions": [
+    {
+      "extensionPoint": "desktop.apps",
+      "type": "app",
+      "id": "media_remote_app",
+      "autoInstall": true
+    },
+    {
+      "extensionPoint": "desktop.widgets",
+      "type": "widget",
+      "id": "media_remote_compact",
+      "autoInstall": true
+    }
+  ],
+  "interface": {
+    "schema": "adaos.ui.skill_interface.v1",
+    "views": {
+      "media_control_skill.remote": {
+        "title": "Media Remote",
+        "surfaces": [
+          "modal"
+        ],
+        "params": {}
+      }
+    },
+    "defaultView": "media_control_skill.remote"
+  }
+}

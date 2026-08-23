@@ -4,5 +4,16 @@
   "runtime.media_control.error.playback_revision_conflict": "Воспроизведение изменено с другого пульта. Обновите состояние и повторите.",
   "runtime.media_control.error.playback_queue_revision_conflict": "Очередь изменена с другого пульта. Обновите состояние и повторите.",
   "runtime.media_control.error.playback_control_lease_conflict": "Сейчас этой сессией управляет другой пульт.",
-  "runtime.media_control.error.no_active_playback": "Активная сессия воспроизведения отсутствует."
+  "runtime.media_control.error.no_active_playback": "Активная сессия воспроизведения отсутствует.",
+  "runtime.media_control.ui.media_remote": "Медиапульт",
+  "runtime.media_control.ui.control_active_playback": "Управление текущим воспроизведением",
+  "runtime.media_control.ui.remote": "Пульт",
+  "runtime.media_control.ui.control_device": "Устройство управления",
+  "runtime.media_control.ui.now_playing": "Сейчас играет",
+  "runtime.media_control.ui.playback": "Воспроизведение",
+  "runtime.media_control.ui.previous": "Назад",
+  "runtime.media_control.ui.play": "Воспроизвести",
+  "runtime.media_control.ui.pause": "Пауза",
+  "runtime.media_control.ui.next": "Далее",
+  "runtime.media_control.ui.stop": "Стоп"
 }

@@ -115,5 +115,11 @@
   "runtime.media_center.ui.your_media_folders_are_being_indexed": "Медиапапки индексируются.",
   "runtime.media_center.ui.no_playable_media_was_found_in_the_configured_folders": "В настроенных папках нет воспроизводимых медиафайлов.",
   "runtime.media_center.ui.library_state_is_temporarily_unavailable": "Состояние медиатеки временно недоступно.",
-  "runtime.media_center.ui.artwork_operation": "Обработка обложки"
+  "runtime.media_center.ui.artwork_operation": "Обработка обложки",
+  "runtime.media_center.ui.control_device": "Устройство управления",
+  "runtime.media_center.ui.choose_a_playback_device": "Выберите устройство воспроизведения",
+  "runtime.media_center.ui.nothing_is_playing_on_this_device": "На этом устройстве ничего не воспроизводится.",
+  "runtime.media_center.ui.metadata_activity": "Обработка метаданных",
+  "runtime.media_center.ui.background_operations": "Фоновые операции",
+  "runtime.media_center.ui.artwork_generation": "Создание обложек"
 }

@@ -1328,8 +1328,9 @@ data_routes:
   guard_visibility: sanitized operation phases and machine error codes
   budget: {max_payload_bytes: 262144, max_publish_hz: 1, max_items: 30, snapshot_policy: on_subscribe}
   read_policy:
-    mode: subscription
-    triggers: [mount, stream_update]
+    mode: live
+    triggers: [mount, reconnect]
+    max_request_hz: 1
     preserve_last_value: true
 - surface: widget:media-center-diagnostics
   route: tool/details

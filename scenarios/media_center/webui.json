@@ -771,6 +771,7 @@
                 "subtitleKey": "media_kind",
                 "imageKey": "artwork.url",
                 "badgeKey": "quality.height",
+                "selectEventKey": "queue_source_type",
                 "groupBy": "shelf_id",
                 "groupTitleKey": "shelf_title",
                 "groupDisplay": "sections",
@@ -806,22 +807,68 @@
               },
               "actions": [
                 {
-                  "on": "select",
-                  "type": "updateState",
-                  "params": {
-                    "playbackSourceType": "$event.queue_source_type",
-                    "playbackSourceId": "$event.queue_source_id",
-                    "selectedMediaItemId": "$event.id",
-                    "selectedMediaFavorite": "$event.favorite"
-                  }
-                },
-                {
-                  "on": "select",
-                  "type": "openModal",
-                  "params": {
-                    "modalId": "media_center_player"
-                  }
+                "on": "select:folder",
+                "type": "updateState",
+                "params": {
+                  "mediaNavigation": "folders",
+                  "mediaSection": "folders",
+                  "mediaFolderParent": "$event.path",
+                  "mediaCursor": "",
+                  "selectedMediaItemId": null,
+                  "selectedMediaFavorite": false
                 }
+              },
+              {
+                "on": "select:item",
+                "type": "updateState",
+                "params": {
+                  "playbackSourceType": "$event.queue_source_type",
+                  "playbackSourceId": "$event.queue_source_id",
+                  "selectedMediaItemId": "$event.id",
+                  "selectedMediaFavorite": "$event.favorite"
+                }
+              },
+              {
+                "on": "select:item",
+                "type": "openModal",
+                "params": {
+                  "modalId": "media_center_player"
+                }
+              },
+              {
+                "on": "select:collection",
+                "type": "updateState",
+                "params": {
+                  "playbackSourceType": "$event.queue_source_type",
+                  "playbackSourceId": "$event.queue_source_id",
+                  "selectedMediaItemId": "$event.id",
+                  "selectedMediaFavorite": "$event.favorite"
+                }
+              },
+              {
+                "on": "select:collection",
+                "type": "openModal",
+                "params": {
+                  "modalId": "media_center_player"
+                }
+              },
+              {
+                "on": "select:playlist",
+                "type": "updateState",
+                "params": {
+                  "playbackSourceType": "$event.queue_source_type",
+                  "playbackSourceId": "$event.queue_source_id",
+                  "selectedMediaItemId": "$event.id",
+                  "selectedMediaFavorite": "$event.favorite"
+                }
+              },
+              {
+                "on": "select:playlist",
+                "type": "openModal",
+                "params": {
+                  "modalId": "media_center_player"
+                }
+              }
               ],
               "title_i18n": {
                 "key": "runtime.media_center.ui.home"
@@ -1347,9 +1394,9 @@
             "widgets": [
               {
                 "id": "media-targets",
-                "type": "ui.list",
+                "type": "input.selector",
                 "area": "main",
-                "title": "Playback target",
+                "title": "Control device",
                 "dataSource": {
                   "kind": "skill",
                   "name": "media_control_skill.list_targets",
@@ -1363,19 +1410,19 @@
                   "preserveLastValue": true,
                   "maxRequestHz": 1
                 },
-                "collection": {
-                  "display": "list",
-                  "focusGroup": "media-targets",
-                  "virtualized": true,
-                  "cursor": {
-                    "enabled": false,
-                    "stateKey": "mediaCursor"
-                  }
-                },
                 "inputs": {
-                  "titleKey": "label",
-                  "subtitleKey": "kind",
-                  "badgeKey": "status",
+                  "value": "$state.selectedPlaybackTargetId",
+                  "optionLabelPath": "label",
+                  "optionValuePath": "id",
+                  "optionMetaPaths": [
+                    "kind",
+                    "status"
+                  ],
+                  "searchable": false,
+                  "placeholder": "Choose a playback device",
+                  "placeholder_i18n": {
+                    "key": "runtime.media_center.ui.choose_a_playback_device"
+                  },
                   "emptyText": "No playback targets are online.",
                   "emptyText_i18n": {
                     "key": "runtime.media_center.ui.no_playback_targets_are_online"
@@ -1383,15 +1430,54 @@
                 },
                 "actions": [
                   {
-                    "on": "select",
+                    "on": "change",
                     "type": "updateState",
                     "params": {
-                      "selectedPlaybackTargetId": "$event.id"
+                      "selectedPlaybackTargetId": "$event.value"
                     }
                   }
                 ],
                 "title_i18n": {
-                  "key": "runtime.media_center.ui.playback_target"
+                  "key": "runtime.media_center.ui.control_device"
+                }
+              },
+              {
+                "id": "media-now-playing",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Now Playing",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_control.now_playing",
+                  "params": {
+                    "profile_id": "$state.profileId",
+                    "target_id": "$state.selectedPlaybackTargetId"
+                  },
+                  "scope": "workspace",
+                  "invalidationTags": [
+                    "media_control.sessions"
+                  ]
+                },
+                "collection": {
+                  "display": "list",
+                  "virtualized": true,
+                  "cursor": {
+                    "enabled": false,
+                    "stateKey": "mediaCursor"
+                  }
+                },
+                "inputs": {
+                  "titleKey": "title",
+                  "subtitleKey": "target_label",
+                  "badgeKey": "state",
+                  "imageKey": "artwork.url",
+                  "emptyText": "Nothing is playing on this device.",
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.nothing_is_playing_on_this_device"
+                  }
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.now_playing"
                 }
               },
               {
@@ -1516,32 +1602,6 @@
                 }
               },
               {
-                "id": "media-now-playing",
-                "type": "ui.list",
-                "area": "main",
-                "title": "Now Playing",
-                "dataSource": {
-                  "kind": "stream",
-                  "receiver": "media_control.now_playing",
-                  "scope": "workspace",
-                  "invalidationTags": [
-                    "media_control.sessions"
-                  ]
-                },
-                "inputs": {
-                  "titleKey": "active_item_id",
-                  "subtitleKey": "state",
-                  "badgeKey": "position_ms",
-                  "emptyText": "Nothing is playing.",
-                  "emptyText_i18n": {
-                    "key": "runtime.media_center.ui.nothing_is_playing"
-                  }
-                },
-                "title_i18n": {
-                  "key": "runtime.media_center.ui.now_playing"
-                }
-              },
-              {
                 "id": "media-remote-close",
                 "type": "ui.actions",
                 "area": "main",
@@ -1619,6 +1679,14 @@
                       }
                     },
                     {
+                      "id": "metadata",
+                      "label": "Metadata activity",
+                      "icon": "sparkles-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.metadata_activity"
+                      }
+                    },
+                    {
                       "id": "close",
                       "label": "Close",
                       "icon": "close-outline",
@@ -1654,6 +1722,13 @@
                       "media_center.catalog",
                       "media_center.roots"
                     ]
+                  },
+                  {
+                    "on": "click:metadata",
+                    "type": "openModal",
+                    "params": {
+                      "modalId": "media_center_metadata"
+                    }
                   },
                   {
                     "on": "click:close",
@@ -1936,56 +2011,6 @@
                 },
                 "title_i18n": {
                   "key": "runtime.media_center.ui.profiles_and_access"
-                }
-              },
-              {
-                "id": "media-metadata-operations",
-                "type": "ui.list",
-                "area": "main",
-                "title": "Metadata operations",
-                "dataSource": {
-                  "kind": "stream",
-                  "receiver": "media_center.operation_state",
-                  "scope": "workspace"
-                },
-                "inputs": {
-                  "itemKey": "id",
-                  "primaryKey": "kind",
-                  "secondaryKey": "status",
-                  "metaKey": "error_code",
-                  "emptyText": "No background operations.",
-                  "emptyText_i18n": {
-                    "key": "runtime.media_center.ui.no_background_operations"
-                  }
-                },
-                "collection": {
-                  "display": "list",
-                  "focusGroup": "media-metadata-operations",
-                  "virtualized": true,
-                  "cursor": {
-                    "enabled": false,
-                    "stateKey": "mediaCursor"
-                  }
-                },
-                "title_i18n": {
-                  "key": "runtime.media_center.ui.metadata_operations"
-                }
-              },
-              {
-                "id": "media-artwork-operation",
-                "type": "item.details",
-                "area": "main",
-                "title": "Artwork operation",
-                "dataSource": {
-                  "kind": "stream",
-                  "receiver": "media_library_agent.rendition_progress",
-                  "scope": "workspace"
-                },
-                "inputs": {
-                  "presentation": "body"
-                },
-                "title_i18n": {
-                  "key": "runtime.media_center.ui.artwork_operation"
                 }
               },
               {
@@ -2361,6 +2386,108 @@
           },
           "title_i18n": {
             "key": "runtime.media_center.ui.media_center_settings"
+          }
+        },
+        "media_center_metadata": {
+          "title": "Metadata activity",
+          "scope": "workspace",
+          "presentation": {
+            "kind": "modal",
+            "restoreFocus": true
+          },
+          "schema": {
+            "id": "media_center_metadata",
+            "title": "Metadata activity",
+            "layout": {
+              "type": "stack",
+              "areas": [
+                {
+                  "id": "main",
+                  "role": "main"
+                }
+              ]
+            },
+            "widgets": [
+              {
+                "id": "media-metadata-operations",
+                "type": "ui.list",
+                "area": "main",
+                "title": "Background operations",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_center.operation_state",
+                  "scope": "workspace"
+                },
+                "inputs": {
+                  "itemKey": "id",
+                  "primaryKey": "kind",
+                  "secondaryKey": "status",
+                  "metaKey": "error_code",
+                  "emptyText": "No background operations.",
+                  "emptyText_i18n": {
+                    "key": "runtime.media_center.ui.no_background_operations"
+                  }
+                },
+                "collection": {
+                  "display": "list",
+                  "focusGroup": "media-metadata-operations",
+                  "virtualized": true,
+                  "cursor": {
+                    "enabled": false,
+                    "stateKey": "mediaCursor"
+                  }
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.background_operations"
+                }
+              },
+              {
+                "id": "media-artwork-operation",
+                "type": "item.details",
+                "area": "main",
+                "title": "Artwork generation",
+                "dataSource": {
+                  "kind": "stream",
+                  "receiver": "media_library_agent.rendition_progress",
+                  "scope": "workspace"
+                },
+                "inputs": {
+                  "presentation": "body"
+                },
+                "title_i18n": {
+                  "key": "runtime.media_center.ui.artwork_generation"
+                }
+              },
+              {
+                "id": "media-metadata-close",
+                "type": "ui.actions",
+                "area": "main",
+                "inputs": {
+                  "buttons": [
+                    {
+                      "id": "close",
+                      "label": "Close",
+                      "icon": "close-outline",
+                      "label_i18n": {
+                        "key": "runtime.media_center.ui.close"
+                      }
+                    }
+                  ]
+                },
+                "actions": [
+                  {
+                    "on": "click:close",
+                    "type": "closeModal"
+                  }
+                ]
+              }
+            ],
+            "title_i18n": {
+              "key": "runtime.media_center.ui.metadata_activity"
+            }
+          },
+          "title_i18n": {
+            "key": "runtime.media_center.ui.metadata_activity"
           }
         },
         "media_center_delete_root": {

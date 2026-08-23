@@ -135,6 +135,25 @@ def test_media_center_main_surface_is_compact_and_server_paged() -> None:
         "scope": "workspace",
     }
     assert widgets["media-home"]["inputs"]["collectionKey"] == "items"
+    assert widgets["media-home"]["inputs"]["selectEventKey"] == "queue_source_type"
+    home_actions = {
+        action["on"]: action
+        for action in widgets["media-home"]["actions"]
+        if action["type"] == "updateState"
+    }
+    assert home_actions["select:folder"]["params"] == {
+        "mediaNavigation": "folders",
+        "mediaSection": "folders",
+        "mediaFolderParent": "$event.path",
+        "mediaCursor": "",
+        "selectedMediaItemId": None,
+        "selectedMediaFavorite": False,
+    }
+    assert {
+        action["on"]
+        for action in widgets["media-home"]["actions"]
+        if action["type"] == "openModal"
+    } == {"select:item", "select:collection", "select:playlist"}
     assert widgets["media-home"]["inputs"]["loadingStatusKey"] == "state"
     empty_text_by_state = widgets["media-home"]["inputs"]["emptyTextByState"]
     assert {
@@ -236,6 +255,7 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media_center_player": "workspace",
         "media_center_remote": "workspace",
         "media_center_settings": "workspace",
+        "media_center_metadata": "workspace",
         "media_center_delete_root": "workspace",
     }
 
@@ -267,8 +287,6 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-autoplay-settings",
         "media-fullscreen-settings",
         "media-profile-policy",
-        "media-metadata-operations",
-        "media-artwork-operation",
         "media-agent-performance",
         "media-playback-qoe",
         "media-deployment-plan-actions",
@@ -277,9 +295,25 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "media-deployment-agent-actions",
         "media-deployment-status",
     } <= settings_ids
-    artwork_operation = next(
+    assert "media-metadata-operations" not in settings_ids
+    assert "media-artwork-operation" not in settings_ids
+    settings_actions = next(
         widget
         for widget in modals["media_center_settings"]["schema"]["widgets"]
+        if widget["id"] == "media-settings-actions"
+    )
+    assert next(
+        action
+        for action in settings_actions["actions"]
+        if action["on"] == "click:metadata"
+    )["params"]["modalId"] == "media_center_metadata"
+    metadata_widgets = {
+        widget["id"]: widget
+        for widget in modals["media_center_metadata"]["schema"]["widgets"]
+    }
+    artwork_operation = next(
+        widget
+        for widget in modals["media_center_metadata"]["schema"]["widgets"]
         if widget["id"] == "media-artwork-operation"
     )
     assert artwork_operation["dataSource"] == {
@@ -287,14 +321,14 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         "receiver": "media_library_agent.rendition_progress",
         "scope": "workspace",
     }
-    settings_widgets = {
-        widget["id"]: widget
-        for widget in modals["media_center_settings"]["schema"]["widgets"]
-    }
-    assert settings_widgets["media-metadata-operations"]["dataSource"] == {
+    assert metadata_widgets["media-metadata-operations"]["dataSource"] == {
         "kind": "stream",
         "receiver": "media_center.operation_state",
         "scope": "workspace",
+    }
+    settings_widgets = {
+        widget["id"]: widget
+        for widget in modals["media_center_settings"]["schema"]["widgets"]
     }
     for widget_id, setting_key in {
         "media-autoplay-settings": "autoplay",
@@ -332,8 +366,10 @@ def test_media_center_player_and_settings_are_ui_as_data_modals() -> None:
         widget["id"]: widget
         for widget in modals["media_center_remote"]["schema"]["widgets"]
     }
+    assert remote["media-targets"]["type"] == "input.selector"
     assert remote["media-targets"]["dataSource"]["name"] == "media_control_skill.list_targets"
     assert remote["media-now-playing"]["dataSource"]["receiver"] == "media_control.now_playing"
+    assert remote["media-now-playing"]["inputs"]["titleKey"] == "title"
     assert remote["media-remote-transport"]["actions"][1]["target"] == "media_control_skill.voice_command"
 
 
