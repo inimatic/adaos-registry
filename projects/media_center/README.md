@@ -6,7 +6,7 @@ playback control plane as an exact compatibility set. Media Server is a shared
 dependency and remains the owner of core media resource registration and byte
 delivery.
 
-Release `0.6.52` locks the distributed coordinator, node-local agent, persistent
+Release `0.6.53` locks the distributed coordinator, node-local agent, persistent
 control plane, adaptive desktop/TV/controller presentation, federated search,
 exact-source renditions, and bounded operations diagnostics as one immutable
 Project closure. Membership, leases, desired topology, and observed replicas are
@@ -23,6 +23,18 @@ durable repository to the canonical SDK node identity. A one-time migration
 rewrites legacy `local` root, source, and delta identities in place while
 preserving root/source identifiers and external media references; a database
 already bound to another concrete node fails closed.
+
+The `0.6.53` release polishes the colocated single-node product surface.
+Carousel arrows now move bounded rails on pointer and mobile layouts; typed
+Home selection enters folders while playable items open the player. The
+app-shell media element survives modal dismissal in a mini-player with separate
+Stop and Close commands. The compact remote groups target selection, human
+Now Playing data, and transport controls, and is also available as a
+skill-owned desktop surface. Metadata operation streams mount only in their
+dedicated modal. Reference-only Media Server catalog rows are normalized into
+the queue route contract without copying source bytes. This closure ships
+`media_center_skill@0.8.46`, `media_control_skill@0.2.5`, and scenario
+`media_center@0.6.14`.
 
 The `0.6.52` release hardens the large-library browser path. The coordinator
 does not wake its agent worker for ordinary reads and publishes a library
